@@ -1,0 +1,10 @@
+{
+  "_about": "Correct left profile: nose points to the left edge, the visible ear (her LEFT) wears the cuff, the mole is above the visible brow.",
+  "pose": "profile", "nose": "image_left", "confidence": 0.9,
+  "framing": "chest_up", "standing": true,
+  "ears": [{ "image_side": "image_right", "jewelry": true, "jewelry_description": "gold double-band cuff" }],
+  "skin_marks": [{ "image_side": "image_left", "location": "above the brow", "description": "subtle mole" }],
+  "other_jewelry": [],
+  "eye_color": "hazel",
+  "text_or_logos": [], "artifacts": [], "notes": ""
+}

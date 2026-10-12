@@ -1,0 +1,10 @@
+{
+  "_about": "Correct right profile: nose points to the right edge, the visible ear (her RIGHT) is bare.",
+  "pose": "profile", "nose": "image_right", "confidence": 0.9,
+  "framing": "chest_up", "standing": true,
+  "ears": [{ "image_side": "image_left", "jewelry": false, "jewelry_description": "" }],
+  "skin_marks": [],
+  "other_jewelry": [],
+  "eye_color": "hazel brown",
+  "text_or_logos": [], "artifacts": [], "notes": ""
+}

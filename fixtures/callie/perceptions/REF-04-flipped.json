@@ -1,0 +1,10 @@
+{
+  "_about": "A correct REF-04 flipped horizontally: it now reads as a left profile with a bare visible ear.",
+  "pose": "profile", "nose": "image_left", "confidence": 0.9,
+  "framing": "chest_up", "standing": true,
+  "ears": [{ "image_side": "image_right", "jewelry": false, "jewelry_description": "" }],
+  "skin_marks": [],
+  "other_jewelry": [],
+  "eye_color": "hazel brown",
+  "text_or_logos": [], "artifacts": [], "notes": ""
+}

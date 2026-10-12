@@ -1,0 +1,15 @@
+{
+  "source": "SPEC.md Appendix A (provisional until character-callie.md is uploaded)",
+  "name": "Callie",
+  "age": 24,
+  "card": "24, long honey-blonde beachy waves with a deep side part, warm hazel-brown eyes, soft oval face, full light-brown brows, full lips, fit athletic build with defined waist and curvy hips.",
+  "eyes": "warm hazel-brown",
+  "marks": [
+    { "name": "mole", "description": "subtle mole", "side": "LEFT", "region": "brow", "kind": "skin", "subtle": true },
+    { "name": "ear cuff", "description": "gold double-band ear cuff", "side": "LEFT", "region": "ear", "kind": "jewelry", "subtle": false }
+  ],
+  "body": "fit, athletic build, toned legs, defined waist, naturally curvy hips, natural medium bust",
+  "makeup": { "default": "natural", "glam_when": ["nights_out", "events"] },
+  "pronouns": { "subj": "she", "obj": "her", "poss": "her", "noun": "woman" },
+  "sheet_model": "GPT Image 2.5"
+}

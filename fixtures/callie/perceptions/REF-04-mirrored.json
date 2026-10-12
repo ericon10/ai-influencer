@@ -1,0 +1,10 @@
+{
+  "_about": "The negative case: right profile, but the gold cuff is on the visible ear, which is her RIGHT ear. The model mirrored the mark.",
+  "pose": "profile", "nose": "image_right", "confidence": 0.88,
+  "framing": "chest_up", "standing": true,
+  "ears": [{ "image_side": "image_left", "jewelry": true, "jewelry_description": "gold double-band ear cuff on the upper ear" }],
+  "skin_marks": [],
+  "other_jewelry": [],
+  "eye_color": "hazel",
+  "text_or_logos": [], "artifacts": [], "notes": ""
+}
