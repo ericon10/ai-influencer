@@ -43,6 +43,25 @@ requirements, not suggestions.
 - Do not modify the OpenCut fork from this repo. The Studio hands
   OpenCut an export folder of finished, continuous shots only.
 
+## Character Studio layout
+
+| Path | What it does |
+|---|---|
+| `config/*.yaml` | Rules engine, prompt templates, sheet graph, views, routing, price book, budgets |
+| `server/core/` | Pure, unit-tested logic (prompts, rules, sheet DAG, QA side logic, character file) |
+| `server/providers/` | `ProviderAdapter` (SPEC 7.1), mock, Higgsfield API, Anthropic, contract tests |
+| `server/jobs/runner.ts` | Quotes required for every run, holds, submit, webhook/poll, ingest, ledger |
+| `server/media/` | ffmpeg tools including the seam-scored join (SPEC 4.3) |
+| `server/qa/faces.ts` | Face matcher for identity and distinctness QA (YuNet + SFace on onnxruntime-web) |
+| `server/pipeline/` | Stage services, review gates, job hooks, import/export, cost views |
+| `server/api/app.ts` | Hono API at `/api/v1`; auth via `server/auth/provider.ts` |
+| `src/studio/` | Studio UI; styles in `src/studio/studio.css` (`st-` classes, tokens) |
+| `fixtures/callie/` | Acceptance fixtures; Callie is test data only |
+
+Studio dev: `npm run studio` (API + worker on 8787, Vite on 5173). Face
+models for identity QA: `npm run models` (once). Checks: `npm run check`. The Studio UI uses a stylesheet with design tokens rather
+than the legacy inline-style convention.
+
 ## Tech stack
 
 - **React 18** + **Vite 5** + **React Router 6**

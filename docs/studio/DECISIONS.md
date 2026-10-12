@@ -138,10 +138,13 @@ Facts that shaped the design (from the official SDK, MIT licensed):
 
 ### B5. LLM provider (Decided)
 Anthropic Claude, called server side with the account's own key.
-Routing is config: a small model for prompt filling and QA triage, a
-mid model for QA verdicts, a large model only for concepts. LLM calls go
-through the same estimate, ledger and budget path as image and video
-jobs. The character file and rules sit in a cached prompt prefix.
+Routing is config (`config/routing.yaml`). It ships with Claude Opus 5.5
+for every LLM task (breakdown, concepts, card check, QA perception),
+because side-of-face accuracy matters more than the few cents saved;
+any task can be moved to Sonnet 5.5 or Haiku 5.5 by editing one line.
+LLM calls go through the same estimate, ledger and budget path as image
+and video jobs. The character file and rules sit in a cached prompt
+prefix.
 
 ### B6. Face matching for identity QA (Decided)
 InsightFace's pretrained weights are non-commercial, so they are ruled

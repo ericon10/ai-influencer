@@ -1,4 +1,20 @@
-# AI Influencer Studio
+# Character Studio
+
+One place to create consistent AI characters and turn them into finished
+images and video, driven by provider APIs. Start here:
+
+- **Run it:** `npm install`, then `npm run studio`, then open
+  http://localhost:5173 (it opens in free demo mode).
+- **Guide:** [`docs/studio/README.md`](docs/studio/README.md)
+- **Scope:** [`SPEC.md`](SPEC.md) · **Decisions:** [`docs/studio/DECISIONS.md`](docs/studio/DECISIONS.md) · **Plan:** [`docs/studio/PLAN.md`](docs/studio/PLAN.md)
+
+The original AI Influencer tools below still work at their old routes
+(Influencers, Photo Studio, Brand Deals) and are reachable from the
+Studio's "Classic" link.
+
+---
+
+# AI Influencer Studio (classic)
 
 A local-first web app for building, managing, and generating AI influencers.
 React + Vite frontend, Higgsfield for image & video generation, your own
@@ -8,7 +24,7 @@ Higgsfield account, your data lives in your browser.
 
 ## Setup (no tech experience needed)
 
-You only install one thing — **Antigravity**. Everything else lives inside
+You only install one thing: **Antigravity**. Everything else lives inside
 it. Just follow these steps in order.
 
 1. **Download the project.** Go to the
@@ -23,12 +39,12 @@ it. Just follow these steps in order.
 5. **Start it.** Open **Terminal → New Terminal**, type `claude`, press Enter,
    then tell Claude: *"install everything and start the app."*
 6. **Open it.** When Claude says it's running, it will show a web address
-   (something like `http://localhost:5173` — the number may differ on your
+   (something like `http://localhost:5173`; the number may differ on your
    computer). Open that address in Chrome.
 7. **Connect Higgsfield.** In the app: **Settings → Connect Higgsfield** (uses
    your own Higgsfield credits).
 
-That's it. Stuck on anything? Just ask Claude in the terminal — that's what
+That's it. Stuck on anything? Just ask Claude in the terminal; that's what
 it's there for. To change something, tell it: *"change the homepage
 headline,"* *"add a new vibe option,"* etc.
 

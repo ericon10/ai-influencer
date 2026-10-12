@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install ffmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - run: npm ci
+      # Face models for identity QA (OpenCV Zoo, checksum-verified).
+      - uses: actions/cache@v4
+        with:
+          path: .data/models
+          key: face-models-${{ hashFiles('scripts/fetch-models.mjs') }}
+      - run: npm run models
+      # Typecheck, no-em-dash check and every test. Tests use mock providers only.
+      - run: npm run check
+      - name: No em-dashes in commit messages
+        if: github.event_name == 'pull_request'
+        run: npx tsx scripts/check-no-emdash.ts --commits origin/${{ github.base_ref }}..HEAD
+      - run: npx vite build
