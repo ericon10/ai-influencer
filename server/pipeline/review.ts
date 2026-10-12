@@ -1,0 +1,125 @@
+import { and, eq, inArray } from 'drizzle-orm'
+import { candidates, refImages } from '../db/schema'
+import type { Ctx, Deps } from '../context'
+import { invalidationFor } from '../core/sheet'
+import { AppError } from '../lib/errors'
+import { audit } from '../lib/audit'
+import { getAsset } from '../storage/assets'
+import { candidatesFor, getCandidate, getCharacter, getRef, setCharacterFields, sheetState } from './characters'
+import { resolveRoute } from './settings'
+
+// Human gates (SPEC 6): hero pick and sheet approval. Rejected results are
+// archived, never deleted.
+
+// Recomputes a shot's status from its candidates and approval.
+export async function refreshRefStatus(deps: Deps, ctx: Ctx, characterId: string, refId: string): Promise<void> {
+  const ref = await getRef(deps, ctx, characterId, refId)
+  const cands = await candidatesFor(deps, ctx, characterId, { refId })
+  let status: string
+  if (cands.some(c => c.status === 'generating' || c.status === 'qa_pending')) status = 'generating'
+  else if (cands.some(c => c.status === 'in_review')) status = 'in_review'
+  else if (ref.approvedCandidateId && ref.staleSince) status = 'stale'
+  else if (ref.approvedCandidateId) status = 'approved'
+  else status = 'pending'
+  if (status !== ref.status) await deps.db.update(refImages).set({ status, updatedAt: deps.clock.now() }).where(eq(refImages.id, ref.id))
+}
+
+async function markDependentsStale(deps: Deps, ctx: Ctx, characterId: string, refId: string): Promise<string[]> {
+  const state = await sheetState(deps, ctx, characterId)
+  const ids = invalidationFor(state.shots, state.states, refId)
+  const now = deps.clock.now()
+  for (const id of ids) {
+    const r = state.refs.find(x => x.refId === id)!
+    await deps.db.update(refImages).set({ status: 'stale', staleReason: `${refId} changed`, staleSince: now, updatedAt: now }).where(eq(refImages.id, r.id))
+  }
+  return ids
+}
+
+export interface ApproveResult { invalidated: string[]; sheetComplete: boolean }
+
+export async function approveCandidate(deps: Deps, ctx: Ctx, candidateId: string): Promise<ApproveResult> {
+  const cand = await getCandidate(deps, ctx, candidateId)
+  const refId = cand.refId
+  if (!refId || !cand.assetId) throw new AppError('bad_request', 'Only sheet shots are approved here. Use "Pick this hero" for heroes.')
+  if (!['in_review', 'approved', 'superseded', 'qa_failed', 'rejected'].includes(cand.status)) throw new AppError('conflict', 'This result is not ready for review yet.')
+  const ref = await getRef(deps, ctx, cand.characterId, refId)
+  const now = deps.clock.now()
+  const changed = ref.approvedCandidateId !== cand.id
+  await deps.db.transaction(async tx => {
+    await tx.update(candidates).set({ status: 'approved', reviewedBy: ctx.userId, reviewedAt: now, updatedAt: now }).where(eq(candidates.id, cand.id))
+    await tx.update(candidates).set({ status: 'superseded', updatedAt: now })
+      .where(and(eq(candidates.accountId, ctx.accountId), eq(candidates.characterId, cand.characterId), eq(candidates.refId, refId), eq(candidates.status, 'in_review')))
+    await tx.update(refImages).set({ status: 'approved', approvedCandidateId: cand.id, staleReason: '', staleSince: null, updatedAt: now }).where(eq(refImages.id, ref.id))
+  })
+  const invalidated = changed && ref.approvedCandidateId ? await markDependentsStale(deps, ctx, cand.characterId, refId) : []
+  await audit(deps.db, ctx, 'sheet.approved', { type: 'candidate', id: cand.id }, { refId, invalidated })
+  const state = await sheetState(deps, ctx, cand.characterId)
+  if (state.progress.complete) {
+    const ch = await getCharacter(deps, ctx, cand.characterId)
+    if (ch.stage < 5) await setCharacterFields(deps, ctx, ch.id, { stage: 5, status: 'active' })
+  }
+  return { invalidated, sheetComplete: state.progress.complete }
+}
+
+export interface FixSuggestion { reason: string; action: string; label: string; available: boolean }
+
+export async function rejectCandidate(deps: Deps, ctx: Ctx, candidateId: string, reasons: string[], note = ''): Promise<FixSuggestion[]> {
+  const cand = await getCandidate(deps, ctx, candidateId)
+  const known = deps.config.pipeline.review.reasons
+  const unknown = reasons.filter(r => !known.some(k => k.id === r))
+  if (unknown.length) throw new AppError('bad_request', `Unknown reason: ${unknown.join(', ')}.`)
+  const now = deps.clock.now()
+  await deps.db.update(candidates).set({ status: 'rejected', rejectReasons: reasons, rejectNote: note.slice(0, 2000), reviewedBy: ctx.userId, reviewedAt: now, updatedAt: now }).where(eq(candidates.id, cand.id))
+  if (cand.refId) await refreshRefStatus(deps, ctx, cand.characterId, cand.refId)
+  return fixesFor(deps, reasons)
+}
+
+// Each reason chip maps to the fix it triggers (config/review.yaml).
+export function fixesFor(deps: Deps, reasons: string[]): FixSuggestion[] {
+  const { reasons: known, actions } = deps.config.pipeline.review
+  return reasons.map(r => {
+    const reason = known.find(k => k.id === r)!
+    const action = actions[reason.action]!
+    const available = action.phase <= 1
+    const effective = available ? reason.action : action.fallback ?? 'regenerate'
+    return { reason: r, action: effective, label: available ? action.label : `${actions[effective]?.label ?? 'Regenerate'} (the ${action.label.toLowerCase()} arrives in phase ${action.phase})`, available }
+  })
+}
+
+export async function pickHero(deps: Deps, ctx: Ctx, candidateId: string): Promise<{ needsUpscale: boolean; height: number | null }> {
+  const cand = await getCandidate(deps, ctx, candidateId)
+  if (cand.target !== 'hero' || !cand.assetId) throw new AppError('bad_request', 'That is not a hero result.')
+  const ch = await getCharacter(deps, ctx, cand.characterId)
+  const ref = await getRef(deps, ctx, ch.id, 'REF-00')
+  const now = deps.clock.now()
+  const previous = ref.approvedCandidateId
+  await deps.db.transaction(async tx => {
+    await tx.update(candidates).set({ status: 'approved', refId: 'REF-00', reviewedBy: ctx.userId, reviewedAt: now, updatedAt: now }).where(eq(candidates.id, cand.id))
+    // One hero across all three prompts (SPEC 5.1 rule 2).
+    await tx.update(candidates).set({ status: 'superseded', updatedAt: now })
+      .where(and(eq(candidates.accountId, ctx.accountId), eq(candidates.characterId, ch.id), eq(candidates.target, 'hero'), inArray(candidates.status, ['in_review'])))
+    await tx.update(refImages).set({ status: 'approved', approvedCandidateId: cand.id, staleReason: '', staleSince: null, updatedAt: now }).where(eq(refImages.id, ref.id))
+  })
+  if (previous && previous !== cand.id) await markDependentsStale(deps, ctx, ch.id, 'REF-00')
+  if (!ch.sheetLock) {
+    const route = await resolveRoute(deps, ctx, 'sheet')
+    await setCharacterFields(deps, ctx, ch.id, { sheetLock: { model: route.model, quality: deps.config.pipeline.sheet.settings.quality, resolution: deps.config.pipeline.sheet.settings.resolution } })
+  }
+  if (ch.stage < 4) await setCharacterFields(deps, ctx, ch.id, { stage: 4 })
+  await audit(deps.db, ctx, 'hero.picked', { type: 'candidate', id: cand.id })
+  const asset = await getAsset(deps, ctx, cand.assetId)
+  return { needsUpscale: (asset.height ?? 0) < deps.config.pipeline.sheet.settings.upscale_ref00_below_px, height: asset.height }
+}
+
+// After a person checks a stale shot and finds it still right.
+export async function keepStale(deps: Deps, ctx: Ctx, characterId: string, refId: string): Promise<void> {
+  const ref = await getRef(deps, ctx, characterId, refId)
+  if (ref.status !== 'stale' || !ref.approvedCandidateId) throw new AppError('conflict', 'That shot is not waiting for a re-check.')
+  await deps.db.update(refImages).set({ status: 'approved', staleReason: '', staleSince: null, updatedAt: deps.clock.now() }).where(eq(refImages.id, ref.id))
+  await audit(deps.db, ctx, 'sheet.kept_after_recheck', { type: 'ref', id: ref.id }, { refId })
+}
+
+export async function setFavorite(deps: Deps, ctx: Ctx, candidateId: string, favorite: boolean): Promise<void> {
+  const cand = await getCandidate(deps, ctx, candidateId)
+  await deps.db.update(candidates).set({ favorite, updatedAt: deps.clock.now() }).where(eq(candidates.id, cand.id))
+}

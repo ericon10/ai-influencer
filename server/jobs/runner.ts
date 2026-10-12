@@ -24,21 +24,26 @@ import { hookFor, type JobOutcome, type JobRow } from './hooks'
 // a webhook or poll; on completion copy every output into our own storage
 // and settle the ledger (release the hold, record the actual charge).
 //
-// States: queued -> submitting -> running -> ingesting -> completed
+// States: [waiting ->] queued -> submitting -> running -> ingesting -> completed
 //         or failed | canceled | needs_attention
 
-export type JobStatusName = 'queued' | 'submitting' | 'running' | 'ingesting' | 'completed' | 'failed' | 'canceled' | 'needs_attention'
+export type JobStatusName = 'waiting' | 'queued' | 'submitting' | 'running' | 'ingesting' | 'completed' | 'failed' | 'canceled' | 'needs_attention'
 
 export interface LlmJobRequest extends Omit<LlmRequest, 'images'> {
   imageAssetIds?: string[]
   mirrorImages?: boolean
+  // Sizes to price when the images do not exist yet (QA on a pending render).
+  estimateImages?: Array<{ width: number; height: number }>
 }
 
+// parentIndex: this job waits for another job in the same run (for example
+// QA on an image that does not exist yet). It is quoted and held up front,
+// and starts when its parent finishes, so no unquoted spend ever happens.
 export type JobSpec =
-  | { type: 'gen'; stage: string; purpose: string; label: string; request: GenRequest }
-  | { type: 'llm'; stage: string; purpose: string; label: string; request: LlmJobRequest }
+  | { type: 'gen'; stage: string; purpose: string; label: string; request: GenRequest; parentIndex?: number }
+  | { type: 'llm'; stage: string; purpose: string; label: string; request: LlmJobRequest; parentIndex?: number }
 
-const ACTIVE: JobStatusName[] = ['queued', 'submitting', 'running', 'ingesting']
+const ACTIVE: JobStatusName[] = ['waiting', 'queued', 'submitting', 'running', 'ingesting']
 
 // ── Quote and run ────────────────────────────────────────────────
 
@@ -48,7 +53,8 @@ async function llmEstimateRequest(deps: Deps, ctx: Ctx, req: LlmJobRequest): Pro
     const a = await getAsset(deps, ctx, id)
     images.push({ mime: 'image/png', data: Buffer.alloc(0), width: a.width ?? undefined, height: a.height ?? undefined })
   }
-  const { imageAssetIds: _ids, mirrorImages: _m, ...rest } = req
+  for (const size of req.estimateImages ?? []) images.push({ mime: 'image/png', data: Buffer.alloc(0), ...size })
+  const { imageAssetIds: _ids, mirrorImages: _m, estimateImages: _e, ...rest } = req
   return { ...rest, images }
 }
 
@@ -84,12 +90,15 @@ export async function runJobs(deps: Deps, ctx: Ctx, input: { quoteId?: string; c
       const estimate = quotedItems[i]?.amountMicros ?? items[i]!.estimate.totalMicros
       const [provider, model] = spec.request.model.split('/') as [string, string]
       const id = newId('job')
+      const parent = spec.parentIndex != null ? rows[spec.parentIndex] : undefined
+      if (spec.parentIndex != null && !parent) throw new AppError('bad_request', 'A dependent job must come after its parent.')
       const [row] = await tx.insert(jobs).values({
         id, accountId: ctx.accountId, userId: ctx.userId, characterId: input.characterId,
         stage: spec.stage, purpose: spec.purpose, provider, model,
         kind: spec.type === 'gen' ? spec.request.kind : 'llm',
-        request: spec.request, idempotencyKey: `${quote.id}:${i}`, quoteId: quote.id,
-        estimateMicros: estimate, status: 'queued', nextPollAt: deps.clock.now(),
+        request: parent ? { ...spec.request, parentJobId: parent.id } : spec.request,
+        idempotencyKey: `${quote.id}:${i}`, quoteId: quote.id,
+        estimateMicros: estimate, status: parent ? 'waiting' : 'queued', nextPollAt: parent ? null : deps.clock.now(),
       }).returning()
       await appendLedger(tx as unknown as Db, [{
         accountId: ctx.accountId, userId: ctx.userId, characterId: input.characterId, jobId: id, quoteId: quote.id,
@@ -342,7 +351,7 @@ async function runLlm(deps: Deps, job: JobRow): Promise<void> {
   await update(deps, job, { status: 'submitting', attempts, submittedAt: deps.clock.now() })
   try {
     const llm = await deps.providers.llm(job.accountId, req.model)
-    const { imageAssetIds: _ids, mirrorImages: _m, ...rest } = req
+    const { imageAssetIds: _ids, mirrorImages: _m, estimateImages: _e, ...rest } = req
     const full: LlmRequest = { ...rest, images: await loadLlmImages(deps, ctx, req) }
     const result = await llm.run(full)
     const cost = llm.actualCost(full, result.usage)
@@ -392,6 +401,29 @@ async function runHook(deps: Deps, ctx: Ctx, job: JobRow, outcome: JobOutcome): 
   } catch (e) {
     ctx.log.error({ err: e }, 'job hook failed')
     await event(deps.db, job, 'hook_failed', { message: (e as Error).message })
+  }
+}
+
+// ── Dependent jobs ───────────────────────────────────────────────
+
+export async function childJobs(deps: Deps, parentJobId: string): Promise<JobRow[]> {
+  return deps.db.select().from(jobs).where(sql`${jobs.request}->>'parentJobId' = ${parentJobId}`)
+}
+
+// Starts a parent's waiting children, patching their requests (for example
+// with the asset the parent produced).
+export async function activateChildren(deps: Deps, parentJobId: string, patch: (child: JobRow) => Record<string, unknown>): Promise<JobRow[]> {
+  const children = (await childJobs(deps, parentJobId)).filter(c => c.status === 'waiting')
+  for (const c of children) {
+    await deps.db.update(jobs).set({ request: { ...(c.request as object), ...patch(c) }, status: 'queued', nextPollAt: deps.clock.now(), updatedAt: deps.clock.now() }).where(eq(jobs.id, c.id))
+    await event(deps.db, c, 'activated', { parentJobId })
+  }
+  return children
+}
+
+export async function cancelChildren(deps: Deps, parentJobId: string, reason: string): Promise<void> {
+  for (const c of await childJobs(deps, parentJobId)) {
+    if (c.status === 'waiting') await finishWithoutCharge(deps, c, 'canceled', reason)
   }
 }
 
