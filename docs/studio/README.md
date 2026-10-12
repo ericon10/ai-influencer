@@ -23,12 +23,13 @@ only), `npm run worker` (worker only, for hosted setups).
    from the Higgsfield Console, pay-per-use; not your web login) and your
    Anthropic API key. Keys are encrypted per account; a free call checks
    each one.
-2. Confirm the Higgsfield model endpoints in `config/models.yaml` (set
-   `endpoint` and `verified: true`) and their prices in
-   `config/pricebook.yaml`. Until then the adapter refuses to send anything
-   to an unverified model. Kling 3.0, Kling 3.0 Turbo and Seedance 2.5
-   carry candidate endpoints from third-party copies of the Higgsfield
-   catalog; check each against the Higgsfield docs before flipping it.
+2. Settings, Higgsfield models: for each model you need, enter its path
+   from Higgsfield's official Model API Reference (never a third-party copy
+   of the catalog), then press Test. The test is the cheapest request the
+   model takes, its price shows first, and a passing result marks the model
+   confirmed for your account. Until then the adapter refuses to send it
+   anything. USD prices come from open.higgsfield.ai/pricing; a "from"
+   price stays unconfirmed until a test shows the tier your requests use.
 3. Reference images need no setup: the Studio uploads them to Higgsfield's
    own storage (`/files/generate-upload-url`, the same flow as the official
    SDK) and reuses each upload for six hours. Cloud storage (R2) is only
@@ -61,7 +62,11 @@ marks every shot built on it for re-check.
 | Identity | Face embeddings (YuNet + SFace, run in process) vs REF-00 and the closest-angle ref | Match under `identity_min_similarity` |
 | Distinctness | Face embeddings, hero vs every inspiration face | Match at or over `distinctness_max_similarity` |
 
-Thresholds live in `config/review.yaml`. Face matching skips profiles and
+Thresholds live in `config/review.yaml`. When the marks come back on the
+wrong side and flipping the image would fix every one of them (with no
+text in frame), the Studio offers "Mirror it (free)": no new generation,
+and the face cannot drift. A mirrored REF-04 imported as a negative test
+lands under "To check" on the Sheet tab, where QA runs on request. Face matching skips profiles and
 backs (set per view in `config/views.yaml`) and demo images, and says so in
 the report. Without the models it reports "skipped" and a person checks the
 face. The models (OpenCV Zoo, MIT and Apache-2.0, fine for commercial use)

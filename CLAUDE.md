@@ -40,6 +40,12 @@ requirements, not suggestions.
   `user_id` where a person acted). No single-user shortcuts.
 - **Rules, prompt templates and model routing are data**, not code.
   Callie is a test fixture (`fixtures/callie/`), not app logic.
+- **Higgsfield endpoints only from the official Model API Reference**,
+  never from third-party catalog copies; a model is confirmed only after
+  one small paid test (Settings, Higgsfield models). USD prices from
+  open.higgsfield.ai/pricing.
+- **Never crossfade a seam.** Cut, grade, or mark the seam failed. Prefer
+  one take with start and end frames (SPEC 4.3).
 - Do not modify the OpenCut fork from this repo. The Studio hands
   OpenCut an export folder of finished, continuous shots only.
 

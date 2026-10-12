@@ -48,7 +48,10 @@ Guardrails that apply to every item:
       submit error, submit timeout, no output, crash mid-submit) producing
       real image and video files
 - [x] Higgsfield API adapter (key id + secret, submit, status, result,
-      cancel, webhook token), endpoints in config, verified on connect
+      cancel, webhook token, own upload for reference images)
+- [x] Per-account model confirmation: path from the official Model API
+      Reference, then one small quoted paid test per model
+- [ ] Confirm each model once the owner's key is in (waiting on the key)
 - [x] Anthropic adapter for text and vision with token-based estimates
 - [x] Provider contract test suite (runs against the mock in CI)
 
@@ -78,12 +81,14 @@ Guardrails that apply to every item:
 - [x] Strip audio
 - [x] Normalize: resolution, constant frame rate, pixel format, color range
 - [x] Trim (including drop-first-frame for chained clips)
-- [x] Join with seam scoring (SPEC 4.3): drop first frame, SSIM score,
-      color-match then 2 to 4 frame crossfade, re-score, fail the seam
-      and refuse export if still bad
+- [x] Join with seam scoring (SPEC 4.3, revised 2026-10-12): drop the
+      duplicated first frame, SSIM score, cut when clean, cut on camera
+      motion when the jump reads as a normal frame step, else color-match
+      and re-score; never crossfade; a seam that still fails is marked
+      failed and nothing is exported
 - [x] Mix audio layers with gains onto a video
-- [x] Tests on synthetic clips (mixed sizes, with and without audio, hard
-      color jumps)
+- [x] Tests on synthetic clips (mixed sizes, with and without audio,
+      exposure drift, hard color jumps, a fast pan, dropped frames)
 
 ---
 
@@ -131,6 +136,8 @@ Guardrails that apply to every item:
 - [x] Deterministic side logic maps image sides to subject sides by view
 - [x] Optional mirror-consistency pass (flip and re-ask) to catch model confusion
 - [x] Checks: mark side, mark presence, extra jewelry, framing, eye color
+- [x] Free mirror fix when flipping puts every mark on its own side and
+      there is no text in frame (Callie's file)
 - [x] Identity: FaceMatcher interface, YuNet + SFace implementation
       (onnxruntime-web in process; `npm run models`; skipped on profiles,
       backs and demo images)
@@ -166,7 +173,8 @@ Guardrails that apply to every item:
       tested; waiting on the images)
 - [x] Regenerate any sheet shot from REF-00 (mock in tests; live only after a quote)
 - [x] QA flags the mirrored REF-04 (ear cuff on the wrong ear), tested
-      with recorded perception answers
+      with recorded perception answers; a mirrored copy imported from the
+      Sheet tab waits under "To check" and QA offers the free mirror fix
 - [ ] Same check on her real images with a live vision call (needs a key
       and an approved quote)
 
@@ -176,5 +184,5 @@ Guardrails that apply to every item:
 - [x] Remove the creator's affiliate code, feedback form, guide doc and
       demo personas and images (approved 2026-10-12)
 - [x] Untrack `.claude/settings.local.json` and ignore it
-- [ ] "Made by Dan Kieft" credit on the classic landing page and in
-      README.md (waiting for the owner's OK)
+- [x] "Made by Dan Kieft" badge removed from the product UI; README keeps
+      a short thank-you (approved 2026-10-12)

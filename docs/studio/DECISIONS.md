@@ -74,8 +74,8 @@ ZIP however they want. Recommended housekeeping before selling:
      `public/seeds.json`. Browsers that already had them drop them once
      on the next visit; nothing a user created is touched.
    - `.claude/settings.local.json` untracked and ignored.
-   Still open (not yet approved): the "Made by Dan Kieft" credit on the
-   classic landing page and in README.md.
+   Later the same day the owner approved removing the "Made by Dan
+   Kieft" badge from the product UI; README.md keeps a short thank-you.
 
 These do not block the Studio build. They are tracked in PLAN.md.
 
@@ -248,3 +248,28 @@ References:
 [Leonardo split view](https://mobbin.com/screens/47b549a4-9c26-488e-a885-b275effe1e3f),
 [Grok two-up pick](https://mobbin.com/screens/69969610-8f18-4e5b-9e8f-c2d2e6ccca58),
 [Plenty of Fish action bar](https://mobbin.com/screens/fbbbf1e3-56f3-4f56-a8f5-ad411d771a1b).
+
+## D. Owner rulings, 2026-10-12
+
+### D1. Seams are never crossfaded
+A blend ghosts when the subject moved (Callie's video rules). The joiner
+cuts clean seams, cuts on camera motion when the jump reads as an ordinary
+frame step, otherwise grades the incoming clip and re-scores, and marks a
+seam that still fails as failed. The preferred path is no seam at all: one
+take with a start frame and an end frame. SPEC 4.3 and rule 33 updated.
+
+### D2. Higgsfield endpoints only from the official reference
+Third-party copies of the Higgsfield catalog are not trusted. A model's
+REST path comes from Higgsfield's official Model API Reference, and a model
+counts as confirmed only after one small paid test passes (per account, in
+Settings). USD prices come from open.higgsfield.ai/pricing. Seedance keeps
+both paths: start and end frames directly on REST, mode omni_reference on
+the web app and MCP connector.
+
+### D3. Saved identities
+A character can carry several: Callie has a trained Soul character (with a
+SOUL IDENTITY block that goes into every Soul prompt and a drift-lock pass
+after every Soul still) and an instant Higgsfield Element. A Soul request
+carries the soul_id as `custom_reference_id` (official SDK). The drift-lock
+pass runs when scene stills arrive in Phase 2; today it is recorded with
+the identity and shown on the Character file tab.
