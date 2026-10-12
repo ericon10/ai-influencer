@@ -109,6 +109,9 @@ export const characters = pgTable('characters', {
   sheetLock: jsonb('sheet_lock'),
   breakdown: jsonb('breakdown'),
   notes: text('notes').notNull().default(''),
+  // Sections of the character file the Studio does not model (scene rules,
+  // recipes, combo log), kept word for word so the file round-trips.
+  fileSections: jsonb('file_sections').notNull().default([]),
   revision: integer('revision').notNull().default(1),
   createdBy: text('created_by'),
   createdAt: createdAt(),

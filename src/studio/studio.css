@@ -508,3 +508,12 @@ button.st-chip:hover { color: var(--st-text); border-color: var(--st-text-3); }
 
 .st-only-phone { display: none; }
 @media (max-width: 860px) { .st-only-phone { display: inline-flex; } }
+
+/* Collapsible kept sections (File tab). */
+.st-details { border: 1px solid var(--st-line); border-radius: 12px; background: var(--st-surface-2, transparent); }
+.st-details > summary { cursor: pointer; padding: 10px 14px; font-weight: 600; font-size: 13.5px; list-style: none; display: flex; align-items: center; gap: 8px; }
+.st-details > summary::-webkit-details-marker { display: none; }
+.st-details > summary::before { content: ''; width: 6px; height: 6px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: rotate(-45deg); transition: transform 0.15s ease; opacity: 0.7; }
+.st-details[open] > summary::before { transform: rotate(45deg); }
+.st-details > .st-prompt { margin: 0 10px 10px; }
+.st-notes { margin: 0; padding: 12px 14px 12px 30px; border-radius: 12px; background: var(--st-surface-2); border: 1px solid var(--st-line); color: var(--st-text-2); font-size: 13px; display: grid; gap: 6px; }

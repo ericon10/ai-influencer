@@ -22,6 +22,20 @@ export const pronounsSchema = z.object({
 export type Pronouns = z.infer<typeof pronounsSchema>
 export type CharacterMark = z.infer<typeof markSchema>
 
+// A saved identity on a provider, for example a Higgsfield Element (instant,
+// no training, referenced from prompts) or a trained model.
+export interface CharacterIdentity {
+  provider: string
+  kind: 'element' | 'trained'
+  name: string
+  externalId: string
+  status: 'ready' | 'queued' | 'failed'
+  notes?: string
+}
+
+// A section of the character file kept as written.
+export interface FileSection { title: string; body: string }
+
 export interface CharacterData {
   name: string
   age: number | null
@@ -30,13 +44,15 @@ export interface CharacterData {
   marks: CharacterMark[]
   body: string
   style: { palette?: string[]; pieces?: string[]; accessories?: string[]; hair_options?: string[]; notes?: string }
-  makeup: { default: string; glam_when: string[] }
+  makeup: { default: string; glam_when: string[]; glam?: string }
   persona: { vibe?: string; settings?: string[]; never?: string[] }
   pronouns: Pronouns
   avoidModels: string[]
   preferredModels: Record<string, string>
   disclosure: string
   notes: string
+  identity: CharacterIdentity | null
+  sections: FileSection[]
 }
 
 export const MIN_AGE = 18

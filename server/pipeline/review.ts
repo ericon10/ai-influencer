@@ -6,7 +6,7 @@ import { AppError } from '../lib/errors'
 import { audit } from '../lib/audit'
 import { getAsset } from '../storage/assets'
 import { candidatesFor, getCandidate, getCharacter, getRef, setCharacterFields, sheetState } from './characters'
-import { resolveRoute } from './settings'
+import { liveRoute } from './settings'
 
 // Human gates (SPEC 6): hero pick and sheet approval. Rejected results are
 // archived, never deleted.
@@ -24,7 +24,7 @@ export async function refreshRefStatus(deps: Deps, ctx: Ctx, characterId: string
   if (status !== ref.status) await deps.db.update(refImages).set({ status, updatedAt: deps.clock.now() }).where(eq(refImages.id, ref.id))
 }
 
-async function markDependentsStale(deps: Deps, ctx: Ctx, characterId: string, refId: string): Promise<string[]> {
+export async function markDependentsStale(deps: Deps, ctx: Ctx, characterId: string, refId: string): Promise<string[]> {
   const state = await sheetState(deps, ctx, characterId)
   const ids = invalidationFor(state.shots, state.states, refId)
   const now = deps.clock.now()
@@ -105,7 +105,8 @@ export async function pickHero(deps: Deps, ctx: Ctx, candidateId: string): Promi
   })
   if (previous && previous !== cand.id) await markDependentsStale(deps, ctx, ch.id, 'REF-00')
   if (!ch.sheetLock) {
-    const route = await resolveRoute(deps, ctx, 'sheet')
+    // Lock the real model, not demo mode's mock (SPEC 5.1 rule 7).
+    const route = await liveRoute(deps, ctx, 'sheet')
     await setCharacterFields(deps, ctx, ch.id, { sheetLock: { model: route.model, quality: deps.config.pipeline.sheet.settings.quality, resolution: deps.config.pipeline.sheet.settings.resolution } })
   }
   if (ch.stage < 4) await setCharacterFields(deps, ctx, ch.id, { stage: 4 })

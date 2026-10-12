@@ -30,13 +30,25 @@ export async function setSetting(deps: Deps, ctx: Ctx, key: string, value: unkno
 export type ProviderMode = 'demo' | 'live'
 export const providerMode = (db: Db, accountId: string) => getSetting<ProviderMode>(db, accountId, 'provider_mode', 'demo')
 
-export async function resolveRoute(deps: Deps, ctx: Ctx, task: string): Promise<Route> {
+// The route as configured for this account (config plus overrides), before
+// demo mode swaps in mock providers. Locks such as the sheet model record
+// this real model, so a sheet started in demo mode keeps its real model
+// when the account goes live.
+export async function liveRoute(deps: Deps, ctx: Ctx, task: string): Promise<Route> {
   const base = deps.config.routing.tasks[task]
   if (!base) throw new AppError('bad_request', `No route for task "${task}".`)
   const overrides = await getSetting<Record<string, Partial<Route>>>(deps.db, ctx.accountId, 'routing_overrides', {})
-  const route = { ...base, ...(overrides[task] ?? {}) }
+  return { ...base, ...(overrides[task] ?? {}) }
+}
+
+// What actually runs: the real route when live, its free mock in demo mode.
+export async function forMode(deps: Deps, ctx: Ctx, route: Route): Promise<Route> {
   if ((await providerMode(deps.db, ctx.accountId)) === 'live') return route
   const isLlm = deps.config.models.llm_models.some(m => m.ref === route.model)
   const isVideo = route.kind === 'video' || route.kind === 'video_extend'
   return { ...route, model: isLlm ? deps.config.routing.mock.llm : isVideo ? deps.config.routing.mock.video : deps.config.routing.mock.image }
+}
+
+export async function resolveRoute(deps: Deps, ctx: Ctx, task: string): Promise<Route> {
+  return forMode(deps, ctx, await liveRoute(deps, ctx, task))
 }

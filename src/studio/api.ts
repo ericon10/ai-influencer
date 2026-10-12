@@ -50,7 +50,14 @@ export const api = {
 
   importCharacter: (form: FormData) => request<{ characterId: string; importedShots: string[]; warnings: string[] }>('POST', '/characters/import', form),
   exportUrl: (id: string) => `/api/v1/characters/${id}/export`,
-  applyFile: (id: string, file: File) => { const f = new FormData(); f.append('file', file); return request<{ warnings: string[]; view: CharacterView }>('POST', `/characters/${id}/import-file`, f) },
+  applyFile: (id: string, files: File[]) => {
+    const f = new FormData()
+    for (const file of files) {
+      if (file.name.toLowerCase().endsWith('.md')) f.append('file', file)
+      else if (file.type.startsWith('image/') && /REF-\d{2}/i.test(file.name) && !/mirror/i.test(file.name)) f.append('images', file)
+    }
+    return request<{ warnings: string[]; importedShots: string[]; view: CharacterView }>('POST', `/characters/${id}/import-file`, f)
+  },
 
   estimate: (action: StudioAction) => request<{ quote: QuoteView; preview: ActionPreview }>('POST', '/actions/estimate', { action }),
   run: (action: StudioAction, quoteId: string, confirmed: boolean) => request<{ jobIds: string[] }>('POST', '/actions/run', { action, quoteId, confirmed }),

@@ -9,6 +9,10 @@ export interface CharacterData {
   pronouns: { subj: string; obj: string; poss: string; noun: string }
   disclosure: string; notes: string
   style: Record<string, unknown>; persona: Record<string, unknown>
+  makeup: { default: string; glam_when: string[]; glam?: string }
+  preferredModels: Record<string, string>; avoidModels: string[]
+  identity: { provider: string; kind: 'element' | 'trained'; name: string; externalId: string; status: string; notes?: string } | null
+  sections: Array<{ title: string; body: string; wrapped?: string }>
 }
 
 export interface QaFinding { code: string; severity: 'fail' | 'warn' | 'info'; message: string; mark?: string }
@@ -46,6 +50,7 @@ export interface CharacterView {
   costs: Costs
   reasons: Array<{ id: string; label: string }>
   variationDefault: number
+  modelLabels: Record<string, string>
 }
 
 export interface CharacterSummary { id: string; name: string; stage: number; status: string; card: string; portraitAssetId: string | null; progress: { approved: number; total: number }; spent: string; updatedAt: string }
@@ -78,7 +83,7 @@ export interface SettingsView {
   budgets: { job: number; character: number; month: number; confirmAbove: number; warnPct: number }
   routing: Array<{ task: string; configured: string; effective: string }>
   models: Array<{ ref: string; label: string; kinds: string[]; verified: boolean; notes: string }>
-  prices: Array<{ model: string; unit: string; price: string; verified: boolean; source: string }>
+  prices: Array<{ model: string; unit: string; price: string; verified: boolean; source: string; when: string; credits: number | null }>
   priceVersion: string
 }
 

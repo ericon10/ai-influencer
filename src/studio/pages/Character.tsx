@@ -38,7 +38,7 @@ export default function Character() {
           <div className="st-kicker">Character · revision {v.revision}</div>
           <h1 className="st-h1">{v.data.name}</h1>
         </div>
-        <Stepper steps={STAGES} current={Math.min(5, v.stage)} />
+        <Stepper steps={STAGES} current={Math.min(5, v.stage)} done={[v.stage > 1, v.stage > 2, !!v.sheet.shots[0]?.approved, v.sheet.progress.complete, false]} />
       </div>
 
       <div className="st-character">
@@ -51,7 +51,7 @@ export default function Character() {
           </div>
           {current === 'start' && <StartTab v={v} onEditCard={() => setEditing(true)} goHero={() => setTab('hero')} />}
           {current === 'hero' && <HeroTab v={v} onEditCard={() => setEditing(true)} goSheet={() => setTab('sheet')} />}
-          {current === 'sheet' && <SheetTab v={v} goHero={() => setTab('hero')} />}
+          {current === 'sheet' && <SheetTab v={v} goHero={() => setTab('hero')} goFile={() => setTab('file')} />}
           {current === 'file' && <FileTab v={v} />}
         </div>
       </div>

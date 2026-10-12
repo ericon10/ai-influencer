@@ -15,7 +15,7 @@ import { getAsset } from '../storage/assets'
 import { quoteJobs, runJobs, type JobSpec } from '../jobs/runner'
 import type { QuoteView } from '../costs/quotes'
 import type { GenRequest } from '../providers/types'
-import { resolveRoute } from './settings'
+import { forMode, liveRoute, resolveRoute } from './settings'
 import { approvedAssets, getCandidate, getCharacter, getRef, inspirationAssetIds, setCharacterFields, sheetState, toData } from './characters'
 
 // Every paid step is an action. The same builder produces the job specs for
@@ -198,9 +198,10 @@ export async function buildAction(deps: Deps, ctx: Ctx, action: StudioAction): P
       const attach = action.refsMode === 'ref00_only' ? ['REF-00'] : shot.attach
       const missing = attach.filter(id => !approved.has(id) || state.states.find(s => s.refId === id)?.status !== 'approved')
       if (missing.length) throw new AppError('bad_request', `Approve ${missing.join(' and ')} first.`)
-      const route = await resolveRoute(deps, ctx, 'sheet')
-      const lock = row.sheetLock as { model: string } | null
-      const model = lock?.model ?? route.model
+      // The lock holds the real model; demo mode runs its mock instead.
+      const lockedModel = await sheetModel(deps, ctx, row.sheetLock as { model: string } | null)
+      const route = await forMode(deps, ctx, { ...await liveRoute(deps, ctx, 'sheet'), model: lockedModel })
+      const model = route.model
       const reasonAction = action.reason ? deps.config.pipeline.review.reasons.find(r => r.id === action.reason)?.action : undefined
       const addendum = reasonAction ? deps.config.pipeline.review.actions[reasonAction]?.prompt_addendum ?? '' : ''
       const prompt = buildSheetPrompt(tpl, views, shot, ch, addendum)
@@ -212,8 +213,8 @@ export async function buildAction(deps: Deps, ctx: Ctx, action: StudioAction): P
           aspect: sheet.settings.aspect[shot.framing], quality: sheet.settings.quality, resolution: sheet.settings.resolution, seed: v + 1,
         }
         warnings = lintOrThrow(lintPrompt(rules, prompt, {
-          stage: 'sheet', framing: shot.framing, kind: 'image_edit', request, marks: ch.marks,
-          sheetLock: lock ?? { model }, aspectByFraming: sheet.settings.aspect,
+          stage: 'sheet', framing: shot.framing, kind: 'image_edit', request: { ...request, model: lockedModel }, marks: ch.marks,
+          sheetLock: { model: lockedModel }, aspectByFraming: sheet.settings.aspect,
         }), shot.label)
         const genIndex = specs.length
         specs.push({ type: 'gen', stage: 'sheet', purpose: `sheet:${shot.id}`, label: `${shot.label}${action.variations > 1 ? `, variation ${v + 1}` : ''}`, request })
@@ -258,8 +259,7 @@ async function afterStart(deps: Deps, ctx: Ctx, action: StudioAction, built: Bui
   }
   if (action.type === 'sheet') {
     const row = await getCharacter(deps, ctx, action.characterId)
-    const genModel = built.specs.find(s => s.type === 'gen')!.request.model
-    if (!row.sheetLock) await setCharacterFields(deps, ctx, row.id, { sheetLock: { model: genModel, quality: deps.config.pipeline.sheet.settings.quality, resolution: deps.config.pipeline.sheet.settings.resolution } })
+    if (!row.sheetLock) await setCharacterFields(deps, ctx, row.id, { sheetLock: { model: await sheetModel(deps, ctx, null), quality: deps.config.pipeline.sheet.settings.quality, resolution: deps.config.pipeline.sheet.settings.resolution } })
     const ref = await getRef(deps, ctx, row.id, action.refId)
     // Regenerating a shot revokes its approval (the old version stays in
     // history and can be restored) and marks everything built on it stale.
@@ -269,4 +269,11 @@ async function afterStart(deps: Deps, ctx: Ctx, action: StudioAction, built: Bui
       await deps.db.update(refImages).set({ status: 'stale', staleReason: `${action.refId} was regenerated`, staleSince: now, updatedAt: now }).where(eq(refImages.id, r.id))
     }
   }
+}
+
+// The real model a character's sheet is locked to (SPEC 5.1 rule 7). A lock
+// written by an older demo-mode build names the mock; treat it as unset.
+export async function sheetModel(deps: Deps, ctx: Ctx, lock: { model: string } | null): Promise<string> {
+  if (lock?.model && !lock.model.startsWith('mock/')) return lock.model
+  return (await liveRoute(deps, ctx, 'sheet')).model
 }

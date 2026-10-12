@@ -15,7 +15,7 @@ import { actionSchema, estimateAction, runAction } from '../pipeline/actions'
 import { createCharacter, getCharacter, linkInspiration, listCharacters, setCharacterFields, updateCharacter } from '../pipeline/characters'
 import { chooseConcept } from '../pipeline/concepts'
 import { approveCandidate, keepStale, pickHero, rejectCandidate, reopenCandidate, setFavorite } from '../pipeline/review'
-import { exportCharacter, importCharacter } from '../pipeline/files'
+import { attachSheetImages, exportCharacter, importCharacter } from '../pipeline/files'
 import { accountUsage } from '../pipeline/costs'
 import { providerMode, setSetting } from '../pipeline/settings'
 import { listCredentials, markVerified, revokeCredential, saveCredential } from '../providers/credentials'
@@ -43,6 +43,20 @@ async function json(c: Context): Promise<unknown> {
 
 function requireRole(ctx: Ctx, role: Parameters<typeof hasRole>[1]): void {
   if (!hasRole(ctx, role)) throw new AppError('forbidden', 'You do not have permission to do that.')
+}
+
+// Uploaded files named REF-00 to REF-11 become approved sheet images.
+// Mirrored copies (negative QA fixtures) are skipped.
+async function sheetImagesFrom(value: unknown): Promise<Record<string, { data: Buffer; mime: string }>> {
+  const images: Record<string, { data: Buffer; mime: string }> = {}
+  for (const f of ([] as unknown[]).concat(value ?? [])) {
+    if (!(f instanceof File)) continue
+    if (f.size > MAX_UPLOAD) throw new AppError('bad_request', `${f.name} is larger than 25 MB.`)
+    const ref = f.name.toUpperCase().match(/REF-(\d{2})(?!.*MIRROR)/)
+    if (!ref) continue
+    images[`REF-${ref[1]}`] = { data: Buffer.from(await f.arrayBuffer()), mime: f.type }
+  }
+  return images
 }
 
 export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
@@ -204,14 +218,26 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
   })
 
   // Apply edits made in an exported character file back to the character.
+  // Edits to the character file, approved sheet images (REF-00 to REF-11),
+  // or both, applied to an existing character.
   app.post('/characters/:id/import-file', async c => {
     const ctx = c.get('ctx')
     requireRole(ctx, 'member')
-    const body = await c.req.parseBody()
-    const md = body.file
-    if (!(md instanceof File)) throw new AppError('bad_request', 'Attach the character file (.md).')
-    const result = await importCharacter(deps, ctx, await md.text(), { characterId: c.req.param('id') })
-    return c.json({ warnings: result.result.warnings, view: await characterView(deps, ctx, c.req.param('id')) })
+    const id = c.req.param('id')
+    const body = await c.req.parseBody({ all: true })
+    const md = ([] as unknown[]).concat(body.file ?? [])[0]
+    const images = await sheetImagesFrom(body.images)
+    if (!(md instanceof File) && !Object.keys(images).length) throw new AppError('bad_request', 'Attach the character file (.md) or sheet images named REF-00 to REF-11.')
+    let warnings: string[] = []
+    let importedShots: string[]
+    if (md instanceof File) {
+      const r = await importCharacter(deps, ctx, await md.text(), { characterId: id, images })
+      warnings = r.result.warnings
+      importedShots = r.importedShots
+    } else {
+      importedShots = await attachSheetImages(deps, ctx, id, images)
+    }
+    return c.json({ warnings, importedShots, view: await characterView(deps, ctx, id) })
   })
 
   app.post('/characters/import', async c => {
@@ -220,15 +246,7 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
     const body = await c.req.parseBody({ all: true })
     const md = body.file
     if (!(md instanceof File)) throw new AppError('bad_request', 'Attach the character file (.md).')
-    const images: Record<string, { data: Buffer; mime: string }> = {}
-    const files = ([] as unknown[]).concat(body.images ?? [])
-    for (const f of files) {
-      if (!(f instanceof File)) continue
-      if (f.size > MAX_UPLOAD) throw new AppError('bad_request', `${f.name} is larger than 25 MB.`)
-      const ref = f.name.toUpperCase().match(/REF-(\d{2})(?!.*MIRROR)/)
-      if (!ref) continue
-      images[`REF-${ref[1]}`] = { data: Buffer.from(await f.arrayBuffer()), mime: f.type }
-    }
+    const images = await sheetImagesFrom(body.images)
     const result = await importCharacter(deps, ctx, await md.text(), { images })
     return c.json({ characterId: result.characterId, importedShots: result.importedShots, warnings: result.result.warnings }, 201)
   })

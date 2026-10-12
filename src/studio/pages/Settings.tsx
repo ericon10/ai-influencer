@@ -143,10 +143,11 @@ function ModelsCard({ d }: { d: SettingsView }) {
         </table>
         <div className="st-divider" style={{ margin: 0 }} />
         <table className="st-table">
-          <thead><tr><th>Model</th><th>Unit</th><th>Price</th><th>Status</th></tr></thead>
+          <thead><tr><th>Model</th><th>Unit</th><th>Price</th><th title="As charged in the Higgsfield web app, for reference">Credits</th><th>Status</th></tr></thead>
           <tbody>{d.prices.map(p => (
-            <tr key={p.model + p.unit}>
-              <td className="st-mono strong">{p.model}</td><td>{p.unit.replace('mtok_', 'million tokens, ').replace('_', ' ')}</td><td>{p.price}</td>
+            <tr key={p.model + p.unit + p.when} title={p.source || undefined}>
+              <td className="st-mono strong">{p.model}</td><td>{p.unit.replace('mtok_', 'million tokens, ').replace('_', ' ')}{p.when ? `, ${p.when}` : ''}</td><td>{p.price}</td>
+              <td className="st-mono">{p.credits ?? ''}</td>
               <td><span className={`st-badge ${p.verified ? 'ok' : 'warn'}`}>{p.verified ? 'Confirmed' : 'Unconfirmed'}</span></td>
             </tr>
           ))}</tbody>

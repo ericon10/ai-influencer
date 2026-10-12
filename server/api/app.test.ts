@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { beforeAll, afterAll, describe, expect, it } from 'vitest'
 import { eq } from 'drizzle-orm'
 import { createHarness, drain, type Harness } from '../testing/harness'
@@ -100,6 +102,40 @@ describe('Studio API', () => {
     expect(own.headers.get('content-type')).toBe('image/webp')
     const other = await app.request(`/api/v1/assets/${assetId}/content`, { headers: { cookie: cookieB } })
     expect(other.status).toBe(404)
+  })
+
+  it("imports Callie's file, then adds her sheet images to the same character", async () => {
+    const md = readFileSync(join(process.cwd(), 'fixtures/callie/character-callie.md'))
+    const form = new FormData()
+    form.append('file', new Blob([md], { type: 'text/markdown' }), 'character-callie.md')
+    const created = await call('POST', '/characters/import', { cookie: cookieA, form })
+    expect(created.status).toBe(201)
+    expect(created.json.importedShots).toEqual([])
+    expect(created.json.warnings.join(' ')).toMatch(/Element "Callie-1"/)
+    const id = created.json.characterId
+
+    const png = async (label: string) => new Blob([new Uint8Array(await renderPlaceholderPortrait(label))], { type: 'image/png' })
+    const imgs = new FormData()
+    imgs.append('images', await png('ref00'), 'REF-00.png')
+    imgs.append('images', await png('ref01'), 'REF-01.png')
+    imgs.append('images', await png('ref04 mirrored'), 'REF-04-mirrored.png')
+    const added = await call('POST', `/characters/${id}/import-file`, { cookie: cookieA, form: imgs })
+    expect(added.status).toBe(200)
+    // The mirrored copy is a QA fixture, never a sheet shot.
+    expect(added.json.importedShots).toEqual(['REF-00', 'REF-01'])
+    expect(added.json.view.data.identity.name).toBe('Callie-1')
+
+    // A new REF-00 replaces the old one and sends REF-01 back for a re-check.
+    const again = new FormData()
+    again.append('images', await png('ref00 v2'), 'REF-00.png')
+    const replaced = await call('POST', `/characters/${id}/import-file`, { cookie: cookieA, form: again })
+    const shots = replaced.json.view.sheet.shots as Array<{ id: string; status: string }>
+    expect(shots.find(s => s.id === 'REF-00')!.status).toBe('approved')
+    expect(shots.find(s => s.id === 'REF-01')!.status).toBe('stale')
+
+    // Another account cannot touch her.
+    const foreign = await call('POST', `/characters/${id}/import-file`, { cookie: cookieB, form: again })
+    expect(foreign.status).toBe(404)
   })
 
   it('stores provider keys encrypted and only ever returns the last 4', async () => {

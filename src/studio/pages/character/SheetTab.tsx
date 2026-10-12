@@ -9,7 +9,7 @@ import type { Candidate, CharacterView, Shot } from '../../types'
 
 // Stage 4: the reference sheet as one "next up" card at a time, with the
 // right refs already attached (SPEC 11: no REF math).
-export function SheetTab({ v, goHero }: { v: CharacterView; goHero: () => void }) {
+export function SheetTab({ v, goHero, goFile }: { v: CharacterView; goHero: () => void; goFile: () => void }) {
   const [open, setOpen] = useState<string | null>(null)
   const shots = v.sheet.shots
   const ref00 = shots[0]!
@@ -17,7 +17,18 @@ export function SheetTab({ v, goHero }: { v: CharacterView; goHero: () => void }
   const nextShot = v.sheet.next ? shots.find(s => s.id === v.sheet.next!.refId)! : null
 
   if (!ref00.approved) {
-    return <div className="st-empty"><h2 className="st-h1">Pick a hero <em>first</em></h2><p className="st-sub" style={{ margin: 0 }}>The sheet is built from REF-00, the hero you pick.</p><button className="st-btn primary" onClick={goHero}>Go to hero<ArrowRight size={15} /></button></div>
+    // An imported character usually has its sheet already; offer both paths.
+    const imported = v.stage >= 5
+    return (
+      <div className="st-empty">
+        <h2 className="st-h1">{imported ? <>Bring in the <em>sheet</em></> : <>Pick a hero <em>first</em></>}</h2>
+        <p className="st-sub" style={{ margin: 0 }}>{imported ? `Add ${v.name}'s approved images named REF-00 to REF-11, or pick a new hero to build the sheet here.` : 'The sheet is built from REF-00, the hero you pick.'}</p>
+        <div className="st-row" style={{ justifyContent: 'center' }}>
+          {imported && <button className="st-btn primary" onClick={goFile}>Import sheet images<ArrowRight size={15} /></button>}
+          <button className={`st-btn ${imported ? '' : 'primary'}`} onClick={goHero}>Go to hero<ArrowRight size={15} /></button>
+        </div>
+      </div>
+    )
   }
 
   return (

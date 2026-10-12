@@ -71,6 +71,7 @@ function ImportDialog({ open, onClose }: { open: boolean; onClose: () => void })
   const [images, setImages] = useState<File[]>([])
   const [busy, setBusy] = useState(false)
   const [over, setOver] = useState(false)
+  const [done, setDone] = useState<{ characterId: string; importedShots: string[]; warnings: string[] } | null>(null)
 
   function take(files: FileList | File[]) {
     for (const f of Array.from(files)) {
@@ -89,14 +90,27 @@ function ImportDialog({ open, onClose }: { open: boolean; onClose: () => void })
       for (const m of mapped) if (m.ref && !m.mirrored) form.append('images', m.f)
       const r = await api.importCharacter(form)
       refresh()
-      toast({ tone: 'ok', text: `Imported with ${r.importedShots.length} sheet shots.${r.warnings.length ? ` ${r.warnings[0]}` : ''}` })
-      onClose(); setFile(null); setImages([])
-      nav(`/studio/c/${r.characterId}`)
+      // Show what was read before opening the character.
+      setDone(r); setFile(null); setImages([])
     } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) } finally { setBusy(false) }
+  }
+  function close() { setDone(null); onClose() }
+  function open_() { if (done) nav(`/studio/c/${done.characterId}`); close() }
+
+  if (done) {
+    return (
+      <Modal open={open} onClose={close}>
+        <div className="st-card-body st-col" style={{ gap: 16 }}>
+          <div><div className="st-kicker">Imported</div><div className="st-h2">Here is what the Studio read</div><p className="st-sub">{done.importedShots.length ? `${done.importedShots.length} approved sheet shot${done.importedShots.length === 1 ? '' : 's'}: ${done.importedShots.join(', ')}.` : 'No sheet images yet. Add them any time from the Sheet tab.'}</p></div>
+          {done.warnings.length > 0 && <ul className="st-notes">{done.warnings.map((w, i) => <li key={i}>{w}</li>)}</ul>}
+          <div className="st-row"><span className="st-spacer" /><button className="st-btn primary" onClick={open_}>Open character</button></div>
+        </div>
+      </Modal>
+    )
   }
 
   return (
-    <Modal open={open} onClose={onClose}>
+    <Modal open={open} onClose={close}>
       <div className="st-card-body st-col" style={{ gap: 16 }}>
         <div><div className="st-kicker">Import</div><div className="st-h2">Bring in a character you already built</div><p className="st-sub">Drop the character file (.md) and any approved sheet images named REF-00 to REF-11.</p></div>
         <label className={`st-drop ${over ? 'over' : ''}`} onDragOver={e => { e.preventDefault(); setOver(true) }} onDragLeave={() => setOver(false)} onDrop={e => { e.preventDefault(); setOver(false); take(e.dataTransfer.files) }}>

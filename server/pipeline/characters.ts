@@ -1,7 +1,7 @@
 import { and, asc, desc, eq, inArray, isNull } from 'drizzle-orm'
 import { assets, candidates, characterInspirations, characterRevisions, characters, concepts, refImages } from '../db/schema'
 import type { Ctx, Deps } from '../context'
-import type { CharacterData, CharacterMark, Pronouns } from '../core/character'
+import type { CharacterData, CharacterIdentity, CharacterMark, FileSection, Pronouns } from '../core/character'
 import { validateCharacter } from '../core/character'
 import { nextUp, sheetProgress, type ShotState } from '../core/sheet'
 import { slugify } from '../core/text'
@@ -31,6 +31,8 @@ export function toData(row: CharacterRow): CharacterData {
     preferredModels: (row.preferredModels ?? {}) as Record<string, string>,
     disclosure: row.disclosure,
     notes: row.notes,
+    identity: (row.identityModel ?? null) as CharacterIdentity | null,
+    sections: (row.fileSections ?? []) as FileSection[],
   }
 }
 
@@ -48,6 +50,8 @@ function fromData(d: Partial<CharacterData>): Partial<typeof characters.$inferIn
   if (d.preferredModels !== undefined) out.preferredModels = d.preferredModels
   if (d.disclosure !== undefined) out.disclosure = d.disclosure
   if (d.notes !== undefined) out.notes = d.notes
+  if (d.identity !== undefined) out.identityModel = d.identity
+  if (d.sections !== undefined) out.fileSections = d.sections
   return out
 }
 

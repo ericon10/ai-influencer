@@ -1,5 +1,6 @@
 import type { Ctx, Deps } from '../context'
 import { validateCharacter } from '../core/character'
+import { hardWrap } from '../core/text'
 import { listCredentials } from '../providers/credentials'
 import { effectiveBudgets } from '../costs/budgets'
 import { formatUsd, microsToUsd } from '../costs/money'
@@ -54,7 +55,9 @@ export async function characterView(deps: Deps, ctx: Ctx, id: string) {
     .orderBy(desc(jobs.completedAt)).limit(1)
   return {
     id: row.id, name: row.name, slug: row.slug, stage: row.stage, status: row.status, revision: row.revision,
-    data, breakdown: row.breakdown, issues: validateCharacter(data),
+    // Kept sections are shown hard-wrapped, like prompts.
+    data: { ...data, sections: data.sections.map(sec => ({ ...sec, wrapped: hardWrap(sec.body, 80) })) },
+    breakdown: row.breakdown, issues: validateCharacter(data),
     sheetLock: row.sheetLock,
     ref00: ref00 ? { assetId: ref00.id, width: ref00.width, height: ref00.height, needsUpscale: (ref00.height ?? 0) < deps.config.pipeline.sheet.settings.upscale_ref00_below_px } : null,
     cardSuggestion: cardJob ? { jobId: cardJob.id, at: cardJob.completedAt?.toISOString() ?? null, ...((cardJob.resultMeta as { data?: object } | null)?.data ?? {}) } : null,
@@ -65,6 +68,7 @@ export async function characterView(deps: Deps, ctx: Ctx, id: string) {
     costs: await characterCosts(deps, ctx, id),
     reasons: deps.config.pipeline.review.reasons.map(r => ({ id: r.id, label: r.label })),
     variationDefault: await defaultVariations(deps, ctx),
+    modelLabels: Object.fromEntries(deps.config.models.models.map(m => [m.ref, m.label])),
   }
 }
 
@@ -92,7 +96,10 @@ export async function settingsView(deps: Deps, ctx: Ctx) {
     },
     routing: await Promise.all(tasks.map(async t => ({ task: t, configured: deps.config.routing.tasks[t]!.model, effective: (await resolveRoute(deps, ctx, t)).model }))),
     models: deps.config.models.models.filter(m => !m.ref.startsWith('mock/')).map(m => ({ ref: m.ref, label: m.label, kinds: m.kinds, verified: m.verified && !!m.endpoint, notes: m.notes ?? '' })),
-    prices: deps.config.pricebook.entries.filter(e => e.provider !== 'mock').map(e => ({ model: `${e.provider}/${e.model}`, unit: e.unit, price: formatUsd(Math.round(e.price * 1_000_000)), verified: e.verified, source: e.source ?? '' })),
+    prices: deps.config.pricebook.entries.filter(e => e.provider !== 'mock').map(e => ({
+      model: `${e.provider}/${e.model}`, unit: e.unit, price: formatUsd(Math.round(e.price * 1_000_000)), verified: e.verified, source: e.source ?? '',
+      when: e.when ? Object.values(e.when).join(', ') : '', credits: e.credits ?? null,
+    })),
     priceVersion: deps.config.pricebook.version,
   }
 }

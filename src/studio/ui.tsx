@@ -59,15 +59,18 @@ export function Meter({ value, max, label, sub }: { value: number; max: number; 
   )
 }
 
-export function Stepper({ steps, current }: { steps: string[]; current: number }) {
+// `done` overrides the default "every step before the current one is done",
+// for example an imported character whose sheet is not in yet.
+export function Stepper({ steps, current, done }: { steps: string[]; current: number; done?: boolean[] }) {
   return (
     <div className="st-steps" aria-label="Progress">
       {steps.map((s, i) => {
         const n = i + 1
-        const state = n < current ? 'done' : n === current ? 'current' : ''
+        const isDone = done ? !!done[i] && n !== current : n < current
+        const state = isDone ? 'done' : n === current ? 'current' : ''
         return (
           <span key={s} className={`st-step ${state}`} aria-current={state === 'current' ? 'step' : undefined}>
-            <span className="dot">{n < current ? <Check size={12} strokeWidth={3} /> : n}</span>{s}
+            <span className="dot">{isDone ? <Check size={12} strokeWidth={3} /> : n}</span>{s}
           </span>
         )
       })}

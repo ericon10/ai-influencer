@@ -13,6 +13,8 @@ import { saveAsset } from '../storage/assets'
 import { renderPlaceholderPortrait } from '../providers/mock'
 import { parseObservation } from '../core/qa/perception'
 import type { LlmRequest } from '../providers/types'
+import { eq } from 'drizzle-orm'
+import { jobs as jobsTable } from '../db/schema'
 
 // The whole of Phase 1 in demo mode (mock providers, no spend), including
 // the acceptance scenario: a REF-04 that comes back with the ear cuff on the
@@ -87,7 +89,9 @@ describe('character creation, stages 1 to 5 (demo mode)', () => {
     expect(pick.needsUpscale).toBe(false)
     const ch = await getCharacter(h.deps, h.ctx, characterId)
     expect(ch.stage).toBe(4)
-    expect((ch.sheetLock as { model: string }).model).toBe('mock/image')
+    // The lock names the real sheet model, so going live keeps the sheet on
+    // it; demo mode substitutes the mock only at run time.
+    expect((ch.sheetLock as { model: string }).model).toBe('higgsfield/gpt-image-2.5')
     expect(await candidatesFor(h.deps, h.ctx, characterId, { target: 'hero', statuses: ['in_review'] })).toHaveLength(0)
   })
 
@@ -180,6 +184,32 @@ describe('character creation, stages 1 to 5 (demo mode)', () => {
     const state = await sheetState(h.deps, h.ctx, imported.characterId)
     expect(state.progress.approved).toBe(3)
     expect(toData(await getCharacter(h.deps, h.ctx, imported.characterId)).marks).toEqual(toData(await getCharacter(h.deps, h.ctx, characterId)).marks)
+  })
+
+  it("acceptance: loads Callie from her real file and regenerates a sheet shot from REF-00", async () => {
+    const md = readFileSync(join(FIX, 'character-callie.md'), 'utf8')
+    const images: Record<string, { data: Buffer }> = {}
+    for (const id of ['REF-00', 'REF-01', 'REF-02']) images[id] = { data: await renderPlaceholderPortrait(`Callie ${id}`) }
+    const imported = await importCharacter(h.deps, h.ctx, md, { images })
+    const row = await getCharacter(h.deps, h.ctx, imported.characterId)
+    const data = toData(row)
+    expect(data.name).toBe('Callie')
+    expect(data.identity).toMatchObject({ kind: 'element', name: 'Callie-1', externalId: '1602db94-79e3-4e5a-bbe5-de3537cd0b83' })
+    expect(data.sections.map(s => s.title)).toContain('Video rules')
+    // Her sheet stays on the model it was built with, even in demo mode.
+    expect((row.sheetLock as { model: string }).model).toBe('higgsfield/gpt-image-2.5')
+
+    const { quote, preview } = await run({ type: 'sheet', characterId: row.id, refId: 'REF-01', variations: 1, refsMode: 'ref00_only', withQa: true })
+    // Demo mode runs the mock in place of the locked model; nothing is spent on a provider.
+    expect(quote.items.map(i => i.model)).toEqual(['mock/image', 'mock/llm', 'mock/llm'])
+    expect(preview.prompts[0]!.text).toMatch(/gold double-band ear cuff/)
+    expect(preview.prompts[0]!.text).toMatch(/LEFT ear/)
+    const [cand] = await candidatesFor(h.deps, h.ctx, row.id, { refId: 'REF-01', statuses: ['in_review'] })
+    expect(cand).toBeDefined()
+    expect(cand!.qaVerdict).toBe('post')
+    const job = (await h.deps.db.select().from(jobsTable).where(eq(jobsTable.id, cand!.jobId!)))[0]!
+    const ref00 = (await candidatesFor(h.deps, h.ctx, row.id, { refId: 'REF-00', statuses: ['approved'] }))[0]!
+    expect((job.request as { refs: Array<{ assetId: string }> }).refs).toEqual([{ assetId: ref00.assetId }])
   })
 
   it('reports cost per approved asset', async () => {

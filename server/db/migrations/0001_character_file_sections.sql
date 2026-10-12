@@ -1,0 +1,1 @@
+ALTER TABLE "characters" ADD COLUMN "file_sections" jsonb DEFAULT '[]'::jsonb NOT NULL;
