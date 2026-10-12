@@ -9,6 +9,18 @@ import { createRegistry, type RegistryOptions } from '../providers/registry'
 import { createAccount } from '../auth/accounts'
 import { readAsset } from '../storage/assets'
 import type { Ctx, Deps } from '../context'
+import type { LlmProvider, ProviderAdapter } from '../providers/types'
+
+// Real providers are unreachable from tests: any call fails loudly, except
+// the free key check, which answers locally.
+const offline = (id: string): ProviderAdapter & LlmProvider => {
+  const refuse = async (): Promise<never> => { throw new Error(`Tests never call the real ${id} API.`) }
+  return {
+    id, listModels: refuse, estimate: refuse, submit: refuse, status: refuse, result: refuse, run: refuse,
+    actualCost: () => { throw new Error(`Tests never call the real ${id} API.`) },
+    verifyCredentials: async () => ({ ok: true, message: 'offline test double' }),
+  }
+}
 
 // Everything a test needs: in-memory Postgres, memory storage, a clock the
 // test controls, mock providers only, and one seeded account.
@@ -43,7 +55,10 @@ export async function createHarness(opts: Partial<Pick<RegistryOptions, 'mockSce
     mockScenario: opts.mockScenario,
     mockPollsUntilDone: opts.mockPollsUntilDone ?? 1,
     mockLlmResponders: opts.mockLlmResponders,
-    overrides: opts.overrides,
+    overrides: {
+      gen: { higgsfield: offline('higgsfield'), ...(opts.overrides?.gen ?? {}) },
+      llm: { anthropic: offline('anthropic'), ...(opts.overrides?.llm ?? {}) },
+    },
   })
   const deps: Deps = { db: handle.db, store, vault, env, config, providers: registry, clock, log: logger }
   depsRef.current = deps

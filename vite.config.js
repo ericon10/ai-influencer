@@ -104,6 +104,11 @@ export default defineConfig({
   plugins: [react(), searchPlugin, imgProxyPlugin, claudePlugin],
   server: {
     proxy: {
+      // Character Studio API (npm run dev:api). Keep before /api/hf.
+      '/api/v1': {
+        target: `http://127.0.0.1:${process.env.STUDIO_API_PORT || 8787}`,
+        changeOrigin: false,
+      },
       '/api/hf': {
         target: 'https://mcp.higgsfield.ai',
         changeOrigin: true,

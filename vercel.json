@@ -1,7 +1,16 @@
 {
   "rewrites": [
-    { "source": "/api/hf/(.*)", "destination": "/api/hfproxy?__hfpath=$1" },
-    { "source": "/((?!api/).*)", "destination": "/index.html" }
+    {
+      "source": "/api/v1/(.*)",
+      "destination": "/api/studio?__path=$1"
+    },
+    {
+      "source": "/api/hf/(.*)",
+      "destination": "/api/hfproxy?__hfpath=$1"
+    },
+    {
+      "source": "/((?!api/).*)",
+      "destination": "/index.html"
+    }
   ]
 }
-
