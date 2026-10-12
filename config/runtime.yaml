@@ -15,7 +15,8 @@ downloads:
   allowed_hosts:
     higgsfield: [higgsfield.ai, cloudfront.net]
 media:
-  seam: { max_diff: 0.18, crossfade_frames: 3, color_match: true }
+  # Seams are cut, never crossfaded (SPEC 4.3).
+  seam: { max_diff: 0.18, motion_max_diff: 0.35, motion_ratio: 1.5, motion_threshold: 0.10, color_match: true }
   last_frame: { step_back_sec: 0.5, blur_ratio: 0.6 }
 llm:
   image_max_edge: 1568

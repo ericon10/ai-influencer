@@ -196,25 +196,32 @@ sound bed + mix -> rough cut -> OpenCut
 Chained clips are joined and verified inside the Studio. OpenCut
 only receives finished, continuous shots.
 
-1. **Chaining is the default; extend is optional.** Last-frame
+1. **No seam is the goal.** A shot that fits in one generation is
+   one take, with a start frame and an end frame when it has to land
+   somewhere specific (for example the look into the lens). Chaining
+   is for shots longer than one take allows; extend is used only
+   where a provider offers it at an affordable tier. Last-frame
    chaining works on any model at any resolution, so seams can be
-   tested on cheap 480p drafts. Extend is used only where a
-   provider offers it at an affordable tier.
+   tested on cheap 480p drafts.
 2. **Normalize before joining.** Re-encode every clip to the same
    resolution, constant frame rate, pixel format, and color range
    (AI clips arrive in mixed sizes, e.g. 480x854 and 716x1280).
-3. **Auto-join:**
+3. **Auto-join. Never crossfade:** a blend ghosts when the subject
+   moved.
    - Drop the first frame of the incoming clip (it duplicates the
      handoff frame).
    - Score the join (SSIM or frame difference between the last
      frame of clip A and the first kept frame of clip B).
-   - Above threshold: color-match clip B to clip A, then apply a
-     2 to 4 frame crossfade, then re-score.
+   - At or below threshold: cut.
+   - Camera moving across the seam: cut when the jump looks like an
+     ordinary frame step of that motion. The motion carries it.
+   - Otherwise color-match clip B to clip A (a grade, not a blend)
+     and re-score; cut if it now passes.
    - Still above threshold: mark the seam failed. Never export a
-     failed seam.
+     failed seam, and never blend it away.
 4. **Cutaway fallback.** Offer a 1-second cutaway (string lights,
    a glass on the table, the crowd) generated from the same scene
-   to cover a seam that will not blend.
+   to cover a seam that fails.
 5. **Export shots, not beats.** A multi-beat moment ("listens,
    then looks into the lens") exports as one continuous file.
    Edit points in OpenCut are only real cuts between shots.
@@ -344,8 +351,9 @@ is a lesson from the Callie run.
     - Next clip uses the same model, resolution and fps.
     - Trim the first frame of the next clip (it duplicates the
       handoff frame).
-    - Run one continuous audio track across the cut; add a 2 to 4
-      frame crossfade only if a color or brightness jump shows.
+    - Run one continuous audio track across the cut. Never
+      crossfade the picture: color-match the incoming clip, or
+      fail the seam (SPEC 4.3).
 34. **Strip any audio track** from generated clips before
     assembly, even when audio was "off."
 35. **Cheap draft first, premium last.** Test motion on Wan or

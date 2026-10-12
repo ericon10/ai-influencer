@@ -5,20 +5,32 @@ import { colorStats, extractFirstFrame, frameDifference } from './frames'
 import { clipFrames, encodeArgs, trimClip } from './edit'
 
 export interface JoinOptions {
-  // Largest allowed difference across a seam (1 - SSIM). Above it, the seam
-  // is blended; if still above after blending, the seam fails.
+  // Largest difference across a seam (1 - SSIM) that still cuts cleanly.
   maxSeamDiff?: number
-  crossfadeFrames?: number
+  // A camera moving across the seam carries a larger jump, as long as the
+  // jump looks like an ordinary frame step: at most motionRatio times the
+  // motion around it, and never above motionMaxSeamDiff.
+  motionMaxSeamDiff?: number
+  motionRatio?: number
+  // Average frame-to-frame difference near the seam that counts as camera
+  // motion.
+  motionThreshold?: number
+  // Grade the incoming clip toward the outgoing one before failing a seam.
+  // A grade, never a blend.
   colorMatch?: boolean
   dropFirstFrame?: boolean
 }
 
+export type SeamReason = 'clean' | 'camera_motion' | 'color_matched' | 'no_match'
+
 export interface SeamReport {
   index: number
   diffBefore: number
-  action: 'cut' | 'blend'
+  // Average frame-to-frame difference across the frames around the seam.
+  motion: number
+  action: 'cut' | 'failed'
+  reason: SeamReason
   colorMatched: boolean
-  crossfadeFrames: number
   diffAfter: number
   passed: boolean
 }
@@ -39,15 +51,6 @@ async function concatPair(a: string, b: string, out: string, fps: number): Promi
   await ffmpeg(['-i', a, '-i', b, '-filter_complex', '[0:v][1:v]concat=n=2:v=1:a=0[v]', '-map', '[v]', ...encodeArgs(fps), out])
 }
 
-async function crossfadePair(a: string, b: string, out: string, fps: number, frames: number): Promise<number> {
-  const { durationSec } = await clipFrames(a)
-  const d = frames / fps
-  const offset = Math.max(0, durationSec - d)
-  const fc = `[0:v]settb=AVTB,fps=${fps}[a];[1:v]settb=AVTB,fps=${fps}[b];[a][b]xfade=transition=fade:duration=${d.toFixed(4)}:offset=${offset.toFixed(4)},format=yuv420p[v]`
-  await ffmpeg(['-i', a, '-i', b, '-filter_complex', fc, '-map', '[v]', ...encodeArgs(fps), out])
-  return offset
-}
-
 // Shifts clip B's per-channel mean and contrast to match the reference frame
 // (the last frame of clip A). Deterministic, no model involved.
 export async function colorMatchClip(input: string, referenceFrame: string, inputFirstFrame: string, out: string, fps: number): Promise<void> {
@@ -61,27 +64,30 @@ export async function colorMatchClip(input: string, referenceFrame: string, inpu
   await ffmpeg(['-i', input, '-an', '-vf', vf, ...encodeArgs(fps), out])
 }
 
-// Largest frame-to-frame difference in a window of the joined clip: the
-// re-score after blending.
-async function maxStepDifference(video: string, startSec: number, frames: number, fps: number, dir: string, tag: string): Promise<number> {
+// Average frame-to-frame difference over a few frames: how much the picture
+// is moving (camera motion shows up as large differences everywhere).
+async function meanStepDifference(video: string, startSec: number, frames: number, dir: string, tag: string): Promise<number> {
   const pattern = join(dir, `${tag}_%04d.png`)
   await ffmpeg(['-ss', Math.max(0, startSec).toFixed(4), '-i', video, '-frames:v', String(frames), '-fps_mode', 'passthrough', pattern])
-  let worst = 0
+  const diffs: number[] = []
   for (let i = 1; i < frames; i++) {
     const a = join(dir, `${tag}_${String(i).padStart(4, '0')}.png`)
     const b = join(dir, `${tag}_${String(i + 1).padStart(4, '0')}.png`)
-    try { worst = Math.max(worst, await frameDifference(a, b)) } catch { break }
+    try { diffs.push(await frameDifference(a, b)) } catch { break }
   }
-  return worst
+  return diffs.length ? diffs.reduce((x, y) => x + y, 0) / diffs.length : 0
 }
 
-// Joins normalized clips (SPEC 4.3 step 3): drop the duplicated first frame of
-// each incoming clip, score the seam, blend if needed, re-score, and refuse to
-// produce output when a seam still fails.
+// Joins normalized clips (SPEC 4.3 step 3). Never crossfades: a blend ghosts
+// when the subject moved. For each seam: drop the duplicated first frame of
+// the incoming clip, then cut if the seam is clean, or if the camera is moving
+// across it (the motion carries the jump), or if grading the incoming clip
+// toward the outgoing one makes it clean. Otherwise the seam fails and there
+// is no output. The better path is no seam at all: one take with a start and
+// an end frame.
 export async function joinClips(clips: string[], out: string, workDir: string, opts: JoinOptions = {}): Promise<JoinResult> {
-  const { maxSeamDiff = 0.18, crossfadeFrames = 3, colorMatch = true, dropFirstFrame = true } = opts
+  const { maxSeamDiff = 0.18, motionMaxSeamDiff = 0.35, motionRatio = 1.5, motionThreshold = 0.10, colorMatch = true, dropFirstFrame = true } = opts
   if (clips.length === 0) throw new MediaError('Nothing to join.')
-  if (crossfadeFrames < 2 || crossfadeFrames > 4) throw new MediaError('Crossfade must be 2 to 4 frames.')
 
   const probes = await Promise.all(clips.map(c => probeFile(c)))
   const p0 = probes[0]!
@@ -91,6 +97,7 @@ export async function joinClips(clips: string[], out: string, workDir: string, o
     }
   }
   const fps = p0.fps ?? 30
+  const window = 4
   const seams: SeamReport[] = []
   let current = clips[0]!
 
@@ -106,27 +113,33 @@ export async function joinClips(clips: string[], out: string, workDir: string, o
     await lastFrameExact(current, lastA)
     await extractFirstFrame(incoming, firstB)
     const diffBefore = await frameDifference(lastA, firstB)
+    const { durationSec: durA } = await clipFrames(current)
+    const motion = Math.min(
+      await meanStepDifference(current, durA - window / fps, window, workDir, `motion_${i}_a`),
+      await meanStepDifference(incoming, 0, window, workDir, `motion_${i}_b`),
+    )
     const next = join(workDir, `joined_${i}.mp4`)
-
-    if (diffBefore <= maxSeamDiff) {
-      await concatPair(current, incoming, next, fps)
-      seams.push({ index: i, diffBefore, action: 'cut', colorMatched: false, crossfadeFrames: 0, diffAfter: diffBefore, passed: true })
+    const cut = async (source: string, reason: SeamReason, colorMatched: boolean, diffAfter: number) => {
+      await concatPair(current, source, next, fps)
+      seams.push({ index: i, diffBefore, motion, action: 'cut', reason, colorMatched, diffAfter, passed: true })
       current = next
-      continue
     }
 
-    let blendSource = incoming
+    if (diffBefore <= maxSeamDiff) { await cut(incoming, 'clean', false, diffBefore); continue }
+    const motionLimit = Math.min(motionMaxSeamDiff, Math.max(maxSeamDiff, motion * motionRatio))
+    if (motion >= motionThreshold && diffBefore <= motionLimit) { await cut(incoming, 'camera_motion', false, diffBefore); continue }
     if (colorMatch) {
       const matched = join(workDir, `in_${i}_matched.mp4`)
+      const matchedFirst = join(workDir, `seam_${i}_b_matched.png`)
       await colorMatchClip(incoming, lastA, firstB, matched, fps)
-      blendSource = matched
+      await extractFirstFrame(matched, matchedFirst)
+      const diffAfter = await frameDifference(lastA, matchedFirst)
+      if (diffAfter <= maxSeamDiff) { await cut(matched, 'color_matched', true, diffAfter); continue }
+      seams.push({ index: i, diffBefore, motion, action: 'failed', reason: 'no_match', colorMatched: true, diffAfter, passed: false })
+    } else {
+      seams.push({ index: i, diffBefore, motion, action: 'failed', reason: 'no_match', colorMatched: false, diffAfter: diffBefore, passed: false })
     }
-    const offset = await crossfadePair(current, blendSource, next, fps, crossfadeFrames)
-    const diffAfter = await maxStepDifference(next, offset - 1 / fps, crossfadeFrames + 3, fps, workDir, `rescore_${i}`)
-    const passed = diffAfter <= maxSeamDiff
-    seams.push({ index: i, diffBefore, action: 'blend', colorMatched: colorMatch, crossfadeFrames, diffAfter, passed })
-    if (!passed) return { passed: false, outputPath: null, seams }
-    current = next
+    return { passed: false, outputPath: null, seams }
   }
 
   await copyFile(current, out)

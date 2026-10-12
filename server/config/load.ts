@@ -104,7 +104,7 @@ const runtimeSchema = z.object({
     allowed_hosts: z.record(z.string(), z.array(z.string())),
   }),
   media: z.object({
-    seam: z.object({ max_diff: z.number().positive(), crossfade_frames: z.number().int().min(2).max(4), color_match: z.boolean() }),
+    seam: z.object({ max_diff: z.number().positive(), motion_max_diff: z.number().positive(), motion_ratio: z.number().min(1), motion_threshold: z.number().positive(), color_match: z.boolean() }),
     last_frame: z.object({ step_back_sec: z.number().positive(), blur_ratio: z.number().positive() }),
   }),
   llm: z.object({ image_max_edge: z.number().int().positive(), image_max_tokens: z.number().int().positive() }),

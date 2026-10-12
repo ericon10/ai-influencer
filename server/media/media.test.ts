@@ -69,28 +69,51 @@ describe('join with seam scoring', () => {
   it('cuts cleanly when the seam matches, dropping the duplicated frame', async () => {
     const r = await joinClips([p('A.mp4'), p('B.mp4')], p('AB.mp4'), await mkdtemp(join(dir, 'j1-')))
     expect(r.passed).toBe(true)
-    expect(r.seams[0]).toMatchObject({ action: 'cut', passed: true })
+    expect(r.seams[0]).toMatchObject({ action: 'cut', reason: 'clean', passed: true })
     const a = await clipFrames(p('A.mp4')), b = await clipFrames(p('B.mp4')), ab = await clipFrames(p('AB.mp4'))
     expect(ab.frames).toBe(a.frames + b.frames - 1)
   })
 
-  it('color-matches and crossfades a brightness jump, then passes', async () => {
-    await ffmpeg(['-i', p('B.mp4'), '-vf', 'eq=brightness=0.18:contrast=0.85', ...encodeArgs(FPS), p('B_bright.mp4')])
-    const r = await joinClips([p('A.mp4'), p('B_bright.mp4')], p('AB_bright.mp4'), await mkdtemp(join(dir, 'j2-')))
-    expect(r.seams[0]!.action).toBe('blend')
-    expect(r.seams[0]!.colorMatched).toBe(true)
+  it('color-matches a small exposure drift and cuts, never crossfading', async () => {
+    await ffmpeg(['-i', p('B.mp4'), '-vf', 'eq=brightness=0.07:contrast=0.95', ...encodeArgs(FPS), p('B_drift.mp4')])
+    const r = await joinClips([p('A.mp4'), p('B_drift.mp4')], p('AB_drift.mp4'), await mkdtemp(join(dir, 'j2-')))
+    expect(r.seams[0]).toMatchObject({ action: 'cut', reason: 'color_matched', colorMatched: true, passed: true })
     expect(r.seams[0]!.diffAfter).toBeLessThan(r.seams[0]!.diffBefore)
-    expect(r.passed).toBe(true)
-    expect(r.outputPath).toBe(p('AB_bright.mp4'))
+    // A cut keeps every frame of both clips; a crossfade would overlap them.
+    const a = await clipFrames(p('A.mp4')), b = await clipFrames(p('B_drift.mp4')), ab = await clipFrames(p('AB_drift.mp4'))
+    expect(ab.frames).toBe(a.frames + b.frames - 1)
+  })
+
+  it('fails a seam the grade cannot fix instead of blending it', async () => {
+    await ffmpeg(['-i', p('B.mp4'), '-vf', 'eq=brightness=0.18:contrast=0.85', ...encodeArgs(FPS), p('B_bright.mp4')])
+    const r = await joinClips([p('A.mp4'), p('B_bright.mp4')], p('AB_bright.mp4'), await mkdtemp(join(dir, 'j3-')))
+    expect(r.passed).toBe(false)
+    expect(r.outputPath).toBeNull()
+    expect(r.seams[0]).toMatchObject({ action: 'failed', reason: 'no_match', colorMatched: true })
+  })
+
+  it('cuts on camera motion, where the seam looks like any other frame step', async () => {
+    // A fast pan: every frame differs a lot, so the seam does too.
+    await makeClip(p('pan.mp4'), { width: W, height: H, fps: FPS, durationSec: 4, vf: "scale=1440:640,crop=360:640:x='t*360':y=0" })
+    await trimClip(p('pan.mp4'), p('PA.mp4'), { endSec: 2 })
+    await trimClip(p('pan.mp4'), p('PB.mp4'), { dropFirstFrames: 47 })
+    const r = await joinClips([p('PA.mp4'), p('PB.mp4')], p('PAB.mp4'), await mkdtemp(join(dir, 'j4-')))
+    expect(r.seams[0]!.diffBefore).toBeGreaterThan(0.18)
+    expect(r.seams[0]).toMatchObject({ action: 'cut', reason: 'camera_motion', passed: true })
+    // Five frames missing at the seam is a jump the motion does not explain.
+    await trimClip(p('pan.mp4'), p('PBskip.mp4'), { dropFirstFrames: 52 })
+    const skip = await joinClips([p('PA.mp4'), p('PBskip.mp4')], p('PABskip.mp4'), await mkdtemp(join(dir, 'j5-')))
+    expect(skip.passed).toBe(false)
+    expect(skip.seams[0]).toMatchObject({ action: 'failed', reason: 'no_match' })
   })
 
   it('fails the seam and produces no output when clips do not belong together', async () => {
     await makeClip(p('other.mp4'), { width: W, height: H, fps: FPS, durationSec: 2, source: 'smptehdbars' })
     await ffmpeg(['-i', p('other.mp4'), ...encodeArgs(FPS), p('other_enc.mp4')])
-    const r = await joinClips([p('A.mp4'), p('other_enc.mp4')], p('bad.mp4'), await mkdtemp(join(dir, 'j3-')))
+    const r = await joinClips([p('A.mp4'), p('other_enc.mp4')], p('bad.mp4'), await mkdtemp(join(dir, 'j6-')))
     expect(r.passed).toBe(false)
     expect(r.outputPath).toBeNull()
-    expect(r.seams[0]).toMatchObject({ action: 'blend', passed: false })
+    expect(r.seams[0]).toMatchObject({ action: 'failed', passed: false })
   })
 
   it('refuses clips that were not normalized to the same format', async () => {
