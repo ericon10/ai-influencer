@@ -14,8 +14,9 @@ import { cancelJob, getJob, resolveJob, wakeFromWebhook } from '../jobs/runner'
 import { actionSchema, estimateAction, runAction } from '../pipeline/actions'
 import { createCharacter, getCharacter, linkInspiration, listCharacters, setCharacterFields, updateCharacter } from '../pipeline/characters'
 import { chooseConcept } from '../pipeline/concepts'
-import { approveCandidate, keepStale, pickHero, rejectCandidate, reopenCandidate, setFavorite } from '../pipeline/review'
-import { attachSheetImages, exportCharacter, importCharacter } from '../pipeline/files'
+import { approveCandidate, keepStale, pickHero, rejectCandidate, reopenCandidate, setFavorite, mirrorCandidate } from '../pipeline/review'
+import { isValidEndpoint, MODEL_OVERRIDES_KEY, readModelOverrides } from '../providers/modelOverrides'
+import { attachCheckImages, attachSheetImages, exportCharacter, importCharacter, type CheckImage } from '../pipeline/files'
 import { accountUsage } from '../pipeline/costs'
 import { providerMode, setSetting } from '../pipeline/settings'
 import { listCredentials, markVerified, revokeCredential, saveCredential } from '../providers/credentials'
@@ -45,18 +46,21 @@ function requireRole(ctx: Ctx, role: Parameters<typeof hasRole>[1]): void {
   if (!hasRole(ctx, role)) throw new AppError('forbidden', 'You do not have permission to do that.')
 }
 
-// Uploaded files named REF-00 to REF-11 become approved sheet images.
-// Mirrored copies (negative QA fixtures) are skipped.
-async function sheetImagesFrom(value: unknown): Promise<Record<string, { data: Buffer; mime: string }>> {
+// Uploaded files named REF-00 to REF-11 become approved sheet images. A
+// mirrored copy (a negative QA fixture) becomes an image to check instead.
+async function sheetImagesFrom(value: unknown): Promise<{ images: Record<string, { data: Buffer; mime: string }>; checks: CheckImage[] }> {
   const images: Record<string, { data: Buffer; mime: string }> = {}
+  const checks: CheckImage[] = []
   for (const f of ([] as unknown[]).concat(value ?? [])) {
     if (!(f instanceof File)) continue
     if (f.size > MAX_UPLOAD) throw new AppError('bad_request', `${f.name} is larger than 25 MB.`)
-    const ref = f.name.toUpperCase().match(/REF-(\d{2})(?!.*MIRROR)/)
+    const ref = f.name.toUpperCase().match(/REF-(\d{2})/)
     if (!ref) continue
-    images[`REF-${ref[1]}`] = { data: Buffer.from(await f.arrayBuffer()), mime: f.type }
+    const data = Buffer.from(await f.arrayBuffer())
+    if (/MIRROR/.test(f.name.toUpperCase())) checks.push({ refId: `REF-${ref[1]}`, name: f.name, data, mime: f.type })
+    else images[`REF-${ref[1]}`] = { data, mime: f.type }
   }
-  return images
+  return { images, checks }
 }
 
 export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
@@ -199,6 +203,8 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
     return c.json({ fixes: await rejectCandidate(deps, ctx, c.req.param('id'), body.reasons, body.note) })
   })
   app.post('/candidates/:id/reopen', async c => { const ctx = c.get('ctx'); requireRole(ctx, 'member'); await reopenCandidate(deps, ctx, c.req.param('id')); return c.json({ ok: true }) })
+  // Free fix for a shot QA found mirrored: flip it, no provider call.
+  app.post('/candidates/:id/mirror', async c => { const ctx = c.get('ctx'); requireRole(ctx, 'member'); return c.json(await mirrorCandidate(deps, ctx, c.req.param('id'))) })
   app.post('/candidates/:id/favorite', async c => {
     const body = parse(z.object({ favorite: z.boolean() }), await json(c))
     await setFavorite(deps, c.get('ctx'), c.req.param('id'), body.favorite)
@@ -226,18 +232,21 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
     const id = c.req.param('id')
     const body = await c.req.parseBody({ all: true })
     const md = ([] as unknown[]).concat(body.file ?? [])[0]
-    const images = await sheetImagesFrom(body.images)
-    if (!(md instanceof File) && !Object.keys(images).length) throw new AppError('bad_request', 'Attach the character file (.md) or sheet images named REF-00 to REF-11.')
+    const { images, checks } = await sheetImagesFrom(body.images)
+    if (!(md instanceof File) && !Object.keys(images).length && !checks.length) throw new AppError('bad_request', 'Attach the character file (.md) or sheet images named REF-00 to REF-11.')
     let warnings: string[] = []
     let importedShots: string[]
+    let checkShots: string[]
     if (md instanceof File) {
-      const r = await importCharacter(deps, ctx, await md.text(), { characterId: id, images })
+      const r = await importCharacter(deps, ctx, await md.text(), { characterId: id, images, checks })
       warnings = r.result.warnings
       importedShots = r.importedShots
+      checkShots = r.checkShots
     } else {
       importedShots = await attachSheetImages(deps, ctx, id, images)
+      checkShots = await attachCheckImages(deps, ctx, id, checks)
     }
-    return c.json({ warnings, importedShots, view: await characterView(deps, ctx, id) })
+    return c.json({ warnings, importedShots, checkShots, view: await characterView(deps, ctx, id) })
   })
 
   app.post('/characters/import', async c => {
@@ -246,9 +255,9 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
     const body = await c.req.parseBody({ all: true })
     const md = body.file
     if (!(md instanceof File)) throw new AppError('bad_request', 'Attach the character file (.md).')
-    const images = await sheetImagesFrom(body.images)
-    const result = await importCharacter(deps, ctx, await md.text(), { images })
-    return c.json({ characterId: result.characterId, importedShots: result.importedShots, warnings: result.result.warnings }, 201)
+    const { images, checks } = await sheetImagesFrom(body.images)
+    const result = await importCharacter(deps, ctx, await md.text(), { images, checks })
+    return c.json({ characterId: result.characterId, importedShots: result.importedShots, checkShots: result.checkShots, warnings: result.result.warnings }, 201)
   })
 
   // ── Paid actions: estimate first, then run with the quote ──
@@ -365,6 +374,22 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
     requireRole(ctx, 'admin')
     await revokeCredential(deps, ctx, c.req.param('provider'))
     return c.json({ ok: true })
+  })
+
+  // A model's REST path, from Higgsfield's official Model API Reference.
+  // Changing it clears the model's confirmation until its test passes again.
+  app.put('/settings/models', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'admin')
+    const body = parse(z.object({ ref: z.string(), endpoint: z.string().trim().max(200) }), await json(c))
+    if (!deps.config.models.models.some(m => m.ref === body.ref && m.ref.startsWith('higgsfield/'))) throw new AppError('bad_request', `Unknown Higgsfield model "${body.ref}".`)
+    if (body.endpoint && !isValidEndpoint(body.endpoint)) throw new AppError('bad_request', 'Enter the path as the reference shows it, for example bytedance/seedance-2.5/image-to-video (no https:// or host).')
+    const overrides = await readModelOverrides(deps.db, ctx.accountId)
+    const current = overrides[body.ref] ?? {}
+    const next = { ...current, endpoint: body.endpoint || undefined }
+    if ((current.endpoint ?? '') !== body.endpoint) { delete next.confirmedAt; delete next.confirmedBy }
+    await setSetting(deps, ctx, MODEL_OVERRIDES_KEY, { ...overrides, [body.ref]: next })
+    return c.json(await settingsView(deps, ctx))
   })
 
   app.put('/settings/budgets', async c => {

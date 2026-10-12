@@ -517,3 +517,7 @@ button.st-chip:hover { color: var(--st-text); border-color: var(--st-text-3); }
 .st-details[open] > summary::before { transform: rotate(45deg); }
 .st-details > .st-prompt { margin: 0 10px 10px; }
 .st-notes { margin: 0; padding: 12px 14px 12px 30px; border-radius: 12px; background: var(--st-surface-2); border: 1px solid var(--st-line); color: var(--st-text-2); font-size: 13px; display: grid; gap: 6px; }
+.st-modelrow { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); gap: 14px; align-items: center; padding: 12px 0; border-top: 1px solid var(--st-line); }
+.st-modelrow:first-of-type { border-top: 0; }
+.st-hint.bad { color: var(--st-bad); }
+@media (max-width: 720px) { .st-modelrow { grid-template-columns: minmax(0, 1fr); gap: 8px; } }

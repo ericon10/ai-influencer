@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowRight, CheckCircle2, Eye, Loader2, RotateCcw, ShieldAlert, Sparkles, Download } from 'lucide-react'
+import { ArrowRight, CheckCircle2, Eye, FlipHorizontal2, Loader2, RotateCcw, ShieldAlert, Sparkles, Download } from 'lucide-react'
 import { api } from '../../api'
 import { useRefresh } from '../../hooks'
 import { PriceButton } from '../../PriceButton'
@@ -20,6 +20,7 @@ export function SheetTab({ v, goHero, goFile }: { v: CharacterView; goHero: () =
     // An imported character usually has its sheet already; offer both paths.
     const imported = v.stage >= 5
     return (
+      <div className="st-col" style={{ gap: 24 }}>
       <div className="st-empty">
         <h2 className="st-h1">{imported ? <>Bring in the <em>sheet</em></> : <>Pick a hero <em>first</em></>}</h2>
         <p className="st-sub" style={{ margin: 0 }}>{imported ? `Add ${v.name}'s approved images named REF-00 to REF-11, or pick a new hero to build the sheet here.` : 'The sheet is built from REF-00, the hero you pick.'}</p>
@@ -27,6 +28,8 @@ export function SheetTab({ v, goHero, goFile }: { v: CharacterView; goHero: () =
           {imported && <button className="st-btn primary" onClick={goFile}>Import sheet images<ArrowRight size={15} /></button>}
           <button className={`st-btn ${imported ? '' : 'primary'}`} onClick={goHero}>Go to hero<ArrowRight size={15} /></button>
         </div>
+      </div>
+      <ToCheck v={v} />
       </div>
     )
   }
@@ -51,6 +54,8 @@ export function SheetTab({ v, goHero, goFile }: { v: CharacterView; goHero: () =
           <div className="grow"><div className="st-h3">Working on {generating.map(s => s.id).join(', ')}</div><div className="st-hint">Rendering, then automatic QA. Failed QA never reaches your review queue.</div></div>
         </div>
       )}
+
+      <ToCheck v={v} />
 
       <section>
         <div className="st-section-head"><div className="st-h2">Reference sheet</div><span className="st-muted">{v.sheet.progress.approved} of {v.sheet.progress.total} approved{v.sheet.progress.stale ? `, ${v.sheet.progress.stale} to re-check` : ''}</span><span className="st-spacer" />{v.sheetLock && <span className="st-badge plain" title="One model for the whole sheet (SPEC 5.1 rule 7)">{v.sheetLock.model}</span>}</div>
@@ -106,6 +111,12 @@ function NextUp({ v, shot, action }: { v: CharacterView; shot: Shot; action: 'ge
             </div>
             {failed?.qaReport && (
               <Callout tone="bad" icon={<ShieldAlert size={16} />}>Last try failed QA: {failed.qaReport.summary.replace(/^Regenerate: /, '')}</Callout>
+            )}
+            {failed?.qaReport?.mirrorFix?.available && (
+              <div className="st-row" style={{ gap: 10 }}>
+                <MirrorButton v={v} candidate={failed} />
+                <span className="st-hint">{failed.qaReport.mirrorFix.message}</span>
+              </div>
             )}
             <div className="st-row">
               <span className="st-label">Variations</span>
@@ -187,7 +198,10 @@ function ShotDrawer({ v, shot, onClose }: { v: CharacterView; shot: Shot | null;
               <div className="st-row" style={{ gap: 6 }}><span className={`st-badge plain ${c.status === 'approved' ? 'ok' : c.status === 'qa_failed' || c.status === 'failed' ? 'bad' : c.status === 'rejected' ? 'warn' : ''}`}>{statusLabel(c.status)}</span><span className="st-hint">{new Date(c.createdAt).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</span></div>
               {c.qaReport && <span className="st-hint">{c.qaReport.summary}</span>}
               {c.rejectReasons.length > 0 && <span className="st-hint">Rejected: {c.rejectReasons.map(r => v.reasons.find(x => x.id === r)?.label ?? r).join(', ')}</span>}
-              {['superseded', 'rejected', 'qa_failed'].includes(c.status) && c.assetId && <button className="st-btn sm ghost" style={{ alignSelf: 'flex-start' }} onClick={() => restore(c)}><RotateCcw size={13} />Approve this version</button>}
+              <div className="st-row" style={{ gap: 6 }}>
+                {(['superseded', 'rejected', 'qa_failed'].includes(c.status) || (c.status === 'check' && c.qaVerdict === 'post')) && c.assetId && <button className="st-btn sm ghost" onClick={() => restore(c)}><RotateCcw size={13} />Approve this version</button>}
+                {c.qaReport?.mirrorFix?.available && <MirrorButton v={v} candidate={c} small />}
+              </div>
             </div>
           </div>
         ))}
@@ -198,5 +212,58 @@ function ShotDrawer({ v, shot, onClose }: { v: CharacterView; shot: Shot | null;
 }
 
 function statusLabel(s: string): string {
-  return ({ generating: 'Generating', qa_pending: 'Checking', qa_failed: 'Failed QA', in_review: 'Needs review', approved: 'Approved', rejected: 'Rejected', superseded: 'Replaced', failed: 'Failed' } as Record<string, string>)[s] ?? s
+  return ({ generating: 'Generating', qa_pending: 'Checking', qa_failed: 'Failed QA', in_review: 'Needs review', approved: 'Approved', rejected: 'Rejected', superseded: 'Replaced', failed: 'Failed', check: 'To check' } as Record<string, string>)[s] ?? s
+}
+
+// The free fix QA offers when a shot came back mirrored: flip it. No
+// provider call, no cost, and the face cannot drift.
+function MirrorButton({ v, candidate, small }: { v: CharacterView; candidate: Candidate; small?: boolean }) {
+  const toast = useToast()
+  const refresh = useRefresh()
+  const [busy, setBusy] = useState(false)
+  async function mirror() {
+    setBusy(true)
+    try {
+      await api.mirror(candidate.id)
+      refresh(v.id)
+      toast({ tone: 'ok', text: `Mirrored ${candidate.refId}. No new generation, no cost.` })
+    } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) } finally { setBusy(false) }
+  }
+  return (
+    <button className={`st-btn ${small ? 'sm ghost' : 'secondary'}`} disabled={busy} onClick={mirror} title={candidate.qaReport?.mirrorFix?.message}>
+      {busy ? <Loader2 size={small ? 13 : 16} className="st-spin" /> : <FlipHorizontal2 size={small ? 13 : 16} />}Mirror it (free)
+    </button>
+  )
+}
+
+// Images brought in to be checked (for example a mirrored REF-04 kept as a
+// negative test). They never join the sheet unless approved after a pass.
+function ToCheck({ v }: { v: CharacterView }) {
+  const items = v.sheet.shots.flatMap(s => s.candidates.filter(c => c.status === 'check').map(c => ({ shot: s, c })))
+  if (!items.length) return null
+  return (
+    <section className="st-card">
+      <div className="st-card-head"><div className="grow"><div className="st-h2">To check</div><div className="st-hint">Uploaded for a QA check. Not part of the sheet.</div></div></div>
+      <div className="st-card-body st-col" style={{ gap: 14 }}>
+        {items.map(({ shot, c }) => (
+          <div key={c.id} className="st-row" style={{ gap: 14, alignItems: 'flex-start' }}>
+            <Img assetId={c.assetId} width={200} style={{ width: 96, aspectRatio: '3/4', flex: 'none' }} />
+            <div className="st-col" style={{ gap: 8, minWidth: 0, flex: 1 }}>
+              <div className="st-row" style={{ gap: 8 }}><b>{c.rejectNote.replace(/^Uploaded to check: /, '') || 'Uploaded image'}</b><span className="st-hint">checked against {shot.id} · {shot.label}</span></div>
+              {c.qaReport ? (
+                <Callout tone={c.qaVerdict === 'post' ? 'ok' : c.qaVerdict === 'regenerate' ? 'bad' : 'warn'} icon={c.qaVerdict === 'post' ? undefined : <ShieldAlert size={16} />}>{c.qaReport.summary}</Callout>
+              ) : (
+                <span className="st-hint">QA reads the mark sides, the view and the framing. It is a paid vision call, so the price shows first.</span>
+              )}
+              <div className="st-row" style={{ gap: 8 }}>
+                {!c.qaReport && <PriceButton action={{ type: 'qa', characterId: v.id, candidateId: c.id }} label="Run QA" variant="secondary" />}
+                {c.qaReport?.mirrorFix?.available && <MirrorButton v={v} candidate={c} />}
+                {c.qaReport?.mirrorFix && !c.qaReport.mirrorFix.available && <span className="st-hint">{c.qaReport.mirrorFix.message}</span>}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  )
 }

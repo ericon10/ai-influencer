@@ -9,7 +9,7 @@ Callie, 24 years old. Long honey-blonde hair, loose beachy waves, deep side part
 
 ## Signature style
 - Wardrobe palette: butter yellow, cream, white, soft pastels, light-wash denim, gold accents
-- Go-to pieces: pastel floral and ruffled mini dresses, fitted white tees, high-rise straight jeans, cream linen co-ords, matching activewear sets, white strappy sandals or clean white sneakers
+- Go-to pieces: pastel floral and ruffled mini dresses, fitted white tees, high-rise straight jeans, cream linen co-ords, butter-yellow ribbed one-piece swimsuit, matching activewear sets, white strappy sandals or clean white sneakers
 - Accessories always worn: gold ear cuff on her left ear; otherwise dainty gold jewelry only
 - Hair styling options (changes often): loose beachy waves with a deep side part; tucked behind her left ear; claw clip or low bun; slicked back after the gym or pool
 - Makeup: natural by default (light skin, groomed brows, tinted lip). Soft glam (bronzer, warm blush, glossy nude-pink lip) only for nights out and events
@@ -17,7 +17,7 @@ Callie, 24 years old. Long honey-blonde hair, loose beachy waves, deep side part
 
 ## Persona
 - Vibe: sunny, approachable, real girl you'd see on the street, a little playful
-- Usual settings: neighborhood cafes, farmers markets, her apartment kitchen, the car, gym and pilates studio, pool and beach, rooftops at golden hour, lakeside terraces, raw urban concrete backdrops
+- Usual settings: neighborhood cafes, farmers markets, her apartment kitchen, the car, gym and pilates studio, pool and beach, tropical coves, rooftops at golden hour, lakeside terraces, raw urban concrete backdrops
 - Never: heavy glam in daytime, studio-perfect looks, low angles or tight crops on her body, provocative poses, visible brand logos, anything that reads like a staged ad shoot instead of a real moment
 
 ## Reference sheet
@@ -40,23 +40,28 @@ Bonus: BONUS-01 (seated, near-front, logo removed). Old body build; keep out of 
 
 ## Fixed blocks
 - REFERENCE: Using the attached reference images, keep this woman's face, hair, and features exactly the same.
+- SOUL IDENTITY (always include with the saved Soul character): Honey-blonde hair, light brown brows, fair skin with a light sun-kissed tan, soft oval face with a rounded chin, full lips. If hair is wet or slicked back, add "but still clearly blonde."
 - REALISM: Candid phone photo, natural skin texture with visible pores, small imperfections, ordinary background clutter, no retouching, not a professional shoot.
 - AVOID: studio lighting, perfect symmetry, plastic skin, text, watermarks.
 
 ## Models
+- Soul 2.0 character "Callie" (soul_id 0fdc33c0-7a1a-40a9-9b12-0dc35f44e29e): trained after two attempts. Works well for stills when the SOUL IDENTITY block is in the prompt. Without it she drifts to a brunette, tan, slimmer-faced look, especially with moodboards like Siren or wet hair. Use the General moodboard as the neutral default.
+- Drift lock: after any Soul still, run a Nano Banana 2.1 face-only pass with the Soul image as base plus @REF-00 and the closest-angle ref; keep everything else identical (inpaint mask on face and hair if it re-composes).
 - Saved identity: Higgsfield Element "Callie-1" (id 1602db94-79e3-4e5a-bbe5-de3537cd0b83), made from REF-00. Instant, no training. Works with Nano Banana 2 / Pro, GPT Image 2, Seedream, Seedance 2.0, Kling 3.0 (Kling needs a start frame too). Reference it with @Callie-1 in Higgsfield.
-- Stills with refs: Nano Banana 2.1 (held her hair and face well). Use @ references in Higgsfield so the model knows which image is which.
+- Stills with refs and all edits: Nano Banana 2.1. Use @ references in Higgsfield so the model knows which image is which.
+- Stills, also strong: GPT Image 2.5 Flare. Produced her best beach shot (Koh Samui, real skin texture, correct ear cuff), though it once distorted her hair in an earlier scene. Worth running alongside Nano Banana and picking the best.
 - Video, final: Seedance 2.5 (mode omni_reference, start + end frame). Best faces by far.
 - Video, cheap motion tests only: Kling 3.0 Turbo. Faces melt when she is small in frame. Kling 3.0 Pro distorted her face when she talked animatedly.
-- Avoid for scenes: GPT Image 2.5 Flare (badly distorted her hair in a scene test)
 - Sheet images were built in GPT Image 2.5
-- Soul 2.0 training: first attempt failed, second stuck in queue. Do not depend on it.
 
 ## Scene rules learned
 - Always write the full outfit in every prompt; never say "same outfit as before." Name the sheet outfit to drop it (white tee, jeans, sneakers).
+- When a scene changes how hair or skin looks (wet, wind, harsh sun, strong moodboard), state her colors anyway.
+- Ear cuff on the wrong ear: mirror the image horizontally if there is no text in frame (free, no drift); otherwise a one-change edit removing it.
 - A closer shot of the same scene is a crop of the wide shot, upscaled, never a new generation. New generations invent a new environment.
 - Upscale with an upscaler, not Nano Banana; Nano Banana re-composes the frame.
 - Expression edits on an existing frame (e.g. turning to look at the lens) work well in Nano Banana 2.1 when the prompt says to keep everything else identical and attaches REF-00 for the face.
+- Background people and tourists are fine and add realism; only edit out what breaks the shot.
 
 ## Proven recipe: the candid "caught you" shot
 1. Still A: wide, from inside a venue looking out, she is small in frame, chatting with a friend.
@@ -82,3 +87,4 @@ Label all posted content as AI-generated per each platform's rules.
 - 2026-10-12 Caught mid-action / Friend shot / Golden hour / Rooftop
 - 2026-10-12 POV / Event photographer, long lens / Golden hour / Rooftop
 - 2026-10-12 Caught you / Phone from inside, model zoom / Overcast daylight / Lakeside terrace
+- 2026-10-12 Laughing in the water / Friend shot from rocks / Tropical late morning / Koh Samui cove

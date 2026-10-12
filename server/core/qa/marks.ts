@@ -37,6 +37,16 @@ export interface QaReport {
   reasons: string[]
   detectedView: string | null
   identity?: IdentityScore | null
+  // When the sides are swapped: whether flipping the image horizontally
+  // fixes it (free, no new generation, the face cannot drift), and the
+  // report the flipped image would get.
+  mirrorFix?: MirrorFix | null
+}
+
+export interface MirrorFix {
+  available: boolean
+  message: string
+  report?: QaReport
 }
 
 const MIRROR_VIEW: Record<string, string> = {
@@ -258,4 +268,30 @@ export function finalize(findings: QaFinding[], detectedView: string | null, for
 
   const reasons = [...new Set(findings.filter(f => f.severity !== 'info').map(f => REASON[f.code]).filter((r): r is string => !!r))]
   return { verdict, summary, findings, reasons, detectedView }
+}
+
+// A shot whose marks came back on the wrong side can often be fixed by
+// flipping it horizontally (Callie's file: "mirror the image horizontally if
+// there is no text in frame"). The flip is checked by re-evaluating the
+// mirrored inspection: every mark must land on its own side, the view must
+// match, and nothing else may still call for a regenerate.
+const SIDE_CODES: QaCode[] = ['mark_wrong_side', 'wrong_view']
+
+export function mirrorFixFor(input: EvaluateInput, report: QaReport): MirrorFix | null {
+  if (!report.findings.some(f => f.severity === 'fail' && SIDE_CODES.includes(f.code))) return null
+  if (input.observation.text_or_logos.length) {
+    return { available: false, message: 'Flipping would mirror the text in the frame, so this needs a one-change edit or a regenerate.' }
+  }
+  const flipped = evaluateSheetShot({ ...input, observation: mirrorObservation(input.observation), mirrored: undefined })
+  if (flipped.findings.some(f => f.severity === 'fail' && (SIDE_CODES.includes(f.code) || f.code === 'mark_missing'))) {
+    return { available: false, message: 'Flipping would not put every mark on its own side.' }
+  }
+  if (flipped.verdict === 'regenerate') {
+    return { available: false, message: `Flipping fixes the sides, but the shot still needs a regenerate: ${flipped.summary.replace(/^Regenerate: /, '')}` }
+  }
+  return {
+    available: true,
+    message: 'Flipping the image horizontally puts every mark on its own side. Free, no new generation, and the face cannot drift.',
+    report: flipped,
+  }
 }

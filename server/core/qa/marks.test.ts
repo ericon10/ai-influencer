@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { loadConfig } from '../../config/load'
-import { evaluateSheetShot, checkMirrorConsistency, mirrorObservation } from './marks'
+import { evaluateSheetShot, checkMirrorConsistency, mirrorFixFor, mirrorObservation } from './marks'
 import { parseObservation, type Observation } from './perception'
 import type { Mark } from '../marks'
 
@@ -118,5 +118,46 @@ describe('mirror consistency (catches inspector left/right confusion)', () => {
     })
     expect(report.verdict).toBe('uncertain')
     expect(report.findings.map(f => f.code)).toContain('uncertain')
+  })
+})
+
+// Callie's file: "Ear cuff on the wrong ear: mirror the image horizontally if
+// there is no text in frame (free, no drift)." The flip is offered only when
+// it actually fixes every side.
+describe('free mirror fix', () => {
+  const input = (refId: string, obs: Observation) => ({ shot: shot(refId), views: config.pipeline.views, marks: callie.marks, eyeColor: callie.eyes, observation: obs })
+  const fixFor = (refId: string, obs: Observation) => mirrorFixFor(input(refId, obs), evaluateSheetShot(input(refId, obs)))
+
+  it('offers the flip for a REF-04 that came back mirrored, and the flipped shot passes', () => {
+    const fix = fixFor('REF-04', perception('REF-04-flipped'))
+    expect(fix?.available).toBe(true)
+    expect(fix!.report!.verdict).toBe('post')
+    expect(fix!.report!.detectedView).toBe('profile_right')
+  })
+
+  it('offers the flip for a front shot with both marks on her RIGHT side', () => {
+    const fix = fixFor('REF-00', mirrorObservation(perception('REF-00')))
+    expect(fix?.available).toBe(true)
+    expect(fix!.report!.findings.filter(f => f.code === 'mark_wrong_side')).toEqual([])
+  })
+
+  it('does not offer it when only the cuff is wrong: flipping would move the mole', () => {
+    const obs = perception('REF-00')
+    obs.ears = obs.ears.map(e => ({ ...e, jewelry: !e.jewelry, jewelry_description: e.jewelry ? '' : 'gold double-band ear cuff' }))
+    const report = evaluateSheetShot(input('REF-00', obs))
+    expect(report.findings.some(f => f.code === 'mark_wrong_side' && f.mark === 'ear cuff')).toBe(true)
+    expect(mirrorFixFor(input('REF-00', obs), report)).toMatchObject({ available: false })
+  })
+
+  it('does not offer it for a right profile with the cuff on the visible right ear', () => {
+    // Flipping that image would turn it into a left profile.
+    expect(fixFor('REF-04', perception('REF-04-mirrored'))).toMatchObject({ available: false })
+  })
+
+  it('does not offer it when there is text in the frame, and not for a correct shot', () => {
+    const obs = perception('REF-04-flipped')
+    obs.text_or_logos = ['a shop sign']
+    expect(fixFor('REF-04', obs)).toMatchObject({ available: false, message: expect.stringMatching(/text/) })
+    expect(fixFor('REF-04', perception('REF-04'))).toBeNull()
   })
 })

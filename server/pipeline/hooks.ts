@@ -6,11 +6,12 @@ import { registerJobHook, type JobOutcome, type JobRow } from '../jobs/hooks'
 import { activateChildren, cancelChildren, childJobs } from '../jobs/runner'
 import { breakdownSchema, conceptsSchema } from '../core/llmSchemas'
 import { validateCharacter } from '../core/character'
-import { evaluateSheetShot, finalize, type QaReport } from '../core/qa/marks'
+import { evaluateSheetShot, finalize, mirrorFixFor, type QaReport } from '../core/qa/marks'
 import { parseObservation } from '../core/qa/perception'
 import { getCharacter, getRef, setCharacterFields, toData } from './characters'
 import { refreshRefStatus } from './review'
 import { scoreDistinctness, scoreIdentity } from './identity'
+import { onModelTest } from './modelTests'
 
 // What each finished job does to the character. Registered once at boot.
 
@@ -122,7 +123,9 @@ async function onQa(deps: Deps, ctx: Ctx, job: JobRow, _out: JobOutcome): Promis
     try {
       const observation = parseObservation((orig.resultMeta as { data: unknown }).data)
       const mirrored = mirror?.status === 'completed' ? parseObservation((mirror.resultMeta as { data: unknown }).data) : undefined
-      report = evaluateSheetShot({ shot, views: deps.config.pipeline.views, marks: ch.marks, eyeColor: ch.eyes, observation, mirrored, pronoun: ch.pronouns.poss, extraFindings: id.findings })
+      const input = { shot, views: deps.config.pipeline.views, marks: ch.marks, eyeColor: ch.eyes, observation, mirrored, pronoun: ch.pronouns.poss, extraFindings: id.findings }
+      report = evaluateSheetShot(input)
+      report.mirrorFix = mirrorFixFor(input, report)
     } catch (e) {
       report = finalize([{ code: 'uncertain', severity: 'warn', message: `The QA answer could not be read (${(e as Error).message}). Check this shot yourself.` }, ...id.findings], null)
     }
@@ -150,4 +153,5 @@ export function registerPipelineHooks(): void {
   registerJobHook('upscale', onUpscale)
   registerJobHook('sheet', onSheet)
   registerJobHook('qa', onQa)
+  registerJobHook('model_test', onModelTest)
 }

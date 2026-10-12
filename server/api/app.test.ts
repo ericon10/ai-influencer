@@ -121,9 +121,13 @@ describe('Studio API', () => {
     imgs.append('images', await png('ref04 mirrored'), 'REF-04-mirrored.png')
     const added = await call('POST', `/characters/${id}/import-file`, { cookie: cookieA, form: imgs })
     expect(added.status).toBe(200)
-    // The mirrored copy is a QA fixture, never a sheet shot.
+    // The mirrored copy is a QA fixture: it waits to be checked, never a sheet shot.
     expect(added.json.importedShots).toEqual(['REF-00', 'REF-01'])
-    expect(added.json.view.data.identity.name).toBe('Callie-1')
+    expect(added.json.checkShots).toEqual(['REF-04-mirrored.png'])
+    const ref04 = (added.json.view.sheet.shots as Array<{ id: string; status: string; candidates: Array<{ status: string }> }>).find(s => s.id === 'REF-04')!
+    expect(ref04.status).toBe('pending')
+    expect(ref04.candidates.map(c => c.status)).toEqual(['check'])
+    expect(added.json.view.data.identities.map((i: { name: string }) => i.name)).toEqual(['Callie', 'Callie-1'])
 
     // A new REF-00 replaces the old one and sends REF-01 back for a re-check.
     const again = new FormData()
@@ -160,6 +164,18 @@ describe('Studio API', () => {
   it('answers unknown webhooks with 404 and no detail', async () => {
     const r = await call('POST', '/webhooks/higgsfield/job_nope?t=abc', { csrf: false })
     expect(r.status).toBe(404)
+  })
+
+  it('takes a model path only as the reference shows it, and changing it needs a new test', async () => {
+    const bad = await call('PUT', '/settings/models', { cookie: cookieA, body: { ref: 'higgsfield/seedance-2.5', endpoint: 'https://evil.example.com/x' } })
+    expect(bad.status).toBe(400)
+    const ok = await call('PUT', '/settings/models', { cookie: cookieA, body: { ref: 'higgsfield/seedance-2.5', endpoint: 'bytedance/seedance-2.5/image-to-video' } })
+    expect(ok.status).toBe(200)
+    const m = ok.json.models.find((x: { ref: string }) => x.ref === 'higgsfield/seedance-2.5')
+    expect(m).toMatchObject({ endpoint: 'bytedance/seedance-2.5/image-to-video', endpointSource: 'account', verified: false, confirmedAt: null })
+    // Another account sees none of it.
+    const other = await call('GET', '/settings', { cookie: cookieB })
+    expect(other.json.models.find((x: { ref: string }) => x.ref === 'higgsfield/seedance-2.5').endpoint).toBe('')
   })
 
   it('updates budgets', async () => {

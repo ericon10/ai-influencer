@@ -62,13 +62,18 @@ export function mapInput(entry: ModelEntry, req: GenRequest): Record<string, unk
         input_images: (req.refs ?? []).map(r => imageUrl(needUrl(r, 'A reference image'))),
       })
     case 'soul_v1':
-      return clean({ prompt: req.prompt, width_and_height: soulSize(req.aspect), quality: '1080p', batch_size: 1, seed: req.seed, enhance_prompt: false })
+      // A trained Soul character rides along as a custom reference (official SDK).
+      return clean({
+        prompt: req.prompt, width_and_height: soulSize(req.aspect), quality: '1080p', batch_size: 1, seed: req.seed, enhance_prompt: false,
+        custom_reference_id: req.identityId, custom_reference_strength: req.identityId ? 1 : undefined,
+      })
     case 'generic_upscale':
       return clean({ input_image: imageUrl(needUrl(req.refs?.[0], 'The image to upscale')), scale: req.scale ?? 2, resolution: req.resolution })
     case 'seedance_i2v':
-      // REST image-to-video takes the frames directly. (The web app and MCP
-      // connector instead need mode omni_reference for start and end frames.)
-      // generate_audio defaults to true there, so it is always sent as false.
+      // REST takes start and end frames directly; the web app and MCP need
+      // mode omni_reference for them instead (both paths are recorded in
+      // config/models.yaml). Field names are confirmed by the model's paid
+      // test. Audio is always sent off.
       return clean({
         prompt: req.prompt,
         image_url: needUrl(req.startFrame, 'The start frame'),
@@ -79,9 +84,9 @@ export function mapInput(entry: ModelEntry, req: GenRequest): Record<string, unk
         generate_audio: false,
       })
     case 'kling_v3':
-      // Mode (std, pro, 4k) is part of the endpoint path. Sound defaults to
-      // on, so it is always sent as off. Turbo has no sound switch; the
-      // Studio strips its audio on arrival.
+      // Sound is always sent off. Turbo has no sound switch; the Studio
+      // strips its audio on arrival. Field names are confirmed by the
+      // model's paid test.
       return clean({
         prompt: req.prompt,
         image_url: needUrl(req.startFrame, 'The start frame'),
@@ -156,11 +161,13 @@ export function createHiggsfieldAdapter(opts: HiggsfieldOptions): ProviderAdapte
     throw new ProviderError(`Higgsfield error ${s}: ${detail}`, { retryable: phase === 'read', submitted: phase === 'submit' ? 'unknown' : 'no', status: s })
   }
 
-  function entryFor(ref: string): ModelEntry {
+  // Only confirmed models run, except the one small paid test that confirms
+  // a model whose endpoint was entered from the official reference.
+  function entryFor(ref: string, modelTest = false): ModelEntry {
     const entry = opts.config.models.models.find(m => m.ref === ref)
     if (!entry || !ref.startsWith('higgsfield/')) throw new ProviderError(`Unknown Higgsfield model "${ref}".`, { retryable: false, submitted: 'no' })
-    if (!entry.verified || !entry.endpoint) {
-      throw new ProviderError(`${entry.label} is not verified for the Higgsfield API yet. Confirm its endpoint in Settings before running it live.`, { retryable: false, submitted: 'no', code: 'unverified_model' })
+    if (!entry.endpoint || (!entry.verified && !modelTest)) {
+      throw new ProviderError(`${entry.label} is not confirmed for the Higgsfield API yet. Enter its endpoint from the official Model API Reference in Settings and run its test first.`, { retryable: false, submitted: 'no', code: 'unverified_model' })
     }
     return entry
   }
@@ -195,7 +202,7 @@ export function createHiggsfieldAdapter(opts: HiggsfieldOptions): ProviderAdapte
       return slot.public_url
     },
     async submit(req, { webhookUrl }) {
-      const entry = entryFor(req.model)
+      const entry = entryFor(req.model, req.modelTest === true)
       if ((req.kind === 'video' || req.kind === 'video_extend') && req.audio !== false) {
         throw new ProviderError('Video requests must send audio off.', { retryable: false, submitted: 'no' })
       }

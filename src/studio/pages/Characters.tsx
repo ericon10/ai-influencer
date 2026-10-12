@@ -71,7 +71,7 @@ function ImportDialog({ open, onClose }: { open: boolean; onClose: () => void })
   const [images, setImages] = useState<File[]>([])
   const [busy, setBusy] = useState(false)
   const [over, setOver] = useState(false)
-  const [done, setDone] = useState<{ characterId: string; importedShots: string[]; warnings: string[] } | null>(null)
+  const [done, setDone] = useState<{ characterId: string; importedShots: string[]; checkShots: string[]; warnings: string[] } | null>(null)
 
   function take(files: FileList | File[]) {
     for (const f of Array.from(files)) {
@@ -87,7 +87,7 @@ function ImportDialog({ open, onClose }: { open: boolean; onClose: () => void })
     try {
       const form = new FormData()
       form.append('file', file)
-      for (const m of mapped) if (m.ref && !m.mirrored) form.append('images', m.f)
+      for (const m of mapped) if (m.ref) form.append('images', m.f)
       const r = await api.importCharacter(form)
       refresh()
       // Show what was read before opening the character.
@@ -101,7 +101,7 @@ function ImportDialog({ open, onClose }: { open: boolean; onClose: () => void })
     return (
       <Modal open={open} onClose={close}>
         <div className="st-card-body st-col" style={{ gap: 16 }}>
-          <div><div className="st-kicker">Imported</div><div className="st-h2">Here is what the Studio read</div><p className="st-sub">{done.importedShots.length ? `${done.importedShots.length} approved sheet shot${done.importedShots.length === 1 ? '' : 's'}: ${done.importedShots.join(', ')}.` : 'No sheet images yet. Add them any time from the Sheet tab.'}</p></div>
+          <div><div className="st-kicker">Imported</div><div className="st-h2">Here is what the Studio read</div><p className="st-sub">{done.importedShots.length ? `${done.importedShots.length} approved sheet shot${done.importedShots.length === 1 ? '' : 's'}: ${done.importedShots.join(', ')}.` : 'No sheet images yet. Add them any time from the Sheet tab.'}{done.checkShots.length ? ` To check with QA: ${done.checkShots.join(', ')}.` : ''}</p></div>
           {done.warnings.length > 0 && <ul className="st-notes">{done.warnings.map((w, i) => <li key={i}>{w}</li>)}</ul>}
           <div className="st-row"><span className="st-spacer" /><button className="st-btn primary" onClick={open_}>Open character</button></div>
         </div>
@@ -121,7 +121,7 @@ function ImportDialog({ open, onClose }: { open: boolean; onClose: () => void })
         {file && <div className="st-chip on">{file.name}</div>}
         {mapped.length > 0 && (
           <div className="st-row" style={{ gap: 6 }}>
-            {mapped.map(m => <span key={m.f.name} className={`st-badge ${m.mirrored ? 'warn' : m.ref ? 'ok' : 'bad'} plain`} title={m.f.name}>{m.mirrored ? `${m.ref ?? '?'} mirrored (skipped)` : m.ref ?? 'No REF id'}</span>)}
+            {mapped.map(m => <span key={m.f.name} className={`st-badge ${m.mirrored ? 'warn' : m.ref ? 'ok' : 'bad'} plain`} title={m.f.name}>{m.mirrored ? `${m.ref ?? '?'} mirrored, to check` : m.ref ?? 'No REF id'}</span>)}
           </div>
         )}
         <div className="st-row"><span className="st-spacer" /><button className="st-btn ghost" onClick={onClose}>Cancel</button><button className="st-btn primary" disabled={!file || busy} onClick={submit}>{busy ? 'Importing...' : 'Import character'}</button></div>

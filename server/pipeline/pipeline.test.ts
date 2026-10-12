@@ -6,12 +6,15 @@ import { registerPipelineHooks } from './hooks'
 import { createCharacter, linkInspiration, listConcepts, getCharacter, candidatesFor, sheetState, toData, updateCharacter } from './characters'
 import { estimateAction, runAction, type StudioAction } from './actions'
 import { chooseConcept } from './concepts'
-import { approveCandidate, keepStale, pickHero, rejectCandidate } from './review'
+import { approveCandidate, keepStale, mirrorCandidate, pickHero, rejectCandidate } from './review'
 import { exportCharacter, importCharacter } from './files'
 import { characterCosts } from './costs'
-import { saveAsset } from '../storage/assets'
+import { setSetting } from './settings'
+import { readAsset, saveAsset } from '../storage/assets'
+import sharp from 'sharp'
 import { renderPlaceholderPortrait } from '../providers/mock'
 import { parseObservation } from '../core/qa/perception'
+import { mirrorObservation, type QaReport } from '../core/qa/marks'
 import type { LlmRequest } from '../providers/types'
 import { eq } from 'drizzle-orm'
 import { jobs as jobsTable } from '../db/schema'
@@ -23,10 +26,12 @@ import { jobs as jobsTable } from '../db/schema'
 const FIX = join(process.cwd(), 'fixtures', 'callie')
 const callie = JSON.parse(readFileSync(join(FIX, 'appendix-a.json'), 'utf8'))
 const mirroredRef04 = parseObservation(JSON.parse(readFileSync(join(FIX, 'perceptions', 'REF-04-mirrored.json'), 'utf8')))
+const flippedRef04 = parseObservation(JSON.parse(readFileSync(join(FIX, 'perceptions', 'REF-04-flipped.json'), 'utf8')))
 
 let h: Harness
 let characterId: string
 let mirrorNextRef04 = false
+let flippedNextRef04 = false
 
 async function run(action: StudioAction) {
   const { quote, preview } = await estimateAction(h.deps, h.ctx, action)
@@ -42,6 +47,7 @@ beforeAll(async () => {
     mockLlmResponders: {
       qa_perception: (req: LlmRequest) => {
         const meta = req.meta as { refId: string; pass: string; mockObservation: unknown }
+        if (flippedNextRef04 && meta.refId === 'REF-04') return meta.pass === 'orig' ? flippedRef04 : mirrorObservation(flippedRef04)
         if (mirrorNextRef04 && meta.refId === 'REF-04') {
           return meta.pass === 'orig' ? mirroredRef04 : { ...mirroredRef04, nose: 'image_left', ears: [{ ...mirroredRef04.ears[0]!, image_side: 'image_right' }] }
         }
@@ -194,7 +200,7 @@ describe('character creation, stages 1 to 5 (demo mode)', () => {
     const row = await getCharacter(h.deps, h.ctx, imported.characterId)
     const data = toData(row)
     expect(data.name).toBe('Callie')
-    expect(data.identity).toMatchObject({ kind: 'element', name: 'Callie-1', externalId: '1602db94-79e3-4e5a-bbe5-de3537cd0b83' })
+    expect(data.identities.map(i => [i.kind, i.name])).toEqual([['trained', 'Callie'], ['element', 'Callie-1']])
     expect(data.sections.map(s => s.title)).toContain('Video rules')
     // Her sheet stays on the model it was built with, even in demo mode.
     expect((row.sheetLock as { model: string }).model).toBe('higgsfield/gpt-image-2.5')
@@ -210,6 +216,51 @@ describe('character creation, stages 1 to 5 (demo mode)', () => {
     const job = (await h.deps.db.select().from(jobsTable).where(eq(jobsTable.id, cand!.jobId!)))[0]!
     const ref00 = (await candidatesFor(h.deps, h.ctx, row.id, { refId: 'REF-00', statuses: ['approved'] }))[0]!
     expect((job.request as { refs: Array<{ assetId: string }> }).refs).toEqual([{ assetId: ref00.assetId }])
+
+    // A run on Soul uses her trained character and always carries its
+    // SOUL IDENTITY block (demo mode still runs the mock).
+    await setSetting(h.deps, h.ctx, 'routing_overrides', { hero: { model: 'higgsfield/soul-2' } })
+    try {
+      const soulRun = await run({ type: 'hero', characterId: row.id, runsPerPrompt: 1 })
+      expect(soulRun.preview.prompts.every(p => p.text.includes('If hair is wet or slicked back, add "but still clearly blonde."'))).toBe(true)
+      expect(soulRun.jobs.map(j => (j.request as { identityId?: string }).identityId)).toEqual(Array(3).fill('0fdc33c0-7a1a-40a9-9b12-0dc35f44e29e'))
+    } finally {
+      await setSetting(h.deps, h.ctx, 'routing_overrides', {})
+    }
+  })
+
+  it('acceptance: a mirrored REF-04 imported to check is flagged by QA, then fixed for free by mirroring', async () => {
+    const md = readFileSync(join(FIX, 'character-callie.md'), 'utf8')
+    const images: Record<string, { data: Buffer }> = {}
+    for (const id of ['REF-00', 'REF-01', 'REF-02', 'REF-03', 'REF-04']) images[id] = { data: await renderPlaceholderPortrait(`Callie ${id}`) }
+    const negative = await renderPlaceholderPortrait('Callie REF-04 mirrored')
+    const imported = await importCharacter(h.deps, h.ctx, md, { images, checks: [{ refId: 'REF-04', name: 'REF-04-mirrored.png', data: negative }] })
+    expect(imported.checkShots).toEqual(['REF-04-mirrored.png'])
+    const id = imported.characterId
+    const [check] = await candidatesFor(h.deps, h.ctx, id, { refId: 'REF-04', statuses: ['check'] })
+    expect(check).toBeDefined()
+    // The negative never joins the sheet or the review queue.
+    const before = await sheetState(h.deps, h.ctx, id)
+    expect(before.states.find(s => s.refId === 'REF-04')!.status).toBe('approved')
+
+    flippedNextRef04 = true
+    try { await run({ type: 'qa', characterId: id, candidateId: check!.id }) } finally { flippedNextRef04 = false }
+    const [checked] = await candidatesFor(h.deps, h.ctx, id, { refId: 'REF-04', statuses: ['check'] })
+    const report = checked!.qaReport as QaReport
+    expect(checked!.qaVerdict).toBe('regenerate')
+    expect(report.findings.find(f => f.code === 'wrong_view')!.message).toMatch(/mirrored/)
+    expect(report.mirrorFix).toMatchObject({ available: true })
+
+    const jobsBefore = (await h.deps.db.select().from(jobsTable)).length
+    const { candidateId } = await mirrorCandidate(h.deps, h.ctx, check!.id)
+    expect((await h.deps.db.select().from(jobsTable)).length).toBe(jobsBefore) // no provider call
+    const fixed = (await candidatesFor(h.deps, h.ctx, id, { refId: 'REF-04' })).find(c => c.id === candidateId)!
+    expect(fixed.status).toBe('check')
+    expect(fixed.qaVerdict).toBe('post')
+    // The fix is exactly the horizontal flip of the uploaded image.
+    const raw = async (assetId: string, flop = false) => (await (flop ? sharp((await readAsset(h.deps, h.ctx, assetId)).data).flop() : sharp((await readAsset(h.deps, h.ctx, assetId)).data)).raw().toBuffer())
+    expect((await raw(fixed.assetId!)).equals(await raw(checked!.assetId!, true))).toBe(true)
+    expect((await sheetState(h.deps, h.ctx, id)).states.find(s => s.refId === 'REF-04')!.status).toBe('approved')
   })
 
   it('reports cost per approved asset', async () => {

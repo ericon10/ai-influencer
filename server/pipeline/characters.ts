@@ -31,7 +31,8 @@ export function toData(row: CharacterRow): CharacterData {
     preferredModels: (row.preferredModels ?? {}) as Record<string, string>,
     disclosure: row.disclosure,
     notes: row.notes,
-    identity: (row.identityModel ?? null) as CharacterIdentity | null,
+    // Stored as a list; an early build stored a single object.
+    identities: (Array.isArray(row.identityModel) ? row.identityModel : row.identityModel ? [row.identityModel] : []) as CharacterIdentity[],
     sections: (row.fileSections ?? []) as FileSection[],
   }
 }
@@ -50,7 +51,7 @@ function fromData(d: Partial<CharacterData>): Partial<typeof characters.$inferIn
   if (d.preferredModels !== undefined) out.preferredModels = d.preferredModels
   if (d.disclosure !== undefined) out.disclosure = d.disclosure
   if (d.notes !== undefined) out.notes = d.notes
-  if (d.identity !== undefined) out.identityModel = d.identity
+  if (d.identities !== undefined) out.identityModel = d.identities
   if (d.sections !== undefined) out.fileSections = d.sections
   return out
 }

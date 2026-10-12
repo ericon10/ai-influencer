@@ -23,13 +23,20 @@ export type Pronouns = z.infer<typeof pronounsSchema>
 export type CharacterMark = z.infer<typeof markSchema>
 
 // A saved identity on a provider, for example a Higgsfield Element (instant,
-// no training, referenced from prompts) or a trained model.
+// no training, referenced from prompts) or a trained Soul character.
 export interface CharacterIdentity {
   provider: string
   kind: 'element' | 'trained'
   name: string
   externalId: string
   status: 'ready' | 'queued' | 'failed'
+  // The model this identity is used with (a Soul character runs on Soul).
+  model?: string
+  // Text that goes into every prompt that uses this identity.
+  promptBlock?: string
+  // A follow-up pass after every result made with this identity, for
+  // example a face-only edit that locks the face to REF-00.
+  followUp?: { name: string; model?: string; text: string }
   notes?: string
 }
 
@@ -51,7 +58,7 @@ export interface CharacterData {
   preferredModels: Record<string, string>
   disclosure: string
   notes: string
-  identity: CharacterIdentity | null
+  identities: CharacterIdentity[]
   sections: FileSection[]
 }
 

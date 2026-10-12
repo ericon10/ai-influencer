@@ -10,6 +10,7 @@ import { getAsset } from '../storage/assets'
 import { candidatesFor, getCharacter, inspirationAssetIds, listConcepts, sheetState, toData, type CharacterRow } from '../pipeline/characters'
 import { characterCosts } from '../pipeline/costs'
 import { providerMode, resolveRoute } from '../pipeline/settings'
+import { effectiveModel, readModelOverrides } from '../providers/modelOverrides'
 
 // Response shapes for the UI. Plain data only; no secrets, no internals.
 
@@ -82,6 +83,7 @@ async function defaultVariations(deps: Deps, ctx: Ctx): Promise<number> {
 
 export async function settingsView(deps: Deps, ctx: Ctx) {
   const b = await effectiveBudgets(deps.db, ctx.accountId, deps.config.budgets)
+  const overrides = await readModelOverrides(deps.db, ctx.accountId)
   const tasks = Object.keys(deps.config.routing.tasks)
   return {
     mode: await providerMode(deps.db, ctx.accountId),
@@ -95,7 +97,15 @@ export async function settingsView(deps: Deps, ctx: Ctx) {
       confirmAbove: microsToUsd(b.confirmAboveMicros), warnPct: b.warnPct,
     },
     routing: await Promise.all(tasks.map(async t => ({ task: t, configured: deps.config.routing.tasks[t]!.model, effective: (await resolveRoute(deps, ctx, t)).model }))),
-    models: deps.config.models.models.filter(m => !m.ref.startsWith('mock/')).map(m => ({ ref: m.ref, label: m.label, kinds: m.kinds, verified: m.verified && !!m.endpoint, notes: m.notes ?? '' })),
+    models: deps.config.models.models.filter(m => !m.ref.startsWith('mock/')).map(m => {
+      const e = effectiveModel(m, overrides[m.ref])
+      const o = overrides[m.ref]
+      return {
+        ref: m.ref, label: m.label, kinds: m.kinds, verified: e.confirmed, notes: m.notes ?? '',
+        endpoint: e.endpoint ?? '', endpointSource: e.endpointSource, confirmedAt: e.confirmed ? (o?.confirmedAt ?? null) : null,
+        lastTest: o?.lastTest ?? null, testing: !!o?.pendingTest,
+      }
+    }),
     prices: deps.config.pricebook.entries.filter(e => e.provider !== 'mock').map(e => ({
       model: `${e.provider}/${e.model}`, unit: e.unit, price: formatUsd(Math.round(e.price * 1_000_000)), verified: e.verified, source: e.source ?? '',
       when: e.when ? Object.values(e.when).join(', ') : '', credits: e.credits ?? null,

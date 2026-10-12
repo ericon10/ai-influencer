@@ -16,14 +16,17 @@ entries:
   - { provider: higgsfield, model: nano-banana-2, unit: image, price: 0.12, verified: false }
   - { provider: higgsfield, model: soul-2, unit: image, price: 0.10, verified: false }
   - { provider: higgsfield, model: bytedance-upscale, unit: image, price: 0.10, verified: false, credits: 2, source: "2 credits at 2k, verified live 2026-10-12" }
-  # Video, per second.
-  - { provider: higgsfield, model: seedance-2.5, unit: second, price: 0.60, verified: false, credits: 7, source: "720p, audio off: 70 credits per 10 s, verified live 2026-10-12. Third-party catalog copies list token pricing near $0.46/s at 720p." }
-  - { provider: higgsfield, model: seedance-2.0, unit: second, price: 0.141, verified: true, source: "SPEC.md 7.2 list price" }
-  - { provider: higgsfield, model: kling-3.0, unit: second, price: 0.15, verified: false, credits: 1.5, source: "Pro, sound off: 15 credits per 10 s, verified live 2026-10-12. Third-party catalog copies list Pro near $0.092/s, Standard near $0.069/s." }
-  - { provider: higgsfield, model: kling-3.0-turbo, unit: second, price: 0.15, verified: false, credits: 1.5, when: { resolution: 720p }, source: "about 1.5 credits/s at 720p, verified live 2026-10-12. Third-party catalog copies list near $0.062/s." }
-  - { provider: higgsfield, model: kling-3.0-turbo, unit: second, price: 0.20, verified: false, credits: 2, when: { resolution: 1080p }, source: "about 2 credits/s at 1080p, verified live 2026-10-12" }
-  - { provider: higgsfield, model: kling-3.0-turbo, unit: second, price: 0.20, verified: false }
-  - { provider: higgsfield, model: wan-3.0, unit: second, price: 0.068, verified: true, source: "SPEC.md 7.2 list price" }
+  # Video, per second. Official prices from open.higgsfield.ai/pricing (read
+  # by the owner 2026-10-12). "From" prices are starting tiers: they stay
+  # unconfirmed until the model's paid test shows the tier its requests use.
+  - { provider: higgsfield, model: seedance-2.5, unit: second, price: 0.206, verified: false, credits: 7, source: "Official pricing page: from $0.206/s. Web/MCP: 70 credits per 10 s at 720p, audio off (verified live 2026-10-12)." }
+  - { provider: higgsfield, model: seedance-2.0, unit: second, price: 0.141, verified: false, source: "Official pricing page: from $0.141/s." }
+  - { provider: higgsfield, model: kling-3.0-standard, unit: second, price: 0.063, verified: true, source: "Official pricing page: $0.063/s." }
+  - { provider: higgsfield, model: kling-3.0-pro, unit: second, price: 0.084, verified: true, credits: 1.5, source: "Official pricing page: $0.084/s. Web/MCP: 15 credits per 10 s, sound off (verified live 2026-10-12)." }
+  - { provider: higgsfield, model: kling-3.0-turbo, unit: second, price: 0.15, verified: false, credits: 1.5, when: { resolution: 720p }, source: "Placeholder. Web/MCP: about 1.5 credits/s at 720p (verified live 2026-10-12)." }
+  - { provider: higgsfield, model: kling-3.0-turbo, unit: second, price: 0.20, verified: false, credits: 2, when: { resolution: 1080p }, source: "Placeholder. Web/MCP: about 2 credits/s at 1080p (verified live 2026-10-12)." }
+  - { provider: higgsfield, model: kling-3.0-turbo, unit: second, price: 0.20, verified: false, source: "Placeholder." }
+  - { provider: higgsfield, model: wan-3.0, unit: second, price: 0.068, verified: false, source: "Official pricing page: Wan 3.0 Prime from $0.068/s." }
   # Audio, per second of sound.
   - { provider: higgsfield, model: mirelo-sfx, unit: second, price: 0.05, verified: false }
 

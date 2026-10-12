@@ -11,6 +11,8 @@ export interface RuleContext {
   kind?: string
   request?: Partial<GenRequest>
   sheetLock?: { model: string } | null
+  // The prompt block of the saved identity this request uses, if any.
+  identityBlock?: string
   aspectByFraming?: Record<string, string>
   marks?: Mark[]
 }
@@ -64,6 +66,8 @@ function check(rule: Rule, prompt: string, ctx: RuleContext): string | null | un
       const want = ctx.framing ? ctx.aspectByFraming?.[ctx.framing] : undefined
       return want && ctx.request?.aspect !== want ? `aspect ${ctx.request?.aspect ?? 'unset'}, expected ${want}` : null
     }
+    case 'identity_block':
+      return ctx.identityBlock && !prompt.includes(ctx.identityBlock.trim()) ? 'the saved identity\'s prompt block is missing' : null
     case 'sheet_model_locked':
       return ctx.sheetLock && ctx.request?.model && ctx.request.model !== ctx.sheetLock.model ? `${ctx.request.model} (sheet uses ${ctx.sheetLock.model})` : null
     case 'marks_stated': {

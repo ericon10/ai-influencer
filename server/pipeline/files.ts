@@ -26,9 +26,10 @@ export async function exportCharacter(deps: Deps, ctx: Ctx, characterId: string)
 export interface ImportOptions {
   characterId?: string // apply edits to an existing character instead of creating one
   images?: Record<string, { data: Buffer; mime?: string }> // REF-xx -> approved sheet image
+  checks?: CheckImage[] // images to check with QA, never approved on import
 }
 
-export async function importCharacter(deps: Deps, ctx: Ctx, markdown: string, opts: ImportOptions = {}): Promise<{ characterId: string; result: ImportResult; importedShots: string[] }> {
+export async function importCharacter(deps: Deps, ctx: Ctx, markdown: string, opts: ImportOptions = {}): Promise<{ characterId: string; result: ImportResult; importedShots: string[]; checkShots: string[] }> {
   const result = importCharacterFile(markdown, { models: deps.config.models.models })
   const data = result.character
   let characterId: string
@@ -40,9 +41,10 @@ export async function importCharacter(deps: Deps, ctx: Ctx, markdown: string, op
     characterId = row.id
   }
   const importedShots = await attachSheetImages(deps, ctx, characterId, opts.images ?? {}, data.name)
+  const checkShots = await attachCheckImages(deps, ctx, characterId, opts.checks ?? [])
   const sheetModel = data.preferredModels.sheet
   if (sheetModel && !opts.characterId) await setCharacterFields(deps, ctx, characterId, { sheetLock: { model: sheetModel, quality: deps.config.pipeline.sheet.settings.quality, resolution: deps.config.pipeline.sheet.settings.resolution } })
-  return { characterId, result, importedShots }
+  return { characterId, result, importedShots, checkShots }
 }
 
 // Approved sheet images brought in from outside (for example a sheet built
@@ -70,4 +72,24 @@ export async function attachSheetImages(deps: Deps, ctx: Ctx, characterId: strin
     attached.push(refId)
   }
   return attached
+}
+
+export interface CheckImage { refId: string; name: string; data: Buffer; mime?: string }
+
+// Images brought in to be checked, such as a mirrored REF-04 kept as a
+// negative test. They sit beside the shot as "to check", never in the sheet
+// and never in the review queue; QA on one is a quoted action.
+export async function attachCheckImages(deps: Deps, ctx: Ctx, characterId: string, checks: CheckImage[]): Promise<string[]> {
+  const shots = deps.config.pipeline.sheet.shots
+  const added: string[] = []
+  for (const c of checks) {
+    if (!shots.some(s => s.id === c.refId)) throw new AppError('bad_request', `Unknown shot ${c.refId}.`)
+    const asset = await saveAsset(deps, ctx, { data: c.data, mime: c.mime, origin: 'upload', label: c.name })
+    await deps.db.insert(candidates).values({
+      id: newId('cand'), accountId: ctx.accountId, characterId, target: 'sheet', refId: c.refId, assetId: asset.id,
+      status: 'check', rejectNote: `Uploaded to check: ${c.name}`, createdBy: ctx.userId,
+    })
+    added.push(c.name)
+  }
+  return added
 }

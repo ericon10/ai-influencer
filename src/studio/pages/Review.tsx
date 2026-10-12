@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { AlertTriangle, Check, CheckCircle2, Columns2, FileText, Maximize, ScanFace, SplitSquareHorizontal, X, XCircle } from 'lucide-react'
+import { AlertTriangle, Check, CheckCircle2, Columns2, FileText, FlipHorizontal2, Maximize, ScanFace, SplitSquareHorizontal, X, XCircle } from 'lucide-react'
 import { api, assetUrl } from '../api'
 import { useCharacter, useRefresh } from '../hooks'
 import { PriceButton } from '../PriceButton'
@@ -176,7 +176,9 @@ function ReviewShot({ v, shot }: { v: CharacterView; shot: Shot }) {
               <input className="st-input" placeholder="Anything else? (optional)" value={note} onChange={e => setNote(e.target.value)} style={{ background: '#11100f', color: '#f6f2ec' }} />
             </div>
           ) : (
-            <Verdict cand={cand} />
+            <Verdict cand={cand} onMirror={cand?.qaReport?.mirrorFix?.available ? async () => {
+              try { await api.mirror(cand.id); refresh(v.id); toast({ tone: 'ok', text: `Mirrored ${cand.refId}. No new generation, no cost.` }) } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) }
+            } : undefined} />
           )}
           <div className="st-review-actions">
             {rejecting ? (
@@ -207,7 +209,7 @@ function zoomTo(cx: number, cy: number, s: number): View {
   return { s, x: (0.5 - cx) * s, y: (0.5 - cy) * s }
 }
 
-function Verdict({ cand }: { cand: Candidate | undefined }) {
+function Verdict({ cand, onMirror }: { cand: Candidate | undefined; onMirror?: () => void }) {
   const r = cand?.qaReport
   if (!r) return <div className="st-verdict uncertain"><span className="st-verdict-icon"><AlertTriangle size={18} /></span><div><div className="st-verdict-title">No automatic QA for this result</div><ul><li>Check the marks, framing and face yourself.</li></ul></div></div>
   const title = { post: 'QA: looks right', edit: 'QA: a small detail to fix', regenerate: 'QA: should be regenerated', uncertain: 'QA: needs your eye' }[r.verdict]
@@ -219,6 +221,7 @@ function Verdict({ cand }: { cand: Candidate | undefined }) {
         <div className="st-verdict-title">{title}</div>
         {notes.length ? <ul>{notes.slice(0, 4).map((f, i) => <li key={i}>{f.message}</li>)}</ul> : <ul><li>Marks on the right sides, framing as asked, no extra jewelry or logos.</li></ul>}
         {r.identity && <FaceMatch score={r.identity} />}
+        {onMirror && <button className="st-btn sm secondary" style={{ marginTop: 8 }} onClick={onMirror} title={r.mirrorFix?.message}><FlipHorizontal2 size={13} />Mirror it (free)</button>}
       </div>
     </div>
   )

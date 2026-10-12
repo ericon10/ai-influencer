@@ -8,6 +8,7 @@ import { createMockAdapter, type MockOptions } from './mock'
 import { createMockLlm, type LlmResponder } from './mockLlm'
 import { createAnthropicLlm } from './anthropic'
 import { createHiggsfieldAdapter } from './higgsfield'
+import { readModelOverrides, withModelOverrides } from './modelOverrides'
 import type { LlmProvider, ProviderAdapter } from './types'
 
 // Resolves the adapter for a model ref, using the account's own encrypted
@@ -60,7 +61,8 @@ export function createRegistry(o: RegistryOptions): ProviderRegistry & { mockFor
       if (p === 'mock') return mockFor(accountId)
       const secret = await readSecret(o.db, o.vault, accountId, p)
       if (!secret) throw new AppError('provider_not_configured', `Add your ${p} API key in Settings to run this live.`)
-      if (p === 'higgsfield') return createHiggsfieldAdapter({ credentials: secret, config: o.config })
+      // The account's own confirmed endpoints apply on top of the catalog.
+      if (p === 'higgsfield') return createHiggsfieldAdapter({ credentials: secret, config: withModelOverrides(o.config, await readModelOverrides(o.db, accountId)) })
       throw new AppError('provider_not_configured', `No adapter for provider "${p}" yet.`)
     },
     async llm(accountId, modelRef) {

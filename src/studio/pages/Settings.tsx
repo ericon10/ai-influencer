@@ -4,6 +4,7 @@ import { CheckCircle2, KeyRound, ShieldCheck, Trash2 } from 'lucide-react'
 import { api } from '../api'
 import { keys, useSettings } from '../hooks'
 import { Callout, errorMessage, useToast } from '../ui'
+import { PriceButton } from '../PriceButton'
 import type { SettingsView } from '../types'
 
 export default function Settings() {
@@ -133,26 +134,70 @@ function BudgetsCard({ d }: { d: SettingsView }) {
 }
 
 function ModelsCard({ d }: { d: SettingsView }) {
+  const hf = d.models.filter(m => m.ref.startsWith('higgsfield/'))
+  const confirmed = hf.filter(m => m.verified).length
   return (
-    <div className="st-card">
-      <div className="st-card-head"><div className="grow"><div className="st-h2">Models and prices</div><div className="st-hint">Price book {d.priceVersion}. Unconfirmed prices are set high on purpose until checked against the provider.</div></div></div>
-      <div style={{ overflowX: 'auto' }}>
-        <table className="st-table">
-          <thead><tr><th>Task</th><th>Model</th><th>Runs on now</th></tr></thead>
-          <tbody>{d.routing.map(r => <tr key={r.task}><td className="strong">{r.task.replace(/_/g, ' ')}</td><td className="st-mono">{r.configured}</td><td className="st-mono">{r.effective}</td></tr>)}</tbody>
-        </table>
-        <div className="st-divider" style={{ margin: 0 }} />
-        <table className="st-table">
-          <thead><tr><th>Model</th><th>Unit</th><th>Price</th><th title="As charged in the Higgsfield web app, for reference">Credits</th><th>Status</th></tr></thead>
-          <tbody>{d.prices.map(p => (
-            <tr key={p.model + p.unit + p.when} title={p.source || undefined}>
-              <td className="st-mono strong">{p.model}</td><td>{p.unit.replace('mtok_', 'million tokens, ').replace('_', ' ')}{p.when ? `, ${p.when}` : ''}</td><td>{p.price}</td>
-              <td className="st-mono">{p.credits ?? ''}</td>
-              <td><span className={`st-badge ${p.verified ? 'ok' : 'warn'}`}>{p.verified ? 'Confirmed' : 'Unconfirmed'}</span></td>
-            </tr>
-          ))}</tbody>
-        </table>
-        <div className="st-card-body"><Callout tone="info">Higgsfield models run live only after their API endpoint is confirmed: {d.models.filter(m => !m.verified).map(m => m.label).join(', ') || 'all confirmed'}.</Callout></div>
+    <>
+      <div className="st-card">
+        <div className="st-card-head">
+          <div className="grow">
+            <div className="st-h2">Higgsfield models</div>
+            <div className="st-hint">A model runs live once it is confirmed: enter its path from Higgsfield's official Model API Reference, then run its test. The test is the cheapest request the model takes, and its price shows first.</div>
+          </div>
+          <span className={`st-badge ${confirmed === hf.length ? 'ok' : 'warn'}`}>{confirmed} of {hf.length} confirmed</span>
+        </div>
+        <div className="st-card-body st-col" style={{ gap: 10 }}>
+          {d.mode !== 'live' && <Callout tone="info">Tests are real, paid runs, so they need live mode and your Higgsfield key.</Callout>}
+          {hf.map(m => <ModelRow key={m.ref} m={m} live={d.mode === 'live'} />)}
+        </div>
+      </div>
+      <div className="st-card">
+        <div className="st-card-head"><div className="grow"><div className="st-h2">Routing and prices</div><div className="st-hint">Price book {d.priceVersion}. Higgsfield USD prices come from open.higgsfield.ai/pricing; a "from" price stays unconfirmed until a test shows which tier the requests use.</div></div></div>
+        <div style={{ overflowX: 'auto' }}>
+          <table className="st-table">
+            <thead><tr><th>Task</th><th>Model</th><th>Runs on now</th></tr></thead>
+            <tbody>{d.routing.map(r => <tr key={r.task}><td className="strong">{r.task.replace(/_/g, ' ')}</td><td className="st-mono">{r.configured}</td><td className="st-mono">{r.effective}</td></tr>)}</tbody>
+          </table>
+          <div className="st-divider" style={{ margin: 0 }} />
+          <table className="st-table">
+            <thead><tr><th>Model</th><th>Unit</th><th>Price</th><th title="As charged in the Higgsfield web app, for reference">Credits</th><th>Status</th></tr></thead>
+            <tbody>{d.prices.map(p => (
+              <tr key={p.model + p.unit + p.when} title={p.source || undefined}>
+                <td className="st-mono strong">{p.model}</td><td>{p.unit.replace('mtok_', 'million tokens, ').replace('_', ' ')}{p.when ? `, ${p.when}` : ''}</td><td>{p.source.includes(': from') ? `from ${p.price}` : p.price}</td>
+                <td className="st-mono">{p.credits ?? ''}</td>
+                <td><span className={`st-badge ${p.verified ? 'ok' : 'warn'}`}>{p.verified ? 'Confirmed' : p.source.startsWith('Official') ? 'Official, from' : 'Placeholder'}</span></td>
+              </tr>
+            ))}</tbody>
+          </table>
+        </div>
+      </div>
+    </>
+  )
+}
+
+function ModelRow({ m, live }: { m: SettingsView['models'][number]; live: boolean }) {
+  const toast = useToast()
+  const invalidate = useInvalidate()
+  const [endpoint, setEndpoint] = useState(m.endpoint)
+  const [saving, setSaving] = useState(false)
+  useEffect(() => { setEndpoint(m.endpoint) }, [m.endpoint])
+  const dirty = endpoint.trim() !== m.endpoint
+  async function save() {
+    setSaving(true)
+    try { await api.setModelEndpoint(m.ref, endpoint.trim()); invalidate(); toast({ tone: 'ok', text: endpoint.trim() ? `${m.label}: path saved. Run its test to confirm it.` : `${m.label}: path cleared.` }) } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) } finally { setSaving(false) }
+  }
+  const status = m.verified ? { tone: 'ok', text: 'Confirmed' } : m.testing ? { tone: 'info', text: 'Testing' } : m.endpoint ? { tone: 'warn', text: 'Ready to test' } : { tone: '', text: 'Needs its path' }
+  return (
+    <div className="st-modelrow">
+      <div className="st-col" style={{ gap: 2, minWidth: 0 }}>
+        <div className="st-row" style={{ gap: 8 }}><b>{m.label}</b><span className={`st-badge plain ${status.tone}`}>{status.text}</span></div>
+        <span className="st-hint st-mono">{m.ref}</span>
+        {m.lastTest && <span className={`st-hint ${m.lastTest.ok ? '' : 'bad'}`}>{m.lastTest.message}</span>}
+      </div>
+      <div className="st-row" style={{ gap: 8, minWidth: 0 }}>
+        <input className="st-input st-mono" style={{ flex: 1, minWidth: 0 }} placeholder="path from the official reference" value={endpoint} onChange={e => setEndpoint(e.target.value)} aria-label={`${m.label} endpoint`} />
+        {dirty && <button className="st-btn sm" disabled={saving} onClick={save}>Save</button>}
+        {!dirty && m.endpoint && live && !m.testing && <PriceButton action={{ type: 'model_test', model: m.ref }} label={m.verified ? 'Test again' : 'Test'} variant="secondary" size="sm" />}
       </div>
     </div>
   )

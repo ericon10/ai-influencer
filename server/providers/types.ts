@@ -26,6 +26,10 @@ export interface GenRequest {
   // Video: always false (SPEC 5.4 rule 27). The type allows nothing else.
   audio?: false
   seed?: number
+  // A saved identity on the provider (for example a trained Soul character).
+  identityId?: string
+  // The one small paid test that confirms a model (Settings, Models).
+  modelTest?: true
   // Upscale factor for kind "upscale" (SPEC 5.1 rule 6: 2x, never more).
   scale?: 2
 }

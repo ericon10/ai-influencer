@@ -13,5 +13,5 @@ mock:
   image: mock/image
   video: mock/video
   llm: mock/llm
-avoid:
-  scene: [higgsfield/gpt-image-2.5-flare]
+# Models to keep out of a task, per task (none at the moment).
+avoid: {}

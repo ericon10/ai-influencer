@@ -1,6 +1,8 @@
-# Model catalog. A model ref is "provider/model". Higgsfield endpoint ids are
-# filled in once confirmed against the Higgsfield Console docs; until then
-# `verified: false` keeps the adapter from submitting live runs to them.
+# Model catalog. A model ref is "provider/model". A Higgsfield REST endpoint
+# is filled in only from Higgsfield's official Model API Reference, never from
+# third-party copies of the catalog, and a model counts as confirmed only after
+# one small paid test passes (Settings, Models: enter the path, then Test).
+# Until then the adapter refuses to send live runs to it.
 #
 # Identity without training: Higgsfield Elements (reference characters) are
 # instant and are used through a <<<element_id>>> placeholder in the prompt
@@ -24,7 +26,7 @@ models:
     aliases: [GPT Image 2.5, gpt_image_2_5, GPT Image 2.5 Sunburst]
     params: { variants: [flare, sunburst] }
     use_for: [hero, sheet]
-    notes: Sheet model (Callie's sheet was built here). Variants flare and sunburst, verified live 2026-10-12. On the REST API it may only exist as marketing-studio/image/flare and /sunburst, billed per token (third-party catalog copies); confirm before use.
+    notes: Sheet model (Callie's sheet was built here). Variants flare and sunburst, verified live 2026-10-12.
   - ref: higgsfield/gpt-image-2.5-flare
     label: GPT Image 2.5 Flare
     kinds: [image, image_edit]
@@ -35,8 +37,8 @@ models:
     mcp_id: gpt_image_2_5
     aliases: [GPT Image 2.5 Flare, Flare]
     params: { variant: flare }
-    avoid_for: [scene]
-    notes: Distorted hair in scene tests (verified live 2026-10-12); avoid for scenes.
+    use_for: [scene_still]
+    notes: Strong for stills; made Callie's best beach shot with real skin texture and the right ear cuff, though it once distorted her hair in a scene. Run it alongside Nano Banana 2.1 and pick the best.
   - ref: higgsfield/nano-banana-2.1
     label: Nano Banana 2.1
     kinds: [image, image_edit]
@@ -81,17 +83,17 @@ models:
     label: Seedance 2.5
     kinds: [video]
     max_refs: 0
-    # Candidate REST path from third-party copies of the Higgsfield catalog;
-    # confirm, then set verified: true.
-    endpoint: bytedance/seedance-2.5/image-to-video
+    endpoint: null
     input_map: seedance_i2v
     verified: false
     mcp_id: seedance_2_5
     aliases: [Seedance 2.5, seedance_2_5]
     audio: off_switch
-    params: { start_image: true, end_image: true, mode_with_images: omni_reference, resolution: [720p] }
+    # Two paths, both kept: the REST API takes start and end frames directly;
+    # the web app and MCP connector need mode omni_reference for them.
+    params: { start_image: true, end_image: true, rest_frames: direct, web_mcp_mode_with_frames: omni_reference, resolution: [720p] }
     use_for: [video_final]
-    notes: Best faces; the final-quality video model. Start and end images require mode omni_reference (the default rejects reference media). 720p, 10 s, audio off = 70 credits (verified live 2026-10-12).
+    notes: Best faces; the final-quality video model. On the web app and MCP, start and end frames need mode omni_reference (the default rejects reference media); 720p, 10 s, audio off = 70 credits (verified live 2026-10-12).
   - ref: higgsfield/seedance-2.0
     label: Seedance 2.0
     kinds: [video, video_extend]
@@ -101,25 +103,35 @@ models:
     verified: false
     aliases: [Seedance 2.0]
     audio: off_switch
-  - ref: higgsfield/kling-3.0
-    label: Kling 3.0
+  - ref: higgsfield/kling-3.0-standard
+    label: Kling 3.0 Standard
     kinds: [video]
     max_refs: 0
-    # Candidate REST path (mode std, pro or 4k is in the path); confirm first.
-    endpoint: kling-video/v3.0/pro/image-to-video
+    endpoint: null
     input_map: kling_v3
     verified: false
     mcp_id: kling3_0
-    aliases: [Kling 3.0, Kling 3.0 Pro, kling3_0, Kling 3.0 Standard]
+    aliases: [Kling 3.0 Standard, Kling 3.0]
     audio: off_switch
-    params: { start_image: true, end_image: true, mode: [std, pro, 4k], sound: [on, off], elements_need_start_image: true }
-    notes: Pro, sound off, 10 s = 15 credits (verified live 2026-10-12). Element placeholders only work with a start image. Pro distorted a face that talked animatedly.
+    params: { start_image: true, end_image: true, mode: std, sound: [on, off], elements_need_start_image: true }
+    notes: Element placeholders only work with a start image (verified live 2026-10-12).
+  - ref: higgsfield/kling-3.0-pro
+    label: Kling 3.0 Pro
+    kinds: [video]
+    max_refs: 0
+    endpoint: null
+    input_map: kling_v3
+    verified: false
+    mcp_id: kling3_0
+    aliases: [Kling 3.0 Pro]
+    audio: off_switch
+    params: { start_image: true, end_image: true, mode: pro, sound: [on, off], elements_need_start_image: true }
+    notes: Pro, sound off, 10 s = 15 credits (verified live 2026-10-12). Distorted Callie's face when she talked animatedly.
   - ref: higgsfield/kling-3.0-turbo
     label: Kling 3.0 Turbo
     kinds: [video]
     max_refs: 0
-    # Candidate REST path; confirm first.
-    endpoint: kling-video/v3.0-turbo/image-to-video
+    endpoint: null
     input_map: kling_v3
     verified: false
     mcp_id: kling3_0_turbo
@@ -129,7 +141,7 @@ models:
     use_for: [video_test]
     notes: Cheap motion tests only; faces melt when the subject is small. Always generates audio (no off switch), so the Studio strips it on arrival (verified live 2026-10-12).
   - ref: higgsfield/wan-3.0
-    label: Wan 3.0
+    label: Wan 3.0 Prime
     kinds: [video]
     max_refs: 0
     endpoint: null

@@ -21,6 +21,9 @@ const identitySchema = z.object({
   name: z.string(),
   externalId: z.string(),
   status: z.enum(['ready', 'queued', 'failed']),
+  model: z.string().optional(),
+  promptBlock: z.string().optional(),
+  followUp: z.object({ name: z.string(), model: z.string().optional(), text: z.string() }).optional(),
   notes: z.string().optional(),
 })
 
@@ -39,7 +42,7 @@ const frontSchema = z.object({
   persona: z.record(z.string(), z.unknown()).default({}),
   avoid_models: z.array(z.string()).default([]),
   preferred_models: z.record(z.string(), z.string()).default({}),
-  identity: identitySchema.nullable().default(null),
+  identities: z.array(identitySchema).default([]),
   disclosure: z.string().default('Label all posts as AI-generated'),
   notes: z.string().default(''),
   sheet: z.array(z.object({ id: z.string(), label: z.string(), status: z.string(), checksum: z.string().nullable() })).optional(),
@@ -99,12 +102,22 @@ function markLine(m: CharacterMark, poss: string): string {
 
 const OWNED = ['card', 'distinguishing marks', 'body', 'makeup', 'notes']
 
+// One key order for identities, so exports are stable however they were built.
+function canonicalIdentity(i: CharacterIdentity): CharacterIdentity {
+  const out: CharacterIdentity = { provider: i.provider, kind: i.kind, name: i.name, externalId: i.externalId, status: i.status }
+  if (i.model) out.model = i.model
+  if (i.promptBlock) out.promptBlock = i.promptBlock
+  if (i.followUp) out.followUp = { name: i.followUp.name, ...(i.followUp.model ? { model: i.followUp.model } : {}), text: i.followUp.text }
+  if (i.notes) out.notes = i.notes
+  return out
+}
+
 export function exportCharacterFile(ch: CharacterData, sheet: SheetEntry[] = []): string {
   const front = {
     studio: 'character-studio', format: FORMAT,
     name: ch.name, age: ch.age, eyes: ch.eyes, card: ch.card, body: ch.body,
     marks: ch.marks, pronouns: ch.pronouns, makeup: ch.makeup, style: ch.style, persona: ch.persona,
-    avoid_models: ch.avoidModels, preferred_models: ch.preferredModels, identity: ch.identity, disclosure: ch.disclosure, notes: ch.notes,
+    avoid_models: ch.avoidModels, preferred_models: ch.preferredModels, identities: ch.identities.map(canonicalIdentity), disclosure: ch.disclosure, notes: ch.notes,
     ...(sheet.length ? { sheet } : {}),
   }
   const p = ch.pronouns.poss
@@ -158,7 +171,7 @@ export function importCharacterFile(md: string, opts: ImportOptions = {}): Impor
       preferredModels: front.preferred_models,
       disclosure: front.disclosure,
       notes: notes != null ? (notes === '(none)' ? '' : unwrap(notes)) : front.notes,
-      identity: front.identity,
+      identities: front.identities,
       sections: kept,
     },
     sheet: front.sheet ?? [],
@@ -236,18 +249,28 @@ function detectPronouns(md: string): Pronouns {
   return { subj: 'she', obj: 'her', poss: 'her', noun: 'woman' }
 }
 
-// The first model named in a line, longest name first at each position.
-function modelIn(line: string, models: ModelAlias[]): string | null {
-  const names = models.flatMap(m => [m.label, ...(m.aliases ?? [])].map(n => ({ n, ref: m.ref })))
-    .sort((a, b) => b.n.length - a.n.length)
-  let best: { at: number; len: number; ref: string } | null = null
+// Every model named in a line, in order, taking the longest name at each
+// position ("GPT Image 2.5 Flare" before "GPT Image 2.5").
+function modelsIn(line: string, models: ModelAlias[]): string[] {
+  const names = models.flatMap(m => [m.label, ...(m.aliases ?? [])].map(n => ({ n: n.toLowerCase(), ref: m.ref })))
   const lower = line.toLowerCase()
+  const hits: Array<{ at: number; end: number; ref: string }> = []
   for (const { n, ref } of names) {
-    const at = lower.search(new RegExp(`(?<![a-z0-9])${n.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![a-z0-9]|\\.\\d)`))
-    if (at >= 0 && (!best || at < best.at || (at === best.at && n.length > best.len))) best = { at, len: n.length, ref }
+    const re = new RegExp(`(?<![a-z0-9])${n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![a-z0-9]|\\.\\d)`, 'g')
+    for (const m of lower.matchAll(re)) hits.push({ at: m.index!, end: m.index! + n.length, ref })
   }
-  return best?.ref ?? null
+  hits.sort((x, y) => x.at - y.at || (y.end - y.at) - (x.end - x.at))
+  const out: string[] = []
+  let covered = -1
+  for (const h of hits) {
+    if (h.at < covered) continue
+    covered = h.end
+    if (!out.includes(h.ref)) out.push(h.ref)
+  }
+  return out
 }
+
+const modelIn = (line: string, models: ModelAlias[]): string | null => modelsIn(line, models)[0] ?? null
 
 export function importFreeform(md: string, opts: ImportOptions = {}): ImportResult {
   const warnings: string[] = ['Read as a hand-written character file (no Studio header). Check the fields below.']
@@ -324,32 +347,65 @@ export function importFreeform(md: string, opts: ImportOptions = {}): ImportResu
   if (discSec) parsedOnly.add(discSec)
   const disclosure = discSec ? unwrap(discSec.body) : 'Label all posts as AI-generated'
 
-  // Models: identity (a saved element), preferred and avoided models.
-  let identity: CharacterIdentity | null = null
+  // Models: saved identities (an element, a trained Soul character), the
+  // follow-up pass that goes with one, and preferred and avoided models.
+  const identities: CharacterIdentity[] = []
+  const followUps: Bullet[] = []
   const preferredModels: Record<string, string> = {}
   const avoidModels: string[] = []
   for (const b of bullets(find(sections, /^models?$/, /^model notes$/)?.body ?? '')) {
     const k = (b.key ?? '').toLowerCase()
-    const line = `${b.key ?? ''}: ${b.value}`
-    const id = b.value.match(UUID)?.[0]
-    if (id && /element|identity|character/i.test(line)) {
-      identity = {
-        provider: /higgsfield/i.test(line) ? 'higgsfield' : 'unknown',
-        kind: /element/i.test(line) ? 'element' : 'trained',
-        name: b.value.match(/["“]([^"”]+)["”]/)?.[1] ?? name,
-        externalId: id, status: 'ready', notes: b.value,
-      }
+    const line = b.key ? `${b.key}: ${b.value}` : b.value
+    const id = line.match(UUID)?.[0]
+    if (id && /element|identity|character|soul_id/i.test(line)) {
+      const kind = /element/i.test(line) ? 'element' : 'trained'
+      const status = /\btrained\b/i.test(line) ? 'ready' : /\bfailed\b/i.test(line) ? 'failed' : /\b(?:queued|stuck)\b/i.test(line) ? 'queued' : 'ready'
+      identities.push({
+        provider: /higgsfield|soul|element/i.test(line) ? 'higgsfield' : 'unknown',
+        kind, name: line.match(/["“]([^"”]+)["”]/)?.[1] ?? name, externalId: id, status,
+        ...(kind === 'trained' && modelIn(line, models) ? { model: modelIn(line, models)! } : {}),
+        notes: b.value,
+      })
       continue
     }
+    if (/drift lock|follow[- ]?up/.test(k)) { followUps.push(b); continue }
     const ref = modelIn(b.value, models)
     if (!ref) continue
+    // "Stills, also strong: ..." is a second choice run alongside the first.
+    const set = (role: string) => { preferredModels[/\balso\b|alternat|second/.test(k) ? `${role}_alt` : role] = ref }
     if (/avoid/.test(k)) { if (!avoidModels.includes(ref)) avoidModels.push(ref) }
-    else if (/video/.test(k) && /final/.test(k)) preferredModels.video_final = ref
-    else if (/video/.test(k) && /test|cheap|motion/.test(k)) preferredModels.video_test = ref
-    else if (/still|scene|image/.test(k)) preferredModels.scene_still = ref
-    else if (!b.key && /sheet/i.test(b.value)) preferredModels.sheet = ref
+    else if (/video/.test(k) && /final/.test(k)) set('video_final')
+    else if (/video/.test(k) && /test|cheap|motion/.test(k)) set('video_test')
+    else if (/still|scene|image|edit/.test(k)) {
+      if (/still|scene|image/.test(k)) set('scene_still')
+      if (/edit/.test(k)) set('edit')
+    } else if (!b.key && /sheet/i.test(b.value)) preferredModels.sheet = ref
   }
-  if (identity) warnings.push(`Identity: ${identity.provider === 'higgsfield' ? 'Higgsfield ' : ''}${identity.kind === 'element' ? 'Element' : 'trained model'} "${identity.name}".`)
+  // A follow-up belongs to the identity whose model it names ("after any Soul
+  // still"); the pass itself runs on the other model it names.
+  for (const f of followUps) {
+    const named = modelsIn(f.value, models)
+    const target = identities.find(i => i.model && named[0] === i.model)
+    if (!target) continue
+    const runsOn = named.find(r => r !== target.model)
+    target.followUp = { name: f.key ?? 'Follow-up', ...(runsOn ? { model: runsOn } : {}), text: f.value }
+  }
+  // A fixed block named after an identity ("SOUL IDENTITY") goes into every
+  // prompt that uses it.
+  for (const b of bullets(find(sections, /^fixed blocks?$/, /^prompt blocks?$/)?.body ?? '')) {
+    if (!b.key || !/identity/i.test(b.key)) continue
+    const word = b.key.replace(/\(.*\)/, '').replace(/identity/i, '').trim().toLowerCase()
+    const target = identities.find(i => {
+      const m = models.find(x => x.ref === i.model)
+      return !!word && [i.name, m?.label ?? '', ...(m?.aliases ?? [])].some(n => n.toLowerCase().includes(word))
+    })
+    if (target) target.promptBlock = b.value
+  }
+  for (const i of identities) {
+    const what = i.kind === 'element' ? 'Element' : `${models.find(m => m.ref === i.model)?.label ?? 'trained'} character`
+    const extras = [i.promptBlock ? 'with its prompt block' : '', i.followUp ? `with a ${i.followUp.name.toLowerCase()} pass` : ''].filter(Boolean).join(' and ')
+    warnings.push(`Identity: ${i.provider === 'higgsfield' ? 'Higgsfield ' : ''}${what} "${i.name}"${extras ? `, ${extras}` : ''}${i.status !== 'ready' ? ` (${i.status})` : ''}.`)
+  }
 
   // Keep everything the Studio does not model, as written.
   const kept = sections.filter(s => !parsedOnly.has(s) && !/^notes?$/.test(norm(s.title)))
@@ -362,7 +418,7 @@ export function importFreeform(md: string, opts: ImportOptions = {}): ImportResu
       pronouns: detectPronouns(md),
       makeup, style, persona, avoidModels, preferredModels, disclosure,
       notes: notesSec ? unwrap(notesSec.body) : '',
-      identity, sections: kept,
+      identities, sections: kept,
     },
     sheet: [],
     warnings,

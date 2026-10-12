@@ -11,7 +11,7 @@ const callie: CharacterData = {
   style: { palette: ['honey', 'cream'] }, makeup: fx.makeup, persona: { vibe: 'sunny' }, pronouns: fx.pronouns,
   avoidModels: ['higgsfield/gpt-image-2.5-flare'], preferredModels: { sheet: 'higgsfield/gpt-image-2.5' },
   disclosure: 'Label all posts as AI-generated', notes: 'Soul 2.0 character queued, not required.',
-  identity: null, sections: [],
+  identities: [], sections: [],
 }
 const sheet = [{ id: 'REF-00', label: 'Front, close-up', status: 'approved', checksum: 'abc123' }]
 
@@ -100,6 +100,8 @@ describe("Callie's character file", () => {
   it('reads style, makeup, persona, pronouns and disclosure', () => {
     expect(c.pronouns).toEqual({ subj: 'she', obj: 'her', poss: 'her', noun: 'woman' })
     expect(c.style.palette).toEqual(['butter yellow', 'cream', 'white', 'soft pastels', 'light-wash denim', 'gold accents'])
+    expect(c.style.pieces).toContain('butter-yellow ribbed one-piece swimsuit')
+    expect(c.persona.settings).toContain('tropical coves')
     expect(c.style.hair_options).toHaveLength(4)
     expect(c.style.notes).toMatch(/^Signature look: pastel florals, ruffles, natural glow\. Footwear:/)
     expect(c.makeup).toEqual({ default: 'natural (light skin, groomed brows, tinted lip)', glam_when: ['nights_out', 'events'], glam: 'soft glam (bronzer, warm blush, glossy nude-pink lip)' })
@@ -108,15 +110,29 @@ describe("Callie's character file", () => {
     expect(c.disclosure).toBe("Label all posted content as AI-generated per each platform's rules.")
   })
 
-  it('reads her Higgsfield Element and model choices', () => {
-    expect(c.identity).toMatchObject({ provider: 'higgsfield', kind: 'element', name: 'Callie-1', externalId: '1602db94-79e3-4e5a-bbe5-de3537cd0b83', status: 'ready' })
+  it('reads her trained Soul character with its prompt block and drift lock, and her Element', () => {
+    expect(c.identities).toHaveLength(2)
+    const [soul, element] = c.identities
+    expect(soul).toMatchObject({ provider: 'higgsfield', kind: 'trained', name: 'Callie', externalId: '0fdc33c0-7a1a-40a9-9b12-0dc35f44e29e', status: 'ready', model: 'higgsfield/soul-2' })
+    expect(soul!.promptBlock).toMatch(/^Honey-blonde hair, light brown brows, fair skin with a light sun-kissed tan/)
+    expect(soul!.promptBlock).toContain('but still clearly blonde.')
+    expect(soul!.followUp).toMatchObject({ name: 'Drift lock', model: 'higgsfield/nano-banana-2.1' })
+    expect(soul!.followUp!.text).toMatch(/face-only pass/)
+    expect(element).toMatchObject({ kind: 'element', name: 'Callie-1', externalId: '1602db94-79e3-4e5a-bbe5-de3537cd0b83', status: 'ready' })
+    expect(element!.model).toBeUndefined()
+    expect(r.warnings.join(' ')).toMatch(/Soul 2.0 character "Callie", with its prompt block and with a drift lock pass/)
+  })
+
+  it('reads her model choices, with Flare as a second choice for stills and nothing avoided', () => {
     expect(c.preferredModels).toEqual({
       scene_still: 'higgsfield/nano-banana-2.1',
+      scene_still_alt: 'higgsfield/gpt-image-2.5-flare',
+      edit: 'higgsfield/nano-banana-2.1',
       video_final: 'higgsfield/seedance-2.5',
       video_test: 'higgsfield/kling-3.0-turbo',
       sheet: 'higgsfield/gpt-image-2.5',
     })
-    expect(c.avoidModels).toEqual(['higgsfield/gpt-image-2.5-flare'])
+    expect(c.avoidModels).toEqual([])
   })
 
   it('keeps every section it does not model, word for word', () => {

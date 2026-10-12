@@ -53,7 +53,10 @@ export function useCharacterJobs(id: string) {
 }
 
 export function useUsage() { return useQuery({ queryKey: keys.usage, queryFn: api.usage }) }
-export function useSettings() { return useQuery({ queryKey: keys.settings, queryFn: api.settings }) }
+// Polls while a model test is running, so its result shows up on its own.
+export function useSettings() {
+  return useQuery({ queryKey: keys.settings, queryFn: api.settings, refetchInterval: q => (q.state.data?.models.some(m => m.testing) ? 3000 : false) })
+}
 
 // Refresh everything a write can affect.
 export function useRefresh() {
@@ -63,6 +66,7 @@ export function useRefresh() {
     qc.invalidateQueries({ queryKey: keys.characters })
     qc.invalidateQueries({ queryKey: ['jobs'] })
     qc.invalidateQueries({ queryKey: keys.usage })
+    qc.invalidateQueries({ queryKey: keys.settings })
   }
 }
 

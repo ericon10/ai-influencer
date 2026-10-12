@@ -48,16 +48,18 @@ export const api = {
   favorite: (candidateId: string, favorite: boolean) => request<{ ok: true }>('POST', `/candidates/${candidateId}/favorite`, { favorite }),
   keepStale: (characterId: string, refId: string) => request<{ ok: true }>('POST', `/characters/${characterId}/sheet/${refId}/keep`, {}),
 
-  importCharacter: (form: FormData) => request<{ characterId: string; importedShots: string[]; warnings: string[] }>('POST', '/characters/import', form),
+  importCharacter: (form: FormData) => request<{ characterId: string; importedShots: string[]; checkShots: string[]; warnings: string[] }>('POST', '/characters/import', form),
   exportUrl: (id: string) => `/api/v1/characters/${id}/export`,
   applyFile: (id: string, files: File[]) => {
     const f = new FormData()
     for (const file of files) {
       if (file.name.toLowerCase().endsWith('.md')) f.append('file', file)
-      else if (file.type.startsWith('image/') && /REF-\d{2}/i.test(file.name) && !/mirror/i.test(file.name)) f.append('images', file)
+      else if (file.type.startsWith('image/') && /REF-\d{2}/i.test(file.name)) f.append('images', file)
     }
-    return request<{ warnings: string[]; importedShots: string[]; view: CharacterView }>('POST', `/characters/${id}/import-file`, f)
+    return request<{ warnings: string[]; importedShots: string[]; checkShots: string[]; view: CharacterView }>('POST', `/characters/${id}/import-file`, f)
   },
+  setModelEndpoint: (ref: string, endpoint: string) => request<SettingsView>('PUT', '/settings/models', { ref, endpoint }),
+  mirror: (candidateId: string) => request<{ candidateId: string }>('POST', `/candidates/${candidateId}/mirror`),
 
   estimate: (action: StudioAction) => request<{ quote: QuoteView; preview: ActionPreview }>('POST', '/actions/estimate', { action }),
   run: (action: StudioAction, quoteId: string, confirmed: boolean) => request<{ jobIds: string[] }>('POST', '/actions/run', { action, quoteId, confirmed }),

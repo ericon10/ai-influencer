@@ -16,6 +16,8 @@ import { quoteJobs, runJobs, type JobSpec } from '../jobs/runner'
 import type { QuoteView } from '../costs/quotes'
 import type { GenRequest } from '../providers/types'
 import { forMode, liveRoute, resolveRoute } from './settings'
+import { identityForModel, withIdentityBlock } from '../core/identity'
+import { buildModelTest, startModelTest } from './modelTests'
 import { approvedAssets, getCandidate, getCharacter, getRef, inspirationAssetIds, setCharacterFields, sheetState, toData } from './characters'
 
 // Every paid step is an action. The same builder produces the job specs for
@@ -35,6 +37,8 @@ export const actionSchema = z.discriminatedUnion('type', [
     refsMode: z.enum(['graph', 'ref00_only']).default('graph'), withQa: z.boolean().default(true),
   }),
   z.object({ type: z.literal('qa'), characterId: z.string(), candidateId: z.string() }),
+  // One small paid test that confirms a model (Settings, Models).
+  z.object({ type: z.literal('model_test'), model: z.string() }),
 ])
 
 export type StudioAction = z.infer<typeof actionSchema>
@@ -48,7 +52,7 @@ export interface ActionPreview {
 
 export interface BuiltAction {
   purpose: string
-  characterId: string
+  characterId: string | null
   specs: JobSpec[]
   preview: ActionPreview
 }
@@ -110,6 +114,7 @@ function mirrorFor(o: ReturnType<typeof idealObservation>) {
 }
 
 export async function buildAction(deps: Deps, ctx: Ctx, action: StudioAction): Promise<BuiltAction> {
+  if (action.type === 'model_test') return buildModelTest(deps, ctx, action.model)
   const row = await getCharacter(deps, ctx, action.characterId)
   const ch = toData(row)
   const tpl = deps.config.pipeline.templates
@@ -143,14 +148,17 @@ export async function buildAction(deps: Deps, ctx: Ctx, action: StudioAction): P
       const issues = validateCharacter(ch).filter(i => i.severity === 'error')
       if (issues.length) throw new AppError('invalid_request', issues.map(i => i.message).join(' '))
       const route = await resolveRoute(deps, ctx, 'hero')
-      const prompts = buildHeroPrompts(tpl, views, ch)
+      // A saved identity for the real model (for example a Soul character)
+      // rides along with its prompt block, even while demo mode runs the mock.
+      const identity = identityForModel(ch.identities, (await liveRoute(deps, ctx, 'hero')).model)
+      const prompts = buildHeroPrompts(tpl, views, ch).map(p => withIdentityBlock(p, identity))
       const warnings: RuleViolation[] = []
       const specs: JobSpec[] = []
       prompts.forEach((prompt, i) => {
         for (let r = 0; r < action.runsPerPrompt; r++) {
           // Text only: the hero never carries an attachment (SPEC 5.1 rule 1).
-          const request: GenRequest = { kind: 'image', model: route.model, prompt, aspect: route.aspect ?? '3:4', resolution: route.resolution, quality: route.quality, seed: 1000 * (i + 1) + r }
-          warnings.push(...lintOrThrow(lintPrompt(rules, prompt, { stage: 'hero', framing: 'chest_up', kind: 'image', request, marks: ch.marks }), `Hero prompt ${i + 1}`))
+          const request: GenRequest = { kind: 'image', model: route.model, prompt, aspect: route.aspect ?? '3:4', resolution: route.resolution, quality: route.quality, seed: 1000 * (i + 1) + r, ...(identity ? { identityId: identity.externalId } : {}) }
+          warnings.push(...lintOrThrow(lintPrompt(rules, prompt, { stage: 'hero', framing: 'chest_up', kind: 'image', request, marks: ch.marks, identityBlock: identity?.promptBlock }), `Hero prompt ${i + 1}`))
           specs.push({ type: 'gen', stage: 'hero', purpose: `hero:${i}`, label: `Hero prompt ${i + 1}, run ${r + 1}`, request })
         }
       })
@@ -204,17 +212,19 @@ export async function buildAction(deps: Deps, ctx: Ctx, action: StudioAction): P
       const model = route.model
       const reasonAction = action.reason ? deps.config.pipeline.review.reasons.find(r => r.id === action.reason)?.action : undefined
       const addendum = reasonAction ? deps.config.pipeline.review.actions[reasonAction]?.prompt_addendum ?? '' : ''
-      const prompt = buildSheetPrompt(tpl, views, shot, ch, addendum)
+      const identity = identityForModel(ch.identities, lockedModel)
+      const prompt = withIdentityBlock(buildSheetPrompt(tpl, views, shot, ch, addendum), identity)
       const specs: JobSpec[] = []
       let warnings: RuleViolation[] = []
       for (let v = 0; v < action.variations; v++) {
         const request: GenRequest = {
           kind: 'image_edit', model, prompt, refs: attach.map(id => ({ assetId: approved.get(id)! })),
           aspect: sheet.settings.aspect[shot.framing], quality: sheet.settings.quality, resolution: sheet.settings.resolution, seed: v + 1,
+          ...(identity ? { identityId: identity.externalId } : {}),
         }
         warnings = lintOrThrow(lintPrompt(rules, prompt, {
           stage: 'sheet', framing: shot.framing, kind: 'image_edit', request: { ...request, model: lockedModel }, marks: ch.marks,
-          sheetLock: { model: lockedModel }, aspectByFraming: sheet.settings.aspect,
+          sheetLock: { model: lockedModel }, aspectByFraming: sheet.settings.aspect, identityBlock: identity?.promptBlock,
         }), shot.label)
         const genIndex = specs.length
         specs.push({ type: 'gen', stage: 'sheet', purpose: `sheet:${shot.id}`, label: `${shot.label}${action.variations > 1 ? `, variation ${v + 1}` : ''}`, request })
@@ -247,7 +257,8 @@ export async function estimateAction(deps: Deps, ctx: Ctx, action: StudioAction)
 export async function runAction(deps: Deps, ctx: Ctx, action: StudioAction, quoteId: string | undefined, confirmed: boolean) {
   const built = await buildAction(deps, ctx, action)
   const jobs = await runJobs(deps, ctx, { quoteId, confirmed, purpose: built.purpose, characterId: built.characterId, specs: built.specs })
-  await afterStart(deps, ctx, action, built)
+  if (action.type === 'model_test') await startModelTest(deps, ctx, action.model, jobs[0]!.id)
+  else await afterStart(deps, ctx, action, built)
   return { jobs, preview: built.preview }
 }
 

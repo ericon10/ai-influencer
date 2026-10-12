@@ -11,13 +11,17 @@ export interface CharacterData {
   style: Record<string, unknown>; persona: Record<string, unknown>
   makeup: { default: string; glam_when: string[]; glam?: string }
   preferredModels: Record<string, string>; avoidModels: string[]
-  identity: { provider: string; kind: 'element' | 'trained'; name: string; externalId: string; status: string; notes?: string } | null
+  identities: Array<{ provider: string; kind: 'element' | 'trained'; name: string; externalId: string; status: string; model?: string; promptBlock?: string; followUp?: { name: string; model?: string; text: string }; notes?: string }>
   sections: Array<{ title: string; body: string; wrapped?: string }>
 }
 
 export interface QaFinding { code: string; severity: 'fail' | 'warn' | 'info'; message: string; mark?: string }
 export interface IdentityScore { kind: 'identity' | 'distinctness'; score: number; threshold: number; against: string }
-export interface QaReport { verdict: 'post' | 'edit' | 'regenerate' | 'uncertain'; summary: string; findings: QaFinding[]; reasons: string[]; detectedView: string | null; identity?: IdentityScore | null }
+export interface QaReport {
+  verdict: 'post' | 'edit' | 'regenerate' | 'uncertain'; summary: string; findings: QaFinding[]; reasons: string[]; detectedView: string | null
+  identity?: IdentityScore | null
+  mirrorFix?: { available: boolean; message: string } | null
+}
 
 export interface Candidate {
   id: string; assetId: string | null; status: string; refId: string | null; heroPromptIndex: number | null; prompt: string
@@ -71,6 +75,7 @@ export type StudioAction =
   | { type: 'card_update'; characterId: string }
   | { type: 'sheet'; characterId: string; refId: string; variations: number; reason?: string; refsMode?: 'graph' | 'ref00_only'; withQa?: boolean }
   | { type: 'qa'; characterId: string; candidateId: string }
+  | { type: 'model_test'; model: string }
 
 export interface JobView { id: string; label: string; purpose: string; stage: string; status: string; kind: string; model: string; characterId: string | null; estimate: string; actual: string | null; error: string | null; createdAt: string; completedAt: string | null }
 
@@ -82,7 +87,11 @@ export interface SettingsView {
   providers: Array<{ id: string; label: string; hint: string; placeholder: string; usedFor: string }>
   budgets: { job: number; character: number; month: number; confirmAbove: number; warnPct: number }
   routing: Array<{ task: string; configured: string; effective: string }>
-  models: Array<{ ref: string; label: string; kinds: string[]; verified: boolean; notes: string }>
+  models: Array<{
+    ref: string; label: string; kinds: string[]; verified: boolean; notes: string
+    endpoint: string; endpointSource: 'config' | 'account' | 'none'; confirmedAt: string | null
+    lastTest: { at: string; ok: boolean; message: string; jobId: string } | null; testing: boolean
+  }>
   prices: Array<{ model: string; unit: string; price: string; verified: boolean; source: string; when: string; credits: number | null }>
   priceVersion: string
 }

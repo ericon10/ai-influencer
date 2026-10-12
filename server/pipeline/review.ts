@@ -4,7 +4,10 @@ import type { Ctx, Deps } from '../context'
 import { invalidationFor } from '../core/sheet'
 import { AppError } from '../lib/errors'
 import { audit } from '../lib/audit'
-import { getAsset } from '../storage/assets'
+import sharp from 'sharp'
+import { getAsset, readAsset, saveAsset } from '../storage/assets'
+import { newId } from '../lib/ids'
+import type { QaReport } from '../core/qa/marks'
 import { candidatesFor, getCandidate, getCharacter, getRef, setCharacterFields, sheetState } from './characters'
 import { liveRoute } from './settings'
 
@@ -134,4 +137,34 @@ export async function reopenCandidate(deps: Deps, ctx: Ctx, candidateId: string)
   if (!['rejected', 'superseded', 'qa_failed'].includes(cand.status) || !cand.assetId) throw new AppError('conflict', 'Only rejected or replaced results can be reopened.')
   await deps.db.update(candidates).set({ status: 'in_review', rejectReasons: [], rejectNote: '', updatedAt: deps.clock.now() }).where(eq(candidates.id, cand.id))
   if (cand.refId) await refreshRefStatus(deps, ctx, cand.characterId, cand.refId)
+}
+
+// The free fix for a shot whose marks came back on the wrong side: flip it
+// horizontally (no provider call, no cost, the face cannot drift). Offered
+// only when QA showed that the flip puts every mark on its own side. The
+// flipped copy gets the report QA computed for it, and the original stays
+// in history.
+export async function mirrorCandidate(deps: Deps, ctx: Ctx, candidateId: string): Promise<{ candidateId: string }> {
+  const cand = await getCandidate(deps, ctx, candidateId)
+  const report = cand.qaReport as QaReport | null
+  if (!cand.assetId || !cand.refId) throw new AppError('bad_request', 'This result has no sheet image to mirror.')
+  if (!report?.mirrorFix?.available || !report.mirrorFix.report) throw new AppError('bad_request', report?.mirrorFix?.message ?? 'QA did not find a mirrored shot here.')
+  const { data } = await readAsset(deps, ctx, cand.assetId)
+  const flipped = await sharp(data).flop().png().toBuffer()
+  const asset = await saveAsset(deps, ctx, { data: flipped, origin: 'derived', label: `${cand.refId} mirrored fix` })
+  const derived: QaReport = {
+    ...report.mirrorFix.report,
+    identity: report.identity ?? null,
+    mirrorFix: null,
+    findings: [...report.mirrorFix.report.findings, { code: 'uncertain', severity: 'info', message: 'Mirrored copy of a shot that came back flipped. Checked by mirroring the original inspection; no new generation.' }],
+  }
+  const id = newId('cand')
+  const status = cand.status === 'check' ? 'check' : 'in_review'
+  await deps.db.insert(candidates).values({
+    id, accountId: ctx.accountId, characterId: cand.characterId, target: cand.target, refId: cand.refId, assetId: asset.id,
+    prompt: cand.prompt, status, qaReport: derived, qaVerdict: derived.verdict, createdBy: ctx.userId,
+  })
+  await audit(deps.db, ctx, 'candidate.mirrored', { type: 'candidate', id }, { from: cand.id })
+  await refreshRefStatus(deps, ctx, cand.characterId, cand.refId)
+  return { candidateId: id }
 }

@@ -56,6 +56,7 @@ const ruleCheck = z.discriminatedUnion('type', [
   z.object({ type: z.literal('request_fields'), require: z.record(z.string(), z.array(z.union([z.string(), z.number(), z.boolean()]))) }),
   z.object({ type: z.literal('aspect_matches_framing') }),
   z.object({ type: z.literal('sheet_model_locked') }),
+  z.object({ type: z.literal('identity_block') }),
   z.object({ type: z.literal('marks_stated') }),
   z.object({ type: z.literal('max_words'), field: z.string(), max: z.number().int() }),
 ])

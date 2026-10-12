@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { loadConfig, type StudioConfig } from '../config/load'
 import { createMockAdapter } from './mock'
 import { createHiggsfieldAdapter, mapInput } from './higgsfield'
+import { withModelOverrides } from './modelOverrides'
 import { ProviderError, type GenRequest, type ProviderAdapter } from './types'
 import { renderPlaceholderPortrait } from './mock'
 
@@ -153,6 +154,20 @@ describe('higgsfield adapter specifics', () => {
     expect((await bad.verifyCredentials!()).ok).toBe(false)
   })
 
+  it('runs an unconfirmed model only for its paid test, and freely once the account confirms it', async () => {
+    const ref = 'higgsfield/nano-banana-2.1'
+    const path = 'google/nano-banana-2.1/text-to-image'
+    const fake = fakeHiggsfield()
+    const pending = createHiggsfieldAdapter({ credentials: 'kid_123:ksecret_456', config: withModelOverrides(config, { [ref]: { endpoint: path } }), fetchImpl: fake.fetchImpl })
+    await expect(pending.submit({ kind: 'image', model: ref, prompt: 'p' }, { idempotencyKey: 'k1' })).rejects.toMatchObject({ opts: { code: 'unverified_model' } })
+    await pending.submit({ kind: 'image', model: ref, prompt: 'p', resolution: '1k', modelTest: true }, { idempotencyKey: 'k2' })
+    expect(fake.calls.at(-1)!.url).toBe(`https://api.higgsfield.ai/${path}`)
+    // The test flag never reaches the provider.
+    expect(fake.calls.at(-1)!.body).toEqual({ prompt: 'p', resolution: '1k' })
+    const confirmed = createHiggsfieldAdapter({ credentials: 'kid_123:ksecret_456', config: withModelOverrides(config, { [ref]: { endpoint: path, confirmedAt: '2026-10-12T12:00:00Z' } }), fetchImpl: fake.fetchImpl })
+    await expect(confirmed.submit({ kind: 'image', model: ref, prompt: 'p' }, { idempotencyKey: 'k3' })).resolves.toMatchObject({ jobId: expect.any(String) })
+  })
+
   it('refuses to send a reference image that was not uploaded', () => {
     const entry = verifiedConfig().models.models.find(m => m.ref === 'higgsfield/gpt-image-2.5')!
     expect(() => mapInput(entry, { kind: 'image_edit', model: entry.ref, prompt: 'p', refs: [{ assetId: 'a1' }] })).toThrow(/not uploaded to Higgsfield/)
@@ -176,7 +191,7 @@ describe('higgsfield adapter specifics', () => {
     const seedance = models.find(m => m.ref === 'higgsfield/seedance-2.5')!
     expect(mapInput(seedance, { kind: 'video', model: seedance.ref, prompt: 'p', ...frames, durationSec: 10, resolution: '720p', audio: false }))
       .toEqual({ prompt: 'p', image_url: 'https://cdn.higgsfield.ai/s.png', end_image_url: 'https://cdn.higgsfield.ai/e.png', duration: 10, resolution: '720p', generate_audio: false })
-    const kling = models.find(m => m.ref === 'higgsfield/kling-3.0')!
+    const kling = models.find(m => m.ref === 'higgsfield/kling-3.0-pro')!
     expect(mapInput(kling, { kind: 'video', model: kling.ref, prompt: 'p', ...frames, durationSec: 10, audio: false }))
       .toEqual({ prompt: 'p', image_url: 'https://cdn.higgsfield.ai/s.png', last_image_url: 'https://cdn.higgsfield.ai/e.png', duration: 10, sound: 'off' })
     // Turbo takes a start frame only and has no sound switch (audio is stripped on arrival).

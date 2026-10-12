@@ -44,7 +44,9 @@ export function FileTab({ v }: { v: CharacterView }) {
   )
 }
 
-const ROLE: Record<string, string> = { sheet: 'Sheet', scene_still: 'Scene stills', video_final: 'Final video', video_test: 'Motion tests' }
+const ROLE: Record<string, string> = {
+  sheet: 'Sheet', scene_still: 'Scene stills', scene_still_alt: 'Scene stills, also', edit: 'Edits', video_final: 'Final video', video_test: 'Motion tests',
+}
 
 // What the file taught the Studio beyond the card: the saved identity,
 // model choices, and the sections kept word for word (scene rules, recipes).
@@ -52,20 +54,27 @@ function Knowledge({ v }: { v: CharacterView }) {
   const d = v.data
   const label = (ref: string) => v.modelLabels[ref] ?? ref
   const prefs = Object.entries(d.preferredModels ?? {})
-  if (!d.identity && !prefs.length && !d.avoidModels?.length && !d.sections?.length) return null
+  const ids = d.identities ?? []
+  if (!ids.length && !prefs.length && !d.avoidModels?.length && !d.sections?.length) return null
   return (
     <section className="st-card">
       <div className="st-card-head"><div className="grow"><div className="st-h2">From the character file</div><div className="st-hint">Kept with {d.name} and written back on every export.</div></div></div>
       <div className="st-card-body st-col" style={{ gap: 16 }}>
-        {d.identity && (
-          <div className="st-row" style={{ gap: 10, alignItems: 'flex-start' }}>
+        {ids.map(id => (
+          <div key={id.externalId} className="st-row" style={{ gap: 10, alignItems: 'flex-start', flexWrap: 'nowrap' }}>
             <Fingerprint size={18} style={{ color: 'var(--st-accent-2)', flex: 'none', marginTop: 2 }} />
-            <div className="st-col" style={{ gap: 2 }}>
-              <b>{d.identity.provider === 'higgsfield' ? 'Higgsfield ' : ''}{d.identity.kind === 'element' ? 'Element' : 'Trained identity'} "{d.identity.name}"</b>
-              <span className="st-hint">{d.identity.kind === 'element' ? 'Instant, no training.' : ''} <span className="st-mono">{d.identity.externalId}</span></span>
+            <div className="st-col" style={{ gap: 4, minWidth: 0, flex: 1 }}>
+              <b>
+                {id.provider === 'higgsfield' ? 'Higgsfield ' : ''}
+                {id.kind === 'element' ? 'Element' : `${id.model ? label(id.model) : 'trained'} character`} "{id.name}"
+                {id.status !== 'ready' && <span className="st-badge plain warn" style={{ marginLeft: 8 }}>{id.status}</span>}
+              </b>
+              <span className="st-hint">{id.kind === 'element' ? 'Instant, no training. ' : 'Trained. '}<span className="st-mono">{id.externalId}</span></span>
+              {id.promptBlock && <span className="st-hint">Every {id.model ? label(id.model) : ''} prompt includes: "{id.promptBlock}"</span>}
+              {id.followUp && <span className="st-hint">{id.followUp.name}{id.followUp.model ? ` (${label(id.followUp.model)})` : ''}: {id.followUp.text}</span>}
             </div>
           </div>
-        )}
+        ))}
         {(prefs.length > 0 || (d.avoidModels?.length ?? 0) > 0) && (
           <div className="st-row" style={{ gap: 6, flexWrap: 'wrap' }}>
             {prefs.map(([role, ref]) => <span key={role} className="st-badge plain ok" title={ref}>{ROLE[role] ?? role}: {label(ref)}</span>)}
