@@ -3,6 +3,9 @@ import { validateCharacter } from '../core/character'
 import { listCredentials } from '../providers/credentials'
 import { effectiveBudgets } from '../costs/budgets'
 import { formatUsd, microsToUsd } from '../costs/money'
+import { and, desc, eq } from 'drizzle-orm'
+import { jobs } from '../db/schema'
+import { getAsset } from '../storage/assets'
 import { candidatesFor, getCharacter, inspirationAssetIds, listConcepts, sheetState, toData, type CharacterRow } from '../pipeline/characters'
 import { characterCosts } from '../pipeline/costs'
 import { providerMode, resolveRoute } from '../pipeline/settings'
@@ -45,10 +48,16 @@ export async function characterView(deps: Deps, ctx: Ctx, id: string) {
     }
   })
   const concepts = await listConcepts(deps, ctx, id)
+  const ref00 = shots[0]?.approved?.assetId ? await getAsset(deps, ctx, shots[0].approved.assetId) : null
+  const [cardJob] = await deps.db.select().from(jobs)
+    .where(and(eq(jobs.accountId, ctx.accountId), eq(jobs.characterId, id), eq(jobs.purpose, 'card_update'), eq(jobs.status, 'completed')))
+    .orderBy(desc(jobs.completedAt)).limit(1)
   return {
     id: row.id, name: row.name, slug: row.slug, stage: row.stage, status: row.status, revision: row.revision,
     data, breakdown: row.breakdown, issues: validateCharacter(data),
     sheetLock: row.sheetLock,
+    ref00: ref00 ? { assetId: ref00.id, width: ref00.width, height: ref00.height, needsUpscale: (ref00.height ?? 0) < deps.config.pipeline.sheet.settings.upscale_ref00_below_px } : null,
+    cardSuggestion: cardJob ? { jobId: cardJob.id, at: cardJob.completedAt?.toISOString() ?? null, ...((cardJob.resultMeta as { data?: object } | null)?.data ?? {}) } : null,
     inspirations: await inspirationAssetIds(deps, ctx, id),
     concepts: concepts.filter(c => c.status !== 'discarded').map(c => ({ id: c.id, position: c.position, status: c.status, data: c.data })),
     heroes: all.filter(c => c.target === 'hero').map(shapeCandidate),

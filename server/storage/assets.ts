@@ -4,7 +4,7 @@ import sharp from 'sharp'
 import { assets } from '../db/schema'
 import type { Ctx, Deps } from '../context'
 import { newId } from '../lib/ids'
-import { notFound } from '../lib/errors'
+import { AppError, notFound } from '../lib/errors'
 import { probeMedia } from '../media/ffmpeg'
 
 export type AssetRow = typeof assets.$inferSelect
@@ -55,6 +55,13 @@ export async function saveAsset(deps: Deps, ctx: Ctx, input: SaveAssetInput): Pr
 
   let width: number | null = null, height: number | null = null, durationMs: number | null = null
   if (kind === 'image') {
+    // Decode the whole image now, so a corrupt upload is refused here with a
+    // clear message instead of failing later inside a paid job.
+    try {
+      await sharp(input.data, { failOn: 'error' }).resize(16).toBuffer()
+    } catch {
+      throw new AppError('bad_request', 'That image file is damaged or not a supported format. Try exporting it again as PNG or JPEG.')
+    }
     const meta = await sharp(input.data).metadata()
     width = meta.width ?? null
     height = meta.height ?? null

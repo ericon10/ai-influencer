@@ -14,7 +14,7 @@ import { cancelJob, getJob, resolveJob, wakeFromWebhook } from '../jobs/runner'
 import { actionSchema, estimateAction, runAction } from '../pipeline/actions'
 import { createCharacter, getCharacter, linkInspiration, listCharacters, setCharacterFields, updateCharacter } from '../pipeline/characters'
 import { chooseConcept } from '../pipeline/concepts'
-import { approveCandidate, keepStale, pickHero, rejectCandidate, setFavorite } from '../pipeline/review'
+import { approveCandidate, keepStale, pickHero, rejectCandidate, reopenCandidate, setFavorite } from '../pipeline/review'
 import { exportCharacter, importCharacter } from '../pipeline/files'
 import { accountUsage } from '../pipeline/costs'
 import { providerMode, setSetting } from '../pipeline/settings'
@@ -184,6 +184,7 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
     const body = parse(z.object({ reasons: z.array(z.string()).min(1), note: z.string().max(2000).default('') }), await json(c))
     return c.json({ fixes: await rejectCandidate(deps, ctx, c.req.param('id'), body.reasons, body.note) })
   })
+  app.post('/candidates/:id/reopen', async c => { const ctx = c.get('ctx'); requireRole(ctx, 'member'); await reopenCandidate(deps, ctx, c.req.param('id')); return c.json({ ok: true }) })
   app.post('/candidates/:id/favorite', async c => {
     const body = parse(z.object({ favorite: z.boolean() }), await json(c))
     await setFavorite(deps, c.get('ctx'), c.req.param('id'), body.favorite)
@@ -200,6 +201,17 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
   app.get('/characters/:id/export', async c => {
     const { filename, markdown } = await exportCharacter(deps, c.get('ctx'), c.req.param('id'))
     return new Response(markdown, { headers: { 'content-type': 'text/markdown; charset=utf-8', 'content-disposition': `attachment; filename="${filename}"` } })
+  })
+
+  // Apply edits made in an exported character file back to the character.
+  app.post('/characters/:id/import-file', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    const body = await c.req.parseBody()
+    const md = body.file
+    if (!(md instanceof File)) throw new AppError('bad_request', 'Attach the character file (.md).')
+    const result = await importCharacter(deps, ctx, await md.text(), { characterId: c.req.param('id') })
+    return c.json({ warnings: result.result.warnings, view: await characterView(deps, ctx, c.req.param('id')) })
   })
 
   app.post('/characters/import', async c => {
@@ -280,8 +292,16 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
     if (width) {
       const asset = await getAsset(deps, ctx, c.req.param('id'))
       if (asset.kind === 'image') {
-        const { data } = await readAsset(deps, ctx, asset.id)
-        const thumb = await sharp(data).resize({ width: Math.min(1600, Math.max(64, width)), withoutEnlargement: true }).webp({ quality: 82 }).toBuffer()
+        // Assets never change, so each thumbnail size is made once and kept.
+        const w = [160, 320, 480, 720, 960, 1600].find(x => x >= width) ?? 1600
+        const key = `${asset.storageKey.replace(/\.[a-z0-9]+$/, '')}.w${w}.webp`
+        let thumb: Buffer
+        if (await deps.store.exists(key)) thumb = await deps.store.get(key)
+        else {
+          const { data } = await readAsset(deps, ctx, asset.id)
+          thumb = await sharp(data).resize({ width: w, withoutEnlargement: true }).webp({ quality: 82 }).toBuffer()
+          await deps.store.put(key, thumb, 'image/webp')
+        }
         return new Response(new Uint8Array(thumb), { headers: { 'content-type': 'image/webp', 'cache-control': 'private, max-age=31536000, immutable' } })
       }
     }

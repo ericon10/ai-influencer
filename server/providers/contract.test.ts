@@ -149,3 +149,12 @@ describe('higgsfield adapter specifics', () => {
     expect(() => mapInput(entry, { kind: 'image_edit', model: entry.ref, prompt: 'p', refs: [{ assetId: 'a1' }] })).toThrow(/public URL/)
   })
 })
+
+describe('mock renders', () => {
+  it('label the camera angle a sheet prompt asks for', async () => {
+    const { mockAngle } = await import('./mock')
+    expect(mockAngle('Full side profile: head turned 90 degrees so only her RIGHT side faces the camera')).toMatchObject({ label: 'right profile', turn: 1 })
+    expect(mockAngle('turned about 45 degrees so her LEFT cheek and LEFT ear face the camera')).toMatchObject({ label: 'left three-quarter', turn: -1 })
+    expect(mockAngle('Full-body framing, standing. Seen from directly behind')).toMatchObject({ label: 'Full body, back', back: true })
+  })
+})

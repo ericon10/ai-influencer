@@ -89,6 +89,9 @@ export function fixesFor(deps: Deps, reasons: string[]): FixSuggestion[] {
 export async function pickHero(deps: Deps, ctx: Ctx, candidateId: string): Promise<{ needsUpscale: boolean; height: number | null }> {
   const cand = await getCandidate(deps, ctx, candidateId)
   if (cand.target !== 'hero' || !cand.assetId) throw new AppError('bad_request', 'That is not a hero result.')
+  if ((cand.qaReport as { findings?: Array<{ code: string; severity: string }> } | null)?.findings?.some(f => f.code === 'too_similar' && f.severity === 'fail')) {
+    throw new AppError('bad_request', 'This hero is too close to the inspiration person. Pick another one or generate more.')
+  }
   const ch = await getCharacter(deps, ctx, cand.characterId)
   const ref = await getRef(deps, ctx, ch.id, 'REF-00')
   const now = deps.clock.now()
@@ -122,4 +125,12 @@ export async function keepStale(deps: Deps, ctx: Ctx, characterId: string, refId
 export async function setFavorite(deps: Deps, ctx: Ctx, candidateId: string, favorite: boolean): Promise<void> {
   const cand = await getCandidate(deps, ctx, candidateId)
   await deps.db.update(candidates).set({ favorite, updatedAt: deps.clock.now() }).where(eq(candidates.id, cand.id))
+}
+
+// Undo for a rejection (or bringing back a superseded result for review).
+export async function reopenCandidate(deps: Deps, ctx: Ctx, candidateId: string): Promise<void> {
+  const cand = await getCandidate(deps, ctx, candidateId)
+  if (!['rejected', 'superseded', 'qa_failed'].includes(cand.status) || !cand.assetId) throw new AppError('conflict', 'Only rejected or replaced results can be reopened.')
+  await deps.db.update(candidates).set({ status: 'in_review', rejectReasons: [], rejectNote: '', updatedAt: deps.clock.now() }).where(eq(candidates.id, cand.id))
+  if (cand.refId) await refreshRefStatus(deps, ctx, cand.characterId, cand.refId)
 }

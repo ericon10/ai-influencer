@@ -65,14 +65,35 @@ export async function renderPlaceholderPortrait(prompt: string, aspect = '3:4'):
   return sharp(Buffer.from(svg)).png().toBuffer()
 }
 
+// Reads the camera angle a sheet prompt asks for, so demo renders say which
+// shot they stand in for (and turn the same way).
+export function mockAngle(prompt: string): { label: string; turn: -1 | 0 | 1; back: boolean } {
+  const full = /Full-body framing/.test(prompt) ? 'Full body, ' : ''
+  if (/Seen from directly behind/.test(prompt)) return { label: `${full}back`, turn: 0, back: true }
+  if (/only \w+ LEFT side faces the camera/.test(prompt)) return { label: `${full}left profile`, turn: -1, back: false }
+  if (/only \w+ RIGHT side faces the camera/.test(prompt)) return { label: `${full}right profile`, turn: 1, back: false }
+  if (/LEFT cheek and LEFT ear face the camera/.test(prompt)) return { label: `${full}left three-quarter`, turn: -1, back: false }
+  if (/RIGHT cheek and RIGHT ear face the camera/.test(prompt)) return { label: `${full}right three-quarter`, turn: 1, back: false }
+  return { label: `${full}front`, turn: 0, back: false }
+}
+
 async function renderFromRef(ref: Buffer, aspect: string, prompt: string): Promise<Buffer> {
   const [w, h] = SIZES[aspect] ?? SIZES['3:4']!
   const hue = hashHue(prompt)
+  const angle = mockAngle(prompt)
+  const label = escapeXml(`Demo render: ${angle.label}`)
   const badge = Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}">
-    <rect x="${w * 0.04}" y="${h * 0.03}" width="${w * 0.3}" height="${h * 0.045}" rx="${h * 0.02}" fill="hsl(${hue},60%,45%)" opacity="0.85"/>
-    <text x="${w * 0.19}" y="${h * 0.062}" font-family="sans-serif" font-size="${Math.round(w / 40)}" text-anchor="middle" fill="white">Demo render</text></svg>`)
-  return sharp(ref).resize(w, h, { fit: 'cover' }).modulate({ hue: (hue % 30) - 15, saturation: 1 })
-    .composite([{ input: badge }]).png().toBuffer()
+    <rect x="${w * 0.04}" y="${h * 0.03}" width="${w * 0.52}" height="${h * 0.05}" rx="${h * 0.022}" fill="rgba(12,11,10,0.72)"/>
+    <text x="${w * 0.3}" y="${h * 0.064}" font-family="sans-serif" font-size="${Math.round(w / 34)}" text-anchor="middle" fill="white">${label}</text></svg>`)
+  let img = sharp(ref).resize(w, h, { fit: 'cover' }).modulate({ hue: (hue % 30) - 15, saturation: angle.back ? 0.4 : 1 })
+  if (angle.turn) {
+    // Shift the subject the way the head turns, as a visual hint only.
+    const shift = Math.round(w * 0.08)
+    const base = await img.png().toBuffer()
+    const extended = await sharp(base).extend({ left: angle.turn < 0 ? 0 : shift, right: angle.turn < 0 ? shift : 0, background: { r: 0, g: 0, b: 0 } }).png().toBuffer()
+    img = sharp(extended).extract({ left: angle.turn < 0 ? shift : 0, top: 0, width: w, height: h })
+  }
+  return sharp(await img.png().toBuffer()).composite([{ input: badge }]).png().toBuffer()
 }
 
 async function renderVideo(start: Buffer | null, seconds: number, prompt: string): Promise<Buffer> {
