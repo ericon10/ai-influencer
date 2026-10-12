@@ -3,3 +3,8 @@ dist
 .DS_Store
 *.local
 .claude/
+.env
+.env.*
+!.env.example
+.data/
+coverage/
