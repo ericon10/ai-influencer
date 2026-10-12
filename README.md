@@ -27,9 +27,8 @@ Higgsfield account, your data lives in your browser.
 You only install one thing: **Antigravity**. Everything else lives inside
 it. Just follow these steps in order.
 
-1. **Download the project.** Go to the
-   [GitHub page](https://github.com/DaanKieft/ai-influencer), click the green
-   **Code** button → **Download ZIP**, then unzip it onto your Desktop.
+1. **Download the project.** On this repository's GitHub page, click the
+   green **Code** button → **Download ZIP**, then unzip it onto your Desktop.
 2. **Install Antigravity.** Search "Antigravity" on Google (or go to
    [antigravity.dev](https://antigravity.dev)) and install it like any app.
 3. **Open the project.** In Antigravity, click **File → Open Folder** and pick
@@ -82,4 +81,5 @@ users still bring their own Higgsfield account.
 
 ---
 
-Made by Dan Kieft.
+Thanks to Dan Kieft, who built the original AI Influencer app this
+project grew from.
