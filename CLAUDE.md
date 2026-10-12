@@ -78,7 +78,7 @@ inline-style convention.
 | Path | What it does |
 |---|---|
 | `src/App.jsx` | Routes + `<ThemeProvider>` + `<StoreProvider>` |
-| `src/store.jsx` | localStorage-backed contexts (`useInfluencers`, etc.) and the `Kayla` seed |
+| `src/store.jsx` | localStorage-backed contexts (`useInfluencers`, etc.); new users start with no demo personas |
 | `src/utils/higgsfieldAuth.js` | OAuth PKCE flow against `mcp.higgsfield.ai` |
 | `src/utils/higgsfieldGenerate.js` | MCP-style image/video generation, polling, media uploads |
 | `src/utils/systemPrompt.js` | Prompt templates: poses, wardrobe library, vibe palettes, Soul vs GPT Image 2 variants |

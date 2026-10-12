@@ -26,10 +26,15 @@ only), `npm run worker` (worker only, for hosted setups).
 2. Confirm the Higgsfield model endpoints in `config/models.yaml` (set
    `endpoint` and `verified: true`) and their prices in
    `config/pricebook.yaml`. Until then the adapter refuses to send anything
-   to an unverified model.
-3. Reference images must be reachable by the provider: set up cloud storage
-   (`STORAGE_DRIVER=s3` with R2 credentials) or a public URL
-   (`STUDIO_PUBLIC_URL`). Text-only hero runs work without either.
+   to an unverified model. Kling 3.0, Kling 3.0 Turbo and Seedance 2.5
+   carry candidate endpoints from third-party copies of the Higgsfield
+   catalog; check each against the Higgsfield docs before flipping it.
+3. Reference images need no setup: the Studio uploads them to Higgsfield's
+   own storage (`/files/generate-upload-url`, the same flow as the official
+   SDK) and reuses each upload for six hours. Cloud storage (R2) is only
+   needed to host the Studio itself somewhere without a disk, such as
+   Vercel. `STUDIO_PUBLIC_URL` turns on webhooks; without it the worker
+   polls.
 4. Settings, Mode: switch to Live. Every run still shows its price first,
    and budget caps block anything over the limit.
 

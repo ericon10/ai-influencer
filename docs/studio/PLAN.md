@@ -140,8 +140,9 @@ Guardrails that apply to every item:
 ### 1.7 Stage 5: Character file
 - [x] Export `character-[name].md` (YAML front matter + readable sections)
 - [x] Import edits back; round-trip test (export, import, export is identical)
-- [ ] Importer accepts Callie's existing file format (heuristic importer
-      is in; confirm against her real file once uploaded)
+- [x] Importer reads Callie's real file (`fixtures/callie/character-callie.md`):
+      card, marks, style, persona, her Higgsfield Element and model
+      choices; sections the Studio does not model are kept word for word
 
 ### 1.8 Review UI
 - [x] One "next up" card at a time, candidate beside REF-00 at full size
@@ -158,10 +159,11 @@ Guardrails that apply to every item:
 - [x] In-browser verification of every flow against the mock adapter
 
 ### 1.10 Acceptance: rebuild Callie
-- [ ] Owner uploads fixtures to `fixtures/callie/` (character file,
-      REF-00 to REF-11, mirrored REF-04)
-- [ ] Studio imports her real character file and sheet (tested today with
-      the SPEC Appendix A data)
+- [x] Her character file is in `fixtures/callie/` and loaded in the Studio
+- [ ] Owner uploads REF-00 to REF-11 and the mirrored REF-04 to
+      `fixtures/callie/`
+- [ ] Studio attaches her real sheet images (the import path is built and
+      tested; waiting on the images)
 - [x] Regenerate any sheet shot from REF-00 (mock in tests; live only after a quote)
 - [x] QA flags the mirrored REF-04 (ear cuff on the wrong ear), tested
       with recorded perception answers
@@ -171,7 +173,8 @@ Guardrails that apply to every item:
 ---
 
 ## Housekeeping (not blocking)
-- [ ] Remove the creator's affiliate code, feedback form, guide doc,
-      credit line and demo assets from customer-facing surfaces (waiting
-      for the owner's OK)
-- [ ] Untrack `.claude/settings.local.json` (waiting for the owner's OK)
+- [x] Remove the creator's affiliate code, feedback form, guide doc and
+      demo personas and images (approved 2026-10-12)
+- [x] Untrack `.claude/settings.local.json` and ignore it
+- [ ] "Made by Dan Kieft" credit on the classic landing page and in
+      README.md (waiting for the owner's OK)

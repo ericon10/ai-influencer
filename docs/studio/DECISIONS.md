@@ -33,6 +33,12 @@ which SPEC already requires as the fallback path.
 Why: SQLite would need a second migration dialect later. PGlite gives
 "no install, no Docker" locally while staying on the production engine.
 
+Update 2026-10-12: reference images do not need our storage to be public.
+The Higgsfield API has its own upload (`POST /files/generate-upload-url`
+returns a presigned PUT link and a public URL; confirmed in the official
+SDKs), so the Studio uploads each reference there before a run. R2 is
+still the plan for hosting the Studio's own files in the cloud.
+
 ### A3. Dzine (Deferred)
 No adapter until Dzine publishes API endpoints and pricing (SPEC 7.2).
 The provider layer is pluggable, so adding it later is one adapter file
@@ -58,15 +64,18 @@ ZIP however they want. Recommended housekeeping before selling:
 
 1. Get that permission as a one-line written note (an email is enough).
    Buyers and investors ask for it during due diligence.
-2. Remove the creator's personal hooks from anything customers see:
-   - Higgsfield affiliate code `fpr=dankieft` fired on connect
-     (`src/utils/higgsfieldAuth.js` lines 120 and 265).
-   - His Google feedback form (`src/App.jsx` line 16).
-   - `docs/seedance-influencer-guide.md` ("All rights reserved"),
-     the "Made by Dan Kieft" credit, and the demo personas and images
-     in `public/`.
-   - `.claude/settings.local.json` (tracked despite `.gitignore`,
-     contains another person's local paths).
+2. Remove the creator's personal hooks from anything customers see.
+   Done 2026-10-12 with the owner's approval:
+   - Higgsfield affiliate code `fpr=dankieft` (the sign-in popup now
+     goes straight to OAuth).
+   - His Google feedback button on the classic pages.
+   - `docs/seedance-influencer-guide.md` ("All rights reserved").
+   - The demo personas and their images and videos in `public/`, plus
+     `public/seeds.json`. Browsers that already had them drop them once
+     on the next visit; nothing a user created is touched.
+   - `.claude/settings.local.json` untracked and ignored.
+   Still open (not yet approved): the "Made by Dan Kieft" credit on the
+   classic landing page and in README.md.
 
 These do not block the Studio build. They are tracked in PLAN.md.
 
