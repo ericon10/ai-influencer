@@ -65,13 +65,13 @@ export function HeroTab({ v, onEditCard, goSheet }: { v: CharacterView; onEditCa
             <div className="st-section-head"><div className="st-h3">Hero prompt {i + 1}</div><span className="st-muted">{items.length} results</span></div>
             <div className="st-grid heroes">
               {items.map(h => (
-                <div key={h.id} className="st-tile" style={h.status === 'approved' ? { borderColor: 'rgba(63,209,143,0.6)' } : undefined}>
+                <div key={h.id} className="st-tile" style={h.status === 'approved' ? { borderColor: 'rgba(63,209,143,0.6)' } : h.status === 'qa_failed' ? { opacity: 0.72 } : undefined}>
                   {h.status === 'failed' ? <div className="st-img" style={{ aspectRatio: '3/4', display: 'grid', placeItems: 'center', padding: 12 }}><span className="st-hint" style={{ textAlign: 'center' }}>{h.rejectNote || 'This run failed. It cost nothing.'}</span></div> : <Img assetId={h.assetId} width={420} />}
                   {h.status === 'approved' && <span className="st-badge ok">REF-00</span>}
-                  {h.status === 'qa_failed' && <span className="st-badge bad">Too close to the inspiration</span>}
+                  {h.status === 'qa_failed' && <span className="st-badge bad">Too similar</span>}
                   {h.qaReport?.identity?.kind === 'distinctness' && (
                     <span className="st-hint" title="Face similarity to the closest inspiration face. It must stay under the threshold so the character is a new person.">
-                      {h.status === 'qa_failed' ? `Face match ${h.qaReport.identity.score.toFixed(2)}; must stay under ${h.qaReport.identity.threshold.toFixed(2)}.` : `New person: face match ${h.qaReport.identity.score.toFixed(2)} with the inspiration.`}
+                      {h.status === 'qa_failed' ? `Too close to the inspiration person (face match ${h.qaReport.identity.score.toFixed(2)}, must stay under ${h.qaReport.identity.threshold.toFixed(2)}), so it cannot be REF-00.` : `New person: face match ${h.qaReport.identity.score.toFixed(2)} with the inspiration.`}
                     </span>
                   )}
                   <div className="st-row" style={{ gap: 6 }}>
