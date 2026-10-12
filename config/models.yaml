@@ -1,9 +1,18 @@
 # Model catalog. A model ref is "provider/model". Higgsfield endpoint ids are
 # filled in once confirmed against the Higgsfield Console docs; until then
 # `verified: false` keeps the adapter from submitting live runs to them.
+#
+# Identity without training: Higgsfield Elements (reference characters) are
+# instant and are used through a <<<element_id>>> placeholder in the prompt
+# (verified live 2026-10-12). A character's element lives in its identity
+# field, imported from the character file.
 version: 1
 models:
   # ── Higgsfield (primary, pay-per-use API) ──
+  # Capabilities marked "verified live 2026-10-12" were confirmed by the
+  # owner through the Higgsfield web app and MCP connector. REST endpoints
+  # stay null (and the adapter refuses the model) until confirmed for the
+  # pay-per-use API.
   - ref: higgsfield/gpt-image-2.5
     label: GPT Image 2.5
     kinds: [image, image_edit]
@@ -11,7 +20,11 @@ models:
     endpoint: null
     input_map: generic_image
     verified: false
-    notes: Sheet model for Callie (SPEC 5.1 rule 7, 5.6 rule 41).
+    mcp_id: gpt_image_2_5
+    aliases: [GPT Image 2.5, gpt_image_2_5, GPT Image 2.5 Sunburst]
+    params: { variants: [flare, sunburst] }
+    use_for: [hero, sheet]
+    notes: Sheet model (Callie's sheet was built here). Variants flare and sunburst, verified live 2026-10-12. On the REST API it may only exist as marketing-studio/image/flare and /sunburst, billed per token (third-party catalog copies); confirm before use.
   - ref: higgsfield/gpt-image-2.5-flare
     label: GPT Image 2.5 Flare
     kinds: [image, image_edit]
@@ -19,7 +32,23 @@ models:
     endpoint: null
     input_map: generic_image
     verified: false
-    notes: Avoid for scenes (distorted hair, SPEC 5.6 rule 41).
+    mcp_id: gpt_image_2_5
+    aliases: [GPT Image 2.5 Flare, Flare]
+    params: { variant: flare }
+    avoid_for: [scene]
+    notes: Distorted hair in scene tests (verified live 2026-10-12); avoid for scenes.
+  - ref: higgsfield/nano-banana-2.1
+    label: Nano Banana 2.1
+    kinds: [image, image_edit]
+    max_refs: 4
+    endpoint: null
+    input_map: generic_image
+    verified: false
+    mcp_id: nano_banana_2_1
+    aliases: [Nano Banana 2.1, nano_banana_2_1]
+    params: { resolution: [1k, 2k, 4k], thinking_level: true, inpaint: mask }
+    use_for: [scene_still, expression_edit]
+    notes: Best for scene stills and expression edits; held face and hair well with refs (verified live 2026-10-12). Re-composes the frame, so never use it to upscale.
   - ref: higgsfield/nano-banana-2
     label: Nano Banana 2
     kinds: [image, image_edit]
@@ -27,6 +56,7 @@ models:
     endpoint: null
     input_map: generic_image
     verified: false
+    aliases: [Nano Banana 2, Nano Banana Pro]
   - ref: higgsfield/soul-2
     label: Soul 2.0
     kinds: [image]
@@ -34,13 +64,34 @@ models:
     endpoint: /v1/text2image/soul
     input_map: soul_v1
     verified: false
-  - ref: higgsfield/upscale-2x
-    label: Image upscale 2x
+    aliases: [Soul 2.0, Soul]
+    notes: Soul 2.0 identity training failed or sat queued for hours (2026-10-12); never block on it. Use Elements instead.
+  - ref: higgsfield/bytedance-upscale
+    label: ByteDance image upscale (2k)
     kinds: [upscale]
     max_refs: 0
     endpoint: null
     input_map: generic_upscale
     verified: false
+    aliases: [ByteDance upscale, bytedance image upscale]
+    params: { resolution: [2k] }
+    use_for: [upscale, punch_in_crop]
+    notes: 2 credits at 2k (verified live 2026-10-12). Use for punch-in crops of a wide still.
+  - ref: higgsfield/seedance-2.5
+    label: Seedance 2.5
+    kinds: [video]
+    max_refs: 0
+    # Candidate REST path from third-party copies of the Higgsfield catalog;
+    # confirm, then set verified: true.
+    endpoint: bytedance/seedance-2.5/image-to-video
+    input_map: seedance_i2v
+    verified: false
+    mcp_id: seedance_2_5
+    aliases: [Seedance 2.5, seedance_2_5]
+    audio: off_switch
+    params: { start_image: true, end_image: true, mode_with_images: omni_reference, resolution: [720p] }
+    use_for: [video_final]
+    notes: Best faces; the final-quality video model. Start and end images require mode omni_reference (the default rejects reference media). 720p, 10 s, audio off = 70 credits (verified live 2026-10-12).
   - ref: higgsfield/seedance-2.0
     label: Seedance 2.0
     kinds: [video, video_extend]
@@ -48,13 +99,35 @@ models:
     endpoint: null
     input_map: generic_video
     verified: false
-  - ref: higgsfield/kling-3.0-standard
-    label: Kling 3.0 Standard
+    aliases: [Seedance 2.0]
+    audio: off_switch
+  - ref: higgsfield/kling-3.0
+    label: Kling 3.0
     kinds: [video]
     max_refs: 0
-    endpoint: null
-    input_map: generic_video
+    # Candidate REST path (mode std, pro or 4k is in the path); confirm first.
+    endpoint: kling-video/v3.0/pro/image-to-video
+    input_map: kling_v3
     verified: false
+    mcp_id: kling3_0
+    aliases: [Kling 3.0, Kling 3.0 Pro, kling3_0, Kling 3.0 Standard]
+    audio: off_switch
+    params: { start_image: true, end_image: true, mode: [std, pro, 4k], sound: [on, off], elements_need_start_image: true }
+    notes: Pro, sound off, 10 s = 15 credits (verified live 2026-10-12). Element placeholders only work with a start image. Pro distorted a face that talked animatedly.
+  - ref: higgsfield/kling-3.0-turbo
+    label: Kling 3.0 Turbo
+    kinds: [video]
+    max_refs: 0
+    # Candidate REST path; confirm first.
+    endpoint: kling-video/v3.0-turbo/image-to-video
+    input_map: kling_v3
+    verified: false
+    mcp_id: kling3_0_turbo
+    aliases: [Kling 3.0 Turbo, kling3_0_turbo]
+    audio: always_on
+    params: { start_image: true, end_image: false, resolution: [720p, 1080p], duration_sec: [3, 15] }
+    use_for: [video_test]
+    notes: Cheap motion tests only; faces melt when the subject is small. Always generates audio (no off switch), so the Studio strips it on arrival (verified live 2026-10-12).
   - ref: higgsfield/wan-3.0
     label: Wan 3.0
     kinds: [video]
@@ -62,6 +135,19 @@ models:
     endpoint: null
     input_map: generic_video
     verified: false
+    audio: off_switch
+  - ref: higgsfield/mirelo-sfx
+    label: Mirelo text to audio (sound effects)
+    kinds: [audio]
+    max_refs: 0
+    endpoint: null
+    input_map: generic_audio
+    verified: false
+    mcp_id: mirelo_text_to_audio
+    aliases: [Mirelo, mirelo_text_to_audio]
+    params: { duration_sec: true }
+    use_for: [sfx]
+    notes: Sound effects with a duration parameter; 12 s worked (verified live 2026-10-12). ElevenLabs flow SFX returned only 1 s clips.
 
   # ── Mock (free, deterministic; tests and demo mode) ──
   - ref: mock/image

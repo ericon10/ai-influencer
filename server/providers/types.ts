@@ -91,6 +91,9 @@ export interface ProviderAdapter {
   id: string
   // True when reference images must be reachable by URL (real providers).
   needsPublicAssetUrls?: boolean
+  // Puts bytes in the provider's own storage and returns a URL its models
+  // accept. Preferred over our own public URLs when available.
+  uploadAsset?(data: Buffer, mime: string): Promise<string>
   listModels(): Promise<ModelInfo[]>
   estimate(req: GenRequest): Promise<CostEstimate>
   submit(req: GenRequest, opts: SubmitOptions): Promise<{ jobId: string; raw?: unknown }>

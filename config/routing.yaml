@@ -4,7 +4,7 @@ version: 1
 tasks:
   hero:          { model: higgsfield/gpt-image-2.5, kind: image, quality: high, resolution: 2k, aspect: "3:4" }
   sheet:         { model: higgsfield/gpt-image-2.5, kind: image_edit, quality: high, resolution: 2k }
-  upscale:       { model: higgsfield/upscale-2x, kind: upscale }
+  upscale:       { model: higgsfield/bytedance-upscale, kind: upscale, resolution: 2k }
   breakdown:     { model: anthropic/claude-opus-5-5, effort: medium }
   concepts:      { model: anthropic/claude-opus-5-5, effort: high }
   qa_perception: { model: anthropic/claude-opus-5-5, effort: medium }

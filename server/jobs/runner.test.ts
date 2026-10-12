@@ -144,6 +144,30 @@ describe('job runner', () => {
     } finally { await h2.close() }
   })
 
+  it('uploads reference images to the provider once and reuses the link, with no public URL set', async () => {
+    const base = h.registry.mockFor(h.ctx.accountId)
+    const uploads: string[] = []
+    const seen: Array<string | undefined> = []
+    const uploading: ProviderAdapter = {
+      ...base,
+      needsPublicAssetUrls: true,
+      async uploadAsset(data, mime) { uploads.push(mime); return `https://cdn.provider.test/u/${uploads.length}.png` },
+      async submit(req, o) { seen.push(req.refs?.[0]?.url); return base.submit({ ...req, refs: req.refs?.map(r => ({ assetId: r.assetId })) }, o) },
+    }
+    const h2 = await createHarness({ overrides: { gen: { mock: uploading } } })
+    try {
+      const ref = await saveAsset(h2.deps, h2.ctx, { data: await renderPlaceholderPortrait('ref'), origin: 'upload' })
+      const spec = img('with a ref', { kind: 'image_edit', refs: [{ assetId: ref.id }] })
+      for (let i = 0; i < 2; i++) {
+        const q = await quoteJobs(h2.deps, h2.ctx, { purpose: 'test', characterId: null, specs: [spec] })
+        await runJobs(h2.deps, h2.ctx, { quoteId: q.id, purpose: 'test', characterId: null, specs: [spec] })
+        await drain(h2)
+      }
+      expect(seen).toEqual(['https://cdn.provider.test/u/1.png', 'https://cdn.provider.test/u/1.png'])
+      expect(uploads).toEqual(['image/png'])
+    } finally { await h2.close() }
+  })
+
   it('cancels a queued job and releases its hold', async () => {
     const { rows } = await quoteAndRun(h, [img('portrait')])
     await cancelJob(h.deps, h.ctx, rows[0]!.id)

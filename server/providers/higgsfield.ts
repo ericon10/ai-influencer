@@ -12,6 +12,11 @@ import { ProviderError, type GenRequest, type JobState, type JobStatus, type Out
 // Model endpoints and input shapes vary per model; they live in
 // config/models.yaml and the adapter refuses to submit to any model not yet
 // marked verified, so nothing is sent until the owner has confirmed it.
+//
+// Reference images go through Higgsfield's own upload (also from the SDK):
+// POST /files/generate-upload-url { content_type } returns { upload_url,
+// public_url }; the bytes are PUT to upload_url without our credentials and
+// public_url is passed as the image. No cloud storage of our own is needed.
 
 export interface HiggsfieldOptions {
   credentials: string // "KEY_ID:KEY_SECRET"
@@ -39,7 +44,7 @@ const STATE: Record<HfResponse['status'], JobState> = {
 const imageUrl = (url?: string) => (url ? { type: 'image_url', image_url: url } : undefined)
 
 function needUrl(ref: { url?: string } | undefined, what: string): string {
-  if (!ref?.url) throw new ProviderError(`${what} needs a public URL. Set up cloud storage (R2) or STUDIO_PUBLIC_URL for live runs with reference images.`, { retryable: false, submitted: 'no' })
+  if (!ref?.url) throw new ProviderError(`${what} was not uploaded to Higgsfield.`, { retryable: false, submitted: 'no' })
   return ref.url
 }
 
@@ -59,7 +64,34 @@ export function mapInput(entry: ModelEntry, req: GenRequest): Record<string, unk
     case 'soul_v1':
       return clean({ prompt: req.prompt, width_and_height: soulSize(req.aspect), quality: '1080p', batch_size: 1, seed: req.seed, enhance_prompt: false })
     case 'generic_upscale':
-      return clean({ input_image: imageUrl(needUrl(req.refs?.[0], 'The image to upscale')), scale: req.scale ?? 2 })
+      return clean({ input_image: imageUrl(needUrl(req.refs?.[0], 'The image to upscale')), scale: req.scale ?? 2, resolution: req.resolution })
+    case 'seedance_i2v':
+      // REST image-to-video takes the frames directly. (The web app and MCP
+      // connector instead need mode omni_reference for start and end frames.)
+      // generate_audio defaults to true there, so it is always sent as false.
+      return clean({
+        prompt: req.prompt,
+        image_url: needUrl(req.startFrame, 'The start frame'),
+        end_image_url: req.endFrame ? needUrl(req.endFrame, 'The end frame') : undefined,
+        duration: req.durationSec,
+        resolution: req.resolution,
+        seed: req.seed,
+        generate_audio: false,
+      })
+    case 'kling_v3':
+      // Mode (std, pro, 4k) is part of the endpoint path. Sound defaults to
+      // on, so it is always sent as off. Turbo has no sound switch; the
+      // Studio strips its audio on arrival.
+      return clean({
+        prompt: req.prompt,
+        image_url: needUrl(req.startFrame, 'The start frame'),
+        last_image_url: req.endFrame && entry.audio !== 'always_on' ? needUrl(req.endFrame, 'The end frame') : undefined,
+        duration: req.durationSec,
+        resolution: entry.audio === 'always_on' ? req.resolution : undefined,
+        sound: entry.audio === 'always_on' ? undefined : 'off',
+      })
+    case 'generic_audio':
+      return clean({ prompt: req.prompt, duration: req.durationSec })
     case 'generic_video':
       return clean({
         prompt: req.prompt,
@@ -95,7 +127,7 @@ export function createHiggsfieldAdapter(opts: HiggsfieldOptions): ProviderAdapte
   const timeoutMs = opts.timeoutMs ?? 60_000
   const headers = { Authorization: `Key ${opts.credentials}`, 'Content-Type': 'application/json', Accept: 'application/json' }
 
-  async function call(method: 'GET' | 'POST', path: string, body?: unknown, phase: 'submit' | 'read' = 'read'): Promise<HfResponse> {
+  async function call<T = HfResponse>(method: 'GET' | 'POST', path: string, body?: unknown, phase: 'submit' | 'read' = 'read'): Promise<T> {
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), timeoutMs)
     let res: Response
@@ -111,7 +143,7 @@ export function createHiggsfieldAdapter(opts: HiggsfieldOptions): ProviderAdapte
       clearTimeout(timer)
     }
     const text = await res.text()
-    let json: HfResponse | undefined
+    let json: (T & { detail?: unknown }) | undefined
     try { json = text ? JSON.parse(text) : undefined } catch { /* non-JSON error body */ }
     if (res.ok && json) return json
     const detail = typeof json?.detail === 'string' ? json.detail : text.slice(0, 300)
@@ -141,6 +173,27 @@ export function createHiggsfieldAdapter(opts: HiggsfieldOptions): ProviderAdapte
         .map(m => ({ ref: m.ref, provider: 'higgsfield', label: m.label, kinds: m.kinds, maxRefs: m.max_refs, verified: m.verified && !!m.endpoint }))
     },
     async estimate(req) { return estimateGen(opts.config, req) },
+    async uploadAsset(data, mime) {
+      const slot = await call<{ upload_url?: string; public_url?: string; upload_headers?: Record<string, string> }>('POST', '/files/generate-upload-url', { content_type: mime })
+      if (!slot.upload_url?.startsWith('https://') || !slot.public_url?.startsWith('https://')) {
+        throw new ProviderError('Higgsfield did not return an upload link.', { retryable: true, submitted: 'no' })
+      }
+      const controller = new AbortController()
+      const timer = setTimeout(() => controller.abort(), timeoutMs)
+      try {
+        // The presigned link carries its own authorization; never send our key.
+        // Some slots name extra headers the storage expects (the Python SDK copies them).
+        const extra = Object.fromEntries(Object.entries(slot.upload_headers ?? {}).filter(([k]) => k.toLowerCase() !== 'authorization'))
+        const res = await doFetch(slot.upload_url, { method: 'PUT', headers: { 'Content-Type': mime, ...extra }, body: new Uint8Array(data), signal: controller.signal })
+        if (!res.ok) throw new ProviderError(`Uploading a reference image to Higgsfield failed (${res.status}).`, { retryable: res.status >= 500, submitted: 'no', status: res.status })
+      } catch (e) {
+        if (e instanceof ProviderError) throw e
+        throw new ProviderError(`Uploading a reference image to Higgsfield failed: ${(e as Error).message}`, { retryable: true, submitted: 'no' })
+      } finally {
+        clearTimeout(timer)
+      }
+      return slot.public_url
+    },
     async submit(req, { webhookUrl }) {
       const entry = entryFor(req.model)
       if ((req.kind === 'video' || req.kind === 'video_extend') && req.audio !== false) {

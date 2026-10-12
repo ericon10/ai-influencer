@@ -28,9 +28,18 @@ function fakeHiggsfield(behavior: { submitStatus?: number; finalStatus?: 'comple
   const fetchImpl = (async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input)
     const headers = Object.fromEntries(Object.entries((init?.headers ?? {}) as Record<string, string>))
-    calls.push({ method: init?.method ?? 'GET', url, headers, body: init?.body ? JSON.parse(String(init.body)) : undefined })
     const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } })
+    // Higgsfield's presigned storage: bytes, no API credentials.
+    if (url.startsWith('https://upload.higgsfield.test/')) {
+      calls.push({ method: init?.method ?? 'GET', url, headers, body: { bytes: (init?.body as Uint8Array).byteLength } })
+      return new Response(null, { status: init?.method === 'PUT' ? 200 : 405 })
+    }
+    calls.push({ method: init?.method ?? 'GET', url, headers, body: init?.body ? JSON.parse(String(init.body)) : undefined })
     if (headers.Authorization !== 'Key kid_123:ksecret_456') return json(401, { detail: 'Invalid API credentials' })
+    if (url.endsWith('/files/generate-upload-url')) {
+      const n = calls.filter(c => c.url.endsWith('/files/generate-upload-url')).length
+      return json(200, { upload_url: `https://upload.higgsfield.test/slot-${n}?sig=x`, public_url: `https://cdn.higgsfield.ai/uploads/slot-${n}.png` })
+    }
     const status = url.match(/\/requests\/([^/]+)\/status$/)
     if (status) {
       const id = decodeURIComponent(status[1]!)
@@ -144,9 +153,37 @@ describe('higgsfield adapter specifics', () => {
     expect((await bad.verifyCredentials!()).ok).toBe(false)
   })
 
-  it('needs public URLs for reference images', () => {
+  it('refuses to send a reference image that was not uploaded', () => {
     const entry = verifiedConfig().models.models.find(m => m.ref === 'higgsfield/gpt-image-2.5')!
-    expect(() => mapInput(entry, { kind: 'image_edit', model: entry.ref, prompt: 'p', refs: [{ assetId: 'a1' }] })).toThrow(/public URL/)
+    expect(() => mapInput(entry, { kind: 'image_edit', model: entry.ref, prompt: 'p', refs: [{ assetId: 'a1' }] })).toThrow(/not uploaded to Higgsfield/)
+  })
+
+  it('uploads reference images to Higgsfield storage without sending the key there', async () => {
+    const fake = fakeHiggsfield()
+    const a = createHiggsfieldAdapter({ credentials: 'kid_123:ksecret_456', config: verifiedConfig(), fetchImpl: fake.fetchImpl })
+    const url = await a.uploadAsset!(portrait, 'image/png')
+    expect(url).toBe('https://cdn.higgsfield.ai/uploads/slot-1.png')
+    const [slot, put] = fake.calls
+    expect(slot).toMatchObject({ method: 'POST', url: 'https://api.higgsfield.ai/files/generate-upload-url', body: { content_type: 'image/png' } })
+    expect(put).toMatchObject({ method: 'PUT', url: 'https://upload.higgsfield.test/slot-1?sig=x', body: { bytes: portrait.length } })
+    expect(put!.headers['Content-Type']).toBe('image/png')
+    expect(put!.headers.Authorization).toBeUndefined()
+  })
+
+  it('sends Seedance 2.5 frames with audio off, and Kling 3.0 with sound off', () => {
+    const models = verifiedConfig().models.models
+    const frames = { startFrame: { assetId: 's', url: 'https://cdn.higgsfield.ai/s.png' }, endFrame: { assetId: 'e', url: 'https://cdn.higgsfield.ai/e.png' } }
+    const seedance = models.find(m => m.ref === 'higgsfield/seedance-2.5')!
+    expect(mapInput(seedance, { kind: 'video', model: seedance.ref, prompt: 'p', ...frames, durationSec: 10, resolution: '720p', audio: false }))
+      .toEqual({ prompt: 'p', image_url: 'https://cdn.higgsfield.ai/s.png', end_image_url: 'https://cdn.higgsfield.ai/e.png', duration: 10, resolution: '720p', generate_audio: false })
+    const kling = models.find(m => m.ref === 'higgsfield/kling-3.0')!
+    expect(mapInput(kling, { kind: 'video', model: kling.ref, prompt: 'p', ...frames, durationSec: 10, audio: false }))
+      .toEqual({ prompt: 'p', image_url: 'https://cdn.higgsfield.ai/s.png', last_image_url: 'https://cdn.higgsfield.ai/e.png', duration: 10, sound: 'off' })
+    // Turbo takes a start frame only and has no sound switch (audio is stripped on arrival).
+    const turbo = models.find(m => m.ref === 'higgsfield/kling-3.0-turbo')!
+    expect(turbo.audio).toBe('always_on')
+    expect(mapInput(turbo, { kind: 'video', model: turbo.ref, prompt: 'p', ...frames, durationSec: 5, resolution: '720p', audio: false }))
+      .toEqual({ prompt: 'p', image_url: 'https://cdn.higgsfield.ai/s.png', duration: 5, resolution: '720p' })
   })
 })
 

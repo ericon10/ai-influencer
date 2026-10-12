@@ -177,14 +177,31 @@ function backoffMs(deps: Deps, attempt: number): number {
   return Math.min(j.poll_max_sec, j.poll_initial_sec * Math.pow(j.poll_backoff, Math.max(0, attempt - 1))) * 1000
 }
 
+// Provider uploads are reused for a while: the same REF-00 rides along on
+// many jobs. Keyed by provider and the asset's checksum.
+const UPLOAD_TTL_MS = 6 * 3600_000
+const uploads = new Map<string, { url: string; at: number }>()
+
+async function refUrl(deps: Deps, ctx: Ctx, adapter: ProviderAdapter, assetId: string): Promise<string> {
+  if (adapter.uploadAsset) {
+    const { row, data } = await readAsset(deps, ctx, assetId)
+    const key = `${ctx.accountId}:${adapter.id}:${row.checksumSha256 ?? row.id}`
+    const hit = uploads.get(key)
+    const now = deps.clock.now().getTime()
+    if (hit && now - hit.at < UPLOAD_TTL_MS) return hit.url
+    const url = await adapter.uploadAsset(data, row.mime)
+    uploads.set(key, { url, at: now })
+    if (uploads.size > 500) uploads.delete(uploads.keys().next().value!)
+    return url
+  }
+  const url = await publicAssetUrl(deps, ctx, assetId)
+  if (!url) throw new ProviderError('Reference images need a public URL. Set up cloud storage (R2) or STUDIO_PUBLIC_URL for live runs with references.', { retryable: false, submitted: 'no' })
+  return url
+}
+
 async function resolveRefs(deps: Deps, ctx: Ctx, adapter: ProviderAdapter, req: GenRequest): Promise<GenRequest> {
   if (!adapter.needsPublicAssetUrls) return req
-  const withUrl = async <T extends { assetId: string } | undefined>(r: T): Promise<T> => {
-    if (!r) return r
-    const url = await publicAssetUrl(deps, ctx, r.assetId)
-    if (!url) throw new ProviderError('Reference images need a public URL. Set up cloud storage (R2) or STUDIO_PUBLIC_URL for live runs with references.', { retryable: false, submitted: 'no' })
-    return { ...r, url }
-  }
+  const withUrl = async <T extends { assetId: string } | undefined>(r: T): Promise<T> => (r ? { ...r, url: await refUrl(deps, ctx, adapter, r.assetId) } : r)
   return {
     ...req,
     refs: req.refs ? await Promise.all(req.refs.map(r => withUrl(r))) : undefined,

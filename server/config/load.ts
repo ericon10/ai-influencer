@@ -21,6 +21,18 @@ const modelsSchema = z.object({
     input_map: z.string(),
     verified: z.boolean(),
     notes: z.string().optional(),
+    // Other names people use for the model (character files, the Higgsfield
+    // web app). The character-file importer maps them to this ref.
+    aliases: z.array(z.string()).default([]),
+    // The model id in the Higgsfield web app and MCP connector.
+    mcp_id: z.string().optional(),
+    // Video and audio: whether a request can turn generated sound off.
+    // always_on means the Studio strips the track on arrival instead.
+    audio: z.enum(['off_switch', 'always_on']).optional(),
+    // Known inputs and limits, recorded as verified facts.
+    params: z.record(z.string(), z.unknown()).default({}),
+    use_for: z.array(z.string()).default([]),
+    avoid_for: z.array(z.string()).default([]),
   })),
   llm_models: z.array(z.object({
     ref: z.string(),
@@ -43,6 +55,9 @@ const pricebookSchema = z.object({
     verified: z.boolean(),
     when: z.record(z.string(), z.string()).optional(),
     source: z.string().optional(),
+    // Higgsfield credits per unit as charged in the web/MCP account. Shown
+    // for reference; estimates use the USD price.
+    credits: z.number().nonnegative().optional(),
   })),
 })
 
