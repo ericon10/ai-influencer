@@ -59,8 +59,9 @@ requirements, not suggestions.
 | `fixtures/callie/` | Acceptance fixtures; Callie is test data only |
 
 Studio dev: `npm run studio` (API + worker on 8787, Vite on 5173). Face
-models for identity QA: `npm run models` (once). Checks: `npm run check`. The Studio UI uses a stylesheet with design tokens rather
-than the legacy inline-style convention.
+models for identity QA: `npm run models` (once). Checks: `npm run check`.
+The Studio UI uses a stylesheet with design tokens rather than the legacy
+inline-style convention.
 
 ## Tech stack
 
