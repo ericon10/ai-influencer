@@ -1,0 +1,40 @@
+# Price book: the source of every estimate. Prices change often; re-check
+# list prices monthly (SPEC 7.2). `verified: false` marks a placeholder that
+# has not been confirmed against the provider's published price; it is set
+# high on purpose so budget caps err on the safe side. Accounts can override
+# entries (negotiated or deposit-discounted prices) in Settings.
+version: "2026-10-12"
+currency: USD
+entries:
+  # Higgsfield images (placeholders until the API price list is confirmed)
+  - { provider: higgsfield, model: gpt-image-2.5, unit: image, price: 0.25, verified: false }
+  - { provider: higgsfield, model: gpt-image-2.5-flare, unit: image, price: 0.25, verified: false }
+  - { provider: higgsfield, model: nano-banana-2, unit: image, price: 0.12, verified: false }
+  - { provider: higgsfield, model: soul-2, unit: image, price: 0.10, verified: false }
+  - { provider: higgsfield, model: upscale-2x, unit: image, price: 0.06, verified: false }
+  # Higgsfield video, per second (SPEC 7.2, Oct 2026 list, before deposit discounts)
+  - { provider: higgsfield, model: seedance-2.0, unit: second, price: 0.141, verified: true, source: "SPEC.md 7.2 list price" }
+  - { provider: higgsfield, model: kling-3.0-standard, unit: second, price: 0.063, verified: true, source: "SPEC.md 7.2 list price" }
+  - { provider: higgsfield, model: wan-3.0, unit: second, price: 0.068, verified: true, source: "SPEC.md 7.2 list price" }
+
+  # Anthropic, per million tokens (first-party API rates, Oct 2026)
+  - { provider: anthropic, model: claude-opus-5-5, unit: mtok_in, price: 4.00, verified: true }
+  - { provider: anthropic, model: claude-opus-5-5, unit: mtok_out, price: 20.00, verified: true }
+  - { provider: anthropic, model: claude-opus-5-5, unit: mtok_cache_read, price: 0.20, verified: true }
+  - { provider: anthropic, model: claude-opus-5-5, unit: mtok_cache_write, price: 5.00, verified: true }
+  - { provider: anthropic, model: claude-sonnet-5-5, unit: mtok_in, price: 2.00, verified: true }
+  - { provider: anthropic, model: claude-sonnet-5-5, unit: mtok_out, price: 10.00, verified: true }
+  - { provider: anthropic, model: claude-sonnet-5-5, unit: mtok_cache_read, price: 0.20, verified: true }
+  - { provider: anthropic, model: claude-sonnet-5-5, unit: mtok_cache_write, price: 2.50, verified: true }
+  - { provider: anthropic, model: claude-haiku-5-5, unit: mtok_in, price: 0.10, verified: true }
+  - { provider: anthropic, model: claude-haiku-5-5, unit: mtok_out, price: 0.50, verified: true }
+  - { provider: anthropic, model: claude-haiku-5-5, unit: mtok_cache_read, price: 0.01, verified: true }
+  - { provider: anthropic, model: claude-haiku-5-5, unit: mtok_cache_write, price: 0.125, verified: true }
+
+  # Mock: small non-zero prices so tests exercise the ledger end to end.
+  - { provider: mock, model: image, unit: image, price: 0.04, verified: true }
+  - { provider: mock, model: video, unit: second, price: 0.10, verified: true }
+  - { provider: mock, model: llm, unit: mtok_in, price: 1.00, verified: true }
+  - { provider: mock, model: llm, unit: mtok_out, price: 5.00, verified: true }
+  - { provider: mock, model: llm, unit: mtok_cache_read, price: 0.10, verified: true }
+  - { provider: mock, model: llm, unit: mtok_cache_write, price: 1.25, verified: true }

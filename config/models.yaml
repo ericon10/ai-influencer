@@ -1,0 +1,98 @@
+# Model catalog. A model ref is "provider/model". Higgsfield endpoint ids are
+# filled in once confirmed against the Higgsfield Console docs; until then
+# `verified: false` keeps the adapter from submitting live runs to them.
+version: 1
+models:
+  # ── Higgsfield (primary, pay-per-use API) ──
+  - ref: higgsfield/gpt-image-2.5
+    label: GPT Image 2.5
+    kinds: [image, image_edit]
+    max_refs: 8
+    endpoint: null
+    input_map: generic_image
+    verified: false
+    notes: Sheet model for Callie (SPEC 5.1 rule 7, 5.6 rule 41).
+  - ref: higgsfield/gpt-image-2.5-flare
+    label: GPT Image 2.5 Flare
+    kinds: [image, image_edit]
+    max_refs: 8
+    endpoint: null
+    input_map: generic_image
+    verified: false
+    notes: Avoid for scenes (distorted hair, SPEC 5.6 rule 41).
+  - ref: higgsfield/nano-banana-2
+    label: Nano Banana 2
+    kinds: [image, image_edit]
+    max_refs: 4
+    endpoint: null
+    input_map: generic_image
+    verified: false
+  - ref: higgsfield/soul-2
+    label: Soul 2.0
+    kinds: [image]
+    max_refs: 0
+    endpoint: /v1/text2image/soul
+    input_map: soul_v1
+    verified: false
+  - ref: higgsfield/upscale-2x
+    label: Image upscale 2x
+    kinds: [upscale]
+    max_refs: 0
+    endpoint: null
+    input_map: generic_upscale
+    verified: false
+  - ref: higgsfield/seedance-2.0
+    label: Seedance 2.0
+    kinds: [video, video_extend]
+    max_refs: 0
+    endpoint: null
+    input_map: generic_video
+    verified: false
+  - ref: higgsfield/kling-3.0-standard
+    label: Kling 3.0 Standard
+    kinds: [video]
+    max_refs: 0
+    endpoint: null
+    input_map: generic_video
+    verified: false
+  - ref: higgsfield/wan-3.0
+    label: Wan 3.0
+    kinds: [video]
+    max_refs: 0
+    endpoint: null
+    input_map: generic_video
+    verified: false
+
+  # ── Mock (free, deterministic; tests and demo mode) ──
+  - ref: mock/image
+    label: Mock image
+    kinds: [image, image_edit, upscale]
+    max_refs: 8
+    endpoint: mock
+    input_map: mock
+    verified: true
+  - ref: mock/video
+    label: Mock video
+    kinds: [video, video_extend]
+    max_refs: 0
+    endpoint: mock
+    input_map: mock
+    verified: true
+
+llm_models:
+  - ref: anthropic/claude-opus-5-5
+    label: Claude Opus 5.5
+    api_model: claude-opus-5-5
+    vision: true
+  - ref: anthropic/claude-sonnet-5-5
+    label: Claude Sonnet 5.5
+    api_model: claude-sonnet-5-5
+    vision: true
+  - ref: anthropic/claude-haiku-5-5
+    label: Claude Haiku 5.5
+    api_model: claude-haiku-5-5
+    vision: true
+  - ref: mock/llm
+    label: Mock LLM
+    api_model: llm
+    vision: true

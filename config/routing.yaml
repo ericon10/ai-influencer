@@ -1,0 +1,17 @@
+# Model routing per pipeline task (SPEC 5.6 rule 41, 7.3). Data, not code.
+# In demo mode every task routes to its mock equivalent (free).
+version: 1
+tasks:
+  hero:          { model: higgsfield/gpt-image-2.5, kind: image, quality: high, resolution: 2k, aspect: "3:4" }
+  sheet:         { model: higgsfield/gpt-image-2.5, kind: image_edit, quality: high, resolution: 2k }
+  upscale:       { model: higgsfield/upscale-2x, kind: upscale }
+  breakdown:     { model: anthropic/claude-opus-5-5, effort: medium }
+  concepts:      { model: anthropic/claude-opus-5-5, effort: high }
+  qa_perception: { model: anthropic/claude-opus-5-5, effort: medium }
+  card_update:   { model: anthropic/claude-opus-5-5, effort: medium }
+mock:
+  image: mock/image
+  video: mock/video
+  llm: mock/llm
+avoid:
+  scene: [higgsfield/gpt-image-2.5-flare]

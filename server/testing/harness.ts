@@ -1,0 +1,72 @@
+import { randomBytes } from 'node:crypto'
+import { openDb, type DbHandle } from '../db/client'
+import { createMemoryStore } from '../storage/blobStore'
+import { createKeyVault } from '../lib/vault'
+import { loadConfig } from '../config/load'
+import { logger } from '../lib/logger'
+import { loadEnv } from '../lib/env'
+import { createRegistry, type RegistryOptions } from '../providers/registry'
+import { createAccount } from '../auth/accounts'
+import { readAsset } from '../storage/assets'
+import type { Ctx, Deps } from '../context'
+
+// Everything a test needs: in-memory Postgres, memory storage, a clock the
+// test controls, mock providers only, and one seeded account.
+
+export interface Harness {
+  deps: Deps
+  ctx: Ctx
+  handle: DbHandle
+  registry: ReturnType<typeof createRegistry>
+  clock: { now(): Date; advance(ms: number): void; set(d: Date): void }
+  close(): Promise<void>
+  newAccount(name?: string): Promise<Ctx>
+}
+
+export async function createHarness(opts: Partial<Pick<RegistryOptions, 'mockScenario' | 'mockPollsUntilDone' | 'mockLlmResponders' | 'overrides'>> & { publicUrl?: string } = {}): Promise<Harness> {
+  const handle = await openDb({ memory: true })
+  let now = new Date('2026-10-12T12:00:00Z')
+  const clock = { now: () => new Date(now), advance: (ms: number) => { now = new Date(now.getTime() + ms) }, set: (d: Date) => { now = d } }
+  const store = createMemoryStore()
+  const vault = createKeyVault(`t1:${randomBytes(32).toString('base64')}`)
+  const config = loadConfig()
+  const env = loadEnv({
+    NODE_ENV: 'test',
+    STUDIO_MASTER_KEYS: `t1:${randomBytes(32).toString('base64')}`,
+    STUDIO_SESSION_SECRET: randomBytes(32).toString('base64'),
+    STUDIO_PUBLIC_URL: opts.publicUrl ?? '',
+  })
+  const depsRef: { current?: Deps } = {}
+  const registry = createRegistry({
+    db: handle.db, vault, config, store,
+    loadAsset: async (accountId, assetId) => (await readAsset(depsRef.current!, { ...ctxBase, accountId }, assetId)).data,
+    mockScenario: opts.mockScenario,
+    mockPollsUntilDone: opts.mockPollsUntilDone ?? 1,
+    mockLlmResponders: opts.mockLlmResponders,
+    overrides: opts.overrides,
+  })
+  const deps: Deps = { db: handle.db, store, vault, env, config, providers: registry, clock, log: logger }
+  depsRef.current = deps
+  const ctxBase = { userId: null, role: 'owner' as const, email: '', requestId: 'test', log: logger }
+
+  const newAccount = async (name = 'Test Studio'): Promise<Ctx> => {
+    const p = await createAccount(handle.db, { name, ownerEmail: `owner-${randomBytes(4).toString('hex')}@example.com` })
+    return { ...p, requestId: 'test', log: logger }
+  }
+  const ctx = await newAccount()
+  return { deps, ctx, handle, registry, clock, close: () => handle.close(), newAccount }
+}
+
+// Runs worker ticks until no job is due, advancing the clock between rounds.
+export async function drain(h: Harness, maxRounds = 30): Promise<void> {
+  const { tick } = await import('../jobs/runner')
+  for (let i = 0; i < maxRounds; i++) {
+    const n = await tick(h.deps, 20)
+    if (n === 0) {
+      h.clock.advance(60_000)
+      const again = await tick(h.deps, 20)
+      if (again === 0) return
+    }
+    h.clock.advance(5_000)
+  }
+}

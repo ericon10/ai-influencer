@@ -1,0 +1,10 @@
+# Default budget caps for a new account (DECISIONS.md A4). Accounts edit
+# these in Settings; edits are stored per account and audited.
+job: 3.00                    # one run, all variations
+character: 50.00             # lifetime per character
+month: 200.00                # per account, calendar month (UTC)
+warn_pct: 80
+confirm_above: 0.50          # extra confirmation for any single run above this
+variation_threshold: 0.25    # outputs priced above this default to 2 variations
+default_variations_expensive: 2
+default_variations_cheap: 4

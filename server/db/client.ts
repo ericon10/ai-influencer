@@ -31,15 +31,26 @@ export async function openDb(opts: { url?: string; pgliteDir?: string; memory?: 
   const { PGlite } = await import('@electric-sql/pglite')
   const { drizzle } = await import('drizzle-orm/pglite')
   const { migrate } = await import('drizzle-orm/pglite/migrator')
-  let client
   if (opts.memory) {
-    client = new PGlite()
-  } else {
-    const dir = resolve(opts.pgliteDir || '.data/pg')
-    mkdirSync(dir, { recursive: true })
-    client = new PGlite(dir)
+    // Tests: migrate once per process, then clone the migrated data directory
+    // for each database (about 6x faster than running migrations every time).
+    template ??= (async () => {
+      const seed = new PGlite()
+      await migrate(drizzle(seed, { schema }), { migrationsFolder: MIGRATIONS })
+      const dump = await seed.dumpDataDir('none')
+      await seed.close()
+      return dump
+    })()
+    const client = new PGlite({ loadDataDir: await template })
+    await client.waitReady
+    return { db: drizzle(client, { schema }) as unknown as Db, driver: 'pglite', close: () => client.close() }
   }
+  const dir = resolve(opts.pgliteDir || '.data/pg')
+  mkdirSync(dir, { recursive: true })
+  const client = new PGlite(dir)
   const db = drizzle(client, { schema })
   await migrate(db, { migrationsFolder: MIGRATIONS })
   return { db: db as unknown as Db, driver: 'pglite', close: () => client.close() }
 }
+
+let template: Promise<File | Blob> | null = null

@@ -1,0 +1,92 @@
+# Rules engine (SPEC 5). Each rule is checked against a built prompt and its
+# request before any quote is issued. An error blocks the run; a warning is
+# shown. `spec` points at the SPEC.md rule it enforces.
+version: 1
+rules:
+  - id: hero-text-only
+    spec: "5.1.1"
+    title: Hero is generated text-only
+    when: { stage: hero }
+    check: { type: no_attachments }
+    message: The hero run must not attach any image. The inspiration supplies the look; the card supplies the face.
+  - id: natural-baseline
+    spec: "5.1.3"
+    title: Natural makeup on hero and sheet
+    when: { stage: [hero, sheet] }
+    check: { type: forbid_pattern, flags: i, pattern: "\\b(glam|glamorous|smok(?:e|ey|y) eyes?|contour(?:ing|ed)?|false lashes|lash extensions|bold lips?|red lip(?:stick)?|heavy makeup|full makeup|winged (?:liner|eyeliner))\\b" }
+    message: Hero and sheet use natural, everyday makeup. Glam is added per scene, never baked into the sheet.
+  - id: sheet-settings
+    spec: "5.1.5"
+    title: Sheet quality high or above, 2k
+    when: { stage: sheet }
+    check: { type: request_fields, require: { quality: [high, ultra, max], resolution: [2k, 4k] } }
+    message: Sheet shots need quality high or above at 2k. Low quality smooths skin and erases small marks.
+  - id: sheet-aspect
+    spec: "5.1.5"
+    title: 3:4 for chest-up, 9:16 for full body
+    when: { stage: sheet }
+    check: { type: aspect_matches_framing }
+    message: Use 3:4 for chest-up shots and 9:16 for full-body shots.
+  - id: sheet-one-model
+    spec: "5.1.7"
+    title: One model and variant for the whole sheet
+    when: { stage: sheet }
+    check: { type: sheet_model_locked }
+    message: The whole sheet must use the model it started with. Switching mid-sheet causes drift.
+  - id: chest-up-no-legwear
+    spec: "5.1.8"
+    title: Chest-up prompts never mention jeans or shoes
+    when: { framing: chest_up }
+    check: { type: forbid_pattern, flags: i, pattern: "\\b(jeans|denim|shoes?|sneakers?|boots?|heels|sandals|trainers|footwear|pants|trousers|shorts|skirts?|leggings)\\b" }
+    message: Chest-up prompts must not mention legwear or shoes; it pulls the shot out to a longer framing.
+  - id: neutral-body-cups
+    spec: "5.1.9"
+    title: No cup sizes
+    check: { type: forbid_pattern, pattern: "\\b(?:[A-H]|AA|DD|DDD)[- ]?cups?\\b" }
+    message: Describe the body in neutral brand terms, never cup sizes.
+  - id: neutral-body-measurements
+    spec: "5.1.9"
+    title: No measurements
+    check: { type: forbid_pattern, flags: i, pattern: "\\b(cup size|bust size|measurements|\\d{2}-\\d{2}-\\d{2}|\\d{2}\\s?(?:AA|DD|DDD|[A-H])\\s?(?:bust|bra))\\b" }
+    message: Describe the body in neutral brand terms, never measurements.
+  - id: marks-side-specific
+    spec: "5.1.11"
+    title: Marks are stated with their side
+    when: { stage: [hero, sheet] }
+    check: { type: marks_stated }
+    message: Every distinguishing mark must be stated with its side, including when it is hidden in this view.
+  - id: upscale-max-2x
+    spec: "5.1.6"
+    title: Upscale 2x, never more
+    when: { kind: upscale }
+    check: { type: request_fields, require: { scale: [2] } }
+    message: Upscale reference images 2x, never more.
+  - id: video-image-only
+    spec: "5.4.26"
+    title: Image-to-video only
+    when: { kind: video }
+    check: { type: requires_start_frame }
+    message: Character video must start from an approved still. Text-to-video is never used for a character.
+  - id: video-audio-off
+    spec: "5.4.27"
+    title: Audio off, always
+    when: { kind: [video, video_extend] }
+    check: { type: request_fields, require: { audio: [false] } }
+    message: Video generation always sends audio off. Sound is added in post.
+  - id: video-silent-phrase
+    spec: "5.4.28"
+    title: Silent, no dialogue
+    when: { kind: [video, video_extend] }
+    check: { type: require_phrase, phrase: "silent, no audio, no dialogue" }
+    message: Video prompts must include "silent, no audio, no dialogue".
+  - id: video-no-talking
+    spec: "5.4.29"
+    title: Never make her the main speaker
+    when: { kind: [video, video_extend] }
+    check: { type: forbid_pattern, flags: i, exclude_after: "Avoid:", pattern: "(mouth moving as (?:she|he|they) talks?|\\bsing(?:s|ing)?\\b|\\bshout(?:s|ing)?\\b)" }
+    message: Use "listens, nods, laughs softly, small natural mouth movements" instead of talking, singing or shouting.
+  - id: no-em-dash
+    spec: "5.7.42"
+    title: No em-dashes in generated copy
+    check: { type: forbid_char, codepoint: 8212 }
+    message: Em-dashes are not allowed in any generated copy.

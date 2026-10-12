@@ -1,0 +1,22 @@
+# Job runner, downloads, media and LLM limits.
+jobs:
+  poll_initial_sec: 3
+  poll_max_sec: 30
+  poll_backoff: 1.6
+  lock_sec: 120
+  submit_max_attempts: 3
+  quote_ttl_sec: 900
+  stuck_after_sec: { image: 600, image_edit: 600, upscale: 600, video: 1800, video_extend: 1800, audio: 900, train_identity: 1800, llm: 300 }
+downloads:
+  max_bytes: 524288000
+  timeout_sec: 120
+  # Output hosts per provider (suffix match). Private and loopback addresses
+  # are always refused, whatever this list says.
+  allowed_hosts:
+    higgsfield: [higgsfield.ai, cloudfront.net]
+media:
+  seam: { max_diff: 0.18, crossfade_frames: 3, color_match: true }
+  last_frame: { step_back_sec: 0.5, blur_ratio: 0.6 }
+llm:
+  image_max_edge: 1568
+  image_max_tokens: 4784

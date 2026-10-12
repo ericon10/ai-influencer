@@ -1,0 +1,45 @@
+# Camera views. Sides are always the character's own LEFT and RIGHT.
+# When the character faces the camera, their LEFT side appears on the RIGHT
+# of the image. A profile with the nose pointing to the right edge of the
+# frame shows the character's RIGHT side.
+version: 1
+views:
+  front:
+    label: Front
+    facing: camera
+    turn: none
+    prompt: "Facing the camera straight on, head level, shoulders square to the camera"
+    sides: { LEFT: visible, RIGHT: visible }
+  three_quarter_left:
+    label: Left side, three-quarter
+    facing: camera
+    turn: LEFT
+    prompt: "Head and shoulders turned about 45 degrees so {poss} LEFT cheek and LEFT ear face the camera; {poss} face points toward the left edge of the frame"
+    sides: { LEFT: visible, RIGHT: partial }
+    partial_regions: [brow, eye, cheek, lip]
+  three_quarter_right:
+    label: Right side, three-quarter
+    facing: camera
+    turn: RIGHT
+    prompt: "Head and shoulders turned about 45 degrees so {poss} RIGHT cheek and RIGHT ear face the camera; {poss} face points toward the right edge of the frame"
+    sides: { LEFT: partial, RIGHT: visible }
+    partial_regions: [brow, eye, cheek, lip]
+  profile_left:
+    label: Left side, profile
+    facing: camera
+    turn: LEFT
+    prompt: "Full side profile: head turned 90 degrees so only {poss} LEFT side faces the camera, LEFT ear fully visible; {poss} nose points toward the left edge of the frame"
+    sides: { LEFT: visible, RIGHT: hidden }
+  profile_right:
+    label: Right side, profile
+    facing: camera
+    turn: RIGHT
+    prompt: "Full side profile: head turned 90 degrees so only {poss} RIGHT side faces the camera, RIGHT ear fully visible; {poss} nose points toward the right edge of the frame"
+    sides: { LEFT: hidden, RIGHT: visible }
+  back:
+    label: Back of head
+    facing: away
+    turn: none
+    prompt: "Seen from directly behind: the back of {poss} head, hair and shoulders, face not visible"
+    sides: { LEFT: partial, RIGHT: partial }
+    partial_regions: [ear, neck]

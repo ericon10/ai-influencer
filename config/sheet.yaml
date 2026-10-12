@@ -1,0 +1,21 @@
+# Reference sheet dependency graph (SPEC 4.1). Run in plain number order;
+# every shot depends only on lower numbers. Labels are plain words for the UI.
+version: 1
+settings:
+  quality: high
+  resolution: 2k
+  aspect: { chest_up: "3:4", full_body: "9:16" }
+  upscale_ref00_below_px: 1500
+shots:
+  - { id: REF-00, label: "Front, close-up",          view: front,               framing: chest_up,  expression: neutral,      attach: [],               source: hero }
+  - { id: REF-01, label: "Left side, three-quarter", view: three_quarter_left,  framing: chest_up,  expression: neutral,      attach: [REF-00] }
+  - { id: REF-02, label: "Right side, three-quarter", view: three_quarter_right, framing: chest_up, expression: neutral,      attach: [REF-00] }
+  - { id: REF-03, label: "Left side, profile",       view: profile_left,        framing: chest_up,  expression: neutral,      attach: [REF-00, REF-01] }
+  - { id: REF-04, label: "Right side, profile",      view: profile_right,       framing: chest_up,  expression: neutral,      attach: [REF-00, REF-02] }
+  - { id: REF-05, label: "Back of head",             view: back,                framing: chest_up,  expression: none,         attach: [REF-03, REF-04] }
+  - { id: REF-06, label: "Full body, front",         view: front,               framing: full_body, expression: neutral,      attach: [REF-00] }
+  - { id: REF-07, label: "Full body, side",          view: profile_left,        framing: full_body, expression: neutral,      attach: [REF-03, REF-06] }
+  - { id: REF-08, label: "Full body, back",          view: back,                framing: full_body, expression: none,         attach: [REF-05, REF-06] }
+  - { id: REF-09, label: "Open smile, close-up",     view: front,               framing: chest_up,  expression: open_smile,   attach: [REF-00] }
+  - { id: REF-10, label: "Laughing, three-quarter",  view: three_quarter_left,  framing: chest_up,  expression: laughing,     attach: [REF-00, REF-01] }
+  - { id: REF-11, label: "Serious, looking down",    view: front,               framing: chest_up,  expression: serious_down, attach: [REF-00] }
