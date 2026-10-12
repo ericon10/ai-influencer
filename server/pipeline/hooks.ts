@@ -10,6 +10,7 @@ import { evaluateSheetShot, finalize, type QaReport } from '../core/qa/marks'
 import { parseObservation } from '../core/qa/perception'
 import { getCharacter, getRef, setCharacterFields, toData } from './characters'
 import { refreshRefStatus } from './review'
+import { scoreDistinctness, scoreIdentity } from './identity'
 
 // What each finished job does to the character. Registered once at boot.
 
@@ -48,7 +49,17 @@ async function onConcepts(deps: Deps, ctx: Ctx, job: JobRow, out: JobOutcome): P
 async function onHero(deps: Deps, ctx: Ctx, job: JobRow, out: JobOutcome): Promise<void> {
   const index = Number(job.purpose.split(':')[1] ?? 0)
   if (out.status === 'completed') {
-    for (const asset of out.assets ?? []) await createCandidate(deps, ctx, job, { target: 'hero', heroPromptIndex: index, assetId: asset.id, status: 'in_review' })
+    for (const asset of out.assets ?? []) {
+      // Distinctness (SPEC 6): a hero that is the inspiration person never
+      // reaches the pick.
+      const check = await scoreDistinctness(deps, ctx, { characterId: job.characterId!, assetId: asset.id, demo: job.provider === 'mock' })
+      const report = check ? { ...finalize(check.findings, null), identity: check.identity } : null
+      await createCandidate(deps, ctx, job, {
+        target: 'hero', heroPromptIndex: index, assetId: asset.id,
+        status: report?.verdict === 'regenerate' ? 'qa_failed' : 'in_review',
+        qaReport: report, qaVerdict: report?.verdict ?? null,
+      })
+    }
   } else {
     await createCandidate(deps, ctx, job, { target: 'hero', heroPromptIndex: index, status: 'failed', rejectNote: out.error ?? '' })
   }
@@ -96,19 +107,27 @@ async function onQa(deps: Deps, ctx: Ctx, job: JobRow, _out: JobOutcome): Promis
   const ch = toData(await getCharacter(deps, ctx, job.characterId!))
   const shot = deps.config.pipeline.sheet.shots.find(s => s.id === meta.refId)!
 
+  // Face identity first: it is measured, not read by the vision model.
+  const [cand] = await deps.db.select({ assetId: candidates.assetId, provider: jobs.provider }).from(candidates)
+    .leftJoin(jobs, eq(jobs.id, candidates.jobId))
+    .where(and(eq(candidates.accountId, job.accountId), eq(candidates.id, meta.candidateId)))
+  const id = cand?.assetId
+    ? await scoreIdentity(deps, ctx, { characterId: job.characterId!, shot, assetId: cand.assetId, demo: cand.provider === 'mock' })
+    : { findings: [], identity: null }
+
   let report: QaReport
   if (!orig || orig.status !== 'completed') {
-    report = finalize([{ code: 'uncertain', severity: 'warn', message: `Automatic QA could not run (${(orig?.error as { message?: string } | null)?.message ?? 'no result'}). Check this shot yourself.` }], null)
+    report = finalize([{ code: 'uncertain', severity: 'warn', message: `Automatic QA could not run (${(orig?.error as { message?: string } | null)?.message ?? 'no result'}). Check this shot yourself.` }, ...id.findings], null)
   } else {
     try {
       const observation = parseObservation((orig.resultMeta as { data: unknown }).data)
       const mirrored = mirror?.status === 'completed' ? parseObservation((mirror.resultMeta as { data: unknown }).data) : undefined
-      report = evaluateSheetShot({ shot, views: deps.config.pipeline.views, marks: ch.marks, eyeColor: ch.eyes, observation, mirrored, pronoun: ch.pronouns.poss })
+      report = evaluateSheetShot({ shot, views: deps.config.pipeline.views, marks: ch.marks, eyeColor: ch.eyes, observation, mirrored, pronoun: ch.pronouns.poss, extraFindings: id.findings })
     } catch (e) {
-      report = finalize([{ code: 'uncertain', severity: 'warn', message: `The QA answer could not be read (${(e as Error).message}). Check this shot yourself.` }], null)
+      report = finalize([{ code: 'uncertain', severity: 'warn', message: `The QA answer could not be read (${(e as Error).message}). Check this shot yourself.` }, ...id.findings], null)
     }
   }
-  report.findings.push({ code: 'identity_skipped', severity: 'info', message: 'Face matching is not set up yet, so identity was not scored automatically.' })
+  report.identity = id.identity
 
   // Failed results never reach the human queue (SPEC 6); they wait with
   // their reasons and a one-click, quoted fix.

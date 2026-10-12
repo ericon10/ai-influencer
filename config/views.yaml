@@ -30,12 +30,14 @@ views:
     turn: LEFT
     prompt: "Full side profile: head turned 90 degrees so only {poss} LEFT side faces the camera, LEFT ear fully visible; {poss} nose points toward the left edge of the frame"
     sides: { LEFT: visible, RIGHT: hidden }
+    identity: skip
   profile_right:
     label: Right side, profile
     facing: camera
     turn: RIGHT
     prompt: "Full side profile: head turned 90 degrees so only {poss} RIGHT side faces the camera, RIGHT ear fully visible; {poss} nose points toward the right edge of the frame"
     sides: { LEFT: hidden, RIGHT: visible }
+    identity: skip
   back:
     label: Back of head
     facing: away
@@ -43,3 +45,4 @@ views:
     prompt: "Seen from directly behind: the back of {poss} head, hair and shoulders, face not visible"
     sides: { LEFT: partial, RIGHT: partial }
     partial_regions: [ear, neck]
+    identity: skip

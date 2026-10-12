@@ -22,6 +22,8 @@ const schema = z.object({
   STUDIO_OWNER_PASSPHRASE: z.string().optional().default(''),
   STUDIO_PUBLIC_URL: z.string().optional().default(''),
   STUDIO_API_PORT: z.coerce.number().default(8787),
+  // Face models for identity QA (npm run models downloads them here).
+  STUDIO_MODELS_DIR: z.string().default('.data/models'),
 })
 
 export type Env = z.infer<typeof schema> & { isProduction: boolean }

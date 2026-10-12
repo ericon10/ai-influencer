@@ -42,6 +42,8 @@ const viewsSchema = z.object({
     sides: z.object({ LEFT: visibility, RIGHT: visibility }),
     // On a partially visible side, the regions that may still show.
     partial_regions: z.array(z.string()).default([]),
+    // Face matching needs most of the face in view: skip profiles and backs.
+    identity: z.enum(['check', 'skip']).default('check'),
   })),
 })
 

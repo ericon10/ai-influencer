@@ -11,6 +11,7 @@ import { readAsset } from './storage/assets'
 import { createAccount } from './auth/accounts'
 import { hashPassword } from './lib/passwords'
 import { registerPipelineHooks } from './pipeline/hooks'
+import { createFaceMatcher } from './qa/faces'
 import { systemClock, type Deps } from './context'
 
 // Builds every service from the environment. Used by the dev server, the
@@ -28,7 +29,8 @@ export async function buildDeps(env: Env = loadEnv()): Promise<{ deps: Deps; han
     db: handle.db, vault, config, store,
     loadAsset: async (accountId, assetId) => (await readAsset(depsRef.current!, { accountId, userId: null, role: 'admin', email: '', requestId: 'mock', log: logger }, assetId)).data,
   })
-  const deps: Deps = { db: handle.db, store, vault, env, config, providers, clock: systemClock, log: logger }
+  const faces = createFaceMatcher({ modelsDir: env.STUDIO_MODELS_DIR, log: logger })
+  const deps: Deps = { db: handle.db, store, vault, env, config, providers, faces, clock: systemClock, log: logger }
   depsRef.current = deps
   registerPipelineHooks()
   await ensureOwner(deps)

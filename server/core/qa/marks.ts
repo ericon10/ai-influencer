@@ -9,7 +9,7 @@ import type { Observation } from './perception'
 
 export type QaCode =
   | 'mark_wrong_side' | 'mark_missing' | 'extra_jewelry' | 'wrong_view' | 'wrong_framing'
-  | 'eye_color' | 'logo' | 'artifact' | 'uncertain' | 'face_drift' | 'too_similar' | 'identity_skipped'
+  | 'eye_color' | 'logo' | 'artifact' | 'uncertain' | 'face_drift' | 'too_similar' | 'identity_skipped' | 'identity_match'
 
 export interface QaFinding {
   code: QaCode
@@ -20,6 +20,14 @@ export interface QaFinding {
 
 export type Verdict = 'post' | 'edit' | 'regenerate' | 'uncertain'
 
+// Face-embedding similarity against the closest reference (SPEC 6).
+export interface IdentityScore {
+  kind: 'identity' | 'distinctness'
+  score: number
+  threshold: number
+  against: string
+}
+
 export interface QaReport {
   verdict: Verdict
   summary: string
@@ -28,6 +36,7 @@ export interface QaReport {
   // same fix actions run whether a person or QA rejected the shot.
   reasons: string[]
   detectedView: string | null
+  identity?: IdentityScore | null
 }
 
 const MIRROR_VIEW: Record<string, string> = {
@@ -41,6 +50,9 @@ const REASON: Partial<Record<QaCode, string>> = {
 }
 
 const REGENERATE: QaCode[] = ['mark_wrong_side', 'mark_missing', 'wrong_view', 'wrong_framing', 'face_drift', 'too_similar']
+// Measured by face embeddings, not the vision model, so they stand even when
+// the vision model contradicted itself.
+const IDENTITY: QaCode[] = ['face_drift', 'too_similar']
 
 const REGION_WORDS: Record<string, RegExp> = {
   brow: /brow/i, eye: /eye(?!brow)|lid|lash/i, cheek: /cheek/i, lip: /lip|mouth/i, jaw: /jaw/i, nose: /nose|nostril/i,
@@ -109,6 +121,8 @@ export interface EvaluateInput {
   // The inspector's answer for the mirrored image (optional second pass).
   mirrored?: Observation
   pronoun?: string // possessive, for messages: "her", "his", "their"
+  // Findings from other checks (face identity), judged together.
+  extraFindings?: QaFinding[]
 }
 
 export function evaluateSheetShot(input: EvaluateInput): QaReport {
@@ -220,6 +234,7 @@ export function evaluateSheetShot(input: EvaluateInput): QaReport {
     }
   }
 
+  findings.push(...(input.extraFindings ?? []))
   return finalize(findings, detectedId, contradicted)
 }
 
@@ -227,7 +242,8 @@ export function finalize(findings: QaFinding[], detectedView: string | null, for
   const fails = findings.filter(f => f.severity === 'fail')
   const warns = findings.filter(f => f.severity === 'warn')
   let verdict: Verdict
-  if (forceUncertain) verdict = 'uncertain'
+  if (fails.some(f => IDENTITY.includes(f.code))) verdict = 'regenerate'
+  else if (forceUncertain) verdict = 'uncertain'
   else if (fails.some(f => REGENERATE.includes(f.code))) verdict = 'regenerate'
   else if (fails.length) verdict = 'edit'
   else if (warns.length) verdict = 'uncertain'
@@ -235,7 +251,7 @@ export function finalize(findings: QaFinding[], detectedView: string | null, for
 
   const summary = {
     post: 'Looks right. Ready to approve.',
-    regenerate: `Regenerate: ${fails.find(f => REGENERATE.includes(f.code))?.message ?? ''}`,
+    regenerate: `Regenerate: ${(fails.find(f => IDENTITY.includes(f.code)) ?? fails.find(f => REGENERATE.includes(f.code)))?.message ?? ''}`,
     edit: `Fix with an edit: ${fails.map(f => f.message).join(' ')}`,
     uncertain: `Needs your eye: ${(warns[0] ?? fails[0])?.message ?? ''}`,
   }[verdict].trim()

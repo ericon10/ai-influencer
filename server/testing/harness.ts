@@ -10,6 +10,7 @@ import { createAccount } from '../auth/accounts'
 import { readAsset } from '../storage/assets'
 import type { Ctx, Deps } from '../context'
 import type { LlmProvider, ProviderAdapter } from '../providers/types'
+import { unavailableFaceMatcher, type FaceMatcher } from '../qa/faces'
 
 // Real providers are unreachable from tests: any call fails loudly, except
 // the free key check, which answers locally.
@@ -35,7 +36,7 @@ export interface Harness {
   newAccount(name?: string): Promise<Ctx>
 }
 
-export async function createHarness(opts: Partial<Pick<RegistryOptions, 'mockScenario' | 'mockPollsUntilDone' | 'mockLlmResponders' | 'overrides'>> & { publicUrl?: string } = {}): Promise<Harness> {
+export async function createHarness(opts: Partial<Pick<RegistryOptions, 'mockScenario' | 'mockPollsUntilDone' | 'mockLlmResponders' | 'overrides'>> & { publicUrl?: string; faces?: FaceMatcher } = {}): Promise<Harness> {
   const handle = await openDb({ memory: true })
   let now = new Date('2026-10-12T12:00:00Z')
   const clock = { now: () => new Date(now), advance: (ms: number) => { now = new Date(now.getTime() + ms) }, set: (d: Date) => { now = d } }
@@ -60,7 +61,8 @@ export async function createHarness(opts: Partial<Pick<RegistryOptions, 'mockSce
       llm: { anthropic: offline('anthropic'), ...(opts.overrides?.llm ?? {}) },
     },
   })
-  const deps: Deps = { db: handle.db, store, vault, env, config, providers: registry, clock, log: logger }
+  const faces = opts.faces ?? unavailableFaceMatcher('Face matching is off in this test.')
+  const deps: Deps = { db: handle.db, store, vault, env, config, providers: registry, faces, clock, log: logger }
   depsRef.current = deps
   const ctxBase = { userId: null, role: 'owner' as const, email: '', requestId: 'test', log: logger }
 

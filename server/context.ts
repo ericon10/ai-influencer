@@ -5,6 +5,7 @@ import type { Env } from './lib/env'
 import type { Logger } from './lib/logger'
 import type { StudioConfig } from './config/load'
 import type { ProviderRegistry } from './providers/registry'
+import type { FaceMatcher } from './qa/faces'
 
 export type Role = 'owner' | 'admin' | 'member' | 'viewer'
 
@@ -32,6 +33,7 @@ export interface Deps {
   env: Env
   config: StudioConfig
   providers: ProviderRegistry
+  faces: FaceMatcher
   clock: Clock
   log: Logger
 }
