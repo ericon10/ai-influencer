@@ -46,12 +46,13 @@ expressions:
 
 # Side-specific mark lines (SPEC 5.1 rules 11 and 12).
 marks:
-  required: "The {mark} is visible."
-  required_front_hint: "The {mark} is visible (it appears on the {image_side} side of the image, because {poss} {side} side is on the {image_side} as we face {obj})."
-  optional: "If it shows, the {mark} stays exactly where it is, on {poss} {side} side."
-  hidden: "{Poss} {side} side faces away from the camera, so the {mark} is hidden."
-  hidden_other_clean: "{Poss} {other} {region} has no {kind_noun}; the {name} is only on {poss} {side} {region}."
-  hero_line: "{Subj} has {marks_list}, subtle but visible."
+  # Marks that share a side and visibility are grouped into one sentence.
+  # {mark} is the joined list; {is}, {it}, {appears} agree with it.
+  required: "The {mark} {is} visible."
+  required_front_hint: "The {mark} {is} visible ({it} {appears} on the {image_side} side of the image, because {poss} {side} side is on the {image_side} as we face {obj})."
+  optional: "If visible, the {mark} {stays} exactly where {it} {is}, on {poss} {side} side."
+  hidden: "{Poss} {side} side faces away from the camera, so the {mark} {is} hidden."
+  other_clean: "{Poss} {other} {region} has no {kind_noun}; the {name} is only on {poss} {side} {region}."
 
 relations:
   brow: above
