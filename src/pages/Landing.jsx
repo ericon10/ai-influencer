@@ -36,64 +36,9 @@ function useTypewriter() {
   return text
 }
 
-// All available images — add more paths here as you collect them
-const ALL_IMGS = [
-  '/inf/i1.png',  '/inf/i2.png',  '/inf/i3.jpg',  '/inf/i4.jpg',  '/inf/i5.png',
-  '/inf/i6.jpg',  '/inf/i7.png',  '/inf/i8.png',  '/inf/i9.png',  '/inf/i10.png',
-  '/inf/i11.png', '/inf/i12.png', '/inf/i13.png', '/inf/i14.png', '/inf/i15.png',
-  '/inf/i16.png', '/inf/i17.png', '/inf/i18.png', '/inf/i19.png', '/inf/i20.png',
-  '/inf/i21.png', '/inf/i22.png', '/inf/i23.png', '/inf/i24.png', '/inf/i25.png',
-  '/inf/i26.png', '/inf/i27.png', '/inf/i28.png', '/inf/i29.png',
-  '/inf/i30.png', '/inf/i31.png', '/inf/i32.png', '/inf/i33.png', '/inf/i34.png',
-  '/inf/i35.png', '/inf/i36.png', '/inf/i37.png', '/inf/i38.png', '/inf/i39.png',
-  '/inf/i40.png', '/inf/i41.png',
-  '/inf/i42.png', '/inf/i43.png', '/inf/i44.png', '/inf/i45.png', '/inf/i46.png',
-]
-
-// 6 card slots — position, rotation, size, float timing
-const CARDS = [
-  { left: '-28px', top: '6%',  w: 158, rot: '-9deg',  opacity: 0.50, period: 8,  sway: 11, delay: 0.0 },
-  { left:  '28px', top: '43%', w: 138, rot:  '5deg',  opacity: 0.38, period: 10, sway: 14, delay: 1.6 },
-  { left: '-14px', top: '74%', w: 146, rot: '-5deg',  opacity: 0.42, period: 12, sway: 16, delay: 0.8 },
-  { right: '-28px',top: '4%',  w: 160, rot:  '10deg', opacity: 0.50, period: 9,  sway: 13, delay: 0.4 },
-  { right:  '24px',top: '42%', w: 140, rot: '-7deg',  opacity: 0.38, period: 11, sway: 15, delay: 2.0 },
-  { right: '-16px',top: '72%', w: 148, rot:  '6deg',  opacity: 0.44, period: 13, sway: 17, delay: 1.2 },
-]
-
 export default function Landing() {
   const navigate = useNavigate()
   const animatedWord = useTypewriter()
-
-  // Per-card: which image src + whether currently fading out
-  const [cardSrcs, setCardSrcs] = useState(() => ALL_IMGS.slice(0, CARDS.length))
-  const [cardFade, setCardFade] = useState(() => CARDS.map(() => false))
-
-  // Rotate cards: every ~3s pick one random slot, crossfade to a different image
-  useEffect(() => {
-    let alive = true
-
-    function tick() {
-      if (!alive) return
-      const i = Math.floor(Math.random() * CARDS.length)
-      // Fade out
-      setCardFade(prev => { const n = [...prev]; n[i] = true; return n })
-      setTimeout(() => {
-        if (!alive) return
-        // Swap image while invisible
-        setCardSrcs(prev => {
-          const options = ALL_IMGS.filter(s => s !== prev[i])
-          const next = [...prev]
-          next[i] = options[Math.floor(Math.random() * options.length)]
-          return next
-        })
-        // Fade back in
-        setCardFade(prev => { const n = [...prev]; n[i] = false; return n })
-      }, 750)
-    }
-
-    const id = setInterval(tick, 2800)
-    return () => { alive = false; clearInterval(id) }
-  }, [])
 
   return (
     <div style={{
@@ -116,49 +61,6 @@ export default function Landing() {
 
       {/* Dot grid */}
       <div style={{ position:'absolute', inset:0, backgroundImage:'radial-gradient(rgba(255,255,255,0.05) 1px, transparent 1px)', backgroundSize:'32px 32px', pointerEvents:'none' }}/>
-
-      {/* ── Floating influencer cards ── */}
-      {CARDS.map((card, i) => {
-        const pos = {}
-        if (card.left  !== undefined) pos.left  = card.left
-        if (card.right !== undefined) pos.right = card.right
-        return (
-          <div
-            key={i}
-            className="landing-card"
-            style={{
-              position: 'absolute',
-              top: card.top,
-              ...pos,
-              width: card.w,
-              transform: `rotate(${card.rot})`,
-              opacity: 0,
-              // --target-opacity on the outer div so cardAppear animation can read it
-              '--target-opacity': card.opacity,
-              animation: `cardAppear 1s ease ${card.delay + 0.2}s forwards`,
-              pointerEvents: 'none',
-              zIndex: 0,
-            }}
-          >
-            {/* Inner: float + sway + crossfade opacity */}
-            <div style={{
-              animation: `cardFloat ${card.period}s ease-in-out ${card.delay}s infinite, cardSway ${card.sway}s ease-in-out ${card.delay * 0.7}s infinite`,
-              borderRadius: 18,
-              overflow: 'hidden',
-              boxShadow: '0 28px 70px rgba(0,0,0,0.65), 0 0 0 1px rgba(255,255,255,0.09)',
-              opacity: cardFade[i] ? 0 : 1,
-              transition: 'opacity 0.75s ease',
-            }}>
-              <img
-                src={cardSrcs[i]}
-                alt=""
-                style={{ width: '100%', aspectRatio: '2/3', objectFit: 'cover', display: 'block' }}
-              />
-              <div style={{ position:'absolute', inset:0, background:'linear-gradient(to top, rgba(7,7,14,0.45) 0%, transparent 55%)' }}/>
-            </div>
-          </div>
-        )
-      })}
 
       {/* Vignette */}
       <div style={{

@@ -9,9 +9,10 @@ with the real models:
 | `person-a-2.jpg` | Person A, a different photo (other light, other setting) |
 | `person-b.jpg` | Person B, a different person |
 
-All three are AI-generated demo characters from the original app's
-`public/` folder (Marcus and an influencer example), cropped and
-downscaled. They are not real people.
+All three are AI-generated demo characters that shipped with the
+original app (Marcus and an influencer example), cropped and
+downscaled. The full demo images have since been removed from `public/`;
+these small crops stay as test data. They are not real people.
 
 The model tests skip when the models are missing. Fetch them with
 `npm run models`.

@@ -83,15 +83,6 @@ function buildPhysicalDescString(d) {
   return parts.join(', ')
 }
 
-// Floating card configuration
-const ALL_IMGS = ['/inf/i1.png', '/inf/i2.png', '/inf/i3.jpg', '/inf/i4.jpg', '/inf/i5.png', '/inf/i6.jpg', '/inf/i7.png', '/inf/i8.png', '/inf/i9.png', '/inf/i10.png', '/inf/i11.png', '/inf/i12.png', '/inf/i13.png', '/inf/i14.png', '/inf/i15.png', '/inf/i16.png']
-const CARD_CONFIG = [
-  { left: '1%',  top: '15%', w: 162, rot: '-9deg',  op: 0.48, period: 9,  sway: 12, delay: 0.0 },
-  { left: '5%',  top: '58%', w: 140, rot:  '5deg',  op: 0.34, period: 11, sway: 15, delay: 1.9 },
-  { right: '1%', top: '10%', w: 170, rot:  '10deg', op: 0.48, period: 10, sway: 13, delay: 0.5 },
-  { right: '5%', top: '57%', w: 148, rot: '-6deg',  op: 0.34, period: 12, sway: 16, delay: 1.3 },
-]
-
 // Theme tokens — map to CSS variables so dark mode is automatic
 const L = {
   bg: 'var(--bg)',
@@ -133,57 +124,6 @@ function Lbl({ children, optional }) {
       {children}
       {optional && <span style={{ fontSize: 10, fontWeight: 500, color: L.textFaint, textTransform: 'none', letterSpacing: 0 }}>optional</span>}
     </div>
-  )
-}
-
-// ── Animated floating cards (same feel as Landing) ────────────
-function FloatingCards() {
-  const [srcs, setSrcs] = useState(() => [ALL_IMGS[0], ALL_IMGS[2], ALL_IMGS[3], ALL_IMGS[5]])
-  const [fading, setFading] = useState([false, false, false, false])
-
-  useEffect(() => {
-    let alive = true
-    function tick() {
-      if (!alive) return
-      const i = Math.floor(Math.random() * CARD_CONFIG.length)
-      setFading(p => { const n = [...p]; n[i] = true; return n })
-      setTimeout(() => {
-        if (!alive) return
-        setSrcs(p => {
-          const current = p[i]
-          const shown = p.filter((_, idx) => idx !== i)
-          const opts = ALL_IMGS.filter(s => !shown.includes(s) && s !== current)
-          const next = [...p]; next[i] = opts[Math.floor(Math.random() * opts.length)]; return next
-        })
-        setFading(p => { const n = [...p]; n[i] = false; return n })
-      }, 700)
-    }
-    const id = setInterval(tick, 3000)
-    return () => { alive = false; clearInterval(id) }
-  }, [])
-
-  return (
-    <>
-      {CARD_CONFIG.map((c, i) => (
-        <div key={i} className="create-bg-card" style={{
-          position: 'absolute', top: c.top,
-          ...(c.left ? { left: c.left } : { right: c.right }),
-          width: c.w, transform: `rotate(${c.rot})`,
-          opacity: 0, '--t-op': c.op,
-          animation: `cAppear 0.9s ease ${c.delay + 0.2}s forwards`,
-          pointerEvents: 'none', zIndex: 0,
-        }}>
-          <div style={{
-            animation: `cFloat ${c.period}s ease-in-out ${c.delay}s infinite, cSway ${c.sway}s ease-in-out ${c.delay * 0.6}s infinite`,
-            borderRadius: 18, overflow: 'hidden',
-            boxShadow: '0 24px 64px rgba(0,0,0,0.14), 0 0 0 1px rgba(0,0,0,0.04)',
-            opacity: fading[i] ? 0 : 1, transition: 'opacity 0.7s ease',
-          }}>
-            <img src={srcs[i]} alt="" style={{ width: '100%', aspectRatio: '2/3', objectFit: 'cover', display: 'block' }} />
-          </div>
-        </div>
-      ))}
-    </>
   )
 }
 
@@ -1691,7 +1631,6 @@ export default function Create() {
       <div style={{ position: 'absolute', width: 600, height: 600, top: '-14%', right: '-12%', borderRadius: '50%', background: 'radial-gradient(circle, rgba(139,92,246,0.08) 0%, transparent 65%)', pointerEvents: 'none', animation: 'orbB 22s ease-in-out infinite' }} />
       <div style={{ position: 'absolute', width: 500, height: 500, bottom: '-20%', left: '22%', borderRadius: '50%', background: 'radial-gradient(circle, rgba(96,165,250,0.06) 0%, transparent 65%)', pointerEvents: 'none', animation: 'orbC 26s ease-in-out infinite' }} />
 
-      <FloatingCards />
 
       {/* Edge vignette to blend cards into bg */}
       <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse at 50% 42%, transparent 28%, var(--bg) 100%)', pointerEvents: 'none', zIndex: 1 }} />
