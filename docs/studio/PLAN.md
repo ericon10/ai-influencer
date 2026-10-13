@@ -198,8 +198,23 @@ Guardrails that apply to every item:
 - [x] Texture check after every upscale and edit ("skin smoothed")
 - [x] QA keeps natural flaws and fails plastic skin even on a face match
 - [x] One-line message on onboarding and the hero screen
-- [ ] Re-import Callie's file with its new Realism section and AVOID block
-  (the importer reads both; waiting on the file)
+- [x] Re-import Callie's file with its new Realism section and AVOID block
+- [x] Hero step matches how Callie's REF-00 was made (text only, 4 to 8
+  candidates per prompt across 3 prompts, the pick becomes REF-00)
+
+## Deployment (owner, 2026-10-13)
+- [x] Vercel project `character-studio`, deployed to production
+- [x] Neon project `character-studio` in the owner's personal org
+- [x] Browser uploads straight to R2 (presigned links, CORS)
+- [x] Railway worker: Dockerfile, wake on demand, app sleeping
+- [x] Production login with a throttle; 503 naming missing settings
+- [x] Model test suite: five real paths in one quoted run, capped at $10
+- [ ] Owner adds the secrets (docs/studio/DEPLOY.md) and creates the
+  Railway service
+- [ ] Model endpoints from the official Model API Reference, then the
+  owner runs the model tests (Settings, Model tests)
+- [ ] Owner drags the "CALLIE MASTER CHARACTER" folder into Callie's
+  Sheet tab; review any face or texture flags
 
 ## MCP connections
 - [x] Shared connection flow for MCP providers on the owner's plan

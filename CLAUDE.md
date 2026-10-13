@@ -101,8 +101,14 @@ requirements, not suggestions. Rule zero (Realism, above) comes first.
 | `server/api/app.ts` | Hono API at `/api/v1`; auth via `server/auth/provider.ts` |
 | `src/studio/` | Studio UI; styles in `src/studio/studio.css` (`st-` classes, tokens) |
 | `fixtures/callie/` | Acceptance fixtures; Callie is test data only |
+| `api/studio.ts`, `vercel.json` | Vercel entry for `/api/v1` (fetch handler, 60 s, iad1) |
+| `server/worker.ts`, `Dockerfile`, `railway.json` | Job worker on Railway; sleeps when idle, woken by the API (`server/jobs/wake.ts`) |
+| `docs/studio/DEPLOY.md` | Production layout, env variables per place, Railway and R2 steps, costs |
 
-Studio dev: `npm run studio` (API + worker on 8787, Vite on 5173). Face
+Production: https://character-studio-pi.vercel.app (Vercel project
+`character-studio`, Neon project `character-studio`, R2, Railway worker).
+Worker bundle: `npm run build:worker`. Studio dev: `npm run studio` (API +
+worker on 8787, Vite on 5173). Face
 models for identity QA: `npm run models` (once). Checks: `npm run check`.
 The Studio UI uses a stylesheet with design tokens rather than the legacy
 inline-style convention.

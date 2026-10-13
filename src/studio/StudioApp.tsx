@@ -27,7 +27,7 @@ function Gate() {
   if (me.error instanceof ApiError && me.error.status === 401) return <Login />
   if (me.error) {
     return (
-      <div className="st-login"><div className="st-card"><div className="st-h2">Cannot reach the Studio API</div><p className="st-sub">{me.error.message}</p></div></div>
+      <div className="st-login"><div className="st-card"><div className="st-h2">{me.error instanceof ApiError && me.error.code === 'not_configured' ? 'The Studio is almost ready' : 'Cannot reach the Studio API'}</div><p className="st-sub">{me.error.message}</p></div></div>
     )
   }
   return (
