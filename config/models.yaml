@@ -8,6 +8,12 @@
 # instant and are used through a <<<element_id>>> placeholder in the prompt
 # (verified live 2026-10-12). A character's element lives in its identity
 # field, imported from the character file.
+#
+# Account path (the owner's Higgsfield account, plan credits): models with an
+# mcp_id also run through the MCP connector. `mcp.params` lists the inputs
+# the model accepts there (from models_explore, read 2026-10-13) and nothing
+# else is sent; `mcp.fixed` is always sent (audio off for every video);
+# `mcp.roles` names the media roles for references and start and end frames.
 version: 1
 models:
   # ── Higgsfield (primary, pay-per-use API) ──
@@ -23,6 +29,7 @@ models:
     input_map: generic_image
     verified: false
     mcp_id: gpt_image_2_5
+    mcp: { params: [aspect_ratio, resolution, quality, variant], roles: { refs: image_references } }
     aliases: [GPT Image 2.5, gpt_image_2_5, GPT Image 2.5 Sunburst]
     params: { variants: [flare, sunburst] }
     use_for: [hero, sheet]
@@ -35,6 +42,7 @@ models:
     input_map: generic_image
     verified: false
     mcp_id: gpt_image_2_5
+    mcp: { params: [aspect_ratio, resolution, quality], fixed: { variant: flare }, roles: { refs: image_references } }
     aliases: [GPT Image 2.5 Flare, Flare]
     params: { variant: flare }
     use_for: [scene_still]
@@ -47,6 +55,7 @@ models:
     input_map: generic_image
     verified: false
     mcp_id: nano_banana_2_1
+    mcp: { params: [aspect_ratio, resolution, seed, thinking_level], roles: { refs: image_references } }
     aliases: [Nano Banana 2.1, nano_banana_2_1]
     params: { resolution: [1k, 2k, 4k], thinking_level: true, inpaint: mask }
     use_for: [scene_still, expression_edit]
@@ -58,6 +67,8 @@ models:
     endpoint: null
     input_map: generic_image
     verified: false
+    mcp_id: nano_banana_2
+    mcp: { params: [aspect_ratio, resolution], roles: { refs: image_references } }
     aliases: [Nano Banana 2, Nano Banana Pro]
   - ref: higgsfield/soul-2
     label: Soul 2.0
@@ -66,6 +77,8 @@ models:
     endpoint: /v1/text2image/soul
     input_map: soul_v1
     verified: false
+    mcp_id: soul_2
+    mcp: { params: [aspect_ratio, soul_id], fixed: { quality: 2k } }
     aliases: [Soul 2.0, Soul]
     notes: Soul 2.0 identity training failed or sat queued for hours (2026-10-12); never block on it. Use Elements instead.
   - ref: higgsfield/bytedance-upscale
@@ -75,6 +88,8 @@ models:
     endpoint: null
     input_map: generic_upscale
     verified: false
+    mcp_id: bytedance
+    mcp: { params: [], fixed: { resolution: 2k } }
     aliases: [ByteDance upscale, bytedance image upscale]
     params: { resolution: [2k] }
     use_for: [upscale, punch_in_crop]
@@ -87,6 +102,7 @@ models:
     input_map: seedance_i2v
     verified: false
     mcp_id: seedance_2_5
+    mcp: { params: [aspect_ratio, duration, resolution, mode], fixed: { generate_audio: false }, roles: { start: start_image, end: end_image } }
     aliases: [Seedance 2.5, seedance_2_5]
     audio: off_switch
     # Two paths, both kept: the REST API takes start and end frames directly;
@@ -101,6 +117,8 @@ models:
     endpoint: null
     input_map: generic_video
     verified: false
+    mcp_id: seedance_2_0
+    mcp: { params: [aspect_ratio, duration, resolution], fixed: { mode: std, generate_audio: false }, roles: { start: start_image, end: end_image } }
     aliases: [Seedance 2.0]
     audio: off_switch
   - ref: higgsfield/kling-3.0-standard
@@ -111,6 +129,7 @@ models:
     input_map: kling_v3
     verified: false
     mcp_id: kling3_0
+    mcp: { params: [aspect_ratio, duration], fixed: { mode: std, sound: 'off' }, roles: { start: start_image, end: end_image } }
     aliases: [Kling 3.0 Standard, Kling 3.0]
     audio: off_switch
     params: { start_image: true, end_image: true, mode: std, sound: [on, off], elements_need_start_image: true }
@@ -123,6 +142,7 @@ models:
     input_map: kling_v3
     verified: false
     mcp_id: kling3_0
+    mcp: { params: [aspect_ratio, duration], fixed: { mode: pro, sound: 'off' }, roles: { start: start_image, end: end_image } }
     aliases: [Kling 3.0 Pro]
     audio: off_switch
     params: { start_image: true, end_image: true, mode: pro, sound: [on, off], elements_need_start_image: true }
@@ -135,6 +155,7 @@ models:
     input_map: kling_v3
     verified: false
     mcp_id: kling3_0_turbo
+    mcp: { params: [aspect_ratio, duration, resolution], roles: { start: start_image } }
     aliases: [Kling 3.0 Turbo, kling3_0_turbo]
     audio: always_on
     params: { start_image: true, end_image: false, resolution: [720p, 1080p], duration_sec: [3, 15] }
@@ -156,6 +177,7 @@ models:
     input_map: generic_audio
     verified: false
     mcp_id: mirelo_text_to_audio
+    mcp: { params: [duration] }
     aliases: [Mirelo, mirelo_text_to_audio]
     params: { duration_sec: true }
     use_for: [sfx]

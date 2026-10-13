@@ -521,3 +521,12 @@ button.st-chip:hover { color: var(--st-text); border-color: var(--st-text-3); }
 .st-modelrow:first-of-type { border-top: 0; }
 .st-hint.bad { color: var(--st-bad); }
 @media (max-width: 720px) { .st-modelrow { grid-template-columns: minmax(0, 1fr); gap: 8px; } }
+/* Billing choice tiles (Settings, Higgsfield billing). */
+.st-choices { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.st-choice { display: grid; gap: 6px; text-align: left; padding: 14px 16px; border-radius: 14px; background: var(--st-surface-2); border: 1px solid var(--st-line); color: var(--st-text); cursor: pointer; font: inherit; transition: border-color 0.15s ease, background 0.15s ease; }
+.st-choice:hover:not(:disabled) { border-color: var(--st-text-2); }
+.st-choice.on { border-color: var(--st-accent); background: var(--st-accent-soft); }
+.st-choice:disabled { cursor: not-allowed; opacity: 0.6; }
+.st-choice:focus-visible { outline: 2px solid var(--st-accent); outline-offset: 2px; }
+.st-choice-status { font-size: 12.5px; color: var(--st-text-2); }
+@media (max-width: 720px) { .st-choices { grid-template-columns: minmax(0, 1fr); } }

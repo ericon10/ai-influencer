@@ -36,7 +36,7 @@ export interface Harness {
   newAccount(name?: string): Promise<Ctx>
 }
 
-export async function createHarness(opts: Partial<Pick<RegistryOptions, 'mockScenario' | 'mockPollsUntilDone' | 'mockLlmResponders' | 'overrides'>> & { publicUrl?: string; faces?: FaceMatcher } = {}): Promise<Harness> {
+export async function createHarness(opts: Partial<Pick<RegistryOptions, 'mockScenario' | 'mockPollsUntilDone' | 'mockLlmResponders' | 'overrides' | 'fetchImpl'>> & { publicUrl?: string; faces?: FaceMatcher } = {}): Promise<Harness> {
   const handle = await openDb({ memory: true })
   let now = new Date('2026-10-12T12:00:00Z')
   const clock = { now: () => new Date(now), advance: (ms: number) => { now = new Date(now.getTime() + ms) }, set: (d: Date) => { now = d } }
@@ -56,6 +56,8 @@ export async function createHarness(opts: Partial<Pick<RegistryOptions, 'mockSce
     mockScenario: opts.mockScenario,
     mockPollsUntilDone: opts.mockPollsUntilDone ?? 1,
     mockLlmResponders: opts.mockLlmResponders,
+    // The Higgsfield account path never reaches the network in tests.
+    fetchImpl: opts.fetchImpl ?? (async () => { throw new Error('Tests never call the real Higgsfield account.') }),
     overrides: {
       gen: { higgsfield: offline('higgsfield'), ...(opts.overrides?.gen ?? {}) },
       llm: { anthropic: offline('anthropic'), ...(opts.overrides?.llm ?? {}) },

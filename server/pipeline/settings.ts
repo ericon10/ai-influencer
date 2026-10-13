@@ -24,6 +24,10 @@ export async function setSetting(deps: Deps, ctx: Ctx, key: string, value: unkno
   await audit(deps.db, ctx, 'setting.changed', { type: 'setting', id: key }, { value })
 }
 
+export async function deleteSetting(db: Db, accountId: string, key: string): Promise<void> {
+  await db.delete(accountSettings).where(and(eq(accountSettings.accountId, accountId), eq(accountSettings.key, key)))
+}
+
 // Demo mode routes every task to free mock providers. New accounts start in
 // demo mode, so nothing can spend money until keys are added and the owner
 // switches to live.

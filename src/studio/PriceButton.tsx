@@ -51,7 +51,7 @@ export function PriceButton({ action, label, variant = 'primary', size = 'normal
       let q = quote
       if (new Date(q.expiresAt).getTime() - Date.now() < 30_000) q = (await qc.fetchQuery({ queryKey: key, queryFn: () => api.estimate(action) })).quote
       const { jobIds } = await api.run(action, q.id, confirming || !q.needsConfirm)
-      toast({ tone: 'ok', text: `Started ${jobIds.length === 1 ? '1 job' : `${jobIds.length} jobs`} for ${q.total}.` })
+      toast({ tone: 'ok', text: `Started ${jobIds.length === 1 ? '1 job' : `${jobIds.length} jobs`} for ${q.display}.` })
       setConfirming(false)
       onStarted?.(jobIds)
     } catch (e) {
@@ -73,9 +73,9 @@ export function PriceButton({ action, label, variant = 'primary', size = 'normal
       <div className="st-row" style={{ gap: 6 }}>
         <button className={cls} disabled={disabled} onClick={go} title={disabledReason ?? estimateError ?? undefined}>
           {running ? <Loader2 size={16} className="st-spin" /> : icon && <Sparkles size={16} />}
-          {confirming ? `Confirm ${quote?.total}` : label}
+          {confirming ? `Confirm ${quote?.display}` : label}
           {!confirming && (
-            <span className="st-price">{est.isLoading ? '...' : blocked ? 'Over budget' : quote ? quote.total : estimateError ? 'n/a' : '...'}</span>
+            <span className="st-price">{est.isLoading ? '...' : blocked ? 'Over budget' : quote ? quote.display : estimateError ? 'n/a' : '...'}</span>
           )}
         </button>
         {confirming && <button className="st-btn ghost sm" onClick={() => setConfirming(false)}>Cancel</button>}
@@ -99,7 +99,8 @@ export function PriceButton({ action, label, variant = 'primary', size = 'normal
             {quote.items.map((it, i) => (
               <div className="st-quote-line" key={i}><span>{it.label}<span className="st-muted"> · {it.model}</span></span><span>{it.amount}</span></div>
             ))}
-            <div className="st-quote-total"><span className="st-muted">Total, reserved until done</span><b>{quote.total}</b></div>
+            <div className="st-quote-total"><span className="st-muted">Total, reserved until done</span><b>{quote.display}</b></div>
+            {quote.credits > 0 && <p className="st-hint" style={{ marginTop: 8 }}>Plan credits come from your Higgsfield account{quote.totalMicros > 0 ? `; they count as ${quote.total} toward budgets` : ''}.</p>}
             {quote.budget.warnings.map((w, i) => <div key={i} style={{ marginTop: 10 }}><Callout tone="warn">Close to the {w.scope} budget.</Callout></div>)}
             {est.data.preview.warnings.map((w, i) => <div key={i} style={{ marginTop: 10 }}><Callout tone="warn">{w.title}: {w.message}</Callout></div>)}
             {est.data.preview.prompts.length > 0 && (

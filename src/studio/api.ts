@@ -1,4 +1,4 @@
-import type { ActionPreview, CharacterSummary, CharacterView, JobView, Me, QuoteView, SettingsView, StudioAction, Usage } from './types'
+import type { ActionPreview, CharacterSummary, CharacterView, HiggsfieldAccount, JobView, Me, QuoteView, SettingsView, StudioAction, Usage } from './types'
 
 // Thin client for /api/v1. Every write sends the CSRF header the server
 // requires; errors come back as ApiError with the server's plain message.
@@ -79,4 +79,8 @@ export const api = {
   saveKey: (provider: string, secret: string) => request<{ credential: unknown; verify: { ok: boolean; message: string } }>('PUT', `/settings/credentials/${provider}`, { secret }),
   removeKey: (provider: string) => request<{ ok: true }>('DELETE', `/settings/credentials/${provider}`),
   saveBudgets: (b: Partial<SettingsView['budgets']>) => request<SettingsView>('PUT', '/settings/budgets', b),
+  setBilling: (b: { default?: 'api' | 'account'; creditUsd?: number }) => request<SettingsView>('PUT', '/settings/billing', b),
+  higgsfieldAccount: (fresh = false) => request<HiggsfieldAccount>('GET', `/settings/higgsfield-account${fresh ? '?fresh=1' : ''}`),
+  connectHiggsfieldAccount: () => request<{ url: string }>('POST', '/oauth/higgsfield/start', {}),
+  disconnectHiggsfieldAccount: () => request<SettingsView>('DELETE', '/settings/higgsfield-account'),
 }

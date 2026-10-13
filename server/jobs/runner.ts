@@ -16,6 +16,7 @@ import { getAsset, readAsset, saveAsset, type AssetRow } from '../storage/assets
 import { probeFile } from '../media/ffmpeg'
 import { stripAudio } from '../media/edit'
 import { ProviderError, type GenRequest, type LlmImage, type LlmRequest, type Output, type ProviderAdapter } from '../providers/types'
+import { withBilling } from '../providers/billing'
 import { publicAssetUrl } from './assetUrls'
 import { safeDownload } from './download'
 import { hookFor, type JobOutcome, type JobRow } from './hooks'
@@ -63,8 +64,10 @@ export async function quoteItemsFor(deps: Deps, ctx: Ctx, specs: JobSpec[]): Pro
   for (const s of specs) {
     const [provider, model] = s.request.model.split('/') as [string, string]
     if (s.type === 'gen') {
-      const adapter = await deps.providers.gen(ctx.accountId, s.request.model)
-      items.push({ label: s.label, provider, model, kind: s.request.kind, request: s.request, estimate: await adapter.estimate(s.request) })
+      // Higgsfield requests carry the billing path they are quoted on.
+      const request = await withBilling(deps.db, ctx.accountId, s.request)
+      const adapter = await deps.providers.gen(ctx.accountId, request.model, { billing: request.billing })
+      items.push({ label: s.label, provider, model, kind: request.kind, request, estimate: await adapter.estimate(request) })
     } else {
       const llm = await deps.providers.llm(ctx.accountId, s.request.model)
       const { meta: _meta, ...fingerprinted } = s.request
@@ -88,7 +91,13 @@ export async function runJobs(deps: Deps, ctx: Ctx, input: { quoteId?: string; c
     const rows: JobRow[] = []
     for (const [i, spec] of input.specs.entries()) {
       const estimate = quotedItems[i]?.amountMicros ?? items[i]!.estimate.totalMicros
+      const credits = items[i]!.estimate.credits
       const [provider, model] = spec.request.model.split('/') as [string, string]
+      // The stored request is the quoted one (with its billing path), plus
+      // the credits quoted on the account path.
+      const request = spec.type === 'gen'
+        ? { ...(items[i]!.request as GenRequest), ...(credits != null ? { quotedCredits: credits } : {}) }
+        : spec.request
       const id = newId('job')
       const parent = spec.parentIndex != null ? rows[spec.parentIndex] : undefined
       if (spec.parentIndex != null && !parent) throw new AppError('bad_request', 'A dependent job must come after its parent.')
@@ -96,7 +105,7 @@ export async function runJobs(deps: Deps, ctx: Ctx, input: { quoteId?: string; c
         id, accountId: ctx.accountId, userId: ctx.userId, characterId: input.characterId,
         stage: spec.stage, purpose: spec.purpose, provider, model,
         kind: spec.type === 'gen' ? spec.request.kind : 'llm',
-        request: parent ? { ...spec.request, parentJobId: parent.id } : spec.request,
+        request: parent ? { ...request, parentJobId: parent.id } : request,
         idempotencyKey: `${quote.id}:${i}`, quoteId: quote.id,
         estimateMicros: estimate, status: parent ? 'waiting' : 'queued', nextPollAt: parent ? null : deps.clock.now(),
       }).returning()
@@ -104,6 +113,7 @@ export async function runJobs(deps: Deps, ctx: Ctx, input: { quoteId?: string; c
         accountId: ctx.accountId, userId: ctx.userId, characterId: input.characterId, jobId: id, quoteId: quote.id,
         stage: spec.stage, provider, model, entryType: 'hold', amountMicros: estimate,
         priceVersion: quotedItems[i]?.priceVersion, source: 'estimate', note: spec.label,
+        ...(credits != null ? { quantity: credits, unit: 'credit' } : {}),
       }])
       await tx.insert(jobEvents).values({ id: newId('jev'), accountId: ctx.accountId, jobId: id, type: 'created', data: { label: spec.label } })
       rows.push(row!)
@@ -182,26 +192,27 @@ function backoffMs(deps: Deps, attempt: number): number {
 const UPLOAD_TTL_MS = 6 * 3600_000
 const uploads = new Map<string, { url: string; at: number }>()
 
-async function refUrl(deps: Deps, ctx: Ctx, adapter: ProviderAdapter, assetId: string): Promise<string> {
+async function refUrl(deps: Deps, ctx: Ctx, adapter: ProviderAdapter, assetId: string): Promise<{ url: string; width?: number; height?: number }> {
   if (adapter.uploadAsset) {
     const { row, data } = await readAsset(deps, ctx, assetId)
+    const size = { width: row.width ?? undefined, height: row.height ?? undefined }
     const key = `${ctx.accountId}:${adapter.id}:${row.checksumSha256 ?? row.id}`
     const hit = uploads.get(key)
     const now = deps.clock.now().getTime()
-    if (hit && now - hit.at < UPLOAD_TTL_MS) return hit.url
+    if (hit && now - hit.at < UPLOAD_TTL_MS) return { url: hit.url, ...size }
     const url = await adapter.uploadAsset(data, row.mime)
     uploads.set(key, { url, at: now })
     if (uploads.size > 500) uploads.delete(uploads.keys().next().value!)
-    return url
+    return { url, ...size }
   }
   const url = await publicAssetUrl(deps, ctx, assetId)
   if (!url) throw new ProviderError('Reference images need a public URL. Set up cloud storage (R2) or STUDIO_PUBLIC_URL for live runs with references.', { retryable: false, submitted: 'no' })
-  return url
+  return { url }
 }
 
 async function resolveRefs(deps: Deps, ctx: Ctx, adapter: ProviderAdapter, req: GenRequest): Promise<GenRequest> {
   if (!adapter.needsPublicAssetUrls) return req
-  const withUrl = async <T extends { assetId: string } | undefined>(r: T): Promise<T> => (r ? { ...r, url: await refUrl(deps, ctx, adapter, r.assetId) } : r)
+  const withUrl = async <T extends { assetId: string } | undefined>(r: T): Promise<T> => (r ? { ...r, ...await refUrl(deps, ctx, adapter, r.assetId) } : r)
   return {
     ...req,
     refs: req.refs ? await Promise.all(req.refs.map(r => withUrl(r))) : undefined,
@@ -211,10 +222,14 @@ async function resolveRefs(deps: Deps, ctx: Ctx, adapter: ProviderAdapter, req: 
   }
 }
 
+// The adapter that quoted the job runs it to the end. Higgsfield jobs from
+// before billing paths existed ran on the API.
+const adapterFor = (deps: Deps, job: JobRow, req: GenRequest) => deps.providers.gen(job.accountId, req.model, { billing: req.billing ?? 'api' })
+
 async function submitGen(deps: Deps, job: JobRow): Promise<void> {
   const ctx = systemCtx(deps, job)
   const req = job.request as GenRequest
-  const adapter = await deps.providers.gen(job.accountId, req.model)
+  const adapter = await adapterFor(deps, job, req)
   const token = newToken(24)
   const attempts = job.attempts + 1
   await update(deps, job, { status: 'submitting', attempts, webhookTokenHash: sha256Hex(token) })
@@ -248,7 +263,7 @@ async function handleProviderError(deps: Deps, job: JobRow, e: unknown, attempts
 
 async function pollGen(deps: Deps, job: JobRow): Promise<void> {
   const req = job.request as GenRequest
-  const adapter = await deps.providers.gen(job.accountId, req.model)
+  const adapter = await adapterFor(deps, job, req)
   const now = deps.clock.now()
   let st
   try {
@@ -305,7 +320,7 @@ async function silence(data: Buffer): Promise<{ data: Buffer; hadAudio: boolean 
 async function ingestGen(deps: Deps, job: JobRow): Promise<void> {
   const ctx = systemCtx(deps, job)
   const req = job.request as GenRequest
-  const adapter = await deps.providers.gen(job.accountId, req.model)
+  const adapter = await adapterFor(deps, job, req)
   const outputs = ((job.resultMeta as { outputs?: Output[] } | null)?.outputs ?? [])
   if (!outputs.length) return finishWithoutCharge(deps, job, 'failed', 'The provider finished without returning any output.')
 
@@ -343,8 +358,14 @@ async function ingestGen(deps: Deps, job: JobRow): Promise<void> {
     return needsAttention(deps, job, `Could not copy the output into storage: ${(e as Error).message}`)
   }
 
-  const actual = actualGen(deps.config, req, measured)
-  await settle(deps, job, 'completed', actual.totalMicros, `${actual.lines.map(l => l.label).join(', ')}`)
+  if (req.billing === 'account') {
+    // Plan credits are charged as quoted (the request fixes the duration).
+    const credits = req.quotedCredits ?? 0
+    await settle(deps, job, 'completed', job.estimateMicros, `${credits} plan credits`, { quantity: credits, unit: 'credit' })
+  } else {
+    const actual = actualGen(deps.config, req, measured)
+    await settle(deps, job, 'completed', actual.totalMicros, `${actual.lines.map(l => l.label).join(', ')}`)
+  }
   await runHook(deps, ctx, job, { status: 'completed', assets })
 }
 
@@ -382,11 +403,11 @@ async function runLlm(deps: Deps, job: JobRow): Promise<void> {
 
 // Final ledger entries for a finished job: release the hold, record the
 // actual charge (computed from the price book until reconciled).
-async function settle(deps: Deps, job: JobRow, status: 'completed', actualMicros: number, note: string): Promise<void> {
+async function settle(deps: Deps, job: JobRow, status: 'completed', actualMicros: number, note: string, amount: { quantity?: number; unit?: string } = {}): Promise<void> {
   await deps.db.transaction(async tx => {
     await appendLedger(tx as unknown as Db, [
       { accountId: job.accountId, userId: job.userId, characterId: job.characterId, jobId: job.id, quoteId: job.quoteId, stage: job.stage, provider: job.provider, model: job.model, entryType: 'release', amountMicros: -job.estimateMicros, source: 'estimate', note: 'hold released' },
-      { accountId: job.accountId, userId: job.userId, characterId: job.characterId, jobId: job.id, quoteId: job.quoteId, stage: job.stage, provider: job.provider, model: job.model, entryType: 'charge', amountMicros: actualMicros, source: 'computed', note },
+      { accountId: job.accountId, userId: job.userId, characterId: job.characterId, jobId: job.id, quoteId: job.quoteId, stage: job.stage, provider: job.provider, model: job.model, entryType: 'charge', amountMicros: actualMicros, source: 'computed', note, ...amount },
     ])
     await tx.update(jobs).set({ status, actualMicros, actualSource: 'computed', completedAt: deps.clock.now(), lockedUntil: null, nextPollAt: null, error: null, updatedAt: deps.clock.now() }).where(eq(jobs.id, job.id))
   })
@@ -469,7 +490,7 @@ export async function cancelJob(deps: Deps, ctx: Ctx, id: string): Promise<void>
   const job = await getJob(deps, ctx, id)
   if (!ACTIVE.includes(job.status as JobStatusName)) return
   if (job.status === 'running' && job.providerJobId) {
-    const adapter = await deps.providers.gen(job.accountId, `${job.provider}/${job.model}`)
+    const adapter = await adapterFor(deps, job, job.request as GenRequest)
     await adapter.cancel?.(job.providerJobId).catch(() => undefined)
   }
   await finishWithoutCharge(deps, job, 'canceled', 'Canceled by a person.')

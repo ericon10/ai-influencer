@@ -12,6 +12,7 @@ export const keys = {
   jobs: (scope: string) => ['jobs', scope] as const,
   usage: ['usage'] as const,
   settings: ['settings'] as const,
+  higgsfieldAccount: ['higgsfield-account'] as const,
 }
 
 export function useMe() {
@@ -56,6 +57,12 @@ export function useUsage() { return useQuery({ queryKey: keys.usage, queryFn: ap
 // Polls while a model test is running, so its result shows up on its own.
 export function useSettings() {
   return useQuery({ queryKey: keys.settings, queryFn: api.settings, refetchInterval: q => (q.state.data?.models.some(m => m.testing) ? 3000 : false) })
+}
+
+// The connected Higgsfield account's plan and credits (asked only when one
+// is connected).
+export function useHiggsfieldAccount(connected: boolean) {
+  return useQuery({ queryKey: keys.higgsfieldAccount, queryFn: () => api.higgsfieldAccount(), enabled: connected, staleTime: 30_000, retry: false })
 }
 
 // Refresh everything a write can affect.

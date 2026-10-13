@@ -24,8 +24,16 @@ const modelsSchema = z.object({
     // Other names people use for the model (character files, the Higgsfield
     // web app). The character-file importer maps them to this ref.
     aliases: z.array(z.string()).default([]),
-    // The model id in the Higgsfield web app and MCP connector.
+    // The model id in the Higgsfield web app and MCP connector. Models with
+    // one can also run through the owner's Higgsfield account (plan credits).
     mcp_id: z.string().optional(),
+    // The account path's inputs, from models_explore: the parameter names this
+    // model accepts (nothing else is sent) and values always sent with it.
+    mcp: z.object({
+      params: z.array(z.string()).default([]),
+      fixed: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).default({}),
+      roles: z.object({ refs: z.string().optional(), start: z.string().optional(), end: z.string().optional() }).default({}),
+    }).optional(),
     // Video and audio: whether a request can turn generated sound off.
     // always_on means the Studio strips the track on arrival instead.
     audio: z.enum(['off_switch', 'always_on']).optional(),
@@ -108,6 +116,13 @@ const runtimeSchema = z.object({
     last_frame: z.object({ step_back_sec: z.number().positive(), blur_ratio: z.number().positive() }),
   }),
   llm: z.object({ image_max_edge: z.number().int().positive(), image_max_tokens: z.number().int().positive() }),
+  // The owner's Higgsfield account (MCP connector, plan credits).
+  higgsfield_account: z.object({
+    mcp_url: z.string().url(),
+    oauth: z.object({ register: z.string().url(), authorize: z.string().url(), token: z.string().url(), scope: z.string() }),
+    timeout_sec: z.number().positive(),
+    poll_after_sec: z.number().positive(),
+  }),
 })
 
 export type ModelsConfig = z.infer<typeof modelsSchema>

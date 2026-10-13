@@ -180,6 +180,15 @@ Guardrails that apply to every item:
 
 ---
 
+## Higgsfield billing paths (owner, 2026-10-13)
+- [x] Second Higgsfield adapter through the owner's account (MCP connector,
+  plan credits); the REST API adapter stays for customers and production
+- [x] Per-account default in Settings; quotes show credits on the account path
+- [x] Server-side OAuth (PKCE, dynamic registration), tokens in the vault
+- [x] Tests against an in-memory fake of the MCP server and OAuth endpoints
+- [ ] Owner connects the account once from Settings (needs a deployed or
+  local Studio that can reach mcp.higgsfield.ai)
+
 ## Housekeeping (not blocking)
 - [x] Remove the creator's affiliate code, feedback form, guide doc and
       demo personas and images (approved 2026-10-12)

@@ -29,12 +29,32 @@ export interface QuoteView {
   characterId: string | null
   totalMicros: number
   total: string
+  // Plan credits on the Higgsfield account path, and the price as shown:
+  // dollars, credits, or both ("70 credits + $0.03").
+  credits: number
+  display: string
   verified: boolean
-  items: Array<{ label: string; model: string; amount: string; amountMicros: number; verified: boolean }>
+  items: Array<{ label: string; model: string; amount: string; amountMicros: number; credits: number | null; verified: boolean }>
   budget: BudgetCheck
   status: 'open' | 'blocked'
   expiresAt: string
   needsConfirm: boolean
+}
+
+export function formatCredits(credits: number): string {
+  const n = Math.round(credits * 100) / 100
+  return `${n.toLocaleString('en-US')} ${n === 1 ? 'credit' : 'credits'}`
+}
+
+// Credit items show credits; everything else shows dollars.
+export function displayPrice(items: Array<{ amountMicros: number; credits?: number | null }>): string {
+  const credits = items.reduce((s, i) => s + (i.credits ?? 0), 0)
+  const usd = items.filter(i => i.credits == null).reduce((s, i) => s + i.amountMicros, 0)
+  const hasCredits = items.some(i => i.credits != null)
+  const parts: string[] = []
+  if (hasCredits) parts.push(formatCredits(credits))
+  if (!hasCredits || usd > 0) parts.push(formatUsd(usd))
+  return parts.join(' + ')
 }
 
 export function fingerprintItems(purpose: string, characterId: string | null, items: Array<Pick<QuoteItem, 'provider' | 'model' | 'kind' | 'request'>>): string {
@@ -52,6 +72,7 @@ export async function createQuote(deps: Deps, ctx: Ctx, input: { purpose: string
   const items = input.items.map(i => ({
     label: i.label, provider: i.provider, model: i.model, kind: i.kind,
     amountMicros: i.estimate.totalMicros, verified: i.estimate.verified, lines: i.estimate.lines, priceVersion: i.estimate.priceVersion,
+    credits: i.estimate.credits ?? null,
   }))
   await deps.db.insert(quotes).values({
     id, accountId: ctx.accountId, userId: ctx.userId, characterId: input.characterId, purpose: input.purpose,
@@ -60,8 +81,10 @@ export async function createQuote(deps: Deps, ctx: Ctx, input: { purpose: string
   })
   return {
     id, purpose: input.purpose, characterId: input.characterId, totalMicros: total, total: formatUsd(total),
+    credits: items.reduce((s, i) => s + (i.credits ?? 0), 0),
+    display: displayPrice(items),
     verified: input.items.every(i => i.estimate.verified),
-    items: items.map(i => ({ label: i.label, model: `${i.provider}/${i.model}`, amount: formatUsd(i.amountMicros), amountMicros: i.amountMicros, verified: i.verified })),
+    items: items.map(i => ({ label: i.label, model: `${i.provider}/${i.model}`, amount: i.credits != null ? formatCredits(i.credits) : formatUsd(i.amountMicros), amountMicros: i.amountMicros, credits: i.credits, verified: i.verified })),
     budget, status, expiresAt: expiresAt.toISOString(), needsConfirm: budget.needsConfirm,
   }
 }
@@ -85,7 +108,7 @@ export async function consumeQuote(tx: Db, deps: Deps, ctx: Ctx, quoteId: string
     throw new AppError('budget_exceeded', 'This run would go over a budget cap.', budget.blocks)
   }
   if (budget.needsConfirm && !confirmed) {
-    throw new AppError('bad_request', `This run costs ${formatUsd(q.totalMicros)}. Confirm to continue.`, { needsConfirm: true })
+    throw new AppError('bad_request', `This run costs ${displayPrice(q.items as Array<{ amountMicros: number; credits?: number | null }>)}. Confirm to continue.`, { needsConfirm: true })
   }
   await tx.update(quotes).set({ status: 'used', usedAt: deps.clock.now() }).where(eq(quotes.id, q.id))
   return q

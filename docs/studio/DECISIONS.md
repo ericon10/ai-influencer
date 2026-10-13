@@ -273,3 +273,36 @@ after every Soul still) and an instant Higgsfield Element. A Soul request
 carries the soul_id as `custom_reference_id` (official SDK). The drift-lock
 pass runs when scene stills arrive in Phase 2; today it is recorded with
 the identity and shown on the Character file tab.
+
+## E. Owner rulings, 2026-10-13
+
+### E1. Style is optional ideas, never a uniform
+A character file's style section is read as optional starting ideas, hair
+options and notes. None of it goes into a prompt. Every scene names its own
+full outfit (rules `scene-names-outfit` and `scene-no-carried-outfit`), and
+the only constant is a distinguishing mark such as Callie's left-ear cuff.
+
+### E2. Two Higgsfield billing paths, chosen per account
+Higgsfield bills two ways. The pay-per-use REST API spends a separate
+prepaid USD balance; it stays the path for customers and production. The
+owner's own account (the MCP connector, OAuth sign-in) spends plan credits;
+it is for the owner's own work. Each account picks its default in Settings,
+Higgsfield billing (new accounts start on the API).
+
+- The path is stamped into each Higgsfield request when it is quoted, so
+  the quote fingerprint covers it: switching the default needs a new
+  estimate, and a running job finishes on the path it started on.
+- Account-path estimates come from Higgsfield's free cost preflight
+  (`get_cost`) in credits, with the price book's credit column as the
+  fallback (an upscale needs its image uploaded before Higgsfield can price
+  it). The ledger records credits as quantity with unit `credit`; the USD
+  amount is credits times the owner's optional value per credit (0 unless
+  set), which is what budgets see.
+- Only inputs the model accepts on that path are sent (`mcp.params` in
+  `config/models.yaml`, from models_explore), plus fixed values: audio off
+  for every video, `use_unlim: false` so free-trial generations are never
+  spent on the owner's behalf. Seedance frames use mode `omni_reference`.
+- The sign-in is OAuth with PKCE and dynamic client registration, run on
+  the server; tokens are sealed in the account's key vault like any key and
+  renew themselves. Model tests always use the API, because they confirm
+  API endpoints. Wan 3.0 Prime has no account path yet.

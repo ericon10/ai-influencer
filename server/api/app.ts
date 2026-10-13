@@ -20,6 +20,9 @@ import { attachCheckImages, attachSheetImages, exportCharacter, importCharacter,
 import { accountUsage } from '../pipeline/costs'
 import { providerMode, setSetting } from '../pipeline/settings'
 import { listCredentials, markVerified, revokeCredential, saveCredential } from '../providers/credentials'
+import { disconnectAccount, finishAccountConnect, readAccountTokens, startAccountConnect } from '../providers/higgsfieldOAuth'
+import { readBilling, saveBilling } from '../providers/billing'
+import type { AccountBalance } from '../providers/higgsfieldAccount'
 import { setBudget } from '../costs/budgets'
 import { formatUsd } from '../costs/money'
 import { characterSummary, characterView, settingsView } from './views'
@@ -94,6 +97,16 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
     const [row] = await deps.db.select().from(assets).where(eq(assets.id, id))
     if (!row) return c.json({ error: { code: 'not_found', message: 'Not found.' } }, 404)
     return new Response(new Uint8Array(await deps.store.get(row.storageKey)), { headers: { 'content-type': row.mime, 'cache-control': 'private, max-age=600' } })
+  })
+
+  // The redirect back from the Higgsfield account sign-in. A browser
+  // navigation, so no API session: the one-time state binds it to the admin
+  // who started it. Always lands on Settings with a message.
+  app.get('/oauth/higgsfield/callback', async c => {
+    const q = c.req.query()
+    const r = await finishAccountConnect(deps, { code: q.code, state: q.state, error: q.error, error_description: q.error_description })
+    const params = new URLSearchParams(r.ok ? { higgsfield: 'connected' } : { higgsfield: 'error', message: r.message })
+    return c.redirect(`${r.returnTo ?? ''}/studio/settings?${params}`, 302)
   })
 
   // ── Session ──
@@ -374,6 +387,53 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
     requireRole(ctx, 'admin')
     await revokeCredential(deps, ctx, c.req.param('provider'))
     return c.json({ ok: true })
+  })
+
+  // ── Higgsfield billing: the REST API or the owner's own account ──
+  app.post('/oauth/higgsfield/start', async c => {
+    const ctx = c.get('ctx')
+    const origin = c.req.header('origin') || new URL(c.req.url).origin
+    return c.json(await startAccountConnect(deps, ctx, { origin }))
+  })
+
+  // Plan and credits come from Higgsfield (a free call), cached briefly so
+  // the Settings page does not ask on every render.
+  const balances = new Map<string, { at: number; credentialId: string; value: AccountBalance }>()
+  app.get('/settings/higgsfield-account', async c => {
+    const ctx = c.get('ctx')
+    const stored = await readAccountTokens(deps.db, deps.vault, ctx.accountId)
+    if (!stored) return c.json({ connected: false })
+    const base = { connected: true, connectedAt: stored.createdAt.toISOString(), verifyStatus: stored.verifyStatus }
+    const hit = balances.get(ctx.accountId)
+    if (hit && hit.credentialId === stored.id && Date.now() - hit.at < 30_000 && !c.req.query('fresh')) return c.json({ ...base, ...hit.value })
+    try {
+      const value = await deps.providers.higgsfieldAccountBalance(ctx.accountId)
+      balances.set(ctx.accountId, { at: Date.now(), credentialId: stored.id, value })
+      if (stored.verifyStatus !== 'ok') await markVerified(deps.db, ctx.accountId, 'higgsfield_account', true, deps.clock.now())
+      return c.json({ ...base, verifyStatus: 'ok', ...value })
+    } catch (e) {
+      return c.json({ ...base, credits: null, plan: null, error: (e as Error).message })
+    }
+  })
+
+  app.delete('/settings/higgsfield-account', async c => {
+    const ctx = c.get('ctx')
+    await disconnectAccount(deps, ctx)
+    balances.delete(ctx.accountId)
+    return c.json(await settingsView(deps, ctx))
+  })
+
+  app.put('/settings/billing', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'admin')
+    const body = parse(z.object({ default: z.enum(['api', 'account']).optional(), creditUsd: z.number().min(0).max(10).optional() }), await json(c))
+    const current = await readBilling(deps.db, ctx.accountId)
+    const next = { default: body.default ?? current.default, creditUsd: body.creditUsd ?? current.creditUsd }
+    if (next.default === 'account' && !(await readAccountTokens(deps.db, deps.vault, ctx.accountId))) {
+      throw new AppError('bad_request', 'Connect your Higgsfield account first.')
+    }
+    await saveBilling(deps, ctx, next)
+    return c.json(await settingsView(deps, ctx))
   })
 
   // A model's REST path, from Higgsfield's official Model API Reference.

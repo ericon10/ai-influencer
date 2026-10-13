@@ -11,6 +11,7 @@ import { candidatesFor, getCharacter, inspirationAssetIds, listConcepts, sheetSt
 import { characterCosts } from '../pipeline/costs'
 import { providerMode, resolveRoute } from '../pipeline/settings'
 import { effectiveModel, readModelOverrides } from '../providers/modelOverrides'
+import { readBilling } from '../providers/billing'
 
 // Response shapes for the UI. Plain data only; no secrets, no internals.
 
@@ -85,9 +86,19 @@ export async function settingsView(deps: Deps, ctx: Ctx) {
   const b = await effectiveBudgets(deps.db, ctx.accountId, deps.config.budgets)
   const overrides = await readModelOverrides(deps.db, ctx.accountId)
   const tasks = Object.keys(deps.config.routing.tasks)
+  const credentials = await listCredentials(deps.db, ctx.accountId)
+  const account = credentials.find(c => c.provider === 'higgsfield_account')
   return {
     mode: await providerMode(deps.db, ctx.accountId),
-    credentials: await listCredentials(deps.db, ctx.accountId),
+    credentials: credentials.filter(c => c.provider !== 'higgsfield_account'),
+    // Which Higgsfield balance pays: the REST API (USD) or the owner's own
+    // account (plan credits). Models with no account path always use the API.
+    billing: {
+      ...(await readBilling(deps.db, ctx.accountId)),
+      accountConnected: !!account,
+      accountStatus: account?.verifyStatus ?? null,
+      accountModels: deps.config.models.models.filter(m => m.ref.startsWith('higgsfield/') && m.mcp_id && m.mcp).map(m => m.ref),
+    },
     providers: [
       { id: 'higgsfield', label: 'Higgsfield', hint: 'KEY_ID:KEY_SECRET from the Higgsfield Console (API keys, pay-per-use). Not your web login.', placeholder: 'kid_xxx:secret_xxx', usedFor: 'Images and video' },
       { id: 'anthropic', label: 'Anthropic', hint: 'An API key from the Anthropic Console.', placeholder: 'sk-ant-...', usedFor: 'Breakdowns, concepts and QA' },

@@ -21,3 +21,15 @@ media:
 llm:
   image_max_edge: 1568
   image_max_tokens: 4784
+# The owner's Higgsfield account: generation through the MCP connector, paid
+# with plan credits. OAuth with PKCE and dynamic client registration, the same
+# flow the classic app uses. The pay-per-use REST API is separate.
+higgsfield_account:
+  mcp_url: https://mcp.higgsfield.ai/mcp
+  oauth:
+    register: https://mcp.higgsfield.ai/oauth2/register
+    authorize: https://mcp.higgsfield.ai/oauth2/authorize
+    token: https://mcp.higgsfield.ai/oauth2/token
+    scope: openid email offline_access
+  timeout_sec: 60
+  poll_after_sec: 5

@@ -61,7 +61,9 @@ export interface CharacterSummary { id: string; name: string; stage: number; sta
 
 export interface QuoteView {
   id: string; total: string; totalMicros: number; verified: boolean; status: 'open' | 'blocked'; needsConfirm: boolean; expiresAt: string
-  items: Array<{ label: string; model: string; amount: string; amountMicros: number; verified: boolean }>
+  // Plan credits on the Higgsfield account path, and the price as shown.
+  credits: number; display: string
+  items: Array<{ label: string; model: string; amount: string; amountMicros: number; credits: number | null; verified: boolean }>
   budget: { ok: boolean; blocks: Array<{ scope: string; capMicros: number; afterMicros: number }>; warnings: Array<{ scope: string; capMicros: number; afterMicros: number }> }
 }
 
@@ -94,6 +96,16 @@ export interface SettingsView {
   }>
   prices: Array<{ model: string; unit: string; price: string; verified: boolean; source: string; when: string; credits: number | null }>
   priceVersion: string
+  billing: { default: 'api' | 'account'; creditUsd: number; accountConnected: boolean; accountStatus: string | null; accountModels: string[] }
+}
+
+export interface HiggsfieldAccount {
+  connected: boolean
+  connectedAt?: string
+  verifyStatus?: string
+  credits?: number | null
+  plan?: string | null
+  error?: string
 }
 
 export interface Usage {

@@ -8,8 +8,17 @@ export interface AssetRef {
   assetId: string
   // A URL the provider can fetch. Filled in by the runner just before submit
   // (for example a short-lived presigned R2 URL); never stored in requests.
+  // On the Higgsfield account path it is the provider's media id instead.
   url?: string
+  // Pixel size, filled in with the url (an account-path upscale needs it).
+  width?: number
+  height?: number
 }
+
+// Which Higgsfield balance pays: "api" is the pay-per-use REST API (prepaid
+// USD, for customers and production); "account" is the owner's own
+// Higgsfield account through the MCP connector (plan credits).
+export type HiggsfieldBilling = 'api' | 'account'
 
 export interface GenRequest {
   kind: GenKind
@@ -32,6 +41,12 @@ export interface GenRequest {
   modelTest?: true
   // Upscale factor for kind "upscale" (SPEC 5.1 rule 6: 2x, never more).
   scale?: 2
+  // Higgsfield only. Stamped when the run is quoted, from the account's
+  // default, so switching the default needs a new quote.
+  billing?: HiggsfieldBilling
+  // Account path: the credits quoted for this job, recorded when the job is
+  // created. Never sent to the provider.
+  quotedCredits?: number
 }
 
 export interface ModelInfo {
@@ -58,6 +73,9 @@ export interface CostEstimate {
   // False when the price book entry is a placeholder not yet confirmed
   // against the provider's published price. The UI says so.
   verified: boolean
+  // Account path: Higgsfield plan credits this run uses. totalMicros is then
+  // the credits at the owner's chosen value per credit (0 unless set).
+  credits?: number
 }
 
 export type JobState = 'queued' | 'running' | 'succeeded' | 'failed' | 'nsfw' | 'canceled'

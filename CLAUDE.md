@@ -55,7 +55,7 @@ requirements, not suggestions.
 |---|---|
 | `config/*.yaml` | Rules engine, prompt templates, sheet graph, views, routing, price book, budgets |
 | `server/core/` | Pure, unit-tested logic (prompts, rules, sheet DAG, QA side logic, character file) |
-| `server/providers/` | `ProviderAdapter` (SPEC 7.1), mock, Higgsfield API, Anthropic, contract tests |
+| `server/providers/` | `ProviderAdapter` (SPEC 7.1), mock, Higgsfield API, Higgsfield account (MCP, plan credits), Anthropic, contract tests |
 | `server/jobs/runner.ts` | Quotes required for every run, holds, submit, webhook/poll, ingest, ledger |
 | `server/media/` | ffmpeg tools including the seam-scored join (SPEC 4.3) |
 | `server/qa/faces.ts` | Face matcher for identity and distinctness QA (YuNet + SFace on onnxruntime-web) |
