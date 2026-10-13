@@ -7,7 +7,7 @@ import { registerPipelineHooks } from './hooks.js'
 import { importCharacter } from './files.js'
 import { linkInspiration } from './characters.js'
 import { pickHero } from './review.js'
-import { scoreDistinctness, scoreIdentity } from './identity.js'
+import { scoreDistinctness, scoreIdentity, scorePerformer } from './identity.js'
 import { saveAsset } from '../storage/assets.js'
 import { renderPlaceholderPortrait } from '../providers/mock.js'
 import { candidates } from '../db/schema.js'
@@ -149,5 +149,30 @@ describe('distinctness on heroes', () => {
     const r = (await scoreDistinctness(h.deps, h.ctx, { characterId, assetId: fresh }))!
     expect(r.findings[0]).toMatchObject({ code: 'identity_match', severity: 'info' })
     expect(r.identity!.score).toBeLessThan(h.deps.config.pipeline.review.qa.distinctness_max_similarity)
+  })
+})
+
+describe('Clone Video: never the person in the source clip', () => {
+  const frame = async (label: string, face: Float32Array | null) => {
+    const data = await renderPlaceholderPortrait(label)
+    embeddings.set(createHash('sha256').update(data).digest('hex'), face)
+    return data
+  }
+
+  it('fails a clone that kept the performer\'s face, at any sampled moment', async () => {
+    const pairs = [
+      { result: await frame('clone 1', vec(1, 0)), source: await frame('source 1', vec(0, 1)) },
+      { result: await frame('clone 2', vec(0.2, 0.98)), source: await frame('source 2', vec(0, 1)) },
+    ]
+    const r = await scorePerformer(h.deps, h.ctx, { pairs, name: 'Callie' })
+    expect(r.findings[0]).toMatchObject({ code: 'too_similar', severity: 'fail' })
+    expect(r.findings[0]!.message).toMatch(/not Callie/)
+  })
+
+  it('passes a clone that is a different person, and skips when no face shows in both', async () => {
+    const ok = await scorePerformer(h.deps, h.ctx, { pairs: [{ result: await frame('clone 3', vec(1, 0)), source: await frame('source 3', vec(0, 1)) }], name: 'Callie' })
+    expect(ok.findings[0]).toMatchObject({ code: 'identity_match', severity: 'info' })
+    const none = await scorePerformer(h.deps, h.ctx, { pairs: [{ result: await frame('clone 4', vec(1, 0)), source: await frame('source 4', null) }], name: 'Callie' })
+    expect(none.findings[0]).toMatchObject({ code: 'identity_skipped' })
   })
 })

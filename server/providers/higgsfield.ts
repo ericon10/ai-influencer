@@ -198,6 +198,45 @@ function mapFamily(entry: ModelEntry, req: GenRequest): Record<string, unknown> 
         resolution: entry.audio === 'always_on' ? req.resolution : undefined,
         sound: entry.audio === 'always_on' ? undefined : req.audio === true ? 'on' : 'off',
       })
+    // Clone Video (SPEC 13.1 R1). The output length follows the source clip,
+    // so no duration is sent, and the source's sound is never kept here: the
+    // Studio puts it back itself when "Keep original sound" is on.
+    case 'kling_motion_control':
+      // Kling 3.0 Motion Control: one character image plus the source clip.
+      // The character follows the clip's orientation and motion.
+      return clean({
+        prompt: req.prompt || undefined,
+        image_url: needUrl(req.refs?.[0], 'The character image'),
+        video_url: needUrl(req.sourceVideo, 'The source clip'),
+        keep_original_sound: 'no',
+        character_orientation: 'video',
+      })
+    case 'genjutsu_motion':
+      // Genjutsu motion transfer: 1 to 8 character images hold the face.
+      return clean({
+        prompt: req.prompt || undefined,
+        video_url: needUrl(req.sourceVideo, 'The source clip'),
+        image_urls: (req.refs ?? []).slice(0, 8).map(r => needUrl(r, 'A character image')),
+        resolution: req.resolution,
+      })
+    case 'seedance_video_edit':
+      // Seedance 2.5 video edit: the clip keeps its place; the prompt swaps
+      // the person for the one in the images. Audio off unless asked.
+      return clean({
+        prompt: req.prompt,
+        video_url: needUrl(req.sourceVideo, 'The source clip'),
+        image_urls: (req.refs ?? []).map(r => needUrl(r, 'A character image')),
+        resolution: req.resolution,
+        generate_audio: req.audio === true,
+      })
+    case 'kling_o3_edit':
+      // Kling O3 video edit: one source clip (3 to 15.5 s), up to 4 images.
+      return clean({
+        prompt: req.prompt,
+        video_urls: [needUrl(req.sourceVideo, 'The source clip')],
+        image_urls: (req.refs ?? []).slice(0, 4).map(r => needUrl(r, 'A character image')),
+        mode: req.quality === 'std' ? 'std' : 'pro',
+      })
     case 'generic_audio':
       return clean({ prompt: req.prompt, duration: req.durationSec })
     case 'generic_video':

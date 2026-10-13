@@ -128,6 +128,14 @@ video:
   # The end frame helper: only the masked head and face change.
   end_frame: "Edit only the masked area, {poss} head and face: {change}. Keep {poss} identity, hair, skin texture, the mole and everything outside the mask exactly the same."
 
+# Clone Video (SPEC 13.1 R1), for the models that take a prompt. "swap"
+# keeps the source clip's place and changes only the person; "image" puts
+# the clip's motion on the character image. The silent line and the
+# REALISM block are added after it.
+clone:
+  swap: "Replace the person in the source video with the person in the reference images: {poss} face, hair, skin and body exactly as in the references. Keep the motion, timing, gestures, camera movement, framing and place of the source video exactly the same. The result must be the reference person, never the person from the source video."
+  image: "The person in the reference image performs the exact motion of the source video: the same timing, gestures, body movement and camera movement. Keep {poss} face, hair, skin, body and the place of the reference image exactly the same, never the face of the person in the source video."
+
 # The prompt writer (owner, 2026-10-13, default rule scene-prompt-writer):
 # Claude turns the scene details into the final prompt as natural sentences.
 # The Studio then adds what must not depend on the writing: the reference

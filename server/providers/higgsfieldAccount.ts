@@ -24,6 +24,9 @@ const LIVE_PRICE_KEEP_MS = 30 * 24 * 3600_000
 // - generate_{image,video,audio} with get_cost:true price a request in
 //   credits without submitting anything (free)
 // - upscale_image needs the source width and height
+// - motion_control (Kling 3.0 Motion Control) is its own tool: image_id,
+//   motion_video_id, resolution 720p or 1080p, scene_control image or video;
+//   no prompt and no cost preflight
 // - jobs_wait with timeout_seconds 0 is an immediate status snapshot
 // - media_upload, PUT to the presigned link, media_confirm: medias take the
 //   media id, never a URL
@@ -218,7 +221,7 @@ export function createHiggsfieldAccountAdapter(o: HiggsfieldAccountOptions): Pro
   // slow to price it and no live price is saved.
   function bookCredits(req: GenRequest): { credits: number; verified: boolean } | null {
     const { provider, model } = splitRef(req.model)
-    const video = req.kind === 'video' || req.kind === 'video_extend' || req.kind === 'audio' || (req.kind === 'upscale' && !!req.sourceVideo)
+    const video = req.kind === 'video' || req.kind === 'video_extend' || req.kind === 'video_clone' || req.kind === 'audio' || (req.kind === 'upscale' && !!req.sourceVideo)
     const entry = findPrice(o.config.pricebook, provider, model, video ? 'second' : 'image', { resolution: req.resolution, quality: req.quality, aspect: req.aspect })
     if (entry?.credits == null) return null
     return { credits: Math.round(entry.credits * (video ? (req.durationSec ?? 5) : 1) * 100) / 100, verified: entry.credits_verified === true }
@@ -257,7 +260,9 @@ export function createHiggsfieldAccountAdapter(o: HiggsfieldAccountOptions): Pro
     async estimate(req) {
       const entry = accountModel(o.config, req.model)
       let reason = ''
-      if (req.kind !== 'upscale') {
+      // A model with its own tool (motion_control) has no price preflight:
+      // the price book answers, marked not confirmed until a run shows it.
+      if (req.kind !== 'upscale' && !entry.mcp.tool) {
         // A recent live price for the same request shape answers at once.
         const sig = priceSignature(req)
         const saved = await o.livePrices?.get(sig).catch(() => null) ?? null
@@ -334,6 +339,24 @@ export function createHiggsfieldAccountAdapter(o: HiggsfieldAccountOptions): Pro
         if (r.jobId) return { jobId: r.jobId, raw: value }
         if (r.problem) throw new ProviderError(r.problem, { retryable: false, submitted: 'no' })
         throw new ProviderError('Higgsfield answered the upscale without a job id.', { retryable: false, submitted: 'unknown' })
+      }
+      // Clone Video on the account path: Kling 3.0 Motion Control's own tool.
+      // The character image and the source clip are media ids; the place
+      // comes from the clip ("video") or the image. It takes no prompt.
+      if (req.kind === 'video_clone') {
+        if (entry.mcp.tool !== 'motion_control') throw new ProviderError(`${entry.label} does not clone a video on the account path.`, { retryable: false, submitted: 'no' })
+        const value = await o.client.callTool('motion_control', {
+          params: forceBeautifyOff({
+            image_id: need(req.refs?.[0], 'The character image'),
+            motion_video_id: need(req.sourceVideo, 'The source clip'),
+            resolution: req.resolution === '1080p' ? '1080p' : '720p',
+            scene_control: req.cloneBackground === 'image' ? 'image' : 'video',
+          }),
+        }, 'submit')
+        const r = submitted(value)
+        if (r.jobId) return { jobId: r.jobId, raw: value }
+        if (r.problem) throw new ProviderError(r.problem, { retryable: false, submitted: 'no' })
+        throw new ProviderError('Higgsfield answered the clone without a job id. It may have started the job; check your Higgsfield history.', { retryable: false, submitted: 'unknown' })
       }
       // use_unlim is always sent, and always false: the plan's credits pay.
       const params = { ...accountParams(entry, req), use_unlim: false }

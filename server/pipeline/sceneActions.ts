@@ -54,7 +54,7 @@ const dedupe = (list: RealismWarning[]): RuleViolation[] => {
   return [...seen.values()]
 }
 
-function lintOrThrow(violations: RuleViolation[], label: string): RuleViolation[] {
+export function lintOrThrow(violations: RuleViolation[], label: string): RuleViolation[] {
   const errors = blocking(violations)
   if (errors.length) throw new AppError('prompt_rejected', `${label}: ${errors.map(e => `${e.title} (SPEC ${e.spec})`).join('; ')}`, errors)
   return violations.filter(v => v.severity === 'warning')
@@ -69,7 +69,7 @@ function modelEntry(deps: Deps, ref: string): ModelEntry {
 // The model that runs (the mock in demo mode) and the Higgsfield billing
 // path. A model the API does not offer runs on the owner's account, which
 // must be connected (DECISIONS E5).
-async function runModel(deps: Deps, ctx: Ctx, model: string, kind: GenRequest['kind']): Promise<{ model: string; billing?: 'account' }> {
+export async function runModel(deps: Deps, ctx: Ctx, model: string, kind: GenRequest['kind']): Promise<{ model: string; billing?: 'account' }> {
   const live = (await providerMode(deps.db, ctx.accountId)) === 'live'
   if (!live) return { model: (await forMode(deps, ctx, { model, kind })).model }
   const entry = modelEntry(deps, model)

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { Clapperboard, Film, Images, Wand2, X } from 'lucide-react'
 import { assetUrl } from '../../api'
 import { ClipGrid, ClipUpload, LibraryDrawer } from '../../library'
@@ -6,12 +7,15 @@ import { Callout, Field } from '../../ui'
 import type { BatchSpec, BrollTiming, LibraryClip, MemeSpec } from '../../types'
 import { VideoSection } from '../character/VideoSection'
 import { BrollPicker } from './parts'
+import { ClonePanel } from './ClonePanel'
 import type { PostCtx } from './ctx'
 
 // The Video step. A video post gets its clip four ways, all right here:
-// a video from a still (takes; picking one keeps it), clone a TikTok or Reel
-// (next), upload a video, or pick one from the Library drawer. A batch
-// picks several clips, rotated across its captions. B-roll is optional.
+// a video from a still (takes; picking one keeps it), clone a TikTok or
+// Reel, upload a video, or pick one from the Library drawer. A batch picks
+// several clips, rotated across its captions (clones of its character can
+// be added too). B-roll is optional. "?clone=1" opens the clone option
+// ("New post from a TikTok").
 
 export function videoSummary(ctx: PostCtx) {
   if (ctx.item.kind === 'batch') {
@@ -25,7 +29,7 @@ export function videoSummary(ctx: PostCtx) {
   return clip ? `${clip.title}${broll ? `, then B-roll: ${broll.title}` : ''}` : 'No clip yet'
 }
 
-type Way = 'animate' | 'library'
+type Way = 'animate' | 'clone'
 
 export function VideoStep({ ctx }: { ctx: PostCtx }) {
   return ctx.item.kind === 'batch' ? <BatchClips ctx={ctx} /> : <PostClip ctx={ctx} />
@@ -37,7 +41,8 @@ function PostClip({ ctx }: { ctx: PostCtx }) {
   const clips = lib?.clips ?? []
   const clip = clips.find(c => c.id === spec.clipId) ?? null
   const hasStills = !!scene?.candidates.some(c => c.media === 'image' && c.assetId)
-  const [way, setWay] = useState<Way | null>(spec.stillId || (hasStills && !clip) ? 'animate' : null)
+  const [params] = useSearchParams()
+  const [way, setWay] = useState<Way | null>(params.get('clone') || (spec.clone && !clip) ? 'clone' : spec.stillId || (hasStills && !clip) ? 'animate' : null)
   // A still picked in the Stills step opens "Make a video from a still" here.
   useEffect(() => { if (spec.stillId && !spec.clipId) setWay('animate') }, [spec.stillId]) // eslint-disable-line react-hooks/exhaustive-deps
   const [changing, setChanging] = useState(false)
@@ -63,7 +68,7 @@ function PostClip({ ctx }: { ctx: PostCtx }) {
         <>
           <div className="st-ways">
             <button type="button" className={`st-way ${way === 'animate' ? 'on' : ''}`} onClick={() => setWay(w => (w === 'animate' ? null : 'animate'))}><Wand2 size={18} /><b>Make a video from a still</b><span className="st-hint">Real video starting from your photo (Kling, Seedance...)</span></button>
-            <button type="button" className="st-way" disabled title="Clone Video is the next update"><Clapperboard size={18} /><b>Clone a TikTok or Reel</b><span className="st-hint">Next update</span></button>
+            <button type="button" className={`st-way ${way === 'clone' ? 'on' : ''}`} onClick={() => setWay(w => (w === 'clone' ? null : 'clone'))}><Clapperboard size={18} /><b>Clone a TikTok or Reel</b><span className="st-hint">Same motion and camera, with {name}</span></button>
             {item.characterId && (
               <div className="st-way as-upload">
                 <Film size={18} /><b>Upload a video</b><span className="st-hint">Any video file</span>
@@ -77,6 +82,7 @@ function PostClip({ ctx }: { ctx: PostCtx }) {
               : !hasStills ? <Callout tone="info">No stills in this post yet. Make one in the Stills step above, then make the video from it here.</Callout>
               : <VideoSection v={v} data={scenes} scene={scene} startId={spec.stillId} setStartId={id => draft.setSpec({ stillId: id })} onUseTake={use} usedId={spec.clipId} />
           )}
+          {way === 'clone' && <ClonePanel ctx={ctx} onUse={use} usedIds={spec.clipId ? [spec.clipId] : []} />}
         </>
       )}
       <Field id="post-broll" label="B-roll (optional)" group hint="A screen recording or phone video, cut in hard before or after the clip.">
@@ -99,6 +105,8 @@ function BatchClips({ ctx }: { ctx: PostCtx }) {
   const spec = draft.spec as unknown as BatchSpec
   const ids = spec.clipIds ?? []
   const [library, setLibrary] = useState(false)
+  const [params] = useSearchParams()
+  const [cloning, setCloning] = useState(!!params.get('clone') || !!spec.clone)
   const picked = ids.map(id => lib?.clips.find(c => c.id === id)).filter((c): c is LibraryClip => !!c)
   const name = v?.data.name ?? 'this character'
   const toggle = (id: string) => { void ctx.advance('video', { clipIds: ids.includes(id) ? ids.filter(x => x !== id) : [...ids, id].slice(0, 20) }) }
@@ -110,9 +118,10 @@ function BatchClips({ ctx }: { ctx: PostCtx }) {
         <div className="st-row" style={{ gap: 8, flexWrap: 'wrap' }}>
           <button type="button" className="st-btn" onClick={() => setLibrary(true)}><Images size={15} />Pick from the Library</button>
           {item.characterId && <ClipUpload characterId={item.characterId} contentId={item.id} onUploaded={() => void ctx.advance('video')} />}
-          <button type="button" className="st-btn ghost" disabled title="Clone Video is the next update"><Clapperboard size={15} />Clone a TikTok or Reel (next update)</button>
+          <button type="button" className={`st-btn ${cloning ? '' : 'ghost'}`} aria-pressed={cloning} onClick={() => setCloning(c => !c)}><Clapperboard size={15} />Clone a TikTok or Reel</button>
         </div>
       </Field>
+      {cloning && <ClonePanel ctx={ctx} batch onUse={id => { if (!ids.includes(id)) toggle(id) }} usedIds={ids} />}
       <Field id="batch-broll" label="B-roll (optional)" group hint="Pick several to rotate them too.">
         <BrollPicker data={data} ids={spec.brollIds ?? []} multi onChange={next => draft.setSpec({ brollIds: next })} timing={spec} setTiming={(p: Partial<BrollTiming>) => draft.setSpec(p)} />
       </Field>

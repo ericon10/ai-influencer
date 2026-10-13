@@ -145,6 +145,9 @@ function NewPostButton() {
               <b>{label}</b><span className="st-hint">{hint}</span>
             </button>
           ))}
+          <button type="button" role="menuitem" onClick={() => { setOpen(false); void newPost.create('meme', { step: 'video' }, '?clone=1') }}>
+            <b>Video post from a TikTok</b><span className="st-hint">Clone a saved TikTok or Reel with your character</span>
+          </button>
         </div>
       )}
     </div>

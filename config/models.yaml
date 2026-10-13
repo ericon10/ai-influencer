@@ -224,6 +224,88 @@ models:
     use_for: [sfx]
     notes: Sound effects with a duration parameter; 12 s worked (verified live 2026-10-12). ElevenLabs flow SFX returned only 1 s clips. Not on the pay-per-use API (the official reference lists image and video only, 2026-10-13); runs through the Higgsfield account.
 
+  # ── Clone Video (SPEC 13.1 R1): a source clip rebuilt with a character ──
+  # Endpoints and fields from the official Model API Reference (read
+  # 2026-10-13). The provider never keeps the source's sound: the Studio
+  # puts it back itself when "Keep original sound" is on (free, the same for
+  # every model). `clone.background` says where the result's place comes
+  # from: the source clip ("video") or the character image ("image").
+  - ref: higgsfield/kling-3.0-motion-control
+    label: Kling 3.0 Motion Control
+    kinds: [video_clone]
+    max_refs: 1
+    api: false
+    endpoint: null
+    input_map: kling_motion_control
+    verified: false
+    # The account tool motion_control (its own tool, no prompt): image_id,
+    # motion_video_id, resolution 720p or 1080p, scene_control image or video
+    # (where the background comes from). Read from the connector 2026-10-13.
+    mcp_id: kling3_0_motion_control
+    mcp: { tool: motion_control, params: [resolution] }
+    clone: { background: [video, image], image_refs: 1, min_sec: 3, max_sec: 30, prompt: none }
+    aliases: [Kling 3.0 Motion Control, motion_control]
+    params: { resolution: [720p, 1080p] }
+    use_for: [video_clone]
+    notes: Your Higgsfield plan. The character follows the clip's motion and camera; the place comes from the clip or the character image.
+  - ref: higgsfield/kling-3.0-motion-control-pro
+    label: Kling 3.0 Motion Control Pro
+    kinds: [video_clone]
+    max_refs: 1
+    reference: https://docs.higgsfield.ai/docs/models/kling-3-motion-control/pro
+    endpoint: kling-video/v3/motion-control/pro
+    input_map: kling_motion_control
+    verified: false
+    clone: { background: [image], image_refs: 1, min_sec: 3, max_sec: 30, prompt: optional }
+    aliases: [Kling 3.0 Motion Control Pro]
+    notes: The character image sets the look and the place; the clip gives the motion and the camera. keep_original_sound is sent "no".
+  - ref: higgsfield/kling-3.0-motion-control-standard
+    label: Kling 3.0 Motion Control Standard
+    kinds: [video_clone]
+    max_refs: 1
+    reference: https://docs.higgsfield.ai/docs/models/kling-3-motion-control/std
+    endpoint: kling-video/v3/motion-control/std
+    input_map: kling_motion_control
+    verified: false
+    clone: { background: [image], image_refs: 1, min_sec: 3, max_sec: 30, prompt: optional }
+    aliases: [Kling 3.0 Motion Control Standard]
+  - ref: higgsfield/genjutsu-motion-transfer
+    label: Genjutsu motion transfer
+    kinds: [video_clone]
+    max_refs: 8
+    reference: https://docs.higgsfield.ai/docs/models/genjutsu/motion-transfer
+    endpoint: higgsfield/genjutsu/motion-transfer/v1.0
+    input_map: genjutsu_motion
+    verified: false
+    clone: { background: [image], image_refs: 8, min_sec: 4, max_sec: 30, prompt: optional }
+    aliases: [Genjutsu, Genjutsu motion transfer]
+    params: { resolution: [480p, 720p, 1080p] }
+    notes: Up to 8 character images, so several sheet shots can hold the face. The source must be at least 4 s; longer than 30 s is trimmed.
+  - ref: higgsfield/seedance-2.5-video-edit
+    label: Seedance 2.5 video edit
+    kinds: [video_clone]
+    max_refs: 30
+    reference: https://docs.higgsfield.ai/docs/models/seedance-2-5/video-edit
+    endpoint: bytedance/seedance-2.5/video-edit
+    input_map: seedance_video_edit
+    verified: false
+    clone: { background: [video], image_refs: 4, min_sec: 4, max_sec: 30, prompt: required }
+    aliases: [Seedance 2.5 video edit]
+    params: { resolution: [480p, 720p, 1080p] }
+    audio: off_switch
+    notes: Keeps the clip's place and swaps the person by prompt. generate_audio is sent false.
+  - ref: higgsfield/kling-o3-video-edit
+    label: Kling O3 video edit
+    kinds: [video_clone]
+    max_refs: 4
+    reference: https://docs.higgsfield.ai/docs/models/kling-o3/video-edit
+    endpoint: kling-video/o3/video-edit
+    input_map: kling_o3_edit
+    verified: false
+    clone: { background: [video], image_refs: 4, min_sec: 3, max_sec: 15.5, prompt: required }
+    aliases: [Kling O3 video edit]
+    notes: Keeps the clip's place and swaps the person by prompt. Sources from 3 to 15.5 s.
+
   # ── Mock (free, deterministic; tests and demo mode) ──
   - ref: mock/image
     label: Mock image
@@ -234,7 +316,7 @@ models:
     verified: true
   - ref: mock/video
     label: Mock video
-    kinds: [video, video_extend]
+    kinds: [video, video_extend, video_clone]
     max_refs: 0
     endpoint: mock
     input_map: mock

@@ -19,6 +19,7 @@ import { approveSceneCandidate, archiveScene, copyScene, createScene, cropCandid
 import { videoPrices } from '../pipeline/sceneActions.js'
 import { expectedVersion, readWorkerStatus } from '../jobs/workerStatus.js'
 import { addClip, libraryView } from '../pipeline/clips.js'
+import { addCloneSource, cloneOptions, keepClone, postClones, postFromClone, saveCloneModel } from '../pipeline/clone.js'
 import { jobViews } from '../jobs/jobView.js'
 import { POST_STEPS, addBroll, archiveBroll, archiveContent, contentView, createContent, duplicateContent, postScene, startRender, updateBroll, updateContent } from '../pipeline/content.js'
 import { rulesView, setRuleSwitch } from '../pipeline/rules.js'
@@ -550,6 +551,35 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
     requireRole(ctx, 'member')
     const body = parse(z.object({ uploadId: z.string().max(40), name: z.string().max(300), contentId: z.string().max(60).optional() }), await json(c))
     return c.json(await addClip(deps, ctx, { characterId: c.req.param('id'), ...body }), 201)
+  })
+  // Clone Video (SPEC 13.1 R1): the post's clip to clone, the models with
+  // their prices, the results, and what to do with one.
+  app.post('/content/:id/clone-source', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    const body = parse(z.object({ uploadId: z.string().max(40), name: z.string().max(300) }), await json(c))
+    return c.json(await addCloneSource(deps, ctx, { contentId: c.req.param('id'), ...body }), 201)
+  })
+  app.get('/content/:id/clone-options', async c => c.json(await cloneOptions(deps, c.get('ctx'), c.req.param('id'))))
+  app.get('/content/:id/clones', async c => c.json({ clones: await postClones(deps, c.get('ctx'), c.req.param('id')) }))
+  app.post('/clones/:id/keep', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    const body = parse(z.object({ acknowledge: z.boolean().default(false) }), await json(c))
+    return c.json(await keepClone(deps, ctx, c.req.param('id'), body.acknowledge))
+  })
+  app.post('/content/:id/clones/:cid/post', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    const body = parse(z.object({ acknowledge: z.boolean().default(false) }), await json(c))
+    return c.json(await postFromClone(deps, ctx, c.req.param('id'), c.req.param('cid'), body.acknowledge), 201)
+  })
+  app.put('/settings/clone-model', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    const body = parse(z.object({ model: z.string().max(80) }), await json(c))
+    await saveCloneModel(deps, ctx, body.model)
+    return c.json({ model: body.model })
   })
   app.post('/broll', async c => {
     const ctx = c.get('ctx')

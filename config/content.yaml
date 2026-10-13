@@ -46,3 +46,29 @@ slideshow:
 batch:
   max: 20
   default_count: 20
+
+# Clone Video (SPEC 13.1 R1; UX-PLAN.md: "Clone a TikTok or Reel" in the
+# Video step). A saved TikTok or Reel is rebuilt with the post's character,
+# or several at once (one quote, a line each). Every choice is a default.
+clone:
+  # Defaults that keep the clip's own place, so a clone from REF-00 alone
+  # is a full scene: Kling 3.0 Motion Control on your Higgsfield plan,
+  # Seedance 2.5 video edit on the API. The last pick is remembered.
+  model: higgsfield/seedance-2.5-video-edit
+  account_model: higgsfield/kling-3.0-motion-control
+  models:
+    - { ref: higgsfield/kling-3.0-motion-control, resolution: 720p }
+    - { ref: higgsfield/kling-3.0-motion-control-pro }
+    - { ref: higgsfield/kling-3.0-motion-control-standard }
+    - { ref: higgsfield/genjutsu-motion-transfer, resolution: 720p }
+    - { ref: higgsfield/seedance-2.5-video-edit, resolution: 720p }
+    - { ref: higgsfield/kling-o3-video-edit }
+  # The source clip: cut to max_seconds on arrival (with its sound, kept for
+  # "Keep original sound"); shorter than min_seconds is refused.
+  min_seconds: 3
+  max_seconds: 30
+  max_upload_mb: 200
+  max_characters: 5
+  # Off by default, like every video (owner ruling G1).
+  keep_sound: false
+

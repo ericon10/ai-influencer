@@ -168,6 +168,7 @@ export type StudioAction =
   | { type: 'scene_qa'; characterId: string; candidateId: string }
   | { type: 'content_slides'; characterId: string; contentId: string }
   | { type: 'content_captions'; characterId: string; contentId: string }
+  | { type: 'clone'; contentId: string; characterIds: string[]; model?: string; background?: 'video' | 'image'; looks: Record<string, string>; keepSound: boolean }
 
 // A run's live status (server/jobs/jobView.ts).
 export type JobPhase = 'waiting' | 'queued' | 'submitting' | 'working' | 'sent' | 'provider_queued' | 'generating' | 'downloading' | 'checking' | 'done' | 'failed' | 'canceled' | 'needs_attention'
@@ -234,10 +235,26 @@ export interface VideoPrice { model: string; label: string; display: string | nu
 export type ContentKind = 'meme' | 'slideshow' | 'batch'
 export interface BrollClip { id: string; title: string; product: string; status: 'processing' | 'ready' | 'failed'; error: string | null; assetId: string | null; durationSec: number | null; createdAt: string }
 export interface BrollTiming { order: 'clip_first' | 'broll_first'; brollStart: number; brollSeconds: number }
-export interface MemeSpec extends BrollTiming { clipId: string | null; stillId: string | null; brollId: string | null; caption: string }
+export interface MemeSpec extends BrollTiming { clipId: string | null; stillId: string | null; brollId: string | null; caption: string; clone: CloneSource | null }
 export interface SlideshowSpec { stillIds: string[]; topic: string; hook: string; slides: string[]; caption: string; hashtags: string[] }
 // A batch rotates its clips and B-roll across the captions.
-export interface BatchSpec extends BrollTiming { clipIds: string[]; brollIds: string[]; topic: string; count: number; captions: string[] }
+export interface BatchSpec extends BrollTiming { clipIds: string[]; brollIds: string[]; topic: string; count: number; captions: string[]; clone: CloneSource | null }
+
+// Clone Video (SPEC 13.1 R1): the post's saved TikTok or Reel, the models
+// with their prices, and the results.
+export interface CloneSource {
+  status: 'preparing' | 'ready' | 'failed'; name: string; uploadId: string | null; assetId: string | null
+  durationSec: number | null; hasAudio: boolean; trimmed: boolean; error: string | null
+}
+export interface CloneModel {
+  ref: string; label: string; resolution: string | null; background: Array<'video' | 'image'>; minSec: number; maxSec: number
+  path: 'account' | 'api'; note: string; display: string | null; verified: boolean; problem: string | null
+}
+export interface CloneOptions { model: string; models: CloneModel[]; seconds: number; maxCharacters: number; keepSound: boolean; minSeconds: number; maxSeconds: number; maxUploadMb: number }
+export interface CloneResult {
+  id: string; characterId: string; characterName: string; assetId: string | null; status: string; label: string
+  durationSec: number | null; error: string | null; findings: Array<{ code: string; severity: string; message: string }>; createdAt: string
+}
 export type PostStep = 'idea' | 'stills' | 'video' | 'text' | 'finish'
 export interface ContentOutputs {
   videoAssetId?: string; imageAssetIds?: string[]; videos?: Array<{ caption: string; assetId: string; clipId?: string; brollId?: string | null } | null>; zipAssetId?: string

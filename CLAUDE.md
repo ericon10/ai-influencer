@@ -157,6 +157,7 @@ the Studio; they are not creative limits on a character.
 | `src/studio/pages/Posts.tsx`, `Library.tsx`, `src/studio/library.tsx` | Posts home (account and character filters, Make another like this); the Library and its drawer |
 | `config/content.yaml`, `server/pipeline/content.ts`, `server/core/overlay.ts`, `server/media/meme.ts` | Posts on the server: idea, scene, account tag, step; B-roll; video posts, slideshows, batches (clips rotate); TikTok caption box (bundled fonts); renders free on the worker |
 | `server/pipeline/clips.ts` | Uploaded clips (kept clips of a character) and the Library view |
+| `server/pipeline/clone.ts`, `src/studio/pages/post/ClonePanel.tsx` | Clone Video (SPEC 13.1 R1, DECISIONS G18): the source clip with its sound, the run for one or more characters, free checks (face, skin, not the performer), original sound put back, results kept in Library > Clips |
 | `server/core/promptWriter.ts`, `src/studio/pages/character/PromptBox.tsx` | The prompt writer: Claude writes the final still or video prompt (editable above Generate); code adds the reference line, mark sides and REALISM |
 | `src/studio/pages/character/SceneStills.tsx`, `VideoSection.tsx`, `server/pipeline/videoAssets.ts`, `server/media/mask.ts` | A post's Stills (details, Write and generate, Use this still) and Video (takes, Use this take, upscale this take, end frame helper, clip QA) |
 | `server/core/qa/scene.ts` | Scene QA as advice: one-click fixes, the free mirror, face drift as a strong warning |

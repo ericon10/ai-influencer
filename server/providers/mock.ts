@@ -99,7 +99,7 @@ async function renderFromRef(ref: Buffer, aspect: string, prompt: string): Promi
   return sharp(await img.png().toBuffer()).composite([{ input: badge }]).png().toBuffer()
 }
 
-async function renderVideo(start: Buffer | null, seconds: number, prompt: string): Promise<Buffer> {
+export async function renderVideo(start: Buffer | null, seconds: number, prompt: string): Promise<Buffer> {
   const dir = await mkdtemp(join(tmpdir(), 'mock-video-'))
   try {
     const frame = join(dir, 'start.png')
@@ -134,6 +134,12 @@ export function createMockAdapter(opts: MockOptions): ProviderAdapter & { jobs: 
       kind = 'video'
       const start = req.startFrame ? await opts.loadAsset(req.startFrame.assetId) : null
       data = await renderVideo(start, req.durationSec ?? 5, req.prompt)
+    } else if (req.kind === 'video_clone') {
+      // Demo: the character image moves for the source clip's length (a real
+      // clone follows the clip's motion and camera).
+      kind = 'video'
+      const look = req.refs?.[0] ? await opts.loadAsset(req.refs[0].assetId) : null
+      data = await renderVideo(look, Math.max(1, Math.min(30, req.durationSec ?? 5)), req.prompt)
     } else if (req.kind === 'upscale' && req.sourceVideo) {
       // Demo: the same take comes back (a real upscale keeps the take too).
       kind = 'video'

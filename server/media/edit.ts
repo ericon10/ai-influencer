@@ -17,6 +17,12 @@ export async function stripAudio(input: string, out: string): Promise<void> {
   await ffmpeg(['-i', input, '-map', '0:v:0', '-c:v', 'copy', '-an', out])
 }
 
+// Puts a source clip's sound under a video, cut to the video's length
+// (Clone Video, "Keep original sound"). The picture is copied untouched.
+export async function muxSound(video: string, soundFrom: string, out: string): Promise<void> {
+  await ffmpeg(['-i', video, '-i', soundFrom, '-map', '0:v:0', '-map', '1:a:0', '-c:v', 'copy', '-c:a', 'aac', '-b:a', '160k', '-shortest', '-movflags', '+faststart', out])
+}
+
 export interface NormalizeTarget {
   width: number
   height: number

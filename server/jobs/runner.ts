@@ -45,9 +45,11 @@ export interface LlmJobRequest extends Omit<LlmRequest, 'images'> {
 // parentIndex: this job waits for another job in the same run (for example
 // QA on an image that does not exist yet). It is quoted and held up front,
 // and starts when its parent finishes, so no unquoted spend ever happens.
+// `characterId` names the character a job belongs to when one run covers
+// several (Clone Video across characters); otherwise the run's character.
 export type JobSpec =
-  | { type: 'gen'; stage: string; purpose: string; label: string; request: GenRequest; parentIndex?: number }
-  | { type: 'llm'; stage: string; purpose: string; label: string; request: LlmJobRequest; parentIndex?: number }
+  | { type: 'gen'; stage: string; purpose: string; label: string; request: GenRequest; parentIndex?: number; characterId?: string }
+  | { type: 'llm'; stage: string; purpose: string; label: string; request: LlmJobRequest; parentIndex?: number; characterId?: string }
 
 const ACTIVE: JobStatusName[] = ['waiting', 'queued', 'submitting', 'running', 'ingesting']
 
@@ -158,8 +160,9 @@ async function createJobs(deps: Deps, ctx: Ctx, input: { quoteId?: string; confi
       const id = newId('job')
       const parent = spec.parentIndex != null ? rows[spec.parentIndex] : undefined
       if (spec.parentIndex != null && !parent) throw new AppError('bad_request', 'A dependent job must come after its parent.')
+      const characterId = spec.characterId ?? input.characterId
       const [row] = await tx.insert(jobs).values({
-        id, accountId: ctx.accountId, userId: ctx.userId, characterId: input.characterId,
+        id, accountId: ctx.accountId, userId: ctx.userId, characterId,
         stage: spec.stage, purpose: spec.purpose, provider, model,
         kind: spec.type === 'gen' ? spec.request.kind : 'llm',
         request: parent ? { ...request, parentJobId: parent.id } : request,
@@ -167,7 +170,7 @@ async function createJobs(deps: Deps, ctx: Ctx, input: { quoteId?: string; confi
         estimateMicros: estimate, status: parent ? 'waiting' : 'queued', nextPollAt: parent ? null : deps.clock.now(),
       }).returning()
       await appendLedger(tx as unknown as Db, [{
-        accountId: ctx.accountId, userId: ctx.userId, characterId: input.characterId, jobId: id, quoteId: quote.id,
+        accountId: ctx.accountId, userId: ctx.userId, characterId, jobId: id, quoteId: quote.id,
         stage: spec.stage, provider, model, entryType: 'hold', amountMicros: estimate,
         priceVersion: quotedItems[i]?.priceVersion, source: 'estimate', note: spec.label,
         ...(credits != null ? { quantity: credits, unit: 'credit' } : {}),

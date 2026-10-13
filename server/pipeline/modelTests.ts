@@ -10,8 +10,8 @@ import { formatUsd } from '../costs/money.js'
 import { hardWrap } from '../core/text.js'
 import { lintPrompt, blocking, type RuleViolation } from '../core/rules.js'
 import { finalizeImagePrompt } from '../core/realism.js'
-import { renderPlaceholderPortrait } from '../providers/mock.js'
-import { saveAsset } from '../storage/assets.js'
+import { renderPlaceholderPortrait, renderVideo } from '../providers/mock.js'
+import { readAsset, saveAsset } from '../storage/assets.js'
 import type { JobSpec } from '../jobs/runner.js'
 import type { JobOutcome, JobRow } from '../jobs/hooks.js'
 import { effectiveModel, MODEL_OVERRIDES_KEY, readModelOverrides, type ModelOverrides } from '../providers/modelOverrides.js'
@@ -30,6 +30,7 @@ const PROMPTS = {
   image: 'A plain white ceramic mug on a wooden table, soft daylight, simple photo.',
   video: 'The scene holds still while the camera pushes in slowly. Calm, no people moving. Silent, no audio, no dialogue.',
   audio: 'Soft rain on a window, steady, no music.',
+  clone: 'The person in the reference image performs the motion of the source video: the same timing and camera. Calm, simple. Silent, no audio, no dialogue.',
 }
 
 export interface BuiltModelTest {
@@ -59,6 +60,17 @@ export async function buildModelTest(deps: Deps, ctx: Ctx, modelRef: string): Pr
     const frame = await testImage(deps, ctx)
     const minDuration = first<number>(entry.params.duration_sec)
     request = { kind: 'video', model: entry.ref, prompt: PROMPTS.video, startFrame: { assetId: frame }, durationSec: Math.min(5, minDuration ?? 5), resolution, audio: false, modelTest: true }
+  } else if (kind === 'video_clone') {
+    // Clone Video: the test portrait as the character and a short motion
+    // clip made from it as the source (4 s, the shortest every clone model
+    // takes). A provider that wants a real person in the source fails the
+    // test without charging; a real clone run also confirms the model.
+    const frame = await testImage(deps, ctx)
+    const sourceVideo = { assetId: await testClip(deps, ctx, frame) }
+    request = {
+      kind: 'video_clone', model: entry.ref, prompt: entry.clone?.prompt === 'none' ? '' : PROMPTS.clone, refs: [{ assetId: frame }], sourceVideo,
+      durationSec: 4, resolution, audio: false, cloneBackground: entry.clone?.background[0] ?? 'image', modelTest: true,
+    }
   } else if (kind === 'upscale') {
     request = { kind: 'upscale', model: entry.ref, prompt: 'Upscale, keep every detail identical.', refs: [{ assetId: await testImage(deps, ctx) }], resolution, scale: 2, modelTest: true }
   } else if (kind === 'audio') {
@@ -81,6 +93,17 @@ export async function buildModelTest(deps: Deps, ctx: Ctx, modelRef: string): Pr
 // A small neutral frame for video and upscale tests.
 async function testImage(deps: Deps, ctx: Ctx): Promise<string> {
   return saveTestImage(deps, ctx, await renderPlaceholderPortrait('Model test'), 'Model test frame')
+}
+
+// The motion clip for a clone model test, made once per account and found
+// again by its label (so the estimate and the run name the same asset).
+async function testClip(deps: Deps, ctx: Ctx, frameAssetId: string): Promise<string> {
+  const label = 'Model test motion clip'
+  const [found] = await deps.db.select({ id: assets.id }).from(assets)
+    .where(and(eq(assets.accountId, ctx.accountId), eq(assets.label, label), eq(assets.origin, 'fixture'), isNull(assets.archivedAt))).limit(1)
+  if (found) return found.id
+  const { data } = await readAsset(deps, ctx, frameAssetId)
+  return (await saveAsset(deps, ctx, { data: await renderVideo(data, 4, 'Model test'), mime: 'video/mp4', origin: 'fixture', label })).id
 }
 
 // Test images are stored once per account and found again by content, so the

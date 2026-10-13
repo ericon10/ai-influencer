@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { and, eq, inArray } from 'drizzle-orm'
 import { candidates } from '../db/schema.js'
 import type { Ctx, Deps } from '../context.js'
@@ -17,6 +18,7 @@ export interface IdentityResult {
 }
 
 const fmt = (x: number) => x.toFixed(2)
+const sha256 = (b: Buffer) => createHash('sha256').update(b).digest('hex')
 
 async function analyzeAsset(deps: Deps, ctx: Ctx, assetId: string): Promise<FaceAnalysis | null> {
   const { row, data } = await readAsset(deps, ctx, assetId)
@@ -154,5 +156,34 @@ export async function scoreSceneIdentity(deps: Deps, ctx: Ctx, input: { assetId:
   } catch (e) {
     ctx.log.warn({ err: (e as Error).message }, 'scene identity check failed')
     return { findings: [{ code: 'uncertain', severity: 'warn', message: `Face matching failed (${(e as Error).message}). Check the face yourself.` }], identity: null }
+  }
+}
+
+// Clone Video: the result must be the character, never the person in the
+// source clip (fixed: a new person, never a copy). Each result frame is
+// compared with the source frame at the same moment.
+export async function scorePerformer(deps: Deps, ctx: Ctx, input: { pairs: Array<{ result: Buffer; source: Buffer }>; name: string; demo?: boolean }): Promise<IdentityResult> {
+  const skip = (message: string): IdentityResult => ({ findings: [{ code: 'identity_skipped', severity: 'info', message }], identity: null })
+  if (input.demo) return skip(DEMO)
+  const unavailable = await facesReady(deps)
+  if (unavailable) return skip(`Face matching is off, so the clone was not compared with the person in the source clip: ${unavailable}`)
+  const threshold = deps.config.pipeline.review.qa.distinctness_max_similarity
+  try {
+    let worst: number | null = null
+    for (const p of input.pairs) {
+      const [r, s] = [await deps.faces.analyze(p.result, sha256(p.result)), await deps.faces.analyze(p.source, sha256(p.source))]
+      if (!r || !s) continue
+      const score = cosineSimilarity(r.embedding, s.embedding)
+      if (worst == null || score > worst) worst = score
+    }
+    if (worst == null) return skip('No face showed in both the clone and the source clip at the same moment, so they were not compared. Check the face yourself.')
+    const identity: IdentityScore = { kind: 'distinctness', score: worst, threshold, against: 'the source clip' }
+    if (worst >= threshold) {
+      return { identity, findings: [{ code: 'too_similar', severity: 'fail', message: `This looks like the person in the source clip (match ${fmt(worst)}, must stay under ${fmt(threshold)}), not ${input.name}. A clone must be the character, so it is not kept. Try another model or a clearer character image.` }] }
+    }
+    return { identity, findings: [{ code: 'identity_match', severity: 'info', message: `Not the person in the source clip (match ${fmt(worst)}).` }] }
+  } catch (e) {
+    ctx.log.warn({ err: (e as Error).message }, 'performer check failed')
+    return { findings: [{ code: 'uncertain', severity: 'warn', message: `Comparing with the source clip failed (${(e as Error).message}). Check the face yourself.` }], identity: null }
   }
 }

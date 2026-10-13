@@ -727,3 +727,37 @@ changes what the Studio suggests and checks, never what the owner types.
   is out of view. A failure says what happened in plain words, whether
   anything was charged, offers a priced Retry, and keeps the provider's
   message under Details. Activity shows the same rows.
+
+### G18. Clone Video in the Video step (owner; SPEC 13.1 R1)
+- "Clone a TikTok or Reel" is the Video step's second way (UX-PLAN.md),
+  also in a batch's Clips step, and "Video post from a TikTok" in the New
+  post menu opens it directly. The owner chooses the saved file (no
+  scrapers); the worker keeps a lean copy with its sound, cut to 30 s; a
+  clip under 3 s is refused.
+- One run clones for the post's character and any others picked (up to
+  5): one quote with a line per character. Each result is a kept clip of
+  its character in Library > Clips (op `clone`). "Use this clip" puts the
+  post's own one in the post; another character's opens as a new video
+  post at the Caption step ("Make a video post").
+- Models (official Model API Reference, read 2026-10-13): Kling 3.0 Motion
+  Control on the owner's plan (the motion_control tool; the place from the
+  clip or the image), Kling 3.0 Motion Control Pro and Standard and
+  Genjutsu motion transfer (the place from the character image),
+  Seedance 2.5 video edit and Kling O3 video edit (the clip's place, the
+  person swapped by prompt). Defaults keep the clip's place, so REF-00
+  alone makes a full scene: Kling 3.0 Motion Control on the plan,
+  Seedance 2.5 video edit on the API. The last pick is remembered.
+  Prices are placeholders, set high and shown as not confirmed, until a
+  run shows them; a real clone that finishes on the API also counts as
+  the model's one paid test.
+- The provider never keeps the source's sound. "Original sound" (off by
+  default) puts it back on the worker, free; the post's MP4 keeps a
+  clip's sound, with silence under B-roll. Every other clip stays silent.
+- Free checks on every clone: the face against REF-00 (face drift is a
+  strong warning; "Use this clip" asks first), the skin against REF-00,
+  and that the result is not the person in the source clip at the same
+  moments. A copy of the performer breaks a fixed rule (a new person,
+  never a copy), so it is not kept and cannot be used.
+- Prompts (the models that take one) carry the character's REALISM
+  block and say the result must be the character, never the performer.
+

@@ -59,7 +59,7 @@ export async function liveRoute(deps: Deps, ctx: Ctx, task: string): Promise<Rou
 export async function forMode(deps: Deps, ctx: Ctx, route: Route): Promise<Route> {
   if ((await providerMode(deps.db, ctx.accountId)) === 'live') return route
   const isLlm = deps.config.models.llm_models.some(m => m.ref === route.model)
-  const isVideo = route.kind === 'video' || route.kind === 'video_extend'
+  const isVideo = route.kind === 'video' || route.kind === 'video_extend' || route.kind === 'video_clone'
   return { ...route, model: isLlm ? deps.config.routing.mock.llm : isVideo ? deps.config.routing.mock.video : deps.config.routing.mock.image }
 }
 

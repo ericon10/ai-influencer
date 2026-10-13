@@ -25,7 +25,9 @@ export function useMe() {
 }
 
 const ACTIVE = ['waiting', 'queued', 'submitting', 'running', 'ingesting', 'needs_attention']
-export const isActiveJob = (j: { status: string }) => ACTIVE.includes(j.status)
+// A job is settled before its free checks run (phase "checking"), and its
+// result appears only after them, so it still counts as running until then.
+export const isActiveJob = (j: { status: string; phase?: string }) => ACTIVE.includes(j.status) || j.phase === 'checking'
 
 // Everything running, and what finished in the last 15 minutes: the live
 // status in each step and in Activity. Polls fast while anything runs.
@@ -116,7 +118,7 @@ export function useContent() {
   const qc = useQueryClient()
   const active = useActiveJobs()
   // Claude writing slides or captions, a render, or a B-roll upload.
-  const busy = (active.data?.jobs ?? []).some(j => /^(content_slides|content_captions|content_render|broll_ingest|clip_ingest):/.test(j.purpose))
+  const busy = (active.data?.jobs ?? []).some(j => /^(content_slides|content_captions|content_render|broll_ingest|clip_ingest|clone_source):/.test(j.purpose))
   const wasBusy = useRef(false)
   useEffect(() => {
     if (wasBusy.current && !busy) qc.invalidateQueries({ queryKey: keys.content })
@@ -134,7 +136,7 @@ export function useContent() {
 export function useLibrary(characterId: string | null = null) {
   const qc = useQueryClient()
   const active = useActiveJobs()
-  const busy = (active.data?.jobs ?? []).some(j => /^(clip_ingest|scene|scene_edit|scene_upscale|scene_video|scene_video_upscale|drift_lock):/.test(j.purpose))
+  const busy = (active.data?.jobs ?? []).some(j => /^(clip_ingest|scene|scene_edit|scene_upscale|scene_video|scene_video_upscale|drift_lock|clone):/.test(j.purpose))
   const wasBusy = useRef(false)
   useEffect(() => {
     if (wasBusy.current && !busy) qc.invalidateQueries({ queryKey: ['library'] })
@@ -145,6 +147,19 @@ export function useLibrary(characterId: string | null = null) {
     queryFn: () => api.library(characterId),
     refetchInterval: q => (busy || q.state.data?.clips.some(c => c.status === 'generating') ? 2000 : false),
   })
+}
+
+// A post's clones (Clone Video): looks again when one of its clone runs ends.
+export function useClones(contentId: string) {
+  const qc = useQueryClient()
+  const active = useActiveJobs()
+  const busy = (active.data?.jobs ?? []).some(j => j.purpose.startsWith(`clone:${contentId}:`))
+  const wasBusy = useRef(false)
+  useEffect(() => {
+    if (wasBusy.current && !busy) { qc.invalidateQueries({ queryKey: ['clones', contentId] }); qc.invalidateQueries({ queryKey: ['library'] }) }
+    wasBusy.current = busy
+  }, [busy, qc, contentId])
+  return useQuery({ queryKey: ['clones', contentId], queryFn: () => api.clones(contentId), refetchInterval: busy ? 3000 : false })
 }
 
 export function useRules(characterId: string | null) {

@@ -32,7 +32,7 @@ function line(label: string, quantity: number, unit: string, entry: PriceEntry):
 export class PriceMissingError extends Error {}
 
 function genUnit(req: GenRequest): { unit: PriceEntry['unit']; quantity: number; label: string } {
-  if (req.kind === 'video' || req.kind === 'video_extend') {
+  if (req.kind === 'video' || req.kind === 'video_extend' || req.kind === 'video_clone') {
     const seconds = req.durationSec ?? 5
     return { unit: 'second', quantity: seconds, label: `${seconds}s of video` }
   }
@@ -58,7 +58,7 @@ export function estimateGen(cfg: StudioConfig, req: GenRequest, pb: PriceBook = 
 // the real clip length). Failed and filtered runs are refunded by providers,
 // so they cost zero.
 export function actualGen(cfg: StudioConfig, req: GenRequest, outputs: Output[], pb: PriceBook = cfg.pricebook): CostEstimate {
-  if ((req.kind === 'video' || req.kind === 'video_extend') && outputs[0]?.durationSec) {
+  if ((req.kind === 'video' || req.kind === 'video_extend' || req.kind === 'video_clone') && outputs[0]?.durationSec) {
     return estimateGen(cfg, { ...req, durationSec: Math.round(outputs[0].durationSec * 10) / 10 }, pb)
   }
   return estimateGen(cfg, req, pb)

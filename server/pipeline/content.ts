@@ -104,6 +104,19 @@ async function runBrollIngest(deps: Deps, ctx: Ctx, job: JobRow): Promise<unknow
 // ── Content items: drafts, edits, renders ───────────────────────────
 
 const id = z.string().max(60)
+// Clone Video's source clip (SPEC 13.1 R1), prepared by the worker from an
+// upload and kept with its sound so "Keep original sound" can put it back.
+const cloneSource = z.object({
+  status: z.enum(['preparing', 'ready', 'failed']),
+  name: z.string().max(300),
+  uploadId: z.string().max(40).nullable().default(null),
+  assetId: id.nullable().default(null),
+  durationSec: z.number().nullable().default(null),
+  hasAudio: z.boolean().default(false),
+  trimmed: z.boolean().default(false),
+  error: z.string().max(500).nullable().default(null),
+})
+export type CloneSource = z.infer<typeof cloneSource>
 const memeSpec = z.object({
   clipId: id.nullable().default(null),
   // The still the clip was made from, when it was made in this post.
@@ -113,6 +126,7 @@ const memeSpec = z.object({
   brollStart: z.number().min(0).max(600).default(0),
   brollSeconds: z.number().min(0.5).max(60).default(6),
   caption: z.string().max(400).default(''),
+  clone: cloneSource.nullable().default(null),
 })
 const slideshowSpec = z.object({
   stillIds: z.array(id).max(20).default([]),
@@ -134,6 +148,7 @@ const batchObject = z.object({
   topic: z.string().max(400).default(''),
   count: z.number().int().min(1).max(50).default(20),
   captions: z.array(z.string().max(400)).max(50).default([]),
+  clone: cloneSource.nullable().default(null),
 })
 const batchSpec = z.preprocess(raw => {
   if (!raw || typeof raw !== 'object') return raw
@@ -361,8 +376,10 @@ async function renderVideo(deps: Deps, ctx: Ctx, job: JobRow, s: Pick<MemeSpec, 
     if (broll?.assetId) await writeFile(b, (await readAsset(deps, ctx, broll.assetId)).data)
     const overlay = await captionPng(caption, cfg)
     await writeFile(cap, overlay.png)
+    // A clip only has sound when the owner kept it (a clone with "Keep
+    // original sound"); every other clip is stored silent.
     await renderMeme({
-      clip, caption: cap, out, canvas: cfg.canvas, order: s.order, maxClipSeconds: cfg.meme.max_clip_seconds,
+      clip, caption: cap, out, canvas: cfg.canvas, order: s.order, maxClipSeconds: cfg.meme.max_clip_seconds, keepSound: true,
       broll: broll?.assetId ? { path: b, startSec: s.brollStart, seconds: Math.min(s.brollSeconds, cfg.meme.max_broll_seconds) } : null,
     })
     const asset = await saveAsset(deps, ctx, { data: await readFile(out), mime: 'video/mp4', origin: 'derived', label, sourceJobId: job.id })

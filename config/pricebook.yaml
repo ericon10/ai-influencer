@@ -34,6 +34,18 @@ entries:
   # The video upscaler has no cost preflight: placeholder credits per second
   # of video, set high on purpose until its first run shows the charge.
   - { provider: higgsfield, model: video-upscale, unit: second, price: 0.10, verified: false, credits: 2, source: "Placeholder. Higgsfield's video upscaler has no price preflight." }
+  # Clone Video, per second of the source clip (the output follows it).
+  # Placeholders, set high on purpose: the official pricing page was not
+  # reachable from the build sandbox (2026-10-13). Each model's paid test
+  # confirms its price. Kling 3.0 image to video is $0.063/s (Standard) and
+  # $0.084/s (Pro), so motion control is expected near those.
+  - { provider: higgsfield, model: kling-3.0-motion-control, unit: second, price: 0.12, verified: false, credits: 2, when: { resolution: 720p }, source: "Placeholder credits per second at 720p, set high until the first run shows the charge (motion_control has no price preflight)." }
+  - { provider: higgsfield, model: kling-3.0-motion-control, unit: second, price: 0.16, verified: false, credits: 3, source: "Placeholder credits per second at 1080p." }
+  - { provider: higgsfield, model: kling-3.0-motion-control-pro, unit: second, price: 0.11, verified: false, source: "Placeholder near Kling 3.0 Pro image to video ($0.084/s)." }
+  - { provider: higgsfield, model: kling-3.0-motion-control-standard, unit: second, price: 0.08, verified: false, source: "Placeholder near Kling 3.0 Standard image to video ($0.063/s)." }
+  - { provider: higgsfield, model: genjutsu-motion-transfer, unit: second, price: 0.15, verified: false, source: "Placeholder." }
+  - { provider: higgsfield, model: seedance-2.5-video-edit, unit: second, price: 0.25, verified: false, source: "Official pricing page: Seedance 2.5 video edit from $0.206/s (SPEC 13.1); placeholder above the starting tier." }
+  - { provider: higgsfield, model: kling-o3-video-edit, unit: second, price: 0.17, verified: false, source: "Placeholder." }
   # Audio, per second of sound.
   - { provider: higgsfield, model: mirelo-sfx, unit: second, price: 0.05, verified: false }
 

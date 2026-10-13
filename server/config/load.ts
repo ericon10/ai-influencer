@@ -8,7 +8,7 @@ import { pipelineSchemas, type PipelineConfig } from './pipeline.js'
 // /config, validated here at boot. A bad config file fails fast with the
 // file name and the offending path, instead of misbehaving at run time.
 
-const genKind = z.enum(['image', 'image_edit', 'video', 'video_extend', 'audio', 'train_identity', 'upscale'])
+const genKind = z.enum(['image', 'image_edit', 'video', 'video_extend', 'video_clone', 'audio', 'train_identity', 'upscale'])
 
 const modelsSchema = z.object({
   version: z.number(),
@@ -41,6 +41,20 @@ const modelsSchema = z.object({
       roles: z.object({ refs: z.string().optional(), start: z.string().optional(), end: z.string().optional(), mask: z.string().optional(), video: z.string().optional() }).default({}),
       // The param that turns on a masked edit (Nano Banana 2.1: is_inpaint).
       inpaint_param: z.string().optional(),
+      // A model with its own tool on the account path (motion_control)
+      // instead of the generate_* tools.
+      tool: z.string().optional(),
+    }).optional(),
+    // Clone Video (SPEC 13.1 R1): where the result's place comes from (the
+    // source clip, the character image, or either), how many character
+    // images it takes, the source length it accepts, and whether it takes
+    // a prompt.
+    clone: z.object({
+      background: z.array(z.enum(['video', 'image'])).min(1),
+      image_refs: z.number().int().min(1),
+      min_sec: z.number().positive(),
+      max_sec: z.number().positive(),
+      prompt: z.enum(['none', 'optional', 'required']),
     }).optional(),
     // Video and audio: whether a request can turn generated sound off.
     // always_on means the Studio strips the track on arrival instead.

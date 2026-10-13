@@ -24,6 +24,7 @@ import { approvedAssets, getCandidate, getCharacter, getRef, inspirationAssetIds
 import { buildSceneEndFrame, buildSceneIdeas, buildScenePlan, buildScenePromptWrite, buildSceneRecheck, buildSceneRun, buildSceneEdit, buildSceneUpscale, buildSceneVideo, buildVideoUpscale, type SceneBuilt } from './sceneActions.js'
 import { markSceneBusy, saveVideoModel } from './scenes.js'
 import { buildContentCaptions, buildContentSlides } from './content.js'
+import { buildClone, saveCloneModel } from './clone.js'
 import { ruleSwitches } from './rules.js'
 import { readBilling } from '../providers/billing.js'
 import { effectiveModel, readModelOverrides } from '../providers/modelOverrides.js'
@@ -95,6 +96,13 @@ export const actionSchema = z.discriminatedUnion('type', [
   // The content builder: Claude writes slideshow text, or batch captions.
   z.object({ type: z.literal('content_slides'), characterId: z.string(), contentId: z.string() }),
   z.object({ type: z.literal('content_captions'), characterId: z.string(), contentId: z.string() }),
+  // Clone Video (SPEC 13.1 R1): the post's source clip rebuilt for one or
+  // more characters, one quote with a line each.
+  z.object({
+    type: z.literal('clone'), contentId: z.string(), characterIds: z.array(z.string().max(60)).min(1).max(10),
+    model: z.string().max(80).optional(), background: z.enum(['video', 'image']).optional(),
+    looks: z.record(z.string().max(60), z.string().max(60)).default({}), keepSound: z.boolean().default(false),
+  }),
 ])
 
 export type StudioAction = z.infer<typeof actionSchema>
@@ -186,6 +194,7 @@ export async function buildAction(deps: Deps, ctx: Ctx, action: StudioAction): P
   if (action.type === 'model_test') return buildModelTest(deps, ctx, action.model)
   if (action.type === 'model_suite') return buildModelSuite(deps, ctx)
   if (action.type === 'retry') return buildRetry(deps, ctx, action.jobId)
+  if (action.type === 'clone') return buildClone(deps, ctx, action)
   const row = await getCharacter(deps, ctx, action.characterId)
   const ch = toData(row)
   const tpl = deps.config.pipeline.templates
@@ -432,6 +441,7 @@ async function afterStart(deps: Deps, ctx: Ctx, action: StudioAction, built: Bui
   }
   // The video model picked last is the next take's default.
   if (action.type === 'scene_video' && !action.test && action.model) await saveVideoModel(deps, ctx, action.model)
+  if (action.type === 'clone' && action.model) await saveCloneModel(deps, ctx, action.model)
   if (action.type === 'hero') {
     const row = await getCharacter(deps, ctx, action.characterId)
     if (row.stage < 3) await setCharacterFields(deps, ctx, row.id, { stage: 3 })

@@ -1,4 +1,4 @@
-import type { ActionPreview, CharacterSummary, CharacterView, HiggsfieldAccount, JobView, Me, QuoteView, RulesView, SceneFields, ScenesData, SettingsView, StudioAction, Usage, VideoPrice, BrollClip, ContentData, ContentKind, LibraryData, PostStep, WorkerStatus } from './types'
+import type { ActionPreview, CharacterSummary, CharacterView, HiggsfieldAccount, JobView, Me, QuoteView, RulesView, SceneFields, ScenesData, SettingsView, StudioAction, Usage, VideoPrice, BrollClip, ContentData, ContentKind, LibraryData, PostStep, WorkerStatus, CloneOptions, CloneResult } from './types'
 import { sheetRefOf, typeOf, uploadFiles } from './files'
 
 // Thin client for /api/v1. Every write sends the CSRF header the server
@@ -98,6 +98,17 @@ export const api = {
     const [up] = await uploadFiles([file], onProgress)
     return request<{ id: string }>('POST', `/characters/${characterId}/clips`, { uploadId: up!.uploadId, name: file.name, ...(contentId ? { contentId } : {}) })
   },
+  // Clone Video: the saved TikTok or Reel goes up, the worker keeps a lean
+  // copy with its sound; then the models with prices, and the results.
+  addCloneSource: async (contentId: string, file: File, onProgress?: (done: number, total: number) => void) => {
+    const [up] = await uploadFiles([file], onProgress)
+    return request<{ ok: true }>('POST', `/content/${contentId}/clone-source`, { uploadId: up!.uploadId, name: file.name })
+  },
+  cloneOptions: (contentId: string) => request<CloneOptions>('GET', `/content/${contentId}/clone-options`),
+  clones: (contentId: string) => request<{ clones: CloneResult[] }>('GET', `/content/${contentId}/clones`),
+  keepClone: (id: string, acknowledge = false) => request<{ ok: true }>('POST', `/clones/${id}/keep`, { acknowledge }),
+  postFromClone: (contentId: string, cloneId: string, acknowledge = false) => request<{ id: string }>('POST', `/content/${contentId}/clones/${cloneId}/post`, { acknowledge }),
+  setCloneModel: (model: string) => request<{ model: string }>('PUT', '/settings/clone-model', { model }),
   archiveContent: (id: string) => request<{ ok: true }>('DELETE', `/content/${id}`),
   renderContent: (id: string) => request<{ id: string; status: string }>('POST', `/content/${id}/render`, {}),
   archiveScene: (sceneId: string) => request<{ ok: true }>('DELETE', `/scenes/${sceneId}`),

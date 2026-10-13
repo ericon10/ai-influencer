@@ -135,6 +135,7 @@ const templatesSchema = z.object({
   scene_plan: z.object({ system: z.string(), prompt: z.string() }),
   scene_ideas: z.object({ system: z.string(), prompt: z.string() }),
   video: z.object({ base: z.string(), silent: z.string(), end_frame: z.string() }),
+  clone: z.object({ swap: z.string(), image: z.string() }),
   content_slides: z.object({ system: z.string(), prompt: z.string() }),
   content_captions: z.object({ system: z.string(), prompt: z.string() }),
   prompt_writer: z.object({
@@ -230,6 +231,16 @@ const contentSchema = z.object({
   broll: z.object({ max_upload_mb: z.number().positive(), max_seconds: z.number().positive(), products: z.array(z.string()).default([]) }),
   slideshow: z.object({ slides: z.tuple([z.number().int().positive(), z.number().int().positive()]), hashtags: z.tuple([z.number().int().min(0), z.number().int().positive()]), max_stills: z.number().int().positive(), image: z.object({ quality: z.number().int().min(50).max(100) }) }),
   batch: z.object({ max: z.number().int().positive(), default_count: z.number().int().positive() }),
+  clone: z.object({
+    model: z.string(),
+    account_model: z.string(),
+    models: z.array(z.object({ ref: z.string(), resolution: z.string().optional() })).min(1),
+    min_seconds: z.number().positive(),
+    max_seconds: z.number().positive(),
+    max_upload_mb: z.number().positive(),
+    max_characters: z.number().int().positive(),
+    keep_sound: z.boolean(),
+  }),
 })
 
 export const pipelineSchemas = {

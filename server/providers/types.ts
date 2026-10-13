@@ -2,7 +2,7 @@
 // production runner needs: capabilities, submit options, webhook handling,
 // error classification, and a free credentials check.
 
-export type GenKind = 'image' | 'image_edit' | 'video' | 'video_extend' | 'audio' | 'train_identity' | 'upscale'
+export type GenKind = 'image' | 'image_edit' | 'video' | 'video_extend' | 'video_clone' | 'audio' | 'train_identity' | 'upscale'
 
 export interface AssetRef {
   assetId: string
@@ -47,6 +47,12 @@ export interface GenRequest {
   modelTest?: true
   // Upscale factor for kind "upscale" (SPEC 5.1 rule 6: 2x, never more).
   scale?: 2
+  // Clone Video: where the result's place comes from, the source clip
+  // ("video") or the character image ("image").
+  cloneBackground?: 'video' | 'image'
+  // Clone Video, "Keep original sound": the source clip's sound is put back
+  // onto the result on the worker (free). Never sent to a provider.
+  keepSourceSound?: boolean
   // A still that waits for the prompt writer ("Write and generate"): its
   // prompt is rebuilt from the written text for this scene model when the
   // writer finishes. Never sent to a provider.

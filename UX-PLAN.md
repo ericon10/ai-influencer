@@ -3,8 +3,8 @@
 Status: APPROVED by the owner (2026-10-13), with the decisions in section 0.
 Built (the refactor, step 2 of section 7): every page below exists, the old
 addresses redirect, and the click counts in section 6 were measured in the
-browser in demo mode. Clone Video is the next step. Every new feature must
-fit this plan or update it first.
+browser in demo mode. Clone Video is built too (step 3 of section 7,
+DECISIONS G18). Every new feature must fit this plan or update it first.
 
 Wireframes: `docs/studio/ux/` (rough, grayscale; numbers match section 4).
 
@@ -278,7 +278,7 @@ extra still), batch **9** with one uploaded clip and one from the Library
 | Flow | Before | Plan | How the plan saves clicks |
 |---|---|---|---|
 | **Video post from an idea** (still > take > caption > MP4) | 18 clicks, 3 pages | **8**, 1 page | No page changes; "Write and generate"; the video prompt is written when a still is used; picking a take keeps it; the clip and caption steps are already open below |
-| **Video post from a TikTok** (clone > caption > MP4) | not possible | **8**, 1 page | "New post from a TikTok" opens the clone option directly; the character comes from the post |
+| **Video post from a TikTok** (clone > caption > MP4) | not possible | **8** planned; **7** measured (8 with a Confirm), 1 page | "New post from a TikTok" opens the clone option directly; the character comes from the post |
 | **Slideshow** (6 stills from the Library > slides > JPEGs) | 15 (Content page, 6 picks, write, export, download) | **12**, 1 page | Multi-pick in the Library drawer adds all at once |
 | **Slideshow from an idea** (generate 6 stills > slides) | 20+, 3 pages | **9**, 1 page | Stills made in the Stills step are picked in place |
 | **Batch of 20** (clip > 20 captions > 20 MP4s) | 9 | **7**, 1 page | The clip picker in the Video step; captions written in place |
@@ -312,6 +312,11 @@ Two approved shortcuts make it 8 instead of 10:
 That's 6 at the least, and 8 if I change the model or add a second
 character.
 
+Measured in the browser after Clone Video was built (demo mode): **7**
+(New post, Video post from a TikTok, Choose the video, Clone it, Use this
+clip, Export MP4, Download), and **8** when the price is over the confirm
+threshold (one Confirm click, the price-first rule).
+
 ---
 
 ## 7. Order of work after approval
@@ -322,7 +327,8 @@ character.
    with the four items folded in from section 0 (mole as the only fixed
    mark, batch clip rotation, "Make another like this", account tag). No
    other new features in this step.
-3. Clone Video in the Video step (upload, characters, model picker with
-   prices, original sound optional, result in Library > Clips).
+3. Done: Clone Video in the Video step (upload, characters, model picker
+   with prices, original sound optional, result in Library > Clips;
+   DECISIONS G18).
 4. The rest of Phase 3 (chaining, sound bed, rough cut), each fitted into
    a step of this plan first.

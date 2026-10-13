@@ -356,7 +356,10 @@ Decisions: `DECISIONS.md` G14, G15.
 - [x] Settings tabs (General, Models, Rules, Budgets and usage, Notices)
 - [x] Character setup as a stepper; the mole is the only fixed mark
 - [x] Old addresses redirect
-- [ ] Clone Video in the Video step (next)
+- [x] Clone Video in the Video step (G18): upload, characters, model picker
+  with prices, original sound optional, results in Library > Clips, New
+  post from a TikTok
+- [ ] First live clone per model (confirms its price and endpoint)
 
 ## Phase 4: OpenCut embedded (planned, not started)
 

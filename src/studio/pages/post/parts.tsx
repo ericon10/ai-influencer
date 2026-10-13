@@ -113,7 +113,8 @@ export function useNewPost() {
   const chars = useCharacters()
   const qc = useQueryClient()
   const [busy, setBusy] = useState<ContentKind | null>(null)
-  async function create(kind: ContentKind, extra: { characterId?: string; sceneId?: string | null; idea?: string; step?: PostStep; spec?: Record<string, unknown> } = {}) {
+  // `open` adds to the post's link, e.g. "?clone=1" opens Clone Video.
+  async function create(kind: ContentKind, extra: { characterId?: string; sceneId?: string | null; idea?: string; step?: PostStep; spec?: Record<string, unknown> } = {}, open = '') {
     const list = chars.data?.characters ?? []
     if (!list.length) { nav('/studio/characters'); return }
     const last = read(LAST_CHARACTER)
@@ -122,7 +123,7 @@ export function useNewPost() {
     try {
       const { id } = await api.createContent({ kind, characterId, accountTag: read(LAST_TAG) ?? '', ...extra })
       await qc.invalidateQueries({ queryKey: keys.content })
-      nav(`/studio/posts/${id}`)
+      nav(`/studio/posts/${id}${open}`)
     } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) } finally { setBusy(null) }
   }
   return { create, busy, ready: !chars.isLoading }
@@ -285,7 +286,7 @@ export function ExportPanel({ item, todo, saving, flush, label, onStart, childre
       </div>
       {!worker.ready && <span className="st-hint st-warntext" role="status">{worker.reason}</span>}
       <RunStatus match={j => j.purpose === `content_render:${item.id}`} pending={starting} />
-      <span className="st-hint">Renders on the Studio's worker: no provider, no cost. 9:16, no sound. {AI_LABEL}</span>
+      <span className="st-hint">Renders on the Studio's worker: no provider, no cost. 9:16, silent unless the clip kept its original sound. {AI_LABEL}</span>
       {item.status === 'failed' && item.error && <Callout tone="bad">{item.error}</Callout>}
       {children}
     </div>

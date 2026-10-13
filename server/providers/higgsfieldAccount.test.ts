@@ -355,6 +355,31 @@ describe('account adapter edge cases', () => {
     expect(fake.tool('upscale_video')[0]!.args.params).toEqual({ provider: 'bytedance', video_id: '9b2f7a10-3c4d-4e5f-8a9b-0c1d2e3f4a5b', width: 720, height: 1280, resolution: '1080p', preset: 'aigc', fps: 24 })
   })
 
+  it('Clone Video runs Kling 3.0 Motion Control through its own tool, with no prompt and the price book price', async () => {
+    const a = adapter()
+    const req: GenRequest = {
+      kind: 'video_clone', model: 'higgsfield/kling-3.0-motion-control', prompt: '', resolution: '720p', durationSec: 12, cloneBackground: 'video', audio: false,
+      refs: [{ assetId: 'r', url: '1b2f7a10-3c4d-4e5f-8a9b-0c1d2e3f4a5b' }], sourceVideo: { assetId: 's', url: '2b2f7a10-3c4d-4e5f-8a9b-0c1d2e3f4a5b' },
+    }
+    const est = await a.estimate(req)
+    // No price preflight for this tool: 2 credits per second, not confirmed.
+    expect(est.credits).toBe(24)
+    expect(est.verified).toBe(false)
+    expect(fake.calls).toHaveLength(0)
+    const { jobId } = await a.submit(req, { idempotencyKey: 'k-clone' })
+    expect(jobId).toBeTruthy()
+    expect(fake.tool('motion_control')[0]!.args.params).toEqual({ image_id: '1b2f7a10-3c4d-4e5f-8a9b-0c1d2e3f4a5b', motion_video_id: '2b2f7a10-3c4d-4e5f-8a9b-0c1d2e3f4a5b', resolution: '720p', scene_control: 'video' })
+    // The place from the character image, at 1080p (3 credits per second).
+    await a.submit({ ...req, cloneBackground: 'image', resolution: '1080p' }, { idempotencyKey: 'k-clone-2' })
+    expect(fake.tool('motion_control')[1]!.args.params).toMatchObject({ resolution: '1080p', scene_control: 'image' })
+    expect((await a.estimate({ ...req, resolution: '1080p' })).credits).toBe(36)
+  })
+
+  it('refuses a clone on a model the account path cannot clone with', async () => {
+    const req: GenRequest = { kind: 'video_clone', model: 'higgsfield/kling-3.0-pro', prompt: 'x', durationSec: 5, refs: [{ assetId: 'r', url: 'u' }], sourceVideo: { assetId: 's', url: 'v' } }
+    await expect(adapter().submit(req, { idempotencyKey: 'k-x' })).rejects.toThrow(/does not clone a video/)
+  })
+
   it('prices an upscale from the price book, since Higgsfield needs the image first', async () => {
     const est = await adapter().estimate({ kind: 'upscale', model: 'higgsfield/bytedance-upscale', prompt: 'Upscale.', resolution: '2k', scale: 2 })
     expect(est.credits).toBe(2)
