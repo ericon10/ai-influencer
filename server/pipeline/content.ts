@@ -4,6 +4,7 @@ import { and, desc, eq, inArray, isNull } from 'drizzle-orm'
 import { zipSync } from 'fflate'
 import { z } from 'zod'
 import { brollClips, candidates, contentItems, scenes } from '../db/schema.js'
+import { isVideoOp } from '../core/clips.js'
 import type { Ctx, Deps } from '../context.js'
 import { AppError, notFound } from '../lib/errors.js'
 import { newId } from '../lib/ids.js'
@@ -17,20 +18,21 @@ import { withTempDir } from '../media/ffmpeg.js'
 import { getAsset, readAsset, saveAsset } from '../storage/assets.js'
 import { uploadKey } from '../storage/uploads.js'
 import { getCharacter, toData, type CharacterRow } from './characters.js'
+import { createScene, getScene } from './scenes.js'
 import { resolveRoute } from './settings.js'
 import type { SceneBuilt } from './sceneActions.js'
 
-// The text-overlay content builder (owner, 2026-10-13): the owner's B-roll
-// library, meme videos (a kept clip, optional B-roll cut in hard, a TikTok
-// caption box), slideshows (stills with Claude's hook and slide text) and
-// batches (many captions, one clip, many videos). Rendering is local and
-// free (ffmpeg and sharp on the worker); only the Claude steps are priced.
+// Posts (UX-PLAN.md; the content builder of 2026-10-13): the owner's B-roll
+// library, video posts (kind "meme": a kept clip, optional B-roll cut in
+// hard, a TikTok caption box), slideshows (stills with Claude's hook and
+// slide text) and batches (many captions, clips and B-roll rotated across
+// them, many videos). Each post keeps its idea, its scene, an account tag
+// and the step it was left on. Rendering is local and free (ffmpeg and
+// sharp on the worker); only the Claude steps are priced.
 
 export type BrollRow = typeof brollClips.$inferSelect
 export type ContentRow = typeof contentItems.$inferSelect
 export type ContentKind = 'meme' | 'slideshow' | 'batch'
-
-const VIDEO_OPS = ['video', 'video_upscale']
 
 // ── B-roll library ──────────────────────────────────────────────────
 
@@ -104,6 +106,8 @@ async function runBrollIngest(deps: Deps, ctx: Ctx, job: JobRow): Promise<unknow
 const id = z.string().max(60)
 const memeSpec = z.object({
   clipId: id.nullable().default(null),
+  // The still the clip was made from, when it was made in this post.
+  stillId: id.nullable().default(null),
   brollId: id.nullable().default(null),
   order: z.enum(['clip_first', 'broll_first']).default('clip_first'),
   brollStart: z.number().min(0).max(600).default(0),
@@ -118,21 +122,50 @@ const slideshowSpec = z.object({
   caption: z.string().max(2200).default(''),
   hashtags: z.array(z.string().max(60)).max(15).default([]),
 })
-const batchSpec = memeSpec.omit({ caption: true }).extend({
+// A batch rotates its clips and B-roll clips across the captions (owner,
+// 2026-10-13): video i uses clip i mod n and B-roll i mod m. Older drafts
+// with one clipId and brollId read as lists of one.
+const batchObject = z.object({
+  clipIds: z.array(id).max(20).default([]),
+  brollIds: z.array(id).max(20).default([]),
+  order: z.enum(['clip_first', 'broll_first']).default('clip_first'),
+  brollStart: z.number().min(0).max(600).default(0),
+  brollSeconds: z.number().min(0.5).max(60).default(6),
   topic: z.string().max(400).default(''),
   count: z.number().int().min(1).max(50).default(20),
   captions: z.array(z.string().max(400)).max(50).default([]),
 })
+const batchSpec = z.preprocess(raw => {
+  if (!raw || typeof raw !== 'object') return raw
+  const { clipId, brollId, ...rest } = raw as Record<string, unknown>
+  return {
+    ...rest,
+    ...(rest.clipIds === undefined && typeof clipId === 'string' ? { clipIds: [clipId] } : {}),
+    ...(rest.brollIds === undefined && typeof brollId === 'string' ? { brollIds: [brollId] } : {}),
+  }
+}, batchObject)
 export const specSchemas = { meme: memeSpec, slideshow: slideshowSpec, batch: batchSpec }
 export type MemeSpec = z.infer<typeof memeSpec>
 export type SlideshowSpec = z.infer<typeof slideshowSpec>
-export type BatchSpec = z.infer<typeof batchSpec>
+export type BatchSpec = z.infer<typeof batchObject>
+
+// The clip and B-roll for video i of a batch.
+export function batchSources(s: BatchSpec, index: number): { clipId: string | null; brollId: string | null } {
+  return {
+    clipId: s.clipIds.length ? s.clipIds[index % s.clipIds.length]! : null,
+    brollId: s.brollIds.length ? s.brollIds[index % s.brollIds.length]! : null,
+  }
+}
+
+export const POST_STEPS = ['idea', 'stills', 'video', 'text', 'finish'] as const
+export type PostStep = (typeof POST_STEPS)[number]
 
 export interface ContentOutputs {
   videoAssetId?: string
   imageAssetIds?: string[]
-  // A batch, by caption order (a failed video leaves a gap).
-  videos?: Array<{ caption: string; assetId: string } | null>
+  // A batch, by caption order (a failed video leaves a gap), with the clip
+  // and B-roll each one used (they rotate).
+  videos?: Array<{ caption: string; assetId: string; clipId?: string; brollId?: string | null } | null>
   zipAssetId?: string
   done?: number
   failed?: number
@@ -152,7 +185,7 @@ function parseSpec(kind: string, raw: unknown) {
 export async function listContent(deps: Deps, ctx: Ctx, characterId?: string | null): Promise<ContentRow[]> {
   return deps.db.select().from(contentItems)
     .where(and(eq(contentItems.accountId, ctx.accountId), isNull(contentItems.archivedAt), ...(characterId ? [eq(contentItems.characterId, characterId)] : [])))
-    .orderBy(desc(contentItems.createdAt)).limit(100)
+    .orderBy(desc(contentItems.updatedAt)).limit(200)
 }
 
 export async function getContent(deps: Deps, ctx: Ctx, itemId: string): Promise<ContentRow> {
@@ -161,7 +194,26 @@ export async function getContent(deps: Deps, ctx: Ctx, itemId: string): Promise<
   return row
 }
 
-export async function createContent(deps: Deps, ctx: Ctx, input: { kind: ContentKind; characterId: string; title?: string; spec?: unknown }): Promise<ContentRow> {
+export interface PostInput {
+  kind: ContentKind
+  characterId: string
+  title?: string
+  spec?: unknown
+  idea?: string
+  accountTag?: string
+  sceneId?: string | null
+  step?: PostStep
+}
+
+// A scene can belong to a post only when it is the post's character's.
+async function checkScene(deps: Deps, ctx: Ctx, sceneId: string | null | undefined, characterId: string): Promise<string | null> {
+  if (!sceneId) return null
+  const scene = await getScene(deps, ctx, sceneId)
+  if (scene.characterId !== characterId) throw new AppError('bad_request', 'That scene belongs to another character.')
+  return scene.id
+}
+
+export async function createContent(deps: Deps, ctx: Ctx, input: PostInput): Promise<ContentRow> {
   await getCharacter(deps, ctx, input.characterId)
   const defaults = deps.config.pipeline.content
   const base = input.kind === 'batch' ? { count: defaults.batch.default_count } : input.kind === 'meme' ? { brollSeconds: defaults.meme.broll_seconds, order: defaults.meme.order } : {}
@@ -169,17 +221,64 @@ export async function createContent(deps: Deps, ctx: Ctx, input: { kind: Content
   const [row] = await deps.db.insert(contentItems).values({
     id: newId('cnt'), accountId: ctx.accountId, characterId: input.characterId, kind: input.kind,
     title: (input.title ?? '').slice(0, 120), spec, createdBy: ctx.userId,
+    idea: (input.idea ?? '').slice(0, 2000), accountTag: cleanTag(input.accountTag ?? ''),
+    sceneId: await checkScene(deps, ctx, input.sceneId, input.characterId), step: input.step ?? 'idea',
   }).returning()
   return row!
 }
 
-export async function updateContent(deps: Deps, ctx: Ctx, itemId: string, patch: { title?: string; spec?: unknown }): Promise<ContentRow> {
+export interface PostPatch { title?: string; spec?: unknown; idea?: string; accountTag?: string; sceneId?: string | null; step?: PostStep; characterId?: string }
+
+// The picks that belong to a character (its clips and stills); B-roll is the
+// account's and stays when the character changes.
+const CHARACTER_PICKS: Record<ContentKind, Record<string, unknown>> = {
+  meme: { clipId: null, stillId: null },
+  slideshow: { stillIds: [] },
+  batch: { clipIds: [] },
+}
+
+export async function updateContent(deps: Deps, ctx: Ctx, itemId: string, patch: PostPatch): Promise<ContentRow> {
   const row = await getContent(deps, ctx, itemId)
-  const spec = patch.spec !== undefined ? parseSpec(row.kind, { ...(row.spec as object), ...(patch.spec as object) }) : row.spec
+  const kind = row.kind as ContentKind
+  // Switching the character drops its scene and the clips and stills that
+  // were its own; the idea, text and B-roll stay.
+  const switching = patch.characterId !== undefined && patch.characterId !== row.characterId
+  if (switching) await getCharacter(deps, ctx, patch.characterId!)
+  const characterId = switching ? patch.characterId! : row.characterId!
+  let spec = row.spec
+  if (patch.spec !== undefined || switching) {
+    spec = parseSpec(kind, { ...(row.spec as object), ...((patch.spec as object) ?? {}), ...(switching ? CHARACTER_PICKS[kind] : {}) })
+  }
+  const sceneId = patch.sceneId !== undefined ? await checkScene(deps, ctx, patch.sceneId, characterId) : switching ? null : row.sceneId
   const [out] = await deps.db.update(contentItems).set({
-    title: patch.title !== undefined ? patch.title.slice(0, 120) : row.title, spec, updatedAt: deps.clock.now(),
+    title: patch.title !== undefined ? patch.title.slice(0, 120) : row.title, spec,
+    idea: patch.idea !== undefined ? patch.idea.slice(0, 2000) : row.idea,
+    accountTag: patch.accountTag !== undefined ? cleanTag(patch.accountTag) : row.accountTag,
+    step: patch.step ?? row.step, characterId, sceneId, updatedAt: deps.clock.now(),
   }).where(eq(contentItems.id, row.id)).returning()
   return out!
+}
+
+// "Make another like this" (owner, 2026-10-13): the same post with
+// everything filled in, as a new draft that opens at the Text step. Nothing
+// rendered is copied.
+export async function duplicateContent(deps: Deps, ctx: Ctx, itemId: string): Promise<ContentRow> {
+  const row = await getContent(deps, ctx, itemId)
+  const [out] = await deps.db.insert(contentItems).values({
+    id: newId('cnt'), accountId: ctx.accountId, characterId: row.characterId, kind: row.kind,
+    title: row.title, idea: row.idea, accountTag: row.accountTag, sceneId: row.sceneId, spec: row.spec,
+    step: 'text', createdBy: ctx.userId,
+  }).returning()
+  return out!
+}
+
+// The post's scene: made from the post's idea the first time stills are
+// asked for (free; nothing runs until Generate).
+export async function postScene(deps: Deps, ctx: Ctx, itemId: string): Promise<ContentRow> {
+  const row = await getContent(deps, ctx, itemId)
+  if (row.sceneId) return row
+  const scene = await createScene(deps, ctx, row.characterId!, { brief: row.idea.trim(), title: row.title || undefined })
+  return updateContent(deps, ctx, row.id, { sceneId: scene.id, step: 'stills' })
 }
 
 export async function archiveContent(deps: Deps, ctx: Ctx, itemId: string): Promise<void> {
@@ -192,8 +291,9 @@ export async function archiveContent(deps: Deps, ctx: Ctx, itemId: string): Prom
 async function candidateAsset(deps: Deps, ctx: Ctx, candidateId: string, characterId: string, media: 'video' | 'image'): Promise<string> {
   const [c] = await deps.db.select({ assetId: candidates.assetId, op: candidates.op, characterId: candidates.characterId }).from(candidates)
     .where(and(eq(candidates.accountId, ctx.accountId), eq(candidates.id, candidateId)))
-  const isVideo = !!c && VIDEO_OPS.includes(c.op)
-  if (!c?.assetId || c.characterId !== characterId || isVideo !== (media === 'video')) throw new AppError('bad_request', media === 'video' ? 'Pick a clip from this character.' : 'Pick stills from this character.')
+  const isVideo = !!c && isVideoOp(c.op)
+  if (!c || c.characterId !== characterId || isVideo !== (media === 'video')) throw new AppError('bad_request', media === 'video' ? 'Pick a clip from this character.' : 'Pick stills from this character.')
+  if (!c.assetId) throw new AppError('bad_request', media === 'video' ? 'A picked clip is still being prepared. Try again in a moment.' : 'A picked still has no image yet.')
   return c.assetId
 }
 
@@ -207,7 +307,7 @@ function renderProblems(row: ContentRow): string[] {
     if (!s.caption.trim()) out.push('Write the caption')
   } else if (row.kind === 'batch') {
     const s = batchSpec.parse(row.spec)
-    if (!s.clipId) out.push('Pick a clip')
+    if (!s.clipIds.length) out.push('Pick a clip')
     if (!s.captions.some(c => c.trim())) out.push('Add captions (paste them or write them with Claude)')
   } else {
     const s = slideshowSpec.parse(row.spec)
@@ -244,6 +344,7 @@ async function setOutputs(deps: Deps, itemId: string, outputs: ContentOutputs, s
 }
 
 async function renderVideo(deps: Deps, ctx: Ctx, job: JobRow, s: Pick<MemeSpec, 'clipId' | 'brollId' | 'order' | 'brollStart' | 'brollSeconds'>, characterId: string, caption: string, label: string) {
+  if (!s.clipId) throw new AppError('bad_request', 'Pick a clip.')
   const cfg = deps.config.pipeline.content
   const clipAsset = await candidateAsset(deps, ctx, s.clipId!, characterId, 'video')
   const broll = s.brollId ? await getBroll(deps, ctx, s.brollId) : null
@@ -310,12 +411,13 @@ async function renderBatchVideo(deps: Deps, ctx: Ctx, job: JobRow, row: ContentR
   const captions = batchCaptions(deps, s)
   const index = (job.request as { index?: number }).index ?? 0
   const caption = captions[index]
-  let result: { caption: string; assetId: string } | null = null
+  let result: { caption: string; assetId: string; clipId?: string; brollId?: string | null } | null = null
   let error: string | null = null
   if (caption) {
     try {
-      const v = await renderVideo(deps, ctx, job, s, row.characterId!, caption, `Batch ${name} ${index + 1}: ${caption.slice(0, 50)}`)
-      result = { caption, assetId: v.assetId }
+      const src = batchSources(s, index)
+      const v = await renderVideo(deps, ctx, job, { ...s, ...src }, row.characterId!, caption, `Batch ${name} ${index + 1}: ${caption.slice(0, 50)}`)
+      result = { caption, assetId: v.assetId, clipId: src.clipId!, brollId: src.brollId }
     } catch (e) {
       error = `Video ${index + 1} failed: ${(e as Error).message.slice(0, 300)}`
     }
@@ -364,6 +466,10 @@ export const captionsJsonSchema = (n: number): Record<string, unknown> => ({
   additionalProperties: false,
 })
 
+// What a post is about: the idea from its Idea step, else the topic an
+// older draft kept in its spec.
+export const postTopic = (item: Pick<ContentRow, 'idea'>, specTopic: string): string => item.idea.trim() || specTopic.trim()
+
 // How many slides follow the hook: one per picked still after the first,
 // kept within the configured range (5 to 7).
 export function slideCount(deps: Deps, stills: number): number {
@@ -387,7 +493,8 @@ export async function buildContentSlides(deps: Deps, ctx: Ctx, row: CharacterRow
   const item = await getContent(deps, ctx, itemId)
   if (item.kind !== 'slideshow' || item.characterId !== row.id) throw new AppError('bad_request', 'Pick a slideshow of this character.')
   const s = slideshowSpec.parse(item.spec)
-  if (s.topic.trim().length < 3) throw new AppError('invalid_request', 'Say what the slideshow is about first.')
+  const topic = postTopic(item, s.topic)
+  if (topic.length < 3) throw new AppError('invalid_request', 'Say what the slideshow is about first.')
   const ch = toData(row)
   const cfg = deps.config.pipeline.content
   const t = deps.config.pipeline.templates.content_slides
@@ -395,9 +502,9 @@ export async function buildContentSlides(deps: Deps, ctx: Ctx, row: CharacterRow
   const n = slideCount(deps, s.stillIds.length)
   const vars = { ...pronounVars(ch.pronouns), name: ch.name, slides: String(n), hashtags_min: String(cfg.slideshow.hashtags[0]), hashtags_max: String(cfg.slideshow.hashtags[1]) }
   const system = fill(t.system, vars)
-  const prompt = fill(t.prompt, { ...vars, topic: s.topic.trim(), vibe: ch.persona.vibe ?? 'not given', photos: await photoNotes(deps, ctx, s.stillIds) })
+  const prompt = fill(t.prompt, { ...vars, topic, vibe: ch.persona.vibe ?? 'not given', photos: await photoNotes(deps, ctx, s.stillIds) })
   const purpose = `content_slides:${item.id}`
-  const mock = { hook: `${s.topic.trim().slice(0, 60)}`, slides: Array.from({ length: n }, (_, i) => `Slide ${i + 2}: ${s.topic.trim().slice(0, 40)}`), caption: `${s.topic.trim()}`, hashtags: ['fyp', 'dayinmylife', 'relatable'].slice(0, Math.max(cfg.slideshow.hashtags[0], 1)) }
+  const mock = { hook: `${topic.slice(0, 60)}`, slides: Array.from({ length: n }, (_, i) => `Slide ${i + 2}: ${topic.slice(0, 40)}`), caption: topic, hashtags: ['fyp', 'dayinmylife', 'relatable'].slice(0, Math.max(cfg.slideshow.hashtags[0], 1)) }
   return {
     purpose,
     preview: { title: 'Write the slides', prompts: [{ label: 'Slideshow writer', text: `${system}\n${prompt}`, wrapped: hardWrap(`${system}\n${prompt}`) }], warnings: [], invalidates: [] },
@@ -409,16 +516,17 @@ export async function buildContentCaptions(deps: Deps, ctx: Ctx, row: CharacterR
   const item = await getContent(deps, ctx, itemId)
   if (item.kind !== 'batch' || item.characterId !== row.id) throw new AppError('bad_request', 'Pick a batch of this character.')
   const s = batchSpec.parse(item.spec)
-  if (s.topic.trim().length < 3) throw new AppError('invalid_request', 'Say what the captions are about first.')
+  const topic = postTopic(item, s.topic)
+  if (topic.length < 3) throw new AppError('invalid_request', 'Say what the captions are about first.')
   const count = Math.min(s.count, deps.config.pipeline.content.batch.max)
   const ch = toData(row)
   const t = deps.config.pipeline.templates.content_captions
   const route = await resolveRoute(deps, ctx, 'content_writer')
   const vars = { ...pronounVars(ch.pronouns), name: ch.name, count: String(count) }
   const system = fill(t.system, vars)
-  const prompt = fill(t.prompt, { ...vars, topic: s.topic.trim(), vibe: ch.persona.vibe ?? 'not given' })
+  const prompt = fill(t.prompt, { ...vars, topic, vibe: ch.persona.vibe ?? 'not given' })
   const purpose = `content_captions:${item.id}`
-  const mock = { captions: Array.from({ length: count }, (_, i) => `POV: ${s.topic.trim().slice(0, 60)} (${i + 1})`) }
+  const mock = { captions: Array.from({ length: count }, (_, i) => `POV: ${topic.slice(0, 60)} (${i + 1})`) }
   return {
     purpose,
     preview: { title: `Write ${count} captions`, prompts: [{ label: 'Caption writer', text: `${system}\n${prompt}`, wrapped: hardWrap(`${system}\n${prompt}`) }], warnings: [], invalidates: [] },
@@ -458,7 +566,12 @@ export async function contentView(deps: Deps, ctx: Ctx) {
   return {
     broll: broll.map(b => ({ id: b.id, title: b.title, product: b.product, status: b.status, error: b.error, assetId: b.assetId, durationSec: b.assetId && durations.get(b.assetId) ? Math.round(durations.get(b.assetId)! / 100) / 10 : null, createdAt: b.createdAt.toISOString() })),
     products: [...new Set([...cfg.broll.products, ...broll.map(b => b.product).filter(Boolean)])].sort((a, b) => a.localeCompare(b)),
-    items: items.map(i => ({ id: i.id, kind: i.kind as ContentKind, characterId: i.characterId, title: i.title, spec: i.spec, status: i.status, outputs: i.outputs as ContentOutputs, error: i.error, createdAt: i.createdAt.toISOString(), updatedAt: i.updatedAt.toISOString() })),
+    items: items.map(i => ({
+      id: i.id, kind: i.kind as ContentKind, characterId: i.characterId, title: i.title, idea: i.idea, sceneId: i.sceneId, accountTag: i.accountTag, step: i.step,
+      spec: i.kind === 'batch' ? batchSpec.parse(i.spec) : i.spec, status: i.status, outputs: i.outputs as ContentOutputs, error: i.error, createdAt: i.createdAt.toISOString(), updatedAt: i.updatedAt.toISOString(),
+    })),
+    // Account tags in use, most recent first (the Idea step suggests them).
+    accountTags: [...new Set(items.map(i => i.accountTag).filter(Boolean))],
     options: {
       caption: { size: cfg.caption.size, safe: cfg.caption.safe, position: cfg.caption.position, maxChars: cfg.caption.max_chars, box: cfg.caption.box },
       canvas: cfg.canvas, meme: cfg.meme, slideshow: { slides: cfg.slideshow.slides, maxStills: cfg.slideshow.max_stills }, batch: cfg.batch,

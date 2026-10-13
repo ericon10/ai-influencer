@@ -18,7 +18,8 @@ import { createCharacter, getCandidate, getCharacter, linkInspiration, listChara
 import { approveSceneCandidate, archiveScene, copyScene, createScene, cropCandidate, saveVideoModel, updateScene } from '../pipeline/scenes.js'
 import { videoPrices } from '../pipeline/sceneActions.js'
 import { expectedVersion, readWorkerStatus } from '../jobs/workerStatus.js'
-import { addBroll, archiveBroll, archiveContent, contentView, createContent, startRender, updateBroll, updateContent } from '../pipeline/content.js'
+import { addClip, libraryView } from '../pipeline/clips.js'
+import { POST_STEPS, addBroll, archiveBroll, archiveContent, contentView, createContent, duplicateContent, postScene, startRender, updateBroll, updateContent } from '../pipeline/content.js'
 import { rulesView, setRuleSwitch } from '../pipeline/rules.js'
 import { chooseConcept } from '../pipeline/concepts.js'
 import { approveCandidate, keepStale, pickHero, rejectCandidate, reopenCandidate, setFavorite, mirrorCandidate } from '../pipeline/review.js'
@@ -541,8 +542,17 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
   // The worker light in the header (read from the database; never wakes it).
   app.get('/worker', async c => c.json(await readWorkerStatus(deps)))
 
-  // ── Content builder: B-roll, meme videos, slideshows, batches ──
+  // ── Posts: B-roll, video posts, slideshows, batches; clips; the Library ──
   app.get('/content', async c => c.json(await contentView(deps, c.get('ctx'))))
+  app.get('/library', async c => c.json(await libraryView(deps, c.get('ctx'), { characterId: c.req.query('characterId') || null })))
+  // An uploaded video becomes a kept clip of the character (picked in the
+  // post it was uploaded from).
+  app.post('/characters/:id/clips', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    const body = parse(z.object({ uploadId: z.string().max(40), name: z.string().max(300), contentId: z.string().max(60).optional() }), await json(c))
+    return c.json(await addClip(deps, ctx, { characterId: c.req.param('id'), ...body }), 201)
+  })
   app.post('/broll', async c => {
     const ctx = c.get('ctx')
     requireRole(ctx, 'member')
@@ -564,16 +574,36 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
   app.post('/content', async c => {
     const ctx = c.get('ctx')
     requireRole(ctx, 'member')
-    const body = parse(z.object({ kind: z.enum(['meme', 'slideshow', 'batch']), characterId: z.string().max(60), title: z.string().max(120).optional(), spec: z.record(z.string(), z.unknown()).optional() }), await json(c))
+    const body = parse(z.object({
+      kind: z.enum(['meme', 'slideshow', 'batch']), characterId: z.string().max(60), title: z.string().max(120).optional(), spec: z.record(z.string(), z.unknown()).optional(),
+      idea: z.string().max(2000).optional(), accountTag: z.string().max(60).optional(), sceneId: z.string().max(60).nullable().optional(), step: z.enum(POST_STEPS).optional(),
+    }), await json(c))
     const row = await createContent(deps, ctx, body)
     return c.json({ id: row.id }, 201)
   })
   app.patch('/content/:id', async c => {
     const ctx = c.get('ctx')
     requireRole(ctx, 'member')
-    const body = parse(z.object({ title: z.string().max(120).optional(), spec: z.record(z.string(), z.unknown()).optional() }), await json(c))
+    const body = parse(z.object({
+      title: z.string().max(120).optional(), spec: z.record(z.string(), z.unknown()).optional(),
+      idea: z.string().max(2000).optional(), accountTag: z.string().max(60).optional(), sceneId: z.string().max(60).nullable().optional(), step: z.enum(POST_STEPS).optional(), characterId: z.string().max(60).optional(),
+    }), await json(c))
     const row = await updateContent(deps, ctx, c.req.param('id'), body)
     return c.json({ id: row.id })
+  })
+  // "Make another like this": a filled-in copy that opens at the Text step.
+  app.post('/content/:id/duplicate', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    const row = await duplicateContent(deps, ctx, c.req.param('id'))
+    return c.json({ id: row.id }, 201)
+  })
+  // The post's scene, made from its idea the first time (free).
+  app.post('/content/:id/scene', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    const row = await postScene(deps, ctx, c.req.param('id'))
+    return c.json({ id: row.id, sceneId: row.sceneId })
   })
   app.delete('/content/:id', async c => {
     const ctx = c.get('ctx')

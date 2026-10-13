@@ -1,3 +1,4 @@
+import { isVideoOp } from '../core/clips.js'
 import type { Ctx, Deps } from '../context.js'
 import { validateCharacter } from '../core/character.js'
 import { hardWrap } from '../core/text.js'
@@ -199,7 +200,7 @@ export async function scenesView(deps: Deps, ctx: Ctx, characterId: string) {
   const editModels = sc.settings.edit_models.map(modelInfo)
   const shape = (c: (typeof cands)[number]) => ({
     id: c.id, assetId: c.assetId, status: c.status, prompt: c.prompt, op: c.op, parentId: c.parentId, sceneId: c.sceneId,
-    media: c.op === 'video' || c.op === 'video_upscale' ? 'video' as const : 'image' as const,
+    media: isVideoOp(c.op) ? 'video' as const : 'image' as const,
     qaVerdict: c.qaVerdict, qaReport: c.qaReport, rejectReasons: c.rejectReasons, rejectNote: c.rejectNote,
     favorite: c.favorite, createdAt: c.createdAt.toISOString(), refId: null, heroPromptIndex: null,
   })

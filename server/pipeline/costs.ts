@@ -1,4 +1,4 @@
-import { and, desc, eq, sql } from 'drizzle-orm'
+import { and, desc, eq, ne, sql } from 'drizzle-orm'
 import { candidates, characters, ledgerEntries } from '../db/schema.js'
 import type { Ctx, Deps } from '../context.js'
 import { effectiveBudgets } from '../costs/budgets.js'
@@ -15,7 +15,8 @@ export async function characterCosts(deps: Deps, ctx: Ctx, characterId: string) 
     effectiveBudgets(deps.db, ctx.accountId, deps.config.budgets, characterId),
   ])
   const [approved] = await deps.db.select({ n: sql<string>`count(*)` }).from(candidates)
-    .where(and(eq(candidates.accountId, ctx.accountId), eq(candidates.characterId, characterId), eq(candidates.status, 'approved')))
+    // Uploaded clips cost nothing to make, so they do not count as made here.
+    .where(and(eq(candidates.accountId, ctx.accountId), eq(candidates.characterId, characterId), eq(candidates.status, 'approved'), ne(candidates.op, 'upload')))
   const approvedCount = Number(approved?.n ?? 0)
   return {
     spentMicros: spent, spent: formatUsd(spent), heldMicros: held, held: formatUsd(held),

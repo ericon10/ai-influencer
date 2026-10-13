@@ -10,6 +10,8 @@ import { createScene, sceneCandidates, updateScene } from './scenes.js'
 import { scenesView } from '../api/views.js'
 import { renderPlaceholderPortrait } from '../providers/mock.js'
 import { getJob } from '../jobs/runner.js'
+import { jobs as jobsTable } from '../db/schema.js'
+import { eq } from 'drizzle-orm'
 import { loadConfig } from '../config/load.js'
 import { assembleStillPrompt, cleanWritten, sceneFieldsSchema } from '../core/scenes.js'
 import { assembleVideoPrompt, mockWrittenPrompt } from '../core/promptWriter.js'
@@ -185,5 +187,67 @@ describe('prompt writer pieces', () => {
     const video = mockWrittenPrompt('video', { motion: 'Callie turns' }, [40, 80])
     expect(wordCount(video)).toBeGreaterThanOrEqual(40)
     expect(wordCount(video)).toBeLessThanOrEqual(80)
+  })
+})
+
+describe('Write and generate (one price)', () => {
+  const writeAndGenerate = (sceneId: string): StudioAction => ({ type: 'scene', characterId, sceneId, models: ['higgsfield/nano-banana-2.1'], variations: 2, withQa: false, write: true })
+
+  it('writes the prompt first, then each still runs on it with the Studio lines and REALISM; one quote for both', async () => {
+    const sceneId = (await createScene(h.deps, h.ctx, characterId, { brief: 'Callie reads on a park bench at golden hour' })).id
+    const { quote, preview } = await estimateAction(h.deps, h.ctx, writeAndGenerate(sceneId))
+    expect(quote.items.map(i => i.label)).toEqual([expect.stringMatching(/^Write the prompt/), expect.stringMatching(/still 1/), expect.stringMatching(/still 2/)])
+    expect(preview.title).toMatch(/write the prompt, then 2 stills/)
+    expect(preview.prompts[0]!.label).toBe('Prompt writer')
+    const { jobs } = await runAction(h.deps, h.ctx, writeAndGenerate(sceneId), quote.id, true)
+    expect(jobs).toHaveLength(3)
+    // The stills wait for the writer.
+    expect((await getJob(h.deps, h.ctx, jobs[1]!.id)).status).toBe('waiting')
+    await drain(h, 60)
+    const v = await view(sceneId)
+    expect(v.prompts.still).toMatchObject({ source: 'claude' })
+    const stills = v.candidates.filter(c => c.op === 'generate')
+    expect(stills).toHaveLength(2)
+    for (const c of stills) {
+      expect(c.assetId).toBeTruthy()
+      expect(c.prompt).toContain(v.prompts.still!.text.slice(0, 60))
+      expect(c.prompt).toMatch(/REALISM: .{20,}/)
+      expect(c.prompt.startsWith('Using the attached reference images')).toBe(true)
+    }
+    for (const j of jobs.slice(1)) expect((await getJob(h.deps, h.ctx, j.id)).request).not.toHaveProperty('promptFrom')
+  })
+
+  it('without a written prompt, the stills do not run and nothing is charged for them', async () => {
+    const sceneId = (await createScene(h.deps, h.ctx, characterId, { brief: 'Callie stretches before a run' })).id
+    const { quote } = await estimateAction(h.deps, h.ctx, writeAndGenerate(sceneId))
+    const { jobs } = await runAction(h.deps, h.ctx, writeAndGenerate(sceneId), quote.id, true)
+    const writer = await getJob(h.deps, h.ctx, jobs[0]!.id)
+    const req = writer.request as { meta: Record<string, unknown> }
+    await h.deps.db.update(jobsTable).set({ request: { ...req, meta: { ...req.meta, mockPrompt: '' } } }).where(eq(jobsTable.id, writer.id))
+    await drain(h, 30)
+    for (const j of jobs.slice(1)) {
+      const job = await getJob(h.deps, h.ctx, j.id)
+      expect(job.status).toBe('canceled')
+      expect(job.actualMicros ?? 0).toBe(0)
+    }
+    // Each still shows as failed, with the reason, in the Stills grid.
+    const tiles = (await view(sceneId)).candidates
+    expect(tiles.map(c => c.status)).toEqual(['failed', 'failed'])
+    expect(tiles[0]!.rejectNote).toMatch(/prompt writer did not finish/)
+  })
+
+  it('a written prompt that breaks a fixed rule is refused before any still runs', async () => {
+    const sceneId = (await createScene(h.deps, h.ctx, characterId, { brief: 'Callie at the beach' })).id
+    const { quote } = await estimateAction(h.deps, h.ctx, writeAndGenerate(sceneId))
+    const { jobs } = await runAction(h.deps, h.ctx, writeAndGenerate(sceneId), quote.id, true)
+    const writer = await getJob(h.deps, h.ctx, jobs[0]!.id)
+    const req = writer.request as { meta: Record<string, unknown> }
+    await h.deps.db.update(jobsTable).set({ request: { ...req, meta: { ...req.meta, mockPrompt: 'Callie poses fully nude on the sand at sunset, candid phone photo.' } } }).where(eq(jobsTable.id, writer.id))
+    await drain(h, 30)
+    for (const j of jobs.slice(1)) {
+      const job = await getJob(h.deps, h.ctx, j.id)
+      expect(job.status).toBe('canceled')
+      expect(JSON.stringify(job.error)).toMatch(/refused/)
+    }
   })
 })

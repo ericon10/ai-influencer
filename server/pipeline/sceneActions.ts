@@ -15,6 +15,7 @@ import { sha256Hex } from '../lib/passwords.js'
 import { ruleSwitches } from './rules.js'
 import { idealObservation } from '../core/qa/ideal.js'
 import { observationJsonSchema } from '../core/qa/perception.js'
+import { isVideoOp } from '../core/clips.js'
 import { AppError } from '../lib/errors.js'
 import { quoteItemsFor, type JobSpec } from '../jobs/runner.js'
 import { displayPrice } from '../costs/quotes.js'
@@ -270,7 +271,25 @@ export async function buildScenePromptWrite(deps: Deps, ctx: Ctx, row: Character
 
 // ── Generate: stills for one scene, on one or two models ────────────
 
-export async function buildSceneRun(deps: Deps, ctx: Ctx, row: CharacterRow, input: { sceneId: string; models: string[]; variations: number; reason?: string; withQa: boolean; allowRepeat?: boolean }): Promise<SceneBuilt> {
+// The still prompt for one scene model, from a written text: the Studio adds
+// the reference line, the wearing and mark sides, and the REALISM block.
+// Used when "Write and generate" hands its written text to the stills.
+export async function writtenStillPrompt(deps: Deps, ctx: Ctx, row: CharacterRow, sceneId: string, sceneModel: string, text: string, reason?: string): Promise<string> {
+  const scene = await getScene(deps, ctx, sceneId)
+  const ch = toData(row)
+  const f = sceneFields(deps, scene)
+  const { templates, scenes: sc, views, review } = deps.config.pipeline
+  const sw = await ruleSwitches(deps, ctx, row.id)
+  const entry = modelEntry(deps, sceneModel)
+  const identity = identityForModel(ch.identities, sceneModel)
+  const mode: ReferenceMode = entry.max_refs > 0 ? 'refs' : identity ? 'trained' : 'text'
+  const reasonAction = reason ? review.reasons.find(r => r.id === reason)?.action : undefined
+  const addendum = reasonAction ? review.actions[reasonAction]?.prompt_addendum ?? '' : ''
+  const sceneRules = { outfitOverride: sw.on('scene-outfit-override'), brandFree: sw.on('scene-brand-free'), colors: sw.on('scene-colors'), referenceLine: sw.on('scene-reference-slot') }
+  return assembleStillPrompt(templates, sc, views, f, ch, mode, text, { identityBlock: identity?.promptBlock, warnings: [], addendum, rules: sceneRules, flawDose: sw.on('realism-flaw-dose') })
+}
+
+export async function buildSceneRun(deps: Deps, ctx: Ctx, row: CharacterRow, input: { sceneId: string; models: string[]; variations: number; reason?: string; withQa: boolean; allowRepeat?: boolean; write?: boolean }): Promise<SceneBuilt> {
   const scene = await getScene(deps, ctx, input.sceneId)
   if (scene.characterId !== row.id) throw new AppError('bad_request', 'That scene belongs to another character.')
   const ch = toData(row)
@@ -304,8 +323,13 @@ export async function buildSceneRun(deps: Deps, ctx: Ctx, row: CharacterRow, inp
   // Default rule scene-prompt-writer: the written prompt (Claude's, or the
   // owner's edit) is the scene text; the Studio adds its own lines and the
   // REALISM block per model. Without one, the template builds it.
-  const written = sw.on('scene-prompt-writer') ? scenePrompts(scene.prompts).still : undefined
-  if (sw.on('scene-prompt-writer') && !written) {
+  const written = sw.on('scene-prompt-writer') && !input.write ? scenePrompts(scene.prompts).still : undefined
+  // "Write and generate": the writer runs first; every still waits for it
+  // and takes its text (until then each holds the template prompt, which is
+  // what the quote and the checks below see).
+  const writer = input.write ? (await buildScenePromptWrite(deps, ctx, row, { sceneId: scene.id, target: 'still' })).specs[0]! : null
+  if (writer) specs.push(writer)
+  if (sw.on('scene-prompt-writer') && !written && !input.write) {
     warnings.push({ ruleId: 'scene-prompt-writer', spec: '9', title: 'No written prompt yet', severity: 'warning', message: 'This run uses the template prompt. Write the prompt above Generate to use natural sentences instead.' })
   }
   for (const model of models) {
@@ -334,7 +358,9 @@ export async function buildSceneRun(deps: Deps, ctx: Ctx, row: CharacterRow, inp
       }), `${entry.label} scene prompt`))
       const genIndex = specs.length
       const what = `${label}, ${entry.label}${input.variations > 1 ? `, still ${v + 1}` : ''}`
-      specs.push({ type: 'gen', stage: 'scene', purpose: `scene:${scene.id}`, label: what, request })
+      specs.push(writer
+        ? { type: 'gen', stage: 'scene', purpose: `scene:${scene.id}`, label: what, request: { ...request, promptFrom: { sceneModel: model, ...(input.reason ? { reason: input.reason } : {}) } }, parentIndex: 0 }
+        : { type: 'gen', stage: 'scene', purpose: `scene:${scene.id}`, label: what, request })
       let qaParent = genIndex
       // Face match against the face and closest-angle refs (SPEC 6).
       const faceRefs = refs.filter(r => r.role !== 'body').map(r => ({ refId: r.refId, assetId: r.assetId }))
@@ -349,9 +375,22 @@ export async function buildSceneRun(deps: Deps, ctx: Ctx, row: CharacterRow, inp
       if (input.withQa) specs.push(...await sceneQaSpecs(deps, ctx, ch, f, { sceneId: scene.id, parentIndex: qaParent, faceRefs, label: what }))
     }
   }
+  const count = `${models.length > 1 ? `${models.length} models x ` : ''}${input.variations} still${input.variations > 1 ? 's' : ''}`
+  if (writer) {
+    const ask = writer.request as { system: string; prompt: string }
+    return {
+      purpose: `scene:${scene.id}`, specs,
+      preview: {
+        title: `${label}: write the prompt, then ${count}`,
+        prompts: [{ label: 'Prompt writer', text: `${ask.system}\n${ask.prompt}`, wrapped: hardWrap(`${ask.system}\n${ask.prompt}`) }],
+        warnings: [...dedupe(realism), ...warnings],
+        invalidates: [],
+      },
+    }
+  }
   return {
     purpose: `scene:${scene.id}`, specs,
-    preview: { title: `${label}: ${models.length > 1 ? `${models.length} models x ` : ''}${input.variations} still${input.variations > 1 ? 's' : ''}`, prompts, warnings: [...dedupe(realism), ...warnings], invalidates: [] },
+    preview: { title: `${label}: ${count}`, prompts, warnings: [...dedupe(realism), ...warnings], invalidates: [] },
   }
 }
 
@@ -436,8 +475,7 @@ export async function buildSceneUpscale(deps: Deps, ctx: Ctx, row: CharacterRow,
 // continuous take, the owner's directions, the REALISM block. Each take is
 // checked locally when it arrives (free).
 
-const VIDEO_OPS = new Set(['video', 'video_upscale'])
-const isVideoCandidate = (c: { op: string }) => VIDEO_OPS.has(c.op)
+const isVideoCandidate = (c: { op: string }) => isVideoOp(c.op)
 
 export interface SceneVideoInput {
   candidateId: string

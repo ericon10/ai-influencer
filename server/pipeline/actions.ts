@@ -68,6 +68,9 @@ export const actionSchema = z.discriminatedUnion('type', [
     reason: z.string().optional(), withQa: z.boolean().optional(),
     // Silences the repeat note (rule scene-combo-log, off unless switched on).
     allowRepeat: z.boolean().optional(),
+    // "Write and generate" (owner, 2026-10-13): the prompt writer runs first
+    // and the stills use what it writes; one price for both.
+    write: z.boolean().optional(),
   }),
   // Still edits (Stage 8): one change per pass, an upscale, a re-check.
   z.object({

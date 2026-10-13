@@ -10,7 +10,10 @@ import { registerPipelineHooks } from './hooks.js'
 import { estimateAction, runAction, type StudioAction } from './actions.js'
 import { importCharacter } from './files.js'
 import { createScene, sceneCandidates } from './scenes.js'
-import { addBroll, contentView, createContent, getContent, startRender, updateContent, type ContentOutputs } from './content.js'
+import { addBroll, batchSources, contentView, createContent, duplicateContent, getContent, postScene, startRender, updateContent, type BatchSpec, type ContentOutputs } from './content.js'
+import { createCharacter } from './characters.js'
+import { addClip, libraryView } from './clips.js'
+import { approveSceneCandidate, getScene } from './scenes.js'
 import { renderPlaceholderPortrait } from '../providers/mock.js'
 import { makeClip } from '../media/testClips.js'
 import { probeFile } from '../media/ffmpeg.js'
@@ -25,6 +28,8 @@ const FIX = join(process.cwd(), 'fixtures', 'callie')
 let h: Harness
 let characterId: string
 let clipId: string
+let clipId2: string
+let sceneId: string
 let stillIds: string[]
 let brollId: string
 let dir: string
@@ -51,12 +56,14 @@ beforeAll(async () => {
   const images: Record<string, { data: Buffer }> = {}
   for (let i = 0; i <= 11; i++) images[`REF-${String(i).padStart(2, '0')}`] = { data: await renderPlaceholderPortrait(`Callie REF-${i}`) }
   characterId = (await importCharacter(h.deps, h.ctx, md, { images })).characterId
-  const sceneId = (await createScene(h.deps, h.ctx, characterId, { brief: 'Callie laughs at her laptop in a cafe' })).id
+  sceneId = (await createScene(h.deps, h.ctx, characterId, { brief: 'Callie laughs at her laptop in a cafe' })).id
   await updateScene(sceneId)
   await run({ type: 'scene', characterId, sceneId, models: ['higgsfield/nano-banana-2.1'], variations: 2, withQa: false })
   stillIds = (await sceneCandidates(h.deps, h.ctx, [sceneId])).filter(c => c.op === 'generate' && c.assetId).map(c => c.id)
   await run({ type: 'scene_video', characterId, candidateId: stillIds[0]!, motion: 'Callie laughs at the screen', directions: 'No talking.', durationSec: 5, aspect: '9:16', audio: false, takes: 1, test: false })
   clipId = (await sceneCandidates(h.deps, h.ctx, [sceneId])).find(c => c.op === 'video' && c.assetId)!.id
+  await run({ type: 'scene_video', characterId, candidateId: stillIds[1]!, motion: 'Callie looks up and smiles', directions: 'No talking.', durationSec: 5, aspect: '9:16', audio: false, takes: 1, test: false })
+  clipId2 = (await sceneCandidates(h.deps, h.ctx, [sceneId])).find(c => c.op === 'video' && c.assetId && c.id !== clipId)!.id
 }, 240_000)
 
 // The prompt writer is on by default; a typed prompt keeps these runs quick.
@@ -144,4 +151,103 @@ describe('content builder (demo mode)', () => {
     expect(Object.keys(zip).filter(n => n.endsWith('.mp4'))).toHaveLength(3)
     expect(Buffer.from(zip['captions.txt']!).toString()).toContain('01. POV: studying with AI (1)')
   }, 180_000)
+})
+
+describe('posts (UX-PLAN.md)', () => {
+  it('keeps the idea, the account tag and the step it was left on; tags are suggested back', async () => {
+    const item = await createContent(h.deps, h.ctx, { kind: 'meme', characterId, idea: 'Callie reacts to her code finally running', accountTag: '  Callie   TikTok ' })
+    expect(item).toMatchObject({ idea: 'Callie reacts to her code finally running', accountTag: 'Callie TikTok', step: 'idea', sceneId: null })
+    await updateContent(h.deps, h.ctx, item.id, { step: 'video' })
+    expect((await getContent(h.deps, h.ctx, item.id)).step).toBe('video')
+    const view = await contentView(h.deps, h.ctx)
+    expect(view.accountTags).toContain('Callie TikTok')
+    expect(view.items.find(i => i.id === item.id)).toMatchObject({ accountTag: 'Callie TikTok', step: 'video' })
+  })
+
+  it('makes its scene from the idea the first time stills are asked for, once', async () => {
+    const item = await createContent(h.deps, h.ctx, { kind: 'meme', characterId, idea: 'Callie picks peaches at the market' })
+    const first = await postScene(h.deps, h.ctx, item.id)
+    expect(first.sceneId).toBeTruthy()
+    expect(first.step).toBe('stills')
+    expect((await getScene(h.deps, h.ctx, first.sceneId!)).brief).toBe('Callie picks peaches at the market')
+    expect((await postScene(h.deps, h.ctx, item.id)).sceneId).toBe(first.sceneId)
+  })
+
+  it('switching the character drops its scene, clips and stills, and keeps the idea and B-roll', async () => {
+    const other = await createCharacter(h.deps, h.ctx, { name: 'Maya' })
+    const item = await createContent(h.deps, h.ctx, { kind: 'meme', characterId, idea: 'A laugh', sceneId, spec: { clipId, stillId: stillIds[0], brollId, caption: 'hi' } })
+    await expect(updateContent(h.deps, h.ctx, item.id, { sceneId: (await createScene(h.deps, h.ctx, other.id, { brief: 'x' })).id })).rejects.toThrow(/another character/)
+    const moved = await updateContent(h.deps, h.ctx, item.id, { characterId: other.id })
+    expect(moved).toMatchObject({ characterId: other.id, sceneId: null, idea: 'A laugh' })
+    expect(moved.spec).toMatchObject({ clipId: null, stillId: null, brollId, caption: 'hi' })
+  })
+
+  it('"Make another like this" copies everything but the render, and opens at the Text step', async () => {
+    const item = await createContent(h.deps, h.ctx, { kind: 'meme', characterId, idea: 'Code works', accountTag: 'Callie TikTok', sceneId, spec: { clipId, caption: 'first one' } })
+    await startRender(h.deps, h.ctx, item.id)
+    await drain(h, 20)
+    expect((await getContent(h.deps, h.ctx, item.id)).status).toBe('ready')
+    const copy = await duplicateContent(h.deps, h.ctx, item.id)
+    expect(copy.id).not.toBe(item.id)
+    expect(copy).toMatchObject({ kind: 'meme', characterId, idea: 'Code works', accountTag: 'Callie TikTok', sceneId, step: 'text', status: 'draft', outputs: {} })
+    expect(copy.spec).toMatchObject({ clipId, caption: 'first one' })
+  })
+
+  it('a batch rotates its clips and B-roll across the captions', async () => {
+    const spec = { clipIds: ['a', 'b'], brollIds: ['x', 'y', 'z'] } as BatchSpec
+    expect([0, 1, 2, 3].map(i => batchSources(spec, i))).toEqual([
+      { clipId: 'a', brollId: 'x' }, { clipId: 'b', brollId: 'y' }, { clipId: 'a', brollId: 'z' }, { clipId: 'b', brollId: 'x' },
+    ])
+    expect(batchSources({ ...spec, brollIds: [] }, 1)).toEqual({ clipId: 'b', brollId: null })
+    const item = await createContent(h.deps, h.ctx, { kind: 'batch', characterId, spec: { clipIds: [clipId, clipId2], brollSeconds: 1, captions: ['one', 'two', 'three'] } })
+    await startRender(h.deps, h.ctx, item.id)
+    await drain(h, 30)
+    const out = (await getContent(h.deps, h.ctx, item.id)).outputs as ContentOutputs
+    expect(out).toMatchObject({ done: 3, failed: 0, total: 3 })
+    expect(out.videos!.map(v => v?.clipId)).toEqual([clipId, clipId2, clipId])
+  }, 180_000)
+})
+
+describe('uploaded clips and the Library', () => {
+  it('an uploaded video becomes a kept clip, picked in the post it came from, and shows in the Library', async () => {
+    const src = join(dir, 'phone.mp4')
+    await makeClip(src, { width: 720, height: 1280, fps: 30, durationSec: 2, audio: true, source: 'testsrc' })
+    const uploadId = 'upl_' + 'c'.repeat(20)
+    await h.deps.store.put(uploadKey(h.ctx.accountId, uploadId), await readFile(src), 'video/mp4')
+    const post = await createContent(h.deps, h.ctx, { kind: 'meme', characterId })
+    const { id } = await addClip(h.deps, h.ctx, { characterId, uploadId, name: 'IMG_0042.MOV', contentId: post.id })
+    expect(((await getContent(h.deps, h.ctx, post.id)).spec as { clipId: string }).clipId).toBe(id)
+    let lib = await libraryView(h.deps, h.ctx)
+    expect(lib.clips.find(c => c.id === id)).toMatchObject({ status: 'generating', title: 'IMG_0042', op: 'upload' })
+    await drain(h, 20)
+    lib = await libraryView(h.deps, h.ctx, { characterId })
+    const clip = lib.clips.find(c => c.id === id)!
+    expect(clip).toMatchObject({ status: 'approved', characterName: 'Callie', title: 'IMG_0042', error: null })
+    expect(clip.durationSec).toBeCloseTo(2, 0)
+    expect(await probeAsset(clip.assetId)).toMatchObject({ hasAudio: false, width: 720, height: 1280 })
+    // Kept takes show with the still they started from; stills show by scene.
+    expect(lib.clips.some(c => c.id === clipId)).toBe(false)
+    await approveSceneCandidate(h.deps, h.ctx, clipId, { acknowledge: true })
+    lib = await libraryView(h.deps, h.ctx, { characterId })
+    const take = lib.clips.find(c => c.id === clipId)!
+    expect(take.posterId).toBeTruthy()
+    expect(take.sceneTitle).toContain('Callie laughs')
+    expect(lib.stills.some(s => s.id === stillIds[0])).toBe(true)
+    expect(lib.stills.every(s => s.characterId === characterId)).toBe(true)
+    // It renders into the post like any kept take.
+    await updateContent(h.deps, h.ctx, post.id, { spec: { caption: 'phone clip' } })
+    await startRender(h.deps, h.ctx, post.id)
+    await drain(h, 20)
+    expect((await getContent(h.deps, h.ctx, post.id)).status).toBe('ready')
+  }, 120_000)
+
+  it('a file that is not a video fails with a reason and shows as failed', async () => {
+    const uploadId = 'upl_' + 'd'.repeat(20)
+    await h.deps.store.put(uploadKey(h.ctx.accountId, uploadId), Buffer.from('not a video'), 'video/mp4')
+    const { id } = await addClip(h.deps, h.ctx, { characterId, uploadId, name: 'broken.mp4' })
+    await drain(h, 10)
+    const clip = (await libraryView(h.deps, h.ctx)).clips.find(c => c.id === id)!
+    expect(clip.status).toBe('failed')
+    expect(clip.error).toMatch(/could not be read as a video/)
+  })
 })

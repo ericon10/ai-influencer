@@ -19,6 +19,9 @@ import { cleanWriterOutput, type PromptTarget } from '../core/promptWriter.js'
 import { modelLabel } from '../costs/quotes.js'
 import { textureCheck, textureSummary } from './texture.js'
 import { ruleSwitches } from './rules.js'
+import { writtenStillPrompt } from './sceneActions.js'
+import { realismBlockers } from '../core/realism.js'
+import { EXPLICIT_MESSAGE, findExplicitTerms } from '../core/safety.js'
 
 // What each finished scene job does (Stage 7 and 8). Failed QA never
 // reaches the review queue (SPEC 6); a still waits with its reasons and a
@@ -71,16 +74,43 @@ async function onScenePlan(deps: Deps, ctx: Ctx, job: JobRow, out: JobOutcome): 
 // REALISM block of its own, no smoothing words), with what it was written
 // from so a later change to the details can be pointed out.
 async function onScenePrompt(deps: Deps, ctx: Ctx, job: JobRow, out: JobOutcome): Promise<void> {
-  if (out.status !== 'completed') return
   const meta = ((job.request as { meta?: Record<string, unknown> }).meta ?? {}) as { target?: PromptTarget; basis?: string; motion?: string; directions?: string }
   const raw = (out.data ?? {}) as { prompt?: unknown }
-  if (typeof raw.prompt !== 'string' || !raw.prompt.trim() || !meta.target) return
+  if (out.status !== 'completed' || typeof raw.prompt !== 'string' || !raw.prompt.trim() || !meta.target) {
+    // "Write and generate": without a written prompt the stills do not run
+    // (their holds are released; nothing is charged for them).
+    await cancelTree(deps, job.id, 'The prompt writer did not finish, so the stills did not run. Nothing was charged for them.')
+    return
+  }
   const { text } = cleanWriterOutput(raw.prompt)
   await setScenePrompt(deps, ctx, sceneIdOf(job), meta.target, {
     text, source: 'claude', model: modelLabel(deps, `${job.provider}/${job.model}`),
     ...(meta.basis ? { basis: meta.basis } : {}),
     ...(meta.target === 'video' ? { motion: meta.motion ?? '', directions: meta.directions ?? '' } : {}),
   })
+  await startWrittenStills(deps, ctx, job, text)
+}
+
+// The stills of "Write and generate" were quoted with the writer and wait
+// for it. Each takes the written text for its model (the reference line,
+// sides and REALISM block added), checked against the fixed rules again
+// because this prompt was not there when the run was checked.
+async function startWrittenStills(deps: Deps, ctx: Ctx, job: JobRow, text: string): Promise<void> {
+  const waiting = (await childJobs(deps, job.id)).filter(c => c.status === 'waiting' && (c.request as GenRequest).promptFrom)
+  if (!waiting.length) return
+  const row = await getCharacter(deps, ctx, job.characterId!)
+  const prompts = new Map<string, string>()
+  for (const c of waiting) {
+    const req = c.request as GenRequest
+    const prompt = await writtenStillPrompt(deps, ctx, row, sceneIdOf(job), req.promptFrom!.sceneModel, text, req.promptFrom!.reason)
+    const problems = [...realismBlockers(prompt, { kind: req.kind, stage: c.stage }), ...(findExplicitTerms(prompt).length ? [EXPLICIT_MESSAGE] : [])]
+    if (problems.length) {
+      await cancelTree(deps, job.id, `The written prompt was refused: ${problems.join(' ')} Edit it above Generate and run again; nothing was charged for the stills.`)
+      return
+    }
+    prompts.set(c.id, prompt)
+  }
+  await activateChildren(deps, job.id, child => (prompts.has(child.id) ? { prompt: prompts.get(child.id), promptFrom: undefined } : {}))
 }
 
 // The free local checks on a still when no Claude check runs (owner,

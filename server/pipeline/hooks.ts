@@ -16,6 +16,7 @@ import { registerImportCheck } from './importCheck.js'
 import { textureCheck, textureSummary } from './texture.js'
 import { freeChecksOnly, registerSceneHooks } from './sceneHooks.js'
 import { registerContent } from './content.js'
+import { registerClips } from './clips.js'
 import type { GenRequest } from '../providers/types.js'
 
 // What each finished job does to the character. Registered once at boot.
@@ -191,4 +192,5 @@ export function registerPipelineHooks(): void {
   registerSceneHooks()
   registerImportCheck()
   registerContent()
+  registerClips()
 }

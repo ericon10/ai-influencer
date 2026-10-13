@@ -47,6 +47,10 @@ export interface GenRequest {
   modelTest?: true
   // Upscale factor for kind "upscale" (SPEC 5.1 rule 6: 2x, never more).
   scale?: 2
+  // A still that waits for the prompt writer ("Write and generate"): its
+  // prompt is rebuilt from the written text for this scene model when the
+  // writer finishes. Never sent to a provider.
+  promptFrom?: { sceneModel: string; reason?: string }
   // Higgsfield only. Stamped when the run is quoted, from the account's
   // default, so switching the default needs a new quote.
   billing?: HiggsfieldBilling

@@ -214,7 +214,9 @@ export const candidates = pgTable('candidates', {
   // made from (an edit, crop, upscale, mirror or drift lock), and how.
   sceneId: text('scene_id'),
   parentId: text('parent_id'),
-  op: text('op').notNull().default('generate'), // generate | edit | crop | upscale | mirror | drift_lock
+  op: text('op').notNull().default('generate'), // generate | edit | crop | upscale | mirror | drift_lock | end_frame | video | video_upscale | upload | clone
+  // A name for a clip the owner brought in (an upload's file name).
+  label: text('label').notNull().default(''),
   heroPromptIndex: integer('hero_prompt_index'),
   jobId: text('job_id'),
   assetId: text('asset_id'),
@@ -293,14 +295,23 @@ export const brollClips = pgTable('broll_clips', {
   archivedAt: timestamp('archived_at', { withTimezone: true }),
 }, t => [index('broll_account_idx').on(t.accountId, t.createdAt)])
 
-// A meme video, a slideshow or a batch: what it is made of (spec), and what
-// rendering it produced (outputs). Drafts are saved as they are edited.
+// A post (UX-PLAN.md): a video post, a slideshow or a batch. What it is made
+// of (spec), and what rendering it produced (outputs). Drafts are saved as
+// they are edited, and the post reopens at the step it was left on.
 export const contentItems = pgTable('content_items', {
   id: text('id').primaryKey(),
   accountId: text('account_id').notNull().references(() => accounts.id),
   characterId: text('character_id'),
-  kind: text('kind').notNull(), // meme | slideshow | batch
+  kind: text('kind').notNull(), // meme (a video post) | slideshow | batch
   title: text('title').notNull().default(''),
+  // The owner's idea for the post, in their own words.
+  idea: text('idea').notNull().default(''),
+  // The scene its stills come from (made in the post, or picked).
+  sceneId: text('scene_id'),
+  // Where it gets posted, for example "Callie TikTok" (Posts filters by it).
+  accountTag: text('account_tag').notNull().default(''),
+  // The step it was left on: idea | stills | video | text | finish.
+  step: text('step').notNull().default('idea'),
   spec: jsonb('spec').notNull().default({}),
   status: text('status').notNull().default('draft'), // draft | rendering | ready | failed
   outputs: jsonb('outputs').notNull().default({}),
