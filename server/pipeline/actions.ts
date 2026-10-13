@@ -22,6 +22,9 @@ import { assertSuiteCap, buildModelSuite, buildModelTest, startModelSuite, start
 import { approvedAssets, getCandidate, getCharacter, getRef, inspirationAssetIds, setCharacterFields, sheetState, toData } from './characters.js'
 import { buildScenePlan, buildSceneRecheck, buildSceneRun, buildSceneEdit, buildSceneUpscale, type SceneBuilt } from './sceneActions.js'
 import { markSceneBusy } from './scenes.js'
+import { ruleSwitches } from './rules.js'
+import { readBilling } from '../providers/billing.js'
+import { effectiveModel, readModelOverrides } from '../providers/modelOverrides.js'
 
 // Every paid step is an action. The same builder produces the job specs for
 // the estimate and for the run, so the run's fingerprint must match its
@@ -31,8 +34,9 @@ import { markSceneBusy } from './scenes.js'
 export const actionSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('breakdown'), characterId: z.string(), notes: z.string().max(2000).optional() }),
   z.object({ type: z.literal('concepts'), characterId: z.string(), notes: z.string().max(2000).optional() }),
-  // 4 to 8 candidates per hero prompt, across the 3 prompts; one pick becomes REF-00.
-  z.object({ type: z.literal('hero'), characterId: z.string(), runsPerPrompt: z.number().int().min(4).max(8) }),
+  // Candidates per hero prompt, across the 3 prompts (4 to 8 by default,
+  // rule hero-runs); one pick becomes REF-00.
+  z.object({ type: z.literal('hero'), characterId: z.string(), runsPerPrompt: z.number().int().min(1).max(8) }),
   z.object({ type: z.literal('upscale'), characterId: z.string() }),
   z.object({ type: z.literal('card_update'), characterId: z.string() }),
   z.object({
@@ -52,6 +56,8 @@ export const actionSchema = z.discriminatedUnion('type', [
     type: z.literal('scene'), characterId: z.string(), sceneId: z.string(),
     models: z.array(z.string()).min(1).max(4), variations: z.number().int().min(1).max(8),
     reason: z.string().optional(), withQa: z.boolean().default(true),
+    // "Use anyway" on a combo log repeat (default rule scene-combo-log).
+    allowRepeat: z.boolean().optional(),
   }),
   // Still edits (Stage 8): one change per pass, an upscale, a re-check.
   z.object({
@@ -83,6 +89,9 @@ const QA_SIZE: Record<string, { width: number; height: number }> = {
   full_body: { width: 882, height: 1568 },
 }
 
+const warn = (ruleId: string, title: string, message: string, spec = ''): RuleViolation => ({ ruleId, spec, title, severity: 'warning', message })
+
+// Only fixed rules can stop a run; defaults arrive here as warnings.
 function lintOrThrow(violations: RuleViolation[], label: string): RuleViolation[] {
   const errors = blocking(violations)
   if (errors.length) {
@@ -148,6 +157,9 @@ export async function buildAction(deps: Deps, ctx: Ctx, action: StudioAction): P
   const ch = toData(row)
   const tpl = deps.config.pipeline.templates
   const { views, rules, sheet } = deps.config.pipeline
+  // Default rules as switched for this character (Settings, Rules).
+  const sw = await ruleSwitches(deps, ctx, row.id)
+  const looks = { background: sw.on('sheet-background') ? sw.value('sheet-background') ?? null : null, flawDose: sw.on('realism-flaw-dose') }
   const scene = (b: SceneBuilt): BuiltAction => ({ purpose: b.purpose, characterId: row.id, specs: b.specs, preview: b.preview })
 
   switch (action.type) {
@@ -181,8 +193,8 @@ export async function buildAction(deps: Deps, ctx: Ctx, action: StudioAction): P
     }
 
     case 'hero': {
-      if (!Number.isInteger(action.runsPerPrompt) || action.runsPerPrompt < 4 || action.runsPerPrompt > 8) {
-        throw new AppError('bad_request', 'Run 4 to 8 candidates per hero prompt, across the 3 prompts, then pick one.')
+      if (!Number.isInteger(action.runsPerPrompt) || action.runsPerPrompt < 1 || action.runsPerPrompt > 8) {
+        throw new AppError('bad_request', 'Run 1 to 8 candidates per hero prompt.')
       }
       const issues = validateCharacter(ch).filter(i => i.severity === 'error')
       if (issues.length) throw new AppError('invalid_request', issues.map(i => i.message).join(' '))
@@ -192,20 +204,21 @@ export async function buildAction(deps: Deps, ctx: Ctx, action: StudioAction): P
       const identity = identityForModel(ch.identities, (await liveRoute(deps, ctx, 'hero')).model)
       // Bare-faced, with the REALISM and AVOID blocks (Realism principle).
       const realism: RealismWarning[] = []
-      const prompts = buildHeroPrompts(tpl, views, ch, { identityBlock: identity?.promptBlock, warnings: realism })
+      const prompts = buildHeroPrompts(tpl, views, ch, { identityBlock: identity?.promptBlock, warnings: realism, ...looks })
       const warnings: RuleViolation[] = dedupe(realism)
+      if (action.runsPerPrompt < 4 && sw.on('hero-runs')) warnings.push(warn('hero-runs', 'Fewer than 4 candidates per prompt', 'More candidates per prompt usually make a better pick. Running anyway.', '5.1.2'))
       const specs: JobSpec[] = []
       prompts.forEach((prompt, i) => {
         for (let r = 0; r < action.runsPerPrompt; r++) {
           // Text only: the hero never carries an attachment (SPEC 5.1 rule 1).
           const request: GenRequest = { kind: 'image', model: route.model, prompt, aspect: route.aspect ?? '3:4', resolution: route.resolution, quality: route.quality, seed: 1000 * (i + 1) + r, ...(identity ? { identityId: identity.externalId } : {}) }
-          warnings.push(...lintOrThrow(lintPrompt(rules, prompt, { stage: 'hero', framing: 'chest_up', kind: 'image', request, marks: ch.marks, identityBlock: identity?.promptBlock }), `Hero prompt ${i + 1}`))
+          warnings.push(...lintOrThrow(lintPrompt(rules, prompt, { stage: 'hero', framing: 'chest_up', kind: 'image', request, marks: ch.marks, identityBlock: identity?.promptBlock, switches: sw }), `Hero prompt ${i + 1}`))
           specs.push({ type: 'gen', stage: 'hero', purpose: `hero:${i}`, label: `Hero prompt ${i + 1}, run ${r + 1}`, request })
         }
       })
       return {
         purpose: 'hero', characterId: row.id, specs,
-        preview: { title: `Hero: 3 prompts x ${action.runsPerPrompt} runs`, prompts: prompts.map((p, i) => ({ label: `Hero prompt ${i + 1}`, text: p, wrapped: hardWrap(p) })), warnings, invalidates: [] },
+        preview: { title: `Hero: 3 prompts x ${action.runsPerPrompt} runs`, prompts: prompts.map((p, i) => ({ label: `Hero prompt ${i + 1}`, text: p, wrapped: hardWrap(p) })), warnings: uniqueWarnings(warnings), invalidates: [] },
       }
     }
 
@@ -214,13 +227,14 @@ export async function buildAction(deps: Deps, ctx: Ctx, action: StudioAction): P
       if (!ref00) throw new AppError('bad_request', 'Pick a hero (REF-00) first.')
       const asset = await getAsset(deps, ctx, ref00)
       const limit = sheet.settings.upscale_ref00_below_px
-      if ((asset.height ?? 0) >= limit) throw new AppError('bad_request', `REF-00 is already ${asset.height}px tall; upscaling is only needed under ${limit}px.`)
+      const warnings: RuleViolation[] = []
+      if ((asset.height ?? 0) >= limit && sw.on('ref00-upscale-size')) warnings.push(warn('ref00-upscale-size', 'REF-00 is already large', `REF-00 is ${asset.height}px tall; an upscale is usually only needed under ${limit}px. Running anyway.`, '5.1.6'))
       const route = await resolveRoute(deps, ctx, 'upscale')
       const request: GenRequest = { kind: 'upscale', model: route.model, prompt: 'Upscale 2x, keep every detail identical.', refs: [{ assetId: ref00 }], scale: 2 }
-      lintOrThrow(lintPrompt(rules, request.prompt, { kind: 'upscale', request }), 'Upscale')
+      warnings.push(...lintOrThrow(lintPrompt(rules, request.prompt, { kind: 'upscale', request, switches: sw }), 'Upscale'))
       return {
         purpose: 'upscale', characterId: row.id,
-        preview: { title: 'Upscale REF-00 2x', prompts: [], warnings: [], invalidates: [] },
+        preview: { title: 'Upscale REF-00 2x', prompts: [], warnings, invalidates: [] },
         specs: [{ type: 'gen', stage: 'hero', purpose: 'upscale', label: 'Upscale REF-00 2x', request }],
       }
     }
@@ -244,18 +258,27 @@ export async function buildAction(deps: Deps, ctx: Ctx, action: StudioAction): P
       if (shot.source === 'hero') throw new AppError('bad_request', 'REF-00 comes from the hero pick. Run more heroes to replace it.')
       const approved = await approvedAssets(deps, ctx, row.id)
       const state = await sheetState(deps, ctx, row.id)
-      const attach = action.refsMode === 'ref00_only' ? ['REF-00'] : shot.attach
-      const missing = attach.filter(id => !approved.has(id) || state.states.find(s => s.refId === id)?.status !== 'approved')
-      if (missing.length) throw new AppError('bad_request', `Approve ${missing.join(' and ')} first.`)
-      // The lock holds the real model; demo mode runs its mock instead.
-      const lockedModel = await sheetModel(deps, ctx, row.sheetLock as { model: string } | null)
+      const wanted = action.refsMode === 'ref00_only' ? ['REF-00'] : shot.attach
+      const usable = (id: string) => approved.has(id) && ['approved', 'stale'].includes(state.states.find(s => s.refId === id)?.status ?? '')
+      // Default rule sheet-order: a shot attaches the shots it depends on;
+      // when one is not approved yet it uses the approved ones and says so.
+      const missing = wanted.filter(id => !usable(id))
+      let attach = wanted.filter(usable)
+      if (!attach.length) attach = usable('REF-00') ? ['REF-00'] : [...approved.keys()].filter(usable).slice(0, 1)
+      if (!attach.length) throw new AppError('bad_request', 'Pick a hero (REF-00) first. The sheet is built from it.')
+      const orderWarning = missing.length && sw.on('sheet-order')
+        ? [warn('sheet-order', 'Built out of order', `${missing.join(' and ')} ${missing.length > 1 ? 'are' : 'is'} not approved yet, so this shot uses ${attach.join(' and ')}. Running anyway.`, '4.1')]
+        : []
+      // The lock holds the real model (default rule sheet-one-model); demo
+      // mode runs its mock instead. Switched off, the current sheet route runs.
+      const lockedModel = sw.on('sheet-one-model') ? await sheetModel(deps, ctx, row.sheetLock as { model: string } | null) : (await liveRoute(deps, ctx, 'sheet')).model
       const route = await forMode(deps, ctx, { ...await liveRoute(deps, ctx, 'sheet'), model: lockedModel })
       const model = route.model
       const reasonAction = action.reason ? deps.config.pipeline.review.reasons.find(r => r.id === action.reason)?.action : undefined
       const addendum = reasonAction ? deps.config.pipeline.review.actions[reasonAction]?.prompt_addendum ?? '' : ''
       const identity = identityForModel(ch.identities, lockedModel)
       const realism: RealismWarning[] = []
-      const prompt = buildSheetPrompt(tpl, views, shot, ch, addendum, { identityBlock: identity?.promptBlock, warnings: realism })
+      const prompt = buildSheetPrompt(tpl, views, shot, ch, addendum, { identityBlock: identity?.promptBlock, warnings: realism, ...looks })
       const specs: JobSpec[] = []
       let warnings: RuleViolation[] = []
       for (let v = 0; v < action.variations; v++) {
@@ -266,9 +289,9 @@ export async function buildAction(deps: Deps, ctx: Ctx, action: StudioAction): P
         }
         warnings = lintOrThrow(lintPrompt(rules, prompt, {
           stage: 'sheet', framing: shot.framing, kind: 'image_edit', request: { ...request, model: lockedModel }, marks: ch.marks,
-          sheetLock: { model: lockedModel }, aspectByFraming: sheet.settings.aspect, identityBlock: identity?.promptBlock,
+          sheetLock: row.sheetLock as { model: string } | null, aspectByFraming: sheet.settings.aspect, identityBlock: identity?.promptBlock, switches: sw,
         }), shot.label)
-        warnings = [...dedupe(realism), ...warnings]
+        warnings = [...orderWarning, ...dedupe(realism), ...warnings]
         const genIndex = specs.length
         specs.push({ type: 'gen', stage: 'sheet', purpose: `sheet:${shot.id}`, label: `${shot.label}${action.variations > 1 ? `, variation ${v + 1}` : ''}`, request })
         if (action.withQa) specs.push(...await qaSpecs(deps, ctx, row.id, shot.id, { parentIndex: genIndex }))
@@ -295,7 +318,31 @@ export async function estimateAction(deps: Deps, ctx: Ctx, action: StudioAction)
   const built = await buildAction(deps, ctx, action)
   const quote = await quoteJobs(deps, ctx, { purpose: built.purpose, characterId: built.characterId, specs: built.specs })
   if (action.type === 'model_suite') assertSuiteCap(deps, quote.totalMicros)
-  return { quote, preview: built.preview }
+  const untested = action.type === 'model_test' || action.type === 'model_suite' ? [] : await untestedModels(deps, ctx, built)
+  return { quote, preview: { ...built.preview, warnings: uniqueWarnings([...built.preview.warnings, ...untested]) } }
+}
+
+function uniqueWarnings(list: RuleViolation[]): RuleViolation[] {
+  const seen = new Set<string>()
+  return list.filter(w => { const k = `${w.ruleId}|${w.match ?? ''}|${w.message}`; if (seen.has(k)) return false; seen.add(k); return true })
+}
+
+// Default rule model-tested: a model on the API that has not passed its
+// paid test yet runs with a warning instead of being refused.
+async function untestedModels(deps: Deps, ctx: Ctx, built: BuiltAction): Promise<RuleViolation[]> {
+  const sw = await ruleSwitches(deps, ctx, built.characterId)
+  if (!sw.on('model-tested')) return []
+  const billing = (await readBilling(deps.db, ctx.accountId)).default
+  const overrides = await readModelOverrides(deps.db, ctx.accountId)
+  const out: RuleViolation[] = []
+  for (const s of built.specs) {
+    if (s.type !== 'gen' || !s.request.model.startsWith('higgsfield/')) continue
+    const base = deps.config.models.models.find(m => m.ref === s.request.model)
+    if (!base || base.api === false || (s.request.billing ?? billing) !== 'api') continue
+    if (effectiveModel(base, overrides[base.ref]).confirmed) continue
+    out.push(warn('model-tested', `${base.label} has not passed its test yet`, `${base.label} runs on the API without its small paid test. If its endpoint is wrong the run fails and costs nothing. You can test it in Settings, Model tests.`, 'D2'))
+  }
+  return out
 }
 
 export async function runAction(deps: Deps, ctx: Ctx, action: StudioAction, quoteId: string | undefined, confirmed: boolean) {

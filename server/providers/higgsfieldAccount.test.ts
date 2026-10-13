@@ -212,9 +212,11 @@ describe('account adapter edge cases', () => {
     }
   })
 
-  it('refuses video with audio on before anything is sent', async () => {
-    await expect(adapter().submit({ ...video, audio: undefined }, { idempotencyKey: 'k' })).rejects.toThrow(/audio off/)
-    expect(fake.calls).toHaveLength(0)
+  it('sends audio off unless the request asks for it (default rule video-audio-off)', async () => {
+    await adapter().submit({ ...video, audio: undefined }, { idempotencyKey: 'k' })
+    expect(fake.tool('generate_video_batch').at(-1)!.args.requests[0].params.generate_audio).toBe(false)
+    await adapter().submit({ ...video, audio: true }, { idempotencyKey: 'k2' })
+    expect(fake.tool('generate_video_batch').at(-1)!.args.requests[0].params.generate_audio).toBe(true)
   })
 
   it('reports status from an immediate snapshot, and a missing job as failed', async () => {

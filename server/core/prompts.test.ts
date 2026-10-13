@@ -70,36 +70,55 @@ describe('hero prompts', () => {
 })
 
 describe('rules engine', () => {
-  const lint = (p: string, ctx: Parameters<typeof lintPrompt>[2]) => blocking(lintPrompt(rules, p, ctx)).map(v => v.ruleId)
+  // Defaults warn, they never block (owner ruling G1); fixed rules block.
+  const all = (p: string, ctx: Parameters<typeof lintPrompt>[2]) => lintPrompt(rules, p, ctx)
+  const lint = (p: string, ctx: Parameters<typeof lintPrompt>[2]) => all(p, ctx).map(v => v.ruleId)
+  const blocks = (p: string, ctx: Parameters<typeof lintPrompt>[2]) => blocking(all(p, ctx)).map(v => v.ruleId)
 
-  it('rejects attachments on the hero run (5.1.1)', () => {
+  it('flags attachments on the hero run as a warning (5.1.1)', () => {
     expect(lint('Chest-up portrait', { stage: 'hero', request: { refs: [{ assetId: 'insp' }] } })).toContain('hero-text-only')
+    expect(blocks('Chest-up portrait', { stage: 'hero', request: { refs: [{ assetId: 'insp' }] } })).not.toContain('hero-text-only')
   })
-  it('rejects glam on hero and sheet (5.1.3)', () => {
-    expect(lint('soft glam with a bold lip', { stage: 'sheet' })).toContain('natural-baseline')
+  it('blocks glam on hero and sheet: the bare face is fixed (5.1.3)', () => {
+    expect(blocks('soft glam with a bold lip', { stage: 'sheet' })).toContain('natural-baseline')
   })
-  it('rejects jeans in a chest-up prompt (5.1.8)', () => {
+  it('flags jeans in a chest-up hero or sheet prompt as a warning (5.1.8)', () => {
     expect(lint('white tee and jeans', { stage: 'sheet', framing: 'chest_up' })).toContain('chest-up-no-legwear')
-    // Scenes always name the footwear (SPEC 5.2 rule 16), whatever the framing.
+    expect(blocks('white tee and jeans', { stage: 'sheet', framing: 'chest_up' })).toEqual([])
     expect(lint('white tee and jeans', { stage: 'scene', framing: 'chest_up' })).not.toContain('chest-up-no-legwear')
   })
-  it('rejects cup sizes and measurements (5.1.9)', () => {
+  it('flags cup sizes and measurements as warnings (5.1.9)', () => {
     expect(lint('a C cup', {})).toContain('neutral-body-cups')
     expect(lint('measurements 34-24-36', {})).toContain('neutral-body-measurements')
+    expect(blocks('a C cup, measurements 34-24-36', {})).toEqual([])
     expect(lint('holding a cup of coffee', {})).toEqual([])
   })
-  it('rejects a model switch mid-sheet (5.1.7)', () => {
+  it('flags a model switch mid-sheet as a warning (5.1.7)', () => {
     expect(lint('x', { stage: 'sheet', sheetLock: { model: 'higgsfield/gpt-image-2.5' }, request: { model: 'higgsfield/nano-banana-2' } })).toContain('sheet-one-model')
   })
-  it('enforces audio off and silent phrasing for video (5.4.27-29)', () => {
+  it('video recipe rules are warnings: audio, silent phrasing, calm action, start frame (5.4.27-29)', () => {
     const ok = 'listens, nods. Style: silent, no audio, no dialogue. Avoid: talking, singing, exaggerated mouth movement'
     expect(lint(ok, { kind: 'video', request: { kind: 'video', audio: false, startFrame: { assetId: 's' } } })).toEqual([])
     expect(lint(ok, { kind: 'video', request: { kind: 'video', startFrame: { assetId: 's' } } })).toContain('video-audio-off')
     expect(lint('her mouth moving as she talks. silent, no audio, no dialogue', { kind: 'video', request: { kind: 'video', audio: false, startFrame: { assetId: 's' } } })).toContain('video-no-talking')
     expect(lint('silent, no audio, no dialogue', { kind: 'video', request: { kind: 'video', audio: false } })).toContain('video-image-only')
+    expect(blocks('her mouth moving as she talks', { kind: 'video', request: { kind: 'video', audio: true } })).toEqual([])
   })
-  it('rejects em-dashes in generated copy (5.7.42)', () => {
+  it('flags em-dashes as a warning (5.7.42)', () => {
     expect(lint(`calm ${EM} warm`, {})).toContain('no-em-dash')
+    expect(blocks(`calm ${EM} warm`, {})).toEqual([])
+  })
+  it('a default switched off is not checked at all', () => {
+    const off = { on: (id: string) => id !== 'no-em-dash', value: () => undefined }
+    expect(lint(`calm ${EM} warm`, { switches: off })).not.toContain('no-em-dash')
+  })
+  it('blocks nudity and explicit content: a fixed rule no switch can turn off', () => {
+    const none = { on: () => false, value: () => undefined }
+    expect(blocks('She stands topless on the beach', { switches: none })).toContain('no-explicit')
+    expect(blocks('A nude portrait', {})).toContain('no-explicit')
+    // Negated, in the AVOID block, swimwear and test markers are fine.
+    expect(blocks('Beach day in a yellow one-piece swimsuit, no nudity.\nAVOID: nudity, explicit content.', {})).toEqual([])
+    expect(blocks('portrait [mock:nsfw]', {})).toEqual([])
   })
 })
 
@@ -116,10 +135,13 @@ describe('text helpers', () => {
 })
 
 describe('character validation', () => {
-  it('requires adults, sided marks and neutral body terms', () => {
+  it('21 or older is fixed; marks are optional; body terms are a warning', () => {
     expect(validateCharacter({ age: 24, card: fx.card, marks: fx.marks, body: fx.body })).toEqual([])
-    const bad = validateCharacter({ age: 17, card: 'x', marks: [], body: 'a DD cup' })
-    expect(bad.map(i => i.field)).toEqual(expect.arrayContaining(['age', 'marks', 'body']))
+    const bad = validateCharacter({ age: 20, card: 'x', marks: [], body: 'a DD cup' })
+    expect(bad.filter(i => i.severity === 'error').map(i => i.field)).toEqual(['age'])
+    expect(bad.find(i => i.field === 'body')?.severity).toBe('warning')
+    expect(bad.some(i => i.field === 'marks')).toBe(false)
+    expect(validateCharacter({ age: 21, card: 'x', marks: [], body: '' }).filter(i => i.severity === 'error')).toEqual([])
   })
 })
 
@@ -143,15 +165,18 @@ describe("a character's style never reaches a prompt", () => {
       for (const idea of [...(c.style.ideas ?? []), ...(c.style.hair_options ?? [])]) expect(p.toLowerCase()).not.toContain(idea.toLowerCase())
       expect(p).not.toMatch(/butter-yellow|linen|sundress|pastel/i)
     }
-    // The cuff is the one constant, stated with its side in every sheet prompt.
-    for (const p of prompts.slice(3)) expect(p).toMatch(/gold double-band ear cuff/)
+    // Only the face is constant: the mole, stated with its side. The ear cuff
+    // is optional styling and never put into a sheet prompt.
+    for (const p of prompts.slice(3)) expect(p).not.toMatch(/ear cuff/)
+    for (const p of prompts) expect(p).toMatch(/LEFT brow/)
   })
 
   it('requires every scene to name its own outfit and never carry one over', async () => {
     const { lintPrompt, blocking } = await import('./rules.js')
     const { loadConfig } = await import('../config/load.js')
     const rules = loadConfig().pipeline.rules
-    const ids = (p: string) => blocking(lintPrompt(rules, p, { stage: 'scene' })).map(v => v.ruleId)
+    const ids = (p: string) => lintPrompt(rules, p, { stage: 'scene' }).map(v => v.ruleId)
+    expect(blocking(lintPrompt(rules, 'She laughs at a cafe table, same outfit as before.', { stage: 'scene' }))).toEqual([])
     expect(ids('She laughs at a cafe table, same outfit as before.')).toEqual(expect.arrayContaining(['scene-names-outfit', 'scene-no-carried-outfit']))
     expect(ids('She laughs at a cafe table, wearing a cream linen shirt, light jeans and white sandals.')).not.toContain('scene-names-outfit')
   })

@@ -11,6 +11,7 @@ import {
   pickSceneRefs, sceneFieldsSchema, type ComboEntry, type RefPick, type SceneFields,
 } from '../core/scenes.js'
 import { getCandidate, getCharacter, toData, updateCharacter, approvedAssets, sheetState } from './characters.js'
+import { ruleSwitches } from './rules.js'
 
 // Scenes (Stage 7) and still edits (Stage 8): the scene records, the free
 // steps (crop, mirror) and the human gate. Paid steps are actions.
@@ -63,7 +64,7 @@ function cleanFields(f: Partial<SceneFields>): Partial<SceneFields> {
   const out: Record<string, unknown> = {}
   for (const [k, v] of Object.entries(f)) {
     if (!(k in shape) || v === undefined || v === null) continue
-    out[k] = typeof v === 'string' ? v.slice(0, 400) : v
+    out[k] = typeof v === 'string' ? v.slice(0, 400) : Array.isArray(v) ? v.filter(x => typeof x === 'string').slice(0, 8) : v
   }
   return out as Partial<SceneFields>
 }
@@ -92,11 +93,12 @@ export function comboEntries(ch: ReturnType<typeof toData>): ComboEntry[] {
   return section ? parseComboLog(section.body) : []
 }
 
+// A warning, never a block (default rule scene-combo-log).
 export function comboProblem(deps: Deps, ch: ReturnType<typeof toData>, f: SceneFields): string | null {
   const sc = deps.config.pipeline.scenes
   const entry = comboEntryFor(sc, f, '')
   const hit = comboConflict(comboEntries(ch), entry.moment, entry.camera, sc.settings.combo_window)
-  return hit ? `"${entry.moment}" with "${entry.camera}" was already used on ${hit.date} (${hit.location || 'no place noted'}). Change the moment or the camera (SPEC 5.2 rule 21).` : null
+  return hit ? `"${entry.moment}" with "${entry.camera}" was used on ${hit.date} (${hit.location || 'no place noted'}). A different moment or camera keeps the feed fresh, or use it anyway.` : null
 }
 
 // Writes the scene to the character's combo log once, on its first pick.
@@ -118,11 +120,11 @@ async function logCombo(deps: Deps, ctx: Ctx, scene: SceneRow): Promise<void> {
 export interface SceneRef extends RefPick { assetId: string }
 
 // The sheet refs a scene attaches, chosen by angle (SPEC 5.2 rule 14).
-export async function sceneRefs(deps: Deps, ctx: Ctx, characterId: string, f: Pick<SceneFields, 'view' | 'framing' | 'expression'>): Promise<SceneRef[]> {
+export async function sceneRefs(deps: Deps, ctx: Ctx, characterId: string, f: Pick<SceneFields, 'view' | 'framing' | 'expression'> & { refs?: string[] }, byAngle = true): Promise<SceneRef[]> {
   const approved = await approvedAssets(deps, ctx, characterId)
   const state = await sheetState(deps, ctx, characterId)
   const usable = new Set(state.states.filter(s => s.status === 'approved' || s.status === 'stale').map(s => s.refId).filter(id => approved.has(id)))
-  const picks = pickSceneRefs(deps.config.pipeline.sheet.shots, deps.config.pipeline.views, usable, f, deps.config.pipeline.scenes)
+  const picks = pickSceneRefs(deps.config.pipeline.sheet.shots, deps.config.pipeline.views, usable, f, deps.config.pipeline.scenes, byAngle)
   return picks.map(p => ({ ...p, assetId: approved.get(p.refId)! }))
 }
 
@@ -166,12 +168,19 @@ async function sceneCandidate(deps: Deps, ctx: Ctx, id: string) {
 
 // The human gate for scenes: picks. Several stills of one scene can be
 // picked (a wide still, its crop and a look frame, for example).
-export async function approveSceneCandidate(deps: Deps, ctx: Ctx, id: string): Promise<{ comboLogged: boolean }> {
+// Face drift is a strong warning (default rule qa-face-drift): the pick
+// needs `acknowledge`, then it is the owner's call. Plastic or smoothed
+// skin is the fixed Realism rule and cannot be picked.
+export async function approveSceneCandidate(deps: Deps, ctx: Ctx, id: string, opts: { acknowledge?: boolean } = {}): Promise<{ comboLogged: boolean }> {
   const cand = await sceneCandidate(deps, ctx, id)
   if (!['in_review', 'qa_failed', 'rejected', 'superseded', 'approved'].includes(cand.status)) throw new AppError('conflict', 'This still is not ready for review yet.')
   const report = cand.qaReport as { findings?: Array<{ code: string; severity: string }> } | null
-  if (report?.findings?.some(f => f.severity === 'fail' && (f.code === 'face_drift' || f.code === 'skin_plastic' || f.code === 'skin_smoothed'))) {
-    throw new AppError('bad_request', 'QA found face drift or smoothed skin in this still. Regenerate it instead; face drift is never fixed with an edit.')
+  const fails = (code: string) => !!report?.findings?.some(f => f.severity === 'fail' && f.code === code)
+  if (fails('skin_plastic') || fails('skin_smoothed')) {
+    throw new AppError('bad_request', 'The skin in this still came back smoothed or plastic. Real skin is a fixed rule, so it cannot be picked; regenerate it.')
+  }
+  if (fails('face_drift') && !opts.acknowledge && (await ruleSwitches(deps, ctx, cand.characterId)).on('qa-face-drift')) {
+    throw new AppError('confirm_required', 'QA found that the face does not match REF-00. Pick it anyway?')
   }
   const now = deps.clock.now()
   await deps.db.update(candidates).set({ status: 'approved', reviewedBy: ctx.userId, reviewedAt: now, updatedAt: now }).where(eq(candidates.id, cand.id))

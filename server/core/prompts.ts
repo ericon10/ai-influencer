@@ -65,6 +65,18 @@ export interface BuildOptions {
   // A saved identity's prompt block (for example SOUL IDENTITY).
   identityBlock?: string
   warnings?: RealismWarning[]
+  // Hero and sheet background (default rule sheet-background); null leaves
+  // it to the model. Undefined uses the built-in gray.
+  background?: string | null
+  // Default rule realism-flaw-dose; false keeps every flaw word as written.
+  flawDose?: boolean
+}
+
+export const DEFAULT_BACKGROUND = 'Plain light gray background, soft even daylight'
+
+function backgroundLine(o: BuildOptions): string {
+  const b = o.background === undefined ? DEFAULT_BACKGROUND : o.background
+  return b ? `${b.trim().replace(/[.\s]+$/, '')}.` : ''
 }
 
 type RealismSource = { realism?: CharacterData['realism'] }
@@ -76,7 +88,7 @@ export function finishPrompt(prompt: string, stage: string, ch: RealismSource & 
   const body = block && !prompt.includes(block) ? `${prompt} ${block}` : prompt
   // Flaw words the character really has (card, marks, realism notes) stay.
   const allowedFlaws = [ch.card ?? '', ...(ch.marks ?? []).map(m => m.description), ...(ch.realism?.notes ?? [])].join(' ')
-  const done = finalizeImagePrompt(body, { stage, realism: ch.realism?.block, avoid: ch.realism?.avoid, allowedFlaws })
+  const done = finalizeImagePrompt(body, { stage, realism: ch.realism?.block, avoid: ch.realism?.avoid, allowedFlaws, flawDose: o.flawDose, plainBackground: o.background !== null })
   o.warnings?.push(...done.warnings)
   return done.prompt
 }
@@ -87,7 +99,7 @@ export function buildHeroPrompts(t: TemplatesConfig, views: ViewsConfig, ch: Pic
   const front = views.views.front!
   const marks = markLines(t, front, ch.marks, ch.pronouns)
   return t.hero.variants.map(variant => finishPrompt(normalizePrompt(fill(t.hero.base, {
-    ...pronounVars(ch.pronouns), card: cardPhrase(ch.card, ch.pronouns.noun), variant, marks,
+    ...pronounVars(ch.pronouns), card: cardPhrase(ch.card, ch.pronouns.noun), variant, marks, background: backgroundLine(o),
   })), 'hero', ch, o))
 }
 
@@ -106,6 +118,8 @@ export function buildSheetPrompt(t: TemplatesConfig, views: ViewsConfig, shot: S
     expression: expression ? `${expression} ` : '',
     body: body ? `${body} ` : '',
     outfit: t.outfit[shot.framing]!,
+    Outfit: capitalize(t.outfit[shot.framing]!),
+    background: backgroundLine(o),
   })
   return finishPrompt(normalizePrompt(addendum ? `${prompt} ${addendum}` : prompt), 'sheet', ch, o)
 }

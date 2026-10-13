@@ -2,11 +2,23 @@ import type { Rule, RulesConfig } from '../config/pipeline.js'
 import type { GenRequest } from '../providers/types.js'
 import type { Mark } from './marks.js'
 import { BARE_FACE_LINE, findBannedTerms, findMakeupTerms, hasRealismBlock, isBareFaceStage } from './realism.js'
+import { EXPLICIT_MESSAGE, findExplicitTerms } from './safety.js'
 
 // The rules engine (SPEC 5). Rules are data (config/rules.yaml); this file
 // only knows how to evaluate each check type against a prompt and request.
 
+// Which rules are on (Settings, Rules), for all characters or one. Fixed
+// rules are always on; a default is on unless switched off. A default never
+// blocks: its violations are warnings (owner ruling G1).
+export interface RuleSwitches {
+  on(id: string): boolean
+  value(id: string): string | undefined
+}
+
+export const ALL_DEFAULTS_ON: RuleSwitches = { on: () => true, value: () => undefined }
+
 export interface RuleContext {
+  switches?: RuleSwitches
   stage?: string
   framing?: string
   kind?: string
@@ -94,18 +106,30 @@ function check(rule: Rule, prompt: string, ctx: RuleContext): string | null | un
       return null
     }
     case 'max_words':
+    case 'behavior':
+    case 'code':
       return undefined
   }
 }
 
 export function lintPrompt(rules: RulesConfig, prompt: string, ctx: RuleContext): RuleViolation[] {
   const out: RuleViolation[] = []
+  const switches = ctx.switches ?? ALL_DEFAULTS_ON
   for (const rule of rules.rules) {
+    if (rule.bucket === 'default' && !switches.on(rule.id)) continue
     if (!applies(rule, ctx)) continue
     const hit = check(rule, prompt, ctx)
-    if (hit) out.push({ ruleId: rule.id, spec: rule.spec, title: rule.title, severity: rule.severity, message: rule.message, match: hit })
+    // A default is a warning at most, whatever the file says.
+    const severity = rule.bucket === 'fixed' ? rule.severity : 'warning'
+    if (hit) out.push({ ruleId: rule.id, spec: rule.spec, title: rule.title, severity, message: rule.message, match: hit })
   }
-  return [...out, ...realismViolations(prompt, ctx)]
+  return [...out, ...realismViolations(prompt, ctx), ...safetyViolations(prompt)]
+}
+
+// Fixed rule no-explicit, in code so no config can switch it off.
+export function safetyViolations(prompt: string): RuleViolation[] {
+  const terms = findExplicitTerms(prompt)
+  return terms.length ? [{ ruleId: 'no-explicit', spec: 'B11', title: 'No nudity or explicit content', severity: 'error', message: EXPLICIT_MESSAGE, match: terms.join(', ') }] : []
 }
 
 // Rule zero, the Realism principle. Checked in code for every prompt, after

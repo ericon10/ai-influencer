@@ -36,15 +36,21 @@ moments:
   - { id: mirror_selfie, label: "Mirror selfie" }
   - { id: selfie, label: "Selfie" }
 
-# Who shoots and how (SPEC 5.2 rule 18). Every camera is at eye level
-# (rule 20); none of them looks up at the character or crops tight on the body.
+# Who shoots and how (SPEC 5.2 rule 18). Starting points, never limits: the
+# planner picks what fits the moment and every field stays editable.
 cameras:
   - id: friend_phone
     label: Friend shot
     text: "Candid phone photo taken by a friend about 6 feet away"
+  - id: friend_rocks
+    label: Friend shot from rocks
+    text: "Candid phone photo taken by a friend from a nearby rock or ledge, a little above {obj}"
+  - id: over_shoulder
+    label: Over-the-shoulder
+    text: "Candid phone photo over a friend's shoulder, the shoulder soft and out of focus in the foreground"
   - id: event_long_lens
     label: Event photographer, long lens
-    text: "Candid event photo, long lens, about 25 feet away, compressed background, blurred foreground ({foreground})"
+    text: "Candid event photo, long lens from across the venue, about 25 feet away, compressed background, blurred foreground ({foreground})"
     foreground: "a door frame and the shoulder of someone at the next table"
   - id: phone_from_inside
     label: Phone from inside
@@ -61,6 +67,14 @@ cameras:
   - id: timer
     label: Phone on a timer
     text: "Phone propped on a ledge with a timer, about 8 feet away"
+
+# Camera height. Any height is allowed; a low angle looking up at the body
+# shows a warning while the default rule scene-everyday-angles is on.
+heights:
+  - { id: eye_level, label: "Eye level", text: "eye level" }
+  - { id: slightly_high, label: "Slightly high", text: "from slightly above eye level" }
+  - { id: high, label: "High, looking down", text: "from a high angle looking down" }
+  - { id: low, label: "Low angle", text: "from a low angle" }
 
 framings:
   - { id: chest_up, label: "Close, chest-up", text: "chest-up framing" }
@@ -96,7 +110,9 @@ makeup:
 destinations:
   - { id: vertical, label: "Reels, TikTok, Shorts, Stories", aspect: "9:16" }
   - { id: feed, label: "Feed post", aspect: "4:5" }
-  - { id: square, label: "Square (only on request)", aspect: "1:1" }
+  - { id: square, label: "Square", aspect: "1:1" }
+  - { id: portrait, label: "Portrait", aspect: "3:4" }
+  - { id: landscape, label: "Landscape", aspect: "16:9" }
 
 # When the setting or hair changes how hair and skin look, the colors are
 # stated anyway (Callie's scene rules).

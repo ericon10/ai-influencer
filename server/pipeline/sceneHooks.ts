@@ -13,6 +13,7 @@ import { getCharacter, toData } from './characters.js'
 import { scoreSceneIdentity } from './identity.js'
 import { draftFields, getScene, refreshSceneStatus, sceneFields, updateScene } from './scenes.js'
 import { textureCheck, textureSummary } from './texture.js'
+import { ruleSwitches } from './rules.js'
 
 // What each finished scene job does (Stage 7 and 8). Failed QA never
 // reaches the review queue (SPEC 6); a still waits with its reasons and a
@@ -175,7 +176,9 @@ async function onSceneQa(deps: Deps, ctx: Ctx, job: JobRow, _out: JobOutcome): P
     try {
       const observation = parseObservation((orig.resultMeta as { data: unknown }).data)
       const mirrored = mirror?.status === 'completed' ? parseObservation((mirror.resultMeta as { data: unknown }).data) : undefined
-      const input = { views, marks: ch.marks, jewelryAsked: f.jewelry, framing: f.framing, eyeColor: ch.eyes, observation, mirrored, pronoun: ch.pronouns.poss, extraFindings: id.findings }
+      const sw = await ruleSwitches(deps, ctx, job.characterId)
+      const rules = { logos: sw.on('qa-logos') && sw.on('scene-brand-free') && !f.brands, jewelry: sw.on('qa-extra-jewelry'), mirror: sw.on('qa-mirror') }
+      const input = { views, marks: ch.marks, jewelryAsked: f.jewelry, framing: f.framing, eyeColor: ch.eyes, observation, mirrored, pronoun: ch.pronouns.poss, extraFindings: id.findings, rules }
       const scored = evaluateScene(input)
       scored.mirrorFix = sceneMirrorFix(input, scored)
       report = scored

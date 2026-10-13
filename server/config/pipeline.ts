@@ -61,9 +61,16 @@ const ruleCheck = z.discriminatedUnion('type', [
   z.object({ type: z.literal('max_words'), field: z.string(), max: z.number().int() }),
   z.object({ type: z.literal('require_pattern'), pattern: z.string(), flags: z.string().default(''), ignore: z.string().optional() }),
   z.object({ type: z.literal('reference_slot') }),
+  // Read by the code that does the thing (a fallback, a pre-filled field, a
+  // QA hint), not by the prompt lint.
+  z.object({ type: z.literal('behavior') }),
+  // Enforced in code (fixed rules); listed here so every rule is in one place.
+  z.object({ type: z.literal('code') }),
 ])
 
 const oneOrMany = z.union([z.string(), z.array(z.string())]).transform(v => (Array.isArray(v) ? v : [v]))
+
+export const RULE_AREAS = ['safety', 'realism', 'money', 'character', 'hero', 'sheet', 'scene', 'qa', 'edit', 'video', 'copy'] as const
 
 const rulesSchema = z.object({
   version: z.number(),
@@ -71,6 +78,14 @@ const rulesSchema = z.object({
     id: z.string(),
     spec: z.string(),
     title: z.string(),
+    // fixed: always on and may block. default: on unless switched off, and
+    // never more than a warning (owner ruling G1, "defaults, not locks").
+    bucket: z.enum(['fixed', 'default']),
+    area: z.enum(RULE_AREAS),
+    // The line the scene planner gets while the rule is on.
+    planner: z.string().optional(),
+    // An editable setting that goes with the rule.
+    value: z.string().optional(),
     when: z.object({
       stage: oneOrMany.optional(),
       framing: oneOrMany.optional(),
@@ -108,6 +123,9 @@ const templatesSchema = z.object({
     reference: z.object({ refs: z.string(), trained: z.string(), text: z.string() }),
     sheet_outfit: z.string(),
     outfit_override: z.string(),
+    brand_free: z.string(),
+    wearing: z.string(),
+    wearing_only: z.string(),
     colors: z.string(),
     makeup: z.object({ bare: z.string(), natural: z.string(), soft_glam: z.string() }),
   }),
@@ -132,6 +150,7 @@ const scenesSchema = z.object({
   }),
   moments: z.array(preset).min(1),
   cameras: z.array(preset.extend({ text: z.string(), foreground: z.string().optional() })).min(1),
+  heights: z.array(preset.extend({ text: z.string() })).min(1),
   framings: z.array(preset.extend({ text: z.string(), identity: z.enum(['check', 'skip']).default('check') })).min(1),
   lights: z.array(preset.extend({ text: z.string() })).min(1),
   expressions: z.array(preset.extend({ text: z.string(), ref_expression: z.string().optional() })).min(1),

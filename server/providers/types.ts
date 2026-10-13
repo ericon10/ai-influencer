@@ -32,8 +32,9 @@ export interface GenRequest {
   resolution?: string
   quality?: string
   durationSec?: number
-  // Video: always false (SPEC 5.4 rule 27). The type allows nothing else.
-  audio?: false
+  // Video: audio off unless a request asks for it (default rule
+  // video-audio-off; owner ruling G1). Only `true` turns it on.
+  audio?: boolean
   seed?: number
   // A saved identity on the provider (for example a trained Soul character).
   identityId?: string

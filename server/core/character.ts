@@ -62,7 +62,8 @@ export interface CharacterData {
     accessories?: string[]
   }
   makeup: { default: string; glam_when: string[]; glam?: string }
-  persona: { vibe?: string; settings?: string[]; never?: string[] }
+  // `never` and `defaults` are suggestions for the planner, never limits.
+  persona: { vibe?: string; settings?: string[]; never?: string[]; defaults?: string }
   pronouns: Pronouns
   avoidModels: string[]
   preferredModels: Record<string, string>
@@ -78,7 +79,8 @@ export interface CharacterData {
 
 export interface CharacterRealism { block?: string; avoid?: string; notes?: string[] }
 
-export const MIN_AGE = 18
+// Fixed rule adult-21: every character is 21 or older (owner ruling G1).
+export const MIN_AGE = 21
 export const DEFAULT_MIN_AGE = 21
 export const CARD_MAX_WORDS = 40
 
@@ -90,16 +92,15 @@ export interface ValidationIssue { field: string; message: string; severity: 'er
 export function validateCharacter(c: Pick<CharacterData, 'age' | 'card' | 'marks' | 'body'>, minAge = DEFAULT_MIN_AGE): ValidationIssue[] {
   const issues: ValidationIssue[] = []
   if (c.age == null) issues.push({ field: 'age', message: 'Set an age. Characters must be adults.', severity: 'error' })
-  else if (c.age < MIN_AGE) issues.push({ field: 'age', message: 'Characters must be adults (18 or older).', severity: 'error' })
-  else if (c.age < minAge) issues.push({ field: 'age', message: `The studio default is ${minAge} or older.`, severity: 'error' })
+  else if (c.age < Math.max(MIN_AGE, minAge)) issues.push({ field: 'age', message: 'Characters are 21 or older.', severity: 'error' })
   if (!c.card.trim()) issues.push({ field: 'card', message: 'The card is empty.', severity: 'error' })
   if (wordCount(c.card) > CARD_MAX_WORDS) issues.push({ field: 'card', message: `Keep the card to ${CARD_MAX_WORDS} words or fewer (now ${wordCount(c.card)}).`, severity: 'warning' })
-  if (c.marks.length !== 2) issues.push({ field: 'marks', message: 'Give the character exactly 2 distinguishing marks.', severity: 'warning' })
   for (const m of c.marks) {
     if (m.side !== 'LEFT' && m.side !== 'RIGHT') issues.push({ field: 'marks', message: `Mark "${m.name}" needs a side: LEFT or RIGHT.`, severity: 'error' })
   }
   if (SIZE_TERMS.test(c.body) || SIZE_TERMS.test(c.card)) {
-    issues.push({ field: 'body', message: 'Describe the body in neutral brand terms, never cup sizes or measurements.', severity: 'error' })
+    // A default (neutral-body-cups), so a warning at most.
+    issues.push({ field: 'body', message: 'Neutral body terms usually work better than cup sizes or measurements; models exaggerate them.', severity: 'warning' })
   }
   return issues
 }

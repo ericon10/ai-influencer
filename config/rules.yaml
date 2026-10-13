@@ -1,146 +1,449 @@
-# Rules engine (SPEC 5). Each rule is checked against a built prompt and its
-# request before any quote is issued. An error blocks the run; a warning is
-# shown. `spec` points at the SPEC.md rule it enforces.
-version: 1
+# The rule book (SPEC 5, owner ruling G1, 2026-10-13: "defaults, not locks").
+#
+# Every rule in the Studio is listed here with its bucket:
+#   fixed:   always on, cannot be switched off, and may block a run. Only
+#            the Realism principle (with a bare face on hero and sheet),
+#            adults 21 and over, no nudity or explicit content, a new person
+#            rather than a copy of a real one, the price before any paid run,
+#            budget caps and server-side keys.
+#   default: on unless switched off (Settings, Rules, for all characters or
+#            one), and at most a warning. A default never blocks a run.
+#
+# `check` is how the prompt lint tests a rule. `behavior` rules change what
+# the Studio does (a fallback, a pre-filled field, a QA hint) and are read
+# by the code that does it; `code` rules are enforced in code. `planner` is
+# the line the scene planner is given while the rule is on. `value` is an
+# editable setting that goes with the rule (for example the background).
+version: 2
 rules:
-  - id: hero-text-only
-    spec: "5.1.1"
-    title: Hero is generated text-only
-    when: { stage: hero }
-    check: { type: no_attachments }
-    message: The hero run must not attach any image. The inspiration supplies the look; the card supplies the face.
-  # Rule zero, the Realism principle, is enforced in code on top of these
-  # (server/core/realism.ts): the REALISM block in every image prompt,
-  # smoothing words refused, bare-faced hero and sheet. Config cannot turn
-  # those checks off.
+  # ── Fixed: safety ──
+  - id: adult-21
+    bucket: fixed
+    area: safety
+    spec: "B11"
+    title: Characters are 21 or older
+    check: { type: code }
+    message: Every character is an adult, 21 or older.
+  - id: no-explicit
+    bucket: fixed
+    area: safety
+    spec: "B11"
+    title: No nudity or explicit content
+    check: { type: code }
+    message: Prompts with nudity or sexual content are refused.
+  - id: distinct-person
+    bucket: fixed
+    area: safety
+    spec: "B11"
+    title: A new person, never a copy of the inspiration face
+    check: { type: code }
+    message: A hero that matches the face of the person in an inspiration image cannot become REF-00. The character must be a new person.
+
+  # ── Fixed: rule zero, the Realism principle ──
+  - id: realism-block
+    bucket: fixed
+    area: realism
+    spec: "0"
+    title: Every image prompt carries the REALISM block
+    check: { type: code }
+    message: Real skin texture, visible pores, no retouching. Added to every image prompt.
+  - id: realism-banned-words
+    bucket: fixed
+    area: realism
+    spec: "0"
+    title: No smoothing or beautifying words
+    check: { type: code }
+    message: Words like flawless, airbrushed or perfect skin are removed, and refused if one reaches a run.
+  - id: realism-beautify-off
+    bucket: fixed
+    area: realism
+    spec: "0"
+    title: Beautify, face-enhance and prompt-enhance options are off
+    check: { type: code }
+    message: Every provider option that smooths, beautifies or rewrites the prompt is sent off.
+  - id: realism-texture
+    bucket: fixed
+    area: realism
+    spec: "0"
+    title: Upscales and edits keep the skin texture
+    check: { type: code }
+    message: A texture check runs after every upscale and edit. A smoothed result is flagged and never replaces its source; plastic or airbrushed skin fails QA.
   - id: natural-baseline
+    bucket: fixed
+    area: realism
     spec: "0"
     title: Hero and sheet are bare-faced
     when: { stage: [hero, sheet] }
     check: { type: forbid_pattern, flags: i, exclude_after: "AVOID:", pattern: "\\b(glam|glamorous|smok(?:e|ey|y) eyes?|contour(?:ing|ed)?|false lashes|lash extensions|bold lips?|red lip(?:stick)?|heavy makeup|full makeup|winged (?:liner|eyeliner))\\b" }
     message: Hero and sheet shots are bare-faced, no makeup and no retouching. Makeup is added per scene, never baked into the sheet.
+
+  # ── Fixed: money and keys ──
+  - id: price-first
+    bucket: fixed
+    area: money
+    spec: "9"
+    title: The price is shown before any paid run
+    check: { type: code }
+    message: Every paid step needs a fresh estimate you have seen; the server refuses a run without one.
+  - id: budget-caps
+    bucket: fixed
+    area: money
+    spec: "9"
+    title: Budget caps hold
+    check: { type: code }
+    message: A run that would pass a job, character or monthly cap is refused. Set the caps in Settings.
+  - id: keys-server-side
+    bucket: fixed
+    area: money
+    spec: "12"
+    title: Keys stay on the server
+    check: { type: code }
+    message: Provider keys live in the server's vault or deployment settings, never in the browser.
+
+  # ── Defaults: character creation ──
+  - id: hero-text-only
+    bucket: default
+    area: hero
+    spec: "5.1.1"
+    title: Hero is generated from text only
+    when: { stage: hero }
+    check: { type: no_attachments }
+    message: The hero usually attaches no image; the inspiration supplies the look and the card supplies the face.
+  - id: hero-runs
+    bucket: default
+    area: hero
+    spec: "5.1.2"
+    title: 4 to 8 hero candidates per prompt
+    check: { type: behavior }
+    message: More candidates per prompt make a better pick. Fewer than 4 is allowed with a warning.
+  - id: sheet-background
+    bucket: default
+    area: sheet
+    spec: "F1"
+    title: Plain light gray background on hero and sheet shots
+    check: { type: behavior }
+    value: "Plain light gray background, soft even daylight"
+    message: Hero and sheet shots use this background. Edit it, or switch it off to leave the background to the model.
   - id: sheet-settings
+    bucket: default
+    area: sheet
     spec: "5.1.5"
     title: Sheet quality high or above, 2k
     when: { stage: sheet }
     check: { type: request_fields, require: { quality: [high, ultra, max], resolution: [2k, 4k] } }
-    message: Sheet shots need quality high or above at 2k. Low quality smooths skin and erases small marks.
+    message: Low quality smooths skin and erases small marks.
   - id: sheet-aspect
+    bucket: default
+    area: sheet
     spec: "5.1.5"
     title: 3:4 for chest-up, 9:16 for full body
     when: { stage: sheet }
     check: { type: aspect_matches_framing }
-    message: Use 3:4 for chest-up shots and 9:16 for full-body shots.
+    message: Chest-up shots are usually 3:4 and full-body shots 9:16.
   - id: sheet-one-model
+    bucket: default
+    area: sheet
     spec: "5.1.7"
-    title: One model and variant for the whole sheet
+    title: One model for the whole sheet
     when: { stage: sheet }
     check: { type: sheet_model_locked }
-    message: The whole sheet must use the model it started with. Switching mid-sheet causes drift.
-  - id: chest-up-no-legwear
-    spec: "5.1.8"
-    title: Chest-up prompts never mention jeans or shoes
-    when: { stage: [hero, sheet], framing: chest_up }
-    check: { type: forbid_pattern, flags: i, pattern: "\\b(jeans|denim|shoes?|sneakers?|boots?|heels|sandals|trainers|footwear|pants|trousers|shorts|skirts?|leggings)\\b" }
-    message: Chest-up prompts must not mention legwear or shoes; it pulls the shot out to a longer framing.
-  - id: neutral-body-cups
-    spec: "5.1.9"
-    title: No cup sizes
-    check: { type: forbid_pattern, pattern: "\\b(?:[A-H]|AA|DD|DDD)[- ]?cups?\\b" }
-    message: Describe the body in neutral brand terms, never cup sizes.
-  - id: neutral-body-measurements
-    spec: "5.1.9"
-    title: No measurements
-    check: { type: forbid_pattern, flags: i, pattern: "\\b(cup size|bust size|measurements|\\d{2}-\\d{2}-\\d{2}|\\d{2}\\s?(?:AA|DD|DDD|[A-H])\\s?(?:bust|bra))\\b" }
-    message: Describe the body in neutral brand terms, never measurements.
-  - id: marks-side-specific
-    spec: "5.1.11"
-    title: Marks are stated with their side
-    when: { stage: [hero, sheet] }
-    check: { type: marks_stated }
-    message: Every distinguishing mark must be stated with its side, including when it is hidden in this view.
-  - id: identity-prompt-block
-    spec: "8"
-    title: A saved identity's prompt block goes into every prompt that uses it
-    when: {}
-    check: { type: identity_block }
-    message: This model runs with the character's saved identity, whose prompt block (for example SOUL IDENTITY) must be in every prompt. Without it the character drifts.
-  - id: scene-names-outfit
-    spec: "char-file"
-    title: Every scene names its own outfit
-    when: { stage: scene }
-    check: { type: require_phrase, phrase: "wearing" }
-    message: Name the full outfit in every scene prompt. A character's style is only a source of ideas; nothing from it is put in for you.
-  - id: scene-no-carried-outfit
-    spec: "char-file"
-    title: Never carry an outfit over or fall back to a default look
-    when: { stage: scene }
-    check: { type: forbid_pattern, flags: i, pattern: "\\b(same outfit|as before|usual outfit|signature (look|outfit|style)|default outfit)\\b" }
-    message: Write the outfit out in full; never say "same outfit as before" or lean on a signature look.
-  - id: scene-reference-slot
-    spec: "5.2.14"
-    title: The reference slot matches the model
-    when: { stage: scene }
-    check: { type: reference_slot }
-    message: With sheet refs attached, the prompt opens with the fixed REFERENCE line and replaces the sheet outfit; with a saved character it names that character and attaches nothing.
-  - id: scene-names-footwear
-    spec: "5.2.16"
-    title: Always name the footwear
-    when: { stage: scene }
-    # The sheet outfit named to drop it ("instead of the white t-shirt, jeans
-    # and sneakers") does not count as naming the footwear.
-    check: { type: require_pattern, flags: i, ignore: "instead of [^.]*", pattern: "\\b(sneakers?|trainers?|sandals?|heels|boots?|loafers|flats|slides|flip-flops|mules|espadrilles|clogs|slippers|shoes|socks|barefoot)\\b" }
-    message: Name the footwear in every scene. Otherwise the sheet sneakers leak into the scene.
-  - id: scene-brand-free
-    spec: "5.2.17"
-    title: Brand-free by default
-    when: { stage: scene }
-    check: { type: require_phrase, phrase: "unbranded" }
-    message: Every scene says its clothes, shoes, cups and props are plain and unbranded.
-  - id: scene-everyday-angles
-    spec: "5.2.20"
-    title: Eye-level angles, no tight crops on the body
-    when: { stage: scene }
-    check: { type: forbid_pattern, flags: i, exclude_after: "AVOID:", pattern: "\\b(low[- ]angle|from (?:far )?below|worm'?s[- ]eye|looking up at (?:her|him|them)|tight crop\\w*|close-up (?:of|on) (?:her |his |their )?(?:legs|chest|body|hips|cleavage|bust|thighs))\\b" }
-    message: Keep body framing everyday. Eye-level angles, waist-up or full body, the moment leads. No low angles and no tight crops on the body.
-  - id: scene-aspect
-    spec: "5.2.22"
-    title: Aspect by destination
-    when: { stage: scene }
-    check: { type: request_fields, require: { aspect: ["9:16", "4:5", "1:1"] } }
-    message: Use 9:16 for Reels, TikTok, Shorts and Stories, 4:5 for the feed, and 1:1 only on request.
+    message: Switching models mid-sheet often causes drift. Switch this off to use the current sheet model instead of the lock.
+  - id: sheet-order
+    bucket: default
+    area: sheet
+    spec: "4.1"
+    title: Build the sheet in dependency order
+    check: { type: behavior }
+    message: Each shot attaches the shots it depends on. When one is not approved yet, the shot uses the approved ones and says so.
+  - id: ref00-upscale-size
+    bucket: default
+    area: sheet
+    spec: "5.1.6"
+    title: Upscale REF-00 only when it is under 1,500 px tall
+    check: { type: behavior }
+    message: A taller REF-00 rarely needs an upscale. Allowed anyway, with a warning.
   - id: upscale-max-2x
+    bucket: default
+    area: sheet
     spec: "5.1.6"
     title: Upscale 2x, never more
     when: { kind: upscale }
     check: { type: request_fields, require: { scale: [2] } }
-    message: Upscale reference images 2x, never more.
+    message: Upscales stay at 2x.
+  - id: chest-up-no-legwear
+    bucket: default
+    area: sheet
+    spec: "5.1.8"
+    title: Chest-up hero and sheet prompts never mention jeans or shoes
+    when: { stage: [hero, sheet], framing: chest_up }
+    check: { type: forbid_pattern, flags: i, pattern: "\\b(jeans|denim|shoes?|sneakers?|boots?|heels|sandals|trainers|footwear|pants|trousers|shorts|skirts?|leggings)\\b" }
+    message: Legwear or shoes in a chest-up prompt often pull the shot out to a longer framing.
+  - id: neutral-body-cups
+    bucket: default
+    area: character
+    spec: "5.1.9"
+    title: No cup sizes
+    check: { type: forbid_pattern, pattern: "\\b(?:[A-H]|AA|DD|DDD)[- ]?cups?\\b" }
+    message: Neutral body terms work better than cup sizes; models exaggerate them.
+  - id: neutral-body-measurements
+    bucket: default
+    area: character
+    spec: "5.1.9"
+    title: No measurements
+    check: { type: forbid_pattern, flags: i, pattern: "\\b(cup size|bust size|measurements|\\d{2}-\\d{2}-\\d{2}|\\d{2}\\s?(?:AA|DD|DDD|[A-H])\\s?(?:bust|bra))\\b" }
+    message: Neutral body terms work better than measurements; models exaggerate them.
+  - id: marks-side-specific
+    bucket: default
+    area: sheet
+    spec: "5.1.11"
+    title: Marks are stated with their side
+    when: { stage: [hero, sheet] }
+    check: { type: marks_stated }
+    message: Stating each mark with its side, including when it is hidden in a view, stops models from mirroring it.
+  - id: realism-flaw-dose
+    bucket: default
+    area: character
+    spec: "0"
+    title: Imperfections at the dose of a real person on a good day
+    check: { type: behavior }
+    message: Heavier flaw words (acne, scars, blemishes) are left out unless the card or marks name them. Switch this off to keep every word as written.
+  - id: identity-prompt-block
+    bucket: default
+    area: character
+    spec: "8"
+    title: A saved identity's prompt block goes into every prompt that uses it
+    when: {}
+    check: { type: identity_block }
+    message: Without its prompt block (for example SOUL IDENTITY), a saved character drifts.
+
+  # ── Defaults: scenes ──
+  - id: scene-reference-slot
+    bucket: default
+    area: scene
+    spec: "5.2.14"
+    title: The reference line matches the model
+    when: { stage: scene }
+    check: { type: reference_slot }
+    message: With sheet refs attached the prompt opens with the REFERENCE line; a saved character is named and attaches nothing.
+  - id: scene-refs-by-angle
+    bucket: default
+    area: scene
+    spec: "5.2.14"
+    title: 2 to 4 sheet refs picked by angle, REF-00 included
+    check: { type: behavior }
+    message: The scene attaches the face, the closest angle, a body ref and the matching expression. Pick your own refs per scene any time.
+  - id: scene-outfit-override
+    bucket: default
+    area: scene
+    spec: "5.2.15"
+    title: The scene outfit replaces the sheet outfit
+    check: { type: behavior }
+    planner: Write the full outfit for this moment, top to bottom. Style notes are ideas, never a uniform.
+    message: The prompt says the outfit replaces the white tee, jeans and sneakers in the reference images.
+  - id: scene-names-outfit
+    bucket: default
+    area: scene
+    spec: "char-file"
+    title: Every scene names its outfit
+    when: { stage: scene }
+    check: { type: require_phrase, phrase: "wearing" }
+    message: Naming the full outfit keeps the sheet outfit out of the scene.
+  - id: scene-no-carried-outfit
+    bucket: default
+    area: scene
+    spec: "char-file"
+    title: No "same outfit as before"
+    when: { stage: scene }
+    check: { type: forbid_pattern, flags: i, pattern: "\\b(same outfit|as before|usual outfit|signature (look|outfit|style)|default outfit)\\b" }
+    message: Models cannot see earlier scenes; write the outfit out.
+  - id: scene-names-footwear
+    bucket: default
+    area: scene
+    spec: "5.2.16"
+    title: Name the footwear
+    when: { stage: scene }
+    # The sheet outfit named to drop it ("instead of the white t-shirt, jeans
+    # and sneakers") does not count as naming the footwear.
+    check: { type: require_pattern, flags: i, ignore: "instead of [^.]*", pattern: "\\b(sneakers?|trainers?|sandals?|heels|boots?|loafers|flats|slides|flip-flops|mules|espadrilles|clogs|slippers|shoes|socks|barefoot)\\b" }
+    planner: Name the footwear, or say barefoot.
+    message: Without named footwear the sheet sneakers often leak into the scene.
+  - id: scene-brand-free
+    bucket: default
+    area: scene
+    spec: "5.2.17"
+    title: Plain and unbranded, unless the scene allows brands
+    when: { stage: scene }
+    check: { type: require_phrase, phrase: "unbranded" }
+    planner: Keep clothes, shoes, cups, bags and signs plain and unbranded unless the scene allows brands.
+    message: Scenes are plain and unbranded by default. Turn on "Brands and logos" in a scene for brand deals and products.
+  - id: scene-signature-jewelry
+    bucket: default
+    area: scene
+    spec: "G1"
+    title: Signature jewelry is suggested, never forced
+    check: { type: behavior }
+    planner: Signature jewelry is optional. Suggest it only when it fits the moment and the outfit.
+    message: The planner may suggest a signature piece (such as an ear cuff); you decide per scene. When it is worn it is placed on its own side.
+  - id: scene-everyday-angles
+    bucket: default
+    area: scene
+    spec: "5.2.20"
+    title: No low angles looking up at the body, no tight crops on the body
+    when: { stage: scene }
+    check: { type: forbid_pattern, flags: i, exclude_after: "AVOID:", pattern: "\\b(low[- ]angle|from (?:far )?below|worm'?s[- ]eye|looking up at (?:her|him|them)|tight crop\\w*|close-up (?:of|on) (?:her |his |their )?(?:legs|chest|body|hips|cleavage|bust|thighs))\\b" }
+    planner: Pick the camera height and position that fit the moment. Prefer to avoid low angles looking up at the body and tight crops on the body.
+    message: Low angles looking up at the body and tight crops on the body are off by default. Any angle is allowed.
+  - id: scene-aspect
+    bucket: default
+    area: scene
+    spec: "5.2.22"
+    title: Aspect by destination
+    when: { stage: scene }
+    check: { type: request_fields, require: { aspect: ["9:16", "4:5", "1:1"] } }
+    message: 9:16 for Reels, TikTok, Shorts and Stories, 4:5 for the feed, 1:1 on request. Other shapes are allowed.
+  - id: scene-colors
+    bucket: default
+    area: scene
+    spec: "char-file"
+    title: State the hair color when water, wind or harsh sun change how it looks
+    check: { type: behavior }
+    message: Adds one line with the character's hair color in wet, windy or harsh-sun scenes.
+  - id: scene-combo-log
+    bucket: default
+    area: scene
+    spec: "5.2.21"
+    title: No repeat of a moment and camera pair from the last 10 scenes
+    check: { type: behavior }
+    planner: Prefer a moment type and camera pair that is not in the recent combo log.
+    message: A repeat shows a warning with "Use anyway".
+  - id: scene-persona-never
+    bucket: default
+    area: scene
+    spec: "char-file"
+    title: The persona's "never" list guides the planner
+    check: { type: behavior }
+    message: The planner reads the persona's "never" list as suggestions to steer away from, never as limits on you.
+  - id: scene-drift-lock
+    bucket: default
+    area: scene
+    spec: "D3"
+    title: Drift lock after a still from a saved character
+    check: { type: behavior }
+    message: A face-only pass locks the face to REF-00 after every still from a trained character such as Soul.
+  - id: scene-auto-qa
+    bucket: default
+    area: qa
+    spec: "6"
+    title: Automatic QA on every still
+    check: { type: behavior }
+    message: Every still is checked (face match, marks, logos, jewelry, skin) before you review it. The price includes the checks.
+
+  # ── Defaults: QA advice ──
+  - id: qa-face-drift
+    bucket: default
+    area: qa
+    spec: "5.3.25"
+    title: Face drift is a strong warning
+    check: { type: behavior }
+    message: When the face does not match REF-00 QA says so loudly and suggests a regenerate. You can still pick the still or edit it.
+  - id: qa-logos
+    bucket: default
+    area: qa
+    spec: "5.2.17"
+    title: QA points out logos and readable text
+    check: { type: behavior }
+    message: Advice with a one-click edit to remove it. Never a block. Off for scenes that allow brands.
+  - id: qa-extra-jewelry
+    bucket: default
+    area: qa
+    spec: "6"
+    title: QA points out jewelry the scene did not ask for
+    check: { type: behavior }
+    message: Advice with a one-click edit. Signature jewelry is never flagged as missing or added.
+  - id: qa-mirror
+    bucket: default
+    area: qa
+    spec: "char-file"
+    title: QA offers the free mirror when a mark is on the wrong side
+    check: { type: behavior }
+    message: Only when there is no text in the frame. One click, no new generation.
+
+  # ── Defaults: edits ──
+  - id: edit-one-change
+    bucket: default
+    area: edit
+    spec: "5.3.24"
+    title: One change per edit pass
+    check: { type: behavior }
+    message: Combined edits often skip the small change. Two changes in one pass are allowed with a warning.
+  - id: closer-shot-crop
+    bucket: default
+    area: edit
+    spec: "char-file"
+    title: A closer shot is a crop of the wide still
+    check: { type: behavior }
+    message: A crop keeps the place exactly the same; a new generation invents a new one. You can still generate a close shot as its own scene.
+  - id: model-tested
+    bucket: default
+    area: edit
+    spec: "D2"
+    title: A model is confirmed by one small paid test
+    check: { type: behavior }
+    message: An untested model runs with a warning. If its endpoint is wrong, the run fails and costs nothing.
+
+  # ── Defaults: video (Phase 3 planner) ──
   - id: video-image-only
+    bucket: default
+    area: video
     spec: "5.4.26"
-    title: Image-to-video only
+    title: Video starts from an approved still
     when: { kind: video }
     check: { type: requires_start_frame }
-    message: Character video must start from an approved still. Text-to-video is never used for a character.
+    message: Image-to-video keeps the face; text-to-video usually does not.
   - id: video-audio-off
+    bucket: default
+    area: video
     spec: "5.4.27"
-    title: Audio off, always
+    title: Audio off in the video request
     when: { kind: [video, video_extend] }
     check: { type: request_fields, require: { audio: [false] } }
-    message: Video generation always sends audio off. Sound is added in post.
+    message: Generated audio is usually replaced in post. Switch this off to keep a model's audio.
   - id: video-silent-phrase
+    bucket: default
+    area: video
     spec: "5.4.28"
-    title: Silent, no dialogue
+    title: '"Silent, no audio, no dialogue" in video prompts'
     when: { kind: [video, video_extend] }
     check: { type: require_phrase, phrase: "silent, no audio, no dialogue" }
-    message: Video prompts must include "silent, no audio, no dialogue".
+    message: Keeps mouths calm when the audio is replaced.
   - id: video-no-talking
+    bucket: default
+    area: video
     spec: "5.4.29"
-    title: Never make her the main speaker
+    title: Calm action, not the main speaker
     when: { kind: [video, video_extend] }
     check: { type: forbid_pattern, flags: i, exclude_after: "Avoid:", pattern: "(mouth moving as (?:she|he|they) talks?|\\bsing(?:s|ing)?\\b|\\bshout(?:s|ing)?\\b)" }
-    message: Use "listens, nods, laughs softly, small natural mouth movements" instead of talking, singing or shouting.
+    message: '"Listens, nods, laughs softly" keeps faces steady; talking, singing or shouting distort them.'
+  - id: video-single-take
+    bucket: default
+    area: video
+    spec: "4.3"
+    title: One continuous take with start and end frames
+    check: { type: behavior }
+    message: Let the model perform the zoom in one take; never crossfade a seam.
+  - id: video-no-winking
+    bucket: default
+    area: video
+    spec: "char-file"
+    title: '"No winking, steady eye contact" when looking at the camera'
+    check: { type: behavior }
+    message: Models add repeated winks otherwise.
+
+  # ── Defaults: copy ──
   - id: no-em-dash
+    bucket: default
+    area: copy
     spec: "5.7.42"
     title: No em-dashes in generated copy
     check: { type: forbid_char, codepoint: 8212 }
-    message: Em-dashes are not allowed in any generated copy.
+    message: Em-dashes are replaced in prompts; generated copy avoids them.

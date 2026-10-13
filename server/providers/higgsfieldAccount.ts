@@ -68,7 +68,8 @@ function need(ref: { url?: string } | undefined, what: string): string {
 }
 
 // The params for one request. Only the inputs the model accepts on the
-// account path are sent, plus its fixed values (audio off for video).
+// account path are sent, plus its fixed values (audio off for video unless
+// the request asks for it).
 export function accountParams(entry: ReturnType<typeof accountModel>, req: GenRequest, withMedia = true): Json {
   const m = entry.mcp
   const candidate: Json = {
@@ -85,6 +86,8 @@ export function accountParams(entry: ReturnType<typeof accountModel>, req: GenRe
   const params: Json = { model: entry.mcp_id, prompt: req.prompt }
   for (const k of m.params) if (candidate[k] !== undefined && candidate[k] !== null) params[k] = candidate[k]
   Object.assign(params, m.fixed, entry.force_off ?? {})
+  // Audio is off unless the request asks for it (default rule video-audio-off).
+  if ('generate_audio' in params) params.generate_audio = req.audio === true
   // Beautify, face-enhance and skin-smoothing options are always off.
   if (!withMedia) return forceBeautifyOff(params)
 
@@ -241,9 +244,6 @@ export function createHiggsfieldAccountAdapter(o: HiggsfieldAccountOptions): Pro
     },
     async submit(req) {
       const entry = accountModel(o.config, req.model)
-      if ((req.kind === 'video' || req.kind === 'video_extend') && req.audio !== false) {
-        throw new ProviderError('Video requests must send audio off.', { retryable: false, submitted: 'no' })
-      }
       if (req.kind === 'upscale') {
         const src = req.refs?.[0]
         if (!src?.width || !src.height) throw new ProviderError('An upscale needs the source image size.', { retryable: false, submitted: 'no' })

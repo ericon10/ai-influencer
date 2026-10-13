@@ -289,7 +289,7 @@ export function importFreeform(md: string, opts: ImportOptions = {}): ImportResu
   const cardRaw = cardSec?.body ?? md.match(/^\s*(?:[-*]\s*)?\**card\**\s*[:\-]\s*(.+)$/im)?.[1] ?? ''
   if (cardSec) parsedOnly.add(cardSec)
   const cardSentences = sentences(cardRaw)
-  const moved = cardSentences.filter(s => /^(?:distinguishing marks|marks|signature style|style)\s*:/i.test(s))
+  const moved = cardSentences.filter(s => /^(?:distinguishing marks?|marks?|signature style|style)\s*:/i.test(s))
   let card = cardSentences.filter(s => !moved.includes(s)).join(' ')
   const age = Number(card.match(/\b(\d{2})\s*(?:years?\s*old|y\/?o)\b/i)?.[1] ?? card.match(/\b(\d{2})\b/)?.[1] ?? md.match(/\bage\b\D{0,3}(\d{2})/i)?.[1] ?? NaN)
   const withName = new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')},\\s*`, 'i')
@@ -311,7 +311,7 @@ export function importFreeform(md: string, opts: ImportOptions = {}): ImportResu
     const m = parseMark(line)
     if (m && !marks.some(x => x.kind === m.kind && x.region === m.region && x.side === m.side)) marks.push(m)
   }
-  if (marks.length !== 2) warnings.push(`Found ${marks.length} side-specific mark(s); expected 2.`)
+  if (!marks.length) warnings.push('No side-specific marks found. Marks are optional; add any the face really has.')
 
   // Style and makeup.
   const style: CharacterData['style'] = {}
@@ -343,9 +343,11 @@ export function importFreeform(md: string, opts: ImportOptions = {}): ImportResu
   const persona: CharacterData['persona'] = {}
   for (const b of bullets(find(sections, /persona$/, /personality$/)?.body ?? '')) {
     const k = (b.key ?? '').toLowerCase()
-    if (/vibe|personality/.test(k)) persona.vibe = b.value
+    // "Usual defaults (overridable, never locks)" is a default, not a never.
+    if (/default/.test(k)) persona.defaults = b.value
+    else if (/vibe|personality/.test(k)) persona.vibe = b.value
     else if (/setting|places|locations/.test(k)) persona.settings = splitList(b.value, ',')
-    else if (/never|avoid|don/.test(k)) persona.never = splitList(b.value, ',')
+    else if (/^(never|avoid|don)/.test(k)) persona.never = splitList(b.value, ',')
   }
 
   // Disclosure.

@@ -6,9 +6,10 @@ import { identityForModel } from '../core/identity.js'
 import { pronounVars } from '../core/prompts.js'
 import type { RealismWarning } from '../core/realism.js'
 import {
-  aspectFor, buildEditPrompt, buildScenePrompt, comboConflict, comboEntryFor, oneChangeProblem,
+  aspectFor, buildEditPrompt, buildScenePrompt, comboConflict, comboEntryFor, oneChangeProblem, plannerRules,
   scenePlanJsonSchema, scenePlanPrompt, type ReferenceMode, type SceneFields,
 } from '../core/scenes.js'
+import { ruleSwitches } from './rules.js'
 import { idealObservation } from '../core/qa/ideal.js'
 import { observationJsonSchema } from '../core/qa/perception.js'
 import { AppError } from '../lib/errors.js'
@@ -151,9 +152,12 @@ function mockPlan(deps: Deps, ch: Ch, brief: string): SceneFields {
     view: 'three_quarter_left',
     expression: 'soft_smile',
     foreground: '',
+    height: 'eye_level',
     framing: 'waist_up',
     light: 'morning',
     destination: 'vertical',
+    brands: false,
+    refs: [],
   }
 }
 
@@ -162,16 +166,20 @@ export async function buildScenePlan(deps: Deps, ctx: Ctx, row: CharacterRow, sc
   if (scene.characterId !== row.id) throw new AppError('bad_request', 'That scene belongs to another character.')
   if (!scene.brief.trim()) throw new AppError('bad_request', 'Describe the moment first, in your own words.')
   const ch = toData(row)
-  const { templates, scenes: sc, views } = deps.config.pipeline
+  const { templates, scenes: sc, views, rules } = deps.config.pipeline
+  const sw = await ruleSwitches(deps, ctx, row.id)
+  const brands = (scene.fields as { brands?: boolean }).brands === true
   const route = await resolveRoute(deps, ctx, 'scene_plan')
-  const prompt = scenePlanPrompt(templates, sc, views, ch, scene.brief, comboEntries(ch).slice(-sc.settings.combo_window))
+  const combos = sw.on('scene-combo-log') ? comboEntries(ch).slice(-sc.settings.combo_window) : []
+  const prompt = scenePlanPrompt(templates, sc, views, ch, scene.brief, combos, { persona: sw.on('scene-persona-never') })
+  const system = fill(templates.scene_plan.system, { rules: plannerRules(rules, id => sw.on(id), brands) })
   return {
     purpose: `scene_plan:${scene.id}`,
-    preview: { title: 'Plan the scene', prompts: [{ label: 'Scene plan', text: prompt, wrapped: hardWrap(prompt) }], warnings: [], invalidates: [] },
+    preview: { title: 'Plan the scene', prompts: [{ label: 'Scene plan', text: `${system}\n${prompt}`, wrapped: hardWrap(`${system}\n${prompt}`) }], warnings: [], invalidates: [] },
     specs: [{
       type: 'llm', stage: 'scene', purpose: `scene_plan:${scene.id}`, label: 'Plan the scene from your words',
       request: {
-        model: route.model, system: templates.scene_plan.system, prompt, schema: scenePlanJsonSchema(sc, views), schemaName: 'scene_plan',
+        model: route.model, system, prompt, schema: scenePlanJsonSchema(sc, views), schemaName: 'scene_plan',
         maxTokens: 3000, effort: route.effort ?? 'medium', meta: { sceneId: scene.id, mockPlan: mockPlan(deps, ch, scene.brief) },
       },
     }],
@@ -180,16 +188,19 @@ export async function buildScenePlan(deps: Deps, ctx: Ctx, row: CharacterRow, sc
 
 // ── Generate: stills for one scene, on one or two models ────────────
 
-export async function buildSceneRun(deps: Deps, ctx: Ctx, row: CharacterRow, input: { sceneId: string; models: string[]; variations: number; reason?: string; withQa: boolean }): Promise<SceneBuilt> {
+export async function buildSceneRun(deps: Deps, ctx: Ctx, row: CharacterRow, input: { sceneId: string; models: string[]; variations: number; reason?: string; withQa: boolean; allowRepeat?: boolean }): Promise<SceneBuilt> {
   const scene = await getScene(deps, ctx, input.sceneId)
   if (scene.characterId !== row.id) throw new AppError('bad_request', 'That scene belongs to another character.')
   const ch = toData(row)
   const f = sceneFields(deps, scene)
   const { templates, scenes: sc, views, rules, review } = deps.config.pipeline
-  // SPEC 5.2 rule 21, unless this scene is already in the log (a rerun).
-  if (!scene.comboLoggedAt) {
+  const sw = await ruleSwitches(deps, ctx, row.id)
+  let warnings: RuleViolation[] = []
+  // Default rule scene-combo-log: a repeat is a warning with "Use anyway",
+  // never a block. A rerun of a logged scene is not a repeat.
+  if (!scene.comboLoggedAt && !input.allowRepeat && sw.on('scene-combo-log')) {
     const combo = comboProblem(deps, ch, f)
-    if (combo) throw new AppError('invalid_request', combo)
+    if (combo) warnings.push({ ruleId: 'scene-combo-log', spec: '5.2.21', title: 'Repeats a recent combo', severity: 'warning', message: combo })
   }
   const models = [...new Set(input.models)]
   if (!models.length) throw new AppError('bad_request', 'Pick a model.')
@@ -198,8 +209,8 @@ export async function buildSceneRun(deps: Deps, ctx: Ctx, row: CharacterRow, inp
   if (!Number.isInteger(input.variations) || input.variations < 1 || input.variations > sc.settings.max_variations) {
     throw new AppError('bad_request', `Run 1 to ${sc.settings.max_variations} stills per model.`)
   }
-  const refs = await sceneRefs(deps, ctx, row.id, f)
-  if (!refs.some(r => r.role === 'face')) throw new AppError('bad_request', 'Approve REF-00 first: every scene attaches the face reference.')
+  const refs = await sceneRefs(deps, ctx, row.id, f, sw.on('scene-refs-by-angle'))
+  if (!refs.length) throw new AppError('bad_request', 'Approve REF-00 first: scenes attach the sheet so the face holds.')
   const aspect = aspectFor(sc, f)
   const reasonAction = input.reason ? review.reasons.find(r => r.id === input.reason)?.action : undefined
   const addendum = reasonAction ? review.actions[reasonAction]?.prompt_addendum ?? '' : ''
@@ -207,14 +218,14 @@ export async function buildSceneRun(deps: Deps, ctx: Ctx, row: CharacterRow, inp
   const specs: JobSpec[] = []
   const prompts: SceneBuilt['preview']['prompts'] = []
   const realism: RealismWarning[] = []
-  let warnings: RuleViolation[] = []
+  const sceneRules = { outfitOverride: sw.on('scene-outfit-override'), brandFree: sw.on('scene-brand-free'), colors: sw.on('scene-colors'), referenceLine: sw.on('scene-reference-slot') }
   for (const model of models) {
     const entry = modelEntry(deps, model)
     const identity = identityForModel(ch.identities, model)
     // SPEC 5.2 rule 14: refs for an edit model, the saved character for a
     // trained one, the full card otherwise.
     const mode: ReferenceMode = entry.max_refs > 0 ? 'refs' : identity ? 'trained' : 'text'
-    const prompt = buildScenePrompt(templates, sc, views, f, ch, mode, { identityBlock: identity?.promptBlock, warnings: realism, addendum })
+    const prompt = buildScenePrompt(templates, sc, views, f, ch, mode, { identityBlock: identity?.promptBlock, warnings: realism, addendum, rules: sceneRules, flawDose: sw.on('realism-flaw-dose') })
     const kind: GenRequest['kind'] = mode === 'refs' ? 'image_edit' : 'image'
     const run = await runModel(deps, ctx, model, kind)
     const attached = mode === 'refs' ? refs.slice(0, Math.max(1, entry.max_refs)) : []
@@ -226,9 +237,11 @@ export async function buildSceneRun(deps: Deps, ctx: Ctx, row: CharacterRow, inp
         ...(mode === 'trained' && identity ? { identityId: identity.externalId } : {}),
         ...(run.billing ? { billing: run.billing } : {}),
       }
-      warnings = lintOrThrow(lintPrompt(rules, prompt, {
-        stage: 'scene', framing: f.framing, kind, request: { ...request, model }, marks: ch.marks, identityBlock: identity?.promptBlock,
-      }), `${entry.label} scene prompt`)
+      // A scene that allows brands is not asked to be unbranded.
+      const lintSwitches = f.brands ? { on: (id: string) => id !== 'scene-brand-free' && sw.on(id), value: sw.value } : sw
+      warnings.push(...lintOrThrow(lintPrompt(rules, prompt, {
+        stage: 'scene', framing: f.framing, kind, request: { ...request, model }, marks: ch.marks, identityBlock: identity?.promptBlock, switches: lintSwitches,
+      }), `${entry.label} scene prompt`))
       const genIndex = specs.length
       const what = `${label}, ${entry.label}${input.variations > 1 ? `, still ${v + 1}` : ''}`
       specs.push({ type: 'gen', stage: 'scene', purpose: `scene:${scene.id}`, label: what, request })
@@ -237,7 +250,7 @@ export async function buildSceneRun(deps: Deps, ctx: Ctx, row: CharacterRow, inp
       const faceRefs = refs.filter(r => r.role !== 'body').map(r => ({ refId: r.refId, assetId: r.assetId }))
       // DECISIONS D3: after a still from a trained character, a face-only
       // pass locks the face to REF-00 and the closest-angle ref.
-      if (mode === 'trained' && identity?.followUp) {
+      if (mode === 'trained' && identity?.followUp && sw.on('scene-drift-lock')) {
         const lock = await driftLockSpec(deps, ctx, ch, refs, identity.followUp, { sceneId: scene.id, parentIndex: genIndex, label: what, aspect })
         specs.push(lock.spec)
         qaParent = specs.length - 1
@@ -273,13 +286,17 @@ async function driftLockSpec(deps: Deps, ctx: Ctx, ch: Ch, refs: SceneRef[], fol
 export async function buildSceneEdit(deps: Deps, ctx: Ctx, row: CharacterRow, input: { candidateId: string; change: string; face: boolean; model?: string; withQa: boolean }): Promise<SceneBuilt> {
   const cand = await getCandidate(deps, ctx, input.candidateId)
   if (cand.characterId !== row.id || !cand.sceneId || !cand.assetId) throw new AppError('bad_request', 'Pick a scene still to edit.')
-  // Rule 25: face drift is never an edit.
+  if (input.change.trim().length < 3) throw new AppError('invalid_request', 'Say what to change.')
+  const sw = await ruleSwitches(deps, ctx, row.id)
+  const advice: RuleViolation[] = []
+  // Defaults, never blocks: face drift is usually a regenerate (rule 25),
+  // and one change per pass works best (rule 24).
   const report = cand.qaReport as { findings?: Array<{ code: string; severity: string }> } | null
-  if (report?.findings?.some(f => f.severity === 'fail' && f.code === 'face_drift')) {
-    throw new AppError('bad_request', 'Face drift is never fixed with an edit (SPEC 5.3 rule 25). Regenerate the scene; the closest-angle refs are attached for you.')
+  if (sw.on('qa-face-drift') && report?.findings?.some(f => f.severity === 'fail' && f.code === 'face_drift')) {
+    advice.push({ ruleId: 'qa-face-drift', spec: '5.3.25', title: 'Face drift is usually a regenerate', severity: 'warning', message: 'QA found the face does not match REF-00. An edit rarely fixes a face; regenerating with the closest-angle refs usually does. Running anyway.' })
   }
-  const problem = oneChangeProblem(input.change)
-  if (problem) throw new AppError('invalid_request', problem)
+  const problem = sw.on('edit-one-change') ? oneChangeProblem(input.change) : null
+  if (problem) advice.push({ ruleId: 'edit-one-change', spec: '5.3.24', title: 'More than one change', severity: 'warning', message: `${problem} Running anyway.` })
   const scene = await getScene(deps, ctx, cand.sceneId)
   const f = sceneFields(deps, scene)
   const ch = toData(row)
@@ -290,13 +307,13 @@ export async function buildSceneEdit(deps: Deps, ctx: Ctx, row: CharacterRow, in
   const ref00 = (await approvedAssets(deps, ctx, row.id)).get('REF-00')
   if (input.face && !ref00) throw new AppError('bad_request', 'A face edit attaches REF-00. Approve REF-00 first.')
   const realism: RealismWarning[] = []
-  const prompt = buildEditPrompt(templates, input.change, ch, input.face, { warnings: realism })
+  const prompt = buildEditPrompt(templates, input.change, ch, input.face, { warnings: realism, flawDose: sw.on('realism-flaw-dose') })
   const request: GenRequest = {
     kind: 'image_edit', model: run.model, prompt, aspect: aspectFor(sc, f), quality: sc.settings.quality, resolution: sc.settings.resolution,
     refs: [{ assetId: cand.assetId }, ...(input.face && ref00 ? [{ assetId: ref00 }] : [])],
     ...(run.billing ? { billing: run.billing } : {}),
   }
-  const warnings = lintOrThrow(lintPrompt(rules, prompt, { stage: 'edit', kind: 'image_edit', request: { ...request, model } }), 'Edit')
+  const warnings = [...advice, ...lintOrThrow(lintPrompt(rules, prompt, { stage: 'edit', kind: 'image_edit', request: { ...request, model }, switches: sw }), 'Edit')]
   const label = `${sceneLabel(scene, f)}, edit`
   const specs: JobSpec[] = [{ type: 'gen', stage: 'edit', purpose: `scene_edit:${scene.id}:${cand.id}`, label: `One-change edit: ${input.change.trim().slice(0, 60)}`, request }]
   if (input.withQa) specs.push(...await sceneQaSpecs(deps, ctx, ch, f, { sceneId: scene.id, parentIndex: 0, faceRefs: ref00 ? [{ refId: 'REF-00', assetId: ref00 }] : [], label }))
@@ -314,7 +331,7 @@ export async function buildSceneUpscale(deps: Deps, ctx: Ctx, row: CharacterRow,
   const { scenes: sc, rules } = deps.config.pipeline
   const run = await runModel(deps, ctx, sc.settings.upscale_model, 'upscale')
   const request: GenRequest = { kind: 'upscale', model: run.model, prompt: 'Upscale 2x, keep every detail identical.', refs: [{ assetId: cand.assetId }], scale: 2, ...(run.billing ? { billing: run.billing } : {}) }
-  lintOrThrow(lintPrompt(rules, request.prompt, { kind: 'upscale', request }), 'Upscale')
+  lintOrThrow(lintPrompt(rules, request.prompt, { kind: 'upscale', request, switches: await ruleSwitches(deps, ctx, row.id) }), 'Upscale')
   return {
     purpose: `scene_upscale:${cand.sceneId}`,
     specs: [{ type: 'gen', stage: 'edit', purpose: `scene_upscale:${cand.sceneId}:${cand.id}`, label: 'Upscale 2x', request }],
@@ -329,7 +346,7 @@ export async function buildSceneRecheck(deps: Deps, ctx: Ctx, row: CharacterRow,
   if (cand.characterId !== row.id || !cand.sceneId || !cand.assetId) throw new AppError('bad_request', 'Pick a scene still to check.')
   const scene = await getScene(deps, ctx, cand.sceneId)
   const f = sceneFields(deps, scene)
-  const refs = await sceneRefs(deps, ctx, row.id, f)
+  const refs = await sceneRefs(deps, ctx, row.id, f, (await ruleSwitches(deps, ctx, row.id)).on('scene-refs-by-angle'))
   const specs = await sceneQaSpecs(deps, ctx, toData(row), f, {
     sceneId: scene.id, assetId: cand.assetId, candidateId: cand.id, group: `recheck:${cand.id}:${deps.clock.now().getTime()}`,
     faceRefs: refs.filter(r => r.role !== 'body').map(r => ({ refId: r.refId, assetId: r.assetId })), label: sceneLabel(scene, f),

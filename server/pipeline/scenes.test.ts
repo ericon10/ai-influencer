@@ -77,12 +77,17 @@ describe('scenes (Stage 7, demo mode)', () => {
     expect(view.title).toBe('Picking out peaches at')
   })
 
-  it('refuses a moment and camera pair from the last 10 combo log entries (rule 21)', async () => {
+  it('warns on a moment and camera pair from the last 10 combo log entries, and "Use anyway" runs it (rule 21)', async () => {
     const repeat = await createScene(h.deps, h.ctx, characterId, {
       fields: { momentType: 'caught_mid_action', camera: 'friend_phone', moment: 'Callie laughs on a rooftop', outfit: 'a linen sundress', footwear: 'white sandals', light: 'golden_hour' },
     })
-    await expect(estimateAction(h.deps, h.ctx, { type: 'scene', characterId, sceneId: repeat.id, models: ['higgsfield/nano-banana-2.1'], variations: 1, withQa: true }))
-      .rejects.toThrow(/already used on 2026-10-12.*rule 21/)
+    const action = { type: 'scene' as const, characterId, sceneId: repeat.id, models: ['higgsfield/nano-banana-2.1'], variations: 1, withQa: true }
+    const warned = await estimateAction(h.deps, h.ctx, action)
+    expect(warned.quote.status).toBe('open')
+    const w = warned.preview.warnings.find(x => (x as { ruleId?: string }).ruleId === 'scene-combo-log')!
+    expect(w.message).toMatch(/was used on 2026-10-12/)
+    const anyway = await estimateAction(h.deps, h.ctx, { ...action, allowRepeat: true })
+    expect(anyway.preview.warnings.some(x => (x as { ruleId?: string }).ruleId === 'scene-combo-log')).toBe(false)
   })
 
   it('runs Nano Banana 2.1 and GPT Image 2.5 Flare side by side, refs chosen by angle, QA on each', async () => {
@@ -148,17 +153,17 @@ describe('still edits (Stage 8, demo mode)', () => {
     stillId = (await stills(sceneId))[0]!.id
   })
 
-  it('QA finds the cuff on the wrong ear: an edit, not a regenerate, with the free mirror offered', async () => {
+  it('jewelry the scene did not ask for is a note, never a fail; any still can be mirrored by hand', async () => {
     const [c] = await stills(sceneId)
-    const report = c!.qaReport as { verdict: string; edits: Array<{ change: string }>; mirrorFix: { available: boolean } }
-    expect(report.verdict).toBe('edit')
-    expect(report.mirrorFix.available).toBe(true)
+    const report = c!.qaReport as { verdict: string; edits: Array<{ change: string }>; findings: Array<{ code: string; severity: string }> }
+    expect(report.verdict).toBe('post')
+    expect(report.findings.find(f => f.code === 'extra_jewelry')?.severity).toBe('info')
     expect(report.edits[0]!.change).toMatch(/^Remove the gold double-band ear cuff from her RIGHT ear/)
     const { candidateId } = await mirrorCandidate(h.deps, h.ctx, stillId)
     const mirrored = (await stills(sceneId)).find(x => x.id === candidateId)!
     expect(mirrored.op).toBe('mirror')
     expect(mirrored.parentId).toBe(stillId)
-    expect(mirrored.qaVerdict).toBe('post')
+    expect((mirrored.qaReport as { summary: string }).summary).toMatch(/Mirrored by hand/)
   })
 
   it('a reason chip for a logo now offers the one-change edit', async () => {
@@ -166,14 +171,19 @@ describe('still edits (Stage 8, demo mode)', () => {
     expect(fixes[0]).toMatchObject({ action: 'edit_one_detail', available: true })
   })
 
-  it('one change per edit, never for face drift (rules 24 and 25)', async () => {
-    await expect(estimateAction(h.deps, h.ctx, { type: 'scene_edit', characterId, candidateId: stillId, change: 'Remove the logo on the mug. Then close her mouth.', face: false, withQa: true }))
-      .rejects.toThrow(/One change per edit/)
+  it('two changes or face drift are warnings on an edit, never a block (rules 24 and 25)', async () => {
+    const two = await estimateAction(h.deps, h.ctx, { type: 'scene_edit', characterId, candidateId: stillId, change: 'Remove the logo on the mug. Then close her mouth.', face: false, withQa: true })
+    expect(two.quote.status).toBe('open')
+    expect(two.preview.warnings.map(w => (w as { ruleId?: string }).ruleId)).toContain('edit-one-change')
     const drift = { verdict: 'regenerate', summary: '', reasons: [], detectedView: null, findings: [{ code: 'face_drift', severity: 'fail', message: 'The face does not match.' }] }
     await h.deps.db.update(candidates).set({ qaReport: drift }).where(eq(candidates.id, stillId))
-    await expect(estimateAction(h.deps, h.ctx, { type: 'scene_edit', characterId, candidateId: stillId, change: 'Remove the logo on the mug', face: false, withQa: true }))
-      .rejects.toThrow(/Face drift is never fixed with an edit/)
-    await h.deps.db.update(candidates).set({ qaReport: null }).where(eq(candidates.id, stillId))
+    const onDrift = await estimateAction(h.deps, h.ctx, { type: 'scene_edit', characterId, candidateId: stillId, change: 'Remove the logo on the mug', face: false, withQa: true })
+    expect(onDrift.quote.status).toBe('open')
+    expect(onDrift.preview.warnings.map(w => (w as { ruleId?: string }).ruleId)).toContain('qa-face-drift')
+    // A pick on face drift is a strong warning: it asks first, then it is yours.
+    await expect(approveSceneCandidate(h.deps, h.ctx, stillId)).rejects.toMatchObject({ code: 'confirm_required' })
+    await expect(approveSceneCandidate(h.deps, h.ctx, stillId, { acknowledge: true })).resolves.toBeDefined()
+    await h.deps.db.update(candidates).set({ qaReport: null, status: 'in_review' }).where(eq(candidates.id, stillId))
   })
 
   it('runs a one-change edit on the still, with REF-00 only for a face change, and checks it', async () => {
@@ -195,6 +205,22 @@ describe('still edits (Stage 8, demo mode)', () => {
     const up = (await stills(sceneId)).find(x => x.op === 'upscale')!
     expect(up.parentId).toBe(crop.candidateId)
     expect(['in_review', 'qa_failed']).toContain(up.status)
+  })
+})
+
+describe('defaults, not locks (ruling G1)', () => {
+  it('a scene with no outfit or footwear, a low angle, a landscape shape and brands on still runs, with warnings', async () => {
+    const scene = await createScene(h.deps, h.ctx, characterId, {
+      fields: { momentType: 'caught_mid_action', camera: 'friend_phone', moment: 'Callie holds up a can of sparkling water for the brand', outfit: '', footwear: '', height: 'low', destination: 'landscape', light: 'golden_hour', pose: 'shot from a low angle, looking up at her' },
+    })
+    await updateScene(h.deps, h.ctx, scene.id, { fields: { brands: true } as never })
+    const { quote, preview } = await estimateAction(h.deps, h.ctx, { type: 'scene', characterId, sceneId: scene.id, models: ['higgsfield/nano-banana-2.1'], variations: 1, withQa: true })
+    expect(quote.status).toBe('open')
+    const ids = preview.warnings.map(w => (w as { ruleId?: string }).ruleId)
+    expect(ids).toEqual(expect.arrayContaining(['scene-names-footwear', 'scene-everyday-angles', 'scene-aspect', 'scene-combo-log']))
+    expect(ids).not.toContain('scene-brand-free')
+    expect(preview.prompts[0]!.text).not.toMatch(/unbranded/)
+    expect(preview.prompts[0]!.text).toContain('from a low angle')
   })
 })
 

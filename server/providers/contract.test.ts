@@ -123,10 +123,11 @@ async function contract(name: string, make: () => ProviderAdapter, req: GenReque
       expect(outputs[0]!.url).toBeTruthy()
     })
 
-    it('refuses video with audio on', async () => {
+    it('takes video with audio on when a request asks for it (default rule video-audio-off)', async () => {
       const a = make()
-      const bad = { kind: 'video', model: req.model.replace(/image.*$/, 'video'), prompt: 'x', audio: true } as unknown as GenRequest
-      await expect(a.submit(bad, { idempotencyKey: 'k2' })).rejects.toBeInstanceOf(ProviderError)
+      const model = req.model.startsWith('mock/') ? 'mock/video' : 'higgsfield/seedance-2.0'
+      const withAudio: GenRequest = { kind: 'video', model, prompt: 'x', audio: true, durationSec: 5, startFrame: { assetId: 's', url: 'https://r2.example.com/s.png' } }
+      await expect(a.submit(withAudio, { idempotencyKey: 'k2' })).resolves.toMatchObject({ jobId: expect.any(String) })
     })
   })
 }
@@ -184,16 +185,20 @@ describe('higgsfield adapter specifics', () => {
       .rejects.toThrow(/not on the Higgsfield API/)
   })
 
-  it('refuses models whose endpoint is not verified yet', async () => {
-    const a = await hf(fakeHiggsfield(), config)
-    await expect(a.submit({ kind: 'image', model: 'higgsfield/gpt-image-2.5', prompt: 'p' }, { idempotencyKey: 'k' }))
+  it('refuses only a model with no endpoint; an untested one runs (default rule model-tested)', async () => {
+    const noEndpoint = { ...config, models: { ...config.models, models: config.models.models.map(m => (m.ref === 'higgsfield/gpt-image-2.5' ? { ...m, endpoint: null } : m)) } } as typeof config
+    await expect((await hf(fakeHiggsfield(), noEndpoint)).submit({ kind: 'image', model: 'higgsfield/gpt-image-2.5', prompt: 'p' }, { idempotencyKey: 'k' }))
       .rejects.toMatchObject({ opts: { code: 'unverified_model', submitted: 'no' } })
+    await expect((await hf(fakeHiggsfield(), config)).submit({ kind: 'image', model: 'higgsfield/gpt-image-2.5', prompt: 'p' }, { idempotencyKey: 'k' }))
+      .resolves.toMatchObject({ jobId: expect.any(String) })
   })
 
-  it('always sends audio off for video', () => {
+  it('sends audio off for video unless the request asks for it', () => {
     const entry = verifiedConfig().models.models.find(m => m.ref === 'higgsfield/seedance-2.0')!
-    const body = mapInput(entry, { kind: 'video', model: entry.ref, prompt: 'p', startFrame: { assetId: 's', url: 'https://r2.example.com/s.png' }, durationSec: 5, audio: false })
-    expect(body.generate_audio).toBe(false)
+    const frame = { assetId: 's', url: 'https://r2.example.com/s.png' }
+    expect(mapInput(entry, { kind: 'video', model: entry.ref, prompt: 'p', startFrame: frame, durationSec: 5, audio: false }).generate_audio).toBe(false)
+    expect(mapInput(entry, { kind: 'video', model: entry.ref, prompt: 'p', startFrame: frame, durationSec: 5 }).generate_audio).toBe(false)
+    expect(mapInput(entry, { kind: 'video', model: entry.ref, prompt: 'p', startFrame: frame, durationSec: 5, audio: true }).generate_audio).toBe(true)
   })
 
   it('classifies errors so the runner never double-charges', async () => {
@@ -227,12 +232,12 @@ describe('higgsfield adapter specifics', () => {
     expect((await bad.verifyCredentials!()).ok).toBe(false)
   })
 
-  it('runs an unconfirmed model only for its paid test, and freely once the account confirms it', async () => {
+  it('runs a model before and after its paid test; the test flag never reaches Higgsfield', async () => {
     const ref = 'higgsfield/gpt-image-2.5-flare'
     const path = 'marketing-studio/image/flare'
     const fake = fakeHiggsfield()
     const pending = await hf(fake, config)
-    await expect(pending.submit({ kind: 'image', model: ref, prompt: 'p' }, { idempotencyKey: 'k1' })).rejects.toMatchObject({ opts: { code: 'unverified_model' } })
+    await expect(pending.submit({ kind: 'image', model: ref, prompt: 'p' }, { idempotencyKey: 'k1' })).resolves.toMatchObject({ jobId: expect.any(String) })
     await pending.submit({ kind: 'image', model: ref, prompt: 'p', resolution: '1k', modelTest: true }, { idempotencyKey: 'k2' })
     expect(fake.calls.at(-1)!.url).toBe(`https://api.higgsfield.ai/${path}`)
     // The test flag never reaches the provider.

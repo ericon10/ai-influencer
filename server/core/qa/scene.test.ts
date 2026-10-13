@@ -42,33 +42,50 @@ describe('scene QA', () => {
     expect(report.edits).toEqual([{ code: 'logo', change: 'Remove the white swoosh logo on the cup in the hand at image_left, leaving that surface plain and unbranded', face: false }])
   })
 
-  it('jewelry the scene asked for is fine; anything else is extra', () => {
+  it('jewelry the scene did not ask for is a note with a one-click edit, never a fail', () => {
     expect(judge({ other_jewelry: [{ image_side: 'center', description: 'thin gold chain necklace' }] }).report.verdict).toBe('post')
     const { report } = judge({ other_jewelry: [{ image_side: 'image_left', description: 'a chunky silver bracelet' }] })
-    expect(report.verdict).toBe('edit')
+    expect(report.verdict).toBe('post')
+    expect(report.findings.find(f => f.code === 'extra_jewelry')?.severity).toBe('info')
     expect(report.edits![0]!.change).toBe('Remove the chunky silver bracelet, on the left of the image')
+    expect(judge({ other_jewelry: [{ image_side: 'image_left', description: 'a chunky silver bracelet' }] }, { rules: { logos: true, jewelry: false, mirror: true } }).report.findings.some(f => f.code === 'extra_jewelry')).toBe(false)
   })
 
-  it('the cuff on the wrong ear: mirror for free without text, else one edit', () => {
+  it('signature jewelry is never flagged as missing or added (ruling G1)', () => {
+    // Not asked for, but worn: fine. Asked for, but not seen: fine.
+    expect(judge({}, { jewelryAsked: '' }).report.verdict).toBe('post')
+    const bare: Partial<Observation> = { ears: [{ image_side: 'image_right', jewelry: false, jewelry_description: '' }, { image_side: 'image_left', jewelry: false, jewelry_description: '' }] }
+    expect(judge(bare, { jewelryAsked: 'her gold ear cuff on her left ear' }).report.verdict).toBe('post')
+  })
+
+  it('a cuff the scene asked for, on the other ear: advice with the free mirror or one edit', () => {
     const flipped: Partial<Observation> = {
       ears: [{ image_side: 'image_left', jewelry: true, jewelry_description: 'gold double-band ear cuff' }, { image_side: 'image_right', jewelry: false, jewelry_description: '' }],
     }
-    const { report, input } = judge(flipped)
-    expect(report.verdict).toBe('edit')
-    expect(report.findings.find(f => f.code === 'mark_wrong_side')!.message).toMatch(/RIGHT ear/)
+    const asked = { jewelryAsked: 'her gold double-band ear cuff on her left ear' }
+    const { report, input } = judge(flipped, asked)
+    expect(report.verdict).toBe('uncertain')
+    expect(report.findings.find(f => f.code === 'mark_wrong_side')!.message).toMatch(/RIGHT ear; it usually sits on her LEFT ear/)
     expect(sceneMirrorFix(input, report)).toMatchObject({ available: true })
     expect(report.edits![0]!.change).toMatch(/^Remove the gold double-band ear cuff from her RIGHT ear/)
-
-    const withText = judge({ ...flipped, text_or_logos: ['CAFE sign above the door'] })
+    const withText = judge({ ...flipped, text_or_logos: ['CAFE sign above the door'] }, asked)
     expect(sceneMirrorFix(withText.input, withText.report)).toMatchObject({ available: false })
+    // Not asked for: not a finding at all.
+    expect(judge(flipped).report.findings.some(f => f.code === 'mark_wrong_side')).toBe(false)
   })
 
-  it('earrings asked for on both ears are not a wrong-side cuff', () => {
+  it('a scene that allows brands is not told about logos', () => {
+    expect(judge({ text_or_logos: ['logo on the cup'] }, { rules: { logos: false, jewelry: true, mirror: true } }).report.verdict).toBe('post')
+  })
+
+  it('earrings asked for on both ears are fine; unasked ones are a note', () => {
     const both: Partial<Observation> = {
       ears: [{ image_side: 'image_right', jewelry: true, jewelry_description: 'gold ear cuff and small gold hoop' }, { image_side: 'image_left', jewelry: true, jewelry_description: 'small gold hoop earring' }],
     }
     expect(judge(both, { jewelryAsked: 'small gold hoop earrings' }).report.verdict).toBe('post')
-    expect(judge(both, { jewelryAsked: '' }).report.findings.map(f => f.code)).toContain('extra_jewelry')
+    const unasked = judge(both, { jewelryAsked: '' }).report
+    expect(unasked.findings.map(f => f.code)).toContain('extra_jewelry')
+    expect(unasked.verdict).toBe('post')
   })
 
   it('face drift and plastic skin always regenerate, and offer no edits (rule 25, Realism)', () => {

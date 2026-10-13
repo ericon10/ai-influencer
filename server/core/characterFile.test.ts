@@ -85,17 +85,15 @@ describe("Callie's character file", () => {
     expect(c.card).toMatch(/^24 years old\. Long honey-blonde hair, loose beachy waves, deep side part\./)
     expect(c.card).not.toMatch(/Distinguishing marks|Style:|Callie/)
     expect(c.body).toBe('Fit, athletic build, toned legs, defined waist, naturally curvy hips')
-    expect(r.warnings.join(' ')).toMatch(/Moved "Distinguishing marks" and "Style" out of the card/)
+    expect(r.warnings.join(' ')).toMatch(/Moved "Distinguishing mark" and "Style" out of the card/)
     expect(validateCharacter(c)).toEqual([])
   })
 
-  it('reads both marks with their sides, including a lowercase "left"', () => {
+  it('reads her one fixed mark with its side; the ear cuff is optional styling, not a mark', () => {
     expect(c.marks).toEqual([
       { name: 'mole', description: 'small, subtle mole', side: 'LEFT', region: 'brow', kind: 'skin', subtle: true },
-      { name: 'ear cuff', description: 'gold double-band ear cuff', side: 'LEFT', region: 'ear', kind: 'jewelry', subtle: false },
     ])
-    // Same marks as SPEC Appendix A.
-    expect(c.marks.map(m => [m.side, m.region, m.kind])).toEqual(fx.marks.map((m: { side: string; region: string; kind: string }) => [m.side, m.region, m.kind]))
+    expect(c.style.notes).toMatch(/She sometimes wears a gold double-band ear cuff/)
   })
 
   it('reads style, makeup, persona, pronouns and disclosure', () => {
@@ -107,12 +105,14 @@ describe("Callie's character file", () => {
     expect(c.style.ideas).toContain('dainty gold jewelry')
     expect(c.style.hair_options).toContain('anything new she tries')
     expect(c.style.notes).toMatch(/^Look: a regular girl whose style evolves; natural glow\./)
-    expect(c.style.notes).toMatch(/The only constant: the gold ear cuff on her left ear/)
+    expect(c.style.notes).toMatch(/Jewelry varies freely\./)
     expect(r.warnings.join(' ')).toMatch(/Style is kept as optional ideas only; it never goes into a prompt/)
     expect(c.persona.settings).toContain('tropical coves')
     expect(c.makeup).toEqual({ default: 'natural (light skin, groomed brows, tinted lip)', glam_when: ['nights_out', 'events'], glam: 'soft glam (bronzer, warm blush, glossy nude-pink lip)' })
     expect(c.persona.vibe).toMatch(/^sunny, approachable/)
-    expect(c.persona.never).toContain('visible brand logos')
+    // "Usual defaults (overridable, never locks)" is read as defaults.
+    expect(c.persona.never).toBeUndefined()
+    expect(c.persona.defaults).toMatch(/^light makeup in daytime, real-moment feel over staged ad shoot/)
     expect(c.disclosure).toBe("Label all posted content as AI-generated per each platform's rules.")
   })
 

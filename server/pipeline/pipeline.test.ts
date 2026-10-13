@@ -85,13 +85,16 @@ describe('character creation, stages 1 to 5 (demo mode)', () => {
   })
 
   it('stage 3: runs 3 text-only hero prompts, 4 to 8 candidates each, and one hero becomes REF-00', async () => {
-    await expect(estimateAction(h.deps, h.ctx, { type: 'hero', characterId, runsPerPrompt: 3 })).rejects.toThrow()
+    // A default (hero-runs): fewer than 4 is allowed, with a warning.
+    const few = await estimateAction(h.deps, h.ctx, { type: 'hero', characterId, runsPerPrompt: 3 })
+    expect(few.quote.status).toBe('open')
+    expect(few.preview.warnings.map(w => (w as { ruleId?: string }).ruleId)).toContain('hero-runs')
     const { preview, jobs } = await run({ type: 'hero', characterId, runsPerPrompt: 4 })
     expect(preview.prompts).toHaveLength(3)
     // How Callie's REF-00 was made: neutral, gray background, white tee, bare face.
     for (const p of preview.prompts) {
       expect(p.text).toMatch(/Chest-up portrait of .*Facing the camera, relaxed neutral expression/)
-      expect(p.text).toMatch(/Plain light gray background, soft even daylight, plain white crew-neck tee, hair in its usual style/)
+      expect(p.text).toMatch(/Plain light gray background, soft even daylight\. Plain white crew-neck tee, hair in its usual style/)
       expect(p.text).toContain('Bare face, no makeup, no retouching.')
       expect(p.text).toContain('natural skin with visible pores and small believable imperfections')
       expect(p.text).not.toMatch(/\b(acne|blemish|scar|rough skin)/i)
@@ -217,7 +220,9 @@ describe('character creation, stages 1 to 5 (demo mode)', () => {
     const { quote, preview } = await run({ type: 'sheet', characterId: row.id, refId: 'REF-01', variations: 1, refsMode: 'ref00_only', withQa: true })
     // Demo mode runs the mock in place of the locked model; nothing is spent on a provider.
     expect(quote.items.map(i => i.model)).toEqual(['mock/image', 'mock/llm', 'mock/llm'])
-    expect(preview.prompts[0]!.text).toMatch(/gold double-band ear cuff/)
+    // Only the face is fixed: her mole, on its side. The ear cuff is styling.
+    expect(preview.prompts[0]!.text).toMatch(/small, subtle mole above her LEFT brow/)
+    expect(preview.prompts[0]!.text).not.toMatch(/ear cuff/)
     expect(preview.prompts[0]!.text).toMatch(/LEFT ear/)
     const [cand] = await candidatesFor(h.deps, h.ctx, row.id, { refId: 'REF-01', statuses: ['in_review'] })
     expect(cand).toBeDefined()

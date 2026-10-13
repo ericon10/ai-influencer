@@ -7,7 +7,7 @@ import { audit } from '../lib/audit.js'
 import sharp from 'sharp'
 import { getAsset, readAsset, saveAsset } from '../storage/assets.js'
 import { newId } from '../lib/ids.js'
-import type { QaReport } from '../core/qa/marks.js'
+import { finalize, type QaReport } from '../core/qa/marks.js'
 import { candidatesFor, getCandidate, getCharacter, getRef, setCharacterFields, sheetState } from './characters.js'
 import { liveRoute } from './settings.js'
 import { refreshSceneStatus } from './scenes.js'
@@ -154,16 +154,21 @@ export async function mirrorCandidate(deps: Deps, ctx: Ctx, candidateId: string)
   const cand = await getCandidate(deps, ctx, candidateId)
   const report = cand.qaReport as QaReport | null
   if (!cand.assetId || (!cand.refId && !cand.sceneId)) throw new AppError('bad_request', 'This result has no image to mirror.')
-  if (!report?.mirrorFix?.available || !report.mirrorFix.report) throw new AppError('bad_request', report?.mirrorFix?.message ?? 'QA did not find a mirrored shot here.')
+  // QA's mirror fix comes with the report the flip would get; a scene still
+  // can also be mirrored by hand at any time (advice, never a lock).
+  const byHand = !report?.mirrorFix?.available || !report.mirrorFix.report
+  if (byHand && !cand.sceneId) throw new AppError('bad_request', report?.mirrorFix?.message ?? 'QA did not find a mirrored shot here.')
   const { data } = await readAsset(deps, ctx, cand.assetId)
   const flipped = await sharp(data).flop().png().toBuffer()
   const asset = await saveAsset(deps, ctx, { data: flipped, origin: 'derived', label: `${cand.refId ?? 'Scene still'} mirrored fix` })
-  const derived: QaReport = {
-    ...report.mirrorFix.report,
-    identity: report.identity ?? null,
-    mirrorFix: null,
-    findings: [...report.mirrorFix.report.findings, { code: 'uncertain', severity: 'info', message: 'Mirrored copy of a shot that came back flipped. Checked by mirroring the original inspection; no new generation.' }],
-  }
+  const derived: QaReport = byHand
+    ? finalize([{ code: 'uncertain', severity: 'warn', message: 'Mirrored by hand: any text in the frame is mirrored too. No new generation, no cost.' }], null)
+    : {
+      ...report!.mirrorFix!.report!,
+      identity: report!.identity ?? null,
+      mirrorFix: null,
+      findings: [...report!.mirrorFix!.report!.findings, { code: 'uncertain', severity: 'info', message: 'Mirrored copy of a shot that came back flipped. Checked by mirroring the original inspection; no new generation.' }],
+    }
   const id = newId('cand')
   const status = cand.status === 'check' ? 'check' : 'in_review'
   await deps.db.insert(candidates).values({

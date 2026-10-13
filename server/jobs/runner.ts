@@ -18,6 +18,7 @@ import { stripAudio } from '../media/edit.js'
 import { ProviderError, type GenRequest, type LlmImage, type LlmRequest, type Output, type ProviderAdapter } from '../providers/types.js'
 import { withBilling } from '../providers/billing.js'
 import { realismBlockers } from '../core/realism.js'
+import { EXPLICIT_MESSAGE, findExplicitTerms } from '../core/safety.js'
 import { publicAssetUrl } from './assetUrls.js'
 import { safeDownload } from './download.js'
 import { hookFor, localJobFor, type JobOutcome, type JobRow } from './hooks.js'
@@ -68,7 +69,7 @@ async function llmEstimateRequest(deps: Deps, ctx: Ctx, req: LlmJobRequest): Pro
 function guardRealism(specs: JobSpec[]): void {
   for (const s of specs) {
     if (s.type !== 'gen') continue
-    const problems = realismBlockers(s.request.prompt, { kind: s.request.kind, stage: s.stage })
+    const problems = [...realismBlockers(s.request.prompt, { kind: s.request.kind, stage: s.stage }), ...(findExplicitTerms(s.request.prompt).length ? [EXPLICIT_MESSAGE] : [])]
     if (problems.length) throw new AppError('prompt_rejected', `${s.label}: ${problems.join(' ')}`)
   }
 }
@@ -347,8 +348,8 @@ async function downloadOutput(deps: Deps, job: JobRow, adapter: ProviderAdapter,
   return data
 }
 
-// Generated clips are stored without audio, even when audio was requested
-// off (SPEC 5.4 rule 34).
+// Generated clips are stored without audio when audio was requested off,
+// because some models return a track anyway (SPEC 5.4 rule 34).
 async function silence(data: Buffer): Promise<{ data: Buffer; hadAudio: boolean }> {
   const dir = await mkdtemp(join(tmpdir(), 'ingest-'))
   try {
@@ -383,7 +384,9 @@ async function ingestGen(deps: Deps, job: JobRow): Promise<void> {
         continue
       }
       let data = await downloadOutput(deps, job, adapter, o)
-      if (o.kind === 'video') {
+      // Audio off by default: a clip is stored silent unless its request
+      // asked for audio (default rule video-audio-off).
+      if (o.kind === 'video' && req.audio !== true) {
         const s = await silence(data)
         data = s.data
         if (s.hadAudio) await event(deps.db, job, 'audio_stripped', { position: i })

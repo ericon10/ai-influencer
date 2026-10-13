@@ -162,7 +162,6 @@ export function createMockAdapter(opts: MockOptions): ProviderAdapter & { jobs: 
       const scenario = pick(req)
       if (scenario === 'submit_error') throw new ProviderError('Mock provider rejected the request.', { retryable: false, submitted: 'no', status: 422 })
       if (scenario === 'submit_timeout') throw new ProviderError('Mock provider timed out after the request was sent.', { retryable: false, submitted: 'unknown' })
-      if (req.kind === 'video' && req.audio !== false) throw new ProviderError('Video requests must send audio off.', { retryable: false, submitted: 'no' })
       const id = newId('req').replace('req_', 'mock_')
       jobs.set(id, { req, scenario, polls: 0 })
       return { jobId: id }

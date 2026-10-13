@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import type { ScenesConfig, SheetShot, TemplatesConfig, ViewsConfig } from '../config/pipeline.js'
+import type { RulesConfig, ScenesConfig, SheetShot, TemplatesConfig, ViewsConfig } from '../config/pipeline.js'
 import type { CharacterData } from './character.js'
 import { cardPhrase, finishPrompt, markLines, pronounVars, type BuildOptions } from './prompts.js'
 import { capitalize, fill, normalizePrompt } from './text.js'
@@ -12,14 +12,16 @@ import { capitalize, fill, normalizePrompt } from './text.js'
 
 const text = (max: number) => z.string().trim().max(max)
 
+// Every field is a default the owner can change (owner ruling G1); only the
+// moment itself is needed to make a scene.
 export const sceneFieldsSchema = z.object({
   title: text(80).default(''),
   momentType: z.string().min(1),
   moment: text(400).min(3, 'Describe the moment.'),
   setting: text(400).default(''),
   location: text(60).default(''),
-  outfit: text(300).min(3, 'Write out the full outfit.'),
-  footwear: text(120).min(2, 'Name the footwear (SPEC 5.2 rule 16).'),
+  outfit: text(300).default(''),
+  footwear: text(120).default(''),
   jewelry: text(200).default(''),
   makeup: z.enum(['bare', 'natural', 'soft_glam']).default('natural'),
   hair: text(160).default(''),
@@ -28,9 +30,14 @@ export const sceneFieldsSchema = z.object({
   expression: z.string().default('neutral'),
   camera: z.string().min(1),
   foreground: text(160).default(''),
+  height: z.string().default('eye_level'),
   framing: z.string().default('waist_up'),
   light: z.string().min(1),
   destination: z.string().default('vertical'),
+  // Brand deals and products: real logos and brand names allowed.
+  brands: z.boolean().default(false),
+  // The sheet refs to attach, chosen by the owner; empty picks by angle.
+  refs: z.array(z.string().regex(/^REF-\d{2}$/)).max(8).default([]),
 })
 
 export type SceneFields = z.infer<typeof sceneFieldsSchema>
@@ -44,6 +51,7 @@ export function checkSceneFields(sc: ScenesConfig, views: ViewsConfig, f: SceneF
   if (!has(sc.moments, f.momentType)) out.push({ field: 'momentType', message: `Unknown moment type "${f.momentType}".` })
   if (!has(sc.cameras, f.camera)) out.push({ field: 'camera', message: `Unknown camera "${f.camera}".` })
   if (!has(sc.framings, f.framing)) out.push({ field: 'framing', message: `Unknown framing "${f.framing}".` })
+  if (!has(sc.heights, f.height)) out.push({ field: 'height', message: `Unknown camera height "${f.height}".` })
   if (!has(sc.lights, f.light)) out.push({ field: 'light', message: `Unknown light "${f.light}".` })
   if (!has(sc.expressions, f.expression)) out.push({ field: 'expression', message: `Unknown expression "${f.expression}".` })
   if (!has(sc.makeup, f.makeup)) out.push({ field: 'makeup', message: `Unknown makeup "${f.makeup}".` })
@@ -69,13 +77,26 @@ export interface RefPick { refId: string; role: 'face' | 'angle' | 'body' | 'exp
 // 2 to 4 sheet refs chosen by angle, always one chest-up face ref (REF-00).
 // The table is the sheet graph itself (views, framings and expressions in
 // sheet.yaml), so a character's "use when" table never needs REF math.
-export function pickSceneRefs(shots: SheetShot[], views: ViewsConfig, approved: Set<string>, f: Pick<SceneFields, 'view' | 'framing' | 'expression'>, sc: ScenesConfig): RefPick[] {
+export function pickSceneRefs(shots: SheetShot[], views: ViewsConfig, approved: Set<string>, f: Pick<SceneFields, 'view' | 'framing' | 'expression'> & { refs?: string[] }, sc: ScenesConfig, byAngle = true): RefPick[] {
   const out: RefPick[] = []
+  // The owner's own choice wins (any approved shots, in their order).
+  const own = (f.refs ?? []).filter(id => approved.has(id))
+  if (own.length) {
+    const roleOf = (id: string): RefPick['role'] => {
+      const s = shots.find(x => x.id === id)
+      if (s?.source === 'hero') return 'face'
+      if (s?.framing === 'full_body') return 'body'
+      return s && s.expression !== 'neutral' && s.expression !== 'none' ? 'expression' : 'angle'
+    }
+    return own.slice(0, sc.settings.max_refs).map(id => ({ refId: id, role: roleOf(id) }))
+  }
   const add = (shot: SheetShot | undefined, role: RefPick['role']) => {
     if (shot && approved.has(shot.id) && !out.some(p => p.refId === shot.id)) out.push({ refId: shot.id, role })
   }
   const face = shots.find(s => s.source === 'hero') ?? shots[0]
   add(face, 'face')
+  // Default rule scene-refs-by-angle; switched off, only the face ref.
+  if (!byAngle) return out
   const calm = (s: SheetShot) => s.expression === 'neutral' || s.expression === 'none'
   const view = views.views[f.view]
   // The closest angle: the same view, close up; else the same side turned less.
@@ -112,8 +133,13 @@ const sentence = (s: string) => s.trim().replace(/[.\s]+$/, '')
 
 type SceneCharacter = Pick<CharacterData, 'name' | 'card' | 'marks' | 'pronouns' | 'makeup' | 'realism'>
 
+// Which default rules shape the scene prompt (owner ruling G1). All on
+// unless switched off; a scene that allows brands drops the brand-free line.
+export interface SceneRuleOptions { outfitOverride?: boolean; brandFree?: boolean; colors?: boolean; referenceLine?: boolean }
+
 // `addendum` is the fix line a review reason adds (config/review.yaml).
-export function buildScenePrompt(t: TemplatesConfig, sc: ScenesConfig, views: ViewsConfig, f: SceneFields, ch: SceneCharacter, mode: ReferenceMode, o: BuildOptions & { addendum?: string } = {}): string {
+export function buildScenePrompt(t: TemplatesConfig, sc: ScenesConfig, views: ViewsConfig, f: SceneFields, ch: SceneCharacter, mode: ReferenceMode, o: BuildOptions & { addendum?: string; rules?: SceneRuleOptions } = {}): string {
+  const rules = { outfitOverride: true, brandFree: true, colors: true, referenceLine: true, ...(o.rules ?? {}) }
   const pv = pronounVars(ch.pronouns)
   const view = views.views[f.view]
   if (!view) throw new Error(`Unknown angle "${f.view}".`)
@@ -121,37 +147,42 @@ export function buildScenePrompt(t: TemplatesConfig, sc: ScenesConfig, views: Vi
   const framing = byId(sc.framings, f.framing, 'framing')
   const light = byId(sc.lights, f.light, 'light')
   const expression = byId(sc.expressions, f.expression, 'expression')
-  const reference = mode === 'refs' ? fill(t.scene.reference.refs, pv)
+  const height = byId(sc.heights, f.height, 'camera height')
+  const reference = mode === 'refs' ? (rules.referenceLine ? fill(t.scene.reference.refs, pv) : '')
     : mode === 'trained' ? fill(t.scene.reference.trained, { name: ch.name })
     : fill(t.scene.reference.text, { card: cardPhrase(ch.card, ch.pronouns.noun) })
-  // The constant jewelry (a mark such as an ear cuff) rides with the outfit.
-  const worn = ch.marks.filter(m => m.kind === 'jewelry').map(m => `${ch.pronouns.poss} ${m.description} on ${ch.pronouns.poss} ${m.side} ${m.region}`)
-  const jewelry = [sentence(f.jewelry), ...worn].filter(Boolean)
+  // Nothing is worn unless the scene says so: outfit, footwear and jewelry
+  // (signature pieces such as an ear cuff included) are each optional.
+  const items = [sentence(f.outfit), f.footwear ? (f.outfit ? `with ${sentence(f.footwear)}` : sentence(f.footwear)) : '', sentence(f.jewelry)].filter(Boolean)
+  const override = mode === 'refs' && rules.outfitOverride && f.outfit ? fill(t.scene.outfit_override, { sheet_outfit: t.scene.sheet_outfit }) : ''
+  const wearing = !items.length ? ''
+    : fill(f.outfit ? t.scene.wearing : t.scene.wearing_only, { ...pv, items: items.join(', '), outfit_override: override })
   const makeup = f.makeup === 'bare' ? t.scene.makeup.bare
     : f.makeup === 'soft_glam' ? fill(t.scene.makeup.soft_glam, { glam: ch.makeup.glam?.trim() || 'soft glam' })
     : fill(t.scene.makeup.natural, { natural: ch.makeup.default?.trim() || 'natural' })
   const hairColor = hairColorFrom(ch.card)
   const triggers = new RegExp(sc.color_triggers, 'i')
-  const colors = hairColor && triggers.test([f.moment, f.setting, f.hair, f.pose, light.text].join(' '))
+  const colors = rules.colors && hairColor && triggers.test([f.moment, f.setting, f.hair, f.pose, light.text].join(' '))
     ? fill(t.scene.colors, { ...pv, hair_color: hairColor }) : ''
+  // Marks that are part of the face (a mole) stay; worn pieces are optional.
+  const faceMarks = ch.marks.filter(m => m.kind !== 'jewelry')
   const prompt = fill(t.scene.base, {
     ...pv,
     reference,
     moment: sentence(f.moment),
     setting: sentence(f.setting),
-    outfit: sentence(f.outfit),
-    footwear: sentence(f.footwear),
-    jewelry: jewelry.length ? `, ${jewelry.join(' and ')}` : '',
-    outfit_override: mode === 'refs' ? fill(t.scene.outfit_override, { sheet_outfit: t.scene.sheet_outfit }) : '',
+    wearing,
     makeup,
     hair: sentence(f.hair) || 'as usual',
     pose: capitalize(sentence(f.pose) || 'Natural, relaxed pose'),
     expression: fill(expression.text, pv),
-    marks: markLines(t, view, ch.marks, ch.pronouns),
+    marks: markLines(t, view, faceMarks, ch.pronouns),
     camera: fill(camera.text, { ...pv, foreground: sentence(f.foreground) || camera.foreground || 'a blurred shoulder' }),
     framing: fill(framing.text, pv),
+    height: height.text,
     light: light.text,
     colors,
+    brand_line: rules.brandFree && !f.brands ? fill(t.scene.brand_free, pv) : '',
   })
   return finishPrompt(normalizePrompt(o.addendum ? `${prompt} ${o.addendum}` : prompt), 'scene', ch, o)
 }
@@ -224,13 +255,17 @@ export function comboEntryFor(sc: ScenesConfig, f: SceneFields, date: string): C
 
 // ── Planner (Claude fills the fields) ───────────────────────────────
 
+// The planner fills the creative fields; brands and refs stay the owner's.
+const PLANNED = ['title', 'momentType', 'moment', 'setting', 'location', 'outfit', 'footwear', 'jewelry', 'makeup', 'hair', 'pose', 'view', 'expression', 'camera', 'foreground', 'height', 'framing', 'light', 'destination'] as const
+export const PLANNED_FIELDS: readonly string[] = PLANNED
+
 export function scenePlanJsonSchema(sc: ScenesConfig, views: ViewsConfig): Record<string, unknown> {
   const ids = (list: Array<{ id: string }>) => list.map(x => x.id)
   const str = (description: string) => ({ type: 'string', description })
   return {
     type: 'object',
     additionalProperties: false,
-    required: ['title', 'momentType', 'moment', 'setting', 'location', 'outfit', 'footwear', 'jewelry', 'makeup', 'hair', 'pose', 'view', 'expression', 'camera', 'foreground', 'framing', 'light', 'destination'],
+    required: [...PLANNED],
     properties: {
       title: str('A short name for the scene, 2 to 5 words.'),
       momentType: { type: 'string', enum: ids(sc.moments) },
@@ -238,14 +273,15 @@ export function scenePlanJsonSchema(sc: ScenesConfig, views: ViewsConfig): Recor
       setting: str('Where, with a few concrete details of the place and the people around.'),
       location: str('The place in 1 to 3 words, for the combo log.'),
       outfit: str('The full outfit, top to bottom, without footwear or jewelry.'),
-      footwear: str('The footwear, or "barefoot".'),
-      jewelry: str('Extra jewelry for this scene, or an empty string. Never the constant marks.'),
+      footwear: str('The footwear, "barefoot", or an empty string when the feet do not matter.'),
+      jewelry: str('Jewelry for this scene, with its side when it matters, or an empty string.'),
       makeup: { type: 'string', enum: ids(sc.makeup) },
       hair: str('Hair styling for this moment.'),
       pose: str('Pose and gaze in a few words. Not looking at the camera unless the moment is "Caught you".'),
       view: { type: 'string', enum: Object.keys(views.views) },
       expression: { type: 'string', enum: ids(sc.expressions) },
       camera: { type: 'string', enum: ids(sc.cameras) },
+      height: { type: 'string', enum: ids(sc.heights) },
       foreground: str('Blurred foreground objects for a long-lens shot, or an empty string.'),
       framing: { type: 'string', enum: ids(sc.framings) },
       light: { type: 'string', enum: ids(sc.lights) },
@@ -254,7 +290,17 @@ export function scenePlanJsonSchema(sc: ScenesConfig, views: ViewsConfig): Recor
   }
 }
 
-export function scenePlanPrompt(t: TemplatesConfig, sc: ScenesConfig, views: ViewsConfig, ch: Pick<CharacterData, 'name' | 'persona' | 'style' | 'makeup' | 'pronouns'>, brief: string, combos: ComboEntry[]): string {
+// The planner's defaults: the `planner` line of every rule switched on.
+export function plannerRules(rules: RulesConfig, on: (id: string) => boolean, brands: boolean): string {
+  const lines = rules.rules
+    .filter(r => r.planner && (r.bucket === 'fixed' || on(r.id)))
+    .filter(r => !(brands && r.id === 'scene-brand-free'))
+    .map(r => `- ${r.planner}`)
+  if (brands) lines.push('- This scene allows real brands and logos (a brand deal or a product).')
+  return lines.join('\n') || '- None. Follow the owner.'
+}
+
+export function scenePlanPrompt(t: TemplatesConfig, sc: ScenesConfig, views: ViewsConfig, ch: Pick<CharacterData, 'name' | 'persona' | 'style' | 'makeup' | 'pronouns' | 'marks'>, brief: string, combos: ComboEntry[], o: { persona?: boolean } = {}): string {
   const list = (items: Array<{ id: string; label: string; hint?: string }>) => items.map(i => `${i.id} (${i.label}${i.hint ? `: ${i.hint}` : ''})`).join(', ')
   const join = (xs?: string[]) => (xs?.length ? xs.join('; ') : 'none given')
   return fill(t.scene_plan.prompt, {
@@ -263,8 +309,11 @@ export function scenePlanPrompt(t: TemplatesConfig, sc: ScenesConfig, views: Vie
     brief: brief.trim() || 'Surprise me with an everyday moment that fits the persona.',
     vibe: ch.persona.vibe ?? 'not given',
     settings: join(ch.persona.settings),
-    never: join(ch.persona.never),
+    defaults: ch.persona.defaults?.trim() || 'none given',
+    never: o.persona === false ? 'none' : join(ch.persona.never),
     style: join([...(ch.style.ideas ?? []), ...(ch.style.pieces ?? []), ...(ch.style.palette ?? [])]),
+    style_notes: ch.style.notes?.trim() || 'none',
+    jewelry_marks: join(ch.marks.filter(m => m.kind === 'jewelry').map(m => `${m.description} (${m.side} ${m.region})`)),
     hair_options: join(ch.style.hair_options),
     natural: ch.makeup.default || 'natural',
     glam: ch.makeup.glam || 'soft glam',
@@ -272,6 +321,7 @@ export function scenePlanPrompt(t: TemplatesConfig, sc: ScenesConfig, views: Vie
     combos: combos.length ? combos.map(c => `- ${c.moment} / ${c.camera} / ${c.light} / ${c.location}`).join('\n') : '(none yet)',
     moment_types: list(sc.moments),
     cameras: list(sc.cameras),
+    heights: list(sc.heights),
     framings: list(sc.framings),
     lights: list(sc.lights),
     expressions: list(sc.expressions),

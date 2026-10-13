@@ -160,8 +160,9 @@ function mapFamily(entry: ModelEntry, req: GenRequest): Record<string, unknown> 
     case 'seedance_i2v':
       // Seedance image to video: start frame (which sets the framing and the
       // aspect) and an optional end frame. The schema takes nothing else, and
-      // generate_audio defaults to true, so it is always sent off. The web app
-      // and MCP need mode omni_reference for frames instead (config notes).
+      // generate_audio defaults to true, so it is sent off unless the request
+      // asks for audio. The web app and MCP need mode omni_reference for
+      // frames instead (config notes).
       if (req.kind === 'video_extend') throw new ProviderError(`${entry.label} has no extend endpoint on the API. Use the Higgsfield account path to extend.`, { retryable: false, submitted: 'no' })
       return clean({
         prompt: req.prompt,
@@ -169,11 +170,11 @@ function mapFamily(entry: ModelEntry, req: GenRequest): Record<string, unknown> 
         end_image_url: req.endFrame ? needUrl(req.endFrame, 'The end frame') : undefined,
         duration: req.durationSec,
         resolution: req.resolution,
-        generate_audio: false,
+        generate_audio: req.audio === true,
       })
     case 'wan_i2v':
-      // Wan image to video: first and optional last frame. Audio off, and
-      // the model's own prompt rewriting ("thinking") off.
+      // Wan image to video: first and optional last frame. Audio as asked
+      // (off by default), and the model's own prompt rewriting off.
       return clean({
         prompt: req.prompt,
         image_url: needUrl(req.startFrame, 'The start frame'),
@@ -182,20 +183,20 @@ function mapFamily(entry: ModelEntry, req: GenRequest): Record<string, unknown> 
         resolution: req.resolution,
         aspect_ratio: req.aspect,
         seed: req.seed || undefined,
-        generate_audio: false,
+        generate_audio: req.audio === true,
         enable_thinking: false,
       })
     case 'kling_v3':
-      // Standard and Pro: sound defaults to on, so it is always sent off.
-      // Turbo has no sound, last-frame or elements field; the Studio strips
-      // its audio on arrival.
+      // Standard and Pro: sound defaults to on, so it is sent off unless the
+      // request asks for audio. Turbo has no sound field; its audio is
+      // stripped on arrival when the request asked for none.
       return clean({
         prompt: req.prompt,
         image_url: needUrl(req.startFrame, 'The start frame'),
         last_image_url: req.endFrame && entry.audio !== 'always_on' ? needUrl(req.endFrame, 'The end frame') : undefined,
         duration: req.durationSec,
         resolution: entry.audio === 'always_on' ? req.resolution : undefined,
-        sound: entry.audio === 'always_on' ? undefined : 'off',
+        sound: entry.audio === 'always_on' ? undefined : req.audio === true ? 'on' : 'off',
       })
     case 'generic_audio':
       return clean({ prompt: req.prompt, duration: req.durationSec })
@@ -209,8 +210,8 @@ function mapFamily(entry: ModelEntry, req: GenRequest): Record<string, unknown> 
         resolution: req.resolution,
         aspect_ratio: req.aspect,
         seed: req.seed,
-        // Audio off, always (SPEC 5.4 rule 27).
-        generate_audio: false,
+        // Audio off unless asked (default rule video-audio-off).
+        generate_audio: req.audio === true,
         enhance_prompt: false,
       })
     default:
@@ -266,14 +267,15 @@ export function createHiggsfieldAdapter(opts: HiggsfieldOptions): ProviderAdapte
     throw new ProviderError(`Higgsfield error ${s}: ${detail}`, { retryable: phase === 'read', submitted: phase === 'submit' ? 'unknown' : 'no', status: s })
   }
 
-  // Only confirmed models run, except the one small paid test that confirms
-  // a model whose endpoint was entered from the official reference.
-  function entryFor(ref: string, modelTest = false): ModelEntry {
+  // A model needs its endpoint from the official reference. One that has
+  // not passed its paid test yet still runs, with a warning in the estimate
+  // (default rule model-tested); a wrong endpoint fails and costs nothing.
+  function entryFor(ref: string): ModelEntry {
     const entry = opts.config.models.models.find(m => m.ref === ref)
     if (!entry || !ref.startsWith('higgsfield/')) throw new ProviderError(`Unknown Higgsfield model "${ref}".`, { retryable: false, submitted: 'no' })
     if (entry.api === false) throw new ProviderError(`${entry.label} is not on the Higgsfield API. Run it on your Higgsfield account (Settings, Billing).`, { retryable: false, submitted: 'no', code: 'unverified_model' })
-    if (!entry.endpoint || (!entry.verified && !modelTest)) {
-      throw new ProviderError(`${entry.label} is not confirmed for the Higgsfield API yet. Enter its endpoint from the official Model API Reference in Settings and run its test first.`, { retryable: false, submitted: 'no', code: 'unverified_model' })
+    if (!entry.endpoint) {
+      throw new ProviderError(`${entry.label} has no API endpoint yet. Enter its endpoint from the official Model API Reference in Settings.`, { retryable: false, submitted: 'no', code: 'unverified_model' })
     }
     return entry
   }
@@ -308,10 +310,7 @@ export function createHiggsfieldAdapter(opts: HiggsfieldOptions): ProviderAdapte
       return slot.public_url
     },
     async submit(req, { idempotencyKey, webhookUrl }) {
-      const entry = entryFor(req.model, req.modelTest === true)
-      if ((req.kind === 'video' || req.kind === 'video_extend') && req.audio !== false) {
-        throw new ProviderError('Video requests must send audio off.', { retryable: false, submitted: 'no' })
-      }
+      const entry = entryFor(req.model)
       const endpoint = entry.endpoint!.startsWith('/') ? entry.endpoint! : `/${entry.endpoint}`
       let r: HfResponse
       try {

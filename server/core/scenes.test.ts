@@ -3,7 +3,7 @@ import { loadConfig } from '../config/load.js'
 import { blocking, lintPrompt } from './rules.js'
 import {
   appendCombo, buildEditPrompt, buildScenePrompt, checkSceneFields, comboConflict, comboEntryFor, hairColorFrom,
-  oneChangeProblem, parseComboLog, pickSceneRefs, sceneFieldsSchema, scenePlanJsonSchema, scenePlanPrompt, type SceneFields,
+  oneChangeProblem, parseComboLog, pickSceneRefs, plannerRules, sceneFieldsSchema, scenePlanJsonSchema, scenePlanPrompt, type SceneFields,
 } from './scenes.js'
 import type { CharacterData } from './character.js'
 
@@ -62,18 +62,38 @@ describe('scene prompts (SPEC 5.2 and 10)', () => {
     expect(p).toContain('wearing this outfit instead of the white t-shirt, jeans and sneakers in the reference images')
   })
 
-  it('names the full outfit, the footwear and the constant ear cuff (rules 15 and 16)', () => {
-    expect(p).toContain('She is wearing a cream linen button-up shirt with the sleeves rolled, light-wash straight jeans, with white leather sandals, a thin gold chain necklace and her gold double-band ear cuff on her LEFT ear')
+  it('names the outfit, the footwear and only the jewelry the scene asks for (rules 15 and 16, ruling G1)', () => {
+    expect(p).toContain('She is wearing a cream linen button-up shirt with the sleeves rolled, light-wash straight jeans, with white leather sandals, a thin gold chain necklace, wearing this outfit instead of the white t-shirt, jeans and sneakers in the reference images.')
+    // Signature jewelry is never forced into a scene.
+    expect(p).not.toMatch(/ear cuff/)
+    const cuff = buildScenePrompt(templates, scenes, views, { ...market, jewelry: 'her gold double-band ear cuff on her left ear' }, callie, 'refs')
+    expect(cuff).toContain('her gold double-band ear cuff on her left ear')
   })
 
-  it('is plain and unbranded, at eye level, with side-specific marks (rules 17, 18, 20 and 11)', () => {
+  it('is plain and unbranded by default, at the chosen height, with the face mark on its side (rules 17, 18 and 11)', () => {
     expect(p).toContain('plain and unbranded, with no logos or readable text')
     expect(p).toContain('Candid phone photo taken by a friend about 6 feet away, waist-up framing, eye level.')
-    // Turned to her left: the cuff side faces the camera.
-    expect(p).toContain('The small mole above her LEFT brow and the gold double-band ear cuff on her LEFT ear are visible.')
+    expect(p).toContain('The small mole above her LEFT brow is visible.')
     const front = buildScenePrompt(templates, scenes, views, { ...market, view: 'front' }, callie, 'refs')
-    expect(front).toMatch(/they appear on the right side of the image/)
-    expect(front).toMatch(/Her RIGHT ear has no jewelry; the ear cuff is only on her LEFT ear/)
+    expect(front).toMatch(/it appears on the right side of the image/)
+    expect(front).not.toMatch(/ear cuff|RIGHT ear|LEFT ear/)
+    const high = buildScenePrompt(templates, scenes, views, { ...market, height: 'slightly_high', camera: 'over_shoulder' }, callie, 'refs')
+    expect(high).toContain('over a friend\'s shoulder')
+    expect(high).toContain('waist-up framing, from slightly above eye level.')
+  })
+
+  it('a brand deal drops the unbranded line, and every default can be switched off', () => {
+    const deal = buildScenePrompt(templates, scenes, views, { ...market, brands: true }, callie, 'refs')
+    expect(deal).not.toMatch(/unbranded/)
+    const bare = buildScenePrompt(templates, scenes, views, market, callie, 'refs', { rules: { outfitOverride: false, brandFree: false, referenceLine: false } })
+    expect(bare).not.toMatch(/instead of the white t-shirt|unbranded|Using the attached reference images/)
+  })
+
+  it('outfit, footwear and jewelry are each optional', () => {
+    const none = buildScenePrompt(templates, scenes, views, { ...market, outfit: '', footwear: '', jewelry: '' }, callie, 'refs')
+    expect(none).not.toMatch(/wearing/)
+    const shoes = buildScenePrompt(templates, scenes, views, { ...market, outfit: '', jewelry: '' }, callie, 'refs')
+    expect(shoes).toContain('She has white leather sandals.')
   })
 
   it('keeps the character\'s REALISM block as written, background clutter included', () => {
@@ -89,12 +109,14 @@ describe('scene prompts (SPEC 5.2 and 10)', () => {
     expect(p).not.toContain(EM)
   })
 
-  it('refuses a scene without footwear, with a low angle, or outside the destination aspects', () => {
-    const bare = buildScenePrompt(templates, scenes, views, { ...market, footwear: 'nothing' }, callie, 'refs')
-    expect(blocking(lintPrompt(rules, bare, { stage: 'scene', kind: 'image_edit', request: { ...request, prompt: bare } })).map(v => v.ruleId)).toContain('scene-names-footwear')
-    const low = buildScenePrompt(templates, scenes, views, { ...market, pose: 'shot from a low angle, looking up at her' }, callie, 'refs')
-    expect(blocking(lintPrompt(rules, low, { stage: 'scene', kind: 'image_edit', request: { ...request, prompt: low } })).map(v => v.ruleId)).toContain('scene-everyday-angles')
-    expect(blocking(lintPrompt(rules, p, { stage: 'scene', kind: 'image_edit', request: { ...request, aspect: '16:9' } })).map(v => v.ruleId)).toContain('scene-aspect')
+  it('no footwear, a low angle or another shape is a warning, never a block (ruling G1)', () => {
+    const ids = (prompt: string, req = request) => lintPrompt(rules, prompt, { stage: 'scene', kind: 'image_edit', request: { ...req, prompt } })
+    const bare = buildScenePrompt(templates, scenes, views, { ...market, footwear: '' }, callie, 'refs')
+    const low = buildScenePrompt(templates, scenes, views, { ...market, height: 'low', pose: 'shot from a low angle, looking up at her' }, callie, 'refs')
+    expect(ids(bare).map(v => v.ruleId)).toContain('scene-names-footwear')
+    expect(ids(low).map(v => v.ruleId)).toContain('scene-everyday-angles')
+    expect(ids(p, { ...request, aspect: '16:9' }).map(v => v.ruleId)).toContain('scene-aspect')
+    for (const v of [...ids(bare), ...ids(low), ...ids(p, { ...request, aspect: '16:9' })]) expect(v.severity).toBe('warning')
   })
 
   it('a trained character is named, carries no face description and attaches nothing (rule 14)', () => {
@@ -138,7 +160,24 @@ describe('scene prompts (SPEC 5.2 and 10)', () => {
   })
 })
 
+describe('the planner\'s defaults come from the rules switched on', () => {
+  it('lists each rule\'s line while it is on, and says when brands are allowed', () => {
+    const on = plannerRules(rules, () => true, false)
+    expect(on).toContain('Name the footwear, or say barefoot.')
+    expect(on).toContain('plain and unbranded')
+    const off = plannerRules(rules, id => id !== 'scene-names-footwear', true)
+    expect(off).not.toContain('Name the footwear')
+    expect(off).not.toContain('plain and unbranded')
+    expect(off).toContain('This scene allows real brands and logos')
+  })
+})
+
 describe('reference picker by angle (SPEC 5.2 rule 14)', () => {
+  it('uses the owner\'s own refs when chosen, and only the face when picking by angle is off', () => {
+    expect(pickSceneRefs(sheet.shots, views, allApproved, { ...market, refs: ['REF-06', 'REF-00'] }, scenes).map(r => r.refId)).toEqual(['REF-06', 'REF-00'])
+    expect(pickSceneRefs(sheet.shots, views, allApproved, market, scenes, false).map(r => r.refId)).toEqual(['REF-00'])
+  })
+
   it('always has the chest-up face ref, then the closest angle, the body and the expression', () => {
     expect(pickSceneRefs(sheet.shots, views, allApproved, market, scenes).map(r => r.refId)).toEqual(['REF-00', 'REF-01', 'REF-07', 'REF-10'])
     expect(pickSceneRefs(sheet.shots, views, allApproved, { view: 'front', framing: 'chest_up', expression: 'neutral' }, scenes).map(r => r.refId)).toEqual(['REF-00'])
@@ -213,6 +252,8 @@ describe('the planner', () => {
     expect(prompt).toContain('friend_phone (Friend shot)')
     expect(prompt).not.toContain(EM)
     const schema = scenePlanJsonSchema(scenes, views) as { required: string[] }
-    expect(new Set(schema.required)).toEqual(new Set(Object.keys(sceneFieldsSchema.shape)))
+    // The planner fills every creative field; brands and refs are the owner's.
+    expect(new Set([...schema.required, 'brands', 'refs'])).toEqual(new Set(Object.keys(sceneFieldsSchema.shape)))
+    expect(prompt).toContain('Signature jewelry (optional; add it to jewelry only when it fits, on its')
   })
 })

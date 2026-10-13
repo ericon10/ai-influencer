@@ -7,7 +7,7 @@ import { formatUsd, microsToUsd } from '../costs/money.js'
 import { and, desc, eq, inArray } from 'drizzle-orm'
 import { jobs } from '../db/schema.js'
 import { getAsset } from '../storage/assets.js'
-import { candidatesFor, getCharacter, inspirationAssetIds, listConcepts, sheetState, toData, type CharacterRow } from '../pipeline/characters.js'
+import { approvedAssets, candidatesFor, getCharacter, inspirationAssetIds, listConcepts, sheetState, toData, type CharacterRow } from '../pipeline/characters.js'
 import { characterCosts } from '../pipeline/costs.js'
 import { providerMode, resolveRoute } from '../pipeline/settings.js'
 import { effectiveModel, readModelOverrides } from '../providers/modelOverrides.js'
@@ -16,6 +16,7 @@ import { serverKeyFor } from '../providers/serverKeys.js'
 import { identityForModel } from '../core/identity.js'
 import { checkSceneFields, sceneFieldsSchema } from '../core/scenes.js'
 import { comboEntries, comboProblem, draftFields, listScenes, sceneAspect, sceneCandidates, sceneRefs } from '../pipeline/scenes.js'
+import { ruleSwitches } from '../pipeline/rules.js'
 import { comboPreview } from '../pipeline/sceneActions.js'
 
 // Response shapes for the UI. Plain data only; no secrets, no internals.
@@ -174,6 +175,7 @@ export async function scenesView(deps: Deps, ctx: Ctx, characterId: string) {
   const row = await getCharacter(deps, ctx, characterId)
   const ch = toData(row)
   const { scenes: sc, views } = deps.config.pipeline
+  const sw = await ruleSwitches(deps, ctx, characterId)
   const list = await listScenes(deps, ctx, characterId)
   const cands = await sceneCandidates(deps, ctx, list.map(s => s.id))
   const active = await deps.db.select({ purpose: jobs.purpose }).from(jobs)
@@ -203,19 +205,29 @@ export async function scenesView(deps: Deps, ctx: Ctx, characterId: string) {
       id: s.id, title: s.title, brief: s.brief, fields: f, status: busy.has(s.id) ? 'generating' : s.status, busy: busy.has(s.id),
       createdAt: s.createdAt.toISOString(), comboLogged: !!s.comboLoggedAt, aspect: sceneAspect(deps, f), complete, missing,
       combo: complete ? comboPreview(deps, parsed.data) : null,
-      comboProblem: complete && !s.comboLoggedAt ? comboProblem(deps, ch, parsed.data) : null,
-      refs: await sceneRefs(deps, ctx, characterId, { view: f.view ?? 'front', framing: f.framing ?? 'waist_up', expression: f.expression ?? 'neutral' }),
+      // A warning with "Use anyway", never a block (default rule scene-combo-log).
+      comboProblem: complete && !s.comboLoggedAt && sw.on('scene-combo-log') ? comboProblem(deps, ch, parsed.data) : null,
+      refs: await sceneRefs(deps, ctx, characterId, { view: f.view ?? 'front', framing: f.framing ?? 'waist_up', expression: f.expression ?? 'neutral', refs: f.refs ?? [] }, sw.on('scene-refs-by-angle')),
+      refsChosen: (f.refs ?? []).length > 0,
       candidates: cands.filter(c => c.sceneId === s.id).map(shape),
     })
   }
   const p = ch.pronouns
+  // Every approved sheet shot, for choosing a scene's refs by hand.
+  const state = await sheetState(deps, ctx, characterId)
+  const approvedMap = await approvedAssets(deps, ctx, characterId)
+  const sheetRefs = state.shots.filter(shot => approvedMap.has(shot.id)).map(shot => ({ refId: shot.id, label: shot.label, assetId: approvedMap.get(shot.id)! }))
   return {
     scenes,
+    sheetRefs,
     combos: comboEntries(ch).slice(-sc.settings.combo_window),
     reasons: deps.config.pipeline.review.reasons.filter(r => r.id !== 'makeup' && r.id !== 'talking').map(r => ({ id: r.id, label: r.label })),
     options: {
       moments: sc.moments, cameras: sc.cameras.map(x => ({ id: x.id, label: x.label })), lights: sc.lights.map(x => ({ id: x.id, label: x.label })),
       framings: sc.framings.map(x => ({ id: x.id, label: x.label })), expressions: sc.expressions.map(x => ({ id: x.id, label: x.label })),
+      heights: sc.heights.map(x => ({ id: x.id, label: x.label })),
+      autoQa: sw.on('scene-auto-qa'), maxRefs: sc.settings.max_refs,
+      signatureJewelry: ch.marks.filter(m => m.kind === 'jewelry').map(m => `${m.description} (${m.side} ${m.region})`),
       makeup: sc.makeup, destinations: sc.destinations,
       views: Object.entries(views.views).map(([id, v]) => ({ id, label: v.label })),
       editPresets: sc.edits.presets.map(e => ({ id: e.id, label: e.label, text: withPronouns(e.text, p), face: e.face })),

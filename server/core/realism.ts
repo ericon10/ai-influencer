@@ -41,7 +41,7 @@ const NEGATION = /\b(?:no|not|never|without|avoid|zero|nothing|free of|instead o
 
 // Negated within the same clause: "no airbrushed look" is fine, but in "no
 // retouching, flawless glow" the "no" belongs to the clause before.
-function negated(prompt: string, index: number): boolean {
+export function negated(prompt: string, index: number): boolean {
   const before = prompt.slice(Math.max(0, index - 60), index)
   const clause = before.split(/[,.;:!?\n]/).pop() ?? ''
   return NEGATION.test(clause)
@@ -55,7 +55,7 @@ const TERM_RE = new RegExp(`\\b(?:${BANNED_REALISM_TERMS.map(t => escape(t).repl
 
 // An AVOID line lists what the model must not do, so banned words there are
 // on our side. It runs from "AVOID:" (or "Avoid:") to the end of its line.
-function avoidRanges(prompt: string): Array<[number, number]> {
+export function avoidRanges(prompt: string): Array<[number, number]> {
   const out: Array<[number, number]> = []
   const re = /\bavoid\s*:/gi
   let m: RegExpExecArray | null
@@ -192,11 +192,15 @@ export interface FinalPrompt {
 // The last step of every image prompt the Studio builds: strip smoothing
 // words (and say why), keep hero and sheet shots bare-faced, and add the
 // REALISM and AVOID blocks. The REALISM block cannot be left out.
-export function finalizeImagePrompt(prompt: string, opts: { stage?: string; realism?: string | null; avoid?: string | null; allowedFlaws?: string } = {}): FinalPrompt {
+// `flawDose` (default rule realism-flaw-dose, on unless switched off) leaves
+// out heavier flaw words the character does not have. `plainBackground`
+// (default rule sheet-background) drops a REALISM background clause from
+// hero and sheet prompts, which use their own background.
+export function finalizeImagePrompt(prompt: string, opts: { stage?: string; realism?: string | null; avoid?: string | null; allowedFlaws?: string; flawDose?: boolean; plainBackground?: boolean } = {}): FinalPrompt {
   const warnings: RealismWarning[] = []
   const stripped = stripBannedTerms(prompt)
   let out = stripped.prompt
-  const heavy = stripHits(out, heavyFlawHits(out, opts.allowedFlaws ?? ''))
+  const heavy = opts.flawDose === false ? { prompt: out, removed: [] as string[] } : stripHits(out, heavyFlawHits(out, opts.allowedFlaws ?? ''))
   out = heavy.prompt
   if (heavy.removed.length) {
     warnings.push({
@@ -225,7 +229,7 @@ export function finalizeImagePrompt(prompt: string, opts: { stage?: string; real
     if (!out.includes(BARE_FACE_LINE)) out = `${out} ${BARE_FACE_LINE}`
   }
   const block = realismBlock(opts.realism)
-  const realism = isBareFaceStage(opts.stage) ? realismForReference(block) : block
+  const realism = isBareFaceStage(opts.stage) && opts.plainBackground !== false ? realismForReference(block) : block
   if (!hasRealismBlock(out)) out = `${out}\n${realism}`
   if (!/\bAVOID:/.test(out)) out = `${out}\n${avoidBlock(opts.avoid)}`
   return { prompt: out.trim(), warnings }

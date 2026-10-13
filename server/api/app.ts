@@ -15,6 +15,7 @@ import { wakeWorker } from '../jobs/wake.js'
 import { actionSchema, estimateAction, runAction } from '../pipeline/actions.js'
 import { createCharacter, getCandidate, getCharacter, linkInspiration, listCharacters, setCharacterFields, updateCharacter } from '../pipeline/characters.js'
 import { approveSceneCandidate, archiveScene, createScene, cropCandidate, updateScene } from '../pipeline/scenes.js'
+import { rulesView, setRuleSwitch } from '../pipeline/rules.js'
 import { chooseConcept } from '../pipeline/concepts.js'
 import { approveCandidate, keepStale, pickHero, rejectCandidate, reopenCandidate, setFavorite, mirrorCandidate } from '../pipeline/review.js'
 import { isValidEndpoint, MODEL_OVERRIDES_KEY, readModelOverrides } from '../providers/modelOverrides.js'
@@ -277,12 +278,25 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
     return c.json({ ok: true })
   })
 
+  // ── Rules: fixed and default (Settings, Rules; owner ruling G1) ──
+  app.get('/settings/rules', async c => c.json(await rulesView(deps, c.get('ctx'), c.req.query('characterId') || null)))
+  app.put('/settings/rules', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'admin')
+    const body = parse(z.object({
+      ruleId: z.string().max(80), characterId: z.string().max(60).nullable().optional(),
+      on: z.boolean().nullable().optional(), value: z.string().max(400).nullable().optional(),
+    }), await json(c))
+    await setRuleSwitch(deps, ctx, body)
+    return c.json(await rulesView(deps, ctx, body.characterId ?? null))
+  })
+
   // ── Scenes (Stage 7) and still edits (Stage 8) ──
   app.get('/characters/:id/scenes', async c => c.json(await scenesView(deps, c.get('ctx'), c.req.param('id'))))
   const sceneBody = z.object({
     brief: z.string().max(2000).optional(),
     title: z.string().max(80).optional(),
-    fields: z.record(z.string(), z.string().max(400)).optional(),
+    fields: z.record(z.string(), z.union([z.string().max(400), z.boolean(), z.array(z.string().max(20)).max(8)])).optional(),
   })
   app.post('/characters/:id/scenes', async c => {
     const ctx = c.get('ctx')
@@ -317,7 +331,8 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
     const ctx = c.get('ctx')
     requireRole(ctx, 'member')
     const cand = await getCandidate(deps, ctx, c.req.param('id'))
-    if (cand.sceneId) return c.json({ ...(await approveSceneCandidate(deps, ctx, cand.id)), invalidated: [], sheetComplete: false })
+    const body = parse(z.object({ acknowledge: z.boolean().optional() }), await json(c).catch(() => ({})))
+    if (cand.sceneId) return c.json({ ...(await approveSceneCandidate(deps, ctx, cand.id, { acknowledge: body.acknowledge })), invalidated: [], sheetComplete: false })
     return c.json(await approveCandidate(deps, ctx, cand.id))
   })
   app.post('/candidates/:id/pick-hero', async c => { const ctx = c.get('ctx'); requireRole(ctx, 'member'); return c.json(await pickHero(deps, ctx, c.req.param('id'))) })

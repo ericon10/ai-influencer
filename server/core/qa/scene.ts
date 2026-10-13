@@ -6,11 +6,10 @@ import type { Observation } from './perception.js'
 
 // QA for scene stills (SPEC 6, Stage 7). The vision model reports what it
 // sees in image positions; this module turns that into the character's own
-// sides and a plain verdict. Scenes differ from sheet shots: any angle is
-// fine, a mark may be out of view, and jewelry the scene asked for is not
-// extra. What a one-change edit can fix (a logo, extra jewelry, a cuff on the
-// wrong ear) is an edit, not a regenerate (SPEC 5.3 rule 23); face drift and
-// plastic skin always regenerate (rule 25 and the Realism principle).
+// sides and a plain verdict. QA is advice with one-click fixes (owner ruling
+// G1): any angle is fine, jewelry varies freely, and nothing here blocks a
+// pick. Face drift is a strong warning; plastic skin fails under the fixed
+// Realism principle.
 
 // The fix for each finding, ready to run as a one-change edit.
 export interface EditSuggestion { code: QaCode; change: string; face: boolean }
@@ -19,11 +18,16 @@ export interface SceneReport extends QaReport {
   edits?: EditSuggestion[]
 }
 
+// QA advice switched on (default rules qa-logos, qa-extra-jewelry,
+// qa-mirror). QA never blocks a pick; only fixed rules can.
+export interface SceneQaRules { logos: boolean; jewelry: boolean; mirror: boolean }
+
 export interface SceneQaInput {
   views: ViewsConfig
   marks: Mark[]
   // What the scene asked for, so requested jewelry is not "extra".
   jewelryAsked: string
+  rules?: SceneQaRules
   framing: string
   eyeColor?: string
   observation: Observation
@@ -63,51 +67,53 @@ export function evaluateScene(input: SceneQaInput): SceneReport {
   }
   const explained = new Set<Side>()
   const asked = input.jewelryAsked.toLowerCase()
+  const rules: SceneQaRules = { logos: true, jewelry: true, mirror: true, ...(input.rules ?? {}) }
 
+  // Signature jewelry (a jewelry mark such as an ear cuff) is optional per
+  // scene (owner ruling G1): never flagged as missing or added. When the
+  // scene asks for it and it lands only on the other ear, that is advice
+  // with a free mirror or a one-click edit.
   for (const mark of marks) {
     if (mark.kind !== 'jewelry' || mark.region !== 'ear') continue
-    const other = otherSide(mark.side)
-    const otherHasOwn = marks.some(m => m !== mark && m.kind === 'jewelry' && m.region === 'ear' && m.side === other)
-    const wrong = earJewelry.get(other)
-    // The same kind of piece as the mark, on the other ear, is the mark on
-    // the wrong side, unless the scene asked for a pair (both ears wear it).
     const markKind = jewelryKind(mark.description)
-    const wrongKind = wrong ? jewelryKind(wrong.desc) : null
-    const sameAsMark = !!wrong && (!wrongKind || !markKind || wrongKind === markKind)
-    const askedPair = !!wrongKind && asked.includes(wrongKind) && earJewelry.has(mark.side)
-    if (wrong && !otherHasOwn && sameAsMark && !askedPair) {
-      explained.add(other)
-      // The fix: mirror when there is no text in frame (free), else remove it
-      // from the wrong ear (one change).
-      findings.push({ code: 'mark_wrong_side', severity: 'fail', mark: mark.name, message: `The ${mark.description} shows on ${poss} ${other} ear. It belongs on ${poss} ${mark.side} ear only.` })
+    for (const [side, j] of earJewelry) if (markKind && jewelryKind(j.desc) === markKind) explained.add(side)
+    const worn = !!markKind && asked.includes(markKind)
+    if (!worn || !rules.jewelry) continue
+    const other = otherSide(mark.side)
+    const wrong = earJewelry.get(other)
+    const onOwn = earJewelry.get(mark.side)
+    if (wrong && jewelryKind(wrong.desc) === markKind && !(onOwn && jewelryKind(onOwn.desc) === markKind) && !marks.some(m => m !== mark && m.region === 'ear' && m.side === other)) {
+      findings.push({ code: 'mark_wrong_side', severity: 'warn', mark: mark.name, message: `The ${mark.description} shows on ${poss} ${other} ear; it usually sits on ${poss} ${mark.side} ear. Leave it, mirror the still, or move it with an edit.` })
       edits.push({ code: 'mark_wrong_side', change: `Remove the ${wrong.desc} from ${poss} ${other} ear, ${where(wrong.image)}`, face: false })
-    } else if (view && view.sides[mark.side] === 'visible' && !earJewelry.has(mark.side) && obs.ears.some(e => sideOf(e.image_side) === mark.side)) {
-      // The ear is in view but the constant jewelry is not on it.
-      findings.push({ code: 'mark_missing', severity: 'warn', mark: mark.name, message: `The ${mark.description} was not seen on ${poss} ${mark.side} ear. Check it yourself.` })
     }
-    if (earJewelry.has(mark.side)) explained.add(mark.side)
   }
 
-  // Jewelry nobody asked for. The scene's own jewelry is fine.
-  for (const [side, j] of earJewelry) {
-    if (explained.has(side)) continue
-    const kind = jewelryKind(j.desc)
-    if (kind && asked.includes(kind)) continue
-    findings.push({ code: 'extra_jewelry', severity: 'fail', message: `Extra jewelry on ${poss} ${side} ear (${j.desc}) that the scene did not ask for.` })
-    edits.push({ code: 'extra_jewelry', change: `Remove the ${j.desc} from ${poss} ${side} ear, ${where(j.image)}`, face: false })
-  }
-  const otherMarks = marks.filter(m => m.kind === 'jewelry' && m.region !== 'ear').map(m => m.description.toLowerCase())
-  for (const j of obs.other_jewelry) {
-    const kind = jewelryKind(j.description)
-    if (kind && (asked.includes(kind) || otherMarks.some(m => m.includes(kind)))) continue
-    findings.push({ code: 'extra_jewelry', severity: 'fail', message: `Extra jewelry: ${j.description}.` })
-    edits.push({ code: 'extra_jewelry', change: `Remove the ${j.description.replace(/^(?:a|an|the)\s+/i, '')}, ${where(j.image_side)}`, face: false })
+  // Jewelry the scene did not ask for: a note with a one-click edit, never
+  // a fail (jewelry varies freely).
+  if (rules.jewelry) {
+    for (const [side, j] of earJewelry) {
+      if (explained.has(side)) continue
+      const kind = jewelryKind(j.desc)
+      if (kind && asked.includes(kind)) continue
+      findings.push({ code: 'extra_jewelry', severity: 'info', message: `Jewelry the scene did not ask for: ${j.desc} on ${poss} ${side} ear.` })
+      edits.push({ code: 'extra_jewelry', change: `Remove the ${j.desc} from ${poss} ${side} ear, ${where(j.image)}`, face: false })
+    }
+    for (const j of obs.other_jewelry) {
+      const kind = jewelryKind(j.description)
+      if (kind && asked.includes(kind)) continue
+      findings.push({ code: 'extra_jewelry', severity: 'info', message: `Jewelry the scene did not ask for: ${j.description}.` })
+      edits.push({ code: 'extra_jewelry', change: `Remove the ${j.description.replace(/^(?:a|an|the)\s+/i, '')}, ${where(j.image_side)}`, face: false })
+    }
   }
 
-  // Logos and readable text (SPEC 5.2 rule 17): an edit, one per pass.
-  for (const t of obs.text_or_logos) {
-    findings.push({ code: 'logo', severity: 'fail', message: `Logo or readable text: ${t}.` })
-    edits.push({ code: 'logo', change: `Remove the ${t.replace(/^(?:a|an|the)\s+/i, '')}, leaving that surface plain and unbranded`, face: false })
+  // Logos and readable text in a brand-free scene (SPEC 5.2 rule 17): a
+  // detail to fix with one edit, never a block. Off when the scene allows
+  // brands or the rule is switched off.
+  if (rules.logos) {
+    for (const t of obs.text_or_logos) {
+      findings.push({ code: 'logo', severity: 'fail', message: `Logo or readable text: ${t}.` })
+      edits.push({ code: 'logo', change: `Remove the ${t.replace(/^(?:a|an|the)\s+/i, '')}, leaving that surface plain and unbranded`, face: false })
+    }
   }
 
   // Framing: scenes are flexible, so a mismatch is for a person to judge.
@@ -152,12 +158,13 @@ export function evaluateScene(input: SceneQaInput): SceneReport {
 // Callie's scene rule: a cuff on the wrong ear is mirrored when there is no
 // text in the frame (free, no drift), otherwise removed with one edit.
 export function sceneMirrorFix(input: SceneQaInput, report: SceneReport): MirrorFix | null {
-  if (!report.findings.some(f => f.severity === 'fail' && f.code === 'mark_wrong_side')) return null
+  if (input.rules?.mirror === false) return null
+  if (!report.findings.some(f => f.severity !== 'info' && f.code === 'mark_wrong_side')) return null
   if (input.observation.text_or_logos.length) {
     return { available: false, message: 'Flipping would mirror the text in the frame, so this needs a one-change edit.' }
   }
   const flipped = evaluateScene({ ...input, observation: mirrorObservation(input.observation), mirrored: undefined })
-  if (flipped.findings.some(f => f.severity === 'fail' && f.code === 'mark_wrong_side')) {
+  if (flipped.findings.some(f => f.severity !== 'info' && f.code === 'mark_wrong_side')) {
     return { available: false, message: 'Flipping would not put every mark on its own side.' }
   }
   return {

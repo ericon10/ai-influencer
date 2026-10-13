@@ -13,9 +13,11 @@ hero:
   # inspiration image (SPEC 5.1 rule 1); chest-up, facing the camera, relaxed
   # neutral expression in all three prompts. Imperfections at the dose of a
   # real person on a good day, never stacked.
+  # {background} is the default rule sheet-background (editable in Settings,
+  # Rules; empty when switched off).
   base: |
-    Chest-up portrait of {card}. {variant} Plain light gray background, soft
-    even daylight, plain white crew-neck tee, hair in its usual style.
+    Chest-up portrait of {card}. {variant} {background} Plain white crew-neck
+    tee, hair in its usual style.
     {marks}
     Photorealistic, natural skin with visible pores and small believable
     imperfections.
@@ -29,8 +31,8 @@ sheet:
     Using the attached reference images, keep this {noun}'s face, hair, skin
     tone, and distinguishing marks exactly the same. {framing}. {view}.
     {marks}
-    {expression}{body} Plain light gray background, soft even daylight,
-    {outfit}. Photorealistic, natural skin with visible pores and the same
+    {expression}{body} {background} {Outfit}. Photorealistic, natural skin
+    with visible pores and the same
     small imperfections as the reference. Same person as the reference, not
     a lookalike.
 
@@ -83,17 +85,23 @@ kind_nouns:
 # the model (rule 14): sheet refs attached, a trained character, or text
 # only. The outfit is always written out in full and replaces the sheet
 # outfit (rule 15), footwear is always named (rule 16), and everything is
-# plain and unbranded (rule 17). Code adds the REALISM and AVOID blocks.
+# plain and unbranded (rule 17). These are defaults (owner ruling G1): each
+# can be switched off, and nothing is worn unless the scene says so. Code
+# adds the REALISM and AVOID blocks.
 scene:
+  # {wearing} is built from the outfit, footwear and jewelry fields (each
+  # optional); {brand_line} is present while the scene is brand-free.
   base: |
     {reference} {moment}. {setting}.
-    {Subj} is wearing {outfit}, with {footwear}{jewelry}{outfit_override}.
+    {wearing}
     {makeup}. Hair: {hair}. {pose}, {expression}.
     {marks}
-    {camera}, {framing}, eye level. {light}.
+    {camera}, {framing}, {height}. {light}.
     {colors}
-    Everything {subj} wears and holds is plain and unbranded, with no logos
-    or readable text.
+    {brand_line}
+  brand_free: "Everything {subj} wears and holds is plain and unbranded, with no logos or readable text."
+  wearing: "{Subj} is wearing {items}{outfit_override}."
+  wearing_only: "{Subj} has {items}{outfit_override}."
   reference:
     refs: "Using the attached reference images, keep this {noun}'s face, hair, and features exactly the same."
     trained: "{name}, the saved character."
@@ -115,31 +123,21 @@ edit:
 # Plans a scene's fields from the owner's words. The model fills fields;
 # code builds the prompt from them (SPEC 9).
 scene_plan:
+  # {rules} is built from the rules switched on (each rule's `planner` line
+  # in rules.yaml). The fixed rules are always in it.
   system: |
     You plan candid photo scenes for an original, fictional adult character
-    who posts everyday moments. Every scene reads like a real moment a
-    friend caught on a phone, never a staged ad shoot. You choose one value
-    for each field and write short, concrete phrases.
-    Rules you always follow:
-    - Write the full outfit for this moment, top to bottom, something a
-      real person this age would actually wear there. Style notes are
-      optional ideas, never a uniform. Never say "same outfit" or lean on a
-      signature look.
-    - Always name the footwear (or "barefoot" when it fits).
-    - Everything is plain and unbranded: no logos, brand names or readable
-      text on clothes, shoes, cups, bags or signs.
-    - The camera matches the story. Eye-level angles only, waist-up or full
-      body, the moment leads. Never low angles, never tight crops on the
-      body, never provocative poses.
-    - Imperfection is a feature: everyday light, real places, a little
-      clutter and other people in the background are fine.
-    - Makeup is light and believable: natural by day, soft glam only for
-      nights out and events. Never heavy glam in daytime.
-    - Calm, natural expressions. The character is not talking to the camera.
-    - Do not repeat a moment type and camera pair from the recent combo log.
+    who posts everyday moments. You choose one value for each field and
+    write short, concrete phrases. Everything about the scene is open: any
+    outfit, setting, angle or moment that fits what the owner asked for. The
+    character's notes are starting ideas, never limits.
+    Always:
+    - The character is an adult; never nudity or sexual content.
     - Never describe the face, hair color or skin; the reference images
       carry the identity. Never use words like flawless, perfect skin,
-      smooth skin or airbrushed.
+      smooth skin or airbrushed; real skin is the look.
+    Defaults for this account (follow them unless the owner asks otherwise):
+    {rules}
   prompt: |
     Plan one scene for {name}.
 
@@ -147,10 +145,14 @@ scene_plan:
 
     Persona: {vibe}
     Usual settings (ideas only): {settings}
-    Never: {never}
+    Usual defaults (overridable): {defaults}
+    Usually steer away from (suggestions, not limits): {never}
     Style ideas (optional, never a uniform): {style}
+    Style notes: {style_notes}
     Hair options (ideas only): {hair_options}
     Makeup: natural is {natural}; soft glam is {glam} and is for {glam_when}.
+    Signature jewelry (optional; add it to jewelry only when it fits, on its
+    own side): {jewelry_marks}
     Recent combo log (moment type / camera / light / location), do not
     repeat a moment type and camera pair:
     {combos}
@@ -158,6 +160,7 @@ scene_plan:
     Pick each preset field from its list:
     moment_type: {moment_types}
     camera: {cameras}
+    height: {heights}
     framing: {framings}
     light: {lights}
     expression: {expressions}
@@ -209,10 +212,11 @@ concepts:
 
     For each concept give: a first name; an age of 21 or older; a card of at
     most 40 words covering age, hair (color, length, texture, part), eyes,
-    face shape, brows, lips, skin tone and build; exactly 2 subtle
-    distinguishing marks, each with a side (LEFT or RIGHT, from the
-    character's own point of view), a face region and whether it is skin or
-    jewelry; a neutral body line; a short style line; a vibe; and pronouns.
+    face shape, brows, lips, skin tone and build; up to 2 subtle
+    distinguishing marks that are part of the face (a mole, freckles, a
+    small scar), each with a side (LEFT or RIGHT, from the character's own
+    point of view) and a face region; a neutral body line; a short style
+    line; a vibe; and pronouns. Jewelry is styling, not a mark.
 
 card_update:
   system: |
