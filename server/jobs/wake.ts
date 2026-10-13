@@ -13,8 +13,16 @@ export function wakeToken(sessionSecret: string): string {
 
 let last = 0
 
+// The worker's address as people paste it: with or without https://, with
+// or without a trailing slash.
+export function workerBaseUrl(raw: string | undefined): string | null {
+  const v = (raw ?? '').trim().replace(/\/+$/, '')
+  if (!v) return null
+  return /^https?:\/\//i.test(v) ? v : `https://${v}`
+}
+
 export async function wakeWorker(deps: Pick<Deps, 'env' | 'log'>, opts: { force?: boolean } = {}): Promise<void> {
-  const url = deps.env.STUDIO_WORKER_URL?.replace(/\/$/, '')
+  const url = workerBaseUrl(deps.env.STUDIO_WORKER_URL)
   if (!url) return
   // One wake every few seconds is plenty; the worker drains everything due.
   const now = Date.now()
