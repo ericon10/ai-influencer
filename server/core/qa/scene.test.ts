@@ -83,8 +83,8 @@ describe('scene QA', () => {
   })
 
   it('when the mark sides are in doubt, the summary leads with where the mole belongs', () => {
-    const mirrored: Observation = { ...base, skin_marks: [{ region: 'brow', image_side: 'image_left', description: 'small mole' }] }
-    const { report: r } = judge({ skin_marks: [{ region: 'brow', image_side: 'image_left', description: 'small mole' }], artifacts: ['a soft, simplified hand'] }, { mirrored })
+    const mirrored: Observation = { ...base, skin_marks: [{ location: 'above the brow', image_side: 'image_left', description: 'small mole' }] }
+    const { report: r } = judge({ skin_marks: [{ location: 'above the brow', image_side: 'image_left', description: 'small mole' }], artifacts: ['a soft, simplified hand'] }, { mirrored })
     expect(r.verdict).toBe('uncertain')
     expect(r.summary).toMatch(/^Needs your eye: Check the side yourself: the mole belongs on her LEFT brow, the right side of the image/)
     expect(r.summary).not.toMatch(/ear cuff/)

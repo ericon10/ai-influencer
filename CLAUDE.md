@@ -108,6 +108,12 @@ the Studio; they are not creative limits on a character.
   endpoint (image, video, audio, LLM, upscale, training) without a quote
   shown to the owner first. The server enforces this: a run needs a
   fresh quote id.
+- **Push in batches, only when the owner needs to try something.** Commit
+  locally as you go; push once a change is ready to use, after `npm run
+  check` passes. Every push deploys Vercel (daily deploy limits) and,
+  for `server/**` or `config/**`, restarts the Railway worker, so check
+  that no job is running first. Say "ready" only after the deploy is
+  READY.
 - **Tests use the mock adapter only.** No test, script or dev session
   calls a real provider without an approved quote.
 - **SPEC.md section 5 rules are defaults.** They live as data in
