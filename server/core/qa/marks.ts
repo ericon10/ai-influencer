@@ -275,20 +275,23 @@ export function evaluateSheetShot(input: EvaluateInput): QaReport {
   return finalize(findings, detectedId, contradicted)
 }
 
-export function finalize(findings: QaFinding[], detectedView: string | null, forceUncertain = false): QaReport {
+// `regenerate` overrides which failures call for a new generation; scenes fix
+// more with a one-change edit than sheet shots do.
+export function finalize(findings: QaFinding[], detectedView: string | null, forceUncertain = false, opts: { regenerate?: QaCode[] } = {}): QaReport {
   const fails = findings.filter(f => f.severity === 'fail')
   const warns = findings.filter(f => f.severity === 'warn')
+  const regenerateCodes = opts.regenerate ?? REGENERATE
   let verdict: Verdict
   if (fails.some(f => IDENTITY.includes(f.code))) verdict = 'regenerate'
   else if (forceUncertain) verdict = 'uncertain'
-  else if (fails.some(f => REGENERATE.includes(f.code))) verdict = 'regenerate'
+  else if (fails.some(f => regenerateCodes.includes(f.code))) verdict = 'regenerate'
   else if (fails.length) verdict = 'edit'
   else if (warns.length) verdict = 'uncertain'
   else verdict = 'post'
 
   const summary = {
     post: 'Looks right. Ready to approve.',
-    regenerate: `Regenerate: ${(fails.find(f => IDENTITY.includes(f.code)) ?? fails.find(f => REGENERATE.includes(f.code)))?.message ?? ''}`,
+    regenerate: `Regenerate: ${(fails.find(f => IDENTITY.includes(f.code)) ?? fails.find(f => regenerateCodes.includes(f.code)))?.message ?? ''}`,
     edit: `Fix with an edit: ${fails.map(f => f.message).join(' ')}`,
     uncertain: `Needs your eye: ${(warns[0] ?? fails[0])?.message ?? ''}`,
   }[verdict].trim()

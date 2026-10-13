@@ -1,0 +1,213 @@
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { beforeAll, describe, expect, it } from 'vitest'
+import { eq } from 'drizzle-orm'
+import { createHarness, drain, type Harness } from '../testing/harness.js'
+import { registerPipelineHooks } from './hooks.js'
+import { estimateAction, runAction, type StudioAction } from './actions.js'
+import { getCharacter, toData } from './characters.js'
+import { importCharacter } from './files.js'
+import { mirrorCandidate, rejectCandidate } from './review.js'
+import { setSetting } from './settings.js'
+import { approveSceneCandidate, createScene, cropCandidate, getScene, sceneCandidates, updateScene } from './scenes.js'
+import { scenesView } from '../api/views.js'
+import { renderPlaceholderPortrait } from '../providers/mock.js'
+import { candidates } from '../db/schema.js'
+import { parseComboLog } from '../core/scenes.js'
+import type { LlmRequest } from '../providers/types.js'
+import type { Observation } from '../core/qa/perception.js'
+
+// Phase 2 in demo mode (mock providers, no spend): plan a scene from plain
+// words, generate stills on two models with QA, the drift lock after a
+// trained character, the human pick writing the combo log, and the
+// one-change edit loop (edit, crop, upscale, free mirror).
+
+const FIX = join(process.cwd(), 'fixtures', 'callie')
+let h: Harness
+let characterId: string
+let cuffOnWrongEar = false
+
+async function run(action: StudioAction) {
+  const { quote, preview } = await estimateAction(h.deps, h.ctx, action)
+  expect(quote.status).toBe('open')
+  const { jobs } = await runAction(h.deps, h.ctx, action, quote.id, true)
+  await drain(h, 60)
+  return { quote, preview, jobs }
+}
+
+const stills = async (sceneId: string) => sceneCandidates(h.deps, h.ctx, [sceneId])
+
+beforeAll(async () => {
+  registerPipelineHooks()
+  h = await createHarness({
+    mockLlmResponders: {
+      qa_perception: (req: LlmRequest) => {
+        const meta = req.meta as { pass: string; mockObservation: Observation; sceneId?: string }
+        if (!cuffOnWrongEar || !meta.sceneId) return meta.mockObservation
+        // The cuff on her RIGHT ear (image left when she faces the camera).
+        const o: Observation = { ...meta.mockObservation, pose: 'frontal', nose: 'toward_camera', ears: [{ image_side: 'image_left', jewelry: true, jewelry_description: 'gold double-band ear cuff' }, { image_side: 'image_right', jewelry: false, jewelry_description: '' }] }
+        return meta.pass === 'orig' ? o : { ...o, ears: o.ears.map(e => ({ ...e, image_side: e.image_side === 'image_left' ? 'image_right' : 'image_left' })) }
+      },
+    },
+  })
+  const md = readFileSync(join(FIX, 'character-callie.md'), 'utf8')
+  const images: Record<string, { data: Buffer }> = {}
+  for (let i = 0; i <= 11; i++) {
+    const id = `REF-${String(i).padStart(2, '0')}`
+    images[id] = { data: await renderPlaceholderPortrait(`Callie ${id}`) }
+  }
+  characterId = (await importCharacter(h.deps, h.ctx, md, { images })).characterId
+}, 120_000)
+
+describe('scenes (Stage 7, demo mode)', () => {
+  let sceneId: string
+
+  it('plans a scene from the owner\'s words: Claude fills the fields, code builds the prompt', async () => {
+    const scene = await createScene(h.deps, h.ctx, characterId, { brief: 'Picking out peaches at the farmers market' })
+    sceneId = scene.id
+    const { quote, preview } = await run({ type: 'scene_plan', characterId, sceneId })
+    expect(quote.items.map(i => i.model)).toEqual(['mock/llm'])
+    expect(preview.prompts[0]!.text).toContain('Picking out peaches at the farmers market')
+    // Callie's real combo log goes to the planner, so it avoids repeats.
+    expect(preview.prompts[0]!.text).toContain('Caught mid-action / Friend shot / Golden hour / Rooftop')
+    const view = (await scenesView(h.deps, h.ctx, characterId)).scenes.find(s => s.id === sceneId)!
+    expect(view.complete).toBe(true)
+    expect(view.fields.footwear).toBeTruthy()
+    expect(view.comboProblem).toBeNull()
+    expect(view.title).toBe('Picking out peaches at')
+  })
+
+  it('refuses a moment and camera pair from the last 10 combo log entries (rule 21)', async () => {
+    const repeat = await createScene(h.deps, h.ctx, characterId, {
+      fields: { momentType: 'caught_mid_action', camera: 'friend_phone', moment: 'Callie laughs on a rooftop', outfit: 'a linen sundress', footwear: 'white sandals', light: 'golden_hour' },
+    })
+    await expect(estimateAction(h.deps, h.ctx, { type: 'scene', characterId, sceneId: repeat.id, models: ['higgsfield/nano-banana-2.1'], variations: 1, withQa: true }))
+      .rejects.toThrow(/already used on 2026-10-12.*rule 21/)
+  })
+
+  it('runs Nano Banana 2.1 and GPT Image 2.5 Flare side by side, refs chosen by angle, QA on each', async () => {
+    await updateScene(h.deps, h.ctx, sceneId, { fields: { view: 'three_quarter_left', framing: 'waist_up', expression: 'laughing' } })
+    const { quote, preview } = await run({ type: 'scene', characterId, sceneId, models: ['higgsfield/nano-banana-2.1', 'higgsfield/gpt-image-2.5-flare'], variations: 1, withQa: true })
+    // Demo mode runs the mock in place of each model; QA is in the price.
+    expect(quote.items.map(i => i.model)).toEqual(['mock/image', 'mock/llm', 'mock/llm', 'mock/image', 'mock/llm', 'mock/llm'])
+    const p = preview.prompts[0]!.text
+    expect(p.startsWith("Using the attached reference images, keep this woman's face, hair, and features exactly the same.")).toBe(true)
+    expect(p).toContain('instead of the white t-shirt, jeans and sneakers in the reference images')
+    expect(p).toContain('ordinary background clutter')
+    const view = (await scenesView(h.deps, h.ctx, characterId)).scenes.find(s => s.id === sceneId)!
+    expect(view.refs.map(r => r.refId)).toEqual(['REF-00', 'REF-01', 'REF-07', 'REF-10'])
+    const made = (await stills(sceneId)).filter(c => c.op === 'generate')
+    expect(made).toHaveLength(2)
+    for (const c of made) {
+      expect(c.status).toBe('in_review')
+      expect(c.qaVerdict).toBe('post')
+    }
+    expect(view.status).toBe('in_review')
+  })
+
+  it('a trained character: the saved character, no attachments, then the drift lock and its QA', async () => {
+    const { quote, preview } = await run({ type: 'scene', characterId, sceneId, models: ['higgsfield/soul-2'], variations: 1, withQa: true })
+    expect(quote.items.map(i => i.label)).toEqual([
+      expect.stringMatching(/Soul 2.0$/), expect.stringMatching(/^Drift lock/), expect.stringMatching(/^QA check/), expect.stringMatching(/^QA mirror check/),
+    ])
+    expect(preview.prompts[0]!.text.startsWith('Callie, the saved character.')).toBe(true)
+    expect(preview.prompts[0]!.text).toContain('Honey-blonde hair, light brown brows')
+    expect(preview.prompts[1]!.text).toMatch(/^Make her face and hair match the person in the other attached images exactly/)
+    const all = await stills(sceneId)
+    const lock = all.find(c => c.op === 'drift_lock')!
+    expect(lock.status).toBe('in_review')
+    expect(all.find(c => c.id === lock.parentId)!.status).toBe('superseded')
+  })
+
+  it('the pick writes the combo log once; a rerun of the same scene is allowed', async () => {
+    const pick = (await stills(sceneId)).find(c => c.op === 'generate' && c.status === 'in_review')!
+    expect((await approveSceneCandidate(h.deps, h.ctx, pick.id)).comboLogged).toBe(true)
+    const ch = toData(await getCharacter(h.deps, h.ctx, characterId))
+    const log = parseComboLog(ch.sections.find(s => s.title.startsWith('Combo log'))!.body)
+    expect(log).toHaveLength(5)
+    expect(log.at(-1)!.date).toBe('2026-10-12')
+    expect((await getScene(h.deps, h.ctx, sceneId)).status).toBe('approved')
+    const second = (await stills(sceneId)).find(c => c.op === 'generate' && c.status === 'in_review')!
+    expect((await approveSceneCandidate(h.deps, h.ctx, second.id)).comboLogged).toBe(false)
+    const again = await estimateAction(h.deps, h.ctx, { type: 'scene', characterId, sceneId, models: ['higgsfield/nano-banana-2.1'], variations: 1, withQa: true })
+    expect(again.quote.status).toBe('open')
+  })
+})
+
+describe('still edits (Stage 8, demo mode)', () => {
+  let sceneId: string
+  let stillId: string
+
+  beforeAll(async () => {
+    const scene = await createScene(h.deps, h.ctx, characterId, {
+      fields: { momentType: 'quiet_moment', camera: 'timer', moment: 'Callie reads on her apartment sofa', setting: 'Her small, lived-in apartment', outfit: 'an oversized gray sweatshirt and soft lounge shorts', footwear: 'thick white socks', light: 'window', view: 'front', framing: 'knees_up', destination: 'feed' },
+    })
+    sceneId = scene.id
+    cuffOnWrongEar = true
+    try { await run({ type: 'scene', characterId, sceneId, models: ['higgsfield/nano-banana-2.1'], variations: 1, withQa: true }) } finally { cuffOnWrongEar = false }
+    stillId = (await stills(sceneId))[0]!.id
+  })
+
+  it('QA finds the cuff on the wrong ear: an edit, not a regenerate, with the free mirror offered', async () => {
+    const [c] = await stills(sceneId)
+    const report = c!.qaReport as { verdict: string; edits: Array<{ change: string }>; mirrorFix: { available: boolean } }
+    expect(report.verdict).toBe('edit')
+    expect(report.mirrorFix.available).toBe(true)
+    expect(report.edits[0]!.change).toMatch(/^Remove the gold double-band ear cuff from her RIGHT ear/)
+    const { candidateId } = await mirrorCandidate(h.deps, h.ctx, stillId)
+    const mirrored = (await stills(sceneId)).find(x => x.id === candidateId)!
+    expect(mirrored.op).toBe('mirror')
+    expect(mirrored.parentId).toBe(stillId)
+    expect(mirrored.qaVerdict).toBe('post')
+  })
+
+  it('a reason chip for a logo now offers the one-change edit', async () => {
+    const fixes = await rejectCandidate(h.deps, h.ctx, stillId, ['logo'])
+    expect(fixes[0]).toMatchObject({ action: 'edit_one_detail', available: true })
+  })
+
+  it('one change per edit, never for face drift (rules 24 and 25)', async () => {
+    await expect(estimateAction(h.deps, h.ctx, { type: 'scene_edit', characterId, candidateId: stillId, change: 'Remove the logo on the mug. Then close her mouth.', face: false, withQa: true }))
+      .rejects.toThrow(/One change per edit/)
+    const drift = { verdict: 'regenerate', summary: '', reasons: [], detectedView: null, findings: [{ code: 'face_drift', severity: 'fail', message: 'The face does not match.' }] }
+    await h.deps.db.update(candidates).set({ qaReport: drift }).where(eq(candidates.id, stillId))
+    await expect(estimateAction(h.deps, h.ctx, { type: 'scene_edit', characterId, candidateId: stillId, change: 'Remove the logo on the mug', face: false, withQa: true }))
+      .rejects.toThrow(/Face drift is never fixed with an edit/)
+    await h.deps.db.update(candidates).set({ qaReport: null }).where(eq(candidates.id, stillId))
+  })
+
+  it('runs a one-change edit on the still, with REF-00 only for a face change, and checks it', async () => {
+    const { quote, preview } = await run({ type: 'scene_edit', characterId, candidateId: stillId, change: 'Turn her head slightly so she looks straight into the lens', face: true, withQa: true })
+    expect(quote.items.map(i => i.model)).toEqual(['mock/image', 'mock/llm', 'mock/llm'])
+    expect(preview.prompts[0]!.text).toMatch(/^Turn her head slightly so she looks straight into the lens\. Keep everything else in the image exactly the same\. Use the attached reference image only for her face\./)
+    const edit = (await stills(sceneId)).find(c => c.op === 'edit')!
+    expect(edit.parentId).toBe(stillId)
+    expect(edit.status).toBe('in_review')
+  })
+
+  it('a closer shot is a free crop, then a 2x upscale that keeps the skin texture', async () => {
+    const crop = await cropCandidate(h.deps, h.ctx, stillId, { x: 0.25, y: 0.1, w: 0.5, h: 0.5 })
+    const c = (await stills(sceneId)).find(x => x.id === crop.candidateId)!
+    expect(c.op).toBe('crop')
+    expect(c.status).toBe('in_review')
+    const { quote } = await run({ type: 'scene_upscale', characterId, candidateId: crop.candidateId })
+    expect(quote.items.map(i => i.model)).toEqual(['mock/image'])
+    const up = (await stills(sceneId)).find(x => x.op === 'upscale')!
+    expect(up.parentId).toBe(crop.candidateId)
+    expect(['in_review', 'qa_failed']).toContain(up.status)
+  })
+})
+
+describe('live mode', () => {
+  it('a model the API does not offer needs the Higgsfield account connected', async () => {
+    const ctx = h.ctx
+    await setSetting(h.deps, ctx, 'provider_mode', 'live')
+    try {
+      const scene = await createScene(h.deps, ctx, characterId, { fields: { momentType: 'walking', camera: 'pov', moment: 'Callie walks to the car', outfit: 'a light denim jacket over a white tank and black leggings', footwear: 'clean white sneakers', light: 'overcast' } })
+      await expect(estimateAction(h.deps, ctx, { type: 'scene', characterId, sceneId: scene.id, models: ['higgsfield/nano-banana-2.1'], variations: 1, withQa: false }))
+        .rejects.toThrow(/runs only through your Higgsfield account/)
+    } finally {
+      await setSetting(h.deps, ctx, 'provider_mode', 'demo')
+    }
+  })
+})

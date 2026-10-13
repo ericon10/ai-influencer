@@ -59,6 +59,8 @@ const ruleCheck = z.discriminatedUnion('type', [
   z.object({ type: z.literal('identity_block') }),
   z.object({ type: z.literal('marks_stated') }),
   z.object({ type: z.literal('max_words'), field: z.string(), max: z.number().int() }),
+  z.object({ type: z.literal('require_pattern'), pattern: z.string(), flags: z.string().default(''), ignore: z.string().optional() }),
+  z.object({ type: z.literal('reference_slot') }),
 ])
 
 const oneOrMany = z.union([z.string(), z.array(z.string())]).transform(v => (Array.isArray(v) ? v : [v]))
@@ -101,6 +103,45 @@ const templatesSchema = z.object({
   concepts: z.object({ system: z.string(), prompt: z.string() }),
   card_update: z.object({ system: z.string(), prompt: z.string() }),
   qa_perception: z.object({ system: z.string(), prompt: z.string() }),
+  scene: z.object({
+    base: z.string(),
+    reference: z.object({ refs: z.string(), trained: z.string(), text: z.string() }),
+    sheet_outfit: z.string(),
+    outfit_override: z.string(),
+    colors: z.string(),
+    makeup: z.object({ bare: z.string(), natural: z.string(), soft_glam: z.string() }),
+  }),
+  edit: z.object({ base: z.string(), face_ref: z.string() }),
+  scene_plan: z.object({ system: z.string(), prompt: z.string() }),
+})
+
+const preset = z.object({ id: z.string(), label: z.string(), hint: z.string().optional() })
+
+const scenesSchema = z.object({
+  version: z.number(),
+  settings: z.object({
+    quality: z.string(),
+    resolution: z.string(),
+    combo_window: z.number().int().positive(),
+    max_refs: z.number().int().min(2).max(8),
+    max_variations: z.number().int().min(1).max(8),
+    max_models: z.number().int().min(1).max(4),
+    still_models: z.array(z.string()).min(1),
+    edit_models: z.array(z.string()).min(1),
+    upscale_model: z.string(),
+  }),
+  moments: z.array(preset).min(1),
+  cameras: z.array(preset.extend({ text: z.string(), foreground: z.string().optional() })).min(1),
+  framings: z.array(preset.extend({ text: z.string(), identity: z.enum(['check', 'skip']).default('check') })).min(1),
+  lights: z.array(preset.extend({ text: z.string() })).min(1),
+  expressions: z.array(preset.extend({ text: z.string(), ref_expression: z.string().optional() })).min(1),
+  makeup: z.array(preset).min(1),
+  destinations: z.array(preset.extend({ aspect: z.string() })).min(1),
+  color_triggers: z.string(),
+  edits: z.object({
+    drift_lock: z.string(),
+    presets: z.array(preset.extend({ text: z.string(), face: z.boolean().default(false) })),
+  }),
 })
 
 const reviewSchema = z.object({
@@ -131,6 +172,7 @@ export const pipelineSchemas = {
   rules: rulesSchema,
   templates: templatesSchema,
   review: reviewSchema,
+  scenes: scenesSchema,
 }
 
 export type SheetConfig = z.infer<typeof sheetSchema>
@@ -141,6 +183,7 @@ export type RulesConfig = z.infer<typeof rulesSchema>
 export type Rule = RulesConfig['rules'][number]
 export type TemplatesConfig = z.infer<typeof templatesSchema>
 export type ReviewConfig = z.infer<typeof reviewSchema>
+export type ScenesConfig = z.infer<typeof scenesSchema>
 
 export interface PipelineConfig {
   sheet: SheetConfig
@@ -148,4 +191,5 @@ export interface PipelineConfig {
   rules: RulesConfig
   templates: TemplatesConfig
   review: ReviewConfig
+  scenes: ScenesConfig
 }

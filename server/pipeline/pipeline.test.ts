@@ -173,7 +173,7 @@ describe('character creation, stages 1 to 5 (demo mode)', () => {
     const [cand] = await candidatesFor(h.deps, h.ctx, characterId, { refId: 'REF-09', statuses: ['in_review'] })
     const fixes = await rejectCandidate(h.deps, h.ctx, cand!.id, ['face_drift', 'logo'], 'eyes too blue')
     expect(fixes.map(f => f.action)).toEqual(['regenerate_closer_refs', 'regenerate'])
-    expect(fixes[1]!.label).toMatch(/phase 2/)
+    expect(fixes[1]!.label).toMatch(/one-change edit is for scene stills/)
     const [archived] = await candidatesFor(h.deps, h.ctx, characterId, { refId: 'REF-09', statuses: ['rejected'] })
     expect(archived!.rejectReasons).toEqual(['face_drift', 'logo'])
   })

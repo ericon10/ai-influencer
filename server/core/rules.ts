@@ -77,6 +77,22 @@ function check(rule: Rule, prompt: string, ctx: RuleContext): string | null | un
       }
       return null
     }
+    case 'require_pattern': {
+      const text = c.ignore ? prompt.replace(new RegExp(c.ignore, `g${c.flags.replace('g', '')}`), '') : prompt
+      return new RegExp(c.pattern, c.flags).test(text) ? null : 'missing'
+    }
+    case 'reference_slot': {
+      // SPEC 5.2 rule 14: refs attached need the REFERENCE line and the
+      // sheet outfit replaced (rule 15); a saved character attaches nothing.
+      const refs = attachments(ctx.request)
+      if (refs > 0) {
+        if (!/using the attached reference images/i.test(prompt)) return 'refs attached without the REFERENCE line'
+        if (!/instead of [^.]*reference images/i.test(prompt)) return 'the sheet outfit is not replaced'
+        return null
+      }
+      if (ctx.identityBlock && !prompt.includes('the saved character')) return 'a saved character must be named as "the saved character"'
+      return null
+    }
     case 'max_words':
       return undefined
   }

@@ -208,8 +208,13 @@ export const candidates = pgTable('candidates', {
   id: text('id').primaryKey(),
   accountId: text('account_id').notNull().references(() => accounts.id),
   characterId: text('character_id').notNull().references(() => characters.id),
-  target: text('target').notNull(), // hero | sheet
+  target: text('target').notNull(), // hero | sheet | scene
   refId: text('ref_id'),
+  // Scenes (Stage 7 and 8): the scene a still belongs to, the still it was
+  // made from (an edit, crop, upscale, mirror or drift lock), and how.
+  sceneId: text('scene_id'),
+  parentId: text('parent_id'),
+  op: text('op').notNull().default('generate'), // generate | edit | crop | upscale | mirror | drift_lock
   heroPromptIndex: integer('hero_prompt_index'),
   jobId: text('job_id'),
   assetId: text('asset_id'),
@@ -226,7 +231,26 @@ export const candidates = pgTable('candidates', {
   createdBy: text('created_by'),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
-}, t => [index('candidates_char_idx').on(t.characterId, t.target, t.refId)])
+}, t => [index('candidates_char_idx').on(t.characterId, t.target, t.refId), index('candidates_scene_idx').on(t.sceneId)])
+
+// A scene (Stage 7): one moment for a character, its structured fields (the
+// prompt is built from them by code, never written by an LLM), and the stills
+// made for it. Approving a still writes the scene to the combo log.
+export const scenes = pgTable('scenes', {
+  id: text('id').primaryKey(),
+  accountId: text('account_id').notNull().references(() => accounts.id),
+  characterId: text('character_id').notNull().references(() => characters.id),
+  title: text('title').notNull().default(''),
+  // The owner's own words, kept as written.
+  brief: text('brief').notNull().default(''),
+  fields: jsonb('fields').notNull().default({}),
+  status: text('status').notNull().default('draft'), // draft | generating | in_review | approved
+  comboLoggedAt: timestamp('combo_logged_at', { withTimezone: true }),
+  createdBy: text('created_by'),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+  archivedAt: timestamp('archived_at', { withTimezone: true }),
+}, t => [index('scenes_char_idx').on(t.characterId, t.createdAt)])
 
 // ── Jobs and money ───────────────────────────────────────────────
 

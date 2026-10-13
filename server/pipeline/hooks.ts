@@ -13,8 +13,8 @@ import { refreshRefStatus } from './review.js'
 import { scoreDistinctness, scoreIdentity } from './identity.js'
 import { onModelTest } from './modelTests.js'
 import { registerImportCheck } from './importCheck.js'
-import { readAsset } from '../storage/assets.js'
-import { compareTexture, type TextureResult } from '../qa/texture.js'
+import { textureCheck, textureSummary } from './texture.js'
+import { registerSceneHooks } from './sceneHooks.js'
 import type { GenRequest } from '../providers/types.js'
 
 // What each finished job does to the character. Registered once at boot.
@@ -28,20 +28,6 @@ async function createCandidate(deps: Deps, ctx: Ctx, job: JobRow, fields: Partia
   return id
 }
 
-// Realism principle: an upscale or edit must keep the face's fine skin
-// detail. Free and local; a failure to measure never blocks the result.
-async function textureCheck(deps: Deps, ctx: Ctx, inputAssetId: string | undefined, outputAssetId: string, sameFraming: boolean): Promise<TextureResult | null> {
-  if (!inputAssetId) return null
-  try {
-    const [a, b] = await Promise.all([readAsset(deps, ctx, inputAssetId), readAsset(deps, ctx, outputAssetId)])
-    return await compareTexture(a.data, b.data, { faces: deps.faces, minRatio: deps.config.runtime.qa.texture_min_ratio, sameFraming })
-  } catch (e) {
-    ctx.log.warn({ err: e }, 'texture check could not run')
-    return null
-  }
-}
-
-const textureSummary = (t: TextureResult) => ({ ratio: t.ratio, smoothed: t.smoothed, region: t.region, message: t.message })
 
 async function onBreakdown(deps: Deps, ctx: Ctx, job: JobRow, out: JobOutcome): Promise<void> {
   if (out.status !== 'completed') return
@@ -196,5 +182,6 @@ export function registerPipelineHooks(): void {
   registerJobHook('sheet', onSheet)
   registerJobHook('qa', onQa)
   registerJobHook('model_test', onModelTest)
+  registerSceneHooks()
   registerImportCheck()
 }

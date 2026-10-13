@@ -4,7 +4,7 @@ import { buildHeroPrompts, buildSheetPrompt } from './prompts.js'
 import { blocking, lintPrompt } from './rules.js'
 import {
   BARE_FACE_LINE, DEFAULT_REALISM_BLOCK, finalizeImagePrompt, findBannedTerms, forceBeautifyOff,
-  hasRealismBlock, stripBannedTerms, suggestsFixingFlaw, treatsFlawAsDefect,
+  hasRealismBlock, realismForReference, stripBannedTerms, suggestsFixingFlaw, treatsFlawAsDefect,
 } from './realism.js'
 import { mapInput } from '../providers/higgsfield.js'
 import { accountModel, accountParams } from '../providers/higgsfieldAccount.js'
@@ -46,13 +46,24 @@ describe('REALISM block', () => {
       ...sheet.shots.filter(s => s.source !== 'hero').map(s => buildSheetPrompt(templates, views, s, callie)),
     ]
     expect(prompts).toHaveLength(3 + 11)
+    // Reference images keep their plain gray background, so the block's
+    // background clause is left out of hero and sheet prompts only.
+    const reference = 'REALISM: Candid phone photo, natural skin texture with visible pores, small imperfections, no retouching, not a professional shoot.'
     for (const p of prompts) {
-      expect(p).toContain(callie.realism.block)
+      expect(p).toContain(reference)
+      expect(p).not.toMatch(/clutter/)
+      expect(p).toContain('Plain light gray background')
       expect(p).toContain(callie.realism.avoid)
       expect(hasRealismBlock(p)).toBe(true)
     }
     const plain = buildHeroPrompts(templates, views, { ...callie, realism: {} })[0]!
     expect(plain).toContain(DEFAULT_REALISM_BLOCK)
+  })
+
+  it('keeps the background clause in scenes, where the clutter belongs', () => {
+    const scene = finalizeImagePrompt('Callie at a farmers market, wearing a white linen shirt.', { stage: 'scene', realism: callie.realism.block }).prompt
+    expect(scene).toContain(callie.realism.block)
+    expect(realismForReference('REALISM: ordinary background clutter')).toBe(DEFAULT_REALISM_BLOCK)
   })
 
   it('is added once by the builder, never twice', () => {

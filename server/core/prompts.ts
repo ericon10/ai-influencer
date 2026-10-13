@@ -7,7 +7,7 @@ import { capitalize, fill, normalizePrompt } from './text.js'
 // Prompts are filled by code from templates and the character record
 // (SPEC 9: never written from scratch by an LLM).
 
-function pronounVars(p: Pronouns): Record<string, string> {
+export function pronounVars(p: Pronouns): Record<string, string> {
   return { subj: p.subj, obj: p.obj, poss: p.poss, noun: p.noun, Subj: capitalize(p.subj), Poss: capitalize(p.poss), Obj: capitalize(p.obj) }
 }
 
@@ -53,7 +53,7 @@ export function markLines(t: TemplatesConfig, view: ViewDef, marks: Mark[], p: P
   return lines.join(' ')
 }
 
-function cardPhrase(card: string, noun: string): string {
+export function cardPhrase(card: string, noun: string): string {
   const c = card.trim().replace(/\.$/, '')
   return /^\d/.test(c) ? `a ${noun}, ${c}` : c
 }
@@ -69,7 +69,9 @@ export interface BuildOptions {
 
 type RealismSource = { realism?: CharacterData['realism'] }
 
-function finish(prompt: string, stage: 'hero' | 'sheet', ch: RealismSource & { card?: string; marks?: CharacterData['marks'] }, o: BuildOptions): string {
+// The last step for every image prompt: the identity block, then the
+// REALISM and AVOID blocks (bare-face line on hero and sheet only).
+export function finishPrompt(prompt: string, stage: string, ch: RealismSource & { card?: string; marks?: CharacterData['marks'] }, o: BuildOptions): string {
   const block = o.identityBlock?.trim()
   const body = block && !prompt.includes(block) ? `${prompt} ${block}` : prompt
   // Flaw words the character really has (card, marks, realism notes) stay.
@@ -84,7 +86,7 @@ function finish(prompt: string, stage: 'hero' | 'sheet', ch: RealismSource & { c
 export function buildHeroPrompts(t: TemplatesConfig, views: ViewsConfig, ch: Pick<CharacterData, 'card' | 'marks' | 'pronouns'> & RealismSource, o: BuildOptions = {}): string[] {
   const front = views.views.front!
   const marks = markLines(t, front, ch.marks, ch.pronouns)
-  return t.hero.variants.map(variant => finish(normalizePrompt(fill(t.hero.base, {
+  return t.hero.variants.map(variant => finishPrompt(normalizePrompt(fill(t.hero.base, {
     ...pronounVars(ch.pronouns), card: cardPhrase(ch.card, ch.pronouns.noun), variant, marks,
   })), 'hero', ch, o))
 }
@@ -105,5 +107,5 @@ export function buildSheetPrompt(t: TemplatesConfig, views: ViewsConfig, shot: S
     body: body ? `${body} ` : '',
     outfit: t.outfit[shot.framing]!,
   })
-  return finish(normalizePrompt(addendum ? `${prompt} ${addendum}` : prompt), 'sheet', ch, o)
+  return finishPrompt(normalizePrompt(addendum ? `${prompt} ${addendum}` : prompt), 'sheet', ch, o)
 }

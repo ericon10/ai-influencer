@@ -13,6 +13,10 @@ import { providerMode, resolveRoute } from '../pipeline/settings.js'
 import { effectiveModel, readModelOverrides } from '../providers/modelOverrides.js'
 import { readBilling } from '../providers/billing.js'
 import { serverKeyFor } from '../providers/serverKeys.js'
+import { identityForModel } from '../core/identity.js'
+import { checkSceneFields, sceneFieldsSchema } from '../core/scenes.js'
+import { comboEntries, comboProblem, draftFields, listScenes, sceneAspect, sceneCandidates, sceneRefs } from '../pipeline/scenes.js'
+import { comboPreview } from '../pipeline/sceneActions.js'
 
 // Response shapes for the UI. Plain data only; no secrets, no internals.
 
@@ -157,5 +161,67 @@ export async function settingsView(deps: Deps, ctx: Ctx) {
       when: e.when ? Object.values(e.when).join(', ') : '', credits: e.credits ?? null,
     })),
     priceVersion: deps.config.pricebook.version,
+  }
+}
+
+// ── Scenes (Stage 7 and 8) ───────────────────────────────────────────
+
+// Fills pronoun placeholders and leaves the rest (an edit preset's {thing}).
+const withPronouns = (text: string, p: { subj: string; obj: string; poss: string }) =>
+  text.replace(/\{(subj|obj|poss)\}/g, (_, k: 'subj' | 'obj' | 'poss') => p[k])
+
+export async function scenesView(deps: Deps, ctx: Ctx, characterId: string) {
+  const row = await getCharacter(deps, ctx, characterId)
+  const ch = toData(row)
+  const { scenes: sc, views } = deps.config.pipeline
+  const list = await listScenes(deps, ctx, characterId)
+  const cands = await sceneCandidates(deps, ctx, list.map(s => s.id))
+  const active = await deps.db.select({ purpose: jobs.purpose }).from(jobs)
+    .where(and(eq(jobs.accountId, ctx.accountId), eq(jobs.characterId, characterId), inArray(jobs.status, ['waiting', 'queued', 'submitting', 'running', 'ingesting'])))
+  const busy = new Set(active.map(j => j.purpose.split(':')[1]))
+  const connected = (await listCredentials(deps.db, ctx.accountId)).some(c => c.provider === 'higgsfield_account')
+  const modelInfo = (ref: string) => {
+    const m = deps.config.models.models.find(x => x.ref === ref)!
+    return { ref, label: m.label, path: m.api === false ? 'account' as const : 'api' as const, refs: m.max_refs, trained: !!identityForModel(ch.identities, ref), note: m.notes ?? '' }
+  }
+  const preferred = [ch.preferredModels.scene_still, ch.preferredModels.scene_still_alt].filter((r): r is string => !!r && sc.settings.still_models.includes(r))
+  const stillModels = [...new Set([...preferred, ...sc.settings.still_models])].map(modelInfo)
+  const editModels = sc.settings.edit_models.map(modelInfo)
+  const shape = (c: (typeof cands)[number]) => ({
+    id: c.id, assetId: c.assetId, status: c.status, prompt: c.prompt, op: c.op, parentId: c.parentId, sceneId: c.sceneId,
+    qaVerdict: c.qaVerdict, qaReport: c.qaReport, rejectReasons: c.rejectReasons, rejectNote: c.rejectNote,
+    favorite: c.favorite, createdAt: c.createdAt.toISOString(), refId: null, heroPromptIndex: null,
+  })
+  const scenes = []
+  for (const s of list) {
+    const f = draftFields(s)
+    const parsed = sceneFieldsSchema.safeParse(f)
+    const issues = parsed.success ? checkSceneFields(sc, views, parsed.data) : []
+    const missing = parsed.success ? issues.map(i => i.field) : [...new Set(parsed.error.issues.map(i => String(i.path[0])))]
+    const complete = parsed.success && !issues.length
+    scenes.push({
+      id: s.id, title: s.title, brief: s.brief, fields: f, status: busy.has(s.id) ? 'generating' : s.status, busy: busy.has(s.id),
+      createdAt: s.createdAt.toISOString(), comboLogged: !!s.comboLoggedAt, aspect: sceneAspect(deps, f), complete, missing,
+      combo: complete ? comboPreview(deps, parsed.data) : null,
+      comboProblem: complete && !s.comboLoggedAt ? comboProblem(deps, ch, parsed.data) : null,
+      refs: await sceneRefs(deps, ctx, characterId, { view: f.view ?? 'front', framing: f.framing ?? 'waist_up', expression: f.expression ?? 'neutral' }),
+      candidates: cands.filter(c => c.sceneId === s.id).map(shape),
+    })
+  }
+  const p = ch.pronouns
+  return {
+    scenes,
+    combos: comboEntries(ch).slice(-sc.settings.combo_window),
+    reasons: deps.config.pipeline.review.reasons.filter(r => r.id !== 'makeup' && r.id !== 'talking').map(r => ({ id: r.id, label: r.label })),
+    options: {
+      moments: sc.moments, cameras: sc.cameras.map(x => ({ id: x.id, label: x.label })), lights: sc.lights.map(x => ({ id: x.id, label: x.label })),
+      framings: sc.framings.map(x => ({ id: x.id, label: x.label })), expressions: sc.expressions.map(x => ({ id: x.id, label: x.label })),
+      makeup: sc.makeup, destinations: sc.destinations,
+      views: Object.entries(views.views).map(([id, v]) => ({ id, label: v.label })),
+      editPresets: sc.edits.presets.map(e => ({ id: e.id, label: e.label, text: withPronouns(e.text, p), face: e.face })),
+      stillModels, editModels, defaultModels: stillModels.slice(0, 1).map(m => m.ref),
+      maxVariations: sc.settings.max_variations, maxModels: sc.settings.max_models,
+      accountConnected: connected, mode: await providerMode(deps.db, ctx.accountId),
+    },
   }
 }

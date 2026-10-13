@@ -40,7 +40,7 @@ rules:
   - id: chest-up-no-legwear
     spec: "5.1.8"
     title: Chest-up prompts never mention jeans or shoes
-    when: { framing: chest_up }
+    when: { stage: [hero, sheet], framing: chest_up }
     check: { type: forbid_pattern, flags: i, pattern: "\\b(jeans|denim|shoes?|sneakers?|boots?|heels|sandals|trainers|footwear|pants|trousers|shorts|skirts?|leggings)\\b" }
     message: Chest-up prompts must not mention legwear or shoes; it pulls the shot out to a longer framing.
   - id: neutral-body-cups
@@ -77,6 +77,38 @@ rules:
     when: { stage: scene }
     check: { type: forbid_pattern, flags: i, pattern: "\\b(same outfit|as before|usual outfit|signature (look|outfit|style)|default outfit)\\b" }
     message: Write the outfit out in full; never say "same outfit as before" or lean on a signature look.
+  - id: scene-reference-slot
+    spec: "5.2.14"
+    title: The reference slot matches the model
+    when: { stage: scene }
+    check: { type: reference_slot }
+    message: With sheet refs attached, the prompt opens with the fixed REFERENCE line and replaces the sheet outfit; with a saved character it names that character and attaches nothing.
+  - id: scene-names-footwear
+    spec: "5.2.16"
+    title: Always name the footwear
+    when: { stage: scene }
+    # The sheet outfit named to drop it ("instead of the white t-shirt, jeans
+    # and sneakers") does not count as naming the footwear.
+    check: { type: require_pattern, flags: i, ignore: "instead of [^.]*", pattern: "\\b(sneakers?|trainers?|sandals?|heels|boots?|loafers|flats|slides|flip-flops|mules|espadrilles|clogs|slippers|shoes|socks|barefoot)\\b" }
+    message: Name the footwear in every scene. Otherwise the sheet sneakers leak into the scene.
+  - id: scene-brand-free
+    spec: "5.2.17"
+    title: Brand-free by default
+    when: { stage: scene }
+    check: { type: require_phrase, phrase: "unbranded" }
+    message: Every scene says its clothes, shoes, cups and props are plain and unbranded.
+  - id: scene-everyday-angles
+    spec: "5.2.20"
+    title: Eye-level angles, no tight crops on the body
+    when: { stage: scene }
+    check: { type: forbid_pattern, flags: i, exclude_after: "AVOID:", pattern: "\\b(low[- ]angle|from (?:far )?below|worm'?s[- ]eye|looking up at (?:her|him|them)|tight crop\\w*|close-up (?:of|on) (?:her |his |their )?(?:legs|chest|body|hips|cleavage|bust|thighs))\\b" }
+    message: Keep body framing everyday. Eye-level angles, waist-up or full body, the moment leads. No low angles and no tight crops on the body.
+  - id: scene-aspect
+    spec: "5.2.22"
+    title: Aspect by destination
+    when: { stage: scene }
+    check: { type: request_fields, require: { aspect: ["9:16", "4:5", "1:1"] } }
+    message: Use 9:16 for Reels, TikTok, Shorts and Stories, 4:5 for the feed, and 1:1 only on request.
   - id: upscale-max-2x
     spec: "5.1.6"
     title: Upscale 2x, never more

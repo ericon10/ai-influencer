@@ -20,6 +20,8 @@ import { identityForModel } from '../core/identity.js'
 import type { RealismWarning } from '../core/realism.js'
 import { assertSuiteCap, buildModelSuite, buildModelTest, startModelSuite, startModelTest } from './modelTests.js'
 import { approvedAssets, getCandidate, getCharacter, getRef, inspirationAssetIds, setCharacterFields, sheetState, toData } from './characters.js'
+import { buildScenePlan, buildSceneRecheck, buildSceneRun, buildSceneEdit, buildSceneUpscale, type SceneBuilt } from './sceneActions.js'
+import { markSceneBusy } from './scenes.js'
 
 // Every paid step is an action. The same builder produces the job specs for
 // the estimate and for the run, so the run's fingerprint must match its
@@ -43,6 +45,21 @@ export const actionSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('model_test'), model: z.string() }),
   // Every real model path once, in one quoted run under a cap (Settings).
   z.object({ type: z.literal('model_suite') }),
+  // Scenes (Stage 7): plan the fields from the owner's words, then stills on
+  // one or two models with QA (and the drift lock after a trained character).
+  z.object({ type: z.literal('scene_plan'), characterId: z.string(), sceneId: z.string() }),
+  z.object({
+    type: z.literal('scene'), characterId: z.string(), sceneId: z.string(),
+    models: z.array(z.string()).min(1).max(4), variations: z.number().int().min(1).max(8),
+    reason: z.string().optional(), withQa: z.boolean().default(true),
+  }),
+  // Still edits (Stage 8): one change per pass, an upscale, a re-check.
+  z.object({
+    type: z.literal('scene_edit'), characterId: z.string(), candidateId: z.string(), change: z.string().max(400),
+    face: z.boolean().default(false), model: z.string().optional(), withQa: z.boolean().default(true),
+  }),
+  z.object({ type: z.literal('scene_upscale'), characterId: z.string(), candidateId: z.string() }),
+  z.object({ type: z.literal('scene_qa'), characterId: z.string(), candidateId: z.string() }),
 ])
 
 export type StudioAction = z.infer<typeof actionSchema>
@@ -131,8 +148,15 @@ export async function buildAction(deps: Deps, ctx: Ctx, action: StudioAction): P
   const ch = toData(row)
   const tpl = deps.config.pipeline.templates
   const { views, rules, sheet } = deps.config.pipeline
+  const scene = (b: SceneBuilt): BuiltAction => ({ purpose: b.purpose, characterId: row.id, specs: b.specs, preview: b.preview })
 
   switch (action.type) {
+    case 'scene_plan': return scene(await buildScenePlan(deps, ctx, row, action.sceneId))
+    case 'scene': return scene(await buildSceneRun(deps, ctx, row, action))
+    case 'scene_edit': return scene(await buildSceneEdit(deps, ctx, row, action))
+    case 'scene_upscale': return scene(await buildSceneUpscale(deps, ctx, row, action.candidateId))
+    case 'scene_qa': return scene(await buildSceneRecheck(deps, ctx, row, action.candidateId))
+
     case 'breakdown': {
       const images = await inspirationAssetIds(deps, ctx, row.id)
       if (!images.length) throw new AppError('bad_request', 'Add at least one inspiration image first.')
@@ -290,6 +314,9 @@ export async function runAction(deps: Deps, ctx: Ctx, action: StudioAction, quot
 
 async function afterStart(deps: Deps, ctx: Ctx, action: StudioAction, built: BuiltAction): Promise<void> {
   const now = deps.clock.now()
+  if (action.type === 'scene' || action.type === 'scene_edit' || action.type === 'scene_upscale') {
+    await markSceneBusy(deps, ctx, built.purpose.split(':')[1]!)
+  }
   if (action.type === 'hero') {
     const row = await getCharacter(deps, ctx, action.characterId)
     if (row.stage < 3) await setCharacterFields(deps, ctx, row.id, { stage: 3 })

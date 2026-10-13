@@ -10,6 +10,7 @@ import { newId } from '../lib/ids.js'
 import type { QaReport } from '../core/qa/marks.js'
 import { candidatesFor, getCandidate, getCharacter, getRef, setCharacterFields, sheetState } from './characters.js'
 import { liveRoute } from './settings.js'
+import { refreshSceneStatus } from './scenes.js'
 
 // Human gates (SPEC 6): hero pick and sheet approval. Rejected results are
 // archived, never deleted.
@@ -73,19 +74,23 @@ export async function rejectCandidate(deps: Deps, ctx: Ctx, candidateId: string,
   if (unknown.length) throw new AppError('bad_request', `Unknown reason: ${unknown.join(', ')}.`)
   const now = deps.clock.now()
   await deps.db.update(candidates).set({ status: 'rejected', rejectReasons: reasons, rejectNote: note.slice(0, 2000), reviewedBy: ctx.userId, reviewedAt: now, updatedAt: now }).where(eq(candidates.id, cand.id))
-  if (cand.refId) await refreshRefStatus(deps, ctx, cand.characterId, cand.refId)
-  return fixesFor(deps, reasons)
+  if (cand.refId && !cand.sceneId) await refreshRefStatus(deps, ctx, cand.characterId, cand.refId)
+  if (cand.sceneId) await refreshSceneStatus(deps, ctx, cand.sceneId)
+  return fixesFor(deps, reasons, { scene: !!cand.sceneId })
 }
 
-// Each reason chip maps to the fix it triggers (config/review.yaml).
-export function fixesFor(deps: Deps, reasons: string[]): FixSuggestion[] {
+// Each reason chip maps to the fix it triggers (config/review.yaml). One-change
+// edits (phase 2) are for scene stills; a sheet shot is regenerated. Video
+// fixes arrive in phase 3.
+export function fixesFor(deps: Deps, reasons: string[], opts: { scene?: boolean } = {}): FixSuggestion[] {
   const { reasons: known, actions } = deps.config.pipeline.review
   return reasons.map(r => {
     const reason = known.find(k => k.id === r)!
     const action = actions[reason.action]!
-    const available = action.phase <= 1
+    const available = action.phase <= (opts.scene ? 2 : 1)
     const effective = available ? reason.action : action.fallback ?? 'regenerate'
-    return { reason: r, action: effective, label: available ? action.label : `${actions[effective]?.label ?? 'Regenerate'} (the ${action.label.toLowerCase()} arrives in phase ${action.phase})`, available }
+    const why = action.phase === 2 ? 'is for scene stills' : `arrives in phase ${action.phase}`
+    return { reason: r, action: effective, label: available ? action.label : `${actions[effective]?.label ?? 'Regenerate'} (the ${action.label.toLowerCase()} ${why})`, available }
   })
 }
 
@@ -136,7 +141,8 @@ export async function reopenCandidate(deps: Deps, ctx: Ctx, candidateId: string)
   const cand = await getCandidate(deps, ctx, candidateId)
   if (!['rejected', 'superseded', 'qa_failed'].includes(cand.status) || !cand.assetId) throw new AppError('conflict', 'Only rejected or replaced results can be reopened.')
   await deps.db.update(candidates).set({ status: 'in_review', rejectReasons: [], rejectNote: '', updatedAt: deps.clock.now() }).where(eq(candidates.id, cand.id))
-  if (cand.refId) await refreshRefStatus(deps, ctx, cand.characterId, cand.refId)
+  if (cand.refId && !cand.sceneId) await refreshRefStatus(deps, ctx, cand.characterId, cand.refId)
+  if (cand.sceneId) await refreshSceneStatus(deps, ctx, cand.sceneId)
 }
 
 // The free fix for a shot whose marks came back on the wrong side: flip it
@@ -147,11 +153,11 @@ export async function reopenCandidate(deps: Deps, ctx: Ctx, candidateId: string)
 export async function mirrorCandidate(deps: Deps, ctx: Ctx, candidateId: string): Promise<{ candidateId: string }> {
   const cand = await getCandidate(deps, ctx, candidateId)
   const report = cand.qaReport as QaReport | null
-  if (!cand.assetId || !cand.refId) throw new AppError('bad_request', 'This result has no sheet image to mirror.')
+  if (!cand.assetId || (!cand.refId && !cand.sceneId)) throw new AppError('bad_request', 'This result has no image to mirror.')
   if (!report?.mirrorFix?.available || !report.mirrorFix.report) throw new AppError('bad_request', report?.mirrorFix?.message ?? 'QA did not find a mirrored shot here.')
   const { data } = await readAsset(deps, ctx, cand.assetId)
   const flipped = await sharp(data).flop().png().toBuffer()
-  const asset = await saveAsset(deps, ctx, { data: flipped, origin: 'derived', label: `${cand.refId} mirrored fix` })
+  const asset = await saveAsset(deps, ctx, { data: flipped, origin: 'derived', label: `${cand.refId ?? 'Scene still'} mirrored fix` })
   const derived: QaReport = {
     ...report.mirrorFix.report,
     identity: report.identity ?? null,
@@ -162,9 +168,11 @@ export async function mirrorCandidate(deps: Deps, ctx: Ctx, candidateId: string)
   const status = cand.status === 'check' ? 'check' : 'in_review'
   await deps.db.insert(candidates).values({
     id, accountId: ctx.accountId, characterId: cand.characterId, target: cand.target, refId: cand.refId, assetId: asset.id,
+    sceneId: cand.sceneId, parentId: cand.sceneId ? cand.id : null, op: cand.sceneId ? 'mirror' : 'generate',
     prompt: cand.prompt, status, qaReport: derived, qaVerdict: derived.verdict, createdBy: ctx.userId,
   })
   await audit(deps.db, ctx, 'candidate.mirrored', { type: 'candidate', id }, { from: cand.id })
-  await refreshRefStatus(deps, ctx, cand.characterId, cand.refId)
+  if (cand.sceneId) await refreshSceneStatus(deps, ctx, cand.sceneId)
+  else await refreshRefStatus(deps, ctx, cand.characterId, cand.refId!)
   return { candidateId: id }
 }

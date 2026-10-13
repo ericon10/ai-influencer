@@ -13,7 +13,8 @@ import { verifyAssetSignature } from '../jobs/assetUrls.js'
 import { cancelJob, getJob, resolveJob, wakeFromWebhook } from '../jobs/runner.js'
 import { wakeWorker } from '../jobs/wake.js'
 import { actionSchema, estimateAction, runAction } from '../pipeline/actions.js'
-import { createCharacter, getCharacter, linkInspiration, listCharacters, setCharacterFields, updateCharacter } from '../pipeline/characters.js'
+import { createCharacter, getCandidate, getCharacter, linkInspiration, listCharacters, setCharacterFields, updateCharacter } from '../pipeline/characters.js'
+import { approveSceneCandidate, archiveScene, createScene, cropCandidate, updateScene } from '../pipeline/scenes.js'
 import { chooseConcept } from '../pipeline/concepts.js'
 import { approveCandidate, keepStale, pickHero, rejectCandidate, reopenCandidate, setFavorite, mirrorCandidate } from '../pipeline/review.js'
 import { isValidEndpoint, MODEL_OVERRIDES_KEY, readModelOverrides } from '../providers/modelOverrides.js'
@@ -28,7 +29,7 @@ import { serverKeyFor } from '../providers/serverKeys.js'
 import type { AccountBalance } from '../providers/higgsfieldAccount.js'
 import { setBudget } from '../costs/budgets.js'
 import { formatUsd } from '../costs/money.js'
-import { characterSummary, characterView, settingsView } from './views.js'
+import { characterSummary, characterView, scenesView, settingsView } from './views.js'
 import { createUploadSlots, receiveUpload, sheetRefOf, takeUploads, MAX_UPLOAD_BYTES, type UploadedFile } from '../storage/uploads.js'
 import { corsRules } from '../storage/blobStore.js'
 import { startImportCheck } from '../pipeline/importCheck.js'
@@ -276,8 +277,49 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
     return c.json({ ok: true })
   })
 
+  // ── Scenes (Stage 7) and still edits (Stage 8) ──
+  app.get('/characters/:id/scenes', async c => c.json(await scenesView(deps, c.get('ctx'), c.req.param('id'))))
+  const sceneBody = z.object({
+    brief: z.string().max(2000).optional(),
+    title: z.string().max(80).optional(),
+    fields: z.record(z.string(), z.string().max(400)).optional(),
+  })
+  app.post('/characters/:id/scenes', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    const body = parse(sceneBody, await json(c))
+    const row = await createScene(deps, ctx, c.req.param('id'), body as Parameters<typeof createScene>[3])
+    return c.json({ id: row.id }, 201)
+  })
+  app.patch('/scenes/:id', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    const body = parse(sceneBody, await json(c))
+    const row = await updateScene(deps, ctx, c.req.param('id'), body as Parameters<typeof updateScene>[3])
+    return c.json({ id: row.id })
+  })
+  app.delete('/scenes/:id', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    await archiveScene(deps, ctx, c.req.param('id'))
+    return c.json({ ok: true })
+  })
+  // A closer shot is a crop of the wide still, never a new generation. Free.
+  app.post('/candidates/:id/crop', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    const body = parse(z.object({ x: z.number().min(0).max(1), y: z.number().min(0).max(1), w: z.number().gt(0).max(1), h: z.number().gt(0).max(1) }), await json(c))
+    return c.json(await cropCandidate(deps, ctx, c.req.param('id'), body))
+  })
+
   // ── Review gates ──
-  app.post('/candidates/:id/approve', async c => { const ctx = c.get('ctx'); requireRole(ctx, 'member'); return c.json(await approveCandidate(deps, ctx, c.req.param('id'))) })
+  app.post('/candidates/:id/approve', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    const cand = await getCandidate(deps, ctx, c.req.param('id'))
+    if (cand.sceneId) return c.json({ ...(await approveSceneCandidate(deps, ctx, cand.id)), invalidated: [], sheetComplete: false })
+    return c.json(await approveCandidate(deps, ctx, cand.id))
+  })
   app.post('/candidates/:id/pick-hero', async c => { const ctx = c.get('ctx'); requireRole(ctx, 'member'); return c.json(await pickHero(deps, ctx, c.req.param('id'))) })
   app.post('/candidates/:id/reject', async c => {
     const ctx = c.get('ctx')

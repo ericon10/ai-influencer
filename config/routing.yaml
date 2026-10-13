@@ -9,6 +9,7 @@ tasks:
   concepts:      { model: anthropic/claude-opus-5-5, effort: high }
   qa_perception: { model: anthropic/claude-opus-5-5, effort: medium }
   card_update:   { model: anthropic/claude-opus-5-5, effort: medium }
+  scene_plan:    { model: anthropic/claude-opus-5-5, effort: medium }
 mock:
   image: mock/image
   video: mock/video

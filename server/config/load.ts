@@ -209,6 +209,7 @@ export function loadConfig(dir = resolve(process.cwd(), 'config')): StudioConfig
       rules: readConfigFile(dir, 'rules.yaml', pipelineSchemas.rules),
       templates: readConfigFile(dir, 'templates.yaml', pipelineSchemas.templates),
       review: readConfigFile(dir, 'review.yaml', pipelineSchemas.review),
+      scenes: readConfigFile(dir, 'scenes.yaml', pipelineSchemas.scenes),
     },
   }
   validateCrossRefs(cfg)
@@ -232,6 +233,15 @@ function validateCrossRefs(cfg: StudioConfig): void {
   for (const v of cfg.pipeline.sheet.shots.map(s => s.view)) {
     if (!cfg.pipeline.views.views[v]) throw new ConfigError(`sheet.yaml: unknown view "${v}"`)
   }
+  const sc = cfg.pipeline.scenes.settings
+  for (const ref of [...sc.still_models, ...sc.edit_models, sc.upscale_model]) {
+    if (!imageRefs.has(ref)) throw new ConfigError(`scenes.yaml: unknown model "${ref}"`)
+  }
+  const expressions = new Set(cfg.pipeline.sheet.shots.map(s => s.expression))
+  for (const e of cfg.pipeline.scenes.expressions) {
+    if (e.ref_expression && !expressions.has(e.ref_expression)) throw new ConfigError(`scenes.yaml: expression "${e.id}" points at "${e.ref_expression}", which no sheet shot has`)
+  }
+  try { new RegExp(cfg.pipeline.scenes.color_triggers, 'i') } catch { throw new ConfigError('scenes.yaml: color_triggers is not a valid pattern') }
 }
 
 export function resetConfigCache(): void { cached = null }

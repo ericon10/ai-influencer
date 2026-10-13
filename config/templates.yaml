@@ -79,6 +79,92 @@ kind_nouns:
   jewelry: jewelry
   skin: mark
 
+# Scene still (SPEC 10, scene; SPEC 5.2). The reference slot depends on
+# the model (rule 14): sheet refs attached, a trained character, or text
+# only. The outfit is always written out in full and replaces the sheet
+# outfit (rule 15), footwear is always named (rule 16), and everything is
+# plain and unbranded (rule 17). Code adds the REALISM and AVOID blocks.
+scene:
+  base: |
+    {reference} {moment}. {setting}.
+    {Subj} is wearing {outfit}, with {footwear}{jewelry}{outfit_override}.
+    {makeup}. Hair: {hair}. {pose}, {expression}.
+    {marks}
+    {camera}, {framing}, eye level. {light}.
+    {colors}
+    Everything {subj} wears and holds is plain and unbranded, with no logos
+    or readable text.
+  reference:
+    refs: "Using the attached reference images, keep this {noun}'s face, hair, and features exactly the same."
+    trained: "{name}, the saved character."
+    text: "Photo of {card}."
+  # The sheet outfit named so it is dropped (Callie's scene rules).
+  sheet_outfit: "the white t-shirt, jeans and sneakers"
+  outfit_override: ", wearing this outfit instead of {sheet_outfit} in the reference images"
+  colors: "{Poss} hair stays {hair_color} and {poss} skin tone is unchanged, even here."
+  makeup:
+    bare: "No makeup, bare skin"
+    natural: "Makeup: {natural}"
+    soft_glam: "Makeup: {glam}, with real skin texture still visible underneath"
+
+# One change per edit pass (SPEC 10, still edit; SPEC 5.3).
+edit:
+  base: "{change}. Keep everything else in the image exactly the same."
+  face_ref: "Use the attached reference image only for {poss} face."
+
+# Plans a scene's fields from the owner's words. The model fills fields;
+# code builds the prompt from them (SPEC 9).
+scene_plan:
+  system: |
+    You plan candid photo scenes for an original, fictional adult character
+    who posts everyday moments. Every scene reads like a real moment a
+    friend caught on a phone, never a staged ad shoot. You choose one value
+    for each field and write short, concrete phrases.
+    Rules you always follow:
+    - Write the full outfit for this moment, top to bottom, something a
+      real person this age would actually wear there. Style notes are
+      optional ideas, never a uniform. Never say "same outfit" or lean on a
+      signature look.
+    - Always name the footwear (or "barefoot" when it fits).
+    - Everything is plain and unbranded: no logos, brand names or readable
+      text on clothes, shoes, cups, bags or signs.
+    - The camera matches the story. Eye-level angles only, waist-up or full
+      body, the moment leads. Never low angles, never tight crops on the
+      body, never provocative poses.
+    - Imperfection is a feature: everyday light, real places, a little
+      clutter and other people in the background are fine.
+    - Makeup is light and believable: natural by day, soft glam only for
+      nights out and events. Never heavy glam in daytime.
+    - Calm, natural expressions. The character is not talking to the camera.
+    - Do not repeat a moment type and camera pair from the recent combo log.
+    - Never describe the face, hair color or skin; the reference images
+      carry the identity. Never use words like flawless, perfect skin,
+      smooth skin or airbrushed.
+  prompt: |
+    Plan one scene for {name}.
+
+    What the owner wants: {brief}
+
+    Persona: {vibe}
+    Usual settings (ideas only): {settings}
+    Never: {never}
+    Style ideas (optional, never a uniform): {style}
+    Hair options (ideas only): {hair_options}
+    Makeup: natural is {natural}; soft glam is {glam} and is for {glam_when}.
+    Recent combo log (moment type / camera / light / location), do not
+    repeat a moment type and camera pair:
+    {combos}
+
+    Pick each preset field from its list:
+    moment_type: {moment_types}
+    camera: {cameras}
+    framing: {framings}
+    light: {lights}
+    expression: {expressions}
+    view (where {poss} face points, from {poss} own point of view): {views}
+    makeup: {makeups}
+    destination: {destinations}
+
 breakdown:
   system: |
     You are a casting director and character designer for a studio that
@@ -168,7 +254,8 @@ qa_perception:
        where exactly it is.
     5. Any other jewelry, with positions.
     6. Eye color as seen.
-    7. Any readable text, logos or brand marks.
+    7. Any readable text, logos or brand marks, each with what it is on and
+       where (for example "white logo on the cup in the hand at image_left").
     8. Anything a real camera would never capture (warped features, wrong
        finger count, melted objects). Natural skin flaws are not on this list.
     9. Skin texture: "real" (visible pores and fine texture, natural

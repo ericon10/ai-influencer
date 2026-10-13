@@ -39,6 +39,8 @@ const DEFAULTS: Record<string, LlmResponder> = {
     card: String(req.meta?.card ?? ''),
     marks: (req.meta?.marks as unknown[]) ?? [],
   }),
+  // Demo mode: the builder passes a plan made from the owner's words.
+  scene_plan: req => req.meta?.mockPlan ?? {},
   qa_perception: req => req.meta?.mockObservation ?? {
     pose: 'frontal', nose: 'toward_camera', confidence: 0.9,
     framing: 'chest_up', standing: true, ears: [], skin_marks: [], other_jewelry: [],

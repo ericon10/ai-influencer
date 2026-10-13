@@ -79,7 +79,9 @@ describe('rules engine', () => {
     expect(lint('soft glam with a bold lip', { stage: 'sheet' })).toContain('natural-baseline')
   })
   it('rejects jeans in a chest-up prompt (5.1.8)', () => {
-    expect(lint('white tee and jeans', { framing: 'chest_up' })).toContain('chest-up-no-legwear')
+    expect(lint('white tee and jeans', { stage: 'sheet', framing: 'chest_up' })).toContain('chest-up-no-legwear')
+    // Scenes always name the footwear (SPEC 5.2 rule 16), whatever the framing.
+    expect(lint('white tee and jeans', { stage: 'scene', framing: 'chest_up' })).not.toContain('chest-up-no-legwear')
   })
   it('rejects cup sizes and measurements (5.1.9)', () => {
     expect(lint('a C cup', {})).toContain('neutral-body-cups')

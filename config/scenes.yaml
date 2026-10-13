@@ -1,0 +1,115 @@
+# Scenes and still edits (SPEC 5.2 and 5.3; Stages 7 and 8). Every choice in
+# the scene builder is a preset here, written in plain words; the scene
+# template (templates.yaml) is filled from these and the character record.
+# Labels for moments and cameras are what the combo log records, so they
+# match the entries in a character file ("Caught you / Friend shot").
+version: 1
+# Pronoun placeholders: {subj} she, {obj} her, {poss} her, {noun} woman.
+
+settings:
+  quality: high
+  resolution: 2k
+  # SPEC 5.2 rule 21: no repeat of a moment type and camera combo from the
+  # character's last N entries.
+  combo_window: 10
+  # SPEC 5.2 rule 14: 2 to 4 sheet refs, always one chest-up face ref.
+  max_refs: 4
+  # Stills per model in one run, and how many models a run may compare.
+  max_variations: 4
+  max_models: 2
+  # Models offered for scene stills (a character's preferred models come
+  # first), for one-change edits, and for crops brought up to full size.
+  still_models: [higgsfield/nano-banana-2.1, higgsfield/gpt-image-2.5-flare, higgsfield/soul-2]
+  edit_models: [higgsfield/nano-banana-2.1, higgsfield/gpt-image-2.5-flare]
+  upscale_model: higgsfield/bytedance-upscale
+
+# Moment types (the first column of the combo log).
+moments:
+  - { id: caught_mid_action, label: "Caught mid-action" }
+  - { id: caught_you, label: "Caught you", hint: "Notices the camera and looks into the lens" }
+  - { id: candid_laugh, label: "Candid laugh" }
+  - { id: quiet_moment, label: "Quiet moment" }
+  - { id: everyday_task, label: "Everyday task", hint: "Cooking, shopping, packing a bag" }
+  - { id: walking, label: "Walking" }
+  - { id: pov, label: "POV", hint: "Seen through a companion's eyes" }
+  - { id: in_the_water, label: "In the water" }
+  - { id: mirror_selfie, label: "Mirror selfie" }
+  - { id: selfie, label: "Selfie" }
+
+# Who shoots and how (SPEC 5.2 rule 18). Every camera is at eye level
+# (rule 20); none of them looks up at the character or crops tight on the body.
+cameras:
+  - id: friend_phone
+    label: Friend shot
+    text: "Candid phone photo taken by a friend about 6 feet away"
+  - id: event_long_lens
+    label: Event photographer, long lens
+    text: "Candid event photo, long lens, about 25 feet away, compressed background, blurred foreground ({foreground})"
+    foreground: "a door frame and the shoulder of someone at the next table"
+  - id: phone_from_inside
+    label: Phone from inside
+    text: "Phone photo taken from inside the venue looking out, through the open doors"
+  - id: pov
+    label: POV
+    text: "Point-of-view phone photo from a companion's eye level, about 4 feet away"
+  - id: selfie
+    label: Selfie
+    text: "Selfie at arm's length, the phone itself out of frame"
+  - id: mirror_selfie
+    label: Mirror selfie
+    text: "Mirror selfie, a plain unbranded phone held at chest height"
+  - id: timer
+    label: Phone on a timer
+    text: "Phone propped on a ledge with a timer, about 8 feet away"
+
+framings:
+  - { id: chest_up, label: "Close, chest-up", text: "chest-up framing" }
+  - { id: waist_up, label: "Waist-up", text: "waist-up framing" }
+  - { id: knees_up, label: "Knees up", text: "framed from the knees up" }
+  - { id: full_body, label: "Full body", text: "full-body framing with a little space around {obj}" }
+  - { id: wide_small, label: "Wide, small in frame", text: "wide shot, {subj} is small in the frame", identity: skip }
+
+lights:
+  - { id: golden_hour, label: "Golden hour", text: "Warm golden-hour sun low in the sky, soft long shadows" }
+  - { id: morning, label: "Morning light", text: "Clean, soft morning daylight" }
+  - { id: overcast, label: "Overcast daylight", text: "Soft, even overcast daylight" }
+  - { id: midday_sun, label: "Midday sun", text: "Bright midday sun with crisp shadows" }
+  - { id: window, label: "Window light", text: "Soft daylight from a nearby window, the rest of the room a little darker" }
+  - { id: blue_hour, label: "Blue hour", text: "Cool blue-hour sky with warm lights coming on" }
+  - { id: night_practical, label: "Night, warm lights", text: "Evening, lit by warm practical lights such as string lights and lamps, slight phone-camera grain" }
+
+# Facial expression; it also picks a matching sheet ref (REF-09 to REF-11).
+expressions:
+  - { id: neutral, label: "Relaxed", text: "relaxed, natural expression" }
+  - { id: soft_smile, label: "Soft smile", text: "soft, closed-mouth smile", ref_expression: open_smile }
+  - { id: open_smile, label: "Open smile", text: "natural open smile", ref_expression: open_smile }
+  - { id: laughing, label: "Laughing", text: "laughing naturally, eyes crinkled", ref_expression: laughing }
+  - { id: focused_down, label: "Looking down, focused", text: "calm and focused, eyes looking down", ref_expression: serious_down }
+  - { id: knowing_look, label: "Knowing look at the lens", text: "looking into the lens with a soft, knowing half-smile, mouth closed" }
+
+makeup:
+  - { id: natural, label: "Natural" }
+  - { id: soft_glam, label: "Soft glam", hint: "Nights out and events" }
+  - { id: bare, label: "No makeup" }
+
+# Aspect by destination (SPEC 5.2 rule 22).
+destinations:
+  - { id: vertical, label: "Reels, TikTok, Shorts, Stories", aspect: "9:16" }
+  - { id: feed, label: "Feed post", aspect: "4:5" }
+  - { id: square, label: "Square (only on request)", aspect: "1:1" }
+
+# When the setting or hair changes how hair and skin look, the colors are
+# stated anyway (Callie's scene rules).
+color_triggers: "\\b(wet|damp|soaked|swim\\w*|pool|ocean|sea|surf|beach|cove|shower|sweat\\w*|wind\\w*|slicked|harsh sun|midday sun|backlit|silhouette)\\b"
+
+# One-change edits (SPEC 5.3). Ready-made changes for what QA finds.
+edits:
+  # The drift lock after a still from a trained character (DECISIONS D3):
+  # a face-only pass with the still as the base plus REF-00 and the
+  # closest-angle ref.
+  drift_lock: "Make {poss} face and hair match the person in the other attached images exactly, the same person and not a lookalike"
+  presets:
+    - { id: look_at_lens, label: "Look into the lens", text: "Turn {poss} head slightly so {subj} looks straight into the lens with a soft, knowing half-smile, mouth closed", face: true }
+    - { id: close_mouth, label: "Close her mouth", text: "Close {poss} mouth into a relaxed, natural expression", face: true }
+    - { id: remove_logo, label: "Remove a logo or text", text: "Remove the {thing}, leaving that surface plain and unbranded" }
+    - { id: remove_jewelry, label: "Remove extra jewelry", text: "Remove the {thing}" }

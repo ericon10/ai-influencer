@@ -162,6 +162,19 @@ export function avoidBlock(text?: string | null): string {
 export const BARE_FACE_STAGES = ['hero', 'sheet'] as const
 export const isBareFaceStage = (stage?: string) => !!stage && (BARE_FACE_STAGES as readonly string[]).includes(stage)
 
+// Every reference image (hero and sheet) keeps its plain light gray
+// background (owner, 2026-10-13). A character's REALISM block is written for
+// scenes, so a clause about the background ("ordinary background clutter")
+// is left out of hero and sheet prompts; scenes keep the block as written.
+const BACKGROUND_CLAUSE = /\b(?:background|backdrop|clutter|surroundings|bystanders|passers-?by)\b/i
+
+export function realismForReference(block: string): string {
+  const body = block.replace(/^REALISM:\s*/i, '')
+  const kept = body.split(/,\s*/).filter(c => !BACKGROUND_CLAUSE.test(c)).join(', ').replace(/[,\s]+$/, '')
+  const out = `REALISM: ${/[.!?]$/.test(kept) ? kept : `${kept}.`}`
+  return hasRealismBlock(out) ? out : DEFAULT_REALISM_BLOCK
+}
+
 export interface RealismWarning {
   ruleId: 'realism-banned-words' | 'realism-makeup' | 'realism-flaw-dose'
   spec: string
@@ -211,7 +224,8 @@ export function finalizeImagePrompt(prompt: string, opts: { stage?: string; real
     }
     if (!out.includes(BARE_FACE_LINE)) out = `${out} ${BARE_FACE_LINE}`
   }
-  const realism = realismBlock(opts.realism)
+  const block = realismBlock(opts.realism)
+  const realism = isBareFaceStage(opts.stage) ? realismForReference(block) : block
   if (!hasRealismBlock(out)) out = `${out}\n${realism}`
   if (!/\bAVOID:/.test(out)) out = `${out}\n${avoidBlock(opts.avoid)}`
   return { prompt: out.trim(), warnings }
