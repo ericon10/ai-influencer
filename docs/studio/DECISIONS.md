@@ -531,3 +531,26 @@ changes what the Studio suggests and checks, never what the owner types.
   copy is a free draft until it is generated. This is the first step of
   the Scene library and multi-character runs (SPEC 13.1, R3 and R4).
 
+### G7. Video: straight to the final model, then upscale the take (owner)
+- **Takes** run straight on Seedance 2.5 at 720p; there is no separate
+  draft model. "Upscale this take" (Higgsfield's video upscaler on the
+  owner's account, ByteDance, 1080p, 24 fps) works on a take you keep, so
+  the exact take is preserved instead of re-rolled. The Generate button
+  shows the take's price and, under it, what the upscale will cost per
+  take. The upscaler has no price preflight, so its price comes from the
+  price book, marked not confirmed until the first run.
+- **Quick motion test**: Kling 3.0 Turbo, 5 s, an optional toggle that is
+  off by default, labeled "faces not representative", for complex motion.
+- **Defaults, all editable**: start frame plus an optional end frame, 9:16,
+  audio off, the directions "No talking, no winking, steady eye contact.
+  One continuous take, no cuts." in the prompt, 5 or 10 s, 1 to 4 takes.
+- **End frame helper**: inpaints only the head and face of the start frame
+  with Nano Banana 2.1 (media role `mask` plus `is_inpaint`, from the
+  Higgsfield catalog). The mask is an ellipse over the detected head, made
+  on the worker just before submit (the face models live there); REF-00 is
+  attached for the face, and scene QA checks the result (mole side first).
+- **Clip QA** is local and free: face match to REF-00 on a middle and a late
+  frame, and skin detail against the start still (video compression
+  softens skin a little, so only a clear loss is pointed out). A smoothed
+  upscale is flagged and the original take stays.
+

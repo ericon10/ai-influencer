@@ -195,6 +195,7 @@ export async function scenesView(deps: Deps, ctx: Ctx, characterId: string) {
   const editModels = sc.settings.edit_models.map(modelInfo)
   const shape = (c: (typeof cands)[number]) => ({
     id: c.id, assetId: c.assetId, status: c.status, prompt: c.prompt, op: c.op, parentId: c.parentId, sceneId: c.sceneId,
+    media: c.op === 'video' || c.op === 'video_upscale' ? 'video' as const : 'image' as const,
     qaVerdict: c.qaVerdict, qaReport: c.qaReport, rejectReasons: c.rejectReasons, rejectNote: c.rejectNote,
     favorite: c.favorite, createdAt: c.createdAt.toISOString(), refId: null, heroPromptIndex: null,
   })
@@ -239,6 +240,16 @@ export async function scenesView(deps: Deps, ctx: Ctx, characterId: string) {
       stillModels, editModels, defaultModels: stillModels.slice(0, 1).map(m => m.ref),
       maxVariations: sc.settings.max_variations, maxModels: sc.settings.max_models,
       accountConnected: connected, mode: await providerMode(deps.db, ctx.accountId),
+      // Video defaults (Stage 9), all editable on the video card.
+      video: {
+        model: modelInfo(sc.video.model), durations: sc.video.durations, duration: sc.video.duration, aspect: sc.video.aspect,
+        maxTakes: sc.video.max_takes, takes: sc.video.takes, directions: sc.video.directions,
+        test: { model: modelInfo(sc.video.test.model), duration: sc.video.test.duration, label: sc.video.test.label, note: sc.video.test.note },
+        upscale: modelInfo(sc.video.upscale.model),
+        endFrame: { model: modelInfo(sc.video.end_frame.model), presets: sc.video.end_frame.presets.map(e => ({ id: e.id, label: e.label, text: capitalize(withPronouns(e.text, p)) })) },
+      },
     },
   }
 }
+
+const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)

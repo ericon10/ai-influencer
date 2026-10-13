@@ -12,7 +12,8 @@ import { idealObservation } from '../core/qa/ideal.js'
 import { breakdownJsonSchema, cardUpdateJsonSchema, conceptsJsonSchema } from '../core/llmSchemas.js'
 import { AppError } from '../lib/errors.js'
 import { getAsset } from '../storage/assets.js'
-import { quoteJobs, runJobs, type JobSpec } from '../jobs/runner.js'
+import { quoteItemsFor, quoteJobs, runJobs, type JobSpec } from '../jobs/runner.js'
+import { displayPrice } from '../costs/quotes.js'
 import type { QuoteView } from '../costs/quotes.js'
 import type { GenRequest } from '../providers/types.js'
 import { forMode, liveRoute, resolveRoute } from './settings.js'
@@ -20,7 +21,7 @@ import { identityForModel } from '../core/identity.js'
 import type { RealismWarning } from '../core/realism.js'
 import { assertSuiteCap, buildModelSuite, buildModelTest, startModelSuite, startModelTest } from './modelTests.js'
 import { approvedAssets, getCandidate, getCharacter, getRef, inspirationAssetIds, setCharacterFields, sheetState, toData } from './characters.js'
-import { buildSceneIdeas, buildScenePlan, buildSceneRecheck, buildSceneRun, buildSceneEdit, buildSceneUpscale, type SceneBuilt } from './sceneActions.js'
+import { buildSceneEndFrame, buildSceneIdeas, buildScenePlan, buildSceneRecheck, buildSceneRun, buildSceneEdit, buildSceneUpscale, buildSceneVideo, buildVideoUpscale, type SceneBuilt } from './sceneActions.js'
 import { markSceneBusy } from './scenes.js'
 import { ruleSwitches } from './rules.js'
 import { readBilling } from '../providers/billing.js'
@@ -67,6 +68,16 @@ export const actionSchema = z.discriminatedUnion('type', [
   }),
   z.object({ type: z.literal('scene_upscale'), characterId: z.string(), candidateId: z.string() }),
   z.object({ type: z.literal('scene_qa'), characterId: z.string(), candidateId: z.string() }),
+  // Video from a picked still (Stage 9): straight to the final model, the
+  // quick motion test optional; then "Upscale this take"; the end frame
+  // helper inpaints only the head of the start frame.
+  z.object({
+    type: z.literal('scene_video'), characterId: z.string(), candidateId: z.string(), endCandidateId: z.string().optional(),
+    motion: z.string().max(600), directions: z.string().max(600).default(''), durationSec: z.number().int().min(2).max(15).default(5),
+    aspect: z.string().max(8).default('9:16'), audio: z.boolean().default(false), takes: z.number().int().min(1).max(8).default(1), test: z.boolean().default(false),
+  }),
+  z.object({ type: z.literal('scene_video_upscale'), characterId: z.string(), candidateId: z.string() }),
+  z.object({ type: z.literal('scene_end_frame'), characterId: z.string(), candidateId: z.string(), change: z.string().max(400), withQa: z.boolean().default(true) }),
 ])
 
 export type StudioAction = z.infer<typeof actionSchema>
@@ -76,6 +87,8 @@ export interface ActionPreview {
   prompts: Array<{ label: string; text: string; wrapped: string }>
   warnings: RuleViolation[]
   invalidates: string[]
+  // The price of a later step, shown with this one (never run here).
+  followUp?: { label: string; display: string; verified: boolean }
 }
 
 export interface BuiltAction {
@@ -83,6 +96,7 @@ export interface BuiltAction {
   characterId: string | null
   specs: JobSpec[]
   preview: ActionPreview
+  followUp?: { label: string; specs: JobSpec[] }
 }
 
 const QA_SIZE: Record<string, { width: number; height: number }> = {
@@ -161,11 +175,14 @@ export async function buildAction(deps: Deps, ctx: Ctx, action: StudioAction): P
   // Default rules as switched for this character (Settings, Rules).
   const sw = await ruleSwitches(deps, ctx, row.id)
   const looks = { background: sw.on('sheet-background') ? sw.value('sheet-background') ?? null : null, flawDose: sw.on('realism-flaw-dose') }
-  const scene = (b: SceneBuilt): BuiltAction => ({ purpose: b.purpose, characterId: row.id, specs: b.specs, preview: b.preview })
+  const scene = (b: SceneBuilt): BuiltAction => ({ purpose: b.purpose, characterId: row.id, specs: b.specs, preview: b.preview, followUp: b.followUp })
 
   switch (action.type) {
     case 'scene_plan': return scene(await buildScenePlan(deps, ctx, row, action.sceneId))
     case 'scene_ideas': return scene(await buildSceneIdeas(deps, ctx, row, action.idea))
+    case 'scene_video': return scene(await buildSceneVideo(deps, ctx, row, action))
+    case 'scene_video_upscale': return scene(await buildVideoUpscale(deps, ctx, row, action.candidateId))
+    case 'scene_end_frame': return scene(await buildSceneEndFrame(deps, ctx, row, action))
     case 'scene': return scene(await buildSceneRun(deps, ctx, row, action))
     case 'scene_edit': return scene(await buildSceneEdit(deps, ctx, row, action))
     case 'scene_upscale': return scene(await buildSceneUpscale(deps, ctx, row, action.candidateId))
@@ -321,7 +338,13 @@ export async function estimateAction(deps: Deps, ctx: Ctx, action: StudioAction)
   const quote = await quoteJobs(deps, ctx, { purpose: built.purpose, characterId: built.characterId, specs: built.specs })
   if (action.type === 'model_suite') assertSuiteCap(deps, quote.totalMicros)
   const untested = action.type === 'model_test' || action.type === 'model_suite' ? [] : await untestedModels(deps, ctx, built)
-  return { quote, preview: { ...built.preview, warnings: uniqueWarnings([...built.preview.warnings, ...untested]) } }
+  // A later step's price (for example "Upscale this take"), quoted for show.
+  let followUp: ActionPreview['followUp']
+  if (built.followUp) {
+    const items = await quoteItemsFor(deps, ctx, built.followUp.specs)
+    followUp = { label: built.followUp.label, display: displayPrice(items.map(i => ({ amountMicros: i.estimate.totalMicros, credits: i.estimate.credits ?? null }))), verified: items.every(i => i.estimate.verified) }
+  }
+  return { quote, preview: { ...built.preview, warnings: uniqueWarnings([...built.preview.warnings, ...untested]), ...(followUp ? { followUp } : {}) } }
 }
 
 function uniqueWarnings(list: RuleViolation[]): RuleViolation[] {
@@ -363,7 +386,7 @@ export async function runAction(deps: Deps, ctx: Ctx, action: StudioAction, quot
 
 async function afterStart(deps: Deps, ctx: Ctx, action: StudioAction, built: BuiltAction): Promise<void> {
   const now = deps.clock.now()
-  if (action.type === 'scene' || action.type === 'scene_edit' || action.type === 'scene_upscale') {
+  if (action.type === 'scene' || action.type === 'scene_edit' || action.type === 'scene_upscale' || action.type === 'scene_video' || action.type === 'scene_video_upscale' || action.type === 'scene_end_frame') {
     await markSceneBusy(deps, ctx, built.purpose.split(':')[1]!)
   }
   if (action.type === 'hero') {

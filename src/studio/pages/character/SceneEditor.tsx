@@ -5,9 +5,10 @@ import { useNavigate } from 'react-router-dom'
 import { api } from '../../api'
 import { useCharacters, useRefresh } from '../../hooks'
 import { PriceButton } from '../../PriceButton'
-import { Field, Img, Modal, SectionProgress, errorMessage, useToast, type TodoItem } from '../../ui'
+import { Field, Img, Modal, SectionProgress, errorMessage, scrollToField, useToast, type TodoItem } from '../../ui'
 import type { CharacterView, SceneFields, SceneStill, SceneView, ScenesData } from '../../types'
 import { StillDrawer, STILL_STATUS, OP_LABEL } from './StillDrawer'
+import { VideoSection } from './VideoSection'
 
 // One scene: the owner's words, the planned fields (all editable, saved as
 // you type), the refs it will attach, and the stills it made.
@@ -61,6 +62,7 @@ export function SceneEditor({ v, data, scene, onBack }: { v: CharacterView; data
   const [saving, setSaving] = useState<'idle' | 'saving' | 'saved'>('idle')
   const [open, setOpen] = useState<string | null>(null)
   const [copying, setCopying] = useState(false)
+  const [videoStart, setVideoStart] = useState<string | null>(null)
   const dirty = useRef<Partial<SceneFields>>({})
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -109,7 +111,7 @@ export function SceneEditor({ v, data, scene, onBack }: { v: CharacterView; data
   const planned = scene.planned
   const checks = sceneChecks(data, draft, scene.missing)
   const todo: TodoItem[] = checks.left.map(k => ({ label: FIELD_LABEL[k] ?? k, target: `scene-${k}` }))
-  const still = scene.candidates.find(c => c.id === open) ?? null
+  const still = scene.candidates.find(c => c.id === open && c.media !== 'video') ?? null
 
   return (
     <div className="st-col" style={{ gap: 22 }}>
@@ -145,13 +147,15 @@ export function SceneEditor({ v, data, scene, onBack }: { v: CharacterView; data
             <div className="grow"><div className="st-h3">Working on this scene</div><div className="st-hint">Rendering, then automatic QA: face match, marks, logos, jewelry and skin texture. Failed QA waits with its fix.</div></div>
           </div>
         )}
-        {scene.candidates.length === 0 && !scene.busy && <span className="st-hint">No stills yet. Generate to see them here.</span>}
+        {scene.candidates.filter(c => c.media !== 'video').length === 0 && !scene.busy && <span className="st-hint">No stills yet. Generate to see them here.</span>}
         <div className="st-grid scenes">
-          {scene.candidates.filter(c => c.assetId || c.status === 'failed').map(c => <StillTile key={c.id} c={c} aspect={scene.aspect} onOpen={() => setOpen(c.id)} />)}
+          {scene.candidates.filter(c => c.media !== 'video' && (c.assetId || c.status === 'failed')).map(c => <StillTile key={c.id} c={c} aspect={scene.aspect} onOpen={() => setOpen(c.id)} />)}
         </div>
       </section>
 
-      <StillDrawer v={v} data={data} scene={scene} still={still} onClose={() => setOpen(null)} onOpen={setOpen} />
+      <VideoSection v={v} data={data} scene={scene} startId={videoStart} setStartId={setVideoStart} />
+
+      <StillDrawer v={v} data={data} scene={scene} still={still} onClose={() => setOpen(null)} onOpen={setOpen} onMakeVideo={id => { setVideoStart(id); setOpen(null); window.setTimeout(() => scrollToField('video-card'), 150) }} />
       <CopyScene v={v} scene={scene} open={copying} onClose={() => setCopying(false)} />
     </div>
   )

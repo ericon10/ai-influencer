@@ -134,6 +134,7 @@ const templatesSchema = z.object({
   edit: z.object({ base: z.string(), face_ref: z.string() }),
   scene_plan: z.object({ system: z.string(), prompt: z.string() }),
   scene_ideas: z.object({ system: z.string(), prompt: z.string() }),
+  video: z.object({ base: z.string(), silent: z.string(), end_frame: z.string() }),
 })
 
 const preset = z.object({ id: z.string(), label: z.string(), hint: z.string().optional() })
@@ -165,6 +166,19 @@ const scenesSchema = z.object({
   edits: z.object({
     drift_lock: z.string(),
     presets: z.array(preset.extend({ text: z.string(), face: z.boolean().default(false) })),
+  }),
+  video: z.object({
+    model: z.string(),
+    resolution: z.string(),
+    durations: z.array(z.number().int().positive()).min(1),
+    duration: z.number().int().positive(),
+    aspect: z.string(),
+    max_takes: z.number().int().min(1).max(8),
+    takes: z.number().int().min(1),
+    directions: z.string(),
+    test: z.object({ model: z.string(), duration: z.number().int().positive(), resolution: z.string(), label: z.string(), note: z.string() }),
+    upscale: z.object({ model: z.string() }),
+    end_frame: z.object({ model: z.string(), presets: z.array(preset.extend({ text: z.string() })) }),
   }),
 })
 

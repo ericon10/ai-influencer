@@ -9,7 +9,10 @@ import { finalize, type QaReport } from '../core/qa/marks.js'
 import { evaluateScene, sceneMirrorFix } from '../core/qa/scene.js'
 import { parseObservation } from '../core/qa/perception.js'
 import type { GenRequest } from '../providers/types.js'
-import { getCharacter, toData } from './characters.js'
+import { approvedAssets, getCharacter, toData } from './characters.js'
+import { clipFrames } from './videoAssets.js'
+import { readAsset, saveAsset } from '../storage/assets.js'
+import { compareTexture } from '../qa/texture.js'
 import { scoreSceneIdentity } from './identity.js'
 import { draftFields, getScene, refreshSceneStatus, sceneFields, updateScene } from './scenes.js'
 import { textureCheck, textureSummary } from './texture.js'
@@ -110,7 +113,7 @@ async function onDriftLock(deps: Deps, ctx: Ctx, job: JobRow, out: JobOutcome): 
 // principle): a smoothed result never replaces its source.
 async function onSceneEdit(deps: Deps, ctx: Ctx, job: JobRow, out: JobOutcome): Promise<void> {
   const parentId = parentCandidateOf(job) ?? null
-  const op = job.purpose.startsWith('scene_upscale:') ? 'upscale' : 'edit'
+  const op = job.purpose.startsWith('scene_upscale:') ? 'upscale' : job.purpose.startsWith('scene_end_frame:') ? 'end_frame' : 'edit'
   const asset = out.assets?.[0]
   if (out.status === 'completed' && asset) {
     const texture = await textureCheck(deps, ctx, (job.request as GenRequest).refs?.[0]?.assetId, asset.id, true)
@@ -127,6 +130,74 @@ async function onSceneEdit(deps: Deps, ctx: Ctx, job: JobRow, out: JobOutcome): 
   } else {
     await newCandidate(deps, job, { parentId, op, status: 'failed', rejectNote: out.error ?? '' })
     await cancelChildren(deps, job.id, `The ${op} did not finish.`)
+  }
+  await refreshSceneStatus(deps, ctx, sceneIdOf(job))
+}
+
+// A video take (Stage 9): checked locally and free. The face is matched to
+// REF-00 on a middle and a late frame, and the skin is compared with the
+// start still (video compression softens skin a little, so only a clear loss
+// is pointed out). A person always decides; face drift asks to confirm.
+async function onSceneVideo(deps: Deps, ctx: Ctx, job: JobRow, out: JobOutcome): Promise<void> {
+  const parentId = parentCandidateOf(job) ?? null
+  const asset = out.assets?.find(a => a.kind === 'video') ?? out.assets?.[0]
+  const req = job.request as GenRequest
+  if (out.status === 'completed' && asset) {
+    const id = await newCandidate(deps, job, { assetId: asset.id, parentId, op: 'video', status: 'qa_pending' })
+    const findings: QaReport['findings'] = []
+    if (job.purpose.split(':')[3] === 'test') {
+      findings.push({ code: 'uncertain', severity: 'info', message: `${deps.config.pipeline.scenes.video.test.label}: faces not representative. Judge the motion only.` })
+    }
+    try {
+      const frames = await clipFrames(deps, ctx, asset.id, [0.5, 0.95])
+      const ref00 = (await approvedAssets(deps, ctx, job.characterId!)).get('REF-00')
+      for (const [i, png] of frames.entries()) {
+        const frame = await saveAsset(deps, ctx, { data: png, mime: 'image/png', origin: 'derived', label: `${i === 0 ? 'middle' : 'last'} frame of ${asset.id}`, sourceJobId: job.id })
+        const r = await scoreSceneIdentity(deps, ctx, { assetId: frame.id, refs: ref00 ? [{ refId: 'REF-00', assetId: ref00 }] : [], demo: job.provider === 'mock' })
+        for (const f of r.findings) if (!findings.some(x => x.code === f.code && x.severity === f.severity)) findings.push({ ...f, message: `${i === 0 ? 'Middle' : 'Last'} frame: ${f.message}` })
+      }
+      if (req.startFrame?.assetId && frames[0]) {
+        const { data: still } = await readAsset(deps, ctx, req.startFrame.assetId)
+        const t = await compareTexture(still, frames[0], { faces: deps.faces, minRatio: deps.config.runtime.qa.texture_min_ratio * 0.6, sameFraming: false })
+        if (t.smoothed) findings.push({ code: 'skin_smoothed', severity: 'warn', message: 'The skin looks smoothed in this take compared with the still. Look closely before keeping it.' })
+      }
+    } catch (e) {
+      findings.push({ code: 'uncertain', severity: 'warn', message: `The automatic check could not run on this take (${(e as Error).message}). Look at the face yourself.` })
+    }
+    const report = finalize(findings, null)
+    await deps.db.update(candidates).set({ status: 'in_review', qaReport: report, qaVerdict: report.verdict }).where(eq(candidates.id, id))
+  } else {
+    await newCandidate(deps, job, { parentId, op: 'video', status: 'failed', rejectNote: out.error ?? '' })
+  }
+  await refreshSceneStatus(deps, ctx, sceneIdOf(job))
+}
+
+// "Upscale this take": the same frames, more detail. If the skin comes out
+// smoothed, the upscale is flagged and the original take stays.
+async function onVideoUpscale(deps: Deps, ctx: Ctx, job: JobRow, out: JobOutcome): Promise<void> {
+  const parentId = parentCandidateOf(job) ?? null
+  const asset = out.assets?.find(a => a.kind === 'video') ?? out.assets?.[0]
+  const src = (job.request as GenRequest).sourceVideo?.assetId
+  if (out.status === 'completed' && asset) {
+    const findings: QaReport['findings'] = [{ code: 'uncertain', severity: 'info', message: 'Upscaled take: the same frames with more detail.' }]
+    let smoothed = false
+    try {
+      if (src) {
+        const [a] = await clipFrames(deps, ctx, src, [0.5])
+        const [b] = await clipFrames(deps, ctx, asset.id, [0.5])
+        const t = await compareTexture(a!, b!, { faces: deps.faces, minRatio: deps.config.runtime.qa.texture_min_ratio, sameFraming: true })
+        smoothed = t.smoothed
+        findings.push(t.smoothed
+          ? { code: 'skin_smoothed', severity: 'fail', message: `${t.message} The original take stays; try the upscale again or keep the original.` }
+          : { code: 'skin_real', severity: 'info', message: t.message })
+      }
+    } catch (e) {
+      findings.push({ code: 'uncertain', severity: 'warn', message: `The texture check could not run (${(e as Error).message}). Compare the skin with the original take yourself.` })
+    }
+    const report = finalize(findings, null)
+    await newCandidate(deps, job, { assetId: asset.id, parentId, op: 'video_upscale', status: smoothed ? 'qa_failed' : 'in_review', qaReport: report, qaVerdict: report.verdict })
+  } else {
+    await newCandidate(deps, job, { parentId, op: 'video_upscale', status: 'failed', rejectNote: out.error ?? '' })
   }
   await refreshSceneStatus(deps, ctx, sceneIdOf(job))
 }
@@ -206,5 +277,8 @@ export function registerSceneHooks(): void {
   registerJobHook('drift_lock', onDriftLock)
   registerJobHook('scene_edit', onSceneEdit)
   registerJobHook('scene_upscale', onSceneEdit)
+  registerJobHook('scene_end_frame', onSceneEdit)
+  registerJobHook('scene_video', onSceneVideo)
+  registerJobHook('scene_video_upscale', onVideoUpscale)
   registerJobHook('scene_qa', onSceneQa)
 }

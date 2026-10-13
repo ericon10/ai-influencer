@@ -315,6 +315,22 @@ Decisions: `DECISIONS.md` F1 to F6, then G1 to G3 (defaults, not locks).
       2.5 Flare on the API), after the owner sees the quote
 - [ ] Soul 2.0 model test, then a Soul scene with its drift lock
 
+## Phase 3: Video (Stage 9, started 2026-10-13)
+
+Decisions: `DECISIONS.md` G7.
+
+- [x] Make a video from a picked still: Seedance 2.5 at 720p, 1 to 4 takes,
+      start frame plus optional end frame, 9:16, audio off, directions in
+      the prompt, one continuous take (all editable)
+- [x] Quick motion test (Kling 3.0 Turbo, 5 s), off by default, labeled
+      faces not representative
+- [x] Upscale this take (video upscaler), price shown with the take
+- [x] End frame helper: head-only masked inpaint (Nano Banana 2.1)
+- [x] Local clip QA: face on sampled frames, skin texture; smoothed
+      upscales never replace the take
+- [ ] First live take, then confirm the upscaler's real price
+- [ ] Chaining (continue from the last frame), sound bed, rough cut
+
 ## Roadmap after Phase 4 (owner, 2026-10-13; not started)
 
 SPEC 13.1, R1 to R7: Clone Video (first after Phase 3), Inspo board

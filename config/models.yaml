@@ -60,7 +60,8 @@ models:
     input_map: generic_image
     verified: false
     mcp_id: nano_banana_2_1
-    mcp: { params: [aspect_ratio, resolution, seed, thinking_level], roles: { refs: image_references } }
+    # Masked edits: media role "mask" plus is_inpaint (Higgsfield catalog, read 2026-10-13).
+    mcp: { params: [aspect_ratio, resolution, seed, thinking_level], roles: { refs: image_references, mask: mask }, inpaint_param: is_inpaint }
     aliases: [Nano Banana 2.1, nano_banana_2_1]
     params: { resolution: [1k, 2k, 4k], thinking_level: true, inpaint: mask }
     use_for: [scene_still, expression_edit]
@@ -104,6 +105,22 @@ models:
     params: { resolution: [2k] }
     use_for: [upscale, punch_in_crop]
     notes: 2 credits at 2k (verified live 2026-10-12). Use for punch-in crops of a wide still.
+  # The video upscaler on the owner's account (upscale_video). It keeps the
+  # exact take; there is no cost preflight, so the price book answers.
+  - ref: higgsfield/video-upscale
+    label: Video upscale (ByteDance)
+    kinds: [upscale]
+    max_refs: 0
+    api: false
+    endpoint: null
+    input_map: generic_upscale
+    verified: false
+    mcp_id: bytedance
+    mcp: { params: [], fixed: { resolution: 1080p, preset: aigc, fps: 24 } }
+    aliases: [Video upscale, upscale_video]
+    params: { resolution: [1080p, 2k, 4k], fps: [24, 30, 60], preflight: none }
+    use_for: [video_upscale]
+    notes: "From the connector's description (2026-10-13): provider bytedance needs the source width and height; fps above 30 doubles the cost; no cost preflight."
   - ref: higgsfield/seedance-2.5
     label: Seedance 2.5
     kinds: [video]

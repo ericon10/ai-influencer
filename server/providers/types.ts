@@ -28,6 +28,11 @@ export interface GenRequest {
   startFrame?: AssetRef
   endFrame?: AssetRef
   sourceVideo?: AssetRef
+  // A masked edit: white is the only area that may change.
+  mask?: AssetRef
+  // The mask still to make: built on the worker (which has the face models)
+  // just before submit, then sent as `mask`. Part of the quote.
+  maskFor?: { assetId: string; region: 'head' }
   aspect?: string
   resolution?: string
   quality?: string

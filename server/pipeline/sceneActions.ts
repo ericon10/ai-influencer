@@ -1,6 +1,6 @@
 import type { Ctx, Deps } from '../context.js'
 import type { ModelEntry } from '../config/load.js'
-import { fill, hardWrap } from '../core/text.js'
+import { fill, hardWrap, normalizePrompt } from '../core/text.js'
 import { blocking, lintPrompt, type RuleViolation } from '../core/rules.js'
 import { identityForModel } from '../core/identity.js'
 import { pronounVars } from '../core/prompts.js'
@@ -20,6 +20,8 @@ import { ACCOUNT_PROVIDER } from '../providers/higgsfieldOAuth.js'
 import { forMode, providerMode, resolveRoute } from './settings.js'
 import { approvedAssets, getCandidate, toData, type CharacterRow } from './characters.js'
 import { comboEntries, comboProblem, getScene, sceneFields, sceneRefs, type SceneRef } from './scenes.js'
+import { assertFace } from './videoAssets.js'
+import { getAsset } from '../storage/assets.js'
 
 // Paid steps for scenes (Stage 7) and still edits (Stage 8). Each returns the
 // job specs for the estimate and the run (one builder for both, so the run
@@ -29,6 +31,9 @@ export interface SceneBuilt {
   purpose: string
   specs: JobSpec[]
   preview: { title: string; prompts: Array<{ label: string; text: string; wrapped: string }>; warnings: RuleViolation[]; invalidates: string[] }
+  // A later step whose price is shown with this one (a video take shows what
+  // "Upscale this take" will cost). Quoted for display only, never run here.
+  followUp?: { label: string; specs: JobSpec[] }
 }
 
 type Ch = ReturnType<typeof toData>
@@ -355,6 +360,127 @@ export async function buildSceneUpscale(deps: Deps, ctx: Ctx, row: CharacterRow,
     purpose: `scene_upscale:${cand.sceneId}`,
     specs: [{ type: 'gen', stage: 'edit', purpose: `scene_upscale:${cand.sceneId}:${cand.id}`, label: 'Upscale 2x', request }],
     preview: { title: 'Upscale 2x', prompts: [], warnings: [], invalidates: [] },
+  }
+}
+
+// ── Video from a picked still (Stage 9, owner ruling 2026-10-13) ────────
+// Straight to the final model (Seedance 2.5, 720p), one job per take; a
+// quick motion test (Kling 3.0 Turbo, 5 s) is optional. Audio off, start
+// frame plus an optional end frame, one continuous take, the owner's
+// directions. Each take is checked locally when it arrives (free).
+
+const VIDEO_OPS = new Set(['video', 'video_upscale'])
+const isVideoCandidate = (c: { op: string }) => VIDEO_OPS.has(c.op)
+
+export interface SceneVideoInput {
+  candidateId: string
+  endCandidateId?: string
+  motion: string
+  directions: string
+  durationSec: number
+  aspect: string
+  audio: boolean
+  takes: number
+  test: boolean
+}
+
+export async function buildSceneVideo(deps: Deps, ctx: Ctx, row: CharacterRow, input: SceneVideoInput): Promise<SceneBuilt> {
+  const start = await getCandidate(deps, ctx, input.candidateId)
+  if (start.characterId !== row.id || !start.sceneId || !start.assetId || isVideoCandidate(start)) throw new AppError('bad_request', 'Pick a still from this scene as the start frame.')
+  const end = input.endCandidateId ? await getCandidate(deps, ctx, input.endCandidateId) : null
+  if (end && (end.sceneId !== start.sceneId || !end.assetId || isVideoCandidate(end))) throw new AppError('bad_request', 'The end frame must be a still from the same scene.')
+  const scene = await getScene(deps, ctx, start.sceneId)
+  const { templates: t, scenes: sc, rules } = deps.config.pipeline
+  const v = sc.video
+  const sw = await ruleSwitches(deps, ctx, row.id)
+  const model = input.test ? v.test.model : v.model
+  const durationSec = input.test ? v.test.duration : input.durationSec
+  const resolution = input.test ? v.test.resolution : v.resolution
+  const warnings: RuleViolation[] = []
+  const entry = modelEntry(deps, model)
+  const endFrame = end && (entry.params as { end_image?: boolean } | undefined)?.end_image !== false ? end : null
+  if (end && !endFrame) warnings.push({ ruleId: 'video-single-take', spec: '4.3', title: 'Start frame only', severity: 'warning', message: `${entry.label} takes a start frame only, so the end frame is left out of this test.` })
+  if (!input.test && !v.durations.includes(durationSec)) warnings.push({ ruleId: 'video-single-take', spec: '5.4.31', title: 'Unusual length', severity: 'warning', message: `${durationSec} s is not one of the usual lengths (${v.durations.join(' or ')} s). Running anyway.` })
+  const run = await runModel(deps, ctx, model, 'video')
+  const motion = input.motion.trim().replace(/[.\s]+$/, '')
+  if (motion.length < 3) throw new AppError('invalid_request', 'Say what happens in the clip.')
+  const prompt = normalizePrompt(fill(t.video.base, { motion, directions: input.directions.trim(), silent: input.audio ? '' : t.video.silent }))
+  const request: GenRequest = {
+    kind: 'video', model: run.model, prompt, aspect: input.aspect, resolution, durationSec, audio: input.audio,
+    startFrame: { assetId: start.assetId },
+    ...(endFrame?.assetId ? { endFrame: { assetId: endFrame.assetId } } : {}),
+    ...(run.billing ? { billing: run.billing } : {}),
+  }
+  warnings.push(...lintOrThrow(lintPrompt(rules, prompt, { stage: 'video', kind: 'video', request: { ...request, model }, switches: sw }), 'Video'))
+  const takes = Math.max(1, Math.min(v.max_takes, Math.round(input.takes)))
+  const label = input.test ? `${v.test.label} (${v.test.note.toLowerCase()})` : 'Video take'
+  const specs: JobSpec[] = Array.from({ length: takes }, (_, i) => ({
+    type: 'gen' as const, stage: 'video', purpose: `scene_video:${scene.id}:${start.id}${input.test ? ':test' : ''}`, label: takes > 1 ? `${label} ${i + 1}` : label, request,
+  }))
+  // What "Upscale this take" will cost later, per take (shown, never run here).
+  // A video upscale is priced per second like video (the mock video in demo mode).
+  const up = await runModel(deps, ctx, v.upscale.model, 'video')
+  const followUp = input.test ? undefined : {
+    label: 'Upscale this take, later, per take',
+    specs: [{ type: 'gen' as const, stage: 'video', purpose: `scene_video_upscale:${scene.id}`, label: 'Upscale this take', request: { kind: 'upscale' as const, model: up.model, prompt: 'Upscale this take; keep every frame identical.', sourceVideo: { assetId: start.assetId }, durationSec, ...(up.billing ? { billing: up.billing } : {}) } }],
+  }
+  return {
+    purpose: `scene_video:${scene.id}`, specs, followUp,
+    preview: { title: input.test ? v.test.label : 'Video from the still', prompts: [{ label: 'Video prompt', text: prompt, wrapped: hardWrap(prompt) }], warnings, invalidates: [] },
+  }
+}
+
+// "Upscale this take": the exact take, never re-rolled. The upscaled clip
+// keeps its source; a smoothed result never replaces it.
+export async function buildVideoUpscale(deps: Deps, ctx: Ctx, row: CharacterRow, candidateId: string): Promise<SceneBuilt> {
+  const cand = await getCandidate(deps, ctx, candidateId)
+  if (cand.characterId !== row.id || !cand.sceneId || !cand.assetId || cand.op !== 'video') throw new AppError('bad_request', 'Pick a video take to upscale.')
+  const clip = await getAsset(deps, ctx, cand.assetId)
+  const v = deps.config.pipeline.scenes.video
+  const run = await runModel(deps, ctx, v.upscale.model, 'video')
+  const request: GenRequest = {
+    kind: 'upscale', model: run.model, prompt: 'Upscale this take; keep every frame identical.', sourceVideo: { assetId: cand.assetId },
+    durationSec: Math.max(1, Math.round((clip.durationMs ?? 5000) / 1000)), ...(run.billing ? { billing: run.billing } : {}),
+  }
+  return {
+    purpose: `scene_video_upscale:${cand.sceneId}`,
+    specs: [{ type: 'gen', stage: 'video', purpose: `scene_video_upscale:${cand.sceneId}:${cand.id}`, label: 'Upscale this take', request }],
+    preview: { title: 'Upscale this take', prompts: [], warnings: [], invalidates: [] },
+  }
+}
+
+// The end frame helper: a masked inpaint of the start frame's head only, so
+// the scene stays exactly as it is. REF-00 holds the face; QA checks it.
+export async function buildSceneEndFrame(deps: Deps, ctx: Ctx, row: CharacterRow, input: { candidateId: string; change: string; withQa: boolean }): Promise<SceneBuilt> {
+  const cand = await getCandidate(deps, ctx, input.candidateId)
+  if (cand.characterId !== row.id || !cand.sceneId || !cand.assetId || isVideoCandidate(cand)) throw new AppError('bad_request', 'Pick a still from this scene to make the end frame from.')
+  const change = input.change.trim().replace(/[.\s]+$/, '')
+  if (change.length < 3) throw new AppError('invalid_request', 'Say how the head or face changes.')
+  const scene = await getScene(deps, ctx, cand.sceneId)
+  const f = sceneFields(deps, scene)
+  const ch = toData(row)
+  const { templates: t, scenes: sc, rules } = deps.config.pipeline
+  const sw = await ruleSwitches(deps, ctx, row.id)
+  const run = await runModel(deps, ctx, sc.video.end_frame.model, 'image_edit')
+  const ref00 = (await approvedAssets(deps, ctx, row.id)).get('REF-00')
+  if (!ref00) throw new AppError('bad_request', 'The end frame attaches REF-00 for the face. Approve REF-00 first.')
+  // The mask is made on the worker just before submit; where face detection
+  // runs here too, a still with no visible face is caught now.
+  if ((await deps.faces.status()).available) await assertFace(deps, ctx, cand.assetId)
+  const realism: RealismWarning[] = []
+  const prompt = buildEditPrompt(t, fill(t.video.end_frame, { ...pronounVars(ch.pronouns), change }), ch, true, { warnings: realism, flawDose: sw.on('realism-flaw-dose') })
+  const request: GenRequest = {
+    kind: 'image_edit', model: run.model, prompt, aspect: aspectFor(sc, f), quality: sc.settings.quality, resolution: sc.settings.resolution,
+    refs: [{ assetId: cand.assetId }, { assetId: ref00 }], maskFor: { assetId: cand.assetId, region: 'head' },
+    ...(run.billing ? { billing: run.billing } : {}),
+  }
+  const warnings = lintOrThrow(lintPrompt(rules, prompt, { stage: 'edit', kind: 'image_edit', request: { ...request, model: sc.video.end_frame.model }, switches: sw }), 'End frame')
+  const label = `${sceneLabel(scene, f)}, end frame`
+  const specs: JobSpec[] = [{ type: 'gen', stage: 'edit', purpose: `scene_end_frame:${scene.id}:${cand.id}`, label: `End frame: ${change.slice(0, 60)}`, request }]
+  if (input.withQa) specs.push(...await sceneQaSpecs(deps, ctx, ch, f, { sceneId: scene.id, parentIndex: 0, faceRefs: [{ refId: 'REF-00', assetId: ref00 }], label }))
+  return {
+    purpose: `scene_end_frame:${scene.id}`, specs,
+    preview: { title: 'End frame (head only)', prompts: [{ label: 'End frame prompt', text: prompt, wrapped: hardWrap(prompt) }], warnings: [...dedupe(realism), ...warnings], invalidates: [] },
   }
 }
 

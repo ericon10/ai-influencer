@@ -107,6 +107,12 @@ export function accountParams(entry: ReturnType<typeof accountModel>, req: GenRe
   Object.assign(params, m.fixed, entry.force_off ?? {})
   // Audio is off unless the request asks for it (default rule video-audio-off).
   if ('generate_audio' in params) params.generate_audio = req.audio === true
+  // A masked edit changes only the white area of the mask (the end frame
+  // helper inpaints the head of the start frame).
+  if (req.mask || req.maskFor) {
+    if (!m.inpaint_param || !m.roles.mask) throw new ProviderError(`${entry.label} does not take a mask on the account path.`, { retryable: false, submitted: 'no' })
+    params[m.inpaint_param] = true
+  }
   // Beautify, face-enhance and skin-smoothing options are always off.
   if (!withMedia) return forceBeautifyOff(params)
 
@@ -116,6 +122,7 @@ export function accountParams(entry: ReturnType<typeof accountModel>, req: GenRe
     return r
   }
   for (const r of req.refs ?? []) medias.push({ value: need(r, 'A reference image'), role: role(m.roles.refs, 'reference images') })
+  if (req.mask) medias.push({ value: need(req.mask, 'The mask'), role: role(m.roles.mask, 'a mask') })
   if (req.startFrame) medias.push({ value: need(req.startFrame, 'The start frame'), role: role(m.roles.start, 'a start frame') })
   if (req.endFrame) medias.push({ value: need(req.endFrame, 'The end frame'), role: role(m.roles.end, 'an end frame') })
   if (req.sourceVideo) throw new ProviderError(`${entry.label} does not take a source video on the account path.`, { retryable: false, submitted: 'no' })
@@ -191,7 +198,7 @@ export function createHiggsfieldAccountAdapter(o: HiggsfieldAccountOptions): Pro
   // slow to price it and no live price is saved.
   function bookCredits(req: GenRequest): { credits: number; verified: boolean } | null {
     const { provider, model } = splitRef(req.model)
-    const video = req.kind === 'video' || req.kind === 'video_extend' || req.kind === 'audio'
+    const video = req.kind === 'video' || req.kind === 'video_extend' || req.kind === 'audio' || (req.kind === 'upscale' && !!req.sourceVideo)
     const entry = findPrice(o.config.pricebook, provider, model, video ? 'second' : 'image', { resolution: req.resolution, quality: req.quality, aspect: req.aspect })
     if (entry?.credits == null) return null
     return { credits: Math.round(entry.credits * (video ? (req.durationSec ?? 5) : 1) * 100) / 100, verified: entry.credits_verified === true }
@@ -285,6 +292,18 @@ export function createHiggsfieldAccountAdapter(o: HiggsfieldAccountOptions): Pro
     },
     async submit(req) {
       const entry = accountModel(o.config, req.model)
+      // "Upscale this take": the video upscaler keeps the exact take.
+      if (req.kind === 'upscale' && req.sourceVideo) {
+        const src = req.sourceVideo
+        if (!src.width || !src.height) throw new ProviderError('A video upscale needs the clip\'s size.', { retryable: false, submitted: 'no' })
+        const value = await o.client.callTool('upscale_video', {
+          params: { provider: entry.mcp_id, video_id: need(src, 'The clip to upscale'), width: src.width, height: src.height, ...entry.mcp.fixed },
+        }, 'submit')
+        const r = submitted(value)
+        if (r.jobId) return { jobId: r.jobId, raw: value }
+        if (r.problem) throw new ProviderError(r.problem, { retryable: false, submitted: 'no' })
+        throw new ProviderError('Higgsfield answered the video upscale without a job id.', { retryable: false, submitted: 'unknown' })
+      }
       if (req.kind === 'upscale') {
         const src = req.refs?.[0]
         if (!src?.width || !src.height) throw new ProviderError('An upscale needs the source image size.', { retryable: false, submitted: 'no' })

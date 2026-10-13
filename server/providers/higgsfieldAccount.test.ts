@@ -138,6 +138,10 @@ describe('Higgsfield account path (plan credits)', () => {
     expect(kling.resolution).toBeUndefined()
     // Turbo takes no end frame on this path.
     expect(() => accountParams(accountModel(cfg, 'higgsfield/kling-3.0-turbo'), { kind: 'video', model: 'higgsfield/kling-3.0-turbo', prompt: 'p', audio: false, ...frames })).toThrow(/end frame/)
+    // The end frame helper: a masked edit sends the mask and is_inpaint.
+    const masked = accountParams(accountModel(cfg, 'higgsfield/nano-banana-2.1'), { kind: 'image_edit', model: 'higgsfield/nano-banana-2.1', prompt: 'p', aspect: '9:16', refs: [{ assetId: 'a', url: 'm-still' }], mask: { assetId: 'b', url: 'm-mask' } })
+    expect(masked).toMatchObject({ model: 'nano_banana_2_1', is_inpaint: true, medias: [{ value: 'm-still', role: 'image_references' }, { value: 'm-mask', role: 'mask' }] })
+    expect(() => accountParams(accountModel(cfg, 'higgsfield/gpt-image-2.5-flare'), { kind: 'image_edit', model: 'higgsfield/gpt-image-2.5-flare', prompt: 'p', mask: { assetId: 'b', url: 'm-mask' } })).toThrow(/does not take a mask/)
     // Soul carries the trained character as soul_id.
     const soul = accountParams(accountModel(cfg, 'higgsfield/soul-2'), { kind: 'image', model: 'higgsfield/soul-2', prompt: 'p', aspect: '3:4', identityId: '0fdc33c0-7a1a-40a9-9b12-0dc35f44e29e' })
     expect(soul).toEqual({ model: 'soul_2', prompt: 'p', aspect_ratio: '3:4', soul_id: '0fdc33c0-7a1a-40a9-9b12-0dc35f44e29e', quality: '2k' })
@@ -296,6 +300,17 @@ describe('account adapter edge cases', () => {
     } finally {
       fake.hangOn = null
     }
+  })
+
+  it('"Upscale this take" sends the exact take to the video upscaler, priced per second from the price book', async () => {
+    const a = adapter()
+    const req: GenRequest = { kind: 'upscale', model: 'higgsfield/video-upscale', prompt: 'Upscale this take.', sourceVideo: { assetId: 'v', url: '9b2f7a10-3c4d-4e5f-8a9b-0c1d2e3f4a5b', width: 720, height: 1280 }, durationSec: 5 }
+    const est = await a.estimate(req)
+    expect(est.credits).toBe(10)
+    expect(est.verified).toBe(false)
+    const { jobId } = await a.submit(req, { idempotencyKey: 'k-up' })
+    expect(jobId).toBeTruthy()
+    expect(fake.tool('upscale_video')[0]!.args.params).toEqual({ provider: 'bytedance', video_id: '9b2f7a10-3c4d-4e5f-8a9b-0c1d2e3f4a5b', width: 720, height: 1280, resolution: '1080p', preset: 'aigc', fps: 24 })
   })
 
   it('prices an upscale from the price book, since Higgsfield needs the image first', async () => {

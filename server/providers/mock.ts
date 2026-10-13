@@ -134,6 +134,10 @@ export function createMockAdapter(opts: MockOptions): ProviderAdapter & { jobs: 
       kind = 'video'
       const start = req.startFrame ? await opts.loadAsset(req.startFrame.assetId) : null
       data = await renderVideo(start, req.durationSec ?? 5, req.prompt)
+    } else if (req.kind === 'upscale' && req.sourceVideo) {
+      // Demo: the same take comes back (a real upscale keeps the take too).
+      kind = 'video'
+      data = await opts.loadAsset(req.sourceVideo.assetId)
     } else if (req.kind === 'upscale' && req.refs?.[0]) {
       const src = await opts.loadAsset(req.refs[0].assetId)
       const meta = await sharp(src).metadata()

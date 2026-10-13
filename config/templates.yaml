@@ -120,6 +120,14 @@ edit:
   base: "{change}. Keep everything else in the image exactly the same."
   face_ref: "Use the attached reference image only for {poss} face."
 
+# Video from a picked still (Stage 9). {motion} is what happens; the
+# directions are the owner's editable defaults.
+video:
+  base: "{motion}. {directions} {silent}"
+  silent: "Silent, no audio, no dialogue."
+  # The end frame helper: only the masked head and face change.
+  end_frame: "Edit only the masked area, {poss} head and face: {change}. Keep {poss} identity, hair, skin texture, the mole and everything outside the mask exactly the same."
+
 # "Punch it up": the owner's rough idea becomes three specific moments to
 # pick from. The pick fills the scene box and stays editable.
 scene_ideas:

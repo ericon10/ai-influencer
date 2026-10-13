@@ -144,6 +144,7 @@ the Studio; they are not creative limits on a character.
 | `server/core/safety.ts` | Fixed: no nudity or explicit content (lint and runner) |
 | `config/rules.yaml`, `server/pipeline/rules.ts` | Rule one: the rule book (fixed or default), switches per account and per character, Settings > Rules |
 | `config/scenes.yaml`, `server/core/scenes.ts` | Stage 7 and 8 presets, scene and edit prompts, ref picker by angle, combo log |
+| `src/studio/pages/character/VideoSection.tsx`, `server/pipeline/videoAssets.ts`, `server/media/mask.ts` | Stage 9 video: takes, upscale this take, end frame helper (head mask), clip QA |
 | `server/core/qa/scene.ts` | Scene QA as advice: one-click fixes, the free mirror, face drift as a strong warning |
 | `server/pipeline/scenes.ts`, `sceneActions.ts`, `sceneHooks.ts` | Scene records, picks and crops; paid scene steps; what finished scene jobs do |
 | `server/qa/texture.ts` | Texture check after upscales and edits (skin smoothed) |

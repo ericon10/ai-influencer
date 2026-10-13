@@ -431,9 +431,17 @@ rule book is `config/rules.yaml`.
       fail the seam (SPEC 4.3).
 34. **Strip any audio track** from generated clips that did not ask
     for audio, even when audio was "off."
-35. **Cheap draft first, premium last.** Test motion on Wan or
-    Kling Turbo at 480p/720p; re-run only the winner on a premium
-    model (Seedance 2.5, Kling 3.0).
+35. **Straight to the final model, then upscale the take you keep**
+    (owner, 2026-10-13). Takes run on Seedance 2.5 at 720p; "Upscale
+    this take" sends the exact take to Higgsfield's video upscaler, so
+    it is preserved instead of re-rolled. Both prices are shown first.
+    A quick motion test (Kling 3.0 Turbo, 5 s, "faces not
+    representative") is optional and off by default, for complex
+    motion only. Defaults, all editable: start frame plus optional end
+    frame, 9:16, audio off, "no talking, no winking, steady eye
+    contact" in the prompt, one continuous take. The end frame helper
+    makes an end frame by inpainting only the head of the start frame
+    (a mask), since full edits re-compose the whole scene.
 
 ### 5.5 Sound
 

@@ -38,7 +38,9 @@ const modelsSchema = z.object({
     mcp: z.object({
       params: z.array(z.string()).default([]),
       fixed: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).default({}),
-      roles: z.object({ refs: z.string().optional(), start: z.string().optional(), end: z.string().optional() }).default({}),
+      roles: z.object({ refs: z.string().optional(), start: z.string().optional(), end: z.string().optional(), mask: z.string().optional(), video: z.string().optional() }).default({}),
+      // The param that turns on a masked edit (Nano Banana 2.1: is_inpaint).
+      inpaint_param: z.string().optional(),
     }).optional(),
     // Video and audio: whether a request can turn generated sound off.
     // always_on means the Studio strips the track on arrival instead.

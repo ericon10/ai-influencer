@@ -55,13 +55,25 @@ export function useCharacter(id: string) {
 export function useScenes(characterId: string) {
   const qc = useQueryClient()
   const active = useActiveJobs()
-  const busy = (active.data?.jobs ?? []).some(j => j.characterId === characterId && /^(scene|scene_plan|scene_qa|scene_edit|scene_upscale|drift_lock):/.test(j.purpose))
+  const busy = (active.data?.jobs ?? []).some(j => j.characterId === characterId && /^(scene|scene_plan|scene_qa|scene_edit|scene_upscale|scene_end_frame|scene_video|scene_video_upscale|drift_lock):/.test(j.purpose))
   const wasBusy = useRef(false)
   useEffect(() => {
-    if (wasBusy.current && !busy) qc.invalidateQueries({ queryKey: keys.scenes(characterId) })
+    // A finished job's own checks (a video take's frame QA) run just after
+    // it ends, so look again a moment later too.
+    if (wasBusy.current && !busy) {
+      qc.invalidateQueries({ queryKey: keys.scenes(characterId) })
+      const t = setTimeout(() => qc.invalidateQueries({ queryKey: keys.scenes(characterId) }), 3000)
+      wasBusy.current = busy
+      return () => clearTimeout(t)
+    }
     wasBusy.current = busy
   }, [busy, characterId, qc])
-  return useQuery({ queryKey: keys.scenes(characterId), queryFn: () => api.scenes(characterId), refetchInterval: busy ? 1500 : false })
+  return useQuery({
+    queryKey: keys.scenes(characterId),
+    queryFn: () => api.scenes(characterId),
+    // Keep looking while a job runs or anything is still being checked.
+    refetchInterval: q => (busy || q.state.data?.scenes.some(s => s.candidates.some(c => c.status === 'qa_pending')) ? 1500 : false),
+  })
 }
 
 export function useRules(characterId: string | null) {

@@ -46,7 +46,8 @@ export interface RulesView { areas: Record<string, string>; rules: RuleRow[] }
 export interface SceneEdit { code: string; change: string; face: boolean }
 
 export interface SceneStill extends Candidate {
-  op: 'generate' | 'edit' | 'crop' | 'upscale' | 'mirror' | 'drift_lock'
+  op: 'generate' | 'edit' | 'crop' | 'upscale' | 'mirror' | 'drift_lock' | 'end_frame' | 'video' | 'video_upscale'
+  media: 'image' | 'video'
   parentId: string | null; sceneId: string
   qaReport: (QaReport & { edits?: SceneEdit[] }) | null
 }
@@ -76,6 +77,12 @@ export interface ScenesData {
     editPresets: Array<ScenePreset & { text: string; face: boolean }>
     stillModels: SceneModel[]; editModels: SceneModel[]; defaultModels: string[]
     maxVariations: number; maxModels: number; accountConnected: boolean; mode: 'demo' | 'live'
+    video: {
+      model: SceneModel; durations: number[]; duration: number; aspect: string; maxTakes: number; takes: number; directions: string
+      test: { model: SceneModel; duration: number; label: string; note: string }
+      upscale: SceneModel
+      endFrame: { model: SceneModel; presets: Array<{ id: string; label: string; text: string }> }
+    }
   }
 }
 
@@ -124,7 +131,7 @@ export interface QuoteView {
   budget: { ok: boolean; blocks: Array<{ scope: string; capMicros: number; afterMicros: number }>; warnings: Array<{ scope: string; capMicros: number; afterMicros: number }> }
 }
 
-export interface ActionPreview { title: string; prompts: Array<{ label: string; text: string; wrapped: string }>; warnings: Array<{ title: string; message: string; spec: string }>; invalidates: string[] }
+export interface ActionPreview { title: string; prompts: Array<{ label: string; text: string; wrapped: string }>; warnings: Array<{ title: string; message: string; spec: string }>; invalidates: string[]; followUp?: { label: string; display: string; verified: boolean } }
 
 export type StudioAction =
   | { type: 'breakdown'; characterId: string; notes?: string }
@@ -138,6 +145,9 @@ export type StudioAction =
   | { type: 'model_suite' }
   | { type: 'scene_plan'; characterId: string; sceneId: string }
   | { type: 'scene_ideas'; characterId: string; idea: string }
+  | { type: 'scene_video'; characterId: string; candidateId: string; endCandidateId?: string; motion: string; directions: string; durationSec: number; aspect: string; audio: boolean; takes: number; test: boolean }
+  | { type: 'scene_video_upscale'; characterId: string; candidateId: string }
+  | { type: 'scene_end_frame'; characterId: string; candidateId: string; change: string; withQa?: boolean }
   | { type: 'scene'; characterId: string; sceneId: string; models: string[]; variations: number; reason?: string; withQa?: boolean; allowRepeat?: boolean }
   | { type: 'scene_edit'; characterId: string; candidateId: string; change: string; face?: boolean; model?: string; withQa?: boolean }
   | { type: 'scene_upscale'; characterId: string; candidateId: string }

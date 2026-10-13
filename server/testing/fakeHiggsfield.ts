@@ -132,6 +132,8 @@ export function createFakeHiggsfield(): FakeHiggsfield {
         }
         case 'upscale_image':
           return answer({ job_id: newJob('image'), status: 'queued' })
+        case 'upscale_video':
+          return answer({ job_id: newJob('video'), status: 'queued' })
         case 'jobs_wait': {
           const jobId = (args.jobs as Json[])[0]!.job_id as string
           const job = f.jobs.get(jobId)

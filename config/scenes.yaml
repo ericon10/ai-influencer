@@ -134,3 +134,29 @@ edits:
     - { id: close_mouth, label: "Close her mouth", text: "Close {poss} mouth into a relaxed, natural expression", face: true }
     - { id: remove_logo, label: "Remove a logo or text", text: "Remove the {thing}, leaving that surface plain and unbranded" }
     - { id: remove_jewelry, label: "Remove extra jewelry", text: "Remove the {thing}" }
+
+# Video from a picked still (Stage 9, owner ruling 2026-10-13). Every value
+# is a default the owner can change on the video card.
+video:
+  # Straight to the final model; no separate draft step.
+  model: higgsfield/seedance-2.5
+  resolution: 720p
+  durations: [5, 10]
+  duration: 5
+  aspect: "9:16"
+  max_takes: 4
+  takes: 1
+  # Directions added to every video prompt (editable per clip).
+  directions: "No talking, no winking, steady eye contact. One continuous take, no cuts."
+  # Optional, off by default: a cheap motion check for complex movement.
+  test: { model: higgsfield/kling-3.0-turbo, duration: 5, resolution: 720p, label: "Quick motion test", note: "Faces not representative" }
+  # "Upscale this take": the exact take, never re-rolled.
+  upscale: { model: higgsfield/video-upscale }
+  # The end frame helper inpaints only the head of the start frame.
+  end_frame:
+    model: higgsfield/nano-banana-2.1
+    presets:
+      - { id: look_at_lens, label: "Looks into the lens", text: "{subj} turns {poss} head toward the camera and looks straight into the lens with a soft, closed-mouth smile" }
+      - { id: laugh, label: "Soft laugh", text: "{subj} laughs softly, eyes crinkling, mouth slightly open" }
+      - { id: look_away, label: "Looks away", text: "{subj} glances away to the side, relaxed and calm" }
+

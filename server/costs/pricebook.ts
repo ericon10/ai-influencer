@@ -36,6 +36,10 @@ function genUnit(req: GenRequest): { unit: PriceEntry['unit']; quantity: number;
     const seconds = req.durationSec ?? 5
     return { unit: 'second', quantity: seconds, label: `${seconds}s of video` }
   }
+  if (req.kind === 'upscale' && req.sourceVideo) {
+    const seconds = req.durationSec ?? 5
+    return { unit: 'second', quantity: seconds, label: `upscale ${seconds}s of video` }
+  }
   if (req.kind === 'audio') return { unit: 'second', quantity: req.durationSec ?? 10, label: 'audio' }
   if (req.kind === 'train_identity') return { unit: 'call', quantity: 1, label: 'identity training' }
   return { unit: 'image', quantity: 1, label: req.kind === 'upscale' ? 'upscale' : 'image' }

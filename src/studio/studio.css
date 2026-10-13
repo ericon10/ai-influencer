@@ -633,3 +633,10 @@ button.st-chip:hover { color: var(--st-text); border-color: var(--st-text-3); }
 .st-ideas { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
 .st-ideas .st-choice { text-align: left; line-height: 1.45; gap: 6px; }
 
+
+/* ── Video (Stage 9) ── */
+.st-clip { display: block; width: 100%; object-fit: cover; border-radius: 12px; background: var(--st-bg-2); }
+.st-clip-empty { display: grid; place-items: center; color: var(--st-bad); }
+.st-clip-player { display: block; width: 100%; max-height: 70vh; object-fit: contain; border-radius: 14px; background: #000; }
+.st-refnone { display: grid; place-items: center; aspect-ratio: 3 / 4; border-radius: 7px; border: 1px dashed var(--st-line-2); color: var(--st-text-3); font-size: 11px; }
+.st-testtoggle { padding: 10px 12px; border-radius: 12px; border: 1px dashed var(--st-line-2); }

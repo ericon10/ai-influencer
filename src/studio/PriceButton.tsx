@@ -130,6 +130,9 @@ export function PriceButton({ action, label, variant = 'primary', size = 'normal
         </div>
       )}
       {quote?.notes?.map((n, i) => <span key={i} className="st-hint" style={{ color: 'var(--st-warn)' }}><Info size={12} style={{ verticalAlign: -2 }} /> {n}</span>)}
+      {est.data?.preview.followUp && !held && (
+        <span className="st-hint"><Receipt size={12} style={{ verticalAlign: -2 }} /> Then: {est.data.preview.followUp.label}: <b>{est.data.preview.followUp.display}</b>{est.data.preview.followUp.verified ? '' : ' (not confirmed yet)'}</span>
+      )}
       {blocked && <span className="st-hint" style={{ color: 'var(--st-bad)' }}>This run would go over a budget cap. Adjust caps in Settings.</span>}
       {realism.map((w, i) => <span key={i} className="st-hint" style={{ color: 'var(--st-warn)' }}><AlertTriangle size={12} style={{ verticalAlign: -2 }} /> {w.message}</span>)}
       {quote && !quote.verified && !blocked && <span className="st-hint"><Info size={12} style={{ verticalAlign: -2 }} /> Uses a price that is not confirmed with the provider yet.</span>}

@@ -15,6 +15,7 @@ import { consumeQuote, createQuote, type QuoteItem, type QuoteView } from '../co
 import { getAsset, readAsset, saveAsset, type AssetRow } from '../storage/assets.js'
 import { probeFile } from '../media/ffmpeg.js'
 import { stripAudio } from '../media/edit.js'
+import { headMaskAsset } from '../pipeline/videoAssets.js'
 import { ProviderError, type CostEstimate, type GenRequest, type LlmImage, type LlmRequest, type Output, type ProviderAdapter } from '../providers/types.js'
 import { withBilling } from '../providers/billing.js'
 import { realismBlockers } from '../core/realism.js'
@@ -274,6 +275,7 @@ async function resolveRefs(deps: Deps, ctx: Ctx, adapter: ProviderAdapter, req: 
     startFrame: await withUrl(req.startFrame),
     endFrame: await withUrl(req.endFrame),
     sourceVideo: await withUrl(req.sourceVideo),
+    mask: await withUrl(req.mask),
   }
 }
 
@@ -291,7 +293,9 @@ async function submitGen(deps: Deps, job: JobRow): Promise<void> {
   const base = deps.env.STUDIO_PUBLIC_URL?.replace(/\/$/, '')
   const webhookUrl = base ? `${base}/api/v1/webhooks/${job.provider}/${job.id}?t=${token}` : undefined
   try {
-    const resolved = await resolveRefs(deps, ctx, adapter, req)
+    // A head mask is made here, on the worker, where the face models are.
+    const masked = req.maskFor && !req.mask ? { ...req, mask: { assetId: await headMaskAsset(deps, ctx, req.maskFor.assetId) } } : req
+    const resolved = await resolveRefs(deps, ctx, adapter, masked)
     const { jobId } = await adapter.submit(resolved, { idempotencyKey: job.idempotencyKey, webhookUrl })
     const now = deps.clock.now()
     await update(deps, job, { status: 'running', providerJobId: jobId, submittedAt: now, nextPollAt: new Date(now.getTime() + backoffMs(deps, 1)), lockedUntil: null })

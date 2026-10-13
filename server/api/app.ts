@@ -493,7 +493,16 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
       }
     }
     const { row, data } = await readAsset(deps, ctx, c.req.param('id'))
-    return new Response(new Uint8Array(data), { headers: { 'content-type': row.mime, 'cache-control': 'private, max-age=31536000, immutable', 'content-disposition': c.req.query('download') ? `attachment; filename="${row.id}.${row.mime.split('/')[1]}"` : 'inline' } })
+    const headers: Record<string, string> = { 'content-type': row.mime, 'cache-control': 'private, max-age=31536000, immutable', 'accept-ranges': 'bytes', 'content-disposition': c.req.query('download') ? `attachment; filename="${row.id}.${row.mime.split('/')[1]}"` : 'inline' }
+    // Video players ask for byte ranges (Safari will not play a clip without them).
+    const range = /^bytes=(\d*)-(\d*)$/.exec(c.req.header('range') ?? '')
+    if (range && data.length) {
+      const start = range[1] ? Number(range[1]) : Math.max(0, data.length - Number(range[2]))
+      const end = range[1] && range[2] ? Math.min(Number(range[2]), data.length - 1) : data.length - 1
+      if (start > end || start >= data.length) return new Response(null, { status: 416, headers: { 'content-range': `bytes */${data.length}` } })
+      return new Response(new Uint8Array(data.subarray(start, end + 1)), { status: 206, headers: { ...headers, 'content-range': `bytes ${start}-${end}/${data.length}`, 'content-length': String(end - start + 1) } })
+    }
+    return new Response(new Uint8Array(data), { headers })
   })
 
   // ── Usage and settings ──
