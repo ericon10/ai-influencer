@@ -61,7 +61,12 @@ restrictions. Every rule is in exactly one of two buckets
   logos" switch for brand deals); the persona "never" list
   (suggestions only); the gray sheet background (editable); QA
   findings (advice with one-click fixes; face drift is a strong
-  warning and the owner still decides); video recipe rules (single
+  warning and the owner still decides); automatic Claude QA (starts
+  off: the free face match and skin checks always run, and "Check
+  this" asks Claude on demand, priced on the button); the Claude
+  model per task (Sonnet 5.5 for every Claude call, each switchable to
+  Opus in Settings, Claude models; the model name shows next to each
+  price); video recipe rules (single
   take, calm action, no winking line, audio off).
 
 Settings > Rules lists every rule with its bucket and an on/off switch

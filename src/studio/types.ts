@@ -126,12 +126,14 @@ export interface QuoteView {
   id: string; total: string; totalMicros: number; verified: boolean; status: 'open' | 'blocked'; needsConfirm: boolean; expiresAt: string
   // Plan credits on the Higgsfield account path, and the price as shown.
   credits: number; display: string
-  items: Array<{ label: string; model: string; amount: string; amountMicros: number; credits: number | null; verified: boolean }>
+  items: Array<{ label: string; model: string; modelLabel: string; amount: string; amountMicros: number; credits: number | null; verified: boolean }>
+  // The models that will run, by name.
+  models: string[]
   notes?: string[]
   budget: { ok: boolean; blocks: Array<{ scope: string; capMicros: number; afterMicros: number }>; warnings: Array<{ scope: string; capMicros: number; afterMicros: number }> }
 }
 
-export interface ActionPreview { title: string; prompts: Array<{ label: string; text: string; wrapped: string }>; warnings: Array<{ title: string; message: string; spec: string }>; invalidates: string[]; followUp?: { label: string; display: string; verified: boolean } }
+export interface ActionPreview { title: string; prompts: Array<{ label: string; text: string; wrapped: string }>; warnings: Array<{ title: string; message: string; spec: string }>; invalidates: string[]; followUp?: { label: string; display: string; verified: boolean; models: string[] } }
 
 export type StudioAction =
   | { type: 'breakdown'; characterId: string; notes?: string }
@@ -171,6 +173,11 @@ export interface SettingsView {
   providers: Array<{ id: string; label: string; hint: string; placeholder: string; usedFor: string; serverKey?: boolean }>
   budgets: { job: number; character: number; month: number; confirmAbove: number; warnPct: number }
   routing: Array<{ task: string; configured: string; effective: string }>
+  // Claude tasks and the model each runs on (Settings, Claude models).
+  claude: {
+    choices: Array<{ ref: string; label: string }>
+    tasks: Array<{ task: string; label: string; hint: string; model: string; modelLabel: string; default: string; changed: boolean }>
+  }
   models: Array<{
     ref: string; label: string; kinds: string[]; verified: boolean; notes: string; api: boolean; reference: string | null
     endpoint: string; endpointSource: 'config' | 'account' | 'none'; confirmedAt: string | null

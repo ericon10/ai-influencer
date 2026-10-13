@@ -161,7 +161,7 @@ function ReviewShot({ v, shot }: { v: CharacterView; shot: Shot }) {
             <div className="st-col" style={{ gap: 10 }}>
               <div className="st-verdict-title">Fix: {fixes.map(f => f.label).join(', ')}</div>
               <div className="st-row">
-                <PriceButton action={{ type: 'sheet', characterId: v.id, refId: shot.id, variations: 1, reason: fixes.find(f => f.available)?.reason ?? reasons[0], refsMode: 'graph', withQa: true }} label="Regenerate with the fix" onStarted={() => nav(`/studio/c/${v.id}`)} />
+                <PriceButton action={{ type: 'sheet', characterId: v.id, refId: shot.id, variations: 1, reason: fixes.find(f => f.available)?.reason ?? reasons[0], refsMode: 'graph' }} label="Regenerate with the fix" onStarted={() => nav(`/studio/c/${v.id}`)} />
                 <button className="st-btn ghost" onClick={back}>Later</button>
               </div>
             </div>
@@ -214,7 +214,7 @@ function zoomTo(cx: number, cy: number, s: number): View {
 
 function Verdict({ cand, onMirror }: { cand: Candidate | undefined; onMirror?: () => void }) {
   const r = cand?.qaReport
-  if (!r) return <div className="st-verdict uncertain"><span className="st-verdict-icon"><AlertTriangle size={18} /></span><div><div className="st-verdict-title">No automatic QA for this result</div><ul><li>Check the marks, framing and face yourself.</li></ul></div></div>
+  if (!r) return <div className="st-verdict uncertain"><span className="st-verdict-icon"><AlertTriangle size={18} /></span><div><div className="st-verdict-title">Not checked by Claude</div><ul><li>Check the marks, framing and face yourself, or press Check this.</li></ul></div></div>
   const title = { post: 'QA: looks right', edit: 'QA: a small detail to fix', regenerate: 'QA: should be regenerated', uncertain: 'QA: needs your eye' }[r.verdict]
   const notes = r.findings.filter(f => f.severity !== 'info')
   return (

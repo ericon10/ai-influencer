@@ -53,7 +53,7 @@ export function SheetTab({ v, goHero, goFile }: { v: CharacterView; goHero: () =
       {generating.length > 0 && (
         <div className="st-card pad st-row" style={{ gap: 14 }}>
           <Loader2 className="st-spin" size={18} />
-          <div className="grow"><div className="st-h3">Working on {generating.map(s => s.id).join(', ')}</div><div className="st-hint">Rendering, then automatic QA. Failed QA never reaches your review queue.</div></div>
+          <div className="grow"><div className="st-h3">Working on {generating.map(s => s.id).join(', ')}</div><div className="st-hint">Rendering, then the free checks: face match against REF-00 and skin texture. Check this asks Claude on demand.</div></div>
         </div>
       )}
 
@@ -184,9 +184,9 @@ function NextUp({ v, shot, action }: { v: CharacterView; shot: Shot; action: 'ge
             <PriceButton
               size="big"
               label={failed ? 'Regenerate with the fix' : `Generate ${shot.id}`}
-              action={{ type: 'sheet', characterId: v.id, refId: shot.id, variations, reason: failed ? fixReason : undefined, refsMode: ref00Only ? 'ref00_only' : 'graph', withQa: true }}
+              action={{ type: 'sheet', characterId: v.id, refId: shot.id, variations, reason: failed ? fixReason : undefined, refsMode: ref00Only ? 'ref00_only' : 'graph' }}
             />
-            <span className="st-hint">Price includes automatic QA (mark sides, framing, jewelry) on every variation.</span>
+            <span className="st-hint">You review each shot. Free checks (face match, skin texture) run on every shot; press Check this for a Claude check of the mark sides and framing.</span>
           </>
         )}
 
@@ -205,9 +205,9 @@ function NextUp({ v, shot, action }: { v: CharacterView; shot: Shot; action: 'ge
             )}
             <div className="st-row">
               <button className="st-btn ok" onClick={keep}><CheckCircle2 size={16} />Still right, keep it</button>
-              {shot.approved && <PriceButton action={{ type: 'qa', characterId: v.id, candidateId: shot.approved.candidateId }} label="Run QA again" variant="secondary" />}
+              {shot.approved && <PriceButton action={{ type: 'qa', characterId: v.id, candidateId: shot.approved.candidateId }} label="Check again" variant="secondary" />}
             </div>
-            <PriceButton action={{ type: 'sheet', characterId: v.id, refId: shot.id, variations, refsMode: 'graph', withQa: true }} label="Regenerate" variant="secondary" />
+            <PriceButton action={{ type: 'sheet', characterId: v.id, refId: shot.id, variations, refsMode: 'graph' }} label="Regenerate" variant="secondary" />
           </>
         )}
       </div>
@@ -243,7 +243,7 @@ function ShotDrawer({ v, shot, onClose }: { v: CharacterView; shot: Shot | null;
                   <option value="">No specific problem</option>
                   {v.reasons.filter(r => r.id !== 'talking').map(r => <option key={r.id} value={r.id}>{r.label}</option>)}
                 </select>
-                <PriceButton action={{ type: 'sheet', characterId: v.id, refId: shot.id, variations: 1, reason: reason || undefined, refsMode: 'graph', withQa: true }} label="Regenerate" variant="secondary" icon />
+                <PriceButton action={{ type: 'sheet', characterId: v.id, refId: shot.id, variations: 1, reason: reason || undefined, refsMode: 'graph' }} label="Regenerate" variant="secondary" icon />
               </div>
             )}
           </div>
@@ -315,7 +315,7 @@ function ToCheck({ v }: { v: CharacterView }) {
                 <span className="st-hint">QA reads the mark sides, the view and the framing. It is a paid vision call, so the price shows first.</span>
               )}
               <div className="st-row" style={{ gap: 8 }}>
-                {!c.qaReport && <PriceButton action={{ type: 'qa', characterId: v.id, candidateId: c.id }} label="Run QA" variant="secondary" />}
+                {!c.qaReport && <PriceButton action={{ type: 'qa', characterId: v.id, candidateId: c.id }} label="Check this" variant="secondary" />}
                 {c.qaReport?.mirrorFix?.available && <MirrorButton v={v} candidate={c} />}
                 {c.qaReport?.mirrorFix && !c.qaReport.mirrorFix.available && <span className="st-hint">{c.qaReport.mirrorFix.message}</span>}
               </div>

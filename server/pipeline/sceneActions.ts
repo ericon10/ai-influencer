@@ -1,3 +1,4 @@
+import { and, eq } from 'drizzle-orm'
 import type { Ctx, Deps } from '../context.js'
 import type { ModelEntry } from '../config/load.js'
 import { fill, hardWrap, normalizePrompt } from '../core/text.js'
@@ -22,6 +23,7 @@ import { approvedAssets, getCandidate, toData, type CharacterRow } from './chara
 import { comboEntries, comboProblem, getScene, sceneFields, sceneRefs, type SceneRef } from './scenes.js'
 import { assertFace } from './videoAssets.js'
 import { getAsset } from '../storage/assets.js'
+import { assets } from '../db/schema.js'
 
 // Paid steps for scenes (Stage 7) and still edits (Stage 8). Each returns the
 // job specs for the estimate and the run (one builder for both, so the run
@@ -491,12 +493,20 @@ export async function buildSceneRecheck(deps: Deps, ctx: Ctx, row: CharacterRow,
   if (cand.characterId !== row.id || !cand.sceneId || !cand.assetId) throw new AppError('bad_request', 'Pick a scene still to check.')
   const scene = await getScene(deps, ctx, cand.sceneId)
   const f = sceneFields(deps, scene)
+  // A video take is checked on its last frame (saved when the take arrived).
+  let image = cand.assetId
+  if (isVideoCandidate(cand)) {
+    const [frame] = await deps.db.select({ id: assets.id }).from(assets)
+      .where(and(eq(assets.accountId, ctx.accountId), eq(assets.label, `last frame of ${cand.assetId}`)))
+    if (!frame) throw new AppError('bad_request', 'This take has no saved frame to check. Make a new take to check it.')
+    image = frame.id
+  }
   const refs = await sceneRefs(deps, ctx, row.id, f, (await ruleSwitches(deps, ctx, row.id)).on('scene-refs-by-angle'))
   const specs = await sceneQaSpecs(deps, ctx, toData(row), f, {
-    sceneId: scene.id, assetId: cand.assetId, candidateId: cand.id, group: `recheck:${cand.id}:${deps.clock.now().getTime()}`,
+    sceneId: scene.id, assetId: image, candidateId: cand.id, group: `recheck:${cand.id}:${deps.clock.now().getTime()}`,
     faceRefs: refs.filter(r => r.role !== 'body').map(r => ({ refId: r.refId, assetId: r.assetId })), label: sceneLabel(scene, f),
   })
-  return { purpose: `scene_qa:${scene.id}`, specs, preview: { title: 'Check this still', prompts: [], warnings: [], invalidates: [] } }
+  return { purpose: `scene_qa:${scene.id}`, specs, preview: { title: isVideoCandidate(cand) ? 'Check this take (last frame)' : 'Check this still', prompts: [], warnings: [], invalidates: [] } }
 }
 
 // The combo log entry a scene would write, for the UI.

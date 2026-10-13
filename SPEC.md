@@ -480,8 +480,15 @@ rule book is `config/rules.yaml`.
 
 ## 6. QA service
 
-Automated checks run on every result before a human sees it.
-Under rule one, QA findings are advice with one-click fixes (an
+The free local checks run on every result before a human sees
+it: face match against REF-00 (plus the closest-angle ref) and the
+skin texture check. The Claude vision checks (mark side, eye
+color, logos, jewelry, hands, framing) run on demand: each still
+and take has a "Check this" button, priced on the button, on
+Sonnet 5.5 (like every Claude call; Opus is a per-task switch in
+Settings, Claude models). Automatic Claude checks are a default that starts off
+(owner, 2026-10-13: "I have eyes"); the Generate price shows only
+what will run. Under rule one, QA findings are advice with one-click fixes (an
 edit, the free mirror, a crop), never a block. Face drift is a
 strong warning: the owner confirms before picking a drifted still.
 Only the fixed checks stop a still: plastic, waxy or smoothed skin

@@ -9,7 +9,7 @@ import { jobs } from '../db/schema.js'
 import { getAsset } from '../storage/assets.js'
 import { approvedAssets, candidatesFor, getCharacter, inspirationAssetIds, listConcepts, sheetState, toData, type CharacterRow } from '../pipeline/characters.js'
 import { characterCosts } from '../pipeline/costs.js'
-import { providerMode, resolveRoute } from '../pipeline/settings.js'
+import { claudeModels, providerMode, resolveRoute } from '../pipeline/settings.js'
 import { effectiveModel, readModelOverrides } from '../providers/modelOverrides.js'
 import { readBilling } from '../providers/billing.js'
 import { serverKeyFor } from '../providers/serverKeys.js'
@@ -141,13 +141,14 @@ export async function settingsView(deps: Deps, ctx: Ctx) {
         // The owner's account can run on the server key (HF_CREDENTIALS).
         serverKey: !!(await serverKeyFor(deps.db, { ownerEmail: deps.env.STUDIO_OWNER_EMAIL || 'owner@studio.local', higgsfield: deps.env.HF_CREDENTIALS }, ctx.accountId, 'higgsfield')),
       },
-      { id: 'anthropic', label: 'Anthropic', hint: 'An API key from the Anthropic Console.', placeholder: 'e.g. sk-ant-...', usedFor: 'Breakdowns, concepts and QA' },
+      { id: 'anthropic', label: 'Anthropic', hint: 'An API key from the Anthropic Console.', placeholder: 'e.g. sk-ant-...', usedFor: 'Scene planner, Punch it up, concepts and Check this' },
     ],
     budgets: {
       job: microsToUsd(b.jobCapMicros), character: microsToUsd(b.characterCapMicros), month: microsToUsd(b.monthCapMicros),
       confirmAbove: microsToUsd(b.confirmAboveMicros), warnPct: b.warnPct,
     },
     routing: await Promise.all(tasks.map(async t => ({ task: t, configured: deps.config.routing.tasks[t]!.model, effective: (await resolveRoute(deps, ctx, t)).model }))),
+    claude: await claudeModels(deps, ctx),
     models: deps.config.models.models.filter(m => !m.ref.startsWith('mock/')).map(m => {
       const e = effectiveModel(m, overrides[m.ref])
       const o = overrides[m.ref]

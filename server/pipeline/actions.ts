@@ -13,7 +13,7 @@ import { breakdownJsonSchema, cardUpdateJsonSchema, conceptsJsonSchema } from '.
 import { AppError } from '../lib/errors.js'
 import { getAsset } from '../storage/assets.js'
 import { quoteItemsFor, quoteJobs, runJobs, type JobSpec } from '../jobs/runner.js'
-import { displayPrice } from '../costs/quotes.js'
+import { displayPrice, modelLabel } from '../costs/quotes.js'
 import type { QuoteView } from '../costs/quotes.js'
 import type { GenRequest } from '../providers/types.js'
 import { forMode, liveRoute, resolveRoute } from './settings.js'
@@ -43,7 +43,7 @@ export const actionSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('sheet'), characterId: z.string(), refId: z.string().regex(/^REF-\d{2}$/),
     variations: z.number().int().min(1).max(4), reason: z.string().optional(),
-    refsMode: z.enum(['graph', 'ref00_only']).default('graph'), withQa: z.boolean().default(true),
+    refsMode: z.enum(['graph', 'ref00_only']).default('graph'), withQa: z.boolean().optional(),
   }),
   z.object({ type: z.literal('qa'), characterId: z.string(), candidateId: z.string() }),
   // One small paid test that confirms a model (Settings, Models).
@@ -57,14 +57,14 @@ export const actionSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('scene'), characterId: z.string(), sceneId: z.string(),
     models: z.array(z.string()).min(1).max(4), variations: z.number().int().min(1).max(8),
-    reason: z.string().optional(), withQa: z.boolean().default(true),
+    reason: z.string().optional(), withQa: z.boolean().optional(),
     // Silences the repeat note (rule scene-combo-log, off unless switched on).
     allowRepeat: z.boolean().optional(),
   }),
   // Still edits (Stage 8): one change per pass, an upscale, a re-check.
   z.object({
     type: z.literal('scene_edit'), characterId: z.string(), candidateId: z.string(), change: z.string().max(400),
-    face: z.boolean().default(false), model: z.string().optional(), withQa: z.boolean().default(true),
+    face: z.boolean().default(false), model: z.string().optional(), withQa: z.boolean().optional(),
   }),
   z.object({ type: z.literal('scene_upscale'), characterId: z.string(), candidateId: z.string() }),
   z.object({ type: z.literal('scene_qa'), characterId: z.string(), candidateId: z.string() }),
@@ -77,7 +77,7 @@ export const actionSchema = z.discriminatedUnion('type', [
     aspect: z.string().max(8).default('9:16'), audio: z.boolean().default(false), takes: z.number().int().min(1).max(8).default(1), test: z.boolean().default(false),
   }),
   z.object({ type: z.literal('scene_video_upscale'), characterId: z.string(), candidateId: z.string() }),
-  z.object({ type: z.literal('scene_end_frame'), characterId: z.string(), candidateId: z.string(), change: z.string().max(400), withQa: z.boolean().default(true) }),
+  z.object({ type: z.literal('scene_end_frame'), characterId: z.string(), candidateId: z.string(), change: z.string().max(400), withQa: z.boolean().optional() }),
 ])
 
 export type StudioAction = z.infer<typeof actionSchema>
@@ -88,7 +88,7 @@ export interface ActionPreview {
   warnings: RuleViolation[]
   invalidates: string[]
   // The price of a later step, shown with this one (never run here).
-  followUp?: { label: string; display: string; verified: boolean }
+  followUp?: { label: string; display: string; verified: boolean; models: string[] }
 }
 
 export interface BuiltAction {
@@ -175,6 +175,8 @@ export async function buildAction(deps: Deps, ctx: Ctx, action: StudioAction): P
   // Default rules as switched for this character (Settings, Rules).
   const sw = await ruleSwitches(deps, ctx, row.id)
   const looks = { background: sw.on('sheet-background') ? sw.value('sheet-background') ?? null : null, flawDose: sw.on('realism-flaw-dose') }
+  // Claude checks run on demand unless the owner switches automatic QA on.
+  const autoQa = sw.on('scene-auto-qa')
   const scene = (b: SceneBuilt): BuiltAction => ({ purpose: b.purpose, characterId: row.id, specs: b.specs, preview: b.preview, followUp: b.followUp })
 
   switch (action.type) {
@@ -182,9 +184,9 @@ export async function buildAction(deps: Deps, ctx: Ctx, action: StudioAction): P
     case 'scene_ideas': return scene(await buildSceneIdeas(deps, ctx, row, action.idea))
     case 'scene_video': return scene(await buildSceneVideo(deps, ctx, row, action))
     case 'scene_video_upscale': return scene(await buildVideoUpscale(deps, ctx, row, action.candidateId))
-    case 'scene_end_frame': return scene(await buildSceneEndFrame(deps, ctx, row, action))
-    case 'scene': return scene(await buildSceneRun(deps, ctx, row, action))
-    case 'scene_edit': return scene(await buildSceneEdit(deps, ctx, row, action))
+    case 'scene_end_frame': return scene(await buildSceneEndFrame(deps, ctx, row, { ...action, withQa: action.withQa ?? autoQa }))
+    case 'scene': return scene(await buildSceneRun(deps, ctx, row, { ...action, withQa: action.withQa ?? autoQa }))
+    case 'scene_edit': return scene(await buildSceneEdit(deps, ctx, row, { ...action, withQa: action.withQa ?? autoQa }))
     case 'scene_upscale': return scene(await buildSceneUpscale(deps, ctx, row, action.candidateId))
     case 'scene_qa': return scene(await buildSceneRecheck(deps, ctx, row, action.candidateId))
 
@@ -313,7 +315,7 @@ export async function buildAction(deps: Deps, ctx: Ctx, action: StudioAction): P
         warnings = [...orderWarning, ...dedupe(realism), ...warnings]
         const genIndex = specs.length
         specs.push({ type: 'gen', stage: 'sheet', purpose: `sheet:${shot.id}`, label: `${shot.label}${action.variations > 1 ? `, variation ${v + 1}` : ''}`, request })
-        if (action.withQa) specs.push(...await qaSpecs(deps, ctx, row.id, shot.id, { parentIndex: genIndex }))
+        if (action.withQa ?? autoQa) specs.push(...await qaSpecs(deps, ctx, row.id, shot.id, { parentIndex: genIndex }))
       }
       const ref = state.refs.find(r => r.refId === shot.id)
       const invalidates = ref?.approvedCandidateId ? invalidationFor(sheet.shots, state.states, shot.id) : []
@@ -342,7 +344,7 @@ export async function estimateAction(deps: Deps, ctx: Ctx, action: StudioAction)
   let followUp: ActionPreview['followUp']
   if (built.followUp) {
     const items = await quoteItemsFor(deps, ctx, built.followUp.specs)
-    followUp = { label: built.followUp.label, display: displayPrice(items.map(i => ({ amountMicros: i.estimate.totalMicros, credits: i.estimate.credits ?? null }))), verified: items.every(i => i.estimate.verified) }
+    followUp = { label: built.followUp.label, display: displayPrice(items.map(i => ({ amountMicros: i.estimate.totalMicros, credits: i.estimate.credits ?? null }))), verified: items.every(i => i.estimate.verified), models: [...new Set(items.map(i => modelLabel(deps, `${i.provider}/${i.model}`)))] }
   }
   return { quote, preview: { ...built.preview, warnings: uniqueWarnings([...built.preview.warnings, ...untested]), ...(followUp ? { followUp } : {}) } }
 }

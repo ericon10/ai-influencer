@@ -118,6 +118,7 @@ export function PriceButton({ action, label, variant = 'primary', size = 'normal
           {!confirming && price}
         </button>
         {confirming && <button className="st-btn ghost sm" onClick={() => setConfirming(false)}>Cancel</button>}
+        {quote && !held && <span className="st-model-tag" title="The model this runs on (Claude models can be switched in Settings)">{quote.models.join(' + ')}</span>}
         {quote && !confirming && (
           <button className="st-btn ghost sm" onClick={() => setDetails(true)} aria-label="Price details"><Receipt size={14} />Details</button>
         )}
@@ -131,7 +132,7 @@ export function PriceButton({ action, label, variant = 'primary', size = 'normal
       )}
       {quote?.notes?.map((n, i) => <span key={i} className="st-hint" style={{ color: 'var(--st-warn)' }}><Info size={12} style={{ verticalAlign: -2 }} /> {n}</span>)}
       {est.data?.preview.followUp && !held && (
-        <span className="st-hint"><Receipt size={12} style={{ verticalAlign: -2 }} /> Then: {est.data.preview.followUp.label}: <b>{est.data.preview.followUp.display}</b>{est.data.preview.followUp.verified ? '' : ' (not confirmed yet)'}</span>
+        <span className="st-hint"><Receipt size={12} style={{ verticalAlign: -2 }} /> Then: {est.data.preview.followUp.label}: <b>{est.data.preview.followUp.display}</b> on {est.data.preview.followUp.models.join(' + ')}{est.data.preview.followUp.verified ? '' : ' (not confirmed yet)'}</span>
       )}
       {blocked && <span className="st-hint" style={{ color: 'var(--st-bad)' }}>This run would go over a budget cap. Adjust caps in Settings.</span>}
       {realism.map((w, i) => <span key={i} className="st-hint" style={{ color: 'var(--st-warn)' }}><AlertTriangle size={12} style={{ verticalAlign: -2 }} /> {w.message}</span>)}
@@ -146,7 +147,7 @@ export function PriceButton({ action, label, variant = 'primary', size = 'normal
             <div className="st-kicker">Estimate</div>
             <div className="st-h2" style={{ marginBottom: 12 }}>{est.data.preview.title}</div>
             {quote.items.map((it, i) => (
-              <div className="st-quote-line" key={i}><span>{it.label}<span className="st-muted"> · {it.model}</span></span><span>{it.amount}</span></div>
+              <div className="st-quote-line" key={i}><span>{it.label}<span className="st-muted"> · {it.modelLabel}</span></span><span>{it.amount}</span></div>
             ))}
             <div className="st-quote-total"><span className="st-muted">Total, reserved until done</span><b>{quote.display}</b></div>
             {quote.credits > 0 && <p className="st-hint" style={{ marginTop: 8 }}>Plan credits come from your Higgsfield account{quote.totalMicros > 0 ? `; they count as ${quote.total} toward budgets` : ''}.</p>}

@@ -102,12 +102,16 @@ const routeSchema = z.object({
   resolution: z.string().optional(),
   aspect: z.string().optional(),
   effort: z.enum(['low', 'medium', 'high', 'xhigh', 'max']).optional(),
+  // For Claude tasks: the name and line shown in Settings, Claude models.
+  label: z.string().optional(),
+  hint: z.string().optional(),
 })
 
 const routingSchema = z.object({
   version: z.number(),
   tasks: z.record(z.string(), routeSchema),
   mock: z.object({ image: z.string(), video: z.string(), llm: z.string() }),
+  claude_choices: z.array(z.string()).default([]),
   avoid: z.record(z.string(), z.array(z.string())),
 })
 
@@ -231,6 +235,9 @@ function validateCrossRefs(cfg: StudioConfig): void {
     if (!imageRefs.has(route.model) && !llmRefs.has(route.model)) {
       throw new ConfigError(`routing.yaml: task "${task}" points at unknown model "${route.model}"`)
     }
+  }
+  for (const ref of cfg.routing.claude_choices) {
+    if (!llmRefs.has(ref)) throw new ConfigError(`routing.yaml: claude_choices has unknown model "${ref}"`)
   }
   for (const ref of Object.values(cfg.routing.mock)) {
     if (!imageRefs.has(ref) && !llmRefs.has(ref)) throw new ConfigError(`routing.yaml: unknown mock model "${ref}"`)

@@ -34,13 +34,23 @@ export interface QuoteView {
   credits: number
   display: string
   verified: boolean
-  items: Array<{ label: string; model: string; amount: string; amountMicros: number; credits: number | null; verified: boolean }>
+  items: Array<{ label: string; model: string; modelLabel: string; amount: string; amountMicros: number; credits: number | null; verified: boolean }>
+  // The models that will run, by name, shown next to the price.
+  models: string[]
   // Why a price is not a fresh live one (Higgsfield was slow), once each.
   notes: string[]
   budget: BudgetCheck
   status: 'open' | 'blocked'
   expiresAt: string
   needsConfirm: boolean
+}
+
+// A model's name as people know it ("Claude Sonnet 5.5", "Nano Banana 2.1").
+// Demo mode runs free mocks, and says so.
+export function modelLabel(deps: Pick<Deps, 'config'>, ref: string): string {
+  if (ref.startsWith('mock/')) return 'Demo mock, free'
+  const { models, llm_models } = deps.config.models
+  return llm_models.find(m => m.ref === ref)?.label ?? models.find(m => m.ref === ref)?.label ?? ref
 }
 
 export function formatCredits(credits: number): string {
@@ -86,7 +96,8 @@ export async function createQuote(deps: Deps, ctx: Ctx, input: { purpose: string
     credits: items.reduce((s, i) => s + (i.credits ?? 0), 0),
     display: displayPrice(items),
     verified: input.items.every(i => i.estimate.verified),
-    items: items.map(i => ({ label: i.label, model: `${i.provider}/${i.model}`, amount: i.credits != null ? formatCredits(i.credits) : formatUsd(i.amountMicros), amountMicros: i.amountMicros, credits: i.credits, verified: i.verified })),
+    items: items.map(i => ({ label: i.label, model: `${i.provider}/${i.model}`, modelLabel: modelLabel(deps, `${i.provider}/${i.model}`), amount: i.credits != null ? formatCredits(i.credits) : formatUsd(i.amountMicros), amountMicros: i.amountMicros, credits: i.credits, verified: i.verified })),
+    models: [...new Set(items.map(i => modelLabel(deps, `${i.provider}/${i.model}`)))],
     notes: [...new Set(input.items.map(i => i.estimate.note).filter((n): n is string => !!n))],
     budget, status, expiresAt: expiresAt.toISOString(), needsConfirm: budget.needsConfirm,
   }

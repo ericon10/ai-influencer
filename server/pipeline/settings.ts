@@ -45,10 +45,12 @@ export const providerMode = (db: Db, accountId: string) => getSetting<ProviderMo
 // demo mode swaps in mock providers. Locks such as the sheet model record
 // this real model, so a sheet started in demo mode keeps its real model
 // when the account goes live.
+export const ROUTING_OVERRIDES_KEY = 'routing_overrides'
+
 export async function liveRoute(deps: Deps, ctx: Ctx, task: string): Promise<Route> {
   const base = deps.config.routing.tasks[task]
   if (!base) throw new AppError('bad_request', `No route for task "${task}".`)
-  const overrides = await getSetting<Record<string, Partial<Route>>>(deps.db, ctx.accountId, 'routing_overrides', {})
+  const overrides = await getSetting<Record<string, Partial<Route>>>(deps.db, ctx.accountId, ROUTING_OVERRIDES_KEY, {})
   return { ...base, ...(overrides[task] ?? {}) }
 }
 
@@ -58,6 +60,38 @@ export async function forMode(deps: Deps, ctx: Ctx, route: Route): Promise<Route
   const isLlm = deps.config.models.llm_models.some(m => m.ref === route.model)
   const isVideo = route.kind === 'video' || route.kind === 'video_extend'
   return { ...route, model: isLlm ? deps.config.routing.mock.llm : isVideo ? deps.config.routing.mock.video : deps.config.routing.mock.image }
+}
+
+// Claude tasks (a route on a Claude model) and the model each one runs on
+// for this account: Sonnet 5.5 unless switched in Settings, Claude models.
+const isClaudeTask = (deps: Deps, task: string) => deps.config.models.llm_models.some(m => m.ref === deps.config.routing.tasks[task]?.model && !m.ref.startsWith('mock/'))
+
+export async function claudeModels(deps: Deps, ctx: Ctx) {
+  const label = (ref: string) => deps.config.models.llm_models.find(m => m.ref === ref)?.label ?? ref
+  const tasks = Object.keys(deps.config.routing.tasks).filter(t => isClaudeTask(deps, t))
+  return {
+    choices: deps.config.routing.claude_choices.map(ref => ({ ref, label: label(ref) })),
+    tasks: await Promise.all(tasks.map(async task => {
+      const base = deps.config.routing.tasks[task]!
+      const model = (await liveRoute(deps, ctx, task)).model
+      return { task, label: base.label ?? task.replace(/_/g, ' '), hint: base.hint ?? '', model, modelLabel: label(model), default: base.model, changed: model !== base.model }
+    })),
+  }
+}
+
+export async function setClaudeModel(deps: Deps, ctx: Ctx, task: string, model: string): Promise<void> {
+  if (!isClaudeTask(deps, task)) throw new AppError('bad_request', `"${task}" is not a Claude task.`)
+  if (!deps.config.routing.claude_choices.includes(model)) throw new AppError('bad_request', `Pick one of: ${deps.config.routing.claude_choices.join(', ')}.`)
+  const overrides = { ...(await getSetting<Record<string, Partial<Route>>>(deps.db, ctx.accountId, ROUTING_OVERRIDES_KEY, {})) }
+  const { model: _old, ...rest } = overrides[task] ?? {}
+  // Back to the default: drop the override, so a config change reaches it.
+  if (model === deps.config.routing.tasks[task]!.model) {
+    if (Object.keys(rest).length) overrides[task] = rest
+    else delete overrides[task]
+  } else {
+    overrides[task] = { ...rest, model }
+  }
+  await setSetting(deps, ctx, ROUTING_OVERRIDES_KEY, overrides)
 }
 
 export async function resolveRoute(deps: Deps, ctx: Ctx, task: string): Promise<Route> {

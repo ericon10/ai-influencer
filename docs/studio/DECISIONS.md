@@ -148,10 +148,10 @@ Facts that shaped the design (from the official SDK, MIT licensed):
 
 ### B5. LLM provider (Decided)
 Anthropic Claude, called server side with the account's own key.
-Routing is config (`config/routing.yaml`). It ships with Claude Opus 5.5
-for every LLM task (breakdown, concepts, card check, QA perception),
-because side-of-face accuracy matters more than the few cents saved;
-any task can be moved to Sonnet 5.5 or Haiku 5.5 by editing one line.
+Routing is config (`config/routing.yaml`). It first shipped with Claude
+Opus 5.5 for every LLM task; since G9 (2026-10-13) every Claude task
+runs on Sonnet 5.5 by default, and each can be switched to Opus 5.5 per
+account in Settings, Claude models.
 LLM calls go through the same estimate, ledger and budget path as image
 and video jobs. The character file and rules sit in a cached prompt
 prefix.
@@ -554,3 +554,34 @@ changes what the Studio suggests and checks, never what the owner types.
   softens skin a little, so only a clear loss is pointed out). A smoothed
   upscale is flagged and the original take stays.
 
+### G8. Claude checks on demand; the free checks always run (owner)
+- **Automatic Claude QA is off by default** for stills (scenes, edits,
+  end frames, the sheet) and video takes. The owner reviews with their
+  own eyes. The switch is the `scene-auto-qa` default rule (`starts_on:
+  false`), so it can be turned back on for all characters or one in
+  Settings, Rules.
+- **The free local checks stay on**: face match against REF-00 and the
+  skin texture check (sheet, scenes, edits, takes). They cost nothing.
+  A still that passes them reads "Free checks passed (face match,
+  skin). Not checked by Claude; look it over yourself.", never "ready".
+- **"Check this"** on each still and take runs the Claude check on
+  demand, with its own price on the button; a take is checked on its
+  saved last frame. The QA model is Sonnet 5.5 (`routing.yaml`,
+  `qa_perception`), not Opus (see G9).
+- **The Generate price shows only what will run**: with the switch off
+  there is no Claude line in the quote (for example "8.24 credits").
+
+### G9. Sonnet 5.5 for every Claude call; Opus is a switch (owner)
+- **Default**: every Claude task runs on Sonnet 5.5: the scene planner
+  (Plan it), Punch it up, Check this, the inspiration breakdown, the
+  character concepts and the card check. Code builds the image and video
+  prompts from data, so no Claude call writes them.
+- **Switch**: Settings, Claude models lists each Claude task with a
+  Sonnet 5.5 or Opus 5.5 choice, per account (`routing_overrides`;
+  `PUT /settings/claude`). The choices are data (`routing.yaml`,
+  `claude_choices`); image tasks and other models are refused. Picking
+  the default again removes the override.
+- **Model name next to each price**: every price button shows the models
+  the run uses ("Claude Sonnet 5.5", "Nano Banana 2.1"), as does the
+  follow-up price line and the price details. Demo mode says "Demo mock,
+  free".

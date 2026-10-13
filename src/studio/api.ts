@@ -97,6 +97,7 @@ export const api = {
   removeKey: (provider: string) => request<{ ok: true }>('DELETE', `/settings/credentials/${provider}`),
   saveBudgets: (b: Partial<SettingsView['budgets']>) => request<SettingsView>('PUT', '/settings/budgets', b),
   setBilling: (b: { default?: 'api' | 'account'; creditUsd?: number }) => request<SettingsView>('PUT', '/settings/billing', b),
+  setClaudeModel: (task: string, model: string) => request<SettingsView>('PUT', '/settings/claude', { task, model }),
   higgsfieldAccount: (fresh = false) => request<HiggsfieldAccount>('GET', `/settings/higgsfield-account${fresh ? '?fresh=1' : ''}`),
   storage: () => request<{ driver: string; bucket: string | null; origins: string[]; corsRules: unknown[] }>('GET', '/settings/storage'),
   checkStorage: () => request<{ ok: boolean; message: string }>('POST', '/settings/storage/check', {}),

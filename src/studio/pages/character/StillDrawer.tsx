@@ -118,6 +118,12 @@ export function StillDrawer({ v, data, scene, still, onClose, onOpen, onMakeVide
         )}
 
         {still.status === 'qa_pending' ? <Callout tone="info" icon={<Loader2 size={16} className="st-spin" />}>Checking the face, marks, logos, jewelry and skin texture...</Callout> : <Verdict r={r} />}
+        {still.assetId && still.status !== 'qa_pending' && (
+          <div className="st-row" style={{ gap: 10, flexWrap: 'wrap' }}>
+            <PriceButton action={{ type: 'scene_qa', characterId: v.id, candidateId: still.id }} label={claudeChecked(r) ? 'Check again' : 'Check this'} variant="secondary" size="sm" icon={false} />
+            <span className="st-hint">Claude looks at the face, the mole side, logos, jewelry and skin. On demand only.</span>
+          </div>
+        )}
 
         {still.assetId && !fixes && !rejecting && (
           <div className="st-row" style={{ gap: 8, flexWrap: 'wrap' }}>
@@ -159,7 +165,7 @@ export function StillDrawer({ v, data, scene, still, onClose, onOpen, onMakeVide
             <div className="st-h3">Fix: {fixes.map(f => f.label).join(', ')}</div>
             {fixes.some(f => f.action === 'edit_one_detail') && !drift && <span className="st-hint">Use "Fix one thing" below: one change per pass, the rest of the still stays the same.</span>}
             {(regenerateReason || drift) && (
-              <PriceButton label="Regenerate the scene with the fix" variant="secondary" action={{ type: 'scene', characterId: v.id, sceneId: scene.id, models: data.options.defaultModels, variations: 1, reason: regenerateReason, withQa: true }} />
+              <PriceButton label="Regenerate the scene with the fix" variant="secondary" action={{ type: 'scene', characterId: v.id, sceneId: scene.id, models: data.options.defaultModels, variations: 1, reason: regenerateReason, withQa: data.options.autoQa }} />
             )}
           </div>
         )}
@@ -174,9 +180,6 @@ export function StillDrawer({ v, data, scene, still, onClose, onOpen, onMakeVide
               <button className="st-btn secondary" onClick={() => setCropping(true)}><Crop size={16} />Crop closer (free)</button>
               {(still.op === 'crop' || still.op === 'edit' || still.op === 'mirror') && (
                 <PriceButton action={{ type: 'scene_upscale', characterId: v.id, candidateId: still.id }} label="Upscale 2x" variant={still.op === 'crop' ? 'primary' : 'secondary'} />
-              )}
-              {(still.op === 'crop' || still.op === 'upscale') && (
-                <PriceButton action={{ type: 'scene_qa', characterId: v.id, candidateId: still.id }} label="Check it" variant="secondary" icon={false} />
               )}
             </div>
           </div>
@@ -224,11 +227,14 @@ function FixOne({ v, data, still, drift }: { v: CharacterView; data: ScenesData;
       <PriceButton
         label="Run this edit"
         todo={todo}
-        action={todo.length ? null : { type: 'scene_edit', characterId: v.id, candidateId: still.id, change: change.trim(), face, model, withQa: true }}
+        action={todo.length ? null : { type: 'scene_edit', characterId: v.id, candidateId: still.id, change: change.trim(), face, model, withQa: data.options.autoQa }}
       />
     </div>
   )
 }
+
+// Whether Claude has looked at this still (the free checks say when not).
+export const claudeChecked = (r: QaReport | null) => !!r && !r.findings.some(f => f.message.startsWith('Not checked by Claude'))
 
 function Verdict({ r }: { r: (QaReport & { edits?: unknown }) | null }) {
   if (!r) return <Callout tone="warn" icon={<AlertTriangle size={16} />}>No automatic check for this still. Look at the face, the marks and the details yourself.</Callout>

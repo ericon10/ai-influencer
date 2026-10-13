@@ -22,7 +22,7 @@ import { approveCandidate, keepStale, pickHero, rejectCandidate, reopenCandidate
 import { isValidEndpoint, MODEL_OVERRIDES_KEY, readModelOverrides } from '../providers/modelOverrides.js'
 import { attachCheckImages, attachSheetImages, exportCharacter, importCharacter, type CheckImage } from '../pipeline/files.js'
 import { accountUsage } from '../pipeline/costs.js'
-import { providerMode, setSetting } from '../pipeline/settings.js'
+import { providerMode, setClaudeModel, setSetting } from '../pipeline/settings.js'
 import { listCredentials, markVerified, revokeCredential, saveCredential } from '../providers/credentials.js'
 import { readAccountTokens } from '../providers/higgsfieldOAuth.js'
 import { disconnect, finishConnect, startConnect } from '../providers/mcpConnections.js'
@@ -609,6 +609,15 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
     const next = { ...current, endpoint: body.endpoint || undefined }
     if ((current.endpoint ?? '') !== body.endpoint) { delete next.confirmedAt; delete next.confirmedBy }
     await setSetting(deps, ctx, MODEL_OVERRIDES_KEY, { ...overrides, [body.ref]: next })
+    return c.json(await settingsView(deps, ctx))
+  })
+
+  // Which Claude model a task runs on (Settings, Claude models).
+  app.put('/settings/claude', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'admin')
+    const body = parse(z.object({ task: z.string(), model: z.string() }), await json(c))
+    await setClaudeModel(deps, ctx, body.task, body.model)
     return c.json(await settingsView(deps, ctx))
   })
 

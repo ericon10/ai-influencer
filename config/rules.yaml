@@ -344,9 +344,11 @@ rules:
     bucket: default
     area: qa
     spec: "6"
-    title: Automatic QA on every still
+    # Owner, 2026-10-13: "I have eyes." Claude checks are on demand.
+    starts_on: false
+    title: Automatic Claude check on every new still
     check: { type: behavior }
-    message: Every still is checked (face match, marks, logos, jewelry, skin) before you review it. The price includes the checks.
+    message: Off unless you switch it on. You review each still yourself, and "Check this" asks Claude on demand (priced on the button). The free local checks (face match against REF-00, skin texture) always run.
 
   # ── Defaults: QA advice ──
   - id: qa-face-drift

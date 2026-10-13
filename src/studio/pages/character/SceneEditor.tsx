@@ -7,7 +7,7 @@ import { useCharacters, useRefresh } from '../../hooks'
 import { PriceButton } from '../../PriceButton'
 import { Field, Img, Modal, SectionProgress, errorMessage, scrollToField, useToast, type TodoItem } from '../../ui'
 import type { CharacterView, SceneFields, SceneStill, SceneView, ScenesData } from '../../types'
-import { StillDrawer, STILL_STATUS, OP_LABEL } from './StillDrawer'
+import { StillDrawer, STILL_STATUS, OP_LABEL, claudeChecked } from './StillDrawer'
 import { VideoSection } from './VideoSection'
 
 // One scene: the owner's words, the planned fields (all editable, saved as
@@ -144,7 +144,7 @@ export function SceneEditor({ v, data, scene, onBack }: { v: CharacterView; data
         {scene.busy && (
           <div className="st-card pad st-row" style={{ gap: 14, marginBottom: 14 }}>
             <Loader2 className="st-spin" size={18} />
-            <div className="grow"><div className="st-h3">Working on this scene</div><div className="st-hint">Rendering, then automatic QA: face match, marks, logos, jewelry and skin texture. Failed QA waits with its fix.</div></div>
+            <div className="grow"><div className="st-h3">Working on this scene</div><div className="st-hint">Rendering, then the free checks: face match against REF-00 and skin texture. Look each still over yourself; Check this asks Claude.</div></div>
           </div>
         )}
         {scene.candidates.filter(c => c.media !== 'video').length === 0 && !scene.busy && <span className="st-hint">No stills yet. Generate to see them here.</span>}
@@ -225,7 +225,7 @@ function StillTile({ c, aspect, onOpen }: { c: SceneStill; aspect: string; onOpe
       <div className="st-row" style={{ gap: 6, padding: '0 4px 2px' }}>
         <span className="st-tile-label">{OP_LABEL[c.op]}</span>
         <span className="st-spacer" />
-        {c.qaVerdict && c.status !== 'qa_pending' && <span className={`st-badge plain ${c.qaVerdict === 'post' ? 'ok' : c.qaVerdict === 'regenerate' ? 'bad' : 'warn'}`}>{c.qaVerdict === 'post' ? 'QA ok' : c.qaVerdict === 'edit' ? 'Fixable' : c.qaVerdict === 'regenerate' ? 'Redo' : 'Look'}</span>}
+        {c.qaVerdict && c.status !== 'qa_pending' && <span className={`st-badge plain ${c.qaVerdict === 'post' ? 'ok' : c.qaVerdict === 'regenerate' ? 'bad' : 'warn'}`}>{c.qaVerdict === 'post' ? (claudeChecked(c.qaReport) ? 'QA ok' : 'Free checks ok') : c.qaVerdict === 'edit' ? 'Fixable' : c.qaVerdict === 'regenerate' ? 'Redo' : 'Look'}</span>}
       </div>
     </button>
   )
@@ -349,7 +349,7 @@ function GenerateCard({ v, data, scene, todo, saving, setRefs }: { v: CharacterV
   }
   return (
     <section className="st-card st-generate">
-      <div className="st-card-head"><Sparkles size={16} /><div className="grow"><div className="st-h3">Generate</div><div className="st-hint">{o.autoQa ? 'Every still is checked automatically before it reaches you; the price includes the checks. QA only ever advises.' : 'Automatic QA is off in Rules; check each still yourself.'}</div></div></div>
+      <div className="st-card-head"><Sparkles size={16} /><div className="grow"><div className="st-h3">Generate</div><div className="st-hint">{o.autoQa ? 'Claude checks every still before it reaches you; the price includes the checks.' : 'You review each still. Free checks (face match, skin) run on every still; press Check this on a still when you want Claude to look.'}</div></div></div>
       <div className="st-card-body st-col" style={{ gap: 16 }}>
         {scene.comboProblem && <span className="st-hint"><Info size={12} style={{ verticalAlign: -2 }} /> Variety note: {scene.comboProblem.replace(/ A different moment or camera keeps the feed fresh, or use it anyway\.$/, '')}</span>}
         <div className="st-row" style={{ gap: 10, flexWrap: 'wrap' }}>

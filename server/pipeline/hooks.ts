@@ -14,7 +14,7 @@ import { scoreDistinctness, scoreIdentity } from './identity.js'
 import { onModelTest } from './modelTests.js'
 import { registerImportCheck } from './importCheck.js'
 import { textureCheck, textureSummary } from './texture.js'
-import { registerSceneHooks } from './sceneHooks.js'
+import { freeChecksOnly, registerSceneHooks } from './sceneHooks.js'
 import type { GenRequest } from '../providers/types.js'
 
 // What each finished job does to the character. Registered once at boot.
@@ -104,7 +104,12 @@ async function onSheet(deps: Deps, ctx: Ctx, job: JobRow, out: JobOutcome): Prom
       const report = { ...finalize([{ code: 'skin_smoothed', severity: 'fail', message: t.message }], null), texture: t }
       await createCandidate(deps, ctx, job, { refId, assetId: asset.id, status: 'qa_failed', qaReport: report, qaVerdict: report.verdict })
     } else {
-      await createCandidate(deps, ctx, job, { refId, assetId: asset.id, status: 'in_review' })
+      // No Claude check (on demand): the free face match still runs.
+      const shot = deps.config.pipeline.sheet.shots.find(s => s.id === refId)
+      const id = shot ? await scoreIdentity(deps, ctx, { characterId: job.characterId!, shot, assetId: asset.id, demo: job.provider === 'mock' }).catch(() => null) : null
+      const findings: QaReport['findings'] = [...(id?.findings ?? []), ...(t ? [{ code: 'skin_real' as const, severity: 'info' as const, message: t.message }] : []), { code: 'uncertain', severity: 'info', message: 'Not checked by Claude. Press Check this for a full check of the mark sides and framing.' }]
+      const report = { ...freeChecksOnly(finalize(findings, null)), texture: t, identity: id?.identity ?? null }
+      await createCandidate(deps, ctx, job, { refId, assetId: asset.id, status: 'in_review', qaReport: report, qaVerdict: report.verdict })
     }
   } else {
     await createCandidate(deps, ctx, job, { refId, status: 'failed', rejectNote: out.error ?? '' })

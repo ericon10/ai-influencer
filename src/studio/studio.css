@@ -166,6 +166,16 @@
   background: rgba(0, 0, 0, 0.16); font-weight: 700;
 }
 .st-btn:not(.primary) .st-price { background: var(--st-surface-3); }
+/* Settings, Claude models: one row per Claude task. */
+.st-claude-row { gap: 12px; padding: 12px 0; border-top: 1px solid var(--st-line); flex-wrap: wrap; }
+.st-claude-row:first-child { border-top: 0; padding-top: 0; }
+.st-claude-row > .grow { flex: 1 1 220px; }
+
+/* The model a price runs on, next to the button. */
+.st-model-tag {
+  font-size: 12px; color: var(--st-text-2); padding: 3px 8px; border-radius: 7px;
+  border: 1px solid var(--st-line); white-space: nowrap;
+}
 
 /* ── Surfaces ─────────────────────────────────────────── */
 

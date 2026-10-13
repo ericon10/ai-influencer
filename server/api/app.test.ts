@@ -235,6 +235,39 @@ describe('Studio API', () => {
     expect(other.json.models.find((x: { ref: string }) => x.ref === 'higgsfield/seedance-2.5')).toMatchObject({ endpoint: 'bytedance/seedance-2.5/image-to-video', endpointSource: 'config' })
   })
 
+  it('runs every Claude task on Sonnet 5.5 by default; any one can switch to Opus, per account', async () => {
+    const before = await call('GET', '/settings', { cookie: cookieA })
+    const tasks = before.json.claude.tasks as Array<{ task: string; label: string; model: string; changed: boolean }>
+    expect(tasks.map(t => t.task).sort()).toEqual(['breakdown', 'card_update', 'concepts', 'qa_perception', 'scene_ideas', 'scene_plan'])
+    for (const t of tasks) expect(t).toMatchObject({ model: 'anthropic/claude-sonnet-5-5', changed: false })
+    expect(tasks.find(t => t.task === 'scene_ideas')!.label).toBe('Punch it up')
+    expect(before.json.claude.choices.map((c: { label: string }) => c.label)).toEqual(['Claude Sonnet 5.5', 'Claude Opus 5.5'])
+
+    const opus = await call('PUT', '/settings/claude', { cookie: cookieA, body: { task: 'scene_plan', model: 'anthropic/claude-opus-5-5' } })
+    expect(opus.status).toBe(200)
+    expect(opus.json.claude.tasks.find((t: { task: string }) => t.task === 'scene_plan')).toMatchObject({ model: 'anthropic/claude-opus-5-5', modelLabel: 'Claude Opus 5.5', changed: true })
+    expect(opus.json.routing.find((r: { task: string }) => r.task === 'scene_plan').configured).toBe('anthropic/claude-sonnet-5-5')
+    // Only this account, and only that task.
+    const other = await call('GET', '/settings', { cookie: cookieB })
+    expect(other.json.claude.tasks.find((t: { task: string }) => t.task === 'scene_plan').model).toBe('anthropic/claude-sonnet-5-5')
+    expect(opus.json.claude.tasks.find((t: { task: string }) => t.task === 'qa_perception').model).toBe('anthropic/claude-sonnet-5-5')
+
+    // Image tasks and models outside the choices are refused.
+    expect((await call('PUT', '/settings/claude', { cookie: cookieA, body: { task: 'hero', model: 'anthropic/claude-opus-5-5' } })).status).toBe(400)
+    expect((await call('PUT', '/settings/claude', { cookie: cookieA, body: { task: 'scene_plan', model: 'anthropic/claude-haiku-5-5' } })).status).toBe(400)
+
+    const back = await call('PUT', '/settings/claude', { cookie: cookieA, body: { task: 'scene_plan', model: 'anthropic/claude-sonnet-5-5' } })
+    expect(back.json.claude.tasks.find((t: { task: string }) => t.task === 'scene_plan')).toMatchObject({ model: 'anthropic/claude-sonnet-5-5', changed: false })
+  })
+
+  it('names the model next to each price', async () => {
+    const id = (await call('POST', '/characters', { body: { name: 'Label test' }, cookie: cookieA })).json.id
+    const est = await call('POST', '/actions/estimate', { body: { action: { type: 'concepts', characterId: id, notes: 'late 20s, short dark hair' } }, cookie: cookieA })
+    // Demo mode runs a free mock, and says so.
+    expect(est.json.quote.models).toEqual(['Demo mock, free'])
+    expect(est.json.quote.items[0].modelLabel).toBe('Demo mock, free')
+  })
+
   it('updates budgets', async () => {
     const r = await call('PUT', '/settings/budgets', { body: { job: 5, month: 300, warnPct: 75 }, cookie: cookieA })
     expect(r.json.budgets).toMatchObject({ job: 5, month: 300, warnPct: 75 })

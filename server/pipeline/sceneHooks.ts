@@ -65,6 +65,39 @@ async function onScenePlan(deps: Deps, ctx: Ctx, job: JobRow, out: JobOutcome): 
   await updateScene(deps, ctx, scene.id, { fields: merged as Partial<SceneFields>, title: scene.title || (typeof raw.title === 'string' ? raw.title : undefined) })
 }
 
+// The free local checks on a still when no Claude check runs (owner,
+// 2026-10-13: Claude checks are on demand). Face match against REF-00 and
+// the closest-angle refs, plus a skin note against REF-00; a person decides.
+async function localStillChecks(deps: Deps, ctx: Ctx, job: JobRow, assetId: string, extra: QaReport['findings'] = []): Promise<QaReport> {
+  const findings: QaReport['findings'] = [...extra]
+  try {
+    const scene = await getScene(deps, ctx, sceneIdOf(job))
+    const f = sceneFields(deps, scene)
+    const { views, scenes: sc } = deps.config.pipeline
+    const framing = sc.framings.find(x => x.id === f.framing)
+    const view = views.views[f.view]
+    const skip = framing?.identity === 'skip' ? 'The character is small in this frame by design, so the face was not matched. Check the face yourself.'
+      : view?.identity === 'skip' ? `Face matching is skipped for the ${view.label.toLowerCase()} angle; check the face yourself.` : undefined
+    const ref00 = (await approvedAssets(deps, ctx, job.characterId!)).get('REF-00')
+    const id = await scoreSceneIdentity(deps, ctx, { assetId, refs: ref00 ? [{ refId: 'REF-00', assetId: ref00 }] : [], demo: job.provider === 'mock', skip })
+    findings.push(...id.findings)
+    if (ref00 && !extra.some(x => x.code === 'skin_smoothed' || x.code === 'skin_real')) {
+      const [{ data: a }, { data: b }] = [await readAsset(deps, ctx, ref00), await readAsset(deps, ctx, assetId)]
+      const t = await compareTexture(a, b, { faces: deps.faces, minRatio: deps.config.runtime.qa.texture_min_ratio * 0.6, sameFraming: false })
+      if (t.smoothed) findings.push({ code: 'skin_smoothed', severity: 'warn', message: 'The skin looks smoother than in REF-00. Look closely before picking.' })
+    }
+  } catch (e) {
+    findings.push({ code: 'uncertain', severity: 'info', message: `The free checks could not run (${(e as Error).message}).` })
+  }
+  findings.push({ code: 'uncertain', severity: 'info', message: 'Not checked by Claude. Press Check this for a full check of the marks, logos and skin.' })
+  return freeChecksOnly(finalize(findings, null))
+}
+
+// With only the free checks, "ready" would overstate it: say what ran.
+export function freeChecksOnly(r: QaReport): QaReport {
+  return r.verdict === 'post' ? { ...r, summary: 'Free checks passed (face match, skin). Not checked by Claude; look it over yourself.' } : r
+}
+
 async function onScene(deps: Deps, ctx: Ctx, job: JobRow, out: JobOutcome): Promise<void> {
   const asset = out.assets?.[0]
   if (out.status === 'completed' && asset) {
@@ -79,7 +112,8 @@ async function onScene(deps: Deps, ctx: Ctx, job: JobRow, out: JobOutcome): Prom
     } else {
       const id = await newCandidate(deps, job, { assetId: asset.id, status: 'qa_pending' })
       if (!(await startQa(deps, job, asset.id, id, null))) {
-        await deps.db.update(candidates).set({ status: 'in_review' }).where(eq(candidates.id, id))
+        const report = await localStillChecks(deps, ctx, job, asset.id)
+        await deps.db.update(candidates).set({ status: 'in_review', qaReport: report, qaVerdict: report.verdict }).where(eq(candidates.id, id))
       }
     }
   } else {
@@ -124,7 +158,7 @@ async function onSceneEdit(deps: Deps, ctx: Ctx, job: JobRow, out: JobOutcome): 
         ? [{ code: 'skin_smoothed', severity: 'fail', message: `${t.message} Run it again.` }]
         : t ? [{ code: 'skin_real', severity: 'info', message: t.message }] : []
       if (op === 'upscale') findings.push({ code: 'uncertain', severity: 'info', message: 'Upscaled 2x with an upscaler: same frame, more detail.' })
-      const report = { ...finalize(findings, null), texture: t }
+      const report = { ...(op === 'upscale' ? finalize(findings, null) : await localStillChecks(deps, ctx, job, asset.id, findings)), texture: t }
       await deps.db.update(candidates).set({ status: t?.smoothed ? 'qa_failed' : 'in_review', qaReport: report, qaVerdict: report.verdict }).where(eq(candidates.id, id))
     }
   } else {
@@ -162,9 +196,10 @@ async function onSceneVideo(deps: Deps, ctx: Ctx, job: JobRow, out: JobOutcome):
         if (t.smoothed) findings.push({ code: 'skin_smoothed', severity: 'warn', message: 'The skin looks smoothed in this take compared with the still. Look closely before keeping it.' })
       }
     } catch (e) {
-      findings.push({ code: 'uncertain', severity: 'warn', message: `The automatic check could not run on this take (${(e as Error).message}). Look at the face yourself.` })
+      findings.push({ code: 'uncertain', severity: 'warn', message: `The free check could not run on this take (${(e as Error).message}). Look at the face yourself.` })
     }
-    const report = finalize(findings, null)
+    findings.push({ code: 'uncertain', severity: 'info', message: 'Not checked by Claude. Press Check this to check the last frame.' })
+    const report = freeChecksOnly(finalize(findings, null))
     await deps.db.update(candidates).set({ status: 'in_review', qaReport: report, qaVerdict: report.verdict }).where(eq(candidates.id, id))
   } else {
     await newCandidate(deps, job, { parentId, op: 'video', status: 'failed', rejectNote: out.error ?? '' })
@@ -219,7 +254,7 @@ async function onSceneQa(deps: Deps, ctx: Ctx, job: JobRow, _out: JobOutcome): P
   const pass = (s: JobRow) => (s.request as { meta?: QaMeta }).meta?.pass
   const orig = all.find(s => pass(s) === 'orig')
   const mirror = all.find(s => pass(s) === 'mirror')
-  const [cand] = await deps.db.select({ id: candidates.id, assetId: candidates.assetId, status: candidates.status, qaReport: candidates.qaReport, provider: jobs.provider })
+  const [cand] = await deps.db.select({ id: candidates.id, assetId: candidates.assetId, op: candidates.op, status: candidates.status, qaReport: candidates.qaReport, provider: jobs.provider })
     .from(candidates).leftJoin(jobs, eq(jobs.id, candidates.jobId))
     .where(and(eq(candidates.accountId, job.accountId), eq(candidates.id, meta.candidateId)))
   if (!cand) return
@@ -234,8 +269,10 @@ async function onSceneQa(deps: Deps, ctx: Ctx, job: JobRow, _out: JobOutcome): P
   const view = views.views[f.view]
   const skip = framing?.identity === 'skip' ? 'The character is small in this frame by design, so identity was not scored. Check the face yourself.'
     : view?.identity === 'skip' ? `Face matching is skipped for the ${view.label.toLowerCase()} angle; check the face yourself.` : undefined
-  const id = cand.assetId
-    ? await scoreSceneIdentity(deps, ctx, { assetId: cand.assetId, refs: meta.faceRefs ?? [], demo: cand.provider === 'mock', skip })
+  // A video take is checked on the frame Claude looked at.
+  const checked = cand.op === 'video' || cand.op === 'video_upscale' ? (job.request as { imageAssetIds?: string[] }).imageAssetIds?.[0] ?? null : cand.assetId
+  const id = checked
+    ? await scoreSceneIdentity(deps, ctx, { assetId: checked, refs: meta.faceRefs ?? [], demo: cand.provider === 'mock', skip })
     : { findings: [], identity: null }
   const texture = meta.texture ?? (cand.qaReport as QaReport | null)?.texture ?? null
   if (texture?.smoothed) id.findings.push({ code: 'skin_smoothed', severity: 'fail', message: texture.message })

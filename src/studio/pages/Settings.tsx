@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
-import { CheckCircle2, CreditCard, KeyRound, Link2, ListChecks, Loader2, RefreshCw, ShieldCheck, Trash2, UserRound } from 'lucide-react'
+import { Bot, CheckCircle2, CreditCard, KeyRound, Link2, ListChecks, Loader2, RefreshCw, ShieldCheck, Trash2, UserRound } from 'lucide-react'
 import { api } from '../api'
 import { keys, useHiggsfieldAccount, useSettings } from '../hooks'
 import { Callout, Field, PromptViewer, errorMessage, useToast } from '../ui'
@@ -21,6 +21,7 @@ export default function Settings() {
           <ModeCard d={d} />
           <KeysCard d={d} />
           <BillingCard d={d} />
+          <ClaudeCard d={d} />
           <ConnectionsCard d={d} />
           <StorageCard />
           <BudgetsCard d={d} />
@@ -51,6 +52,47 @@ function ModeCard({ d }: { d: SettingsView }) {
         {d.mode === 'live'
           ? <Callout tone="ok" icon={<ShieldCheck size={16} />}>Live. Nothing runs without an estimate you saw, and budget caps block anything over the limit.</Callout>
           : <Callout tone="info">Demo. Images are placeholders and QA answers are simulated, so you can try the whole flow at no cost.</Callout>}
+      </div>
+    </div>
+  )
+}
+
+// Which Claude model each task runs on. Sonnet 5.5 by default; any task
+// can switch to Opus. The model also shows next to every price.
+function ClaudeCard({ d }: { d: SettingsView }) {
+  const toast = useToast()
+  const invalidate = useInvalidate()
+  const [busy, setBusy] = useState<string | null>(null)
+  const short = (label: string) => label.replace(/^Claude /, '')
+  async function choose(task: string, label: string, model: string) {
+    setBusy(task)
+    try {
+      await api.setClaudeModel(task, model)
+      invalidate()
+      toast({ tone: 'ok', text: `${label} now runs on ${short(d.claude.choices.find(c => c.ref === model)?.label ?? model)}.` })
+    } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) } finally { setBusy(null) }
+  }
+  return (
+    <div className="st-card">
+      <div className="st-card-head"><div className="grow"><div className="st-h2">Claude models</div><div className="st-hint">Every Claude step runs on Sonnet 5.5 unless you switch it here. Opus costs about twice as much per call. Each price button shows the model it runs on.</div></div></div>
+      <div className="st-card-body st-col" style={{ gap: 0 }}>
+        {d.claude.tasks.map(t => (
+          <div key={t.task} className="st-row st-claude-row">
+            <Bot size={16} style={{ color: 'var(--st-text-2)', flex: 'none' }} />
+            <div className="grow" style={{ minWidth: 180 }}>
+              <div className="st-h3">{t.label}{t.changed && <span className="st-badge plain warn" style={{ marginLeft: 8 }}>Changed</span>}</div>
+              <div className="st-hint">{t.hint}</div>
+            </div>
+            <div className="st-seg" role="radiogroup" aria-label={`${t.label} model`}>
+              {d.claude.choices.map(c => (
+                <button key={c.ref} role="radio" aria-checked={t.model === c.ref} className={t.model === c.ref ? 'on' : ''} disabled={busy === t.task} onClick={() => t.model !== c.ref && choose(t.task, t.label, c.ref)}>
+                  {short(c.label)}{c.ref === t.default ? ' (default)' : ''}
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
+        {d.mode !== 'live' && <p className="st-hint" style={{ marginTop: 10 }}>Demo mode runs a free mock in place of Claude, so prices show "Demo mock, free" until you go live.</p>}
       </div>
     </div>
   )

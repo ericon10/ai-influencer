@@ -5,12 +5,16 @@ tasks:
   hero:          { model: higgsfield/gpt-image-2.5, kind: image, quality: high, resolution: 2k, aspect: "3:4" }
   sheet:         { model: higgsfield/gpt-image-2.5, kind: image_edit, quality: high, resolution: 2k }
   upscale:       { model: higgsfield/bytedance-upscale, kind: upscale, resolution: 2k }
-  breakdown:     { model: anthropic/claude-opus-5-5, effort: medium }
-  concepts:      { model: anthropic/claude-opus-5-5, effort: high }
-  qa_perception: { model: anthropic/claude-opus-5-5, effort: medium }
-  card_update:   { model: anthropic/claude-opus-5-5, effort: medium }
-  scene_plan:    { model: anthropic/claude-opus-5-5, effort: medium }
-  scene_ideas:   { model: anthropic/claude-opus-5-5, effort: low }
+  # Claude tasks. Sonnet 5.5 for all of them (owner, 2026-10-13); each can
+  # be switched to another of claude_choices in Settings, Claude models.
+  breakdown:     { model: anthropic/claude-sonnet-5-5, effort: medium, label: Inspiration breakdown, hint: What to keep and change from the inspiration photos. }
+  concepts:      { model: anthropic/claude-sonnet-5-5, effort: high, label: Character concepts, hint: Writes the three character cards to pick from. }
+  card_update:   { model: anthropic/claude-sonnet-5-5, effort: medium, label: Card check, hint: Compares the card with the picked hero. }
+  scene_plan:    { model: anthropic/claude-sonnet-5-5, effort: medium, label: Scene planner, hint: Fills a scene's fields from your words (Plan it). }
+  scene_ideas:   { model: anthropic/claude-sonnet-5-5, effort: low, label: Punch it up, hint: Three specific moments from a rough idea. }
+  qa_perception: { model: anthropic/claude-sonnet-5-5, effort: medium, label: Check this, hint: The on-demand Claude check of a still or a take. }
+# Models a Claude task can be switched to in Settings.
+claude_choices: [anthropic/claude-sonnet-5-5, anthropic/claude-opus-5-5]
 mock:
   image: mock/image
   video: mock/video

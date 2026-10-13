@@ -167,6 +167,20 @@ describe('scenes (Stage 7, demo mode)', () => {
     expect(view.status).toBe('in_review')
   })
 
+  it('by default no Claude check: the price is the image only, the free checks run, and Check this is priced on its own', async () => {
+    const { quote } = await run({ type: 'scene', characterId, sceneId, models: ['higgsfield/nano-banana-2.1'], variations: 1 })
+    expect(quote.items.map(i => i.model)).toEqual(['mock/image'])
+    const still = (await stills(sceneId)).filter(c => c.op === 'generate').sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt))[0]!
+    expect(still.status).toBe('in_review')
+    const report = still.qaReport as { summary: string; findings: Array<{ message: string }>; identity: unknown }
+    expect(report.findings.map(f => f.message)).toContain('Not checked by Claude. Press Check this for a full check of the marks, logos and skin.')
+    expect(report.summary).toMatch(/^Free checks passed \(face match, skin\)/)
+    // On demand, with Sonnet (owner, 2026-10-13).
+    const check = await estimateAction(h.deps, h.ctx, { type: 'scene_qa', characterId, candidateId: still.id })
+    expect(check.quote.items.map(i => i.model)).toEqual(['mock/llm', 'mock/llm'])
+    expect(h.deps.config.routing.tasks.qa_perception!.model).toBe('anthropic/claude-sonnet-5-5')
+  })
+
   it('a trained character: the saved character, no attachments, then the drift lock and its QA', async () => {
     const { quote, preview } = await run({ type: 'scene', characterId, sceneId, models: ['higgsfield/soul-2'], variations: 1, withQa: true })
     expect(quote.items.map(i => i.label)).toEqual([

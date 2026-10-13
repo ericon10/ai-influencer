@@ -5,7 +5,7 @@ import { useRefresh } from '../../hooks'
 import { PriceButton } from '../../PriceButton'
 import { Callout, Drawer, Field, Img, PromptViewer, errorMessage, useToast, type TodoItem } from '../../ui'
 import type { CharacterView, SceneStill, SceneView, ScenesData } from '../../types'
-import { OP_LABEL, STILL_STATUS, wrap } from './StillDrawer'
+import { OP_LABEL, STILL_STATUS, claudeChecked, wrap } from './StillDrawer'
 
 // Stage 9 (owner ruling 2026-10-13): a video from a picked still. Straight
 // to the final model (Seedance 2.5, 720p), then "Upscale this take" on a
@@ -167,7 +167,7 @@ function ClipTile({ c, aspect, onOpen }: { c: SceneStill; aspect: string; onOpen
       <div className="st-row" style={{ gap: 6, padding: '0 4px 2px' }}>
         <span className="st-tile-label">{test ? 'Motion test' : OP_LABEL[c.op]}</span>
         <span className="st-spacer" />
-        {c.qaVerdict && <span className={`st-badge plain ${c.qaVerdict === 'post' ? 'ok' : c.qaVerdict === 'regenerate' ? 'bad' : 'warn'}`}>{c.qaVerdict === 'post' ? 'QA ok' : c.qaVerdict === 'regenerate' ? 'Face?' : 'Look'}</span>}
+        {c.qaVerdict && <span className={`st-badge plain ${c.qaVerdict === 'post' ? 'ok' : c.qaVerdict === 'regenerate' ? 'bad' : 'warn'}`}>{c.qaVerdict === 'post' ? (claudeChecked(c.qaReport) ? 'QA ok' : 'Free checks ok') : c.qaVerdict === 'regenerate' ? 'Face?' : 'Look'}</span>}
       </div>
     </button>
   )
@@ -224,6 +224,12 @@ function ClipDrawer({ v, scene, clip, onClose, onOpen }: { v: CharacterView; sce
             QA found the face does not match REF-00 in this take. Keep it anyway?
             <div className="st-row" style={{ gap: 8, marginTop: 8 }}><button className="st-btn sm" disabled={busy} onClick={() => keep(true)}>Keep anyway</button><button className="st-btn sm ghost" onClick={() => setConfirm(false)}>Cancel</button></div>
           </Callout>
+        )}
+        {clip.assetId && clip.status !== 'qa_pending' && (
+          <div className="st-row" style={{ gap: 10, flexWrap: 'wrap' }}>
+            <PriceButton action={{ type: 'scene_qa', characterId: v.id, candidateId: clip.id }} label={claudeChecked(r) ? 'Check again' : 'Check this'} variant="secondary" size="sm" icon={false} />
+            <span className="st-hint">Claude checks the take's last frame: the face, the mole side and the skin. On demand only.</span>
+          </div>
         )}
         <div className="st-row" style={{ gap: 8, flexWrap: 'wrap' }}>
           {canKeep && <button className="st-btn ok" disabled={busy} onClick={() => keep()}>{busy ? <Loader2 size={15} className="st-spin" /> : <CheckCircle2 size={15} />}Keep this take</button>}
