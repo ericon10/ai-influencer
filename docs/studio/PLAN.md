@@ -332,6 +332,23 @@ Decisions: `DECISIONS.md` G7.
       remembered), DECISIONS G11
 - [x] Prompt writer for stills and video, editable above Generate,
       DECISIONS G10
+
+## Phase 3b: Text-overlay content builder (2026-10-13)
+
+Decisions: `DECISIONS.md` G12.
+
+- [x] B-roll library: uploads up to 200 MB, tagged by product, lean copy
+- [x] Meme video: kept clip, optional B-roll hard cut, TikTok caption box
+- [x] Slideshow: Claude writes hook, slides, caption, hashtags; images in order
+- [x] Batch: captions pasted or written by Claude, one video each, zip
+
+## Phase 4: OpenCut embedded (planned, not started)
+
+Decisions: `DECISIONS.md` G13. Export or Fine-tune from the post screen;
+OpenCut as a page in the Studio, project from R2, Done saves back.
+
+- [ ] OpenCut's license notice in the app
+- [ ] Written permission from the ai-influencer author (owner)
 - [ ] First live take, then confirm the upscaler's real price
 - [ ] Chaining (continue from the last frame), sound bed, rough cut
 

@@ -15,6 +15,7 @@ import { onModelTest } from './modelTests.js'
 import { registerImportCheck } from './importCheck.js'
 import { textureCheck, textureSummary } from './texture.js'
 import { freeChecksOnly, registerSceneHooks } from './sceneHooks.js'
+import { registerContent } from './content.js'
 import type { GenRequest } from '../providers/types.js'
 
 // What each finished job does to the character. Registered once at boot.
@@ -189,4 +190,5 @@ export function registerPipelineHooks(): void {
   registerJobHook('model_test', onModelTest)
   registerSceneHooks()
   registerImportCheck()
+  registerContent()
 }

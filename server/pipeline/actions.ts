@@ -23,6 +23,7 @@ import { assertSuiteCap, buildModelSuite, buildModelTest, startModelSuite, start
 import { approvedAssets, getCandidate, getCharacter, getRef, inspirationAssetIds, setCharacterFields, sheetState, toData } from './characters.js'
 import { buildSceneEndFrame, buildSceneIdeas, buildScenePlan, buildScenePromptWrite, buildSceneRecheck, buildSceneRun, buildSceneEdit, buildSceneUpscale, buildSceneVideo, buildVideoUpscale, type SceneBuilt } from './sceneActions.js'
 import { markSceneBusy, saveVideoModel } from './scenes.js'
+import { buildContentCaptions, buildContentSlides } from './content.js'
 import { ruleSwitches } from './rules.js'
 import { readBilling } from '../providers/billing.js'
 import { effectiveModel, readModelOverrides } from '../providers/modelOverrides.js'
@@ -86,6 +87,9 @@ export const actionSchema = z.discriminatedUnion('type', [
   }),
   z.object({ type: z.literal('scene_video_upscale'), characterId: z.string(), candidateId: z.string() }),
   z.object({ type: z.literal('scene_end_frame'), characterId: z.string(), candidateId: z.string(), change: z.string().max(400), withQa: z.boolean().optional() }),
+  // The content builder: Claude writes slideshow text, or batch captions.
+  z.object({ type: z.literal('content_slides'), characterId: z.string(), contentId: z.string() }),
+  z.object({ type: z.literal('content_captions'), characterId: z.string(), contentId: z.string() }),
 ])
 
 export type StudioAction = z.infer<typeof actionSchema>
@@ -191,6 +195,8 @@ export async function buildAction(deps: Deps, ctx: Ctx, action: StudioAction): P
     case 'scene_plan': return scene(await buildScenePlan(deps, ctx, row, action.sceneId))
     case 'scene_ideas': return scene(await buildSceneIdeas(deps, ctx, row, action.idea))
     case 'scene_prompt': return scene(await buildScenePromptWrite(deps, ctx, row, action))
+    case 'content_slides': return scene(await buildContentSlides(deps, ctx, row, action.contentId))
+    case 'content_captions': return scene(await buildContentCaptions(deps, ctx, row, action.contentId))
     case 'scene_video': return scene(await buildSceneVideo(deps, ctx, row, action))
     case 'scene_video_upscale': return scene(await buildVideoUpscale(deps, ctx, row, action.candidateId))
     case 'scene_end_frame': return scene(await buildSceneEndFrame(deps, ctx, row, { ...action, withQa: action.withQa ?? autoQa }))

@@ -625,3 +625,52 @@ changes what the Studio suggests and checks, never what the owner types.
   connector's catalog, 2026-10-13). Kling's sound now follows the Sound
   switch instead of always being off.
 
+### G12. Text-overlay content builder (owner)
+- **Content** page, four tabs: Meme video, Slideshow, Batch, B-roll
+  library. Reaction clips come from Clone Video later (roadmap R1), so
+  there is no reactions tab; any kept clip (a take, its upscale, later a
+  clone) works.
+- **B-roll**: the owner's uploads (up to 200 MB a video), tagged by
+  product, converted on the worker to a lean H.264 copy without sound
+  (never enlarged). Landscape clips are fitted over a blurred copy of
+  themselves in 9:16, so nothing on a laptop screen is cut off.
+- **Meme video**: the clip, then an optional B-roll cut in hard (or
+  B-roll first), never a crossfade, with the caption on top the whole
+  time. 1080x1920, 30 fps, H.264, no sound, no music.
+- **Caption style** (`config/content.yaml`): TikTok's white rounded box
+  per line, black TikTok Sans text (open font, bundled), centered,
+  balanced line lengths, inside TikTok's safe zones (top 250, bottom
+  480, sides 60 and 160 px at 1080x1920). Emoji come from Noto Emoji.
+  Drawn as outlines, so the worker needs no system fonts.
+- **Slideshow**: picked stills in order; Claude (route `content_writer`,
+  Sonnet 5.5, switchable) writes a hook plus 5 to 7 slides (one per still
+  after the first, stills repeat if fewer), a caption and hashtags, all
+  editable. Export: 1080x1920 JPEGs in order, plus a zip with
+  `caption.txt` (caption, hashtags, the AI-label reminder).
+- **Batch**: captions pasted (one per line) or written by Claude from a
+  topic (up to 20), one clip and B-roll for all, one video per caption.
+  Each video is its own short worker job, so other work runs in between;
+  the last one bundles a zip with `captions.txt`.
+- **Money**: rendering is local and free; only Claude's writing is
+  priced (quote first, model name shown). Every export reminds the owner
+  to turn on TikTok's AI-generated label (fixed rule `ai-label`).
+- **Downloads**: videos and zips come straight from R2 through a
+  short-lived link (a function response is capped at 4.5 MB on Vercel).
+- Posts (`content_items`) keep their parts as data (clip, B-roll and its
+  in and out points, caption text), not baked in, so Phase 4 can open
+  the same post in OpenCut with editable layers (G13).
+
+### G13. Phase 4: OpenCut embedded in the Studio (owner, planned)
+- One app, one login. The post screen has **Export** (renders straight
+  to MP4; most posts) and **Fine-tune** (OpenCut opens as a page inside
+  the Studio, the project preloaded from R2: clips, B-roll, captions as
+  editable text layers). **Done** saves the final MP4 back to the post
+  and the vault and returns to the Studio. No downloads, no re-uploads,
+  no second login, no folders.
+- Built in Phase 4, not now. The content builder already stores each
+  post's parts separately for this.
+- OpenCut's license notice stays in the app.
+- ai-influencer (the upstream this Studio grew from) has no license
+  file; the owner is getting written permission from its author
+  (SPEC 2).
+

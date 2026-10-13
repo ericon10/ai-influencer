@@ -43,6 +43,13 @@
       "when": 1791918510242,
       "tag": "0005_scene_prompts",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1791920325021,
+      "tag": "0006_content_builder",
+      "breakpoints": true
     }
   ]
 }

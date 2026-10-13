@@ -15,6 +15,7 @@ const Review = lazy(() => import('./pages/Review'))
 const Usage = lazy(() => import('./pages/Usage'))
 const Settings = lazy(() => import('./pages/Settings'))
 const Rules = lazy(() => import('./pages/Rules'))
+const Content = lazy(() => import('./pages/Content'))
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { staleTime: 5_000, refetchOnWindowFocus: true } } })
 
@@ -41,6 +42,7 @@ function Gate() {
               <Route index element={<Characters />} />
               <Route path="c/:id" element={<Character />} />
               <Route path="usage" element={<Usage />} />
+              <Route path="content" element={<Content />} />
               <Route path="settings" element={<Settings />} />
               <Route path="settings/rules" element={<Rules />} />
             </Routes>

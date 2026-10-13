@@ -165,6 +165,8 @@ export type StudioAction =
   | { type: 'scene_edit'; characterId: string; candidateId: string; change: string; face?: boolean; model?: string; withQa?: boolean }
   | { type: 'scene_upscale'; characterId: string; candidateId: string }
   | { type: 'scene_qa'; characterId: string; candidateId: string }
+  | { type: 'content_slides'; characterId: string; contentId: string }
+  | { type: 'content_captions'; characterId: string; contentId: string }
 
 export interface JobView { id: string; label: string; purpose: string; stage: string; status: string; kind: string; model: string; characterId: string | null; estimate: string; actual: string | null; error: string | null; createdAt: string; completedAt: string | null }
 
@@ -218,3 +220,29 @@ export interface Usage {
 }
 
 export interface VideoPrice { model: string; label: string; display: string | null; verified: boolean; note: string | null }
+
+// The content builder (text overlays): B-roll, meme videos, slideshows, batches.
+export type ContentKind = 'meme' | 'slideshow' | 'batch'
+export interface BrollClip { id: string; title: string; product: string; status: 'processing' | 'ready' | 'failed'; error: string | null; assetId: string | null; durationSec: number | null; createdAt: string }
+export interface MemeSpec { clipId: string | null; brollId: string | null; order: 'clip_first' | 'broll_first'; brollStart: number; brollSeconds: number; caption: string }
+export interface SlideshowSpec { stillIds: string[]; topic: string; hook: string; slides: string[]; caption: string; hashtags: string[] }
+export interface BatchSpec extends Omit<MemeSpec, 'caption'> { topic: string; count: number; captions: string[] }
+export interface ContentOutputs {
+  videoAssetId?: string; imageAssetIds?: string[]; videos?: Array<{ caption: string; assetId: string } | null>; zipAssetId?: string
+  done?: number; failed?: number; total?: number; dropped?: string[]; renderedAt?: string
+}
+export interface ContentItem {
+  id: string; kind: ContentKind; characterId: string | null; title: string; spec: Record<string, unknown>
+  status: 'draft' | 'rendering' | 'ready' | 'failed'; outputs: ContentOutputs; error: string | null; createdAt: string; updatedAt: string
+}
+export interface ContentData {
+  broll: BrollClip[]; products: string[]; items: ContentItem[]
+  options: {
+    caption: { size: number; safe: { top: number; bottom: number; left: number; right: number }; position: 'top' | 'middle' | 'bottom'; maxChars: number; box: { fill: string; text: string; radius: number; pad_x: number; pad_y: number } }
+    canvas: { width: number; height: number; fps: number }
+    meme: { max_clip_seconds: number; broll_seconds: number; max_broll_seconds: number; order: 'clip_first' | 'broll_first' }
+    slideshow: { slides: [number, number]; maxStills: number }
+    batch: { max: number; default_count: number }
+    maxUploadMb: number
+  }
+}

@@ -1,0 +1,48 @@
+# Text-overlay content builder (owner, 2026-10-13): meme videos, slideshows
+# and batches, made from kept clips, stills and the owner's B-roll. Data,
+# not code. Everything renders locally (ffmpeg on the worker), so only the
+# Claude steps (slideshow text, batch captions) cost money.
+version: 1
+
+# The output frame: 9:16 at 1080x1920.
+canvas: { width: 1080, height: 1920, fps: 30 }
+
+# TikTok-style caption: a white rounded box per line, black text, centered,
+# kept out of TikTok's own interface (the safe zones, in pixels at
+# 1080x1920: the top bar, the caption and buttons at the bottom, the
+# button column on the right).
+caption:
+  font: { file: tiktok-sans, weight: 600 }
+  size: 56
+  line_height: 1.3
+  box: { fill: "#ffffff", text: "#000000", radius: 18, pad_x: 26, pad_y: 12 }
+  max_width: 820
+  max_lines: 7
+  max_chars: 220
+  safe: { top: 250, bottom: 480, left: 60, right: 160 }
+  # Where the caption sits inside the safe area: top, middle or bottom.
+  position: top
+
+meme:
+  # The clip plays in full; B-roll is cut in hard (never a crossfade).
+  max_clip_seconds: 30
+  broll_seconds: 6
+  max_broll_seconds: 20
+  order: clip_first
+
+broll:
+  # Phone recordings and screen captures; converted on the worker to a
+  # lean H.264 copy without sound.
+  max_upload_mb: 200
+  max_seconds: 120
+  products: []
+
+slideshow:
+  slides: [5, 7]
+  hashtags: [3, 6]
+  max_stills: 10
+  image: { quality: 90 }
+
+batch:
+  max: 20
+  default_count: 20

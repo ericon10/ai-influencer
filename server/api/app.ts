@@ -17,6 +17,7 @@ import { actionSchema, estimateAction, runAction } from '../pipeline/actions.js'
 import { createCharacter, getCandidate, getCharacter, linkInspiration, listCharacters, setCharacterFields, updateCharacter } from '../pipeline/characters.js'
 import { approveSceneCandidate, archiveScene, copyScene, createScene, cropCandidate, saveVideoModel, updateScene } from '../pipeline/scenes.js'
 import { videoPrices } from '../pipeline/sceneActions.js'
+import { addBroll, archiveBroll, archiveContent, contentView, createContent, startRender, updateBroll, updateContent } from '../pipeline/content.js'
 import { rulesView, setRuleSwitch } from '../pipeline/rules.js'
 import { chooseConcept } from '../pipeline/concepts.js'
 import { approveCandidate, keepStale, pickHero, rejectCandidate, reopenCandidate, setFavorite, mirrorCandidate } from '../pipeline/review.js'
@@ -235,7 +236,7 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
   app.post('/uploads', async c => {
     const ctx = c.get('ctx')
     requireRole(ctx, 'member')
-    const body = parse(z.object({ files: z.array(z.object({ name: z.string().max(300), type: z.string().max(100), size: z.number().int().min(1).max(MAX_UPLOAD_BYTES) })).min(1).max(40) }), await json(c))
+    const body = parse(z.object({ files: z.array(z.object({ name: z.string().max(300), type: z.string().max(100), size: z.number().int().min(1).max(1024 * 1024 * 1024) })).min(1).max(40) }), await json(c))
     const result = await createUploadSlots(deps, ctx, body.files)
     // Direct uploads need the bucket's CORS rules; set them once if the key may.
     const origin = c.req.header('origin') ?? ''
@@ -511,8 +512,20 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
         return new Response(new Uint8Array(thumb), { headers: { 'content-type': 'image/webp', 'cache-control': 'private, max-age=31536000, immutable' } })
       }
     }
+    // Videos and download bundles come straight from storage (a short-lived
+    // link): a function response is capped at 4.5 MB on Vercel.
+    const download = c.req.query('download') ? (c.req.query('name') || `${c.req.param('id')}`) : null
+    if (deps.store.driver === 's3') {
+      const asset = await getAsset(deps, ctx, c.req.param('id'))
+      if (asset.kind === 'video' || asset.kind === 'file' || download) {
+        const ext = asset.storageKey.split('.').pop() ?? 'bin'
+        const url = await deps.store.presignGet(asset.storageKey, 3600, download ? { downloadName: download.endsWith(`.${ext}`) ? download : `${download}.${ext}` } : undefined)
+        if (url) return new Response(null, { status: 302, headers: { location: url, 'cache-control': 'private, max-age=600' } })
+      }
+    }
     const { row, data } = await readAsset(deps, ctx, c.req.param('id'))
-    const headers: Record<string, string> = { 'content-type': row.mime, 'cache-control': 'private, max-age=31536000, immutable', 'accept-ranges': 'bytes', 'content-disposition': c.req.query('download') ? `attachment; filename="${row.id}.${row.mime.split('/')[1]}"` : 'inline' }
+    const ext = row.storageKey.split('.').pop() ?? 'bin'
+    const headers: Record<string, string> = { 'content-type': row.mime, 'cache-control': 'private, max-age=31536000, immutable', 'accept-ranges': 'bytes', 'content-disposition': download ? `attachment; filename="${(download.endsWith(`.${ext}`) ? download : `${download}.${ext}`).replace(/[^\w.-]+/g, '_')}"` : 'inline' }
     // Video players ask for byte ranges (Safari will not play a clip without them).
     const range = /^bytes=(\d*)-(\d*)$/.exec(c.req.header('range') ?? '')
     if (range && data.length) {
@@ -522,6 +535,54 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
       return new Response(new Uint8Array(data.subarray(start, end + 1)), { status: 206, headers: { ...headers, 'content-range': `bytes ${start}-${end}/${data.length}`, 'content-length': String(end - start + 1) } })
     }
     return new Response(new Uint8Array(data), { headers })
+  })
+
+  // ── Content builder: B-roll, meme videos, slideshows, batches ──
+  app.get('/content', async c => c.json(await contentView(deps, c.get('ctx'))))
+  app.post('/broll', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    const body = parse(z.object({ uploadId: z.string().max(40), name: z.string().max(300), title: z.string().max(120).optional(), product: z.string().max(60).optional() }), await json(c))
+    return c.json(await addBroll(deps, ctx, body), 201)
+  })
+  app.patch('/broll/:id', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    const body = parse(z.object({ title: z.string().max(120).optional(), product: z.string().max(60).optional() }), await json(c))
+    return c.json(await updateBroll(deps, ctx, c.req.param('id'), body))
+  })
+  app.delete('/broll/:id', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    await archiveBroll(deps, ctx, c.req.param('id'))
+    return c.json({ ok: true })
+  })
+  app.post('/content', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    const body = parse(z.object({ kind: z.enum(['meme', 'slideshow', 'batch']), characterId: z.string().max(60), title: z.string().max(120).optional(), spec: z.record(z.string(), z.unknown()).optional() }), await json(c))
+    const row = await createContent(deps, ctx, body)
+    return c.json({ id: row.id }, 201)
+  })
+  app.patch('/content/:id', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    const body = parse(z.object({ title: z.string().max(120).optional(), spec: z.record(z.string(), z.unknown()).optional() }), await json(c))
+    const row = await updateContent(deps, ctx, c.req.param('id'), body)
+    return c.json({ id: row.id })
+  })
+  app.delete('/content/:id', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    await archiveContent(deps, ctx, c.req.param('id'))
+    return c.json({ ok: true })
+  })
+  // Rendering is local and free (ffmpeg and sharp on the worker).
+  app.post('/content/:id/render', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    const row = await startRender(deps, ctx, c.req.param('id'))
+    return c.json({ id: row.id, status: row.status }, 202)
   })
 
   // ── Usage and settings ──

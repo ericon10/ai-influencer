@@ -255,6 +255,42 @@ export const scenes = pgTable('scenes', {
   archivedAt: timestamp('archived_at', { withTimezone: true }),
 }, t => [index('scenes_char_idx').on(t.characterId, t.createdAt)])
 
+// ── Content builder (text overlays, owner 2026-10-13) ───────────────
+
+// The owner's own clips (screen recordings, phone video of a laptop), tagged
+// by product. The upload is converted on the worker to a lean copy.
+export const brollClips = pgTable('broll_clips', {
+  id: text('id').primaryKey(),
+  accountId: text('account_id').notNull().references(() => accounts.id),
+  assetId: text('asset_id'),
+  title: text('title').notNull().default(''),
+  product: text('product').notNull().default(''),
+  status: text('status').notNull().default('processing'), // processing | ready | failed
+  error: text('error'),
+  createdBy: text('created_by'),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+  archivedAt: timestamp('archived_at', { withTimezone: true }),
+}, t => [index('broll_account_idx').on(t.accountId, t.createdAt)])
+
+// A meme video, a slideshow or a batch: what it is made of (spec), and what
+// rendering it produced (outputs). Drafts are saved as they are edited.
+export const contentItems = pgTable('content_items', {
+  id: text('id').primaryKey(),
+  accountId: text('account_id').notNull().references(() => accounts.id),
+  characterId: text('character_id'),
+  kind: text('kind').notNull(), // meme | slideshow | batch
+  title: text('title').notNull().default(''),
+  spec: jsonb('spec').notNull().default({}),
+  status: text('status').notNull().default('draft'), // draft | rendering | ready | failed
+  outputs: jsonb('outputs').notNull().default({}),
+  error: text('error'),
+  createdBy: text('created_by'),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+  archivedAt: timestamp('archived_at', { withTimezone: true }),
+}, t => [index('content_account_idx').on(t.accountId, t.createdAt)])
+
 // ── Jobs and money ───────────────────────────────────────────────
 
 export const jobs = pgTable('jobs', {

@@ -11,7 +11,8 @@ export interface BlobStore {
   delete(key: string): Promise<void>
   // A short-lived direct URL when the driver supports it; otherwise null and
   // the API streams the bytes after its own auth check.
-  presignGet(key: string, ttlSeconds: number): Promise<string | null>
+  // `downloadName` makes the browser save the file under that name.
+  presignGet(key: string, ttlSeconds: number, opts?: { downloadName?: string }): Promise<string | null>
   // A short-lived URL the browser PUTs a file to directly (R2), so uploads
   // never pass through the API (Vercel caps request bodies at 4.5 MB).
   // Null when the driver has none; the API then takes the bytes itself.
@@ -106,8 +107,9 @@ export async function createS3Store(o: S3Options): Promise<BlobStore> {
       try { await client.send(new HeadObjectCommand({ Bucket: o.bucket, Key: key })); return true } catch { return false }
     },
     async delete(key) { await client.send(new DeleteObjectCommand({ Bucket: o.bucket, Key: key })) },
-    async presignGet(key, ttlSeconds) {
-      return getSignedUrl(client, new GetObjectCommand({ Bucket: o.bucket, Key: key }), { expiresIn: ttlSeconds })
+    async presignGet(key, ttlSeconds, opts) {
+      const disposition = opts?.downloadName ? `attachment; filename="${opts.downloadName.replace(/[^\w.-]+/g, '_')}"` : undefined
+      return getSignedUrl(client, new GetObjectCommand({ Bucket: o.bucket, Key: key, ...(disposition ? { ResponseContentDisposition: disposition } : {}) }), { expiresIn: ttlSeconds })
     },
     async presignPut(key, contentType, ttlSeconds) {
       assertSafeKey(key)

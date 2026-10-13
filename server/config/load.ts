@@ -221,6 +221,7 @@ export function loadConfig(dir = resolve(process.cwd(), 'config')): StudioConfig
       templates: readConfigFile(dir, 'templates.yaml', pipelineSchemas.templates),
       review: readConfigFile(dir, 'review.yaml', pipelineSchemas.review),
       scenes: readConfigFile(dir, 'scenes.yaml', pipelineSchemas.scenes),
+      content: readConfigFile(dir, 'content.yaml', pipelineSchemas.content),
     },
   }
   validateCrossRefs(cfg)

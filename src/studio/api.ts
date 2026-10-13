@@ -1,4 +1,4 @@
-import type { ActionPreview, CharacterSummary, CharacterView, HiggsfieldAccount, JobView, Me, QuoteView, RulesView, SceneFields, ScenesData, SettingsView, StudioAction, Usage, VideoPrice } from './types'
+import type { ActionPreview, CharacterSummary, CharacterView, HiggsfieldAccount, JobView, Me, QuoteView, RulesView, SceneFields, ScenesData, SettingsView, StudioAction, Usage, VideoPrice, BrollClip, ContentData, ContentKind } from './types'
 import { sheetRefOf, typeOf, uploadFiles } from './files'
 
 // Thin client for /api/v1. Every write sends the CSRF header the server
@@ -28,6 +28,8 @@ async function request<T>(method: string, path: string, body?: unknown, signal?:
 }
 
 export const assetUrl = (id: string, width?: number) => `/api/v1/assets/${id}/content${width ? `?w=${width}` : ''}`
+// A download under a readable name (videos and zips come straight from storage).
+export const downloadUrl = (id: string, name: string) => `/api/v1/assets/${id}/content?download=1&name=${encodeURIComponent(name)}`
 
 export const api = {
   me: () => request<Me>('GET', '/me'),
@@ -76,6 +78,18 @@ export const api = {
   updateScene: (sceneId: string, body: { brief?: string; title?: string; fields?: Partial<SceneFields>; prompts?: { still?: string; video?: string }; fromTemplate?: boolean }) => request<{ id: string }>('PATCH', `/scenes/${sceneId}`, body),
   videoPrices: (characterId: string, duration: number, aspect: string) => request<{ prices: VideoPrice[] }>('GET', `/characters/${characterId}/video-prices?duration=${duration}&aspect=${encodeURIComponent(aspect)}`),
   setVideoModel: (model: string) => request<{ model: string }>('PUT', '/settings/video-model', { model }),
+  // The content builder.
+  content: () => request<ContentData>('GET', '/content'),
+  addBroll: async (file: File, product: string, onProgress?: (done: number, total: number) => void) => {
+    const [up] = await uploadFiles([file], onProgress)
+    return request<BrollClip>('POST', '/broll', { uploadId: up!.uploadId, name: file.name, product })
+  },
+  updateBroll: (id: string, patch: { title?: string; product?: string }) => request<BrollClip>('PATCH', `/broll/${id}`, patch),
+  archiveBroll: (id: string) => request<{ ok: true }>('DELETE', `/broll/${id}`),
+  createContent: (body: { kind: ContentKind; characterId: string; title?: string; spec?: Record<string, unknown> }) => request<{ id: string }>('POST', '/content', body),
+  updateContent: (id: string, patch: { title?: string; spec?: Record<string, unknown> }) => request<{ id: string }>('PATCH', `/content/${id}`, patch),
+  archiveContent: (id: string) => request<{ ok: true }>('DELETE', `/content/${id}`),
+  renderContent: (id: string) => request<{ id: string; status: string }>('POST', `/content/${id}/render`, {}),
   archiveScene: (sceneId: string) => request<{ ok: true }>('DELETE', `/scenes/${sceneId}`),
   crop: (candidateId: string, rect: { x: number; y: number; w: number; h: number }) => request<{ candidateId: string; width: number; height: number }>('POST', `/candidates/${candidateId}/crop`, rect),
 

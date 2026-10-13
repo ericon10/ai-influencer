@@ -26,6 +26,7 @@ export default function Settings() {
           <StorageCard />
           <BudgetsCard d={d} />
           <ModelsCard d={d} />
+          <NoticesCard />
         </div>
       )}
     </div>
@@ -475,6 +476,29 @@ function ModelRow({ m, live }: { m: SettingsView['models'][number]; live: boolea
         {dirty && <button className="st-btn sm" disabled={saving} onClick={save}>Save</button>}
         {!dirty && m.endpoint && live && !m.testing && <PriceButton action={{ type: 'model_test', model: m.ref }} label={m.verified ? 'Test again' : 'Test'} variant="secondary" size="sm" />}
       </div>}
+    </div>
+  )
+}
+
+// Open-source notices for what the Studio ships to the browser or uses to
+// draw exports. OpenCut's notice joins these when it is embedded (Phase 4).
+const NOTICES: Array<{ name: string; what: string; license: string; copyright: string; url: string }> = [
+  { name: 'TikTok Sans', what: 'Caption text in exports and previews', license: 'SIL Open Font License 1.1', copyright: 'Copyright 2024 TikTok Inc.', url: 'https://github.com/tiktok/TikTokSans' },
+  { name: 'Noto Emoji', what: 'Emoji in captions', license: 'SIL Open Font License 1.1', copyright: 'Copyright 2013 Google LLC', url: 'https://github.com/googlefonts/noto-emoji' },
+  { name: 'opentype.js', what: 'Drawing caption text', license: 'MIT', copyright: 'Copyright the opentype.js authors', url: 'https://github.com/opentypejs/opentype.js' },
+  { name: 'fflate', what: 'Zip downloads', license: 'MIT', copyright: 'Copyright 2023 Arjun Barrett', url: 'https://github.com/101arrowz/fflate' },
+]
+
+function NoticesCard() {
+  return (
+    <div className="st-card">
+      <div className="st-card-head"><div className="grow"><div className="st-h2">Open-source notices</div><div className="st-hint">Fonts and libraries the Studio uses, with their licenses. OpenCut's notice is added here when the editor is built into the Studio.</div></div></div>
+      <div style={{ overflowX: 'auto' }}>
+        <table className="st-table">
+          <thead><tr><th>Name</th><th>Used for</th><th>License</th></tr></thead>
+          <tbody>{NOTICES.map(n => <tr key={n.name}><td className="strong"><a href={n.url} target="_blank" rel="noreferrer">{n.name}</a></td><td>{n.what}</td><td>{n.license}. {n.copyright}.</td></tr>)}</tbody>
+        </table>
+      </div>
     </div>
   )
 }

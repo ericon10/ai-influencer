@@ -43,6 +43,8 @@ const DEFAULTS: Record<string, LlmResponder> = {
   scene_plan: req => req.meta?.mockPlan ?? {},
   scene_ideas: req => req.meta?.mockIdeas ?? { options: [] },
   scene_prompt: req => ({ prompt: req.meta?.mockPrompt ?? '' }),
+  content_slides: req => req.meta?.mockSlides ?? { hook: '', slides: [], caption: '', hashtags: [] },
+  content_captions: req => req.meta?.mockCaptions ?? { captions: [] },
   qa_perception: req => req.meta?.mockObservation ?? {
     pose: 'frontal', nose: 'toward_camera', confidence: 0.9,
     framing: 'chest_up', standing: true, ears: [], skin_marks: [], other_jewelry: [],

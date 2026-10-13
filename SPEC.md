@@ -92,7 +92,8 @@ shuffling.
    time.
 4. Gates every expensive step behind a cheap draft plus QA.
 5. Tracks cost per approved asset.
-6. Hands finished clips to OpenCut for final touches.
+6. Opens OpenCut inside the Studio for final touches (Phase 4:
+   embedded, one app, one login).
 
 **Non-goals for v1.** Social posting and scheduling, multi-user
 teams, training our own models, and a full timeline editor (that
@@ -115,12 +116,12 @@ Two existing repos, both forked privately.
   goes.
 - Keep the OpenCut fork as close to upstream as possible. It is
   mid-rewrite, so heavy local changes will be painful to merge.
-- Connect them by **file handoff now, API later**:
-  - Now: the Studio does the deterministic rough cut itself with
-    ffmpeg (stitch, trim, mix) and exports a project folder
-    (clips, audio stems, manifest) that OpenCut opens.
-  - Later: when OpenCut's Editor API, MCP server or headless mode
-    lands, the Studio pushes timelines into it directly.
+- Connect them **inside the Studio** (owner, 2026-10-13, Phase 4):
+  OpenCut is embedded as a page of the Studio, and a post's project
+  (clips, B-roll, captions as text layers) is loaded from R2. Until
+  then the Studio renders posts itself with ffmpeg (the content
+  builder's Export). The earlier export-folder handoff is dropped:
+  no folders, no downloads, no re-uploads.
 
 **Gaps in ai-influencer to close first:**
 
@@ -130,8 +131,11 @@ Two existing repos, both forked privately.
   WaveSpeed, Dzine, fal and others plug in.
 - **Jobs.** Video jobs run for minutes. Needs an async job runner
   with webhooks and polling, not request-response calls.
-- **License.** Confirm the ai-influencer license before any
-  commercial use. OpenCut is MIT.
+- **License.** ai-influencer (DaanKieft/ai-influencer) has no
+  license file, so no license is granted by default. The owner is
+  getting written permission from its author (noted 2026-10-13);
+  no commercial use until it is in hand. OpenCut is MIT: its
+  license notice stays in the Studio once it is embedded (Phase 4).
 
 ---
 
@@ -850,11 +854,32 @@ run.
 - Draft-to-final routing, extend and start/end frame support,
   chaining, sound bed layering, automatic rough cut.
 
-**Phase 4: OpenCut handoff and automation**
-- Export folder (clips, stems, manifest) that OpenCut opens.
-- Swap to OpenCut Editor API / MCP / headless when available.
-- Batch mode: "7 scenes for the week" end to end, stopping only
-  at human gates.
+**Phase 3b: Text-overlay content builder (owner, 2026-10-13)**
+- B-roll library (the owner's screen recordings and phone video,
+  tagged by product), meme videos (a kept clip, optional B-roll cut
+  in hard, a TikTok-style caption box in the safe zones, 9:16 MP4,
+  no sound), slideshows (stills, Claude writes the hook, 5 to 7
+  slides, caption and hashtags; images exported in order) and
+  batches (captions pasted or written by Claude, one video each).
+  Rendering is local (ffmpeg, sharp) and free; Claude's writing is
+  priced. Reaction clips come from Clone Video (13.1), so there is
+  no separate reactions tab. DECISIONS G12.
+
+**Phase 4: OpenCut embedded in the Studio (owner, 2026-10-13)**
+- One app, one login. Not built yet; planned now (DECISIONS G13).
+- The post screen offers two ways out:
+  - **Export** (most posts): renders straight to MP4, as the
+    content builder does today.
+  - **Fine-tune**: the OpenCut editor opens as a page inside the
+    Studio, with the project preloaded from R2: the clips, the
+    B-roll and the captions as editable text layers.
+- **Done** in the editor saves the final MP4 back to the post and
+  the vault, and returns to the Studio. No downloads, no
+  re-uploads, no second login, no folders.
+- OpenCut's license notice stays in the app (an open-source notices
+  page, its LICENSE text verbatim).
+- Batch mode: "7 scenes for the week" end to end, stopping only at
+  human gates.
 
 ### 13.1 Roadmap after Phase 4 (owner, 2026-10-13)
 

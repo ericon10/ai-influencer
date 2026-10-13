@@ -229,6 +229,8 @@ async function processJob(deps: Deps, job: JobRow): Promise<void> {
   switch (job.status as JobStatusName) {
     case 'queued': return job.provider === 'local' ? runLocal(deps, job) : job.kind === 'llm' ? runLlm(deps, job) : submitGen(deps, job)
     case 'submitting':
+      // Free local work (a render, a check) that was cut off runs again.
+      if (job.provider === 'local') return runLocal(deps, job)
       // The lock expired mid-submit: the worker died and we cannot know if the
       // provider accepted (and charged) the job. Never resubmit blindly.
       return needsAttention(deps, job, 'The worker stopped while submitting this job. Check the provider console before retrying; it may have been charged.')
@@ -468,12 +470,19 @@ async function runLocal(deps: Deps, job: JobRow): Promise<void> {
   const run = localJobFor(job.purpose)
   await update(deps, job, { status: 'submitting', attempts: job.attempts + 1, submittedAt: deps.clock.now() })
   if (!run) return finishLocal(deps, ctx, job, 'failed', undefined, `No worker step for "${job.purpose}".`)
+  // A long render keeps its lock, so it is never picked up twice.
+  const lockMs = deps.config.runtime.jobs.lock_sec * 1000
+  const beat = setInterval(() => {
+    void deps.db.update(jobs).set({ lockedUntil: new Date(deps.clock.now().getTime() + lockMs) }).where(eq(jobs.id, job.id)).catch(() => undefined)
+  }, Math.max(5_000, lockMs / 3))
   try {
     const data = await run(deps, ctx, job)
     await finishLocal(deps, ctx, job, 'completed', data)
   } catch (e) {
     ctx.log.error({ err: e }, 'local job failed')
     await finishLocal(deps, ctx, job, 'failed', undefined, (e as Error).message)
+  } finally {
+    clearInterval(beat)
   }
 }
 

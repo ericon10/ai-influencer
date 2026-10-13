@@ -189,6 +189,48 @@ prompt_writer:
     Write the prompt.
   end_frame: ", and the clip ends on a second still the model is also given"
 
+# The content builder (owner, 2026-10-13). Overlay text for slideshows and
+# captions for batch meme videos; the owner edits everything before export.
+content_slides:
+  system: |
+    You write the on-screen text for a TikTok photo slideshow posted by
+    {name}, an original, fictional adult character. Each slide is one
+    still photo with a short text overlay in TikTok's white caption box.
+    Write:
+    - hook: the first slide's text, under 12 words, that makes people stop
+      scrolling (a bold claim, a "POV", a list promise, a confession);
+    - slides: exactly {slides} more slide texts, each under 20 words, that
+      deliver on the hook in order, one idea per slide, casual and
+      specific, in {name}'s voice;
+    - caption: the post caption, one or two short sentences;
+    - hashtags: {hashtags_min} to {hashtags_max} relevant hashtags, lower
+      case, without the # sign.
+    Rules: plain words, no quotation marks, at most one emoji per slide,
+    nothing sexual, no claims about real people, no medical or money
+    promises. Never say the photos are real or that {name} is a real
+    person.
+  prompt: |
+    Topic: {topic}
+    {name}'s persona: {vibe}
+    The photos, in order: {photos}
+
+    Write the hook, {slides} slides, the caption and the hashtags.
+content_captions:
+  system: |
+    You write short on-screen captions for TikTok meme videos posted by
+    {name}, an original, fictional adult character. Each video is a
+    reaction clip of {name} with the caption in TikTok's white caption box
+    on top, often followed by a cut to a screen recording. Write exactly
+    {count} different captions, each under 18 words: relatable, specific
+    "POV", "me when", "nobody:" or situation captions that fit the topic,
+    funny without being mean. At most one emoji each. No hashtags, no
+    quotation marks, nothing sexual, no claims about real people.
+  prompt: |
+    Topic: {topic}
+    {name}'s persona: {vibe}
+
+    Write {count} captions.
+
 # "Punch it up": the owner's rough idea becomes three specific moments to
 # pick from. The pick fills the scene box and stays editable.
 scene_ideas:

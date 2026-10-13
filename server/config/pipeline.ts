@@ -135,6 +135,8 @@ const templatesSchema = z.object({
   scene_plan: z.object({ system: z.string(), prompt: z.string() }),
   scene_ideas: z.object({ system: z.string(), prompt: z.string() }),
   video: z.object({ base: z.string(), silent: z.string(), end_frame: z.string() }),
+  content_slides: z.object({ system: z.string(), prompt: z.string() }),
+  content_captions: z.object({ system: z.string(), prompt: z.string() }),
   prompt_writer: z.object({
     still_system: z.string(), still_prompt: z.string(), video_system: z.string(), video_prompt: z.string(),
     end_frame: z.string(),
@@ -210,6 +212,26 @@ const reviewSchema = z.object({
   }),
 })
 
+const contentSchema = z.object({
+  version: z.number(),
+  canvas: z.object({ width: z.number().int().positive(), height: z.number().int().positive(), fps: z.number().int().positive() }),
+  caption: z.object({
+    font: z.object({ file: z.string(), weight: z.number().int() }),
+    size: z.number().positive(),
+    line_height: z.number().positive(),
+    box: z.object({ fill: z.string(), text: z.string(), radius: z.number().min(0), pad_x: z.number().min(0), pad_y: z.number().min(0) }),
+    max_width: z.number().positive(),
+    max_lines: z.number().int().positive(),
+    max_chars: z.number().int().positive(),
+    safe: z.object({ top: z.number().min(0), bottom: z.number().min(0), left: z.number().min(0), right: z.number().min(0) }),
+    position: z.enum(['top', 'middle', 'bottom']),
+  }),
+  meme: z.object({ max_clip_seconds: z.number().positive(), broll_seconds: z.number().positive(), max_broll_seconds: z.number().positive(), order: z.enum(['clip_first', 'broll_first']) }),
+  broll: z.object({ max_upload_mb: z.number().positive(), max_seconds: z.number().positive(), products: z.array(z.string()).default([]) }),
+  slideshow: z.object({ slides: z.tuple([z.number().int().positive(), z.number().int().positive()]), hashtags: z.tuple([z.number().int().min(0), z.number().int().positive()]), max_stills: z.number().int().positive(), image: z.object({ quality: z.number().int().min(50).max(100) }) }),
+  batch: z.object({ max: z.number().int().positive(), default_count: z.number().int().positive() }),
+})
+
 export const pipelineSchemas = {
   sheet: sheetSchema,
   views: viewsSchema,
@@ -217,6 +239,7 @@ export const pipelineSchemas = {
   templates: templatesSchema,
   review: reviewSchema,
   scenes: scenesSchema,
+  content: contentSchema,
 }
 
 export type SheetConfig = z.infer<typeof sheetSchema>
@@ -228,6 +251,7 @@ export type Rule = RulesConfig['rules'][number]
 export type TemplatesConfig = z.infer<typeof templatesSchema>
 export type ReviewConfig = z.infer<typeof reviewSchema>
 export type ScenesConfig = z.infer<typeof scenesSchema>
+export type ContentConfig = z.infer<typeof contentSchema>
 
 export interface PipelineConfig {
   sheet: SheetConfig
@@ -236,4 +260,5 @@ export interface PipelineConfig {
   templates: TemplatesConfig
   review: ReviewConfig
   scenes: ScenesConfig
+  content: ContentConfig
 }

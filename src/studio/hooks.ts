@@ -15,6 +15,7 @@ export const keys = {
   usage: ['usage'] as const,
   settings: ['settings'] as const,
   higgsfieldAccount: ['higgsfield-account'] as const,
+  content: ['content'] as const,
 }
 
 export function useMe() {
@@ -76,6 +77,24 @@ export function useScenes(characterId: string) {
   })
 }
 
+// The content builder: polls while a render or a B-roll upload is working.
+export function useContent() {
+  const qc = useQueryClient()
+  const active = useActiveJobs()
+  // Claude writing slides or captions, a render, or a B-roll upload.
+  const busy = (active.data?.jobs ?? []).some(j => /^(content_slides|content_captions|content_render|broll_ingest):/.test(j.purpose))
+  const wasBusy = useRef(false)
+  useEffect(() => {
+    if (wasBusy.current && !busy) qc.invalidateQueries({ queryKey: keys.content })
+    wasBusy.current = busy
+  }, [busy, qc])
+  return useQuery({
+    queryKey: keys.content,
+    queryFn: api.content,
+    refetchInterval: q => (busy || q.state.data?.items.some(i => i.status === 'rendering') || q.state.data?.broll.some(b => b.status === 'processing') ? 2000 : false),
+  })
+}
+
 export function useRules(characterId: string | null) {
   return useQuery({ queryKey: keys.rules(characterId), queryFn: () => api.rules(characterId) })
 }
@@ -108,6 +127,7 @@ export function useRefresh() {
     qc.invalidateQueries({ queryKey: ['jobs'] })
     qc.invalidateQueries({ queryKey: keys.usage })
     qc.invalidateQueries({ queryKey: keys.settings })
+    qc.invalidateQueries({ queryKey: keys.content })
   }
 }
 

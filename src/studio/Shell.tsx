@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react'
 import { Link, NavLink } from 'react-router-dom'
-import { Activity, AlertTriangle, CheckCircle2, Circle, Gauge, Loader2, Moon, Settings2, Sparkle, Sun, Users, XCircle } from 'lucide-react'
+import { Activity, AlertTriangle, CheckCircle2, Circle, Clapperboard, Gauge, Loader2, Moon, Settings2, Sparkle, Sun, Users, XCircle } from 'lucide-react'
 import { useTheme } from '../context/theme'
 import { api } from './api'
 import { useActiveJobs, useMe, useRefresh, useUsage } from './hooks'
@@ -26,6 +26,7 @@ export function Shell({ children }: { children: ReactNode }) {
         </Link>
         <nav className="st-nav">
           <NavLink to="/studio" end className={({ isActive }) => `st-nav-item ${isActive ? 'active' : ''}`}><Users size={17} />Characters</NavLink>
+          <NavLink to="/studio/content" className={({ isActive }) => `st-nav-item ${isActive ? 'active' : ''}`}><Clapperboard size={17} />Content</NavLink>
           <button className="st-nav-item" onClick={() => setActivity(true)}>
             <Activity size={17} />Activity
             {needsYou > 0 ? <span className="st-count">{needsYou}</span> : running > 0 ? <span className="st-count calm">{running}</span> : null}

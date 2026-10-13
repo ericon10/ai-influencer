@@ -136,8 +136,11 @@ the Studio; they are not creative limits on a character.
   its quote. USD prices from open.higgsfield.ai/pricing.
 - **Never crossfade a seam.** Cut, grade, or mark the seam failed. Prefer
   one take with start and end frames (SPEC 4.3).
-- Do not modify the OpenCut fork from this repo. The Studio hands
-  OpenCut an export folder of finished, continuous shots only.
+- OpenCut gets embedded in the Studio in Phase 4 (DECISIONS G13: one
+  app, one login; Export or Fine-tune; Done saves back to the post).
+  Do not start it before Phase 4. Keep posts' parts as data (clips,
+  B-roll, caption text) so the editor can load them as layers, and keep
+  OpenCut's license notice in the app once it is in.
 
 ## Character Studio layout
 
@@ -149,6 +152,7 @@ the Studio; they are not creative limits on a character.
 | `server/core/safety.ts` | Fixed: no nudity or explicit content (lint and runner) |
 | `config/rules.yaml`, `server/pipeline/rules.ts` | Rule one: the rule book (fixed or default), switches per account and per character, Settings > Rules |
 | `config/scenes.yaml`, `server/core/scenes.ts` | Stage 7 and 8 presets, scene and edit prompts, ref picker by angle, combo log |
+| `config/content.yaml`, `server/pipeline/content.ts`, `server/core/overlay.ts`, `server/media/meme.ts`, `src/studio/pages/Content.tsx` | Content builder: B-roll library, meme videos, slideshows, batches; TikTok caption box (bundled fonts); renders free on the worker |
 | `server/core/promptWriter.ts`, `src/studio/pages/character/PromptBox.tsx` | The prompt writer: Claude writes the final still or video prompt (editable above Generate); code adds the reference line, mark sides and REALISM |
 | `src/studio/pages/character/VideoSection.tsx`, `server/pipeline/videoAssets.ts`, `server/media/mask.ts` | Stage 9 video: takes, upscale this take, end frame helper (head mask), clip QA |
 | `server/core/qa/scene.ts` | Scene QA as advice: one-click fixes, the free mirror, face drift as a strong warning |

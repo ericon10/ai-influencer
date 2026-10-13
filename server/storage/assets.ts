@@ -14,12 +14,15 @@ const EXT: Record<string, string> = {
   'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp', 'image/gif': 'gif',
   'video/mp4': 'mp4', 'video/quicktime': 'mov', 'video/webm': 'webm',
   'audio/mpeg': 'mp3', 'audio/wav': 'wav', 'audio/x-wav': 'wav', 'audio/mp4': 'm4a', 'audio/aac': 'aac',
+  'application/zip': 'zip',
 }
 
-export function kindOf(mime: string): 'image' | 'video' | 'audio' {
+// `file` is a download bundle (a zip of slideshow images or batch videos).
+export function kindOf(mime: string): 'image' | 'video' | 'audio' | 'file' {
   if (mime.startsWith('image/')) return 'image'
   if (mime.startsWith('video/')) return 'video'
   if (mime.startsWith('audio/')) return 'audio'
+  if (mime === 'application/zip') return 'file'
   throw new Error(`Unsupported media type: ${mime}`)
 }
 
@@ -28,6 +31,7 @@ export function sniffMime(data: Buffer): string | null {
   if (data.length >= 3 && data[0] === 0xff && data[1] === 0xd8 && data[2] === 0xff) return 'image/jpeg'
   if (data.length >= 12 && data.subarray(0, 4).toString() === 'RIFF' && data.subarray(8, 12).toString() === 'WEBP') return 'image/webp'
   if (data.length >= 12 && data.subarray(4, 8).toString() === 'ftyp') return 'video/mp4'
+  if (data.length >= 4 && data.subarray(0, 4).equals(Buffer.from([0x50, 0x4b, 0x03, 0x04]))) return 'application/zip'
   if (data.length >= 12 && data.subarray(0, 4).toString() === 'RIFF' && data.subarray(8, 12).toString() === 'WAVE') return 'audio/wav'
   if (data.length >= 3 && (data.subarray(0, 3).toString() === 'ID3' || (data[0] === 0xff && (data[1]! & 0xe0) === 0xe0))) return 'audio/mpeg'
   return null
@@ -65,7 +69,7 @@ export async function saveAsset(deps: Deps, ctx: Ctx, input: SaveAssetInput): Pr
     const meta = await sharp(input.data).metadata()
     width = meta.width ?? null
     height = meta.height ?? null
-  } else {
+  } else if (kind !== 'file') {
     const probe = await probeMedia(input.data)
     width = probe.width ?? null
     height = probe.height ?? null
