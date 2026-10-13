@@ -50,7 +50,17 @@ export interface CharacterData {
   eyes: string
   marks: CharacterMark[]
   body: string
-  style: { palette?: string[]; pieces?: string[]; accessories?: string[]; hair_options?: string[]; notes?: string }
+  // Style is optional suggestions only. It is never put into a prompt; every
+  // scene names its own outfit. The only constants are the marks.
+  style: {
+    ideas?: string[]
+    hair_options?: string[]
+    notes?: string
+    // From older files; read the same way, as suggestions.
+    palette?: string[]
+    pieces?: string[]
+    accessories?: string[]
+  }
   makeup: { default: string; glam_when: string[]; glam?: string }
   persona: { vibe?: string; settings?: string[]; never?: string[] }
   pronouns: Pronouns

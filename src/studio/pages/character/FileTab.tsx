@@ -55,7 +55,9 @@ function Knowledge({ v }: { v: CharacterView }) {
   const label = (ref: string) => v.modelLabels[ref] ?? ref
   const prefs = Object.entries(d.preferredModels ?? {})
   const ids = d.identities ?? []
-  if (!ids.length && !prefs.length && !d.avoidModels?.length && !d.sections?.length) return null
+  const ideas = (d.style?.ideas as string[] | undefined) ?? []
+  const constants = d.marks.filter(m => m.kind === 'jewelry')
+  if (!ids.length && !prefs.length && !d.avoidModels?.length && !d.sections?.length && !ideas.length) return null
   return (
     <section className="st-card">
       <div className="st-card-head"><div className="grow"><div className="st-h2">From the character file</div><div className="st-hint">Kept with {d.name} and written back on every export.</div></div></div>
@@ -79,6 +81,13 @@ function Knowledge({ v }: { v: CharacterView }) {
           <div className="st-row" style={{ gap: 6, flexWrap: 'wrap' }}>
             {prefs.map(([role, ref]) => <span key={role} className="st-badge plain ok" title={ref}>{ROLE[role] ?? role}: {label(ref)}</span>)}
             {d.avoidModels.map(ref => <span key={ref} className="st-badge plain bad" title={ref}>Avoid: {label(ref)}</span>)}
+          </div>
+        )}
+        {ideas.length > 0 && (
+          <div className="st-col" style={{ gap: 6 }}>
+            <div className="st-kicker">Style ideas, optional</div>
+            <span className="st-hint">Never put into a prompt: every scene names its own outfit.{constants.length ? ` The one constant: ${constants.map(m => `${m.description} on ${d.pronouns.poss} ${m.side} ${m.region}`).join(', ')}.` : ''}</span>
+            <div className="st-row" style={{ gap: 6, flexWrap: 'wrap' }}>{ideas.map(i => <span key={i} className="st-chip">{i}</span>)}</div>
           </div>
         )}
         {(d.sections?.length ?? 0) > 0 && (

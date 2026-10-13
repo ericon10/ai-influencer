@@ -82,9 +82,9 @@ describe("Callie's character file", () => {
     expect(c.age).toBe(24)
     expect(c.eyes).toBe('warm hazel-brown')
     expect(c.card).toMatch(/^24 years old\. Long honey-blonde hair, loose beachy waves, deep side part\./)
-    expect(c.card).not.toMatch(/Distinguishing marks|Signature style|Callie/)
+    expect(c.card).not.toMatch(/Distinguishing marks|Style:|Callie/)
     expect(c.body).toBe('Fit, athletic build, toned legs, defined waist, naturally curvy hips')
-    expect(r.warnings.join(' ')).toMatch(/Moved "Distinguishing marks" and "Signature style" out of the card/)
+    expect(r.warnings.join(' ')).toMatch(/Moved "Distinguishing marks" and "Style" out of the card/)
     expect(validateCharacter(c)).toEqual([])
   })
 
@@ -99,11 +99,16 @@ describe("Callie's character file", () => {
 
   it('reads style, makeup, persona, pronouns and disclosure', () => {
     expect(c.pronouns).toEqual({ subj: 'she', obj: 'her', poss: 'her', noun: 'woman' })
-    expect(c.style.palette).toEqual(['butter yellow', 'cream', 'white', 'soft pastels', 'light-wash denim', 'gold accents'])
-    expect(c.style.pieces).toContain('butter-yellow ribbed one-piece swimsuit')
+    // Style is optional ideas only: no palette, no default outfit.
+    expect(c.style.palette).toBeUndefined()
+    expect(c.style.pieces).toBeUndefined()
+    expect(c.style.ideas).toContain('a butter-yellow ribbed one-piece swimsuit')
+    expect(c.style.ideas).toContain('dainty gold jewelry')
+    expect(c.style.hair_options).toContain('anything new she tries')
+    expect(c.style.notes).toMatch(/^Look: a regular girl whose style evolves; natural glow\./)
+    expect(c.style.notes).toMatch(/The only constant: the gold ear cuff on her left ear/)
+    expect(r.warnings.join(' ')).toMatch(/Style is kept as optional ideas only; it never goes into a prompt/)
     expect(c.persona.settings).toContain('tropical coves')
-    expect(c.style.hair_options).toHaveLength(4)
-    expect(c.style.notes).toMatch(/^Signature look: pastel florals, ruffles, natural glow\. Footwear:/)
     expect(c.makeup).toEqual({ default: 'natural (light skin, groomed brows, tinted lip)', glam_when: ['nights_out', 'events'], glam: 'soft glam (bronzer, warm blush, glossy nude-pink lip)' })
     expect(c.persona.vibe).toMatch(/^sunny, approachable/)
     expect(c.persona.never).toContain('visible brand logos')
@@ -137,7 +142,7 @@ describe("Callie's character file", () => {
 
   it('keeps every section it does not model, word for word', () => {
     expect(c.sections.map(s => s.title)).toEqual([
-      'Signature style', 'Persona', 'Reference sheet', 'Fixed blocks', 'Models', 'Scene rules learned',
+      'Style (evolves over time, never a uniform)', 'Persona', 'Reference sheet', 'Fixed blocks', 'Models', 'Scene rules learned',
       'Proven recipe: the candid "caught you" shot', 'Video rules', 'Combo log (last 10)',
     ])
     const original = splitSections(md).sections

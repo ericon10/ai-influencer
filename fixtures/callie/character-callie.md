@@ -1,18 +1,19 @@
 # Character: Callie
 
 ## Card
-Callie, 24 years old. Long honey-blonde hair, loose beachy waves, deep side part. Warm hazel-brown eyes, soft oval face, full light-brown brows, full lips. Fit, athletic build, toned legs, defined waist, naturally curvy hips. Distinguishing marks: small mole above her left brow, gold ear cuff on her left ear. Signature style: pastel florals, ruffles, natural glow.
+Callie, 24 years old. Long honey-blonde hair, loose beachy waves, deep side part. Warm hazel-brown eyes, soft oval face, full light-brown brows, full lips. Fit, athletic build, toned legs, defined waist, naturally curvy hips. Distinguishing marks: small mole above her left brow, gold ear cuff on her left ear. Style: a regular girl whose style evolves; natural glow.
 
 ## Distinguishing marks
 - Small, subtle mole just above her left brow (keep it subtle, never a feature)
 - Gold double-band ear cuff on her LEFT ear, always worn
 
-## Signature style
-- Wardrobe palette: butter yellow, cream, white, soft pastels, light-wash denim, gold accents
-- Go-to pieces: pastel floral and ruffled mini dresses, fitted white tees, high-rise straight jeans, cream linen co-ords, butter-yellow ribbed one-piece swimsuit, matching activewear sets, white strappy sandals or clean white sneakers
-- Accessories always worn: gold ear cuff on her left ear; otherwise dainty gold jewelry only
-- Hair styling options (changes often): loose beachy waves with a deep side part; tucked behind her left ear; claw clip or low bun; slicked back after the gym or pool
-- Makeup: natural by default (light skin, groomed brows, tinted lip). Soft glam (bronzer, warm blush, glossy nude-pink lip) only for nights out and events
+## Style (evolves over time, never a uniform)
+- She is a regular 24-year-old with her own developing taste. Any outfit fits her as long as it is something a real girl her age would actually wear for that moment.
+- Every scene prompt names the full outfit; nothing here is enforced.
+- Starting ideas only (optional): soft neutrals and pastels, light denim, linen sets, simple tees, sundresses, activewear, a butter-yellow ribbed one-piece swimsuit, white sandals or clean sneakers, dainty gold jewelry.
+- The only constant: the gold ear cuff on her left ear. Other jewelry varies.
+- Hair styling changes often: loose beachy waves with a deep side part; tucked behind her left ear; claw clip or low bun; slicked back after the gym or pool; anything new she tries.
+- Makeup: natural by default (light skin, groomed brows, tinted lip). Soft glam (bronzer, warm blush, glossy nude-pink lip) for nights out and events.
 - Footwear: always name her shoes in scene prompts (the sheet sneakers should not carry into scenes)
 
 ## Persona

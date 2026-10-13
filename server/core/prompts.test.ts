@@ -119,3 +119,37 @@ describe('character validation', () => {
     expect(bad.map(i => i.field)).toEqual(expect.arrayContaining(['age', 'marks', 'body']))
   })
 })
+
+// Callie's file: style is optional suggestions, never put into a prompt;
+// only the left-ear cuff is constant.
+describe("a character's style never reaches a prompt", () => {
+  it('keeps every style idea out of the hero and all twelve sheet prompts', async () => {
+    const { readFileSync } = await import('node:fs')
+    const { join } = await import('node:path')
+    const { importCharacterFile } = await import('./characterFile')
+    const { buildHeroPrompts, buildSheetPrompt } = await import('./prompts')
+    const { loadConfig } = await import('../config/load')
+    const cfg = loadConfig()
+    const c = importCharacterFile(readFileSync(join(process.cwd(), 'fixtures/callie/character-callie.md'), 'utf8'), { models: cfg.models.models }).character
+    const prompts = [
+      ...buildHeroPrompts(cfg.pipeline.templates, cfg.pipeline.views, c),
+      ...cfg.pipeline.sheet.shots.map(shot => buildSheetPrompt(cfg.pipeline.templates, cfg.pipeline.views, shot, c)),
+    ]
+    expect(c.style.ideas?.length).toBeGreaterThan(5)
+    for (const p of prompts) {
+      for (const idea of [...(c.style.ideas ?? []), ...(c.style.hair_options ?? [])]) expect(p.toLowerCase()).not.toContain(idea.toLowerCase())
+      expect(p).not.toMatch(/butter-yellow|linen|sundress|pastel/i)
+    }
+    // The cuff is the one constant, stated with its side in every sheet prompt.
+    for (const p of prompts.slice(3)) expect(p).toMatch(/gold double-band ear cuff/)
+  })
+
+  it('requires every scene to name its own outfit and never carry one over', async () => {
+    const { lintPrompt, blocking } = await import('./rules')
+    const { loadConfig } = await import('../config/load')
+    const rules = loadConfig().pipeline.rules
+    const ids = (p: string) => blocking(lintPrompt(rules, p, { stage: 'scene' })).map(v => v.ruleId)
+    expect(ids('She laughs at a cafe table, same outfit as before.')).toEqual(expect.arrayContaining(['scene-names-outfit', 'scene-no-carried-outfit']))
+    expect(ids('She laughs at a cafe table, wearing a cream linen shirt, light jeans and white sandals.')).not.toContain('scene-names-outfit')
+  })
+})

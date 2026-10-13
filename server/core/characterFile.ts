@@ -312,26 +312,28 @@ export function importFreeform(md: string, opts: ImportOptions = {}): ImportResu
   // Style and makeup.
   const style: CharacterData['style'] = {}
   const makeup: CharacterData['makeup'] = { default: 'natural', glam_when: [] }
-  const styleSec = find(sections, /style$/)
+  const styleSec = find(sections, /^(?:signature )?style\b/, /style$/)
   const styleNotes: string[] = []
   const summary = moved.find(s => /^(?:signature )?style\s*:/i.test(s))
-  if (summary) styleNotes.push(`Signature look: ${summary.replace(/^[^:]+:\s*/, '')}`)
+  if (summary) styleNotes.push(`Look: ${summary.replace(/^[^:]+:\s*/, '')}`)
   for (const b of bullets(styleSec?.body ?? '')) {
     const k = (b.key ?? '').toLowerCase()
     if (/palette|colou?rs/.test(k)) style.palette = splitList(b.value, ',')
     else if (/pieces|staples|wardrobe/.test(k)) style.pieces = splitList(b.value, ',')
+    else if (/idea|suggest|starting/.test(k)) style.ideas = splitList(b.value, ',')
     else if (/accessor/.test(k)) style.accessories = splitList(b.value, ';')
     else if (/hair/.test(k)) style.hair_options = splitList(b.value, ';')
     else if (/makeup/.test(k)) {
       const def = b.value.match(/^([a-z][a-z ]*?)\s+by default(?:\s*\(([^)]*)\))?/i)
       if (def) makeup.default = def[2] ? `${def[1]!.toLowerCase()} (${def[2]})` : def[1]!.toLowerCase()
-      const when = b.value.match(/\bonly for\s+([^.]+)/i)?.[1]
+      const when = b.value.match(/glam[^.]*?\bfor\s+([^.]+)/i)?.[1]
       if (when) makeup.glam_when = when.split(/,|\band\b/).map(w => w.trim().toLowerCase().replace(/\s+/g, '_')).filter(Boolean)
       const glam = b.value.match(/\b((?:soft |full )?glam(?:\s*\([^)]*\))?)/i)?.[1]
       if (glam) makeup.glam = glam.toLowerCase()
     } else styleNotes.push(b.key ? `${b.key}: ${b.value}` : b.value)
   }
   if (styleNotes.length) style.notes = styleNotes.map(n => (/[.!?]$/.test(n) ? n : `${n}.`)).join(' ')
+  if (style.ideas?.length || style.palette?.length || style.pieces?.length) warnings.push('Style is kept as optional ideas only; it never goes into a prompt, and every scene names its own outfit.')
 
   // Persona.
   const persona: CharacterData['persona'] = {}

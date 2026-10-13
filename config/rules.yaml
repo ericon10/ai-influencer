@@ -61,6 +61,18 @@ rules:
     when: {}
     check: { type: identity_block }
     message: This model runs with the character's saved identity, whose prompt block (for example SOUL IDENTITY) must be in every prompt. Without it the character drifts.
+  - id: scene-names-outfit
+    spec: "char-file"
+    title: Every scene names its own outfit
+    when: { stage: scene }
+    check: { type: require_phrase, phrase: "wearing" }
+    message: Name the full outfit in every scene prompt. A character's style is only a source of ideas; nothing from it is put in for you.
+  - id: scene-no-carried-outfit
+    spec: "char-file"
+    title: Never carry an outfit over or fall back to a default look
+    when: { stage: scene }
+    check: { type: forbid_pattern, flags: i, pattern: "\\b(same outfit|as before|usual outfit|signature (look|outfit|style)|default outfit)\\b" }
+    message: Write the outfit out in full; never say "same outfit as before" or lean on a signature look.
   - id: upscale-max-2x
     spec: "5.1.6"
     title: Upscale 2x, never more
