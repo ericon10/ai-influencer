@@ -311,5 +311,6 @@ Decisions: `DECISIONS.md` F1 to F6, then G1 to G3 (defaults, not locks).
 
 SPEC 13.1, R1 to R7: Clone Video (first after Phase 3), Inspo board
 and "Recreate this", Scene library, Multi-character runs, LoRA
-training, Vault, Posting calendar. Endpoints and rough costs are in
+training, Vault, Posting calendar (TikTok prepare and notify;
+Instagram as ready-to-post exports). Endpoints and rough costs are in
 the SPEC. Phase 2 and Phase 3 come first.

@@ -4,8 +4,9 @@
 #   fixed:   always on, cannot be switched off, and may block a run. Only
 #            the Realism principle (with a bare face on hero and sheet),
 #            adults 21 and over, no nudity or explicit content, a new person
-#            rather than a copy of a real one, the price before any paid run,
-#            budget caps and server-side keys.
+#            rather than a copy of a real one, the AI-generated label on
+#            posts, the price before any paid run, budget caps and
+#            server-side keys.
 #   default: on unless switched off (Settings, Rules, for all characters or
 #            one), and at most a warning. A default never blocks a run.
 #
@@ -38,6 +39,13 @@ rules:
     title: A new person, never a copy of the inspiration face
     check: { type: code }
     message: A hero that matches the face of the person in an inspiration image cannot become REF-00. The character must be a new person.
+  - id: ai-label
+    bucket: fixed
+    area: safety
+    spec: "13.1"
+    title: Posts are labeled as AI-generated
+    check: { type: behavior }
+    message: Every post the Studio prepares and every ready-to-post export carries the AI-generated label (TikTok and Instagram require it). The character file's disclosure line is the wording.
 
   # ── Fixed: rule zero, the Realism principle ──
   - id: realism-block

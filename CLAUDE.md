@@ -49,8 +49,9 @@ restrictions. Every rule is in exactly one of two buckets
   skin, the REALISM block, banned words, beautify off, the texture
   check, the natural baseline); bare face on hero and sheet;
   characters are 21 or older; no nudity or explicit content; a new
-  person, never a copy of the inspiration face; the price shown before
-  any paid run; budget caps; keys server-side only. Fixed rules can
+  person, never a copy of the inspiration face; posts labeled as
+  AI-generated; the price shown before any paid run; budget caps;
+  keys server-side only. Fixed rules can
   stop a run and cannot be switched off.
 - **DEFAULT, everything else:** pre-filled, fully editable, a warning
   at most, never blocks a run. Outfit, footwear, jewelry (the ear

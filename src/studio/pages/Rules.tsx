@@ -61,7 +61,7 @@ export default function Rules() {
               </div>
             </section>
           ))}
-          <Callout tone="info">Turning a default off changes what the Studio suggests and checks; it never removes anything you write yourself. Realism, adults 21 and over, no explicit content, a new person rather than a copy, the price first, budget caps and server-side keys stay on.</Callout>
+          <Callout tone="info">Turning a default off changes what the Studio suggests and checks; it never removes anything you write yourself. Realism, adults 21 and over, no explicit content, a new person rather than a copy, the AI-generated label on posts, the price first, budget caps and server-side keys stay on.</Callout>
         </div>
       )}
     </div>

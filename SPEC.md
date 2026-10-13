@@ -46,8 +46,9 @@ life. Every rule is in one of two buckets:
 - **FIXED (only these):** the Realism principle (rule zero), bare face
   on hero and sheet, characters 21 or older, no nudity or explicit
   content, a new person rather than a copy of the inspiration face,
-  the price shown before any paid run, budget caps, keys server-side
-  only. Fixed rules can stop a run.
+  posts labeled as AI-generated, the price shown before any paid
+  run, budget caps, keys server-side only. Fixed rules can stop a
+  run.
 - **DEFAULT (everything else), including section 5 apart from its
   Realism items (5.1.3 and 5.2.19):**
   pre-filled, fully editable, a warning at most, never a block. Each
@@ -836,7 +837,8 @@ the first thing after Phase 3 ships. Rule one holds in every item:
 every choice is a pre-filled default the owner can change, and only
 the fixed rules stop a run (Realism and the texture check, 21 or
 older, no explicit content, a new person rather than a copy, the
-price first, budget caps, keys server-side).
+AI-generated label on posts, the price first, budget caps, keys
+server-side).
 
 Endpoints below are from Higgsfield's official Model API Reference
 (docs.higgsfield.ai, read 2026-10-13) or are tools on the owner's
@@ -940,29 +942,32 @@ are confirmed by the paid test. Every run is quoted before it starts.
   month with no download fees.
 
 **R7. Posting calendar**
-- Schedule finished content per character for Instagram and
-  TikTok. Before posting: trending sound suggestions and a virality
-  score, both optional.
-- TikTok, through the owner's Higgsfield account: `tiktok_connect`
-  and `tiktok_accounts` to link, `tiktok_music_trending` for sounds
-  from TikTok's Commercial Music Library (cleared for commercial
-  use, SPEC 5.5.38), `tiktok_prepare_publish` and
-  `tiktok_publish_status` to post. Higgsfield's publish form must be
-  submitted by the owner, so at the scheduled time the Studio
-  prepares the post (or saves it to TikTok drafts) and notifies the
-  owner to press publish. Fully automatic posting would need
-  TikTok's own Content Posting API and an approved TikTok app.
-- Instagram: Higgsfield has no Instagram tool. Posting goes through
-  Meta's Instagram API content publishing for a professional
-  account, which needs a Meta app and its review.
+- Schedule finished content per character. Before posting: trending
+  sound suggestions and a virality score, both optional.
+- TikTok, prepare and notify (owner, 2026-10-13), through the
+  owner's Higgsfield account: `tiktok_connect` and `tiktok_accounts`
+  to link, `tiktok_music_trending` for sounds from TikTok's
+  Commercial Music Library (cleared for commercial use, SPEC
+  5.5.38), `tiktok_prepare_publish` and `tiktok_publish_status`.
+  Higgsfield's publish form is submitted by the owner, so at the
+  scheduled time the Studio prepares the post (or saves it to TikTok
+  drafts) and notifies the owner to press publish.
+- Instagram: no posting for now (owner, 2026-10-13). The calendar
+  exports ready-to-post files instead: the media at the destination
+  aspect, the caption with the disclosure line, and the suggested
+  sound, in one folder per post. Higgsfield has no Instagram tool;
+  posting later would go through Meta's Instagram API for a
+  professional account, after Meta's app review.
 - Virality: account tool `virality_predictor` on the finished clip.
-- AI disclosure: TikTok and Instagram require AI-generated content
-  to be labeled, so the label is on by default on every post.
-  Proposed as fixed (a platform rule, like 21 and older); owner to
-  confirm.
-- Rough cost: posting and the sound list are free; the virality
-  score is charged in Higgsfield credits (price from its first
-  quote).
+- AI-generated label (fixed, owner 2026-10-13, rule `ai-label`):
+  every prepared TikTok post sets the AI-generated flag
+  (`is_aigc`), and every export carries the disclosure line in its
+  caption and AI-source metadata in the file (IPTC digital source
+  type "trainedAlgorithmicMedia", which platforms read to apply
+  their own AI label). It cannot be switched off.
+- Rough cost: posting, exports and the sound list are free; the
+  virality score is charged in Higgsfield credits (price from its
+  first quote).
 
 ---
 

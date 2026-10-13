@@ -439,10 +439,11 @@ is in `config/rules.yaml` with a `bucket`:
   `server/pipeline/rulebook.test.ts` trips every lintable default and
   shows none of them blocks.
 
-One addition to the owner's fixed list, kept fixed on purpose:
-**distinct-person** (a hero that matches the face in an inspiration
-image cannot become REF-00). It is the same safety line as "no explicit
-content": the Studio makes new people, never a copy of a real one.
+One addition to the owner's fixed list, kept fixed on purpose and
+confirmed by the owner: **distinct-person** (a hero that matches the
+face in an inspiration image cannot become REF-00). It is the same
+safety line as "no explicit content": the Studio makes new people,
+never a copy of a real one.
 
 ### G2. Switches per account and per character
 Settings > Rules lists every rule with its bucket. Each default has an
@@ -485,3 +486,12 @@ changes what the Studio suggests and checks, never what the owner types.
 - **Hero runs** are 1 to 8 per prompt (fewer than 4 warns), and the sheet
   can be regenerated out of order (missing inputs fall back with a
   warning).
+
+### G4. The AI-generated label is fixed; posting is TikTok only (owner)
+- **ai-label** joins the fixed rules: every post the Studio prepares and
+  every ready-to-post export is labeled as AI-generated (TikTok and
+  Instagram require it). The character file's disclosure line is the
+  wording; the label itself cannot be switched off.
+- Posting calendar (SPEC 13.1, R7): TikTok is prepare and notify through
+  the owner's Higgsfield account (the owner presses publish). Instagram
+  is not posted for now; the calendar exports ready-to-post files.
