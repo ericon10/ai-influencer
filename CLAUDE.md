@@ -56,8 +56,8 @@ restrictions. Every rule is in exactly one of two buckets
 - **DEFAULT, everything else:** pre-filled, fully editable, a warning
   at most, never blocks a run. Outfit, footwear, jewelry (the ear
   cuff included), makeup and hair; any camera angle, height, distance
-  or framing; aspect by destination; combo log repeats (warning with
-  "Use anyway"); logos (off by default, a per-scene "Brands and
+  or framing; aspect by destination; repeats (the combo log is a
+  history; a variety note exists but starts off); logos (off by default, a per-scene "Brands and
   logos" switch for brand deals); the persona "never" list
   (suggestions only); the gray sheet background (editable); QA
   findings (advice with one-click fixes; face drift is a strong
@@ -69,6 +69,11 @@ for each default, for all characters or one (the character setting
 wins). The lint forces a default to "warning" even if the yaml says
 "error", and `server/pipeline/rulebook.test.ts` proves no default can
 block a run. A new rule is a default unless the owner says otherwise.
+
+Forms follow the same idea: as few required fields as possible (a scene
+needs only its moment, and the owner's own words count), each required
+field marked REQUIRED until filled, and a blocked button always shows
+what is left, linked to the field (`Field`, `Todo` in `src/studio/ui.tsx`).
 
 This file gives a new Claude Code session enough context to be useful
 immediately. Read this first before making changes.

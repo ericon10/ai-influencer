@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { ArrowRight, Clapperboard, History, Loader2, Plus } from 'lucide-react'
 import { api } from '../../api'
 import { useRefresh, useScenes } from '../../hooks'
-import { Img, errorMessage, useToast } from '../../ui'
+import { Field, Img, Todo, errorMessage, useToast } from '../../ui'
 import type { CharacterView, SceneView, ScenesData } from '../../types'
 import { SceneEditor } from './SceneEditor'
 
@@ -69,17 +69,20 @@ function NewScene({ v, onCreated }: { v: CharacterView; onCreated: (id: string) 
         <span className="st-kicker" style={{ margin: 0 }}><Clapperboard size={13} style={{ verticalAlign: -2 }} /> New scene</span>
         <div className="st-nextup-title">What is {v.data.name} doing?</div>
       </div>
-      <textarea
-        className="st-textarea" rows={3} maxLength={2000} value={brief} onChange={e => setBrief(e.target.value)}
-        placeholder={`In your own words, for example: ${v.data.name} picking out peaches at the farmers market, a friend snaps it on their phone`}
-        onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) void start() }}
-      />
+      <Field id="new-scene-brief" label="In your own words" required done={!!brief.trim()}>
+        <textarea
+          className="st-textarea" rows={3} maxLength={2000} value={brief} onChange={e => setBrief(e.target.value)}
+          placeholder={`e.g. ${v.data.name} picking out peaches at the farmers market, a friend snaps it on their phone`}
+          onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) void start() }}
+        />
+      </Field>
       {ideas.length > 0 && (
         <div className="st-row" style={{ gap: 6, flexWrap: 'wrap' }}>
           <span className="st-hint">Ideas:</span>
           {ideas.map(i => <button key={i} className="st-chip" onClick={() => setBrief(b => (b.trim() ? `${b.trim()}, ${i}` : `${v.data.name} at ${i}`))}>{i}</button>)}
         </div>
       )}
+      {!brief.trim() && <Todo items={[{ label: `What is ${v.data.name} doing?`, target: 'new-scene-brief' }]} />}
       <div className="st-row">
         <button className="st-btn primary" disabled={!brief.trim() || busy} onClick={start}>{busy ? <Loader2 size={16} className="st-spin" /> : <Plus size={16} />}Start this scene</button>
         <span className="st-hint">Free. Next you plan the details and see the price before anything runs.</span>
@@ -121,7 +124,7 @@ function ComboLog({ data }: { data: ScenesData }) {
   if (!data.combos.length) return null
   return (
     <section className="st-card">
-      <div className="st-card-head"><History size={16} /><div className="grow"><div className="st-h3">Combo log</div><div className="st-hint">The last {data.combos.length} picked scenes. A new scene never repeats a moment and camera pair from this list.</div></div></div>
+      <div className="st-card-head"><History size={16} /><div className="grow"><div className="st-h3">Combo log</div><div className="st-hint">The last {data.combos.length} picked scenes, as a history. Repeats are fine; every still comes out different.</div></div></div>
       <div className="st-card-body st-col" style={{ gap: 6 }}>
         {[...data.combos].reverse().map((c, i) => (
           <div key={i} className="st-combo"><span className="st-mono st-muted">{c.date}</span><b>{c.moment}</b><span>{c.camera}</span><span className="st-muted">{c.light}</span><span className="st-muted">{c.location}</span></div>

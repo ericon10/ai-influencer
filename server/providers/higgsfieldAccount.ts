@@ -6,7 +6,13 @@ import type { McpClient } from './mcpClient.js'
 import { ProviderError, type CostEstimate, type GenRequest, type JobState, type JobStatus, type Output, type ProviderAdapter } from './types.js'
 
 // How long an estimate waits for Higgsfield's live price on the account path.
-const ESTIMATE_WAIT_MS = 20_000
+// Short, so the owner sees a price within seconds: past it, a saved live
+// price or the price book answers.
+const ESTIMATE_WAIT_MS = 6_000
+// A live price this recent is used as is, without asking Higgsfield again.
+export const LIVE_PRICE_FRESH_MS = 6 * 3600_000
+// An older live price still beats the price book when Higgsfield is slow.
+const LIVE_PRICE_KEEP_MS = 30 * 24 * 3600_000
 
 // The owner's own Higgsfield account (the MCP connector, plan credits), next
 // to the pay-per-use REST API adapter that customers and production use.
@@ -35,7 +41,20 @@ export interface HiggsfieldAccountOptions {
   timeoutMs?: number
   // How long an estimate waits for Higgsfield's live price.
   estimateWaitMs?: number
+  // Live prices Higgsfield gave before, by request shape (priceSignature).
+  livePrices?: LivePriceStore
 }
+
+export interface LivePriceStore {
+  get(signature: string): Promise<{ credits: number; at: number } | null>
+  set(signature: string, credits: number): Promise<void>
+}
+
+// What a price depends on. The prompt and the seed do not change it.
+export const priceSignature = (req: GenRequest) =>
+  [req.model, req.kind, req.resolution ?? '', req.quality ?? '', req.durationSec ?? '', req.audio === true ? 'audio' : ''].join('|')
+
+const day = (ms: number) => new Date(ms).toISOString().slice(0, 10)
 
 export interface AccountBalance { credits: number | null; plan: string | null }
 
@@ -168,13 +187,23 @@ export function createHiggsfieldAccountAdapter(o: HiggsfieldAccountOptions): Pro
   }
 
   // Credits from the price book, when Higgsfield cannot price a request
-  // before its media exist (an upscale needs the uploaded image).
-  function bookCredits(req: GenRequest): number | null {
+  // before its media exist (an upscale needs the uploaded image), or is too
+  // slow to price it and no live price is saved.
+  function bookCredits(req: GenRequest): { credits: number; verified: boolean } | null {
     const { provider, model } = splitRef(req.model)
     const video = req.kind === 'video' || req.kind === 'video_extend' || req.kind === 'audio'
     const entry = findPrice(o.config.pricebook, provider, model, video ? 'second' : 'image', { resolution: req.resolution, quality: req.quality, aspect: req.aspect })
     if (entry?.credits == null) return null
-    return Math.round(entry.credits * (video ? (req.durationSec ?? 5) : 1) * 100) / 100
+    return { credits: Math.round(entry.credits * (video ? (req.durationSec ?? 5) : 1) * 100) / 100, verified: entry.credits_verified === true }
+  }
+
+  async function livePrice(req: GenRequest, entry: ReturnType<typeof accountModel>): Promise<number | null> {
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const slow = new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new ProviderError(`no answer in ${Math.round((o.estimateWaitMs ?? ESTIMATE_WAIT_MS) / 1000)} s`, { retryable: true, submitted: 'no', code: 'slow_price' })), o.estimateWaitMs ?? ESTIMATE_WAIT_MS) })
+    const value = await Promise.race([o.client.callTool(tools(req).cost, { params: { ...accountParams(entry, req, false), get_cost: true, use_unlim: false } }), slow])
+      .finally(() => clearTimeout(timer))
+    const cost = isObj(value) && isObj(value.cost) ? value.cost : undefined
+    return typeof cost?.credits_exact === 'number' ? cost.credits_exact : typeof cost?.credits === 'number' ? cost.credits : null
   }
 
   async function balance(): Promise<AccountBalance> {
@@ -200,24 +229,36 @@ export function createHiggsfieldAccountAdapter(o: HiggsfieldAccountOptions): Pro
     },
     async estimate(req) {
       const entry = accountModel(o.config, req.model)
+      let reason = ''
       if (req.kind !== 'upscale') {
+        // A recent live price for the same request shape answers at once.
+        const sig = priceSignature(req)
+        const saved = await o.livePrices?.get(sig).catch(() => null) ?? null
+        const now = Date.now()
+        if (saved && now - saved.at < LIVE_PRICE_FRESH_MS) return creditEstimate(saved.credits, true, 'higgsfield-account-live')
         try {
           // A live price from Higgsfield, but never long enough to stall the
-          // estimate: past the wait, the price book answers instead.
-          let timer: ReturnType<typeof setTimeout> | undefined
-          const slow = new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new ProviderError('Higgsfield took too long to price this.', { retryable: true, submitted: 'no', code: 'slow_price' })), o.estimateWaitMs ?? ESTIMATE_WAIT_MS) })
-          const value = await Promise.race([o.client.callTool(tools(req).cost, { params: { ...accountParams(entry, req, false), get_cost: true, use_unlim: false } }), slow])
-            .finally(() => clearTimeout(timer))
-          const cost = isObj(value) && isObj(value.cost) ? value.cost : undefined
-          const credits = typeof cost?.credits_exact === 'number' ? cost.credits_exact : typeof cost?.credits === 'number' ? cost.credits : null
-          if (credits != null) return creditEstimate(credits, true, 'higgsfield-account-live')
+          // estimate.
+          const credits = await livePrice(req, entry)
+          if (credits != null) {
+            await o.livePrices?.set(sig, credits).catch(() => undefined)
+            return creditEstimate(credits, true, 'higgsfield-account-live')
+          }
+          reason = 'Higgsfield answered without a price'
         } catch (e) {
           if (e instanceof ProviderError && e.opts.code === 'reconnect') throw e
+          reason = `Higgsfield did not price it: ${(e as Error).message}`
+        }
+        if (saved && now - saved.at < LIVE_PRICE_KEEP_MS) {
+          return { ...creditEstimate(saved.credits, true, 'higgsfield-account-live'), note: `${reason}. Using Higgsfield's live price from ${day(saved.at)}.` }
         }
       }
-      const credits = bookCredits(req)
-      if (credits == null) throw new ProviderError(`Higgsfield did not price ${entry.label} in time, and the price book has no credit cost for it. Try again in a moment.`, { retryable: true, submitted: 'no' })
-      return creditEstimate(credits, true, `${o.config.pricebook.version} credits`)
+      const fromBook = bookCredits(req)
+      if (fromBook == null) {
+        throw new ProviderError(`${reason || 'Higgsfield could not price this'}, and there is no saved price for ${entry.label} yet. Press Retry, or pick another model.`, { retryable: true, submitted: 'no' })
+      }
+      const book = creditEstimate(fromBook.credits, fromBook.verified, `${o.config.pricebook.version} credits`)
+      return reason ? { ...book, note: `${reason}. Using the price book's credit cost${fromBook.verified ? '' : ', which is not confirmed'}.` } : book
     },
     async uploadAsset(data, mime) {
       const ext = mime.split('/')[1]?.replace('jpeg', 'jpg').replace(/[^a-z0-9]/g, '') || 'png'

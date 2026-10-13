@@ -22,7 +22,7 @@ export function makeSwitches(rules: RulesConfig, stored: Stored, characterId?: s
     on(id) {
       const rule = byId.get(id)
       if (!rule || rule.bucket === 'fixed') return true
-      return pick(id).on ?? true
+      return pick(id).on ?? rule.starts_on
     },
     value(id) {
       const rule = byId.get(id)

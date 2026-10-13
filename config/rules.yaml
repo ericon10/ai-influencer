@@ -320,10 +320,12 @@ rules:
     bucket: default
     area: scene
     spec: "5.2.21"
-    title: No repeat of a moment and camera pair from the last 10 scenes
+    # Owner, 2026-10-13: repeats are fine; every still comes out different.
+    starts_on: false
+    title: Variety note when a moment and camera pair repeats
     check: { type: behavior }
     planner: Prefer a moment type and camera pair that is not in the recent combo log.
-    message: A repeat shows a warning with "Use anyway".
+    message: Off unless you switch it on. When on, the planner prefers fresh pairs and a repeat shows a small note. It never stops a run. The combo log is kept as a history either way.
   - id: scene-persona-never
     bucket: default
     area: scene

@@ -257,9 +257,8 @@ Decisions: `DECISIONS.md` F1 to F6, then G1 to G3 (defaults, not locks).
 - [x] Outfit written out in full and replacing the sheet outfit; footwear
       named; colors stated when water, wind or harsh sun change how hair
       looks (all defaults; jewelry is never added for you, see G3)
-- [x] Combo log: a repeated moment and camera pair from the last 10 entries
-      warns with "Use anyway"; the first pick writes the entry to the
-      character file
+- [x] Combo log: the first pick writes the entry to the character file as
+      a history; repeats are fine (the variety note starts off, G5)
 - [x] One or two models side by side, 1 to 4 stills each, one quote
 - [x] Drift lock after a still from a trained character (DECISIONS D3)
 - [x] Scene QA: face match against the face and closest-angle refs (small
@@ -295,8 +294,12 @@ Decisions: `DECISIONS.md` F1 to F6, then G1 to G3 (defaults, not locks).
 - [x] Switches per account and per character; editable sheet background
 - [x] Settings > Rules page
 - [x] Scene form: optional outfit and footwear, signature pieces as
-      chips, camera height, Brands and logos switch, refs chooser,
-      "Use anyway" on a combo repeat
+      chips, camera height, Brands and logos switch, refs chooser
+- [x] Required fields at the minimum (a scene needs only its moment);
+      REQUIRED badges, section progress, "things left" above every blocked
+      button, "e.g." examples (G5)
+- [x] Prices: "Getting price...", a 10 s limit with the reason and Retry;
+      saved live prices and price book credits on the account path (G5)
 - [x] QA as advice: face drift confirm, mirror for any still
 - [x] Audio per request; untested models warn
 - [x] Tests: no default can block a run (`rulebook.test.ts`)

@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { Check, Copy, User, X } from 'lucide-react'
+import { CircleAlert, Check, Copy, User, X } from 'lucide-react'
 import { assetUrl } from './api'
 import type { ShotStatus } from './types'
 
@@ -177,4 +177,78 @@ export const STAGES = ['Inspiration', 'Concepts', 'Hero', 'Sheet', 'Character fi
 
 export function errorMessage(e: unknown): string {
   return e instanceof Error ? e.message : 'Something went wrong.'
+}
+
+// ── Required fields (owner, 2026-10-13: impossible to miss) ──────────
+// A required field carries a bold REQUIRED badge and a colored border until
+// it is filled, then a green check. Example text in a field always starts
+// with "e.g." and is light and italic, so it never looks filled in.
+
+export function ReqBadge({ done }: { done: boolean }) {
+  return done
+    ? <span className="st-req-badge done"><Check size={11} strokeWidth={3} />Done</span>
+    : <span className="st-req-badge">Required</span>
+}
+
+// One labeled field. `id` is what a checklist link scrolls to. `group` is for
+// chips and other non-input controls (a div, so a click on the label text
+// does not press the first chip).
+export function Field({ id, label, required = false, done = false, hint, extra, group = false, className = '', children }: {
+  id?: string; label: ReactNode; required?: boolean; done?: boolean; hint?: ReactNode; extra?: ReactNode; group?: boolean; className?: string; children: ReactNode
+}) {
+  const cls = `st-field ${required ? 'req' : ''} ${required && done ? 'done' : ''} ${className}`
+  const inner = (
+    <>
+      <span className="st-label">{label}{required && <ReqBadge done={done} />}{extra}</span>
+      <div className="st-field-body">{children}</div>
+      {hint && <span className="st-hint">{hint}</span>}
+    </>
+  )
+  return group ? <div className={cls} data-field={id}>{inner}</div> : <label className={cls} data-field={id}>{inner}</label>
+}
+
+// A section header's status: "2 of 3 required done", a green check, or
+// "Optional" when nothing in it is required.
+export function SectionProgress({ done, total }: { done: number; total: number }) {
+  if (!total) return <span className="st-progress optional">Optional</span>
+  if (done >= total) return <span className="st-progress done"><Check size={13} strokeWidth={3} />{total === 1 ? 'Done' : 'All required done'}</span>
+  return <span className="st-progress">{done} of {total} required done</span>
+}
+
+export interface TodoItem {
+  label: string
+  // The data-field id to scroll to and highlight, or a custom action.
+  target?: string
+  onGo?: () => void
+}
+
+export function scrollToField(id: string) {
+  const el = document.querySelector<HTMLElement>(`[data-field="${CSS.escape(id)}"]`)
+  if (!el) return
+  el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  el.classList.remove('st-flash')
+  void el.offsetWidth
+  el.classList.add('st-flash')
+  window.setTimeout(() => el.classList.remove('st-flash'), 1900)
+  el.querySelector<HTMLElement>('input, textarea, select, button')?.focus({ preventScroll: true })
+}
+
+// What still stands between the owner and a button: never a silent gray
+// button. Each item scrolls to its field.
+export function Todo({ items }: { items: TodoItem[] }) {
+  if (!items.length) return null
+  return (
+    <div className="st-todo" role="status">
+      <CircleAlert size={16} />
+      <b>{items.length === 1 ? '1 thing left:' : `${items.length} things left:`}</b>
+      {items.map((it, i) => (
+        <span key={`${it.label}-${i}`}>
+          {it.target || it.onGo
+            ? <button type="button" className="st-todo-link" onClick={() => (it.onGo ? it.onGo() : scrollToField(it.target!))}>{it.label}</button>
+            : <span>{it.label}</span>}
+          {i < items.length - 1 ? ',' : ''}
+        </span>
+      ))}
+    </div>
+  )
 }

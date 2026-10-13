@@ -128,14 +128,7 @@ function sceneLabel(row: { title: string }, f: SceneFields): string {
 
 function mockPlan(deps: Deps, ch: Ch, brief: string): SceneFields {
   const sc = deps.config.pipeline.scenes
-  const combos = comboEntries(ch)
-  // A free pair of moment and camera, like the real planner would choose.
-  let momentType = sc.moments[0]!.id, camera = sc.cameras[0]!.id
-  outer: for (const m of sc.moments) {
-    for (const c of sc.cameras) {
-      if (!comboConflict(combos, m.label, c.label, sc.settings.combo_window)) { momentType = m.id; camera = c.id; break outer }
-    }
-  }
+  const { momentType, camera } = sc.settings.defaults
   const words = brief.trim().replace(/[.!?]+$/, '')
   return {
     title: words.split(/\s+/).slice(0, 4).join(' ') || 'Everyday moment',
@@ -196,7 +189,7 @@ export async function buildSceneRun(deps: Deps, ctx: Ctx, row: CharacterRow, inp
   const { templates, scenes: sc, views, rules, review } = deps.config.pipeline
   const sw = await ruleSwitches(deps, ctx, row.id)
   let warnings: RuleViolation[] = []
-  // Default rule scene-combo-log: a repeat is a warning with "Use anyway",
+  // Default rule scene-combo-log (off unless switched on): a repeat is a note,
   // never a block. A rerun of a logged scene is not a repeat.
   if (!scene.comboLoggedAt && !input.allowRepeat && sw.on('scene-combo-log')) {
     const combo = comboProblem(deps, ch, f)

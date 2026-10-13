@@ -73,9 +73,12 @@ const pricebookSchema = z.object({
     verified: z.boolean(),
     when: z.record(z.string(), z.string()).optional(),
     source: z.string().optional(),
-    // Higgsfield credits per unit as charged in the web/MCP account. Shown
-    // for reference; estimates use the USD price.
+    // Higgsfield credits per unit as charged in the web/MCP account. The
+    // account path falls back to them when no live price is available.
     credits: z.number().nonnegative().optional(),
+    // True when the credit cost was seen live (a real charge or Higgsfield's
+    // own price); otherwise the credits are a placeholder.
+    credits_verified: z.boolean().optional(),
   })),
 })
 
@@ -240,6 +243,11 @@ function validateCrossRefs(cfg: StudioConfig): void {
   const expressions = new Set(cfg.pipeline.sheet.shots.map(s => s.expression))
   for (const e of cfg.pipeline.scenes.expressions) {
     if (e.ref_expression && !expressions.has(e.ref_expression)) throw new ConfigError(`scenes.yaml: expression "${e.id}" points at "${e.ref_expression}", which no sheet shot has`)
+  }
+  const scn = cfg.pipeline.scenes
+  for (const [field, list] of [['momentType', scn.moments], ['camera', scn.cameras], ['light', scn.lights]] as const) {
+    const id = sc.defaults[field]
+    if (!list.some(x => x.id === id)) throw new ConfigError(`scenes.yaml: default ${field} "${id}" is not a preset`)
   }
   try { new RegExp(cfg.pipeline.scenes.color_triggers, 'i') } catch { throw new ConfigError('scenes.yaml: color_triggers is not a valid pattern') }
 }

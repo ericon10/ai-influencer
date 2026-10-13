@@ -3,7 +3,7 @@ import { ArrowRight, Check, Star } from 'lucide-react'
 import { api } from '../../api'
 import { useRefresh } from '../../hooks'
 import { PriceButton } from '../../PriceButton'
-import { Callout, Img, MarkChip, errorMessage, useToast } from '../../ui'
+import { Callout, Img, MarkChip, errorMessage, scrollToField, useToast } from '../../ui'
 import { LastRun } from '../../LastRun'
 import type { CharacterView } from '../../types'
 import { REALISM_LINE } from '../../copy'
@@ -38,13 +38,12 @@ export function HeroTab({ v, onEditCard, goSheet }: { v: CharacterView; onEditCa
         <div className="st-card-body st-col" style={{ gap: 14 }}>
           <p className="st-realism left">{REALISM_LINE}</p>
           {v.data.marks.length > 0 && <div className="st-marks">{v.data.marks.map(m => <MarkChip key={m.name + m.side} mark={m} />)}</div>}
-          {errors.length > 0 && <Callout tone="warn">{errors.map(e => e.message).join(' ')}</Callout>}
           <div className="st-row">
             <span className="st-label">Runs per prompt</span>
             <div className="st-stepnum"><button onClick={() => setRuns(r => Math.max(1, r - 1))} aria-label="Fewer" disabled={runs <= 1}>-</button><span>{runs}</span><button onClick={() => setRuns(r => Math.min(8, r + 1))} aria-label="More" disabled={runs >= 8}>+</button></div>
             <span className="st-hint">3 prompts x {runs} = {3 * runs} portraits{runs < 4 ? '. 4 or more per prompt usually makes a better pick.' : ''}</span>
           </div>
-          <PriceButton action={errors.length ? null : { type: 'hero', characterId: v.id, runsPerPrompt: runs }} label={v.heroes.length ? 'Generate more heroes' : 'Generate heroes'} variant={picked ? 'secondary' : 'primary'} size={picked ? 'normal' : 'big'} disabledReason={errors.length ? 'Fix the card first.' : undefined} />
+          <PriceButton action={errors.length ? null : { type: 'hero', characterId: v.id, runsPerPrompt: runs }} label={v.heroes.length ? 'Generate more heroes' : 'Generate heroes'} variant={picked ? 'secondary' : 'primary'} size={picked ? 'normal' : 'big'} todo={errors.map(e => ({ label: e.message.replace(/\.$/, ''), onGo: () => { onEditCard(); window.setTimeout(() => scrollToField(`card-${e.field}`), 250) } }))} />
           <span className="st-hint">Pick one hero across all three prompts. Prefer one where both marks are visible; every later shot copies what REF-00 shows.</span>
         </div>
       </section>

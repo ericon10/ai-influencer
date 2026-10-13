@@ -56,7 +56,7 @@ export const actionSchema = z.discriminatedUnion('type', [
     type: z.literal('scene'), characterId: z.string(), sceneId: z.string(),
     models: z.array(z.string()).min(1).max(4), variations: z.number().int().min(1).max(8),
     reason: z.string().optional(), withQa: z.boolean().default(true),
-    // "Use anyway" on a combo log repeat (default rule scene-combo-log).
+    // Silences the repeat note (rule scene-combo-log, off unless switched on).
     allowRepeat: z.boolean().optional(),
   }),
   // Still edits (Stage 8): one change per pass, an upscale, a re-check.

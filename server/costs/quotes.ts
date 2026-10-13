@@ -35,6 +35,8 @@ export interface QuoteView {
   display: string
   verified: boolean
   items: Array<{ label: string; model: string; amount: string; amountMicros: number; credits: number | null; verified: boolean }>
+  // Why a price is not a fresh live one (Higgsfield was slow), once each.
+  notes: string[]
   budget: BudgetCheck
   status: 'open' | 'blocked'
   expiresAt: string
@@ -85,6 +87,7 @@ export async function createQuote(deps: Deps, ctx: Ctx, input: { purpose: string
     display: displayPrice(items),
     verified: input.items.every(i => i.estimate.verified),
     items: items.map(i => ({ label: i.label, model: `${i.provider}/${i.model}`, amount: i.credits != null ? formatCredits(i.credits) : formatUsd(i.amountMicros), amountMicros: i.amountMicros, credits: i.credits, verified: i.verified })),
+    notes: [...new Set(input.items.map(i => i.estimate.note).filter((n): n is string => !!n))],
     budget, status, expiresAt: expiresAt.toISOString(), needsConfirm: budget.needsConfirm,
   }
 }

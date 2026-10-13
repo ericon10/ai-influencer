@@ -84,6 +84,8 @@ const rulesSchema = z.object({
     area: z.enum(RULE_AREAS),
     // The line the scene planner gets while the rule is on.
     planner: z.string().optional(),
+    // Whether a default starts on (almost all do). The owner can switch it.
+    starts_on: z.boolean().default(true),
     // An editable setting that goes with the rule.
     value: z.string().optional(),
     when: z.object({
@@ -147,6 +149,8 @@ const scenesSchema = z.object({
     still_models: z.array(z.string()).min(1),
     edit_models: z.array(z.string()).min(1),
     upscale_model: z.string(),
+    // Pre-filled starting points, so only the moment itself is ever needed.
+    defaults: z.object({ momentType: z.string(), camera: z.string(), light: z.string() }),
   }),
   moments: z.array(preset).min(1),
   cameras: z.array(preset.extend({ text: z.string(), foreground: z.string().optional() })).min(1),

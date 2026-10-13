@@ -52,7 +52,7 @@ export interface SceneStill extends Candidate {
 }
 
 export interface SceneView {
-  id: string; title: string; brief: string; fields: Partial<SceneFields>; status: 'draft' | 'generating' | 'in_review' | 'approved'; busy: boolean
+  id: string; title: string; brief: string; fields: Partial<SceneFields>; planned: boolean; status: 'draft' | 'generating' | 'in_review' | 'approved'; busy: boolean
   createdAt: string; comboLogged: boolean; aspect: string; complete: boolean; missing: string[]
   combo: { moment: string; camera: string; light: string; location: string } | null
   comboProblem: string | null
@@ -120,6 +120,7 @@ export interface QuoteView {
   // Plan credits on the Higgsfield account path, and the price as shown.
   credits: number; display: string
   items: Array<{ label: string; model: string; amount: string; amountMicros: number; credits: number | null; verified: boolean }>
+  notes?: string[]
   budget: { ok: boolean; blocks: Array<{ scope: string; capMicros: number; afterMicros: number }>; warnings: Array<{ scope: string; capMicros: number; afterMicros: number }> }
 }
 

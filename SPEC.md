@@ -375,8 +375,10 @@ rule book is `config/rules.yaml`.
     eye level, slightly high, over the shoulder, a friend shooting
     from rocks or a ledge, or a long lens from across a venue all
     fit. Any angle, including low or high, is allowed when chosen.
-21. **Combo log.** A moment type + camera combo from the
-    character's last 10 entries shows a warning with "Use anyway".
+21. **Combo log.** A history of the character's last 10 picked
+    scenes. Repeats are fine: every still comes out different. An
+    optional variety note (off unless switched on) points them out
+    and never stops a run.
 22. **Aspect by destination:** 9:16 Reels/TikTok/Shorts/Stories,
     4:5 feed, 1:1 on request; other shapes are allowed.
 

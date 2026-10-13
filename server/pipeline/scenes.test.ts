@@ -9,6 +9,7 @@ import { getCharacter, toData } from './characters.js'
 import { importCharacter } from './files.js'
 import { mirrorCandidate, rejectCandidate } from './review.js'
 import { setSetting } from './settings.js'
+import { setRuleSwitch } from './rules.js'
 import { approveSceneCandidate, createScene, cropCandidate, getScene, sceneCandidates, updateScene } from './scenes.js'
 import { scenesView } from '../api/views.js'
 import { renderPlaceholderPortrait } from '../providers/mock.js'
@@ -68,8 +69,9 @@ describe('scenes (Stage 7, demo mode)', () => {
     const { quote, preview } = await run({ type: 'scene_plan', characterId, sceneId })
     expect(quote.items.map(i => i.model)).toEqual(['mock/llm'])
     expect(preview.prompts[0]!.text).toContain('Picking out peaches at the farmers market')
-    // Callie's real combo log goes to the planner, so it avoids repeats.
-    expect(preview.prompts[0]!.text).toContain('Caught mid-action / Friend shot / Golden hour / Rooftop')
+    // Repeats are fine (owner, 2026-10-13): the combo log is a history, and
+    // the planner only sees it when the variety note is switched on.
+    expect(preview.prompts[0]!.text).not.toContain('Caught mid-action / Friend shot / Golden hour / Rooftop')
     const view = (await scenesView(h.deps, h.ctx, characterId)).scenes.find(s => s.id === sceneId)!
     expect(view.complete).toBe(true)
     expect(view.fields.footwear).toBeTruthy()
@@ -77,17 +79,39 @@ describe('scenes (Stage 7, demo mode)', () => {
     expect(view.title).toBe('Picking out peaches at')
   })
 
-  it('warns on a moment and camera pair from the last 10 combo log entries, and "Use anyway" runs it (rule 21)', async () => {
+  it('only the moment is required: the owner\'s words count as the moment, and the rest starts pre-filled', async () => {
+    const scene = await createScene(h.deps, h.ctx, characterId, { brief: 'Callie reading on a sunny park bench' })
+    const view = (await scenesView(h.deps, h.ctx, characterId)).scenes.find(s => s.id === scene.id)!
+    expect(view.missing).toEqual([])
+    expect(view.complete).toBe(true)
+    expect(view.planned).toBe(false)
+    expect(view.fields).toMatchObject({ moment: 'Callie reading on a sunny park bench', camera: 'friend_phone', light: 'natural' })
+    // A repeat of a logged pair is fine: no note, nothing to press.
+    expect(view.comboProblem).toBeNull()
+    const { quote, preview } = await estimateAction(h.deps, h.ctx, { type: 'scene', characterId, sceneId: scene.id, models: ['higgsfield/nano-banana-2.1'], variations: 1, withQa: false })
+    expect(quote.items.length).toBeGreaterThan(0)
+    expect(preview.warnings.map(w => w.title).join(' ')).not.toMatch(/combo/i)
+    // Without words, the moment is the one thing left.
+    const empty = await createScene(h.deps, h.ctx, characterId, { title: 'Blank' })
+    expect((await scenesView(h.deps, h.ctx, characterId)).scenes.find(s => s.id === empty.id)!.missing).toEqual(['moment'])
+  })
+
+  it('a repeated moment and camera pair runs as is; the variety note only shows when switched on (rule 21)', async () => {
     const repeat = await createScene(h.deps, h.ctx, characterId, {
       fields: { momentType: 'caught_mid_action', camera: 'friend_phone', moment: 'Callie laughs on a rooftop', outfit: 'a linen sundress', footwear: 'white sandals', light: 'golden_hour' },
     })
     const action = { type: 'scene' as const, characterId, sceneId: repeat.id, models: ['higgsfield/nano-banana-2.1'], variations: 1, withQa: true }
-    const warned = await estimateAction(h.deps, h.ctx, action)
-    expect(warned.quote.status).toBe('open')
-    const w = warned.preview.warnings.find(x => (x as { ruleId?: string }).ruleId === 'scene-combo-log')!
-    expect(w.message).toMatch(/was used on 2026-10-12/)
-    const anyway = await estimateAction(h.deps, h.ctx, { ...action, allowRepeat: true })
-    expect(anyway.preview.warnings.some(x => (x as { ruleId?: string }).ruleId === 'scene-combo-log')).toBe(false)
+    const plain = await estimateAction(h.deps, h.ctx, action)
+    expect(plain.quote.status).toBe('open')
+    expect(plain.preview.warnings.some(x => (x as { ruleId?: string }).ruleId === 'scene-combo-log')).toBe(false)
+    await setRuleSwitch(h.deps, h.ctx, { ruleId: 'scene-combo-log', on: true })
+    try {
+      const noted = await estimateAction(h.deps, h.ctx, action)
+      expect(noted.quote.status).toBe('open')
+      expect(noted.preview.warnings.find(x => (x as { ruleId?: string }).ruleId === 'scene-combo-log')!.message).toMatch(/was used on 2026-10-12/)
+    } finally {
+      await setRuleSwitch(h.deps, h.ctx, { ruleId: 'scene-combo-log', on: null })
+    }
   })
 
   it('runs Nano Banana 2.1 and GPT Image 2.5 Flare side by side, refs chosen by angle, QA on each', async () => {
@@ -217,7 +241,8 @@ describe('defaults, not locks (ruling G1)', () => {
     const { quote, preview } = await estimateAction(h.deps, h.ctx, { type: 'scene', characterId, sceneId: scene.id, models: ['higgsfield/nano-banana-2.1'], variations: 1, withQa: true })
     expect(quote.status).toBe('open')
     const ids = preview.warnings.map(w => (w as { ruleId?: string }).ruleId)
-    expect(ids).toEqual(expect.arrayContaining(['scene-names-footwear', 'scene-everyday-angles', 'scene-aspect', 'scene-combo-log']))
+    expect(ids).toEqual(expect.arrayContaining(['scene-names-footwear', 'scene-everyday-angles', 'scene-aspect']))
+    expect(ids).not.toContain('scene-combo-log')
     expect(ids).not.toContain('scene-brand-free')
     expect(preview.prompts[0]!.text).not.toMatch(/unbranded/)
     expect(preview.prompts[0]!.text).toContain('from a low angle')

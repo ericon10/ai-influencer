@@ -4,7 +4,7 @@ import { AlertTriangle, Check, CheckCircle2, Columns2, FileText, FlipHorizontal2
 import { api, assetUrl } from '../api'
 import { useCharacter, useRefresh } from '../hooks'
 import { PriceButton } from '../PriceButton'
-import { Drawer, PromptViewer, errorMessage, useToast } from '../ui'
+import { Drawer, Field, PromptViewer, Todo, errorMessage, useToast } from '../ui'
 import type { Candidate, CharacterView, QaReport, Shot } from '../types'
 
 // The human gate (SPEC 6 and 11): one candidate at a time beside REF-00 at
@@ -168,11 +168,14 @@ function ReviewShot({ v, shot }: { v: CharacterView; shot: Shot }) {
           ) : rejecting ? (
             <div className="st-col" style={{ gap: 10 }}>
               <div className="st-verdict-title">What is wrong? Each reason picks its fix.</div>
+              <Field id="reject-reasons" label="Reasons" required done={reasons.length > 0} group>
               <div className="st-reasons">
                 {v.reasons.filter(r => r.id !== 'talking').map(r => (
                   <button key={r.id} className={`st-chip ${reasons.includes(r.id) ? 'on' : ''}`} onClick={() => setReasons(rs => (rs.includes(r.id) ? rs.filter(x => x !== r.id) : [...rs, r.id]))}>{reasons.includes(r.id) && <Check size={12} />}{r.label}</button>
                 ))}
               </div>
+              </Field>
+              {!reasons.length && <Todo items={[{ label: 'Pick at least one reason', target: 'reject-reasons' }]} />}
               <input className="st-input" placeholder="Anything else? (optional)" value={note} onChange={e => setNote(e.target.value)} style={{ background: '#11100f', color: '#f6f2ec' }} />
             </div>
           ) : (

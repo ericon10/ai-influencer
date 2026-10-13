@@ -100,7 +100,7 @@ function RuleLine({ r, scope }: { r: RuleRow; scope: string | null }) {
         <span className="st-hint">{r.message}</span>
         {r.defaultValue !== null && r.bucket === 'default' && state.on && (
           <div className="st-row" style={{ gap: 8, marginTop: 4 }}>
-            <input className="st-input" value={value} maxLength={400} onChange={e => setValue(e.target.value)} placeholder={r.defaultValue} />
+            <input className="st-input" value={value} maxLength={400} onChange={e => setValue(e.target.value)} placeholder={`Default: ${r.defaultValue}`} />
             <button className="st-btn sm secondary" disabled={busy || value === (state.value ?? '')} onClick={() => save({ value })}>Save</button>
             <button className="st-btn sm ghost" disabled={busy} onClick={() => save({ value: null })} title="Back to the default">Reset</button>
           </div>

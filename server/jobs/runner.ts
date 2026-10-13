@@ -15,7 +15,7 @@ import { consumeQuote, createQuote, type QuoteItem, type QuoteView } from '../co
 import { getAsset, readAsset, saveAsset, type AssetRow } from '../storage/assets.js'
 import { probeFile } from '../media/ffmpeg.js'
 import { stripAudio } from '../media/edit.js'
-import { ProviderError, type GenRequest, type LlmImage, type LlmRequest, type Output, type ProviderAdapter } from '../providers/types.js'
+import { ProviderError, type CostEstimate, type GenRequest, type LlmImage, type LlmRequest, type Output, type ProviderAdapter } from '../providers/types.js'
 import { withBilling } from '../providers/billing.js'
 import { realismBlockers } from '../core/realism.js'
 import { EXPLICIT_MESSAGE, findExplicitTerms } from '../core/safety.js'
@@ -81,13 +81,21 @@ const QUOTE_CONCURRENCY = 4
 
 export async function quoteItemsFor(deps: Deps, ctx: Ctx, specs: JobSpec[]): Promise<QuoteItem[]> {
   guardRealism(specs)
+  // Identical requests (stills that differ only by seed) are priced once.
+  const priced = new Map<string, Promise<CostEstimate>>()
   const priceOne = async (s: JobSpec): Promise<QuoteItem> => {
     const [provider, model] = s.request.model.split('/') as [string, string]
     if (s.type === 'gen') {
       // Higgsfield requests carry the billing path they are quoted on.
       const request = await withBilling(deps.db, ctx.accountId, s.request)
-      const adapter = await deps.providers.gen(ctx.accountId, request.model, { billing: request.billing })
-      return { label: s.label, provider, model, kind: request.kind, request, estimate: await adapter.estimate(request) }
+      const key = JSON.stringify({ ...request, seed: undefined })
+      let estimate = priced.get(key)
+      if (!estimate) {
+        estimate = deps.providers.gen(ctx.accountId, request.model, { billing: request.billing }).then(a => a.estimate(request))
+        priced.set(key, estimate)
+        estimate.then(e => { if (e.note) deps.log.warn({ model: request.model, billing: request.billing, note: e.note }, 'estimate used a fallback price') }, () => undefined)
+      }
+      return { label: s.label, provider, model, kind: request.kind, request, estimate: await estimate }
     }
     const llm = await deps.providers.llm(ctx.accountId, s.request.model)
     const { meta: _meta, ...fingerprinted } = s.request

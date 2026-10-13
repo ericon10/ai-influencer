@@ -3,7 +3,7 @@ import { ArrowRight, Check, ImagePlus, Loader2 } from 'lucide-react'
 import { api } from '../../api'
 import { useRefresh } from '../../hooks'
 import { PriceButton } from '../../PriceButton'
-import { Callout, Img, MarkChip, errorMessage, useToast } from '../../ui'
+import { Callout, Field, Img, MarkChip, SectionProgress, errorMessage, useToast } from '../../ui'
 import { LastRun } from '../../LastRun'
 import type { CharacterView } from '../../types'
 import { REALISM_LINE } from '../../copy'
@@ -31,9 +31,10 @@ export function StartTab({ v, onEditCard, goHero }: { v: CharacterView; onEditCa
   return (
     <div className="st-col" style={{ gap: 24 }}>
       <section className="st-card">
-        <div className="st-card-head"><div className="grow"><div className="st-h2">1. Inspiration</div><div className="st-hint">The look to borrow: styling, palette, vibe. The face will be a new person.</div></div></div>
+        <div className="st-card-head"><div className="grow"><div className="st-h2">1. Inspiration</div><div className="st-hint">The look to borrow: styling, palette, vibe. The face will be a new person.</div></div><SectionProgress done={v.inspirations.length ? 1 : 0} total={1} /></div>
         <div className="st-card-body st-col" style={{ gap: 14 }}>
           {v.inspirations.length === 0 && <p className="st-realism left">{REALISM_LINE}</p>}
+          <Field id="start-inspiration" label="Inspiration images" required done={v.inspirations.length > 0} group hint="At least one. Styling, palette and vibe come from here; never the face.">
           <div className="st-grid heroes">
             {v.inspirations.map(id => <Img key={id} assetId={id} width={360} style={{ aspectRatio: '3/4' }} />)}
             <label className={`st-drop ${over ? 'over' : ''}`} style={{ aspectRatio: '3/4', padding: 12 }} onDragOver={e => { e.preventDefault(); setOver(true) }} onDragLeave={() => setOver(false)} onDrop={e => { e.preventDefault(); setOver(false); upload(e.dataTransfer.files) }}>
@@ -42,9 +43,10 @@ export function StartTab({ v, onEditCard, goHero }: { v: CharacterView; onEditCa
               <input type="file" accept="image/*" multiple hidden onChange={e => e.target.files && upload(e.target.files)} />
             </label>
           </div>
-          <label className="st-field"><span className="st-label">Notes for the breakdown and concepts (optional)</span><textarea className="st-textarea" style={{ minHeight: 64 }} value={notes} onChange={e => setNotes(e.target.value)} placeholder="Keep the beachy, sun-kissed feel. Late 20s. Not a model look, a real person." /></label>
+          </Field>
+          <Field id="start-notes" label="Notes for the breakdown and concepts (optional)"><textarea className="st-textarea" style={{ minHeight: 64 }} value={notes} onChange={e => setNotes(e.target.value)} placeholder="e.g. Keep the beachy, sun-kissed feel. Late 20s. Not a model look, a real person." /></Field>
           <LastRun characterId={v.id} purpose="breakdown" />
-          <PriceButton action={v.inspirations.length ? { type: 'breakdown', characterId: v.id, notes: notes || undefined } : null} label={v.breakdown ? 'Break it down again' : 'Break it down'} variant={v.breakdown ? 'secondary' : 'primary'} disabledReason={v.inspirations.length ? undefined : 'Add at least one inspiration image.'} />
+          <PriceButton action={v.inspirations.length ? { type: 'breakdown', characterId: v.id, notes: notes || undefined } : null} label={v.breakdown ? 'Break it down again' : 'Break it down'} variant={v.breakdown ? 'secondary' : 'primary'} todo={v.inspirations.length ? [] : [{ label: 'Add at least one inspiration image', target: 'start-inspiration' }]} />
         </div>
       </section>
 
@@ -68,7 +70,7 @@ export function StartTab({ v, onEditCard, goHero }: { v: CharacterView; onEditCa
         </div>
         <div className="st-card-body st-col" style={{ gap: 16 }}>
           <LastRun characterId={v.id} purpose="concepts" />
-          <PriceButton action={v.breakdown || notes ? { type: 'concepts', characterId: v.id, notes: notes || undefined } : null} label={v.concepts.length ? 'Propose 3 new concepts' : 'Propose 3 concepts'} variant={v.concepts.length ? 'secondary' : 'primary'} disabledReason={v.breakdown || notes ? undefined : 'Run the breakdown first, or add notes.'} />
+          <PriceButton action={v.breakdown || notes ? { type: 'concepts', characterId: v.id, notes: notes || undefined } : null} label={v.concepts.length ? 'Propose 3 new concepts' : 'Propose 3 concepts'} variant={v.concepts.length ? 'secondary' : 'primary'} todo={v.breakdown || notes ? [] : [{ label: 'Run the breakdown above, or write notes', target: 'start-notes' }]} />
           {v.concepts.length > 0 && (
             <div className="st-grid cards">
               {v.concepts.map(c => <ConceptCard key={c.id} characterId={v.id} c={c} chosen={chosen?.id === c.id} onChosen={goHero} />)}

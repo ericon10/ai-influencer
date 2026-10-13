@@ -22,6 +22,10 @@ settings:
   still_models: [higgsfield/nano-banana-2.1, higgsfield/gpt-image-2.5-flare, higgsfield/soul-2]
   edit_models: [higgsfield/nano-banana-2.1, higgsfield/gpt-image-2.5-flare]
   upscale_model: higgsfield/bytedance-upscale
+  # Pre-filled in every new scene (defaults, not locks): the owner or the
+  # planner changes them. With these, only the moment itself is required,
+  # and the owner's own words count as the moment until it is planned.
+  defaults: { momentType: caught_mid_action, camera: friend_phone, light: natural }
 
 # Moment types (the first column of the combo log).
 moments:
@@ -84,6 +88,7 @@ framings:
   - { id: wide_small, label: "Wide, small in frame", text: "wide shot, {subj} is small in the frame", identity: skip }
 
 lights:
+  - { id: natural, label: "Natural light", text: "Natural available light that fits the place and the time of day" }
   - { id: golden_hour, label: "Golden hour", text: "Warm golden-hour sun low in the sky, soft long shadows" }
   - { id: morning, label: "Morning light", text: "Clean, soft morning daylight" }
   - { id: overcast, label: "Overcast daylight", text: "Soft, even overcast daylight" }

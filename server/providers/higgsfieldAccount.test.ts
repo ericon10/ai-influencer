@@ -7,7 +7,7 @@ import { quoteJobs, runJobs, getJob, type JobSpec } from '../jobs/runner.js'
 import { ledgerEntries } from '../db/schema.js'
 import { saveAsset } from '../storage/assets.js'
 import { renderPlaceholderPortrait } from './mock.js'
-import { setSetting } from '../pipeline/settings.js'
+import { deleteSetting, setSetting } from '../pipeline/settings.js'
 import { readBilling, saveBilling, withBilling } from './billing.js'
 import { accountModel, accountParams, createHiggsfieldAccountAdapter } from './higgsfieldAccount.js'
 import { ACCOUNT_PROVIDER, disconnectAccount, finishAccountConnect, readAccountTokens, startAccountConnect } from './higgsfieldOAuth.js'
@@ -60,6 +60,15 @@ describe('Higgsfield account path (plan credits)', () => {
     // A free preflight only: no job was created.
     expect(fake.tool('generate_image')[0]!.args.params).toMatchObject({ model: 'nano_banana_2_1', get_cost: true, use_unlim: false })
     expect(fake.calls.some(c => c.tool.endsWith('_batch'))).toBe(false)
+  })
+
+  it('prices identical stills once, then answers from the saved live price', async () => {
+    await deleteSetting(h.deps.db, h.ctx.accountId, 'higgsfield_live_prices')
+    const quote = await quoteJobs(h.deps, h.ctx, { purpose: 'test_still', characterId: null, specs: [still({ seed: 1 }), still({ seed: 2 })] })
+    expect(quote.display).toBe('3 credits')
+    expect(fake.tool('generate_image')).toHaveLength(1)
+    await quoteJobs(h.deps, h.ctx, { purpose: 'test_still', characterId: null, specs: [still()] })
+    expect(fake.tool('generate_image')).toHaveLength(1)
   })
 
   it('runs on the account and records the credits it used', async () => {
@@ -241,14 +250,49 @@ describe('account adapter edge cases', () => {
     } finally {
       fake.hangOn = null
     }
-    // Nano Banana 2.1 has no credit cost in the price book: a clear message, fast.
+    // A still falls back to the price book's placeholder credits, marked as
+    // not confirmed, with the reason.
     fake.hangOn = 'generate_image'
     try {
       const started = Date.now()
-      const err = await slow.estimate(still().request as GenRequest).catch(e => e)
-      expect(err).toBeInstanceOf(ProviderError)
-      expect((err as ProviderError).message).toMatch(/did not price .* in time/)
+      const est = await slow.estimate(still().request as GenRequest)
+      expect(est.credits).toBe(4)
+      expect(est.verified).toBe(false)
+      expect(est.note).toMatch(/no answer in 0 s.*price book/)
       expect(Date.now() - started).toBeLessThan(1000)
+      // With no credit cost anywhere: a clear message with what to do, fast.
+      const bare = { ...h.deps.config, pricebook: { ...h.deps.config.pricebook, entries: h.deps.config.pricebook.entries.filter(e => e.model !== 'nano-banana-2.1') } }
+      const noBook = createHiggsfieldAccountAdapter({ config: bare, client: client(2000), creditUsd: 0, fetchImpl: fake.fetch, estimateWaitMs: 50 })
+      const err = await noBook.estimate(still().request as GenRequest).catch(e => e)
+      expect(err).toBeInstanceOf(ProviderError)
+      expect((err as ProviderError).message).toMatch(/no saved price for Nano Banana 2.1 yet. Press Retry/)
+    } finally {
+      fake.hangOn = null
+    }
+  })
+
+  it('saves live prices and answers from them: at once when recent, and when Higgsfield is slow', async () => {
+    const saved = new Map<string, { credits: number; at: number }>()
+    const livePrices = { get: async (s: string) => saved.get(s) ?? null, set: async (s: string, c: number) => { saved.set(s, { credits: c, at: Date.now() }) } }
+    const a = createHiggsfieldAccountAdapter({ config: h.deps.config, client: client(2000), creditUsd: 0, fetchImpl: fake.fetch, estimateWaitMs: 50, livePrices })
+    const req = still().request as GenRequest
+    const live = await a.estimate(req)
+    expect(live.verified).toBe(true)
+    expect(saved.size).toBe(1)
+    // A recent price answers without asking Higgsfield again, whatever the prompt.
+    const before = fake.calls.length
+    const again = await a.estimate({ ...req, prompt: `${req.prompt} Another moment.` })
+    expect(again.credits).toBe(live.credits)
+    expect(fake.calls.length).toBe(before)
+    // An older one still beats the price book when Higgsfield is slow.
+    const [sig] = [...saved.keys()]
+    saved.set(sig!, { credits: live.credits!, at: Date.now() - 7 * 3600_000 })
+    fake.hangOn = 'generate_image'
+    try {
+      const old = await a.estimate(req)
+      expect(old.credits).toBe(live.credits)
+      expect(old.verified).toBe(true)
+      expect(old.note).toMatch(/live price from \d{4}-\d{2}-\d{2}/)
     } finally {
       fake.hangOn = null
     }

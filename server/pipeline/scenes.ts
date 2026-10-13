@@ -36,8 +36,25 @@ export function draftFields(row: SceneRow): Partial<SceneFields> {
   return (row.fields ?? {}) as Partial<SceneFields>
 }
 
+// The fields a scene runs with: the pre-filled defaults (moment type, camera,
+// light), the owner's own words as the moment until one is written or
+// planned, then everything the owner or the planner set.
+// The schema's own defaults for the preset fields (angle front, expression
+// neutral, eye level, waist-up, vertical, natural makeup), so the form shows
+// what will run.
+const PRESET_DEFAULTS: Partial<SceneFields> = (() => {
+  const d = sceneFieldsSchema.parse({ momentType: 'x', moment: 'xxx', camera: 'x', light: 'x' })
+  return { view: d.view, expression: d.expression, height: d.height, framing: d.framing, destination: d.destination, makeup: d.makeup }
+})()
+
+// Once a scene has run, its fields are saved, so they never shift after.
+export function effectiveFields(deps: Deps, row: SceneRow): Partial<SceneFields> {
+  const brief = (row.brief ?? '').trim()
+  return { ...PRESET_DEFAULTS, ...deps.config.pipeline.scenes.settings.defaults, ...(brief.length >= 3 ? { moment: brief.slice(0, 400) } : {}), ...draftFields(row) }
+}
+
 export function sceneFields(deps: Deps, row: SceneRow): SceneFields {
-  const parsed = sceneFieldsSchema.safeParse(row.fields ?? {})
+  const parsed = sceneFieldsSchema.safeParse(effectiveFields(deps, row))
   if (!parsed.success) {
     const first = parsed.error.issues[0]
     throw new AppError('invalid_request', `Finish the scene first: ${first?.path.join('.') || 'fields'} ${first?.message ?? 'is missing'}.`)
@@ -93,7 +110,7 @@ export function comboEntries(ch: ReturnType<typeof toData>): ComboEntry[] {
   return section ? parseComboLog(section.body) : []
 }
 
-// A warning, never a block (default rule scene-combo-log).
+// A note, never a block, and only when the variety note is on.
 export function comboProblem(deps: Deps, ch: ReturnType<typeof toData>, f: SceneFields): string | null {
   const sc = deps.config.pipeline.scenes
   const entry = comboEntryFor(sc, f, '')
@@ -146,8 +163,11 @@ export async function sceneBusy(deps: Deps, ctx: Ctx, sceneId: string): Promise<
   return rows.length > 0
 }
 
+// A run saves the fields it used (pre-filled defaults included), so the
+// scene shows and logs exactly what was generated.
 export async function markSceneBusy(deps: Deps, ctx: Ctx, sceneId: string): Promise<void> {
-  await deps.db.update(scenes).set({ status: 'generating', updatedAt: deps.clock.now() }).where(and(eq(scenes.accountId, ctx.accountId), eq(scenes.id, sceneId)))
+  const fields = effectiveFields(deps, await getScene(deps, ctx, sceneId))
+  await deps.db.update(scenes).set({ status: 'generating', fields, updatedAt: deps.clock.now() }).where(and(eq(scenes.accountId, ctx.accountId), eq(scenes.id, sceneId)))
 }
 
 export async function refreshSceneStatus(deps: Deps, ctx: Ctx, sceneId: string): Promise<void> {

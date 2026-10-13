@@ -10,13 +10,13 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+async function request<T>(method: string, path: string, body?: unknown, signal?: AbortSignal): Promise<T> {
   const headers: Record<string, string> = {}
   let payload: BodyInit | undefined
   if (body instanceof FormData) payload = body
   else if (body !== undefined) { payload = JSON.stringify(body); headers['content-type'] = 'application/json' }
   if (method !== 'GET') headers['x-studio-request'] = '1'
-  const res = await fetch(`/api/v1${path}`, { method, headers, body: payload, credentials: 'same-origin' })
+  const res = await fetch(`/api/v1${path}`, { method, headers, body: payload, credentials: 'same-origin', signal })
   const text = await res.text()
   let json: unknown = null
   try { json = text ? JSON.parse(text) : null } catch { /* non-JSON */ }
@@ -76,7 +76,7 @@ export const api = {
   archiveScene: (sceneId: string) => request<{ ok: true }>('DELETE', `/scenes/${sceneId}`),
   crop: (candidateId: string, rect: { x: number; y: number; w: number; h: number }) => request<{ candidateId: string; width: number; height: number }>('POST', `/candidates/${candidateId}/crop`, rect),
 
-  estimate: (action: StudioAction) => request<{ quote: QuoteView; preview: ActionPreview }>('POST', '/actions/estimate', { action }),
+  estimate: (action: StudioAction, signal?: AbortSignal) => request<{ quote: QuoteView; preview: ActionPreview }>('POST', '/actions/estimate', { action }, signal),
   run: (action: StudioAction, quoteId: string, confirmed: boolean) => request<{ jobIds: string[] }>('POST', '/actions/run', { action, quoteId, confirmed }),
 
   jobs: (opts: { characterId?: string; active?: boolean } = {}) => {

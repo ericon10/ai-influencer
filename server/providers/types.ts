@@ -77,6 +77,9 @@ export interface CostEstimate {
   // Account path: Higgsfield plan credits this run uses. totalMicros is then
   // the credits at the owner's chosen value per credit (0 unless set).
   credits?: number
+  // Why this is not a fresh live price (Higgsfield was slow, so a saved live
+  // price or the price book answered). Shown with the quote and logged.
+  note?: string
 }
 
 export type JobState = 'queued' | 'running' | 'succeeded' | 'failed' | 'nsfw' | 'canceled'

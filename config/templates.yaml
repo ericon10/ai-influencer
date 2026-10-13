@@ -153,8 +153,8 @@ scene_plan:
     Makeup: natural is {natural}; soft glam is {glam} and is for {glam_when}.
     Signature jewelry (optional; add it to jewelry only when it fits, on its
     own side): {jewelry_marks}
-    Recent combo log (moment type / camera / light / location), do not
-    repeat a moment type and camera pair:
+    Recent combo log (moment type / camera / light / location); a fresh
+    pair is nice when one fits the moment, and a repeat is fine:
     {combos}
 
     Pick each preset field from its list:

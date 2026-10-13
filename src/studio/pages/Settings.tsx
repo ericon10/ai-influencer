@@ -4,7 +4,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { CheckCircle2, CreditCard, KeyRound, Link2, ListChecks, Loader2, RefreshCw, ShieldCheck, Trash2, UserRound } from 'lucide-react'
 import { api } from '../api'
 import { keys, useHiggsfieldAccount, useSettings } from '../hooks'
-import { Callout, PromptViewer, errorMessage, useToast } from '../ui'
+import { Callout, Field, PromptViewer, errorMessage, useToast } from '../ui'
 import { PriceButton } from '../PriceButton'
 import type { SettingsView } from '../types'
 
@@ -101,8 +101,10 @@ function KeyRow({ p, cred }: { p: SettingsView['providers'][number]; cred?: Sett
       </div>
       {editing && (
         <div className="st-col" style={{ gap: 8, marginTop: 12 }}>
-          <input className="st-input st-mono" type="password" autoComplete="off" placeholder={p.placeholder} value={secret} onChange={e => setSecret(e.target.value)} />
-          <div className="st-row"><span className="st-hint" style={{ flex: 1 }}>{p.hint}</span><button className="st-btn primary sm" disabled={secret.length < 8 || busy} onClick={save}>Save and verify</button></div>
+          <Field id={`key-${p.id}`} label={`${p.label} key`} required done={secret.length >= 8}>
+            <input className="st-input st-mono" type="password" autoComplete="off" placeholder={p.placeholder} value={secret} onChange={e => setSecret(e.target.value)} />
+          </Field>
+          <div className="st-row"><span className="st-hint" style={{ flex: 1 }}>{p.hint}</span><button className="st-btn primary sm" disabled={secret.length < 8 || busy} onClick={save} title={secret.length < 8 ? 'Enter the key first' : undefined}>Save and verify</button></div>
         </div>
       )}
     </div>
@@ -159,7 +161,7 @@ function BillingCard({ d }: { d: SettingsView }) {
             <span className="st-label">What one credit is worth to you</span>
             <div className="st-row" style={{ gap: 6, flexWrap: 'nowrap', maxWidth: 320 }}>
               <span className="st-muted">$</span>
-              <input className="st-input" inputMode="decimal" placeholder="0.00" value={creditUsd} onChange={e => setCreditUsd(e.target.value.replace(/[^\d.]/g, ''))} />
+              <input className="st-input" inputMode="decimal" placeholder="e.g. 0.05" value={creditUsd} onChange={e => setCreditUsd(e.target.value.replace(/[^\d.]/g, ''))} />
               <button className="st-btn sm" onClick={saveCreditValue} disabled={busy || Number(creditUsd || 0) === b.creditUsd}><CreditCard size={14} />Save</button>
             </div>
             <span className="st-hint">Optional. Credit runs count toward budget caps at this value. Leave it empty to track credits only.</span>
@@ -413,7 +415,7 @@ function ModelRow({ m, live }: { m: SettingsView['models'][number]; live: boolea
         {m.reference && <a className="st-hint" href={m.reference} target="_blank" rel="noreferrer">Official API reference</a>}
       </div>
       {!m.api ? <span className="st-hint">Not on the Higgsfield API. It runs through your Higgsfield account.</span> : <div className="st-row" style={{ gap: 8, minWidth: 0 }}>
-        <input className="st-input st-mono" style={{ flex: 1, minWidth: 0 }} placeholder="path from the official reference" value={endpoint} onChange={e => setEndpoint(e.target.value)} aria-label={`${m.label} endpoint`} />
+        <input className="st-input st-mono" style={{ flex: 1, minWidth: 0 }} placeholder="e.g. path from the official reference" value={endpoint} onChange={e => setEndpoint(e.target.value)} aria-label={`${m.label} endpoint`} />
         {dirty && <button className="st-btn sm" disabled={saving} onClick={save}>Save</button>}
         {!dirty && m.endpoint && live && !m.testing && <PriceButton action={{ type: 'model_test', model: m.ref }} label={m.verified ? 'Test again' : 'Test'} variant="secondary" size="sm" />}
       </div>}

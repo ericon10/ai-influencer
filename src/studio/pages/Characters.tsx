@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { FileUp, FolderOpen, Plus, Upload } from 'lucide-react'
 import { api } from '../api'
 import { useCharacters, useRefresh } from '../hooks'
-import { Callout, Img, Modal, STAGES, errorMessage, useToast } from '../ui'
+import { Callout, Field, Img, Modal, STAGES, Todo, errorMessage, useToast } from '../ui'
 import { REALISM_LINE } from '../copy'
 import { filesFromDrop, sheetRefOf, typeOf } from '../files'
 
@@ -121,11 +121,13 @@ function ImportDialog({ open, onClose }: { open: boolean; onClose: () => void })
     <Modal open={open} onClose={close}>
       <div className="st-card-body st-col" style={{ gap: 16 }}>
         <div><div className="st-kicker">Import</div><div className="st-h2">Bring in a character you already built</div><p className="st-sub">Drop the character file (.md) and the sheet folder. Images named REF 00 to REF 11 (or REF-00) become the approved sheet.</p></div>
+        <Field id="import-file" label="Character file (.md)" required done={!!file} group hint="The sheet images are optional; add them now or later.">
         <label className={`st-drop ${over ? 'over' : ''}`} onDragOver={e => { e.preventDefault(); setOver(true) }} onDragLeave={() => setOver(false)} onDrop={e => { e.preventDefault(); setOver(false); void drop(e.dataTransfer) }}>
           <Upload size={22} />
           <span>Drop the file and the folder here, or <u>browse</u></span>
           <input type="file" multiple accept=".md,image/*" hidden onChange={e => e.target.files && take(e.target.files)} />
         </label>
+        </Field>
         <label className="st-btn sm ghost" style={{ alignSelf: 'flex-start', cursor: 'pointer' }}>
           <FolderOpen size={14} />Choose a folder
           <input type="file" multiple hidden {...({ webkitdirectory: '', directory: '' } as Record<string, string>)} onChange={e => e.target.files && take(e.target.files)} />
@@ -137,6 +139,7 @@ function ImportDialog({ open, onClose }: { open: boolean; onClose: () => void })
           </div>
         )}
         {missing.length > 0 && <span className="st-hint">Not in this folder: {missing.join(', ')}. You can add them later from the Sheet tab.</span>}
+        {!file && <Todo items={[{ label: 'Add the character file (.md)', target: 'import-file' }]} />}
         <div className="st-row"><span className="st-spacer" />{busy && <span className="st-hint">{busy}</span>}<button className="st-btn ghost" onClick={onClose}>Cancel</button><button className="st-btn primary" disabled={!file || !!busy} onClick={submit}>{busy ? 'Importing...' : 'Import character'}</button></div>
       </div>
     </Modal>

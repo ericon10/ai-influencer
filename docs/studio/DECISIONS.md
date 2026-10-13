@@ -406,7 +406,7 @@ faces in the frame. Logos and text are read by the vision model; OCR is not
 added (SPEC 6 lists OCR with the vision model; the vision model alone is
 judged enough for now).
 
-### F5. The combo log lives in the character file (repeats warn: see G3)
+### F5. The combo log lives in the character file (repeats are fine: see G5)
 The "Combo log (last 10)" section of the character file is the log. A run
 whose moment and camera pair is in the last 10 entries is refused with the
 date and place of the earlier one; the first pick of a scene appends its
@@ -464,7 +464,8 @@ changes what the Studio suggests and checks, never what the owner types.
   friend shooting from rocks or a ledge and a long lens across a venue
   are offered; low and high are allowed. The planner's default is to
   avoid low angles up at her body and tight crops on the body.
-- **Combo log repeats warn** with "Use anyway" (supersedes F5's refusal).
+- **Combo log repeats warn** with "Use anyway" (supersedes F5's refusal;
+  superseded by G5: repeats are fine).
 - **Outfit and footwear are optional** scene fields. Nothing from the
   sheet or the style notes is put in for you.
 - **Logos:** brand-free by default; a per-scene "Brands and logos" switch
@@ -495,3 +496,25 @@ changes what the Studio suggests and checks, never what the owner types.
 - Posting calendar (SPEC 13.1, R7): TikTok is prepare and notify through
   the owner's Higgsfield account (the owner presses publish). Instagram
   is not posted for now; the calendar exports ready-to-post files.
+
+### G5. Repeats are fine; required fields are the minimum (owner)
+- **Repeats.** "You are never going to get the same picture twice." The
+  combo log stays as a history of picked scenes. The variety note (rule
+  `scene-combo-log`) starts off; switched on, it is a small note and the
+  planner prefers fresh pairs. Nothing is ever pressed to get past it.
+- **Required fields.** Only what cannot be filled for the owner: a scene
+  needs only its moment, and the owner's own words count as the moment.
+  Moment type, camera and light start pre-filled (`scenes.yaml`
+  `settings.defaults`) and are saved with the scene when it first runs.
+- **Impossible to miss.** A REQUIRED badge and colored border until a field
+  is filled, then a green check; example text starts with "e.g." and is
+  light and italic; section headers show "2 of 3 required done"; a blocked
+  button shows "N things left" right above it, each a link that scrolls to
+  and highlights the field. Applies to every Studio form.
+- **Prices never hang.** The button says "Getting price..." and, after 10
+  seconds, the reason with a Retry. On the account path the estimate
+  reuses Higgsfield's live price for the same request shape (6 hours),
+  waits at most 6 seconds for a new one, then falls back to a saved live
+  price or the price book's credit cost, marked as not confirmed and with
+  the reason shown. Identical stills in one run are priced once.
+

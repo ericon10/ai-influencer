@@ -3,7 +3,7 @@ import { AlertTriangle, Check, CheckCircle2, Crop, FlipHorizontal2, Loader2, Rot
 import { api, ApiError } from '../../api'
 import { useRefresh } from '../../hooks'
 import { PriceButton } from '../../PriceButton'
-import { Callout, Drawer, Img, PromptViewer, errorMessage, useToast } from '../../ui'
+import { Callout, Drawer, Field, Img, PromptViewer, errorMessage, useToast } from '../../ui'
 import type { CharacterView, QaReport, SceneStill, SceneView, ScenesData } from '../../types'
 import { CropTool } from './CropTool'
 
@@ -196,8 +196,9 @@ function FixOne({ v, data, still, drift }: { v: CharacterView; data: ScenesData;
   const [model, setModel] = useState(data.options.editModels.find(m => !(data.options.mode === 'live' && m.path === 'account' && !data.options.accountConnected))?.ref ?? data.options.editModels[0]?.ref)
   useEffect(() => { setChange(suggestions[0]?.change ?? ''); setFace(suggestions[0]?.face ?? false) }, [still.id]) // eslint-disable-line react-hooks/exhaustive-deps
   const placeholder = /\{thing\}/.test(change)
-  const disabledReason = change.trim().length < 3 ? 'Say what to change, where, and on which side.'
-    : placeholder ? 'Replace {thing} with what to remove and where.' : undefined
+  const ready = change.trim().length >= 3 && !placeholder
+  const todo = change.trim().length < 3 ? [{ label: 'Say what to change, where, and on which side', target: 'fix-change' }]
+    : placeholder ? [{ label: 'Replace {thing} with what to remove and where', target: 'fix-change' }] : []
   return (
     <div className="st-card pad st-col" style={{ gap: 10, boxShadow: 'none' }}>
       <div className="st-h3">Fix one thing</div>
@@ -207,7 +208,9 @@ function FixOne({ v, data, still, drift }: { v: CharacterView; data: ScenesData;
         {suggestions.map((s, i) => <button key={`qa${i}`} className="st-chip on" onClick={() => { setChange(s.change); setFace(s.face) }}>QA: {s.change.length > 48 ? `${s.change.slice(0, 48)}...` : s.change}</button>)}
         {data.options.editPresets.map(p => <button key={p.id} className="st-chip" onClick={() => { setChange(p.text); setFace(p.face) }}>{p.label}</button>)}
       </div>
-      <textarea className="st-textarea" rows={2} style={{ minHeight: 0 }} maxLength={400} value={change} onChange={e => setChange(e.target.value)} placeholder="Remove the white logo on the cup in her right hand, leaving it plain" />
+      <Field id="fix-change" label="The one change" required done={ready}>
+        <textarea className="st-textarea" rows={2} style={{ minHeight: 0 }} maxLength={400} value={change} onChange={e => setChange(e.target.value)} placeholder="e.g. Remove the white logo on the cup in her right hand, leaving it plain" />
+      </Field>
       <div className="st-row" style={{ gap: 12, flexWrap: 'wrap' }}>
         <label className="st-row st-hint" style={{ gap: 6, cursor: 'pointer' }}><input type="checkbox" checked={face} onChange={e => setFace(e.target.checked)} />Attach REF-00 for the face (expression changes)</label>
         {data.options.editModels.length > 1 && (
@@ -218,8 +221,8 @@ function FixOne({ v, data, still, drift }: { v: CharacterView; data: ScenesData;
       </div>
       <PriceButton
         label="Run this edit"
-        disabledReason={disabledReason}
-        action={disabledReason ? null : { type: 'scene_edit', characterId: v.id, candidateId: still.id, change: change.trim(), face, model, withQa: true }}
+        todo={todo}
+        action={todo.length ? null : { type: 'scene_edit', characterId: v.id, candidateId: still.id, change: change.trim(), face, model, withQa: true }}
       />
     </div>
   )

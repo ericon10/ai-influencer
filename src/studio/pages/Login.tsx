@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Sparkle } from 'lucide-react'
 import { api } from '../api'
-import { errorMessage } from '../ui'
+import { Field, errorMessage } from '../ui'
 
 export function Login() {
   const qc = useQueryClient()
@@ -20,8 +20,8 @@ export function Login() {
       <form className="st-card st-col" style={{ gap: 16 }} onSubmit={submit}>
         <span className="st-brand-mark" style={{ width: 40, height: 40 }}><Sparkle size={20} /></span>
         <div><h1 className="st-h1" style={{ fontSize: 34 }}>Character <em>Studio</em></h1><p className="st-sub">Sign in to your studio.</p></div>
-        <label className="st-field"><span className="st-label">Email</span><input className="st-input" type="email" autoComplete="username" value={email} onChange={e => setEmail(e.target.value)} required /></label>
-        <label className="st-field"><span className="st-label">Passphrase</span><input className="st-input" type="password" autoComplete="current-password" value={passphrase} onChange={e => setPassphrase(e.target.value)} required /></label>
+        <Field id="login-email" label="Email" required done={/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)}><input className="st-input" type="email" autoComplete="username" value={email} placeholder="e.g. you@example.com" onChange={e => setEmail(e.target.value)} required /></Field>
+        <Field id="login-passphrase" label="Passphrase" required done={passphrase.length > 0}><input className="st-input" type="password" autoComplete="current-password" value={passphrase} onChange={e => setPassphrase(e.target.value)} required /></Field>
         {error && <div className="st-callout bad">{error}</div>}
         <button className="st-btn primary big" disabled={busy}>{busy ? 'Signing in...' : 'Sign in'}</button>
       </form>

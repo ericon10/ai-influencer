@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Check, Loader2, ShieldAlert, Sparkles, Trash2, Wand2 } from 'lucide-react'
+import { ArrowLeft, Check, Info, Loader2, Sparkles, Trash2, Wand2 } from 'lucide-react'
 import { api } from '../../api'
 import { useRefresh } from '../../hooks'
 import { PriceButton } from '../../PriceButton'
-import { Callout, Img, errorMessage, useToast } from '../../ui'
+import { Field, Img, SectionProgress, errorMessage, useToast, type TodoItem } from '../../ui'
 import type { CharacterView, SceneFields, SceneStill, SceneView, ScenesData } from '../../types'
 import { StillDrawer, STILL_STATUS, OP_LABEL } from './StillDrawer'
 
@@ -19,6 +19,37 @@ const FIELD_LABEL: Record<string, string> = {
 }
 
 const ROLE: Record<string, string> = { face: 'Face', angle: 'Closest angle', body: 'Body', expression: 'Expression' }
+
+// Only the moment itself is required (owner, 2026-10-13: keep required fields
+// to the minimum). Moment type, camera and light start pre-filled, and the
+// owner's own words count as the moment until one is planned or written. A
+// preset that no longer exists is flagged too, so it can be picked again.
+const REQUIRED = new Set<keyof SceneFields>(['moment'])
+const SECTIONS: Record<'moment' | 'wear' | 'camera', Array<keyof SceneFields>> = {
+  moment: ['moment', 'setting', 'location', 'momentType'],
+  wear: ['outfit', 'footwear', 'jewelry', 'makeup', 'hair'],
+  camera: ['camera', 'light', 'height', 'foreground', 'framing', 'view', 'expression', 'pose', 'destination'],
+}
+
+function sceneChecks(data: ScenesData, draft: Partial<SceneFields>, missing: string[]) {
+  const o = data.options
+  const presets: Partial<Record<keyof SceneFields, Array<{ id: string }>>> = {
+    momentType: o.moments, camera: o.cameras, light: o.lights, height: o.heights, framing: o.framings, view: o.views,
+    expression: o.expressions, makeup: o.makeup, destination: o.destinations,
+  }
+  const required = (k: keyof SceneFields) => REQUIRED.has(k) || missing.includes(k)
+  const done = (k: keyof SceneFields) => {
+    const list = presets[k]
+    if (list) return list.some(x => x.id === draft[k])
+    return String(draft[k] ?? '').trim().length >= (k === 'moment' ? 3 : 1)
+  }
+  const progress = (keys: Array<keyof SceneFields>) => {
+    const req = keys.filter(required)
+    return { total: req.length, done: req.filter(done).length }
+  }
+  const left = (Object.keys(FIELD_LABEL) as Array<keyof SceneFields>).filter(k => required(k) && !done(k))
+  return { required, done, progress, left }
+}
 
 export function SceneEditor({ v, data, scene, onBack }: { v: CharacterView; data: ScenesData; scene: SceneView; onBack: () => void }) {
   const toast = useToast()
@@ -73,8 +104,9 @@ export function SceneEditor({ v, data, scene, onBack }: { v: CharacterView; data
     try { await api.archiveScene(scene.id); refresh(v.id); onBack(); toast({ tone: '', text: 'Scene archived. Its stills are kept.' }) } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) }
   }
 
-  const planned = Object.keys(scene.fields).length > 2
-  const missing = scene.missing.map(m => FIELD_LABEL[m] ?? m)
+  const planned = scene.planned
+  const checks = sceneChecks(data, draft, scene.missing)
+  const todo: TodoItem[] = checks.left.map(k => ({ label: FIELD_LABEL[k] ?? k, target: `scene-${k}` }))
   const still = scene.candidates.find(c => c.id === open) ?? null
 
   return (
@@ -98,9 +130,9 @@ export function SceneEditor({ v, data, scene, onBack }: { v: CharacterView; data
         </div>
       </section>
 
-      <SceneForm data={data} draft={draft} set={set} missing={scene.missing} v={v} />
+      <SceneForm data={data} draft={draft} set={set} checks={checks} v={v} />
 
-      <GenerateCard v={v} data={data} scene={scene} missing={missing} saving={saving === 'saving' || Object.keys(dirty.current).length > 0} setRefs={refs => set('refs', refs)} />
+      <GenerateCard v={v} data={data} scene={scene} todo={todo} saving={saving === 'saving' || Object.keys(dirty.current).length > 0} setRefs={refs => set('refs', refs)} />
 
       <section>
         <div className="st-section-head"><div className="st-h2">Stills</div><span className="st-muted">{scene.candidates.filter(c => c.assetId).length}</span></div>
@@ -144,79 +176,79 @@ function StillTile({ c, aspect, onOpen }: { c: SceneStill; aspect: string; onOpe
 
 // ── The fields ────────────────────────────────────────────────────────
 
-function SceneForm({ v, data, draft, set, missing }: { v: CharacterView; data: ScenesData; draft: Partial<SceneFields>; set: <K extends keyof SceneFields>(k: K, value: SceneFields[K]) => void; missing: string[] }) {
+function SceneForm({ v, data, draft, set, checks }: { v: CharacterView; data: ScenesData; draft: Partial<SceneFields>; set: <K extends keyof SceneFields>(k: K, value: SceneFields[K]) => void; checks: ReturnType<typeof sceneChecks> }) {
   const o = data.options
-  const need = (k: keyof SceneFields) => missing.includes(k)
+  const field = (k: keyof SceneFields) => ({ id: `scene-${k}`, label: FIELD_LABEL[k], required: checks.required(k), done: checks.done(k) })
   const text = (k: keyof SceneFields, opts: { rows?: number; placeholder?: string; hint?: string } = {}) => (
-    <label className="st-field">
-      <span className="st-label">{FIELD_LABEL[k]}{need(k) && <span className="st-need"> needed</span>}</span>
+    <Field {...field(k)} hint={opts.hint}>
       {opts.rows ? (
         <textarea className="st-textarea" rows={opts.rows} style={{ minHeight: 0 }} value={(draft[k] as string) ?? ''} placeholder={opts.placeholder} onChange={e => set(k, e.target.value as never)} />
       ) : (
         <input className="st-input" value={(draft[k] as string) ?? ''} placeholder={opts.placeholder} onChange={e => set(k, e.target.value as never)} />
       )}
-      {opts.hint && <span className="st-hint">{opts.hint}</span>}
-    </label>
+    </Field>
   )
   const chips = (k: keyof SceneFields, list: Array<{ id: string; label: string; hint?: string }>) => (
-    <div className="st-field">
-      <span className="st-label">{FIELD_LABEL[k]}{need(k) && <span className="st-need"> needed</span>}</span>
+    <Field {...field(k)} group>
       <div className="st-row" style={{ gap: 6, flexWrap: 'wrap' }}>
         {list.map(x => <button key={x.id} type="button" title={x.hint} className={`st-chip ${draft[k] === x.id ? 'on' : ''}`} onClick={() => set(k, x.id as never)}>{draft[k] === x.id && <Check size={12} />}{x.label}</button>)}
       </div>
-    </div>
+    </Field>
   )
   const select = (k: keyof SceneFields, list: Array<{ id: string; label: string }>) => (
-    <label className="st-field">
-      <span className="st-label">{FIELD_LABEL[k]}{need(k) && <span className="st-need"> needed</span>}</span>
+    <Field {...field(k)}>
       <select className="st-select" value={(draft[k] as string) ?? ''} onChange={e => set(k, e.target.value as never)}>
         <option value="" disabled>Choose</option>
         {list.map(x => <option key={x.id} value={x.id}>{x.label}</option>)}
       </select>
-    </label>
+    </Field>
   )
+  const head = (title: ReactNode, keys: Array<keyof SceneFields>, hint?: ReactNode) => {
+    const p = checks.progress(keys)
+    return <div className="st-card-head"><div className="grow"><div className="st-h3">{title}</div>{hint && <div className="st-hint">{hint}</div>}</div><SectionProgress done={p.done} total={p.total} /></div>
+  }
   const hairIdeas = ((v.data.style as { hair_options?: string[] }).hair_options ?? []).slice(0, 5)
   const cuff = data.options.signatureJewelry
   return (
     <div className="st-col" style={{ gap: 16 }}>
       <section className="st-card">
-        <div className="st-card-head"><div className="grow"><div className="st-h3">The moment</div></div></div>
+        {head('The moment', SECTIONS.moment, 'Only the moment is required. Your own words count as the moment until you plan or write one.')}
         <div className="st-card-body st-form">
-          <div className="wide">{text('moment', { rows: 2, placeholder: `${v.data.name} picks out peaches at a market stall, laughing at something the vendor said` })}</div>
-          <div className="wide">{text('setting', { rows: 2, placeholder: 'Where, with a few real details and people around' })}</div>
-          {text('location', { placeholder: 'Farmers market', hint: 'A short name for the combo log.' })}
+          <div className="wide">{text('moment', { rows: 2, placeholder: `e.g. ${v.data.name} picks out peaches at a market stall, laughing at something the vendor said` })}</div>
+          <div className="wide">{text('setting', { rows: 2, placeholder: 'e.g. A busy farmers market, striped awnings, a few shoppers behind her' })}</div>
+          {text('location', { placeholder: 'e.g. Farmers market', hint: 'A short name for the combo log.' })}
           {select('momentType', o.moments)}
         </div>
       </section>
 
       <section className="st-card">
-        <div className="st-card-head"><div className="grow"><div className="st-h3">What {v.data.pronouns.subj} wears</div><div className="st-hint">Anything goes, and every field is optional. Nothing from the sheet or the style notes is put in for you.</div></div></div>
+        {head(`What ${v.data.pronouns.subj} wears`, SECTIONS.wear, 'Anything goes, and every field is optional. Nothing from the sheet or the style notes is put in for you.')}
         <div className="st-card-body st-form">
-          <div className="wide">{text('outfit', { rows: 2, placeholder: 'A cream linen button-up with the sleeves rolled, light-wash straight jeans' })}</div>
-          {text('footwear', { placeholder: 'White leather sandals, barefoot, or leave empty' })}
-          <div className="st-field">
-            {text('jewelry', { placeholder: 'A thin gold chain necklace, or leave empty' })}
+          <div className="wide">{text('outfit', { rows: 2, placeholder: 'e.g. A cream linen button-up with the sleeves rolled, light-wash straight jeans' })}</div>
+          {text('footwear', { placeholder: 'e.g. White leather sandals, or barefoot' })}
+          <div className="st-col" style={{ gap: 6 }}>
+            {text('jewelry', { placeholder: 'e.g. A thin gold chain necklace' })}
             {cuff.length > 0 && <div className="st-row" style={{ gap: 6, flexWrap: 'wrap' }}><span className="st-hint">Signature pieces (optional):</span>{cuff.map(c => <button key={c} type="button" className="st-chip" onClick={() => set('jewelry', [draft.jewelry, c].filter(Boolean).join(', '))}>{c}</button>)}</div>}
           </div>
           {chips('makeup', o.makeup)}
-          <div className="st-field">
-            {text('hair', { placeholder: 'Loose beachy waves with a deep side part' })}
+          <div className="st-col" style={{ gap: 6 }}>
+            {text('hair', { placeholder: 'e.g. Loose beachy waves with a deep side part' })}
             {hairIdeas.length > 0 && <div className="st-row" style={{ gap: 6, flexWrap: 'wrap' }}>{hairIdeas.map(h => <button key={h} type="button" className="st-chip" onClick={() => set('hair', h)}>{h}</button>)}</div>}
           </div>
         </div>
       </section>
 
       <section className="st-card">
-        <div className="st-card-head"><div className="grow"><div className="st-h3">Camera</div><div className="st-hint">Starting points. Any angle, height, distance or shape works; the planner picks what fits the moment.</div></div></div>
+        {head('Camera', SECTIONS.camera, 'Starting points. Any angle, height, distance or shape works; the planner picks what fits the moment.')}
         <div className="st-card-body st-form">
           {select('camera', o.cameras)}
           {select('light', o.lights)}
           <div className="wide">{chips('height', o.heights)}</div>
-          {draft.camera === 'event_long_lens' && <div className="wide">{text('foreground', { placeholder: 'A door frame and the shoulder of someone at the next table', hint: 'Blurred things in front of the lens sell "across the room".' })}</div>}
+          {draft.camera === 'event_long_lens' && <div className="wide">{text('foreground', { placeholder: 'e.g. A door frame and the shoulder of someone at the next table', hint: 'Blurred things in front of the lens sell "across the room".' })}</div>}
           <div className="wide">{chips('framing', o.framings)}</div>
           {select('view', o.views)}
           {select('expression', o.expressions)}
-          <div className="wide">{text('pose', { placeholder: 'Holding a peach, eyes on the vendor' })}</div>
+          <div className="wide">{text('pose', { placeholder: 'e.g. Holding a peach, eyes on the vendor' })}</div>
           <div className="wide">{chips('destination', o.destinations.map(d => ({ ...d, label: `${d.label} · ${d.aspect}` })))}</div>
         </div>
       </section>
@@ -238,23 +270,20 @@ function SceneForm({ v, data, draft, set, missing }: { v: CharacterView; data: S
 
 // ── Generate ──────────────────────────────────────────────────────────
 
-function GenerateCard({ v, data, scene, missing, saving, setRefs }: { v: CharacterView; data: ScenesData; scene: SceneView; missing: string[]; saving: boolean; setRefs: (refs: string[]) => void }) {
+function GenerateCard({ v, data, scene, todo, saving, setRefs }: { v: CharacterView; data: ScenesData; scene: SceneView; todo: TodoItem[]; saving: boolean; setRefs: (refs: string[]) => void }) {
   const o = data.options
   const usable = (m: (typeof o.stillModels)[number]) => !(o.mode === 'live' && m.path === 'account' && !o.accountConnected)
   const [models, setModels] = useState<string[]>(() => o.defaultModels.filter(r => usable(o.stillModels.find(m => m.ref === r)!)).slice(0, 1))
   const [variations, setVariations] = useState(2)
-  const [anyway, setAnyway] = useState(false)
   const [choosing, setChoosing] = useState(false)
-  useEffect(() => setAnyway(false), [scene.comboProblem])
   const chosen = useMemo(() => o.stillModels.filter(m => models.includes(m.ref)), [o.stillModels, models])
   function toggle(ref: string) {
     setModels(ms => (ms.includes(ref) ? ms.filter(x => x !== ref) : [...ms, ref].slice(-o.maxModels)))
   }
-  const repeat = !!scene.comboProblem && !anyway
-  const disabledReason = saving ? 'Saving your changes...'
-    : missing.length ? `Fill in: ${missing.join(', ')}.`
-    : repeat ? 'This repeats a recent combo. Change it, or press "Use anyway".'
-    : !models.length ? 'Pick a model.' : undefined
+  const left: TodoItem[] = [
+    ...todo,
+    ...(!models.length ? [{ label: 'Pick a model', target: 'scene-models' }] : []),
+  ]
   const trained = chosen.find(m => m.trained)
   const picked = scene.refs.map(r => r.refId)
   function toggleRef(id: string) {
@@ -265,14 +294,7 @@ function GenerateCard({ v, data, scene, missing, saving, setRefs }: { v: Charact
     <section className="st-card st-generate">
       <div className="st-card-head"><Sparkles size={16} /><div className="grow"><div className="st-h3">Generate</div><div className="st-hint">{o.autoQa ? 'Every still is checked automatically before it reaches you; the price includes the checks. QA only ever advises.' : 'Automatic QA is off in Rules; check each still yourself.'}</div></div></div>
       <div className="st-card-body st-col" style={{ gap: 16 }}>
-        {scene.comboProblem && (
-          <Callout tone="warn" icon={<ShieldAlert size={16} />}>
-            {scene.comboProblem}
-            <div className="st-row" style={{ gap: 8, marginTop: 8 }}>
-              {anyway ? <span className="st-hint">Using it anyway for this run.</span> : <button className="st-btn sm secondary" onClick={() => setAnyway(true)}>Use anyway</button>}
-            </div>
-          </Callout>
-        )}
+        {scene.comboProblem && <span className="st-hint"><Info size={12} style={{ verticalAlign: -2 }} /> Variety note: {scene.comboProblem.replace(/ A different moment or camera keeps the feed fresh, or use it anyway\.$/, '')}</span>}
         <div className="st-row" style={{ gap: 10, flexWrap: 'wrap' }}>
           <span className="st-label">Attaches</span>
           {scene.refs.map(r => (
@@ -298,7 +320,7 @@ function GenerateCard({ v, data, scene, missing, saving, setRefs }: { v: Charact
             </div>
           </div>
         )}
-        <div className="st-field">
+        <div className="st-field" data-field="scene-models">
           <span className="st-label">Models <span className="st-muted">(pick up to {o.maxModels} to compare)</span></span>
           <div className="st-choices">
             {o.stillModels.map(m => {
@@ -322,8 +344,9 @@ function GenerateCard({ v, data, scene, missing, saving, setRefs }: { v: Charact
         <PriceButton
           size="big"
           label={chosen.length > 1 ? `Generate ${variations * chosen.length} stills` : `Generate ${variations} still${variations > 1 ? 's' : ''}`}
-          disabledReason={disabledReason}
-          action={disabledReason ? null : { type: 'scene', characterId: v.id, sceneId: scene.id, models, variations, withQa: o.autoQa, ...(anyway ? { allowRepeat: true } : {}) }}
+          todo={left}
+          waiting={saving ? 'Saving your changes...' : undefined}
+          action={left.length || saving ? null : { type: 'scene', characterId: v.id, sceneId: scene.id, models, variations, withQa: o.autoQa, allowRepeat: true }}
         />
         {scene.combo && <span className="st-hint">Logged on your first pick as: {[scene.combo.moment, scene.combo.camera, scene.combo.light, scene.combo.location].filter(Boolean).join(' / ')}</span>}
       </div>

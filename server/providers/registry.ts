@@ -8,7 +8,8 @@ import { createMockAdapter, type MockOptions } from './mock.js'
 import { createMockLlm, type LlmResponder } from './mockLlm.js'
 import { createAnthropicLlm } from './anthropic.js'
 import { createHiggsfieldAdapter } from './higgsfield.js'
-import { createHiggsfieldAccountAdapter, type AccountBalance } from './higgsfieldAccount.js'
+import { createHiggsfieldAccountAdapter, type AccountBalance, type LivePriceStore } from './higgsfieldAccount.js'
+import { getSetting, putCacheSetting } from '../pipeline/settings.js'
 import { accountTokenSource, readAccountTokens } from './higgsfieldOAuth.js'
 import { createMcpClient, type McpClient } from './mcpClient.js'
 import { readBilling } from './billing.js'
@@ -75,6 +76,21 @@ export function createRegistry(o: RegistryOptions): ProviderRegistry & { mockFor
   const mockLlm = createMockLlm(o.config, o.mockLlmResponders)
   const provider = (ref: string) => ref.split('/')[0] ?? ''
 
+  // Higgsfield's live prices on the account path, saved per request shape,
+  // so an estimate answers at once when Higgsfield is slow to price.
+  const LIVE_PRICES_KEY = 'higgsfield_live_prices'
+  type LivePrices = Record<string, { credits: number; at: number }>
+  const livePrices = (accountId: string): LivePriceStore => ({
+    async get(sig) {
+      return (await getSetting<LivePrices>(o.db, accountId, LIVE_PRICES_KEY, {}))[sig] ?? null
+    },
+    async set(sig, credits) {
+      const all = await getSetting<LivePrices>(o.db, accountId, LIVE_PRICES_KEY, {})
+      const next = Object.entries({ ...all, [sig]: { credits, at: Date.now() } }).sort((a, b) => b[1].at - a[1].at).slice(0, 100)
+      await putCacheSetting(o.db, accountId, LIVE_PRICES_KEY, Object.fromEntries(next))
+    },
+  })
+
   // One MCP session per connected account, reused across jobs. A reconnect
   // stores a new credential, which starts a new session.
   const sessions = new Map<string, { credentialId: string; client: McpClient }>()
@@ -92,7 +108,7 @@ export function createRegistry(o: RegistryOptions): ProviderRegistry & { mockFor
       sessions.set(accountId, s)
     }
     const { creditUsd } = await readBilling(o.db, accountId)
-    const adapter = createHiggsfieldAccountAdapter({ config: o.config, client: s.client, creditUsd, fetchImpl: o.fetchImpl, timeoutMs: o.config.runtime.mcp_connections.higgsfield!.timeout_sec * 1000 })
+    const adapter = createHiggsfieldAccountAdapter({ config: o.config, client: s.client, creditUsd, fetchImpl: o.fetchImpl, timeoutMs: o.config.runtime.mcp_connections.higgsfield!.timeout_sec * 1000, livePrices: livePrices(accountId) })
     // A test network serves the results too; real downloads go through the
     // runner's guarded download (host allowlist, no private addresses).
     const net = o.fetchImpl

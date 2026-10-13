@@ -24,6 +24,13 @@ export async function setSetting(deps: Deps, ctx: Ctx, key: string, value: unkno
   await audit(deps.db, ctx, 'setting.changed', { type: 'setting', id: key }, { value })
 }
 
+// A cache the Studio keeps for itself (no person changed anything, so no
+// audit entry): last write wins.
+export async function putCacheSetting(db: Db, accountId: string, key: string, value: unknown): Promise<void> {
+  await db.insert(accountSettings).values({ accountId, key, value })
+    .onConflictDoUpdate({ target: [accountSettings.accountId, accountSettings.key], set: { value, updatedAt: new Date() } })
+}
+
 export async function deleteSetting(db: Db, accountId: string, key: string): Promise<void> {
   await db.delete(accountSettings).where(and(eq(accountSettings.accountId, accountId), eq(accountSettings.key, key)))
 }

@@ -10,12 +10,16 @@ entries:
   # high on purpose, until the pay-per-use API price list is confirmed.
   # `credits` are as charged in the Higgsfield web/MCP account (verified live
   # 2026-10-12) and are shown for reference only.
-  - { provider: higgsfield, model: gpt-image-2.5, unit: image, price: 0.25, verified: false }
-  - { provider: higgsfield, model: gpt-image-2.5-flare, unit: image, price: 0.25, verified: false }
-  - { provider: higgsfield, model: nano-banana-2.1, unit: image, price: 0.15, verified: false }
-  - { provider: higgsfield, model: nano-banana-2, unit: image, price: 0.12, verified: false }
-  - { provider: higgsfield, model: soul-2, unit: image, price: 0.10, verified: false }
-  - { provider: higgsfield, model: bytedance-upscale, unit: image, price: 0.10, verified: false, credits: 2, source: "2 credits at 2k, verified live 2026-10-12" }
+  # `credits` on the still models answer an account-path estimate only when
+  # Higgsfield is too slow to price live and no recent live price is saved.
+  # They are set high on purpose and always shown as not confirmed.
+  - { provider: higgsfield, model: gpt-image-2.5, unit: image, price: 0.25, verified: false, credits: 6, source: "Placeholder credits." }
+  - { provider: higgsfield, model: gpt-image-2.5-flare, unit: image, price: 0.25, verified: false, credits: 6, source: "Placeholder credits." }
+  - { provider: higgsfield, model: nano-banana-2.1, unit: image, price: 0.15, verified: false, credits: 1.5, credits_verified: true, when: { resolution: 1k }, source: "1.5 plan credits at 1k, Higgsfield's live price in the model test (2026-10-13)." }
+  - { provider: higgsfield, model: nano-banana-2.1, unit: image, price: 0.15, verified: false, credits: 4, source: "Placeholder credits above 1k." }
+  - { provider: higgsfield, model: nano-banana-2, unit: image, price: 0.12, verified: false, credits: 3, source: "Placeholder credits." }
+  - { provider: higgsfield, model: soul-2, unit: image, price: 0.10, verified: false, credits: 3, source: "Placeholder credits." }
+  - { provider: higgsfield, model: bytedance-upscale, unit: image, price: 0.10, verified: false, credits: 2, credits_verified: true, source: "2 credits at 2k, verified live 2026-10-12" }
   # Video, per second. Official prices from open.higgsfield.ai/pricing (read
   # by the owner 2026-10-12). "From" prices are starting tiers: they stay
   # unconfirmed until the model's paid test shows the tier its requests use.

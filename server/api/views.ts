@@ -15,7 +15,7 @@ import { readBilling } from '../providers/billing.js'
 import { serverKeyFor } from '../providers/serverKeys.js'
 import { identityForModel } from '../core/identity.js'
 import { checkSceneFields, sceneFieldsSchema } from '../core/scenes.js'
-import { comboEntries, comboProblem, draftFields, listScenes, sceneAspect, sceneCandidates, sceneRefs } from '../pipeline/scenes.js'
+import { comboEntries, comboProblem, draftFields, effectiveFields, listScenes, sceneAspect, sceneCandidates, sceneRefs } from '../pipeline/scenes.js'
 import { ruleSwitches } from '../pipeline/rules.js'
 import { comboPreview } from '../pipeline/sceneActions.js'
 
@@ -137,11 +137,11 @@ export async function settingsView(deps: Deps, ctx: Ctx) {
     },
     providers: [
       {
-        id: 'higgsfield', label: 'Higgsfield', hint: 'KEY_ID:KEY_SECRET from the Higgsfield Console (API keys, pay-per-use). Not your web login.', placeholder: 'kid_xxx:secret_xxx', usedFor: 'Images and video',
+        id: 'higgsfield', label: 'Higgsfield', hint: 'KEY_ID:KEY_SECRET from the Higgsfield Console (API keys, pay-per-use). Not your web login.', placeholder: 'e.g. kid_xxx:secret_xxx', usedFor: 'Images and video',
         // The owner's account can run on the server key (HF_CREDENTIALS).
         serverKey: !!(await serverKeyFor(deps.db, { ownerEmail: deps.env.STUDIO_OWNER_EMAIL || 'owner@studio.local', higgsfield: deps.env.HF_CREDENTIALS }, ctx.accountId, 'higgsfield')),
       },
-      { id: 'anthropic', label: 'Anthropic', hint: 'An API key from the Anthropic Console.', placeholder: 'sk-ant-...', usedFor: 'Breakdowns, concepts and QA' },
+      { id: 'anthropic', label: 'Anthropic', hint: 'An API key from the Anthropic Console.', placeholder: 'e.g. sk-ant-...', usedFor: 'Breakdowns, concepts and QA' },
     ],
     budgets: {
       job: microsToUsd(b.jobCapMicros), character: microsToUsd(b.characterCapMicros), month: microsToUsd(b.monthCapMicros),
@@ -182,9 +182,13 @@ export async function scenesView(deps: Deps, ctx: Ctx, characterId: string) {
     .where(and(eq(jobs.accountId, ctx.accountId), eq(jobs.characterId, characterId), inArray(jobs.status, ['waiting', 'queued', 'submitting', 'running', 'ingesting'])))
   const busy = new Set(active.map(j => j.purpose.split(':')[1]))
   const connected = (await listCredentials(deps.db, ctx.accountId)).some(c => c.provider === 'higgsfield_account')
+  // The path a model runs on: the account when the API does not offer it, or
+  // when the account's Higgsfield billing is set to plan credits.
+  const onAccount = (await readBilling(deps.db, ctx.accountId)).default === 'account'
   const modelInfo = (ref: string) => {
     const m = deps.config.models.models.find(x => x.ref === ref)!
-    return { ref, label: m.label, path: m.api === false ? 'account' as const : 'api' as const, refs: m.max_refs, trained: !!identityForModel(ch.identities, ref), note: m.notes ?? '' }
+    const account = m.api === false || (onAccount && ref.startsWith('higgsfield/') && !!m.mcp_id)
+    return { ref, label: m.label, path: account ? 'account' as const : 'api' as const, refs: m.max_refs, trained: !!identityForModel(ch.identities, ref), note: m.notes ?? '' }
   }
   const preferred = [ch.preferredModels.scene_still, ch.preferredModels.scene_still_alt].filter((r): r is string => !!r && sc.settings.still_models.includes(r))
   const stillModels = [...new Set([...preferred, ...sc.settings.still_models])].map(modelInfo)
@@ -196,16 +200,17 @@ export async function scenesView(deps: Deps, ctx: Ctx, characterId: string) {
   })
   const scenes = []
   for (const s of list) {
-    const f = draftFields(s)
+    const raw = draftFields(s)
+    const f = effectiveFields(deps, s)
     const parsed = sceneFieldsSchema.safeParse(f)
     const issues = parsed.success ? checkSceneFields(sc, views, parsed.data) : []
     const missing = parsed.success ? issues.map(i => i.field) : [...new Set(parsed.error.issues.map(i => String(i.path[0])))]
     const complete = parsed.success && !issues.length
     scenes.push({
-      id: s.id, title: s.title, brief: s.brief, fields: f, status: busy.has(s.id) ? 'generating' : s.status, busy: busy.has(s.id),
+      id: s.id, title: s.title, brief: s.brief, fields: f, planned: Object.keys(raw).some(k => k !== 'title' && k !== 'refs' && k !== 'brands'), status: busy.has(s.id) ? 'generating' : s.status, busy: busy.has(s.id),
       createdAt: s.createdAt.toISOString(), comboLogged: !!s.comboLoggedAt, aspect: sceneAspect(deps, f), complete, missing,
       combo: complete ? comboPreview(deps, parsed.data) : null,
-      // A warning with "Use anyway", never a block (default rule scene-combo-log).
+      // A small note, only when the owner switched the variety note on.
       comboProblem: complete && !s.comboLoggedAt && sw.on('scene-combo-log') ? comboProblem(deps, ch, parsed.data) : null,
       refs: await sceneRefs(deps, ctx, characterId, { view: f.view ?? 'front', framing: f.framing ?? 'waist_up', expression: f.expression ?? 'neutral', refs: f.refs ?? [] }, sw.on('scene-refs-by-angle')),
       refsChosen: (f.refs ?? []).length > 0,
