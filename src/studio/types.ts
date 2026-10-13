@@ -91,7 +91,7 @@ export interface SettingsView {
   modelSuite: {
     cap: string
     tests: Array<{
-      ref: string; label: string; what: string; endpoint: string; testing: boolean
+      ref: string; label: string; what: string; endpoint: string; path: 'api' | 'account'; testing: boolean
       lastTest: { at: string; ok: boolean; message: string; jobId: string } | null
       cost: string | null; estimate: string | null
     }>
@@ -101,7 +101,7 @@ export interface SettingsView {
   budgets: { job: number; character: number; month: number; confirmAbove: number; warnPct: number }
   routing: Array<{ task: string; configured: string; effective: string }>
   models: Array<{
-    ref: string; label: string; kinds: string[]; verified: boolean; notes: string
+    ref: string; label: string; kinds: string[]; verified: boolean; notes: string; api: boolean; reference: string | null
     endpoint: string; endpointSource: 'config' | 'account' | 'none'; confirmedAt: string | null
     lastTest: { at: string; ok: boolean; message: string; jobId: string } | null; testing: boolean
   }>

@@ -16,6 +16,8 @@ import { quoteItemsFor, type JobSpec } from '../jobs/runner.js'
 import type { JobOutcome, JobRow } from '../jobs/hooks.js'
 import { effectiveModel, MODEL_OVERRIDES_KEY, readModelOverrides, type ModelOverrides } from '../providers/modelOverrides.js'
 import { providerMode, setSetting } from './settings.js'
+import { listCredentials } from '../providers/credentials.js'
+import { ACCOUNT_PROVIDER } from '../providers/higgsfieldOAuth.js'
 
 // One small paid test per model before it counts as confirmed (owner's rule,
 // 2026-10-12): the endpoint comes from Higgsfield's official Model API
@@ -45,6 +47,7 @@ export async function buildModelTest(deps: Deps, ctx: Ctx, modelRef: string): Pr
   if (!hasRole(ctx, 'admin')) throw new AppError('forbidden', 'Only an owner or admin can test a model.')
   const base = deps.config.models.models.find(m => m.ref === modelRef && m.ref.startsWith('higgsfield/'))
   if (!base) throw new AppError('bad_request', `Unknown Higgsfield model "${modelRef}".`)
+  if (base.api === false) throw new AppError('bad_request', `${base.label} is not on the Higgsfield API, so there is no API endpoint to test. It runs through your Higgsfield account (Settings, Model tests covers it there).`)
   const entry = effectiveModel(base, (await readModelOverrides(deps.db, ctx.accountId))[modelRef])
   if (!entry.endpoint) throw new AppError('bad_request', `Enter ${entry.label}'s endpoint from the official Model API Reference first.`)
   if ((await providerMode(deps.db, ctx.accountId)) !== 'live') throw new AppError('bad_request', 'Switch to live mode to test a model. Demo mode never calls a provider.')
@@ -144,9 +147,13 @@ export async function buildModelSuite(deps: Deps, ctx: Ctx): Promise<BuiltModelT
   if ((await providerMode(deps.db, ctx.accountId)) !== 'live') throw new AppError('bad_request', 'Switch to live mode to test models. Demo mode never calls a provider.')
   const suite = deps.config.runtime.model_suite
   const overrides = await readModelOverrides(deps.db, ctx.accountId)
+  // A model the API does not offer is tested on the owner's Higgsfield
+  // account instead (plan credits), when it is connected.
+  const accountConnected = (await listCredentials(deps.db, ctx.accountId)).some(c => c.provider === ACCOUNT_PROVIDER)
   const specs: JobSpec[] = []
   const prompts: BuiltModelTest['preview']['prompts'] = []
   const skipped: string[] = []
+  const notOnApi: string[] = []
   const images = new Map<string, Promise<string>>()
   const image = (key: string, make: () => Promise<Buffer>, label: string) => {
     if (!images.has(key)) images.set(key, make().then(d => saveTestImage(deps, ctx, d, label)))
@@ -157,7 +164,9 @@ export async function buildModelSuite(deps: Deps, ctx: Ctx): Promise<BuiltModelT
     const base = deps.config.models.models.find(m => m.ref === t.model)
     if (!base) throw new AppError('bad_request', `The model test list names an unknown model "${t.model}".`)
     const entry = effectiveModel(base, overrides[t.model])
-    if (!entry.endpoint) { skipped.push(entry.label); continue }
+    const onAccount = base.api === false
+    if (onAccount && (!accountConnected || !base.mcp_id)) { notOnApi.push(entry.label); continue }
+    if (!onAccount && !entry.endpoint) { skipped.push(entry.label); continue }
     const aspect = t.aspect ?? '1:1'
     let request: GenRequest
     if (t.kind === 'video') {
@@ -182,21 +191,27 @@ export async function buildModelSuite(deps: Deps, ctx: Ctx): Promise<BuiltModelT
       const prompt = finalizeImagePrompt(refs.length ? SUITE_PROMPTS.refs : SUITE_PROMPTS.image).prompt
       request = { kind: 'image', model: entry.ref, prompt, ...(refs.length ? { refs: refs.map(assetId => ({ assetId })) } : {}), aspect, resolution: t.resolution, modelTest: true }
     }
+    if (onAccount) request = { ...request, billing: 'account' }
     const errors = blocking(lintPrompt(deps.config.pipeline.rules, request.prompt, { kind: request.kind, request }))
     if (errors.length) throw new AppError('prompt_rejected', `${entry.label}: ${errors.map(e => e.message).join(' ')}`)
-    specs.push({ type: 'gen', stage: 'model_test', purpose: `model_test:${entry.ref}`, label: `Test ${entry.label}`, request })
-    prompts.push({ label: `${entry.label} (${entry.endpoint})`, text: request.prompt, wrapped: hardWrap(request.prompt) })
+    specs.push({ type: 'gen', stage: 'model_test', purpose: `model_test:${entry.ref}`, label: `Test ${entry.label}${onAccount ? ' (your Higgsfield account)' : ''}`, request })
+    prompts.push({ label: `${entry.label} (${onAccount ? 'your Higgsfield account, plan credits' : entry.endpoint})`, text: request.prompt, wrapped: hardWrap(request.prompt) })
   }
-  if (!specs.length) throw new AppError('bad_request', 'Enter the models\' endpoints from the official Model API Reference first (Settings, Higgsfield models).')
+  if (!specs.length) {
+    throw new AppError('bad_request', notOnApi.length && !skipped.length
+      ? `Connect your Higgsfield account in Settings to test ${notOnApi.join(', ')}; the API does not offer them.`
+      : 'Enter the models\' endpoints from the official Model API Reference first (Settings, Higgsfield models).')
+  }
 
   // The cap covers the whole run, before anything is quoted or spent.
   const cap = Math.round(suite.cap_usd * 1_000_000)
   const total = (await quoteItemsFor(deps, ctx, specs)).reduce((sum, i) => sum + i.estimate.totalMicros, 0)
   if (total > cap) throw new AppError('budget_exceeded', `These model tests would cost about ${formatUsd(total)}, over the ${formatUsd(cap)} cap for one run.`)
 
-  const warnings: RuleViolation[] = skipped.length
-    ? [{ ruleId: 'model-suite-skipped', spec: '7.1', title: 'Skipped: no endpoint yet', severity: 'warning', message: `Not tested this run: ${skipped.join(', ')}. Enter each endpoint from the official Model API Reference, then run the tests again.` }]
-    : []
+  const warnings: RuleViolation[] = [
+    ...(skipped.length ? [{ ruleId: 'model-suite-skipped', spec: '7.1', title: 'Skipped: no endpoint yet', severity: 'warning' as const, message: `Not tested this run: ${skipped.join(', ')}. Enter each endpoint from the official Model API Reference, then run the tests again.` }] : []),
+    ...(notOnApi.length ? [{ ruleId: 'model-suite-account', spec: '7.1', title: 'Skipped: not on the API', severity: 'warning' as const, message: `Not tested this run: ${notOnApi.join(', ')}. The Higgsfield API does not offer them; connect your Higgsfield account in Settings to test them there.` }] : []),
+  ]
   return {
     purpose: 'model_suite', characterId: null, specs, cap,
     preview: { title: `Model tests: ${specs.length} model${specs.length === 1 ? '' : 's'}, capped at ${formatUsd(cap)}`, prompts, warnings, invalidates: [] },
@@ -213,7 +228,7 @@ export async function startModelSuite(deps: Deps, ctx: Ctx, jobs: JobRow[]): Pro
 export async function startModelTest(deps: Deps, ctx: Ctx, modelRef: string, jobId: string): Promise<void> {
   const overrides = await readModelOverrides(deps.db, ctx.accountId)
   const base = deps.config.models.models.find(m => m.ref === modelRef)!
-  const endpoint = effectiveModel(base, overrides[modelRef]).endpoint!
+  const endpoint = effectiveModel(base, overrides[modelRef]).endpoint ?? 'account'
   await save(deps, ctx, { ...overrides, [modelRef]: { ...overrides[modelRef], pendingTest: { jobId, endpoint } } })
 }
 
@@ -223,8 +238,16 @@ export async function onModelTest(deps: Deps, ctx: Ctx, job: JobRow, out: JobOut
   const current = { ...(overrides[ref] ?? {}) }
   const base = deps.config.models.models.find(m => m.ref === ref)
   if (!base) return
-  const endpointNow = effectiveModel(base, current).endpoint
   const ok = out.status === 'completed' && (out.assets?.length ?? 0) > 0
+  // A model the API does not offer was tested on the owner's account: a pass
+  // shows the account path works and confirms no API endpoint.
+  if ((job.request as { billing?: string } | null)?.billing === 'account') {
+    current.lastTest = { at: deps.clock.now().toISOString(), ok, message: ok ? `Test passed on your Higgsfield account: ${out.assets!.length} output(s).` : `Test failed: ${out.error ?? out.status}`, jobId: job.id }
+    delete current.pendingTest
+    await save(deps, ctx, { ...overrides, [ref]: current })
+    return
+  }
+  const endpointNow = effectiveModel(base, current).endpoint
   const sameEndpoint = current.pendingTest?.jobId === job.id && current.pendingTest.endpoint === endpointNow
   const message = ok
     ? (sameEndpoint ? `Test passed: ${out.assets!.length} output(s) at ${endpointNow}.` : 'Test passed, but the endpoint changed while it ran. Test again to confirm the new one.')

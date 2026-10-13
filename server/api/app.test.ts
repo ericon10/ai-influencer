@@ -226,13 +226,13 @@ describe('Studio API', () => {
   it('takes a model path only as the reference shows it, and changing it needs a new test', async () => {
     const bad = await call('PUT', '/settings/models', { cookie: cookieA, body: { ref: 'higgsfield/seedance-2.5', endpoint: 'https://evil.example.com/x' } })
     expect(bad.status).toBe(400)
-    const ok = await call('PUT', '/settings/models', { cookie: cookieA, body: { ref: 'higgsfield/seedance-2.5', endpoint: 'bytedance/seedance-2.5/image-to-video' } })
+    const ok = await call('PUT', '/settings/models', { cookie: cookieA, body: { ref: 'higgsfield/seedance-2.5', endpoint: 'bytedance/seedance-2.5/reference-to-video' } })
     expect(ok.status).toBe(200)
     const m = ok.json.models.find((x: { ref: string }) => x.ref === 'higgsfield/seedance-2.5')
-    expect(m).toMatchObject({ endpoint: 'bytedance/seedance-2.5/image-to-video', endpointSource: 'account', verified: false, confirmedAt: null })
-    // Another account sees none of it.
+    expect(m).toMatchObject({ endpoint: 'bytedance/seedance-2.5/reference-to-video', endpointSource: 'account', verified: false, confirmedAt: null })
+    // Another account sees none of it: only the path from the official reference.
     const other = await call('GET', '/settings', { cookie: cookieB })
-    expect(other.json.models.find((x: { ref: string }) => x.ref === 'higgsfield/seedance-2.5').endpoint).toBe('')
+    expect(other.json.models.find((x: { ref: string }) => x.ref === 'higgsfield/seedance-2.5')).toMatchObject({ endpoint: 'bytedance/seedance-2.5/image-to-video', endpointSource: 'config' })
   })
 
   it('updates budgets', async () => {

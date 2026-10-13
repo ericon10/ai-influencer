@@ -1,8 +1,9 @@
 # Job runner, downloads, media and LLM limits.
 jobs:
-  poll_initial_sec: 3
-  poll_max_sec: 30
-  poll_backoff: 1.6
+  # Higgsfield's polling guidance: start at 2 s, back off to 10 s.
+  poll_initial_sec: 2
+  poll_max_sec: 10
+  poll_backoff: 1.5
   lock_sec: 120
   submit_max_attempts: 3
   quote_ttl_sec: 900

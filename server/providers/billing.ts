@@ -30,10 +30,11 @@ export async function saveBilling(deps: Deps, ctx: Ctx, next: BillingSetting): P
 
 // Stamps the path into a Higgsfield request when it is quoted, so the quote
 // fingerprint covers it: switching the default needs a new estimate, and a
-// running job keeps the path it was started on. A model test always uses the
-// API, because it confirms an API endpoint.
+// running job keeps the path it was started on. A model test uses the API,
+// because it confirms an API endpoint, unless its builder chose the account
+// (a model the API does not offer).
 export async function withBilling(db: Db, accountId: string, req: GenRequest): Promise<GenRequest> {
   if (!req.model.startsWith('higgsfield/')) return req
-  const billing: HiggsfieldBilling = req.modelTest ? 'api' : (await readBilling(db, accountId)).default
+  const billing: HiggsfieldBilling = req.billing ?? (req.modelTest ? 'api' : (await readBilling(db, accountId)).default)
   return { ...req, billing }
 }

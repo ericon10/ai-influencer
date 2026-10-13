@@ -344,3 +344,30 @@ mcp_connections). Dzine AI (www.dzine.ai) is listed there as coming soon
 with no endpoints, so it shows in Settings, Connected accounts, and never
 makes a call. Adding it later is its MCP URL, OAuth endpoints and an
 adapter, on the same flow.
+
+### E5. Higgsfield API endpoints from the official reference (2026-10-13)
+Read from docs.higgsfield.ai (the Model API Reference and the shared
+request pages); each entry in `config/models.yaml` names its page in
+`reference`. Every model still needs its one paid test before it counts as
+confirmed.
+- On the API: Seedance 2.5 and 2.0 image to video, Kling 3.0 Standard, Pro
+  and Turbo image to video, Wan 3.0 Prime image to video, Soul 2, and GPT
+  Image 2.5 Flare and Sunburst (as Marketing Studio Image).
+- Not on the API (absent from the reference): Nano Banana 2.1 and 2, the
+  ByteDance upscaler (the API has no upscaler) and Mirelo sound effects.
+  They are marked `api: false` and run only through the owner's Higgsfield
+  account. The model test suite runs them there when the account is
+  connected, in plan credits.
+- Request shapes follow each schema exactly (several reject unknown
+  fields): Seedance and Wan default audio on, so `generate_audio: false` is
+  always sent; Kling Standard and Pro send `sound: off`; Kling Turbo has no
+  sound field, so its audio is stripped on arrival; Marketing Studio and Soul
+  send `enhance_prompt: false`; Wan sends `enable_thinking: false`.
+- Every submit carries the job's own Idempotency-Key, so Higgsfield never
+  starts or charges one generation twice. An unknown outcome still goes to
+  a person. 423 and 503 retry later; a reused key is reported as an earlier
+  accepted job.
+- Polling follows Higgsfield's guidance: 2 s, backing off to 10 s.
+- Prices: open.higgsfield.ai (the console and pricing page) is still not
+  reachable from the build sandbox, so the price book keeps its "from" and
+  placeholder prices until each test shows the real charge.

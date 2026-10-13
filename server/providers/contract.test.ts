@@ -16,15 +16,16 @@ const config = loadConfig()
 function verifiedConfig(): StudioConfig {
   const c = structuredClone(config)
   for (const m of c.models.models) {
-    if (m.ref === 'higgsfield/gpt-image-2.5') { m.verified = true; m.endpoint = 'openai/gpt-image-2.5/edit' }
-    if (m.ref === 'higgsfield/seedance-2.0') { m.verified = true; m.endpoint = 'bytedance/seedance-2.0/image-to-video' }
+    // Endpoints as config/models.yaml has them from the official reference;
+    // only the paid-test confirmation is faked.
+    if (m.ref === 'higgsfield/gpt-image-2.5' || m.ref === 'higgsfield/seedance-2.0') m.verified = true
   }
   return c
 }
 
 interface FakeCall { method: string; url: string; headers: Record<string, string>; body?: unknown }
 
-function fakeHiggsfield(behavior: { submitStatus?: number; finalStatus?: 'completed' | 'failed' | 'nsfw' | 'canceled'; submitDelayMs?: number; emptyCompleted?: boolean } = {}) {
+function fakeHiggsfield(behavior: { submitStatus?: number; submitDetail?: string; finalStatus?: 'completed' | 'failed' | 'nsfw' | 'canceled'; submitDelayMs?: number; emptyCompleted?: boolean } = {}) {
   const calls: FakeCall[] = []
   const reqs = new Map<string, number>()
   const fetchImpl = (async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -56,7 +57,7 @@ function fakeHiggsfield(behavior: { submitStatus?: number; finalStatus?: 'comple
     if (init?.method === 'POST' && url.includes('/cancel')) return json(200, { status: 'canceled', request_id: 'x' })
     if (init?.method === 'POST') {
       if (behavior.submitDelayMs) await new Promise(r => setTimeout(r, behavior.submitDelayMs))
-      if (behavior.submitStatus) return json(behavior.submitStatus, { detail: 'nope' })
+      if (behavior.submitStatus) return json(behavior.submitStatus, { detail: behavior.submitDetail ?? 'nope' })
       const id = `req-${reqs.size + 1}`
       reqs.set(id, 0)
       return json(200, { status: 'queued', request_id: id, status_url: `https://api.higgsfield.ai/requests/${id}/status`, cancel_url: `https://api.higgsfield.ai/requests/${id}/cancel` })
@@ -77,6 +78,7 @@ async function bridge(fetchImpl: typeof fetch): Promise<string> {
     for await (const c of req) chunks.push(c as Buffer)
     const body = chunks.length ? Buffer.concat(chunks).toString() : undefined
     const headers: Record<string, string> = { Authorization: String(req.headers.authorization ?? ''), 'Content-Type': String(req.headers['content-type'] ?? '') }
+    if (req.headers['idempotency-key']) headers['Idempotency-Key'] = String(req.headers['idempotency-key'])
     try {
       const r = await fetchImpl(`https://api.higgsfield.ai${req.url}`, { method: req.method, headers, body })
       res.writeHead(r.status, { 'content-type': r.headers.get('content-type') ?? 'application/json' })
@@ -143,12 +145,43 @@ describe('higgsfield adapter specifics', () => {
     const fake = fakeHiggsfield()
     const a = await hf(fake)
     await a.submit({ kind: 'image_edit', model: 'higgsfield/gpt-image-2.5', prompt: 'p', aspect: '3:4', resolution: '2k', quality: 'high', refs: [{ assetId: 'a1', url: 'https://r2.example.com/a1.png' }] },
-      { idempotencyKey: 'k', webhookUrl: 'https://studio.example.com/api/v1/webhooks/higgsfield/job_1?t=abc' })
+      { idempotencyKey: 'qte_1:0', webhookUrl: 'https://studio.example.com/api/v1/webhooks/higgsfield/job_1?t=abc' })
     const call = fake.calls[0]!
     expect(call.method).toBe('POST')
     expect(call.headers.Authorization).toBe('Key kid_123:ksecret_456')
-    expect(call.url).toBe('https://api.higgsfield.ai/openai/gpt-image-2.5/edit?hf_webhook=' + encodeURIComponent('https://studio.example.com/api/v1/webhooks/higgsfield/job_1?t=abc'))
-    expect(call.body).toEqual({ prompt: 'p', aspect_ratio: '3:4', resolution: '2k', quality: 'high', input_images: [{ type: 'image_url', image_url: 'https://r2.example.com/a1.png' }] })
+    // The job's own key, so a repeated submit never starts a second generation.
+    expect(call.headers['Idempotency-Key']).toBe('qte_1:0')
+    expect(call.url).toBe('https://api.higgsfield.ai/marketing-studio/image/sunburst?hf_webhook=' + encodeURIComponent('https://studio.example.com/api/v1/webhooks/higgsfield/job_1?t=abc'))
+    // Marketing Studio Image schema: plain reference URLs, enhancement off.
+    expect(call.body).toEqual({ prompt: 'p', image_urls: ['https://r2.example.com/a1.png'], aspect_ratio: '3:4', resolution: '2k', quality: 'high', enhance_prompt: false })
+  })
+
+  it('sends each video model exactly the fields its official schema takes', () => {
+    const c = verifiedConfig()
+    const entry = (ref: string) => c.models.models.find(m => m.ref === ref)!
+    const start = { assetId: 's', url: 'https://r2.example.com/s.png' }, end = { assetId: 'e', url: 'https://r2.example.com/e.png' }
+    const base = { kind: 'video' as const, prompt: 'p', startFrame: start, endFrame: end, durationSec: 5, resolution: '720p', aspect: '9:16', audio: false as const, seed: 7 }
+    // Seedance 2.5: framing follows the start frame; no seed or aspect field; audio defaults to on, so off.
+    expect(mapInput(entry('higgsfield/seedance-2.5'), { ...base, model: 'higgsfield/seedance-2.5' }))
+      .toEqual({ prompt: 'p', image_url: start.url, end_image_url: end.url, duration: 5, resolution: '720p', generate_audio: false })
+    // Kling 3.0 Turbo: no sound, last-frame or elements field.
+    expect(mapInput(entry('higgsfield/kling-3.0-turbo'), { ...base, model: 'higgsfield/kling-3.0-turbo' }))
+      .toEqual({ prompt: 'p', image_url: start.url, duration: 5, resolution: '720p' })
+    // Kling 3.0 Standard: sound defaults to on, so off; last frame allowed.
+    expect(mapInput(entry('higgsfield/kling-3.0-standard'), { ...base, model: 'higgsfield/kling-3.0-standard' }))
+      .toEqual({ prompt: 'p', image_url: start.url, last_image_url: end.url, duration: 5, sound: 'off' })
+    // Wan 3.0 Prime: audio and the model's own prompt rewriting off.
+    expect(mapInput(entry('higgsfield/wan-3.0'), { ...base, model: 'higgsfield/wan-3.0' }))
+      .toEqual({ prompt: 'p', image_url: start.url, end_image_url: end.url, duration: 5, resolution: '720p', aspect_ratio: '9:16', seed: 7, generate_audio: false, enable_thinking: false })
+    // Soul 2: one image, prompt enhancement off.
+    expect(mapInput(entry('higgsfield/soul-2'), { kind: 'image', model: 'higgsfield/soul-2', prompt: 'p', aspect: '3:4', resolution: '1080p' }))
+      .toEqual({ prompt: 'p', aspect_ratio: '3:4', resolution: '1080p', batch_size: 1, enhance_prompt: false })
+  })
+
+  it('refuses a model the API does not offer, pointing to the account path', async () => {
+    const a = await hf(fakeHiggsfield())
+    await expect(a.submit({ kind: 'image', model: 'higgsfield/nano-banana-2.1', prompt: 'p', modelTest: true }, { idempotencyKey: 'k' }))
+      .rejects.toThrow(/not on the Higgsfield API/)
   })
 
   it('refuses models whose endpoint is not verified yet', async () => {
@@ -168,6 +201,7 @@ describe('higgsfield adapter specifics', () => {
       [401, { retryable: false, submitted: 'no' }],
       [403, { retryable: false, submitted: 'no' }],
       [422, { retryable: false, submitted: 'no' }],
+      [423, { retryable: true, submitted: 'no' }],
       [503, { retryable: true, submitted: 'no' }],
       [500, { retryable: false, submitted: 'unknown' }],
     ]
@@ -175,6 +209,12 @@ describe('higgsfield adapter specifics', () => {
       const a = await hf(fakeHiggsfield({ submitStatus: status }))
       await expect(a.submit({ kind: 'image', model: 'higgsfield/gpt-image-2.5', prompt: 'p' }, { idempotencyKey: 'k' })).rejects.toMatchObject({ opts: expected })
     }
+  })
+
+  it('treats a reused idempotency key as an earlier accepted job, not a new one', async () => {
+    const a = await hf(fakeHiggsfield({ submitStatus: 422, submitDetail: 'Idempotency-Key was already used with different request parameters' }))
+    await expect(a.submit({ kind: 'image', model: 'higgsfield/gpt-image-2.5', prompt: 'p' }, { idempotencyKey: 'k' }))
+      .rejects.toMatchObject({ opts: { submitted: 'unknown', retryable: false }, message: expect.stringMatching(/already accepted this job/) })
   })
 
   it('maps nsfw and failed results, and verifies keys for free', async () => {
@@ -188,16 +228,16 @@ describe('higgsfield adapter specifics', () => {
   })
 
   it('runs an unconfirmed model only for its paid test, and freely once the account confirms it', async () => {
-    const ref = 'higgsfield/nano-banana-2.1'
-    const path = 'google/nano-banana-2.1/text-to-image'
+    const ref = 'higgsfield/gpt-image-2.5-flare'
+    const path = 'marketing-studio/image/flare'
     const fake = fakeHiggsfield()
-    const pending = await hf(fake, withModelOverrides(config, { [ref]: { endpoint: path } }))
+    const pending = await hf(fake, config)
     await expect(pending.submit({ kind: 'image', model: ref, prompt: 'p' }, { idempotencyKey: 'k1' })).rejects.toMatchObject({ opts: { code: 'unverified_model' } })
     await pending.submit({ kind: 'image', model: ref, prompt: 'p', resolution: '1k', modelTest: true }, { idempotencyKey: 'k2' })
     expect(fake.calls.at(-1)!.url).toBe(`https://api.higgsfield.ai/${path}`)
     // The test flag never reaches the provider.
-    expect(fake.calls.at(-1)!.body).toEqual({ prompt: 'p', resolution: '1k' })
-    const confirmed = await hf(fake, withModelOverrides(config, { [ref]: { endpoint: path, confirmedAt: '2026-10-12T12:00:00Z' } }))
+    expect(fake.calls.at(-1)!.body).toEqual({ prompt: 'p', resolution: '1k', enhance_prompt: false })
+    const confirmed = await hf(fake, withModelOverrides(config, { [ref]: { confirmedAt: '2026-10-12T12:00:00Z' } }))
     await expect(confirmed.submit({ kind: 'image', model: ref, prompt: 'p' }, { idempotencyKey: 'k3' })).resolves.toMatchObject({ jobId: expect.any(String) })
   })
 

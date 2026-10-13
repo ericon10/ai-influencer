@@ -211,8 +211,8 @@ Guardrails that apply to every item:
 - [x] Model test suite: five real paths in one quoted run, capped at $10
 - [ ] Owner adds the secrets (docs/studio/DEPLOY.md) and creates the
   Railway service
-- [ ] Model endpoints from the official Model API Reference, then the
-  owner runs the model tests (Settings, Model tests)
+- [x] Model endpoints from the official Model API Reference (DECISIONS E5)
+- [ ] Owner runs the model tests (Settings, Model tests)
 - [ ] Owner drags the "CALLIE MASTER CHARACTER" folder into Callie's
   Sheet tab; review any face or texture flags
 

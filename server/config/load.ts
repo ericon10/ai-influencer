@@ -18,6 +18,12 @@ const modelsSchema = z.object({
     kinds: z.array(genKind).min(1),
     max_refs: z.number().int().min(0),
     endpoint: z.string().nullable(),
+    // The official Model API Reference page the endpoint and fields come from.
+    reference: z.string().url().optional(),
+    // False when the model is not on the pay-per-use API at all (it is absent
+    // from the official Model API Reference); it then runs only through the
+    // owner's Higgsfield account.
+    api: z.boolean().default(true),
     input_map: z.string(),
     verified: z.boolean(),
     notes: z.string().optional(),

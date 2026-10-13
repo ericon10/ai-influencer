@@ -312,18 +312,18 @@ function BudgetsCard({ d }: { d: SettingsView }) {
 
 function ModelSuiteCard({ d }: { d: SettingsView }) {
   const { tests, cap } = d.modelSuite
-  const ready = tests.filter(t => t.endpoint).length
+  const ready = tests.filter(t => t.endpoint || (t.path === 'account' && d.billing.accountConnected)).length
   const running = tests.some(t => t.testing)
   const result = (t: SettingsView['modelSuite']['tests'][number]) =>
     t.testing ? <span className="st-badge plain info">Running</span>
-      : !t.lastTest ? <span className="st-badge plain">{t.endpoint ? 'Not run yet' : 'Needs its path'}</span>
+      : !t.lastTest ? <span className="st-badge plain">{t.path === 'account' ? (d.billing.accountConnected ? 'Not run yet' : 'Connect your account') : t.endpoint ? 'Not run yet' : 'Needs its path'}</span>
       : <span className={`st-badge ${t.lastTest.ok ? 'ok' : 'bad'}`}>{t.lastTest.ok ? 'Passed' : 'Failed'}</span>
   return (
     <div className="st-card">
       <div className="st-card-head">
         <div className="grow">
           <div className="st-h2">Model tests</div>
-          <div className="st-hint">Each real model path once, on the pay-per-use API, with neutral test images (a mug and a plant, never a character). One estimate for the whole run, capped at {cap}. A model without its path is skipped.</div>
+          <div className="st-hint">Each real model path once, with neutral test images (a mug and a plant, never a character). One estimate for the whole run, capped at {cap}. Models the API does not offer run on your Higgsfield account.</div>
         </div>
         {d.mode === 'live' && ready > 0 && !running && <PriceButton action={{ type: 'model_suite' }} label="Run model tests" />}
       </div>
@@ -333,7 +333,7 @@ function ModelSuiteCard({ d }: { d: SettingsView }) {
           <tbody>{tests.map(t => (
             <tr key={t.ref}>
               <td className="strong">{t.label}</td>
-              <td>{t.what}</td>
+              <td><div className="st-col" style={{ gap: 2 }}><span>{t.what}</span><span className="st-hint">{t.path === 'account' ? 'On your Higgsfield account (plan credits); the API does not offer it' : 'On the Higgsfield API'}</span></div></td>
               <td><div className="st-col" style={{ gap: 4 }}>{result(t)}{t.lastTest && !t.testing && <span className={`st-hint ${t.lastTest.ok ? '' : 'bad'}`}>{t.lastTest.message}</span>}</div></td>
               <td className="st-mono">{t.cost ?? (t.estimate ? `about ${t.estimate}` : '')}</td>
             </tr>
@@ -348,7 +348,8 @@ function ModelSuiteCard({ d }: { d: SettingsView }) {
 
 function ModelsCard({ d }: { d: SettingsView }) {
   const hf = d.models.filter(m => m.ref.startsWith('higgsfield/'))
-  const confirmed = hf.filter(m => m.verified).length
+  const onApi = hf.filter(m => m.api)
+  const confirmed = onApi.filter(m => m.verified).length
   return (
     <>
       <ModelSuiteCard d={d} />
@@ -356,9 +357,9 @@ function ModelsCard({ d }: { d: SettingsView }) {
         <div className="st-card-head">
           <div className="grow">
             <div className="st-h2">Higgsfield models</div>
-            <div className="st-hint">A model runs live once it is confirmed: enter its path from Higgsfield's official Model API Reference, then run its test. The test is the cheapest request the model takes, and its price shows first.</div>
+            <div className="st-hint">A model runs live on the API once it is confirmed by its test. Paths come from Higgsfield's official Model API Reference (linked under each model). The test is the cheapest request the model takes, and its price shows first.</div>
           </div>
-          <span className={`st-badge ${confirmed === hf.length ? 'ok' : 'warn'}`}>{confirmed} of {hf.length} confirmed</span>
+          <span className={`st-badge ${confirmed === onApi.length ? 'ok' : 'warn'}`}>{confirmed} of {onApi.length} on the API confirmed</span>
         </div>
         <div className="st-card-body st-col" style={{ gap: 10 }}>
           {d.mode !== 'live' && <Callout tone="info">Tests are real, paid runs, so they need live mode and your Higgsfield key.</Callout>}
@@ -400,19 +401,20 @@ function ModelRow({ m, live }: { m: SettingsView['models'][number]; live: boolea
     setSaving(true)
     try { await api.setModelEndpoint(m.ref, endpoint.trim()); invalidate(); toast({ tone: 'ok', text: endpoint.trim() ? `${m.label}: path saved. Run its test to confirm it.` : `${m.label}: path cleared.` }) } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) } finally { setSaving(false) }
   }
-  const status = m.verified ? { tone: 'ok', text: 'Confirmed' } : m.testing ? { tone: 'info', text: 'Testing' } : m.endpoint ? { tone: 'warn', text: 'Ready to test' } : { tone: '', text: 'Needs its path' }
+  const status = !m.api ? { tone: '', text: 'Account only' } : m.verified ? { tone: 'ok', text: 'Confirmed' } : m.testing ? { tone: 'info', text: 'Testing' } : m.endpoint ? { tone: 'warn', text: 'Ready to test' } : { tone: '', text: 'Needs its path' }
   return (
     <div className="st-modelrow">
       <div className="st-col" style={{ gap: 2, minWidth: 0 }}>
         <div className="st-row" style={{ gap: 8 }}><b>{m.label}</b><span className={`st-badge plain ${status.tone}`}>{status.text}</span></div>
         <span className="st-hint st-mono">{m.ref}</span>
         {m.lastTest && <span className={`st-hint ${m.lastTest.ok ? '' : 'bad'}`}>{m.lastTest.message}</span>}
+        {m.reference && <a className="st-hint" href={m.reference} target="_blank" rel="noreferrer">Official API reference</a>}
       </div>
-      <div className="st-row" style={{ gap: 8, minWidth: 0 }}>
+      {!m.api ? <span className="st-hint">Not on the Higgsfield API. It runs through your Higgsfield account.</span> : <div className="st-row" style={{ gap: 8, minWidth: 0 }}>
         <input className="st-input st-mono" style={{ flex: 1, minWidth: 0 }} placeholder="path from the official reference" value={endpoint} onChange={e => setEndpoint(e.target.value)} aria-label={`${m.label} endpoint`} />
         {dirty && <button className="st-btn sm" disabled={saving} onClick={save}>Save</button>}
         {!dirty && m.endpoint && live && !m.testing && <PriceButton action={{ type: 'model_test', model: m.ref }} label={m.verified ? 'Test again' : 'Test'} variant="secondary" size="sm" />}
-      </div>
+      </div>}
     </div>
   )
 }

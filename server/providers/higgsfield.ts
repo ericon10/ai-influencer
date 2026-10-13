@@ -8,28 +8,32 @@ import { forceBeautifyOff } from '../core/realism.js'
 import { ProviderError, type GenRequest, type JobState, type JobStatus, type Output, type ProviderAdapter } from './types.js'
 
 // Higgsfield pay-per-use API (not the web subscription), through the
-// official SDK (@higgsfield/client, v2 client). Submits use subscribe() with
-// withPolling false: POST /{endpoint}?hf_webhook=<url>, "Authorization: Key
-// KEY_ID:KEY_SECRET", answered with { status, request_id, status_url,
-// cancel_url }. The SDK's automatic retries are turned off for submits: a
-// retried POST after a timeout can start (and charge) the job twice, so an
-// unknown outcome goes to a person instead. Status, cancel and uploads use
-// the endpoints the SDK itself uses (GET /requests/{id}/status, the
-// cancel_url, POST /files/generate-upload-url).
+// official SDK (@higgsfield/client, v2 client), as documented at
+// docs.higgsfield.ai (read 2026-10-13). Submits use subscribe() with
+// withPolling false: POST /{endpoint id}?hf_webhook=<url>, "Authorization:
+// Key KEY_ID:KEY_SECRET", answered with { status, request_id, status_url,
+// cancel_url }. Every submit carries an Idempotency-Key (the job's own key),
+// so Higgsfield never starts or charges the same generation twice for it.
+// The SDK's automatic retries stay off: an unknown outcome (a timeout, a 5xx
+// after sending) goes to a person, who can check the console.
 //
-// Status values (SDK): queued, in_progress, completed, failed, nsfw. Only
-// "completed" with at least one output counts as success; failed, nsfw
-// (moderated) and canceled results are refunded and never succeed.
-// 401 = bad key, 403 = not enough credits, 400/422 = bad input.
+// Status values: queued, in_progress, completed, failed, nsfw, canceled.
+// Only "completed" with at least one output counts as success; failed, nsfw
+// (moderated) and canceled are never a success, and Higgsfield refunds failed
+// and nsfw requests. Errors: 400 invalid input (or concurrency reached), 401
+// bad key, 403 not enough credits, 404 model not found, 422 validation (or an
+// idempotency key reused with other parameters), 423 model blocked for now,
+// 500 server error, 503 model disabled or not ready.
 //
-// Model endpoints and input shapes vary per model; they live in
-// config/models.yaml and the adapter refuses to submit to any model not yet
-// marked verified, so nothing is sent until the owner has confirmed it.
+// Endpoint ids and input fields are per model, from each model's page in the
+// official Model API Reference; they live in config/models.yaml, and the
+// adapter refuses any model not yet confirmed by its paid test.
 //
-// Reference images go through Higgsfield's own upload (also from the SDK):
-// POST /files/generate-upload-url { content_type } returns { upload_url,
-// public_url }; the bytes are PUT to upload_url without our credentials and
-// public_url is passed as the image. No cloud storage of our own is needed.
+// Reference images go through Higgsfield's own upload: POST
+// /files/generate-upload-url { content_type } returns { upload_url,
+// public_url, upload_headers }; the bytes are PUT to upload_url with those
+// headers and without our credentials, and public_url is passed as the
+// image. No cloud storage of our own is needed.
 
 // The part of the SDK client the adapter uses (tests can pass their own).
 export interface HiggsfieldSubmitter {
@@ -42,8 +46,9 @@ export interface HiggsfieldOptions {
   baseUrl?: string
   // Status, cancel and uploads.
   fetchImpl?: typeof fetch
-  // Submits. Defaults to the official SDK client.
-  sdk?: HiggsfieldSubmitter
+  // Submits. Defaults to the official SDK client, one per submit so it can
+  // carry that submit's Idempotency-Key header.
+  sdk?: (headers: Record<string, string>) => HiggsfieldSubmitter
   timeoutMs?: number
 }
 
@@ -73,6 +78,11 @@ export function classifySubmitError(e: unknown): ProviderError {
   if (e instanceof AuthenticationError) return new ProviderError('Higgsfield rejected the API key. Check it in Settings.', { retryable: false, submitted: 'no', status: 401 })
   if (e instanceof NotEnoughCreditsError) return new ProviderError('Not enough Higgsfield API credits. Top up in the Higgsfield Console.', { retryable: false, submitted: 'no', status: 403, code: 'credits' })
   if (e instanceof ValidationError || e instanceof BadInputError) {
+    // The same key with other parameters: the first request was accepted.
+    // (The SDK puts a text detail in the message.)
+    if (/idempotency/i.test(e.message)) {
+      return new ProviderError('Higgsfield already accepted this job earlier. Find it in the Higgsfield console and attach its request id.', { retryable: false, submitted: 'unknown', status: e.statusCode })
+    }
     const d = (e as { details?: Array<{ loc?: string[]; msg?: string }> }).details
     const detail = Array.isArray(d) && d.length ? d.map(x => `${(x.loc ?? []).slice(1).join('.') || 'input'}: ${x.msg ?? ''}`).join('; ') : e.message
     return new ProviderError(`Higgsfield rejected the request: ${detail}`, { retryable: false, submitted: 'no', status: e.statusCode })
@@ -80,8 +90,9 @@ export function classifySubmitError(e: unknown): ProviderError {
   if (e instanceof APIError) {
     const s = e.statusCode
     const detail = typeof (e.responseData as { detail?: unknown } | undefined)?.detail === 'string' ? (e.responseData as { detail: string }).detail : e.message
-    if (s === 404) return new ProviderError('Higgsfield could not find that endpoint.', { retryable: false, submitted: 'no', status: s })
-    if (s === 429 || s === 502 || s === 503 || s === 504) return new ProviderError(`Higgsfield is busy (${s}). Will retry.`, { retryable: true, submitted: 'no', status: s })
+    if (s === 404) return new ProviderError('Higgsfield could not find that model for this account.', { retryable: false, submitted: 'no', status: s })
+    if (s === 423) return new ProviderError('Higgsfield has this model blocked for now. Will retry.', { retryable: true, submitted: 'no', status: s })
+    if (s === 429 || s === 503) return new ProviderError(`Higgsfield is busy or the model is not ready (${s}). Will retry.`, { retryable: true, submitted: 'no', status: s })
     return new ProviderError(`Higgsfield error ${s ?? ''}: ${detail}`.trim(), { retryable: false, submitted: 'unknown', status: s })
   }
   if (axios.isAxiosError(e)) {
@@ -112,6 +123,23 @@ export function mapInput(entry: ModelEntry, req: GenRequest): Record<string, unk
 function mapFamily(entry: ModelEntry, req: GenRequest): Record<string, unknown> {
   const clean = (o: Record<string, unknown>) => Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined && !(Array.isArray(v) && !v.length)))
   switch (entry.input_map) {
+    case 'marketing_image':
+      // Marketing Studio Image (GPT Image 2.5 Flare and Sunburst): plain
+      // reference URLs, and prompt enhancement always off.
+      return clean({
+        prompt: req.prompt,
+        image_urls: (req.refs ?? []).map(r => needUrl(r, 'A reference image')),
+        aspect_ratio: req.aspect,
+        resolution: req.resolution,
+        quality: req.quality,
+        enhance_prompt: false,
+      })
+    case 'soul_v2':
+      // A trained Soul character rides along as a custom reference.
+      return clean({
+        prompt: req.prompt, aspect_ratio: req.aspect, resolution: req.resolution, seed: req.seed, batch_size: 1, enhance_prompt: false,
+        custom_reference_id: req.identityId, custom_reference_strength: req.identityId ? 1 : undefined,
+      })
     case 'generic_image':
       return clean({
         prompt: req.prompt,
@@ -130,23 +158,37 @@ function mapFamily(entry: ModelEntry, req: GenRequest): Record<string, unknown> 
     case 'generic_upscale':
       return clean({ input_image: imageUrl(needUrl(req.refs?.[0], 'The image to upscale')), scale: req.scale ?? 2, resolution: req.resolution })
     case 'seedance_i2v':
-      // REST takes start and end frames directly; the web app and MCP need
-      // mode omni_reference for them instead (both paths are recorded in
-      // config/models.yaml). Field names are confirmed by the model's paid
-      // test. Audio is always sent off.
+      // Seedance image to video: start frame (which sets the framing and the
+      // aspect) and an optional end frame. The schema takes nothing else, and
+      // generate_audio defaults to true, so it is always sent off. The web app
+      // and MCP need mode omni_reference for frames instead (config notes).
+      if (req.kind === 'video_extend') throw new ProviderError(`${entry.label} has no extend endpoint on the API. Use the Higgsfield account path to extend.`, { retryable: false, submitted: 'no' })
       return clean({
         prompt: req.prompt,
         image_url: needUrl(req.startFrame, 'The start frame'),
         end_image_url: req.endFrame ? needUrl(req.endFrame, 'The end frame') : undefined,
         duration: req.durationSec,
         resolution: req.resolution,
-        seed: req.seed,
         generate_audio: false,
       })
+    case 'wan_i2v':
+      // Wan image to video: first and optional last frame. Audio off, and
+      // the model's own prompt rewriting ("thinking") off.
+      return clean({
+        prompt: req.prompt,
+        image_url: needUrl(req.startFrame, 'The start frame'),
+        end_image_url: req.endFrame ? needUrl(req.endFrame, 'The end frame') : undefined,
+        duration: req.durationSec,
+        resolution: req.resolution,
+        aspect_ratio: req.aspect,
+        seed: req.seed || undefined,
+        generate_audio: false,
+        enable_thinking: false,
+      })
     case 'kling_v3':
-      // Sound is always sent off. Turbo has no sound switch; the Studio
-      // strips its audio on arrival. Field names are confirmed by the
-      // model's paid test.
+      // Standard and Pro: sound defaults to on, so it is always sent off.
+      // Turbo has no sound, last-frame or elements field; the Studio strips
+      // its audio on arrival.
       return clean({
         prompt: req.prompt,
         image_url: needUrl(req.startFrame, 'The start frame'),
@@ -193,7 +235,7 @@ export function createHiggsfieldAdapter(opts: HiggsfieldOptions): ProviderAdapte
   const credentials = opts.credentials.trim()
   const headers = { Authorization: `Key ${credentials}`, 'Content-Type': 'application/json', Accept: 'application/json' }
   // Retries off for submits (see above); the runner decides what to retry.
-  const sdk: HiggsfieldSubmitter = opts.sdk ?? createHiggsfieldClient({ credentials, baseURL: base, timeout: timeoutMs, maxRetries: 0 })
+  const sdkFor = opts.sdk ?? ((extra: Record<string, string>) => createHiggsfieldClient({ credentials, baseURL: base, timeout: timeoutMs, maxRetries: 0, headers: extra }))
 
   async function call<T = HfResponse>(method: 'GET' | 'POST', path: string, body?: unknown, phase: 'submit' | 'read' = 'read'): Promise<T> {
     const controller = new AbortController()
@@ -220,7 +262,7 @@ export function createHiggsfieldAdapter(opts: HiggsfieldOptions): ProviderAdapte
     if (s === 403) throw new ProviderError('Not enough Higgsfield API credits. Top up in the Higgsfield Console.', { retryable: false, submitted: 'no', status: s, code: 'credits' })
     if (s === 400 || s === 422) throw new ProviderError(`Higgsfield rejected the request: ${detail}`, { retryable: false, submitted: 'no', status: s })
     if (s === 404) throw new ProviderError('Higgsfield could not find that endpoint or job.', { retryable: false, submitted: 'no', status: s })
-    if (s === 429 || s === 502 || s === 503 || s === 504) throw new ProviderError(`Higgsfield is busy (${s}). Will retry.`, { retryable: true, submitted: 'no', status: s })
+    if (s === 423 || s === 429 || s === 502 || s === 503 || s === 504) throw new ProviderError(`Higgsfield is busy (${s}). Will retry.`, { retryable: true, submitted: 'no', status: s })
     throw new ProviderError(`Higgsfield error ${s}: ${detail}`, { retryable: phase === 'read', submitted: phase === 'submit' ? 'unknown' : 'no', status: s })
   }
 
@@ -229,6 +271,7 @@ export function createHiggsfieldAdapter(opts: HiggsfieldOptions): ProviderAdapte
   function entryFor(ref: string, modelTest = false): ModelEntry {
     const entry = opts.config.models.models.find(m => m.ref === ref)
     if (!entry || !ref.startsWith('higgsfield/')) throw new ProviderError(`Unknown Higgsfield model "${ref}".`, { retryable: false, submitted: 'no' })
+    if (entry.api === false) throw new ProviderError(`${entry.label} is not on the Higgsfield API. Run it on your Higgsfield account (Settings, Billing).`, { retryable: false, submitted: 'no', code: 'unverified_model' })
     if (!entry.endpoint || (!entry.verified && !modelTest)) {
       throw new ProviderError(`${entry.label} is not confirmed for the Higgsfield API yet. Enter its endpoint from the official Model API Reference in Settings and run its test first.`, { retryable: false, submitted: 'no', code: 'unverified_model' })
     }
@@ -264,7 +307,7 @@ export function createHiggsfieldAdapter(opts: HiggsfieldOptions): ProviderAdapte
       }
       return slot.public_url
     },
-    async submit(req, { webhookUrl }) {
+    async submit(req, { idempotencyKey, webhookUrl }) {
       const entry = entryFor(req.model, req.modelTest === true)
       if ((req.kind === 'video' || req.kind === 'video_extend') && req.audio !== false) {
         throw new ProviderError('Video requests must send audio off.', { retryable: false, submitted: 'no' })
@@ -272,6 +315,7 @@ export function createHiggsfieldAdapter(opts: HiggsfieldOptions): ProviderAdapte
       const endpoint = entry.endpoint!.startsWith('/') ? entry.endpoint! : `/${entry.endpoint}`
       let r: HfResponse
       try {
+        const sdk = sdkFor({ 'Idempotency-Key': idempotencyKey })
         r = await sdk.subscribe(endpoint, { input: mapInput(entry, req), withPolling: false, ...(webhookUrl ? { webhook: { url: webhookUrl, secret: '' } } : {}) }) as HfResponse
       } catch (e) {
         throw classifySubmitError(e)

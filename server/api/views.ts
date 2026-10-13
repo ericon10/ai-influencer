@@ -109,6 +109,8 @@ export async function settingsView(deps: Deps, ctx: Ctx) {
           : t.kind === 'upscale' ? `Upscale${t.resolution ? ` to ${t.resolution}` : ''}` : `Still${t.refs ? ` with ${t.refs} reference images` : ''}`
         return {
           ref: t.model, label: base?.label ?? t.model, what, endpoint: base ? (effectiveModel(base, o).endpoint ?? '') : '',
+          // Where the test runs: the API, or the owner's account for a model the API does not offer.
+          path: base?.api === false ? 'account' as const : 'api' as const,
           testing: !!o?.pendingTest, lastTest: o?.lastTest ?? null,
           cost: job ? (job.actual != null ? formatUsd(job.actual) : null) : null, estimate: job ? formatUsd(job.estimate) : null,
         }
@@ -145,7 +147,7 @@ export async function settingsView(deps: Deps, ctx: Ctx) {
       const e = effectiveModel(m, overrides[m.ref])
       const o = overrides[m.ref]
       return {
-        ref: m.ref, label: m.label, kinds: m.kinds, verified: e.confirmed, notes: m.notes ?? '',
+        ref: m.ref, label: m.label, kinds: m.kinds, verified: e.confirmed, notes: m.notes ?? '', api: m.api, reference: m.reference ?? null,
         endpoint: e.endpoint ?? '', endpointSource: e.endpointSource, confirmedAt: e.confirmed ? (o?.confirmedAt ?? null) : null,
         lastTest: o?.lastTest ?? null, testing: !!o?.pendingTest,
       }

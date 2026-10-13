@@ -1,8 +1,10 @@
 # Model catalog. A model ref is "provider/model". A Higgsfield REST endpoint
-# is filled in only from Higgsfield's official Model API Reference, never from
-# third-party copies of the catalog, and a model counts as confirmed only after
-# one small paid test passes (Settings, Models: enter the path, then Test).
-# Until then the adapter refuses to send live runs to it.
+# is filled in only from Higgsfield's official Model API Reference
+# (docs.higgsfield.ai/docs/models, read 2026-10-13; `reference` names the
+# page), never from third-party copies of the catalog. A model counts as
+# confirmed only after one small paid test passes (Settings, Model tests);
+# until then the adapter refuses to send live runs to it. `api: false` marks
+# a model the API does not offer at all: it runs only through the account.
 #
 # Identity without training: Higgsfield Elements (reference characters) are
 # instant and are used through a <<<element_id>>> placeholder in the prompt
@@ -18,15 +20,16 @@ version: 1
 models:
   # ── Higgsfield (primary, pay-per-use API) ──
   # Capabilities marked "verified live 2026-10-12" were confirmed by the
-  # owner through the Higgsfield web app and MCP connector. REST endpoints
-  # stay null (and the adapter refuses the model) until confirmed for the
-  # pay-per-use API.
+  # owner through the Higgsfield web app and MCP connector. Endpoints and
+  # field names are from the official reference; each model still needs its
+  # paid test (verified stays false until then).
   - ref: higgsfield/gpt-image-2.5
     label: GPT Image 2.5
     kinds: [image, image_edit]
     max_refs: 8
-    endpoint: null
-    input_map: generic_image
+    reference: https://docs.higgsfield.ai/docs/models/marketing-studio-image/sunburst
+    endpoint: marketing-studio/image/sunburst
+    input_map: marketing_image
     verified: false
     mcp_id: gpt_image_2_5
     mcp: { params: [aspect_ratio, resolution, quality, variant], roles: { refs: image_references } }
@@ -38,8 +41,9 @@ models:
     label: GPT Image 2.5 Flare
     kinds: [image, image_edit]
     max_refs: 8
-    endpoint: null
-    input_map: generic_image
+    reference: https://docs.higgsfield.ai/docs/models/marketing-studio-image/flare
+    endpoint: marketing-studio/image/flare
+    input_map: marketing_image
     verified: false
     mcp_id: gpt_image_2_5
     mcp: { params: [aspect_ratio, resolution, quality], fixed: { variant: flare }, roles: { refs: image_references } }
@@ -51,6 +55,7 @@ models:
     label: Nano Banana 2.1
     kinds: [image, image_edit]
     max_refs: 4
+    api: false
     endpoint: null
     input_map: generic_image
     verified: false
@@ -64,18 +69,22 @@ models:
     label: Nano Banana 2
     kinds: [image, image_edit]
     max_refs: 4
+    api: false
     endpoint: null
     input_map: generic_image
     verified: false
     mcp_id: nano_banana_2
     mcp: { params: [aspect_ratio, resolution], roles: { refs: image_references } }
     aliases: [Nano Banana 2, Nano Banana Pro]
+    notes: Not on the pay-per-use API (absent from the official Model API Reference, 2026-10-13); runs through the Higgsfield account.
+
   - ref: higgsfield/soul-2
     label: Soul 2.0
     kinds: [image]
     max_refs: 0
-    endpoint: /v1/text2image/soul
-    input_map: soul_v1
+    reference: https://docs.higgsfield.ai/docs/models/soul-2/generate
+    endpoint: higgsfield-ai/soul/v2/standard
+    input_map: soul_v2
     verified: false
     mcp_id: soul_2
     mcp: { params: [aspect_ratio, soul_id], fixed: { quality: 2k } }
@@ -85,6 +94,7 @@ models:
     label: ByteDance image upscale (2k)
     kinds: [upscale]
     max_refs: 0
+    api: false
     endpoint: null
     input_map: generic_upscale
     verified: false
@@ -98,7 +108,8 @@ models:
     label: Seedance 2.5
     kinds: [video]
     max_refs: 0
-    endpoint: null
+    reference: https://docs.higgsfield.ai/docs/models/seedance-2-5/image-to-video
+    endpoint: bytedance/seedance-2.5/image-to-video
     input_map: seedance_i2v
     verified: false
     mcp_id: seedance_2_5
@@ -114,8 +125,9 @@ models:
     label: Seedance 2.0
     kinds: [video, video_extend]
     max_refs: 0
-    endpoint: null
-    input_map: generic_video
+    reference: https://docs.higgsfield.ai/docs/models/seedance-2/image-to-video
+    endpoint: bytedance/seedance-2.0/image-to-video
+    input_map: seedance_i2v
     verified: false
     mcp_id: seedance_2_0
     mcp: { params: [aspect_ratio, duration, resolution], fixed: { mode: std, generate_audio: false }, roles: { start: start_image, end: end_image } }
@@ -125,7 +137,8 @@ models:
     label: Kling 3.0 Standard
     kinds: [video]
     max_refs: 0
-    endpoint: null
+    reference: https://docs.higgsfield.ai/docs/models/kling-3/standard-image-to-video
+    endpoint: kling-video/v3.0/std/image-to-video
     input_map: kling_v3
     verified: false
     mcp_id: kling3_0
@@ -138,7 +151,8 @@ models:
     label: Kling 3.0 Pro
     kinds: [video]
     max_refs: 0
-    endpoint: null
+    reference: https://docs.higgsfield.ai/docs/models/kling-3/pro-image-to-video
+    endpoint: kling-video/v3.0/pro/image-to-video
     input_map: kling_v3
     verified: false
     mcp_id: kling3_0
@@ -151,7 +165,8 @@ models:
     label: Kling 3.0 Turbo
     kinds: [video]
     max_refs: 0
-    endpoint: null
+    reference: https://docs.higgsfield.ai/docs/models/kling-3/turbo-image-to-video
+    endpoint: kling-video/v3.0-turbo/image-to-video
     input_map: kling_v3
     verified: false
     mcp_id: kling3_0_turbo
@@ -165,14 +180,16 @@ models:
     label: Wan 3.0 Prime
     kinds: [video]
     max_refs: 0
-    endpoint: null
-    input_map: generic_video
+    reference: https://docs.higgsfield.ai/docs/models/wan-3-prime/image-to-video
+    endpoint: alibaba/wan-3.0-prime/image-to-video
+    input_map: wan_i2v
     verified: false
     audio: off_switch
   - ref: higgsfield/mirelo-sfx
     label: Mirelo text to audio (sound effects)
     kinds: [audio]
     max_refs: 0
+    api: false
     endpoint: null
     input_map: generic_audio
     verified: false
@@ -181,7 +198,7 @@ models:
     aliases: [Mirelo, mirelo_text_to_audio]
     params: { duration_sec: true }
     use_for: [sfx]
-    notes: Sound effects with a duration parameter; 12 s worked (verified live 2026-10-12). ElevenLabs flow SFX returned only 1 s clips.
+    notes: Sound effects with a duration parameter; 12 s worked (verified live 2026-10-12). ElevenLabs flow SFX returned only 1 s clips. Not on the pay-per-use API (the official reference lists image and video only, 2026-10-13); runs through the Higgsfield account.
 
   # ── Mock (free, deterministic; tests and demo mode) ──
   - ref: mock/image
