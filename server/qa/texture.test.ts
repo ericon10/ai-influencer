@@ -70,4 +70,16 @@ describe('texture check', () => {
     const clean = await sharp(photo).resize((meta.width ?? 400) * 2, undefined, { kernel: 'lanczos3' }).jpeg({ quality: 95 }).toBuffer()
     expect((await compareTexture(photo, clean, { faces, sameFraming: true })).smoothed).toBe(false)
   }, 60_000)
+
+  it.skipIf(!haveModels)('does not judge a face too small to show skin detail (full-body framing)', async () => {
+    const faces = createFaceMatcher({ modelsDir: MODELS_DIR })
+    const photo = readFileSync(join(process.cwd(), 'fixtures/faces/person-a-1.jpg'))
+    const meta = await sharp(photo).metadata()
+    // The same face, far smaller in the frame, as in a full-body shot.
+    const small = await sharp(photo).resize(Math.round((meta.width ?? 400) / 4)).extend({ top: 300, bottom: 300, left: 150, right: 150, background: '#d8d4cc' }).jpeg({ quality: 95 }).toBuffer()
+    const r = await compareTexture(photo, small, { faces })
+    expect(r.judged).toBe(false)
+    expect(r.smoothed).toBe(false)
+    expect(r.message).toMatch(/too small here to judge skin texture/)
+  }, 60_000)
 })

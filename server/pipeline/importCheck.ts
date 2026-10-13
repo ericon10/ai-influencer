@@ -52,9 +52,11 @@ export async function runImportCheck(deps: Deps, ctx: Ctx, job: JobRow): Promise
       try {
         const t = await compareTexture(ref00Data, (await readAsset(deps, ctx, cand.assetId)).data, { faces: deps.faces, minRatio: deps.config.runtime.qa.texture_min_ratio })
         texture = { ratio: t.ratio, smoothed: t.smoothed, region: t.region, message: t.message }
-        findings.push(t.smoothed
-          ? { code: 'skin_smoothed', severity: 'fail', message: `${t.message.replace(/ Rerun it;.*$/, '')} Compared with REF-00.` }
-          : { code: 'skin_real', severity: 'info', message: `${t.message} Compared with REF-00.` })
+        findings.push(!t.judged
+          ? { code: 'uncertain', severity: 'info', message: t.message }
+          : t.smoothed
+            ? { code: 'skin_smoothed', severity: 'fail', message: `${t.message.replace(/ Rerun it;.*$/, '')} Compared with REF-00.` }
+            : { code: 'skin_real', severity: 'info', message: `${t.message} Compared with REF-00.` })
       } catch (e) {
         findings.push({ code: 'uncertain', severity: 'warn', message: `The skin texture check could not run (${(e as Error).message}).` })
       }

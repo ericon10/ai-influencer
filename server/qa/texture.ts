@@ -12,6 +12,9 @@ export interface TextureResult {
   inputDetail: number
   outputDetail: number
   smoothed: boolean
+  // False when a face is too small to show skin detail (a full-body shot):
+  // nothing is measured, and a person checks it instead.
+  judged: boolean
   region: 'face' | 'center'
   message: string
 }
@@ -23,11 +26,19 @@ export interface TextureOptions {
   // The output keeps the input's framing (an upscale): the input's face box
   // is used on both, scaled. Otherwise each image is searched on its own.
   sameFraming?: boolean
+  // A face narrower or shorter than this many pixels has no skin detail to
+  // measure, so it is not judged.
+  minFaceSide?: number
 }
 
 type Box = { x: number; y: number; w: number; h: number }
 
 const MAX_SIDE = 256
+const MIN_FACE_SIDE = 64
+// Two different shots are compared only when their faces are of similar size:
+// a full-body face is a fraction of a chest-up one and shows no pores at all,
+// so comparing them would call real skin "smoothed".
+const MAX_FACE_SCALE = 2
 
 // The 4-neighbour Laplacian's variance over a grayscale image.
 export function laplacianVariance(px: Uint8Array | Buffer, w: number, h: number): number {
@@ -82,19 +93,31 @@ async function detail(img: Buffer, box: Box, side: number): Promise<number> {
 
 export async function compareTexture(input: Buffer, output: Buffer, o: TextureOptions = {}): Promise<TextureResult> {
   const minRatio = o.minRatio ?? 0.6
+  const minFace = o.minFaceSide ?? MIN_FACE_SIDE
   const [si, so] = await Promise.all([size(input), size(output)])
   const fi = await faceBox(o.faces, input)
   let inBox: Box, outBox: Box, region: TextureResult['region']
   if (fi) {
     region = 'face'
     inBox = grow(fi, si.w, si.h)
+    let fo: Box | null
     if (o.sameFraming) {
       const sx = so.w / si.w, sy = so.h / si.h
-      outBox = grow({ x: fi.x * sx, y: fi.y * sy, w: fi.w * sx, h: fi.h * sy }, so.w, so.h)
+      fo = { x: fi.x * sx, y: fi.y * sy, w: fi.w * sx, h: fi.h * sy }
+      outBox = grow(fo, so.w, so.h)
     } else {
-      const fo = await faceBox(o.faces, output)
+      fo = await faceBox(o.faces, output)
       outBox = fo ? grow(fo, so.w, so.h) : centerBox(so.w, so.h)
       if (!fo) region = 'center'
+    }
+    const side = (b: Box) => Math.min(b.w, b.h)
+    const tooSmall = Math.min(side(fi), fo ? side(fo) : Infinity) < minFace
+    const tooDifferent = !o.sameFraming && !!fo && Math.max(side(fi), side(fo)) / Math.min(side(fi), side(fo)) > MAX_FACE_SCALE
+    if (tooSmall || tooDifferent) {
+      return {
+        ratio: 1, inputDetail: 0, outputDetail: 0, smoothed: false, judged: false, region,
+        message: 'The face is too small here to judge skin texture (full-body framing). Check it yourself.',
+      }
     }
   } else {
     region = 'center'
@@ -109,7 +132,7 @@ export async function compareTexture(input: Buffer, output: Buffer, o: TextureOp
   const pct = Math.round(ratio * 100)
   const where = region === 'face' ? 'face' : 'center of the frame'
   return {
-    ratio, inputDetail, outputDetail, smoothed, region,
+    ratio, inputDetail, outputDetail, smoothed, judged: true, region,
     message: smoothed
       ? `Skin smoothed: the ${where} kept only ${pct}% of the fine detail it had before. Rerun it; real skin texture is the product.`
       : `Skin texture kept (${pct}% of the fine detail before).`,
