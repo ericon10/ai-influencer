@@ -5,6 +5,7 @@ import { and, desc, eq, inArray } from 'drizzle-orm'
 import type { Ctx, Deps, Principal } from '../context.js'
 import { hasRole } from '../context.js'
 import { AppError } from '../lib/errors.js'
+import { ProviderError } from '../providers/types.js'
 import { newId } from '../lib/ids.js'
 import type { AuthProvider } from '../auth/provider.js'
 import { jobEvents, jobs } from '../db/schema.js'
@@ -104,6 +105,12 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
     const reqId = c.get('ctx')?.requestId
     if (err instanceof AppError) {
       return c.json({ error: { code: err.code, message: err.message, details: err.details ?? null, requestId: reqId } }, err.status as 400)
+    }
+    // Provider messages are written for the owner (what went wrong and what
+    // to do), so they are shown as they are instead of a generic error.
+    if (err instanceof ProviderError) {
+      deps.log.warn({ err, requestId: reqId }, 'provider error')
+      return c.json({ error: { code: err.opts.code === 'reconnect' ? 'reconnect' : 'provider', message: err.message, details: null, requestId: reqId } }, 502)
     }
     deps.log.error({ err, requestId: reqId }, 'unhandled API error')
     return c.json({ error: { code: 'internal', message: 'Something went wrong on our side. It has been logged.', requestId: reqId } }, 500)
