@@ -348,6 +348,14 @@ rules:
     title: Claude writes the final prompt
     check: { type: behavior }
     message: Claude (the Prompt writer in Settings, Claude models) turns the scene details into the final still or video prompt, as natural sentences about a real candid moment. You can edit it or rewrite it before you generate. The Studio still adds the reference line, the mark sides and the REALISM block. Switched off, the template builds the prompt.
+  - id: scene-directors-pass
+    bucket: default
+    area: scene
+    spec: "9"
+    # Owner, 2026-10-13: think like a director and DP before writing.
+    title: Director's pass before the prompt
+    check: { type: behavior }
+    message: Before writing, the prompt writer decides what makes the shot memorable while it stays phone-real (the moment the viewer remembers, the hook in the first second, the payoff, one camera move, depth, motivated light, one contrast) and shows them as an editable "Director's notes" line above the prompt. Rewrite follows your edited notes. Switched off, the writer skips the notes.
   - id: scene-auto-qa
     bucket: default
     area: qa

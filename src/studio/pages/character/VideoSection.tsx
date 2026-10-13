@@ -117,10 +117,11 @@ export function VideoSection({ v, data, scene, startId, setStartId, onUseTake, u
                 <PromptBox
                   id="video-motion" characterId={v.id} sceneId={scene.id} target="video"
                   label="What happens in the video"
-                  placeholder={`Press "Use this still" or "Write it" and Claude writes the motion, or type your own: e.g. ${v.data.name} laughs softly and turns toward the camera.`}
+                  placeholder={`Press "Use this still" or "Write it" and Claude writes the video prompt (who records, the action, the light, the camera), or type your own: e.g. ${v.data.name} laughs softly and turns toward the camera.`}
                   written={written} templateText={null} words={pw.words.video} model={pw.model} realism={pw.realism}
                   writeTodo={writeTodo}
-                  writeAction={saved => (!start || (saved.trim() || seed).length < 3 ? null : { type: 'scene_prompt', characterId: v.id, sceneId: scene.id, target: 'video', motion: (saved.trim() || seed).slice(0, 600), directions: directions.trim(), startCandidateId: start.id, ...(endId ? { endCandidateId: endId } : {}) })}
+                  writeAction={saved => (!start || (saved.trim() || seed).length < 3 ? null : { type: 'scene_prompt', characterId: v.id, sceneId: scene.id, target: 'video', motion: (saved.trim() || seed).slice(0, 3000), directions: directions.trim(), startCandidateId: start.id, ...(endId ? { endCandidateId: endId } : {}), durationSec: duration, audio, aspect })}
+                  directors={pw.directorsPass}
                   addedNote="Added when it runs: the directions, the silent line when sound is off, and the REALISM block (always)."
                   onDirty={setPromptDirty}
                   onText={setMotion}
@@ -130,10 +131,17 @@ export function VideoSection({ v, data, scene, startId, setStartId, onUseTake, u
                   <summary>Directions, added after it: <span className="st-muted">{directions.trim() || 'none'}</span></summary>
                   <textarea className="st-textarea" rows={2} style={{ minHeight: 0 }} maxLength={600} value={directions} onChange={e => setDirections(e.target.value)} aria-label="Directions" />
                 </details>
+                  {data.options.diagnose.length > 0 && (
+                    <details className="st-directions">
+                      <summary>If a take looks off: diagnose and revise</summary>
+                      <ul className="st-diagnose">{data.options.diagnose.map(d => <li key={d.symptom}><b>{d.symptom}.</b> {d.revision}</li>)}</ul>
+                      <span className="st-hint">Change one group of instructions at a time, and judge the motion at normal speed.</span>
+                    </details>
+                  )}
                 </PromptBox>
               ) : (
                 <Field id="video-motion" label="What happens in the video" required done={motion.trim().length >= 3} hint="Motion only: one action and at most one camera move. Calm motion keeps the face steady.">
-                  <textarea className="st-textarea" rows={3} style={{ minHeight: 0 }} maxLength={600} value={motion} onChange={e => setMotion(e.target.value)} placeholder={`e.g. ${v.data.name} laughs softly and turns toward the camera`} />
+                  <textarea className="st-textarea" rows={3} style={{ minHeight: 0 }} maxLength={3000} value={motion} onChange={e => setMotion(e.target.value)} placeholder={`e.g. ${v.data.name} laughs softly and turns toward the camera`} />
                   <details className="st-directions">
                   <summary>Directions, added after it: <span className="st-muted">{directions.trim() || 'none'}</span></summary>
                   <textarea className="st-textarea" rows={2} style={{ minHeight: 0 }} maxLength={600} value={directions} onChange={e => setDirections(e.target.value)} aria-label="Directions" />

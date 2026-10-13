@@ -1,7 +1,7 @@
 import type { SheetShot, TemplatesConfig, ViewDef, ViewsConfig } from '../config/pipeline.js'
 import type { CharacterData, Pronouns } from './character.js'
 import { imageSideOf, markExpectation, otherSide, regionVisible, type Mark } from './marks.js'
-import { finalizeImagePrompt, type RealismWarning } from './realism.js'
+import { finalizeImagePrompt, type RealismWarning, type SkinDetail } from './realism.js'
 import { capitalize, fill, normalizePrompt } from './text.js'
 
 // Prompts are filled by code from templates and the character record
@@ -72,6 +72,8 @@ export interface BuildOptions {
   flawDose?: boolean
   // A scene's makeup choice; it wins over the REALISM block's makeup line.
   makeup?: string
+  // How much skin detail the REALISM block names at this framing.
+  skin?: SkinDetail
 }
 
 export const DEFAULT_BACKGROUND = 'Plain light gray background, soft even daylight'
@@ -90,7 +92,7 @@ export function finishPrompt(prompt: string, stage: string, ch: RealismSource & 
   const body = block && !prompt.includes(block) ? `${prompt} ${block}` : prompt
   // Flaw words the character really has (card, marks, realism notes) stay.
   const allowedFlaws = [ch.card ?? '', ...(ch.marks ?? []).map(m => m.description), ...(ch.realism?.notes ?? [])].join(' ')
-  const done = finalizeImagePrompt(body, { stage, realism: ch.realism?.block, avoid: ch.realism?.avoid, allowedFlaws, flawDose: o.flawDose, plainBackground: o.background !== null, makeup: o.makeup })
+  const done = finalizeImagePrompt(body, { stage, realism: ch.realism?.block, avoid: ch.realism?.avoid, allowedFlaws, flawDose: o.flawDose, plainBackground: o.background !== null, makeup: o.makeup, skin: o.skin })
   o.warnings?.push(...done.warnings)
   return done.prompt
 }

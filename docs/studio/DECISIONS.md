@@ -783,3 +783,40 @@ changes what the Studio suggests and checks, never what the owner types.
   and new model, video and safety-filter notes; it is the fixture now. In
   production it reaches Callie when the owner imports it on her Character
   file step.
+
+### G20. The prompt writer follows the ultra-realism guide; the director's pass (owner, 2026-10-13)
+- The owner's cyberjungle-ultra-realism guide is guidance for the Claude
+  prompt writer, not a feature. Still prompts name who takes the photo
+  (front or rear camera, position, distance), an ordinary task, one small
+  trigger and the reaction the photo catches, a named light source and its
+  direction, one cause-and-effect camera imperfection, hand and prop
+  contact, and a short exclusion list for the scene. One paragraph.
+- Video prompts use the guide's labeled lines: FORMAT, SUBJECT,
+  SETTING/LIGHT, CAMERA, ACTION (task, trigger, small reaction, back to the
+  task), CONTINUITY, AUDIO, CONSTRAINTS, one per line. The Studio writes
+  FORMAT (9:16 by default, the take's length) and AUDIO (sound off unless
+  turned on) itself, over whatever the writer put there. SUBJECT and
+  SETTING point at the start frame instead of describing it again. The
+  directions, the silent line and the REALISM block follow on their own
+  lines. Word ranges: stills 120 to 170, video 110 to 180.
+- The director's pass (default rule scene-directors-pass, on): before
+  writing, the writer decides the moment the viewer remembers, the hook in
+  the first second, the payoff in the last 2 seconds (video), one camera
+  move (video), depth, motivated light and one contrast, and returns them
+  as a short "Director's notes" line shown above the prompt. The owner can
+  edit the notes; Rewrite (and Write and generate) then follow them as
+  given. Switched off, there are no notes.
+- Framing-aware REALISM (scenes.yaml framings, `skin`): close and chest-up
+  keep the full skin detail; waist-up and knees-up say "natural skin
+  texture"; full-body and wide name no skin detail. "No beauty smoothing"
+  and "no retouching" are always there, added when a block lacks them.
+  Scenes, edits, video takes and sheet shots (REF-06 to REF-08 are
+  full-body) all follow it.
+- Planner fields (defaults, all optional): the character's task and what
+  catches their attention, with the moment; the camera distance and the
+  front or rear camera, with the camera. The planner fills them; the
+  template and the writer use them.
+- "Fix one thing" gets the guide's Diagnose and revise rows that a still
+  edit can fix (plastic face, staged performance, hands or objects morph,
+  background synchronized, low light synthetic, overprocessed). The full
+  table sits under the video prompt as "If a take looks off".

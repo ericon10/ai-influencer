@@ -360,6 +360,10 @@ Decisions: `DECISIONS.md` G14, G15.
   with prices, original sound optional, results in Library > Clips, New
   post from a TikTok
 - [ ] First live clone per model (confirms its price and endpoint)
+- [x] New default REALISM block; Callie's new character file (G19)
+- [x] Prompt writer follows the ultra-realism guide; director's notes;
+  framing-aware REALISM; task, trigger, distance and phone camera fields;
+  Diagnose and revise (G20)
 
 ## Phase 4: OpenCut embedded (planned, not started)
 

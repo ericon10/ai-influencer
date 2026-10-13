@@ -75,7 +75,7 @@ export const api = {
   scenes: (characterId: string) => request<ScenesData>('GET', `/characters/${characterId}/scenes`),
   copyScene: (id: string, characterIds: string[]) => request<{ copies: Array<{ characterId: string; sceneId: string; name: string }> }>('POST', `/scenes/${id}/copy`, { characterIds }),
   createScene: (characterId: string, body: { brief?: string; title?: string; fields?: Partial<SceneFields> }) => request<{ id: string }>('POST', `/characters/${characterId}/scenes`, body),
-  updateScene: (sceneId: string, body: { brief?: string; title?: string; fields?: Partial<SceneFields>; prompts?: { still?: string; video?: string }; fromTemplate?: boolean }) => request<{ id: string }>('PATCH', `/scenes/${sceneId}`, body),
+  updateScene: (sceneId: string, body: { brief?: string; title?: string; fields?: Partial<SceneFields>; prompts?: { still?: string; video?: string }; fromTemplate?: boolean; notes?: { still?: string; video?: string } }) => request<{ id: string }>('PATCH', `/scenes/${sceneId}`, body),
   videoPrices: (characterId: string, duration: number, aspect: string) => request<{ prices: VideoPrice[] }>('GET', `/characters/${characterId}/video-prices?duration=${duration}&aspect=${encodeURIComponent(aspect)}`),
   setVideoModel: (model: string) => request<{ model: string }>('PUT', '/settings/video-model', { model }),
   worker: () => request<WorkerStatus>('GET', '/worker'),

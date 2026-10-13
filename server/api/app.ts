@@ -311,6 +311,8 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
     title: z.string().max(80).optional(),
     fields: z.record(z.string(), z.union([z.string().max(400), z.boolean(), z.array(z.string().max(20)).max(8)])).optional(),
     prompts: z.object({ still: z.string().max(4000).optional(), video: z.string().max(4000).optional() }).optional(),
+    // The director's notes the owner edited.
+    notes: z.object({ still: z.string().max(600).optional(), video: z.string().max(600).optional() }).optional(),
     // "Use the template": the prompt box text came from the template.
     fromTemplate: z.boolean().optional(),
   })

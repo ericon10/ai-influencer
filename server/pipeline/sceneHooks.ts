@@ -15,12 +15,13 @@ import { readAsset, saveAsset } from '../storage/assets.js'
 import { compareTexture } from '../qa/texture.js'
 import { scoreSceneIdentity } from './identity.js'
 import { draftFields, getScene, refreshSceneStatus, sceneFields, setScenePrompt, updateScene } from './scenes.js'
-import { cleanWriterOutput, type PromptTarget } from '../core/promptWriter.js'
+import { cleanWriterOutput, enforceVideoLines, isLabeled, type PromptTarget } from '../core/promptWriter.js'
+import { normalizePrompt } from '../core/text.js'
 import { modelLabel } from '../costs/quotes.js'
 import { textureCheck, textureSummary } from './texture.js'
 import { ruleSwitches } from './rules.js'
 import { writtenStillPrompt } from './sceneActions.js'
-import { realismBlockers } from '../core/realism.js'
+import { realismBlockers, stripBannedTerms } from '../core/realism.js'
 import { EXPLICIT_MESSAGE, findExplicitTerms } from '../core/safety.js'
 
 // What each finished scene job does (Stage 7 and 8). Failed QA never
@@ -74,19 +75,24 @@ async function onScenePlan(deps: Deps, ctx: Ctx, job: JobRow, out: JobOutcome): 
 // REALISM block of its own, no smoothing words), with what it was written
 // from so a later change to the details can be pointed out.
 async function onScenePrompt(deps: Deps, ctx: Ctx, job: JobRow, out: JobOutcome): Promise<void> {
-  const meta = ((job.request as { meta?: Record<string, unknown> }).meta ?? {}) as { target?: PromptTarget; basis?: string; motion?: string; directions?: string }
-  const raw = (out.data ?? {}) as { prompt?: unknown }
+  const meta = ((job.request as { meta?: Record<string, unknown> }).meta ?? {}) as { target?: PromptTarget; basis?: string; motion?: string; directions?: string; format?: string; audioLine?: string; directors?: boolean; notes?: string }
+  const raw = (out.data ?? {}) as { prompt?: unknown; notes?: unknown }
   if (out.status !== 'completed' || typeof raw.prompt !== 'string' || !raw.prompt.trim() || !meta.target) {
     // "Write and generate": without a written prompt the stills do not run
     // (their holds are released; nothing is charged for them).
     await cancelTree(deps, job.id, 'The prompt writer did not finish, so the stills did not run. Nothing was charged for them.')
     return
   }
-  const { text } = cleanWriterOutput(raw.prompt)
+  let { text } = cleanWriterOutput(raw.prompt)
+  // A video prompt's FORMAT and AUDIO lines are the Studio's own.
+  if (meta.target === 'video' && meta.format && meta.audioLine && isLabeled(text)) text = enforceVideoLines(text, { format: meta.format, audio: meta.audioLine })
+  // The director's notes: the owner's, kept as set, or the writer's.
+  const notes = meta.notes ? meta.notes : typeof raw.notes === 'string' ? normalizePrompt(stripBannedTerms(raw.notes).prompt).slice(0, 600) : ''
   await setScenePrompt(deps, ctx, sceneIdOf(job), meta.target, {
     text, source: 'claude', model: modelLabel(deps, `${job.provider}/${job.model}`),
     ...(meta.basis ? { basis: meta.basis } : {}),
     ...(meta.target === 'video' ? { motion: meta.motion ?? '', directions: meta.directions ?? '' } : {}),
+    ...(meta.directors && notes ? { notes, notesBy: meta.notes ? 'owner' as const : 'claude' as const } : {}),
   })
   await startWrittenStills(deps, ctx, job, text)
 }

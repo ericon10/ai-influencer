@@ -120,7 +120,7 @@ function cleanFields(f: Partial<SceneFields>): Partial<SceneFields> {
 
 // `prompts` is the owner's own edit of a written prompt (or "" to clear it):
 // the text becomes theirs, and what it was written from is kept.
-export async function updateScene(deps: Deps, ctx: Ctx, id: string, patch: { brief?: string; title?: string; fields?: Partial<SceneFields>; prompts?: Partial<Record<PromptTarget, string>>; fromTemplate?: boolean }): Promise<SceneRow> {
+export async function updateScene(deps: Deps, ctx: Ctx, id: string, patch: { brief?: string; title?: string; fields?: Partial<SceneFields>; prompts?: Partial<Record<PromptTarget, string>>; fromTemplate?: boolean; notes?: Partial<Record<PromptTarget, string>> }): Promise<SceneRow> {
   const row = await getScene(deps, ctx, id)
   const fields = patch.fields ? { ...draftFields(row), ...cleanFields(patch.fields) } : draftFields(row)
   let prompts = scenePrompts(row.prompts)
@@ -128,6 +128,14 @@ export async function updateScene(deps: Deps, ctx: Ctx, id: string, patch: { bri
     const before = prompts[target]
     const source = patch.fromTemplate ? 'template' as const : before?.text === text ? before.source : 'owner' as const
     prompts = { ...prompts, [target]: text.trim() ? { ...before, text: text.slice(0, MAX_PROMPT), source, at: deps.clock.now().toISOString(), words: wordCount(text) } : undefined }
+  }
+  // The director's notes, edited by the owner: kept with the prompt and
+  // followed by the next Rewrite.
+  for (const [target, notes] of Object.entries(patch.notes ?? {}) as Array<[PromptTarget, string]>) {
+    const before = prompts[target]
+    if (!before) continue
+    const clean = notes.replace(/\s+/g, ' ').trim().slice(0, 600)
+    prompts = { ...prompts, [target]: { ...before, ...(clean ? { notes: clean, notesBy: 'owner' as const } : { notes: undefined, notesBy: undefined }) } }
   }
   const [out] = await deps.db.update(scenes).set({
     brief: patch.brief !== undefined ? patch.brief.slice(0, 2000) : row.brief,

@@ -92,11 +92,11 @@ scene:
   # {wearing} is built from the outfit, footwear and jewelry fields (each
   # optional); {brand_line} is present while the scene is brand-free.
   base: |
-    {reference} {moment}. {setting}.
+    {reference} {moment}. {task_line} {setting}.
     {wearing}
     {makeup}. Hair: {hair}. {pose}, {expression}.
     {marks}
-    {camera}, {framing}, {height}. {light}.
+    {camera}{camera_extra}, {framing}, {height}. {light}.
     {colors}
     {brand_line}
   brand_free: "Everything {subj} wears and holds is plain and unbranded, with no logos or readable text."
@@ -144,17 +144,33 @@ clone:
 # and the REALISM and AVOID blocks. Word ranges live in scenes.yaml
 # (settings.prompt_words).
 prompt_writer:
+  # Owner, 2026-10-13: the writer follows the ultra-realism guide (Capture,
+  # Behavior, Consequences: who records, what the character is doing, what
+  # interrupts them, and the small reaction), then the director's pass.
   still_system: |
-    You write the final prompt for an image model: one candid photo of
-    {name}, an original, fictional adult character, in everyday life.
-    Write it as natural sentences that describe a real moment as it
-    happens, the way you would describe a photo a friend just took: the
-    action in progress, the place, what {subj} wears, the light, who is
-    holding the camera and from where, and one or two small real-life
-    details that make it feel unposed.
+    You write the final prompt for an image model: one candid phone photo
+    of {name}, an original, fictional adult character, in everyday life.
+    Direct a believable photo of a real moment: who takes it, what {subj} is
+    doing, what interrupts {obj}, and the small reaction the photo catches.
+    Write natural sentences that name:
+    - Camera ownership: who takes the photo, the front or rear camera, from
+      where, and about how far away. The angle must fit that person.
+    - An ordinary task {subj} is busy with, the one small real thing that
+      catches {poss} attention, and the small reaction the photo catches (a
+      glance, a half-smile, a pause), never a pose for the camera.
+    - The light: a named source (a window, the low sun, a pendant lamp) and
+      where it is relative to the camera.
+    - One cause-and-effect camera imperfection that fits the moment (the
+      moving hand is slightly blurred; focus lands on the nearer cup; the
+      frame is a little off-center because the friend was laughing).
+    - Physical contact for hands and props: what {subj} holds and how, and
+      where things rest.
+    - End with a short exclusion list for this scene only (for example: no
+      posed smile, no morphing fingers, no duplicated people).
+    {directors_pass}
     Rules:
-    - {min} to {max} words. One paragraph, present tense. No lists,
-      headings, labels or quotation marks.
+    - {min} to {max} words. One paragraph, present tense. No headings,
+      labels or quotation marks.
     - Use every detail given. Add only small, believable details that do
       not contradict them.
     - Never describe {name}'s face, eyes, eye color, hair color, skin or
@@ -174,28 +190,77 @@ prompt_writer:
     Write the prompt.
   video_system: |
     You write the prompt for an image-to-video model that turns a still
-    photo of {name}, an original, fictional adult character, into a real
-    video. The attached still is the first frame{end_frame}. Write ONLY
-    the motion: what {name} does, how {subj} moves, how {poss} expression
-    changes, and at most one slow camera move.
+    photo of {name}, an original, fictional adult character, into a
+    believable phone video. The attached still is the first frame{end_frame}.
+    Direct a real recording: who records it, the ordinary task, the one
+    thing that interrupts it, the small reaction, and the return to the
+    task. Write exactly these labeled lines, each on its own line, in this
+    order, and nothing before or after them:
+    FORMAT: (the Studio fills this line in)
+    SUBJECT: {name} exactly as in the start frame: the same face, hair and
+    outfit. Never describe how {subj} looks.
+    SETTING/LIGHT: the place as in the start frame, in a few words, then the
+    light source by name and its direction relative to the camera.
+    CAMERA: who records, the front or rear camera, the position and the
+    distance; small human hand movement; one or two cause-and-effect
+    imperfections (an event, the camera's response, the recovery).
+    ACTION: the ordinary task, then one trigger, a small reaction, and the
+    return to the task, in order, with rough timing.
+    CONTINUITY: hands and props: contact before anything moves, the same
+    grip, where each thing ends up and stays.
+    AUDIO: (the Studio fills this line in)
+    CONSTRAINTS: a short exclusion list for this scene only.
+    {directors_pass}
     Rules:
-    - {min} to {max} words. One paragraph, present tense. No lists,
-      headings, labels or quotation marks.
-    - Motion only. Never describe the place, the outfit, the light, the
-      other people's looks or how {name} looks: the start frame already
-      shows all of it. Do not repeat the setting words of the idea.
-    - Calm, natural motion keeps the face steady: small movements, no
-      fast turns, no talking, singing or shouting.
+    - {min} to {max} words in all. Present tense.
+    - Calm, natural motion keeps the face steady: small movements, no fast
+      turns, no talking, singing or shouting.
     - These directions are added after your text, so never contradict
       them: {directions}
     - Never describe {name}'s face, eyes, hair color or skin, and never
       use words like flawless, smooth skin or airbrushed.
     - {name} is an adult. Never nudity or sexual content.
   video_prompt: |
-    The idea for this clip (use it for the motion only):
+    The idea for this clip:
     {motion}
 
-    Write only the motion.
+    From the scene (use what fits; the start frame shows the rest):
+    {facts}
+
+    Write the labeled lines.
+  # The two lines the Studio always writes itself (defaults: 9:16, sound
+  # off unless the owner turns it on).
+  video_format: "FORMAT: {duration} s, {aspect}, live-action personal phone video, one continuous take, no cuts."
+  video_audio_off: "AUDIO: Sound off: silent, no dialogue, no music."
+  video_audio_on: "AUDIO: Phone-microphone sound: natural location ambience and small sounds with their visible causes, no added music."
+  # The director's pass (owner, 2026-10-13; default rule
+  # scene-directors-pass): decide what makes the shot memorable, keep it
+  # phone-real, and return the choices as a short "Director's notes" line
+  # the owner can edit.
+  directors_still: |
+    Before writing, think like a film director and DP making this photo
+    memorable while it stays phone-real and believable. Decide: the one
+    moment the viewer remembers; the hook at first glance (the angle, the
+    face, a gesture); depth (a foreground element, {name}, life in the
+    background); motivated light that sets the mood; one contrast (still
+    against moving, calm against busy). Return them as "notes": one short
+    line such as "Moment: ... · Hook: ... · Depth: ... · Light: ... ·
+    Contrast: ...". Then write the prompt so it carries them out.
+  directors_video: |
+    Before writing, think like a film director and DP making this clip
+    memorable while it stays phone-real and believable. Decide: the one
+    moment the viewer remembers; the hook in the first second (motion,
+    angle, face); the payoff in the last 2 seconds (a look to the lens, a
+    reveal, a laugh, a punchline); what the camera reveals and when, with
+    one move only (a push in, a pan or a pull back); depth (a foreground
+    element, {name}, life in the background); motivated light that sets the
+    mood; one contrast (still against moving, calm against busy). Return
+    them as "notes": one short line such as "Moment: ... · Hook: ... ·
+    Payoff: ... · Camera: ... · Depth: ... · Light: ... · Contrast: ...".
+    Then write the prompt so it carries them out.
+  notes_given: |
+    The owner set these director's notes. Follow them, and return them
+    unchanged as "notes": {notes}
   end_frame: ", and the clip ends on a second still the model is also given"
 
 # The content builder (owner, 2026-10-13). Overlay text for slideshows and

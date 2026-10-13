@@ -14,7 +14,7 @@ import { jobs as jobsTable } from '../db/schema.js'
 import { eq } from 'drizzle-orm'
 import { loadConfig } from '../config/load.js'
 import { assembleStillPrompt, cleanWritten, sceneFieldsSchema } from '../core/scenes.js'
-import { assembleVideoPrompt, mockWrittenPrompt } from '../core/promptWriter.js'
+import { assembleVideoPrompt, cleanWriterOutput, enforceVideoLines, isLabeled, mockWrittenPrompt } from '../core/promptWriter.js'
 import { wordCount } from '../core/text.js'
 import type { LlmRequest } from '../providers/types.js'
 
@@ -50,23 +50,29 @@ beforeAll(async () => {
 describe('the prompt writer (default on)', () => {
   let sceneId: string
 
-  it('writes the still prompt from the details: natural sentences, 110 to 150 words, priced with its model', async () => {
+  it('writes the still prompt from the details: natural sentences, 120 to 170 words, the guide\'s method and the director\'s notes, priced with its model', async () => {
     sceneId = (await createScene(h.deps, h.ctx, characterId, { brief: 'Callie buys peaches at a busy farmers market', fields: { outfit: 'a faded denim jacket over a white tank', footwear: 'worn white sneakers' } })).id
     const before = await view(sceneId)
     expect(before.prompts.still).toBeNull()
     expect(before.templateText).toMatch(/^Callie buys peaches at a busy farmers market\./)
     const { quote, preview, jobs } = await run({ type: 'scene_prompt', characterId, sceneId, target: 'still' })
     expect(quote.models).toEqual(['Demo mock, free'])
-    expect(preview.prompts[0]!.text).toMatch(/110 to 150 words/)
+    expect(preview.prompts[0]!.text).toMatch(/120 to 170 words/)
+    // The ultra-realism guide's method and the director's pass (defaults).
+    expect(preview.prompts[0]!.text).toMatch(/Camera ownership: who takes the photo, the front or rear camera/)
+    expect(preview.prompts[0]!.text).toMatch(/cause-and-effect camera imperfection/)
+    expect(preview.prompts[0]!.text).toMatch(/think like a film director and DP/)
     expect(preview.prompts[0]!.text).toContain('- Outfit: a faded denim jacket over a white tank.')
     // The Studio's own lines are not the writer's job.
     expect(preview.prompts[0]!.text).not.toMatch(/LEFT|RIGHT/)
     expect((await getJob(h.deps, h.ctx, jobs[0]!.id)).status).toBe('completed')
     const written = (await view(sceneId)).prompts.still!
     expect(written).toMatchObject({ source: 'claude', model: 'Demo mock, free', stale: false })
-    expect(written.words).toBeGreaterThanOrEqual(110)
-    expect(written.words).toBeLessThanOrEqual(150)
+    expect(written.words).toBeGreaterThanOrEqual(120)
+    expect(written.words).toBeLessThanOrEqual(170)
     expect(written.text).not.toContain('REALISM:')
+    expect(written).toMatchObject({ notesBy: 'claude' })
+    expect(written.notes).toMatch(/^Moment: .+ · Hook: /)
   })
 
   it('Generate uses it; the Studio adds the reference line, the mark sides and the REALISM and AVOID blocks', async () => {
@@ -124,7 +130,7 @@ describe('the prompt writer (default on)', () => {
     expect(preview.prompts[0]!.text).toMatch(/REALISM: .{20,}/)
   })
 
-  it('writes the motion only (40 to 80 words), looking at the start frame; the take adds the directions, silence and REALISM', async () => {
+  it('writes the video prompt in the guide\'s labeled lines, looking at the start frame; FORMAT and AUDIO are the Studio\'s; the take adds the directions, silence and REALISM', async () => {
     await run(generate(sceneId))
     const still = (await sceneCandidates(h.deps, h.ctx, [sceneId])).find(c => c.op === 'generate' && c.assetId)!
     const action: StudioAction = { type: 'scene_prompt', characterId, sceneId, target: 'video', motion: 'Callie bites into a peach and laughs', directions: 'No talking, no winking, steady eye contact.', startCandidateId: still.id }
@@ -132,25 +138,55 @@ describe('the prompt writer (default on)', () => {
     expect(quote.models).toEqual(['Demo mock, free'])
     const seen = (await getJob(h.deps, h.ctx, jobs[0]!.id)).request as LlmRequest & { imageAssetIds?: string[] }
     expect(seen.imageAssetIds).toEqual([still.assetId])
-    expect(seen.system).toMatch(/40 to 80 words/)
+    expect(seen.system).toMatch(/110 to 180 words/)
     expect(seen.system).toContain('No talking, no winking, steady eye contact.')
-    // Motion only: the still's scene description is not handed to the writer.
-    expect(seen.system).toMatch(/Write ONLY\s+the motion/)
-    expect(seen.prompt).not.toMatch(/scene in the still/i)
+    expect(seen.system).toMatch(/Write exactly these labeled lines/)
+    expect(seen.system).toMatch(/the payoff in the last 2 seconds/)
+    // The start frame shows the place: the setting is not handed over.
     expect(seen.prompt).not.toContain('farmers market')
     const written = (await view(sceneId)).prompts.video!
-    expect(written).toMatchObject({ source: 'claude', motion: 'Callie bites into a peach and laughs' })
-    expect(written.words).toBeGreaterThanOrEqual(40)
-    expect(written.words).toBeLessThanOrEqual(80)
+    expect(written).toMatchObject({ source: 'claude', motion: 'Callie bites into a peach and laughs', notesBy: 'claude' })
+    const lines = written.text.split('\n')
+    expect(lines.map(l => l.split(':')[0])).toEqual(['FORMAT', 'SUBJECT', 'SETTING/LIGHT', 'CAMERA', 'ACTION', 'CONTINUITY', 'AUDIO', 'CONSTRAINTS'])
+    // 9:16 and sound off unless the owner turns it on.
+    expect(lines[0]).toBe('FORMAT: 5 s, 9:16, live-action personal phone video, one continuous take, no cuts.')
+    expect(lines[6]).toBe('AUDIO: Sound off: silent, no dialogue, no music.')
+    expect(written.words).toBeGreaterThanOrEqual(110)
+    expect(written.words).toBeLessThanOrEqual(180)
     // The box holds the written motion; the take sends exactly that.
     const take = await estimateAction(h.deps, h.ctx, {
       type: 'scene_video', characterId, candidateId: still.id, motion: written.text,
       directions: 'No talking, no winking, steady eye contact.', durationSec: 5, aspect: '9:16', audio: false, takes: 1, test: false,
     })
     const text = take.preview.prompts[0]!.text
-    expect(text.startsWith(written.text.slice(0, 40))).toBe(true)
-    expect(text).toContain('No talking, no winking, steady eye contact. Silent, no audio, no dialogue.')
+    // The labeled lines go as written, one per line, then the directions.
+    expect(text.startsWith(written.text)).toBe(true)
+    expect(text).toContain('\nNo talking, no winking, steady eye contact. Silent, no audio, no dialogue.\n')
     expect(text).toMatch(/\nREALISM: .{20,}/)
+  })
+
+  it('Rewrite follows the director\'s notes you set; sound on writes the sound line', async () => {
+    const still = (await sceneCandidates(h.deps, h.ctx, [sceneId])).find(c => c.op === 'generate' && c.assetId)!
+    await updateScene(h.deps, h.ctx, sceneId, { notes: { video: 'Moment: the first bite · Hook: juice on the chin · Payoff: a laugh to the lens · Camera: slow push in' } })
+    expect((await view(sceneId)).prompts.video).toMatchObject({ notesBy: 'owner' })
+    const notes = (await view(sceneId)).prompts.video!.notes!
+    const { jobs } = await run({ type: 'scene_prompt', characterId, sceneId, target: 'video', motion: 'Callie bites into a peach and laughs', startCandidateId: still.id, notes, audio: true, durationSec: 10 })
+    const seen = (await getJob(h.deps, h.ctx, jobs[0]!.id)).request as LlmRequest
+    expect(seen.system).toContain(`The owner set these director's notes. Follow them, and return them\nunchanged as "notes": ${notes}`)
+    const written = (await view(sceneId)).prompts.video!
+    expect(written).toMatchObject({ notes, notesBy: 'owner' })
+    expect(written.text.split('\n')[0]).toBe('FORMAT: 10 s, 9:16, live-action personal phone video, one continuous take, no cuts.')
+    expect(written.text).toContain('AUDIO: Phone-microphone sound')
+  })
+
+  it('the director\'s pass is a default the owner can switch off', async () => {
+    await setRuleSwitch(h.deps, h.ctx, { ruleId: 'scene-directors-pass', on: false })
+    try {
+      const { preview } = await estimateAction(h.deps, h.ctx, { type: 'scene_prompt', characterId, sceneId, target: 'still' })
+      expect(preview.prompts[0]!.text).not.toMatch(/film director/)
+    } finally {
+      await setRuleSwitch(h.deps, h.ctx, { ruleId: 'scene-directors-pass', on: null })
+    }
   })
 })
 
@@ -181,17 +217,29 @@ describe('prompt writer pieces', () => {
   it('drops a REALISM or AVOID block from written text; the Studio adds its own', () => {
     expect(cleanWritten('"Callie laughs."\nREALISM: none\nAVOID: x')).toBe('Callie laughs.')
     expect(assembleVideoPrompt(t, 'Callie laughs.\nREALISM: none', { directions: 'No winking.', audio: false, realism: ch.realism.block }))
-      .toBe('Callie laughs. No winking. Silent, no audio, no dialogue.\nREALISM: visible pores, fine peach fuzz, slight redness around the nose.')
+      .toBe('Callie laughs. No winking. Silent, no audio, no dialogue.\nREALISM: visible pores, fine peach fuzz, slight redness around the nose. No beauty smoothing, no retouching.')
     expect(assembleVideoPrompt(t, 'Callie laughs, her smooth skin glowing.', { directions: '', audio: true })).not.toMatch(/smooth skin/)
+  })
+
+  it('labeled video answers keep one line per label; FORMAT and AUDIO are always the Studio\'s', () => {
+    const answer = '"FORMAT: 15 s, 16:9, cinematic.\nSUBJECT: Callie as in the start frame.\nSETTING/LIGHT: A cafe; window light from camera-left,\nfalling across the table.\nCAMERA: A friend on the rear camera, about 1 metre away.\nACTION: She stirs her coffee, hears her name, smiles, and stirs again.\nCONTINUITY: The spoon stays in her right hand.\nCONSTRAINTS: No posed smile, flawless skin.\nREALISM: none"'
+    const { text, removed } = cleanWriterOutput(answer)
+    expect(text.split('\n')[2]).toBe('SETTING/LIGHT: A cafe; window light from camera-left, falling across the table.')
+    expect(text).not.toMatch(/REALISM|flawless/)
+    expect(removed).toContain('flawless')
+    const fixed = enforceVideoLines(text, { format: 'FORMAT: 5 s, 9:16, live-action personal phone video, one continuous take, no cuts.', audio: 'AUDIO: Sound off: silent, no dialogue, no music.' })
+    expect(fixed.split('\n').map(l => l.split(':')[0])).toEqual(['FORMAT', 'SUBJECT', 'SETTING/LIGHT', 'CAMERA', 'ACTION', 'CONTINUITY', 'AUDIO', 'CONSTRAINTS'])
+    expect(fixed).not.toMatch(/16:9|cinematic/)
   })
 
   it('demo answers stay inside the word ranges', () => {
     const still = mockWrittenPrompt('still', { facts: '- The moment: Callie laughs.' }, [110, 150])
     expect(wordCount(still)).toBeGreaterThanOrEqual(110)
     expect(wordCount(still)).toBeLessThanOrEqual(150)
-    const video = mockWrittenPrompt('video', { motion: 'Callie turns' }, [40, 80])
-    expect(wordCount(video)).toBeGreaterThanOrEqual(40)
-    expect(wordCount(video)).toBeLessThanOrEqual(80)
+    const video = mockWrittenPrompt('video', { motion: 'Callie turns' }, [110, 180])
+    expect(wordCount(video)).toBeGreaterThanOrEqual(110)
+    expect(wordCount(video)).toBeLessThanOrEqual(180)
+    expect(isLabeled(video)).toBe(true)
   })
 })
 

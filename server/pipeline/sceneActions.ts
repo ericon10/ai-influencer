@@ -8,9 +8,9 @@ import { pronounVars } from '../core/prompts.js'
 import type { RealismWarning } from '../core/realism.js'
 import {
   aspectFor, assembleStillPrompt, buildEditPrompt, buildScenePrompt, comboConflict, comboEntryFor, mockSceneIdeas, oneChangeProblem, plannerRules,
-  sceneIdeasJsonSchema, scenePlanJsonSchema, scenePlanPrompt, writerFacts, type ReferenceMode, type SceneFields,
+  sceneIdeasJsonSchema, scenePlanJsonSchema, scenePlanPrompt, skinFor, videoWriterFacts, writerFacts, type ReferenceMode, type SceneFields,
 } from '../core/scenes.js'
-import { assembleVideoPrompt, mockWrittenPrompt, promptWriterJsonSchema, scenePrompts, type PromptTarget } from '../core/promptWriter.js'
+import { assembleVideoPrompt, mockDirectorNotes, mockWrittenPrompt, promptWriterSchema, scenePrompts, type PromptTarget } from '../core/promptWriter.js'
 import { sha256Hex } from '../lib/passwords.js'
 import { ruleSwitches } from './rules.js'
 import { idealObservation } from '../core/qa/ideal.js'
@@ -145,6 +145,10 @@ function mockPlan(deps: Deps, ch: Ch, brief: string): SceneFields {
     title: words.split(/\s+/).slice(0, 4).join(' ') || 'Everyday moment',
     momentType, camera,
     moment: `${ch.name} ${words ? words.charAt(0).toLowerCase() + words.slice(1) : 'walks to a neighborhood cafe'}`,
+    task: 'carrying an iced coffee and checking the street signs',
+    trigger: `a friend calling ${ch.pronouns.poss} name from behind`,
+    distance: 'about 2 metres',
+    phone: 'rear',
     setting: 'A sunny neighborhood street with a few people in the background',
     location: 'Neighborhood street',
     outfit: 'a white cotton tee tucked into light-wash straight jeans',
@@ -224,7 +228,7 @@ export function stillBasis(deps: Deps, ch: Ch, f: SceneFields): string {
   return sha256Hex(writerFacts(templates, sc, views, f, ch))
 }
 
-export interface PromptWriteInput { sceneId: string; target: PromptTarget; motion?: string; directions?: string; startCandidateId?: string; endCandidateId?: string }
+export interface PromptWriteInput { sceneId: string; target: PromptTarget; motion?: string; directions?: string; startCandidateId?: string; endCandidateId?: string; notes?: string; durationSec?: number; audio?: boolean; aspect?: string }
 
 export async function buildScenePromptWrite(deps: Deps, ctx: Ctx, row: CharacterRow, input: PromptWriteInput): Promise<SceneBuilt> {
   const scene = await getScene(deps, ctx, input.sceneId)
@@ -236,22 +240,33 @@ export async function buildScenePromptWrite(deps: Deps, ctx: Ctx, row: Character
   const pv = pronounVars(ch.pronouns)
   const purpose = `scene_prompt:${scene.id}:${input.target}`
   const label = sceneLabel(scene, f)
+  // The director's pass (default rule scene-directors-pass): the writer
+  // decides what makes the shot memorable and returns it as notes; notes the
+  // owner set are followed as given.
+  const sw = await ruleSwitches(deps, ctx, row.id)
+  const directors = sw.on('scene-directors-pass')
+  const notes = directors ? (input.notes ?? '').trim().slice(0, 600) : ''
+  const pass = !directors ? '' : [
+    fill(input.target === 'still' ? t.prompt_writer.directors_still : t.prompt_writer.directors_video, { name: ch.name }),
+    notes ? fill(t.prompt_writer.notes_given, { notes }) : '',
+  ].filter(Boolean).join('\n')
+  const directorsMeta = directors ? { directors: true, mockNotes: notes || mockDirectorNotes(input.target), ...(notes ? { notes } : {}) } : {}
   const llm = (system: string, prompt: string, extra: { imageAssetIds?: string[]; meta: Record<string, unknown> }): SceneBuilt => ({
     purpose,
     preview: { title: input.target === 'still' ? 'Write the prompt' : 'Write the video prompt', prompts: [{ label: 'Prompt writer', text: `${system}\n${prompt}`, wrapped: hardWrap(`${system}\n${prompt}`) }], warnings: [], invalidates: [] },
     specs: [{
       type: 'llm', stage: 'scene', purpose, label: `${input.target === 'still' ? 'Write the prompt' : 'Write the video prompt'}, ${label}`,
       request: {
-        model: route.model, system, prompt, schema: promptWriterJsonSchema, schemaName: 'scene_prompt', maxTokens: 1200, effort: route.effort ?? 'medium',
+        model: route.model, system, prompt, schema: promptWriterSchema(directors), schemaName: 'scene_prompt', maxTokens: 1600, effort: route.effort ?? 'medium',
         ...(extra.imageAssetIds?.length ? { imageAssetIds: extra.imageAssetIds } : {}),
-        meta: { sceneId: scene.id, target: input.target, ...extra.meta },
+        meta: { sceneId: scene.id, target: input.target, ...directorsMeta, ...extra.meta },
       },
     }],
   })
   if (input.target === 'still') {
     const range = sc.settings.prompt_words.still
     const facts = writerFacts(t, sc, views, f, ch)
-    const system = fill(t.prompt_writer.still_system, { ...pv, name: ch.name, min: String(range[0]), max: String(range[1]) })
+    const system = fill(t.prompt_writer.still_system, { ...pv, name: ch.name, min: String(range[0]), max: String(range[1]), directors_pass: pass })
     const prompt = fill(t.prompt_writer.still_prompt, { name: ch.name, facts })
     return llm(system, prompt, { meta: { basis: sha256Hex(facts), mockPrompt: mockWrittenPrompt('still', { facts }, range) } })
   }
@@ -261,12 +276,17 @@ export async function buildScenePromptWrite(deps: Deps, ctx: Ctx, row: Character
   const start = input.startCandidateId ? await getCandidate(deps, ctx, input.startCandidateId) : null
   if (start && (start.sceneId !== scene.id || !start.assetId || isVideoCandidate(start))) throw new AppError('bad_request', 'The start frame must be a still from this scene.')
   const directions = (input.directions ?? sc.video.directions).trim()
-  // Motion only (owner, 2026-10-13): the idea goes in for what happens; the
-  // still's scene description does not (the start frame shows the scene).
+  // The guide's labeled lines (owner, 2026-10-13). The start frame shows the
+  // place and the look, so the writer gets the idea and only the scene's
+  // task, trigger, camera and light; the Studio writes FORMAT (9:16 by
+  // default) and AUDIO (sound off unless turned on) itself.
   const range = sc.settings.prompt_words.video
-  const system = fill(t.prompt_writer.video_system, { ...pv, name: ch.name, min: String(range[0]), max: String(range[1]), directions, end_frame: input.endCandidateId ? t.prompt_writer.end_frame : '' })
-  const prompt = fill(t.prompt_writer.video_prompt, { motion })
-  return llm(system, prompt, { imageAssetIds: start?.assetId ? [start.assetId] : [], meta: { motion, directions, mockPrompt: mockWrittenPrompt('video', { motion }, range) } })
+  const system = fill(t.prompt_writer.video_system, { ...pv, name: ch.name, min: String(range[0]), max: String(range[1]), directions, end_frame: input.endCandidateId ? t.prompt_writer.end_frame : '', directors_pass: pass })
+  const facts = videoWriterFacts(t, sc, views, f, ch)
+  const prompt = fill(t.prompt_writer.video_prompt, { motion, facts })
+  const format = fill(t.prompt_writer.video_format, { duration: String(input.durationSec ?? sc.video.duration), aspect: input.aspect ?? sc.video.aspect })
+  const audio = input.audio ? t.prompt_writer.video_audio_on : t.prompt_writer.video_audio_off
+  return llm(system, prompt, { imageAssetIds: start?.assetId ? [start.assetId] : [], meta: { motion, directions, format, audioLine: audio, mockPrompt: mockWrittenPrompt('video', { motion, name: ch.name, subj: ch.pronouns.subj, poss: ch.pronouns.poss, format, audio }, range) } })
 }
 
 // ── Generate: stills for one scene, on one or two models ────────────
@@ -327,7 +347,9 @@ export async function buildSceneRun(deps: Deps, ctx: Ctx, row: CharacterRow, inp
   // "Write and generate": the writer runs first; every still waits for it
   // and takes its text (until then each holds the template prompt, which is
   // what the quote and the checks below see).
-  const writer = input.write ? (await buildScenePromptWrite(deps, ctx, row, { sceneId: scene.id, target: 'still' })).specs[0]! : null
+  // Notes the owner set on the still prompt are followed by the writer.
+  const ownNotes = scenePrompts(scene.prompts).still
+  const writer = input.write ? (await buildScenePromptWrite(deps, ctx, row, { sceneId: scene.id, target: 'still', ...(ownNotes?.notesBy === 'owner' && ownNotes.notes ? { notes: ownNotes.notes } : {}) })).specs[0]! : null
   if (writer) specs.push(writer)
   if (sw.on('scene-prompt-writer') && !written && !input.write) {
     warnings.push({ ruleId: 'scene-prompt-writer', spec: '9', title: 'No written prompt yet', severity: 'warning', message: 'This run uses the template prompt. Write the prompt above Generate to use natural sentences instead.' })
@@ -436,7 +458,7 @@ export async function buildSceneEdit(deps: Deps, ctx: Ctx, row: CharacterRow, in
   const ref00 = (await approvedAssets(deps, ctx, row.id)).get('REF-00')
   if (input.face && !ref00) throw new AppError('bad_request', 'A face edit attaches REF-00. Approve REF-00 first.')
   const realism: RealismWarning[] = []
-  const prompt = buildEditPrompt(templates, input.change, ch, input.face, { warnings: realism, flawDose: sw.on('realism-flaw-dose') })
+  const prompt = buildEditPrompt(templates, input.change, ch, input.face, { warnings: realism, flawDose: sw.on('realism-flaw-dose'), skin: skinFor(sc, f.framing) })
   const request: GenRequest = {
     kind: 'image_edit', model: run.model, prompt, aspect: aspectFor(sc, f), quality: sc.settings.quality, resolution: sc.settings.resolution,
     refs: [{ assetId: cand.assetId }, ...(input.face && ref00 ? [{ assetId: ref00 }] : [])],
@@ -518,7 +540,7 @@ export async function buildSceneVideo(deps: Deps, ctx: Ctx, row: CharacterRow, i
   const motion = input.motion.trim().replace(/[.\s]+$/, '')
   if (motion.length < 3) throw new AppError('invalid_request', 'Say what happens in the video.')
   const ch = toData(row)
-  const prompt = assembleVideoPrompt(t, `${motion}.`, { directions: input.directions, audio: input.audio, realism: ch.realism?.block })
+  const prompt = assembleVideoPrompt(t, `${motion}.`, { directions: input.directions, audio: input.audio, realism: ch.realism?.block, skin: skinFor(sc, sceneFields(deps, scene).framing) })
   const request: GenRequest = {
     kind: 'video', model: run.model, prompt, aspect: input.aspect, resolution, durationSec, audio: input.audio,
     startFrame: { assetId: start.assetId },

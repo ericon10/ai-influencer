@@ -141,6 +141,8 @@ const templatesSchema = z.object({
   prompt_writer: z.object({
     still_system: z.string(), still_prompt: z.string(), video_system: z.string(), video_prompt: z.string(),
     end_frame: z.string(),
+    video_format: z.string(), video_audio_off: z.string(), video_audio_on: z.string(),
+    directors_still: z.string(), directors_video: z.string(), notes_given: z.string(),
   }),
 })
 
@@ -165,7 +167,7 @@ const scenesSchema = z.object({
   moments: z.array(preset).min(1),
   cameras: z.array(preset.extend({ text: z.string(), foreground: z.string().optional() })).min(1),
   heights: z.array(preset.extend({ text: z.string() })).min(1),
-  framings: z.array(preset.extend({ text: z.string(), identity: z.enum(['check', 'skip']).default('check') })).min(1),
+  framings: z.array(preset.extend({ text: z.string(), identity: z.enum(['check', 'skip']).default('check'), skin: z.enum(['full', 'natural', 'none']).default('full') })).min(1),
   lights: z.array(preset.extend({ text: z.string() })).min(1),
   expressions: z.array(preset.extend({ text: z.string(), ref_expression: z.string().optional() })).min(1),
   makeup: z.array(preset).min(1),
@@ -173,8 +175,12 @@ const scenesSchema = z.object({
   color_triggers: z.string(),
   edits: z.object({
     drift_lock: z.string(),
-    presets: z.array(preset.extend({ text: z.string(), face: z.boolean().default(false) })),
+    presets: z.array(preset.extend({ text: z.string(), face: z.boolean().default(false), group: z.enum(['quick', 'diagnose']).default('quick') })),
   }),
+  // The ultra-realism guide's "Diagnose and revise" table (owner,
+  // 2026-10-13): a symptom and its first useful revision, shown under the
+  // video prompt. The rows a still edit can fix are also edit presets.
+  diagnose: z.array(z.object({ symptom: z.string(), revision: z.string() })).default([]),
   video: z.object({
     model: z.string(),
     // The models the owner picks from, each with its resolution if it has one.

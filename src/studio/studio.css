@@ -818,3 +818,8 @@ button.st-chip:hover { color: var(--st-text); border-color: var(--st-text-3); }
 .st-directions summary { cursor: pointer; padding: 2px 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .st-directions[open] summary { white-space: normal; }
 .st-directions .st-textarea { margin-top: 6px; font-size: 13px; }
+
+/* The director's notes above a prompt (default rule scene-directors-pass). */
+.st-notes { margin: 2px 0 6px; }
+.st-notes-edit { font-size: 13px; line-height: 1.45; background: var(--st-surface-2, rgba(255, 255, 255, 0.03)); }
+.st-diagnose { margin: 6px 0; padding-left: 18px; display: grid; gap: 4px; font-size: 13px; }

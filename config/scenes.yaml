@@ -28,7 +28,8 @@ settings:
   defaults: { momentType: caught_mid_action, camera: friend_phone, light: natural }
   # The prompt writer's length, in words, for the text it writes (the
   # Studio's added lines and the REALISM block come on top).
-  prompt_words: { still: [110, 150], video: [40, 80] }
+  # The video prompt is labeled lines (FORMAT to CONSTRAINTS), so it is longer.
+  prompt_words: { still: [120, 170], video: [110, 180] }
 
 # Moment types (the first column of the combo log).
 moments:
@@ -83,12 +84,17 @@ heights:
   - { id: high, label: "High, looking down", text: "from a high angle looking down" }
   - { id: low, label: "Low angle", text: "from a low angle" }
 
+# `skin` is how much skin detail the REALISM block names at this framing
+# (owner, 2026-10-13, from the ultra-realism guide): full (pores, peach fuzz,
+# stray hairs) close and chest-up, "natural skin texture" waist-up, none
+# full-body and wide. "No beauty smoothing, no retouching" always stays.
+# Sheet shots use the same ids.
 framings:
-  - { id: chest_up, label: "Close, chest-up", text: "chest-up framing" }
-  - { id: waist_up, label: "Waist-up", text: "waist-up framing" }
-  - { id: knees_up, label: "Knees up", text: "framed from the knees up" }
-  - { id: full_body, label: "Full body", text: "full-body framing with a little space around {obj}" }
-  - { id: wide_small, label: "Wide, small in frame", text: "wide shot, {subj} is small in the frame", identity: skip }
+  - { id: chest_up, label: "Close, chest-up", text: "chest-up framing", skin: full }
+  - { id: waist_up, label: "Waist-up", text: "waist-up framing", skin: natural }
+  - { id: knees_up, label: "Knees up", text: "framed from the knees up", skin: natural }
+  - { id: full_body, label: "Full body", text: "full-body framing with a little space around {obj}", skin: none }
+  - { id: wide_small, label: "Wide, small in frame", text: "wide shot, {subj} is small in the frame", identity: skip, skin: none }
 
 lights:
   - { id: natural, label: "Natural light", text: "Natural available light that fits the place and the time of day" }
@@ -137,6 +143,28 @@ edits:
     - { id: close_mouth, label: "Close her mouth", text: "Close {poss} mouth into a relaxed, natural expression", face: true }
     - { id: remove_logo, label: "Remove a logo or text", text: "Remove the {thing}, leaving that surface plain and unbranded" }
     - { id: remove_jewelry, label: "Remove extra jewelry", text: "Remove the {thing}" }
+    # Diagnose and revise (the ultra-realism guide's table, owner
+    # 2026-10-13): the rows a one-change still edit can fix.
+    - { id: dx_plastic, group: diagnose, label: "Plastic face", hint: "Remove beauty language; restrained, distance-appropriate skin", text: "Restore real skin on {poss} face at this distance: visible pores and subtle color variation where the light reveals them, no beauty smoothing, no waxy sheen, the same person", face: true }
+    - { id: dx_staged, group: diagnose, label: "Staged performance", hint: "An ordinary task, one trigger, a small reaction", text: "Change {poss} expression to an unguarded reaction to something just off camera, a brief glance and a small half-smile, instead of a pose for the lens", face: true }
+    - { id: dx_hands, group: diagnose, label: "Hands or objects morph", hint: "Show contact; name the resting state", text: "Fix {poss} hand on the {thing}: five natural fingers in real contact with it, a steady grip, nothing floating" }
+    - { id: dx_background, group: diagnose, label: "Background looks synchronized", hint: "A few people, different small activities", text: "Give the people in the background different small activities, none looking at the camera, no duplicated people" }
+    - { id: dx_low_light, group: diagnose, label: "Low light looks synthetic", hint: "Name the practical source; keep its direction", text: "Light the scene only from the {thing} with one steady direction, and remove the unexplained rim light" }
+    - { id: dx_overprocessed, group: diagnose, label: "Looks overprocessed", hint: "One recording look; no HDR, sharpening or beauty", text: "Remove the overprocessed look: no oversharpening halos, no HDR glow, ordinary phone color and saturation" }
+
+# The ultra-realism guide's "Diagnose and revise" table (owner,
+# 2026-10-13), under the video prompt: when a take looks off, the first
+# useful revision to the prompt. Change one group at a time.
+diagnose:
+  - { symptom: "Plastic face", revision: "Check the reference; remove beauty language; ask for restrained, distance-appropriate skin." }
+  - { symptom: "Staged performance", revision: "Add an ordinary task, one trigger, a small reaction, and a return to the task." }
+  - { symptom: "Restless camera", revision: "Keep one operator and one reachable viewpoint; remove unmotivated moves and repeated focus hunting." }
+  - { symptom: "Hands or objects morph", revision: "Simplify the interaction; show contact before movement and name the final resting state." }
+  - { symptom: "Props reset after a cut", revision: "Carry the changed place, owner, fill level and direction into the next shot." }
+  - { symptom: "Background looks synchronized", revision: "Give a few people different small activities; fewer people." }
+  - { symptom: "Dialogue feels rushed", revision: "Shorten the line, leave silence, or simplify what happens at the same time." }
+  - { symptom: "Low light looks synthetic", revision: "Name the practical light sources; keep the light direction steady; no unexplained rim light." }
+  - { symptom: "Clip looks overprocessed", revision: "Remove VHS, grain, HDR, sharpening and beauty effects; choose one recording look." }
 
 # Video from a picked still (Stage 9, owner ruling 2026-10-13). Every value
 # is a default the owner can change on the video card.

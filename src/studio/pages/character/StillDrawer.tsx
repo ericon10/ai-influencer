@@ -215,8 +215,14 @@ function FixOne({ v, data, still, drift }: { v: CharacterView; data: ScenesData;
       {drift && <span className="st-hint" style={{ color: 'var(--st-warn)' }}>QA found face drift. An edit rarely fixes a face; a regenerate usually does. Your call.</span>}
       <div className="st-row" style={{ gap: 6, flexWrap: 'wrap' }}>
         {suggestions.map((s, i) => <button key={`qa${i}`} className="st-chip on" onClick={() => { setChange(s.change); setFace(s.face) }}>QA: {s.change.length > 48 ? `${s.change.slice(0, 48)}...` : s.change}</button>)}
-        {data.options.editPresets.map(p => <button key={p.id} className="st-chip" onClick={() => { setChange(p.text); setFace(p.face) }}>{p.label}</button>)}
+        {data.options.editPresets.filter(p => p.group !== 'diagnose').map(p => <button key={p.id} className="st-chip" onClick={() => { setChange(p.text); setFace(p.face) }}>{p.label}</button>)}
       </div>
+      {data.options.editPresets.some(p => p.group === 'diagnose') && (
+        <div className="st-row" style={{ gap: 6, flexWrap: 'wrap' }}>
+          <span className="st-hint">Diagnose and revise:</span>
+          {data.options.editPresets.filter(p => p.group === 'diagnose').map(p => <button key={p.id} className="st-chip" title={p.hint ? `First useful revision: ${p.hint}` : undefined} onClick={() => { setChange(p.text); setFace(p.face) }}>{p.label}</button>)}
+        </div>
+      )}
       <Field id="fix-change" label="The one change" required done={ready}>
         <textarea className="st-textarea" rows={2} style={{ minHeight: 0 }} maxLength={400} value={change} onChange={e => setChange(e.target.value)} placeholder="e.g. Remove the white logo on the cup in her right hand, leaving it plain" />
       </Field>

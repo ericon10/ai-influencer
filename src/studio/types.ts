@@ -30,6 +30,7 @@ export interface SceneFields {
   title: string; momentType: string; moment: string; setting: string; location: string
   outfit: string; footwear: string; jewelry: string; makeup: 'bare' | 'natural' | 'soft_glam'
   hair: string; pose: string; view: string; expression: string; camera: string; foreground: string
+  task: string; trigger: string; distance: string; phone: '' | 'rear' | 'front'
   height: string; framing: string; light: string; destination: string
   brands: boolean; refs: string[]
 }
@@ -69,6 +70,8 @@ export interface SceneView {
 export interface WrittenPrompt {
   text: string; source: 'claude' | 'owner' | 'template'; at: string; model?: string; words: number; stale: boolean
   motion?: string; directions?: string
+  // The director's notes (default rule scene-directors-pass) and who set them.
+  notes?: string; notesBy?: 'claude' | 'owner'
 }
 
 export interface ScenePreset { id: string; label: string; hint?: string }
@@ -83,10 +86,11 @@ export interface ScenesData {
     moments: ScenePreset[]; cameras: ScenePreset[]; lights: ScenePreset[]; framings: ScenePreset[]; expressions: ScenePreset[]; heights: ScenePreset[]
     autoQa: boolean; maxRefs: number; signatureJewelry: string[]
     makeup: ScenePreset[]; destinations: Array<ScenePreset & { aspect: string }>; views: ScenePreset[]
-    editPresets: Array<ScenePreset & { text: string; face: boolean }>
+    editPresets: Array<ScenePreset & { text: string; face: boolean; group: 'quick' | 'diagnose'; hint: string }>
+    diagnose: Array<{ symptom: string; revision: string }>
     stillModels: SceneModel[]; editModels: SceneModel[]; defaultModels: string[]
     maxVariations: number; maxModels: number; accountConnected: boolean; mode: 'demo' | 'live'
-    promptWriter: { on: boolean; model: string; words: { still: [number, number]; video: [number, number] }; realism: string }
+    promptWriter: { on: boolean; model: string; words: { still: [number, number]; video: [number, number] }; realism: string; directorsPass: boolean }
     video: {
       model: SceneModel; models: Array<SceneModel & { resolution: string | null }>; durations: number[]; duration: number; aspect: string; maxTakes: number; takes: number; directions: string
       test: { model: SceneModel; duration: number; label: string; note: string }
@@ -158,7 +162,7 @@ export type StudioAction =
   | { type: 'retry'; jobId: string }
   | { type: 'scene_plan'; characterId: string; sceneId: string }
   | { type: 'scene_ideas'; characterId: string; idea: string }
-  | { type: 'scene_prompt'; characterId: string; sceneId: string; target: 'still' | 'video'; motion?: string; directions?: string; startCandidateId?: string; endCandidateId?: string }
+  | { type: 'scene_prompt'; characterId: string; sceneId: string; target: 'still' | 'video'; motion?: string; directions?: string; startCandidateId?: string; endCandidateId?: string; notes?: string; durationSec?: number; audio?: boolean; aspect?: string }
   | { type: 'scene_video'; characterId: string; candidateId: string; endCandidateId?: string; model?: string; motion: string; directions: string; durationSec: number; aspect: string; audio: boolean; takes: number; test: boolean }
   | { type: 'scene_video_upscale'; characterId: string; candidateId: string }
   | { type: 'scene_end_frame'; characterId: string; candidateId: string; change: string; withQa?: boolean }

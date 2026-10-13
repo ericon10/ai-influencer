@@ -20,6 +20,7 @@ const FIELD_LABEL: Record<string, string> = {
   jewelry: 'Extra jewelry', makeup: 'Makeup', hair: 'Hair', pose: 'Pose and gaze', view: 'Angle', expression: 'Expression',
   camera: 'Camera', foreground: 'Foreground', framing: 'Framing', light: 'Light', destination: 'Where it goes', title: 'Title',
   height: 'Camera height', brands: 'Brands and logos', refs: 'Sheet refs',
+  task: 'Task', trigger: 'What catches the eye', distance: 'Camera distance', phone: 'Front or rear camera',
 }
 
 const ROLE: Record<string, string> = { face: 'Face', angle: 'Closest angle', body: 'Body', expression: 'Expression' }
@@ -31,9 +32,9 @@ const ROLE: Record<string, string> = { face: 'Face', angle: 'Closest angle', bod
 // can be picked again.
 const REQUIRED = new Set<keyof SceneFields>(['moment'])
 const SECTIONS: Record<'moment' | 'wear' | 'camera', Array<keyof SceneFields>> = {
-  moment: ['moment', 'setting', 'location', 'momentType'],
+  moment: ['moment', 'task', 'trigger', 'setting', 'location', 'momentType'],
   wear: ['outfit', 'footwear', 'jewelry', 'makeup', 'hair'],
-  camera: ['camera', 'light', 'height', 'foreground', 'framing', 'view', 'expression', 'pose', 'destination'],
+  camera: ['camera', 'distance', 'phone', 'light', 'height', 'foreground', 'framing', 'view', 'expression', 'pose', 'destination'],
 }
 
 function sceneChecks(data: ScenesData, draft: Partial<SceneFields>, missing: string[]) {
@@ -241,7 +242,10 @@ function StillTile({ c, aspect, onOpen, action, picked }: { c: SceneStill; aspec
 
 function SceneForm({ v, data, draft, set, checks }: { v: CharacterView; data: ScenesData; draft: Partial<SceneFields>; set: <K extends keyof SceneFields>(k: K, value: SceneFields[K]) => void; checks: ReturnType<typeof sceneChecks> }) {
   const o = data.options
-  const field = (k: keyof SceneFields) => ({ id: `scene-${k}`, label: FIELD_LABEL[k], required: checks.required(k), done: checks.done(k) })
+  // "Her task", "What catches her attention": the character's own pronoun.
+  const poss = v.data.pronouns.poss
+  const LABEL: Partial<Record<keyof SceneFields, string>> = { task: `${poss.charAt(0).toUpperCase()}${poss.slice(1)} task`, trigger: `What catches ${poss} attention` }
+  const field = (k: keyof SceneFields) => ({ id: `scene-${k}`, label: LABEL[k] ?? FIELD_LABEL[k], required: checks.required(k), done: checks.done(k) })
   const text = (k: keyof SceneFields, opts: { rows?: number; placeholder?: string; hint?: string } = {}) => (
     <Field {...field(k)} hint={opts.hint}>
       {opts.rows ? (
@@ -278,6 +282,8 @@ function SceneForm({ v, data, draft, set, checks }: { v: CharacterView; data: Sc
         {head('The moment', SECTIONS.moment, 'Only the moment is required. Your own words count as the moment until you plan or write one.')}
         <div className="st-card-body st-form">
           <div className="wide">{text('moment', { rows: 2, placeholder: `e.g. ${v.data.name} picks out peaches at a market stall, laughing at something the vendor said` })}</div>
+          {text('task', { placeholder: 'e.g. Choosing peaches, turning one over in her hand', hint: `What ${v.data.name} is busy with. Optional.` })}
+          {text('trigger', { placeholder: "e.g. The vendor's joke", hint: `One small thing ${v.data.name} reacts to, then back to the task.` })}
           <div className="wide">{text('setting', { rows: 2, placeholder: 'e.g. A busy farmers market, striped awnings, a few shoppers behind her' })}</div>
           {text('location', { placeholder: 'e.g. Farmers market', hint: 'A short name for the combo log.' })}
           {select('momentType', o.moments)}
@@ -306,6 +312,8 @@ function SceneForm({ v, data, draft, set, checks }: { v: CharacterView; data: Sc
         <div className="st-card-body st-form">
           {select('camera', o.cameras)}
           {select('light', o.lights)}
+          {text('distance', { placeholder: 'e.g. About 1 metre', hint: `How far the phone is from ${v.data.name}.` })}
+          {chips('phone', [{ id: 'rear', label: 'Rear camera' }, { id: 'front', label: 'Front camera (selfie)' }])}
           <div className="wide">{chips('height', o.heights)}</div>
           {draft.camera === 'event_long_lens' && <div className="wide">{text('foreground', { placeholder: 'e.g. A door frame and the shoulder of someone at the next table', hint: 'Blurred things in front of the lens sell "across the room".' })}</div>}
           <div className="wide">{chips('framing', o.framings)}</div>
@@ -417,7 +425,7 @@ function GenerateCard({ v, data, scene, todo, saving, setRefs, onStarted }: { v:
           <button type="button" className="st-btn ghost sm" style={{ alignSelf: 'flex-start' }} onClick={() => setShowBox(true)}><PenLine size={14} />See or type the prompt first</button>
         ) : pw.on ? (
           <PromptBox
-            id="scene-prompt" characterId={v.id} sceneId={scene.id} target="still"
+            id="scene-prompt" characterId={v.id} sceneId={scene.id} target="still" directors={pw.directorsPass}
             written={scene.prompts.still} templateText={scene.templateText} words={pw.words.still} model={pw.model} realism={pw.realism}
             writeTodo={todo}
             writeAction={todo.length || saving ? null : { type: 'scene_prompt', characterId: v.id, sceneId: scene.id, target: 'still' }}

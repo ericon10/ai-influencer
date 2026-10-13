@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { Check, Copy, FileText, Info, Loader2, PenLine } from 'lucide-react'
+import { Check, Clapperboard, Copy, FileText, Info, Loader2, PenLine } from 'lucide-react'
 import { api } from '../../api'
 import { isActiveJob, useLiveJobs, useRefresh } from '../../hooks'
 import { PriceButton } from '../../PriceButton'
@@ -12,11 +12,13 @@ import type { JobView, StudioAction, WrittenPrompt } from '../../types'
 // in Settings), and it stays fully editable, saved as you type. Rewrite asks
 // Claude again, priced on the button. The Studio adds the reference line,
 // the mark sides and the REALISM block when it runs, so they can never be
-// edited away.
+// edited away. With the director's pass on (default rule
+// scene-directors-pass), the writer's choices show as an editable
+// "Director's notes" line above the prompt; Rewrite follows notes you set.
 
 const SOURCE: Record<WrittenPrompt['source'], string> = { claude: 'Written by', owner: 'Edited by you', template: 'From the template' }
 
-export function PromptBox({ id, characterId, sceneId, target, written, writeAction, writeTodo = [], templateText, words, model, realism, addedNote, changedNote, onDirty, watch, label, placeholder, onText, children }: {
+export function PromptBox({ id, characterId, sceneId, target, written, writeAction, writeTodo = [], templateText, words, model, realism, addedNote, changedNote, onDirty, watch, label, placeholder, onText, children, directors = false }: {
   id: string
   characterId: string
   sceneId: string
@@ -42,6 +44,8 @@ export function PromptBox({ id, characterId, sceneId, target, written, writeActi
   onText?: (text: string) => void
   // A line under the box (the video directions).
   children?: ReactNode
+  // The director's pass is on: show and edit the notes.
+  directors?: boolean
 }) {
   const toast = useToast()
   const refresh = useRefresh()
@@ -55,11 +59,17 @@ export function PromptBox({ id, characterId, sceneId, target, written, writeActi
   const [copied, setCopied] = useState(false)
   const dirty = useRef(false)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // The director's notes: the writer's, or yours. Yours are sent with the
+  // next Rewrite and followed as given.
+  const [notes, setNotes] = useState(written?.notes ?? '')
+  const [ownNotes, setOwnNotes] = useState(written?.notesBy === 'owner')
+  const notesTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // A new answer from the writer (or another tab) replaces untouched text.
   const serverAt = written?.at ?? ''
   useEffect(() => {
     if (!dirty.current) setText(written?.text ?? '')
+    if (!notesTimer.current) { setNotes(written?.notes ?? ''); setOwnNotes(written?.notesBy === 'owner') }
     if (writing !== null && serverAt !== writing) setWriting(null)
   }, [serverAt]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
@@ -88,6 +98,20 @@ export function PromptBox({ id, characterId, sceneId, target, written, writeActi
   }
   useEffect(() => () => { if (timer.current) { clearTimeout(timer.current); void save(text) } }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
+  function editNotes(next: string) {
+    setNotes(next)
+    setOwnNotes(next.trim().length > 0)
+    if (!written) return
+    if (notesTimer.current) clearTimeout(notesTimer.current)
+    notesTimer.current = setTimeout(() => {
+      notesTimer.current = null
+      api.updateScene(sceneId, { notes: { [target]: next } }).then(() => refresh(characterId)).catch(e => toast({ tone: 'bad', text: errorMessage(e) }))
+    }, 700)
+  }
+  // The write action, with your notes when you set them.
+  const baseAction = typeof writeAction === 'function' ? writeAction(written?.text ?? '') : writeAction
+  const action = baseAction && baseAction.type === 'scene_prompt' && directors && ownNotes && notes.trim() ? { ...baseAction, notes: notes.trim() } : baseAction
+
   function useTemplate() {
     if (!templateText) return
     if (timer.current) { clearTimeout(timer.current); timer.current = null }
@@ -111,12 +135,25 @@ export function PromptBox({ id, characterId, sceneId, target, written, writeActi
         {written && has && <span className="st-hint">{SOURCE[written.source]}{written.source === 'claude' && written.model ? ` ${written.model}` : ''}</span>}
         {has && <span className={`st-hint ${inRange ? '' : 'st-warntext'}`} title={`Aim for ${words[0]} to ${words[1]} words`}>{count} words</span>}
       </div>
+      {directors && (
+        <label className="st-col st-notes" style={{ gap: 4 }}>
+          <span className="st-row" style={{ gap: 6 }}><Clapperboard size={13} /><span className="st-label" style={{ margin: 0 }}>Director's notes</span><span className="st-hint">{ownNotes ? 'Yours: Rewrite follows them' : notes ? 'From Claude: edit them, then Rewrite' : 'Optional'}</span></span>
+          <textarea
+            className="st-textarea st-notes-edit" rows={2} style={{ minHeight: 0 }} maxLength={600} value={notes}
+            onChange={e => editNotes(e.target.value)}
+            placeholder={target === 'video'
+              ? 'Claude decides these when it writes: the moment people remember, the hook in the first second, the payoff in the last 2, one camera move, depth, light, one contrast. Or set your own.'
+              : 'Claude decides these when it writes: the moment people remember, the hook, depth, light, one contrast. Or set your own.'}
+            aria-label="Director's notes"
+          />
+        </label>
+      )}
       {writing !== null || liveWriting ? (
-        <div className="st-promptbox-writing"><Loader2 size={16} className="st-spin" />{target === 'video' ? 'Claude is writing the motion from the still...' : 'Claude is writing the prompt from your details...'}</div>
+        <div className="st-promptbox-writing"><Loader2 size={16} className="st-spin" />{target === 'video' ? 'Claude is writing the video prompt from the still...' : 'Claude is writing the prompt from your details...'}</div>
       ) : (
         <textarea
           className={`st-textarea st-prompt-edit ${has ? '' : 'empty'}`}
-          rows={target === 'still' ? 8 : 4}
+          rows={target === 'still' ? 8 : 9}
           maxLength={4000}
           value={text}
           onChange={e => edit(e.target.value)}
@@ -130,7 +167,7 @@ export function PromptBox({ id, characterId, sceneId, target, written, writeActi
       {has && !inRange && <span className="st-hint">Aim for {words[0]} to {words[1]} words. Longer or shorter still runs.</span>}
       <div className="st-row" style={{ gap: 8, flexWrap: 'wrap', alignItems: 'flex-start' }}>
         <PriceButton
-          action={typeof writeAction === 'function' ? writeAction(written?.text ?? '') : writeAction}
+          action={action}
           todo={writeTodo}
           label={has ? 'Rewrite' : target === 'still' ? 'Write the prompt' : 'Write it'}
           variant={has ? 'secondary' : 'primary'}

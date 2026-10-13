@@ -3,7 +3,7 @@ import { loadConfig } from '../config/load.js'
 import { blocking, lintPrompt } from './rules.js'
 import {
   appendCombo, buildEditPrompt, buildScenePrompt, checkSceneFields, comboConflict, comboEntryFor, hairColorFrom,
-  oneChangeProblem, parseComboLog, pickSceneRefs, plannerRules, sceneFieldsSchema, scenePlanJsonSchema, scenePlanPrompt, type SceneFields,
+  oneChangeProblem, parseComboLog, pickSceneRefs, plannerRules, sceneFieldsSchema, scenePlanJsonSchema, scenePlanPrompt, writerFacts, type SceneFields,
 } from './scenes.js'
 import type { CharacterData } from './character.js'
 
@@ -96,11 +96,36 @@ describe('scene prompts (SPEC 5.2 and 10)', () => {
     expect(shoes).toContain('She has white leather sandals.')
   })
 
-  it('keeps the character\'s REALISM block as written, background clutter included', () => {
-    expect(p).toContain(callie.realism.block)
+  it('keeps the character\'s REALISM block, background clutter included, with skin detail scaled to the framing', () => {
+    // Waist-up: the skin details read "natural skin texture"; the rest stays,
+    // and "no beauty smoothing" is added because the block lacks it.
+    expect(p).toContain('REALISM: Candid phone photo, natural skin texture, ordinary background clutter, no retouching, not a professional shoot. No beauty smoothing.')
+    const close = buildScenePrompt(templates, scenes, views, { ...market, framing: 'chest_up' }, callie, 'refs')
+    expect(close).toContain(callie.realism.block!.replace(/\.$/, ''))
+    expect(close).toMatch(/visible pores/)
+    for (const framing of ['full_body', 'wide_small']) {
+      const far = buildScenePrompt(templates, scenes, views, { ...market, framing }, callie, 'refs')
+      expect(far).not.toMatch(/pores|skin texture|imperfections/)
+      expect(far).toMatch(/no retouching/)
+      expect(far).toMatch(/No beauty smoothing/)
+    }
     expect(p).toContain(callie.realism.avoid)
     expect(p).not.toContain('Bare face, no makeup')
     expect(p).toContain('Makeup: natural (light skin, groomed brows, tinted lip)')
+  })
+
+  it('her task, what catches her attention, distance and the phone camera read naturally, and go to the writer', () => {
+    const f = { ...market, task: 'turning a peach over in her hand', trigger: "the vendor's joke", distance: 'about 1 metre', phone: 'rear' as const }
+    const prompt = buildScenePrompt(templates, scenes, views, f, callie, 'refs')
+    expect(prompt).toContain("Turning a peach over in her hand. The vendor's joke catches her attention.")
+    expect(prompt).toMatch(/, on the rear camera, about 1 metre away, /)
+    const facts = writerFacts(templates, scenes, views, f, callie)
+    expect(facts).toContain('- Her ordinary task: turning a peach over in her hand.')
+    expect(facts).toContain("- What catches her attention: the vendor's joke.")
+    expect(facts).toContain('- Camera distance: about 1 metre.')
+    expect(facts).toContain('- Phone camera: the rear camera.')
+    // All optional: without them the prompt reads as before.
+    expect(p).not.toMatch(/catches her attention|camera, about/)
   })
 
   it('passes every scene rule in the lint, and has no em-dash', () => {

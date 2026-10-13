@@ -1,3 +1,4 @@
+import type { SkinDetail } from './realism.js'
 import { z } from 'zod'
 import type { RulesConfig, ScenesConfig, SheetShot, TemplatesConfig, ViewsConfig } from '../config/pipeline.js'
 import type { CharacterData } from './character.js'
@@ -19,6 +20,11 @@ export const sceneFieldsSchema = z.object({
   title: text(80).default(''),
   momentType: z.string().min(1),
   moment: text(400).min(3, 'Describe the moment.'),
+  // The ordinary task the character is busy with, and the one small thing
+  // that catches their attention (owner, 2026-10-13, from the ultra-realism
+  // guide: task, trigger, small reaction, back to the task). Optional.
+  task: text(200).default(''),
+  trigger: text(200).default(''),
   setting: text(400).default(''),
   location: text(60).default(''),
   outfit: text(300).default(''),
@@ -30,6 +36,9 @@ export const sceneFieldsSchema = z.object({
   view: z.string().default('front'),
   expression: z.string().default('neutral'),
   camera: z.string().min(1),
+  // How far the camera is, and the phone's front or rear camera. Optional.
+  distance: text(60).default(''),
+  phone: z.enum(['', 'rear', 'front']).default(''),
   foreground: text(160).default(''),
   height: z.string().default('eye_level'),
   framing: z.string().default('waist_up'),
@@ -189,11 +198,24 @@ function wearingLine(t: TemplatesConfig, f: SceneFields, p: Parts, o: { jewelry:
   return !items.length ? '' : fill(f.outfit ? t.scene.wearing : t.scene.wearing_only, { ...p.pv, items: items.join(', '), outfit_override: override })
 }
 
+// "Busy choosing a pastry. A bicycle bell catches her attention." (both optional).
+function taskLine(f: SceneFields, pv: Record<string, string>): string {
+  const task = sentence(f.task), trigger = sentence(f.trigger)
+  return [task ? `${capitalize(task)}.` : '', trigger ? `${capitalize(trigger)} catches ${pv.poss} attention.` : ''].filter(Boolean).join(' ')
+}
+
+// ", on the rear camera, about 1 metre away" (both optional).
+function cameraExtra(f: SceneFields): string {
+  const distance = sentence(f.distance).replace(/\s+away$/i, '')
+  return [f.phone ? `, on the ${f.phone} camera` : '', distance ? `, ${distance} away` : ''].join('')
+}
+
 function fillSceneBase(t: TemplatesConfig, f: SceneFields, p: Parts, o: { scaffold: boolean }): string {
   return fill(t.scene.base, {
     ...p.pv,
     reference: o.scaffold ? p.reference : '',
     moment: sentence(f.moment),
+    task_line: taskLine(f, p.pv),
     setting: sentence(f.setting),
     wearing: wearingLine(t, f, p, { jewelry: o.scaffold, override: o.scaffold }),
     makeup: p.makeup,
@@ -202,6 +224,7 @@ function fillSceneBase(t: TemplatesConfig, f: SceneFields, p: Parts, o: { scaffo
     expression: p.expression,
     marks: o.scaffold ? p.marks : '',
     camera: p.camera,
+    camera_extra: cameraExtra(f),
     framing: p.framing,
     height: p.height,
     light: p.light,
@@ -213,7 +236,7 @@ function fillSceneBase(t: TemplatesConfig, f: SceneFields, p: Parts, o: { scaffo
 // `addendum` is the fix line a review reason adds (config/review.yaml).
 export function buildScenePrompt(t: TemplatesConfig, sc: ScenesConfig, views: ViewsConfig, f: SceneFields, ch: SceneCharacter, mode: ReferenceMode, o: BuildOptions & { addendum?: string; rules?: SceneRuleOptions } = {}): string {
   const prompt = fillSceneBase(t, f, sceneParts(t, sc, views, f, ch, mode, o), { scaffold: true })
-  return finishPrompt(normalizePrompt(o.addendum ? `${prompt} ${o.addendum}` : prompt), 'scene', ch, { ...o, makeup: f.makeup })
+  return finishPrompt(normalizePrompt(o.addendum ? `${prompt} ${o.addendum}` : prompt), 'scene', ch, { ...o, makeup: f.makeup, skin: skinFor(sc, f.framing) })
 }
 
 // The template's own text without the Studio's lines: what "Use the
@@ -231,6 +254,8 @@ export function writerFacts(t: TemplatesConfig, sc: ScenesConfig, views: ViewsCo
   const line = (label: string, value: string) => (value.trim() ? `- ${label}: ${sentence(value)}.` : '')
   return [
     line('The moment', f.moment),
+    line(`${capitalize(ch.pronouns.poss)} ordinary task`, f.task),
+    line(`What catches ${ch.pronouns.poss} attention`, f.trigger),
     line('Kind of moment', p.momentType),
     line('Setting', f.setting),
     line('Place', f.location),
@@ -241,11 +266,29 @@ export function writerFacts(t: TemplatesConfig, sc: ScenesConfig, views: ViewsCo
     line('Pose and gaze', f.pose),
     line('Expression', p.expression),
     line('Who takes the photo and from where', p.camera),
+    line('Camera distance', f.distance),
+    line('Phone camera', f.phone === 'front' ? 'the front camera (a selfie)' : f.phone === 'rear' ? 'the rear camera' : ''),
     line('Framing and camera height', `${p.framing}, ${p.height}`),
     line('Light', p.light),
     line('In the foreground', f.foreground),
     `- Brands: ${f.brands ? 'brands and logos may show' : 'everything is plain and unbranded'}.`,
   ].filter(Boolean).join('\n')
+}
+
+// What the video writer gets from the scene: the task and trigger, who
+// records and from how far, and the light. The start frame shows the rest.
+export function videoWriterFacts(t: TemplatesConfig, sc: ScenesConfig, views: ViewsConfig, f: SceneFields, ch: SceneCharacter): string {
+  const p = sceneParts(t, sc, views, f, ch, 'refs')
+  const line = (label: string, value: string) => (value.trim() ? `- ${label}: ${sentence(value)}.` : '')
+  return [
+    line(`${capitalize(ch.pronouns.poss)} ordinary task`, f.task),
+    line(`What catches ${ch.pronouns.poss} attention`, f.trigger),
+    line('Who records and from where', p.camera),
+    line('Camera distance', f.distance),
+    line('Phone camera', f.phone === 'front' ? 'the front camera (a selfie)' : f.phone === 'rear' ? 'the rear camera' : ''),
+    line('Framing', p.framing),
+    line('Light', p.light),
+  ].filter(Boolean).join('\n') || '- Nothing more; use the start frame.'
 }
 
 // Text the writer or the owner wrote, made safe to wrap: a REALISM or AVOID
@@ -267,7 +310,7 @@ export function assembleStillPrompt(t: TemplatesConfig, sc: ScenesConfig, views:
   // full outfit" holds whatever the writing says.
   const wearing = wearingLine(t, f, p, { jewelry: true, override: true })
   const text = [p.reference, cleanWritten(body), wearing, p.marks, p.colors, p.brand_line, o.addendum ?? ''].filter(Boolean).join('\n')
-  return finishPrompt(normalizePrompt(text), 'scene', ch, { ...o, makeup: f.makeup })
+  return finishPrompt(normalizePrompt(text), 'scene', ch, { ...o, makeup: f.makeup, skin: skinFor(sc, f.framing) })
 }
 
 // ── One-change edits (SPEC 5.3) ─────────────────────────────────────
@@ -280,6 +323,11 @@ export function oneChangeProblem(change: string): string | null {
   if (sentences.length > 1) return 'One change per edit (SPEC 5.3 rule 24). Run the second change as its own edit.'
   if (/\b(?:and also|as well as|then also|plus also)\b/i.test(c)) return 'One change per edit (SPEC 5.3 rule 24). Run the second change as its own edit.'
   return null
+}
+
+// How much skin detail the REALISM block names at a framing (scenes.yaml).
+export function skinFor(sc: ScenesConfig, framing: string | undefined): SkinDetail {
+  return sc.framings.find(x => x.id === framing)?.skin ?? 'full'
 }
 
 export function buildEditPrompt(t: TemplatesConfig, change: string, ch: Pick<CharacterData, 'card' | 'marks' | 'pronouns' | 'realism'>, face: boolean, o: BuildOptions = {}): string {
@@ -339,7 +387,7 @@ export function comboEntryFor(sc: ScenesConfig, f: SceneFields, date: string): C
 // ── Planner (Claude fills the fields) ───────────────────────────────
 
 // The planner fills the creative fields; brands and refs stay the owner's.
-const PLANNED = ['title', 'momentType', 'moment', 'setting', 'location', 'outfit', 'footwear', 'jewelry', 'makeup', 'hair', 'pose', 'view', 'expression', 'camera', 'foreground', 'height', 'framing', 'light', 'destination'] as const
+const PLANNED = ['title', 'momentType', 'moment', 'task', 'trigger', 'setting', 'location', 'outfit', 'footwear', 'jewelry', 'makeup', 'hair', 'pose', 'view', 'expression', 'camera', 'distance', 'phone', 'foreground', 'height', 'framing', 'light', 'destination'] as const
 export const PLANNED_FIELDS: readonly string[] = PLANNED
 
 // "Punch it up": three specific moments from a rough idea.
@@ -396,6 +444,8 @@ export function scenePlanJsonSchema(sc: ScenesConfig, views: ViewsConfig): Recor
       title: str('A short name for the scene, 2 to 5 words.'),
       momentType: { type: 'string', enum: ids(sc.moments) },
       moment: str('What is happening, present tense, one sentence, naming the character by name.'),
+      task: str('The ordinary task the character is busy with in this moment (choosing a pastry, folding a sleeve), a few words, present tense.'),
+      trigger: str('The one small real thing that catches their attention (a friend\'s voice, a bicycle bell, a breeze lifting a napkin), a few words.'),
       setting: str('Where, with a few concrete details of the place and the people around.'),
       location: str('The place in 1 to 3 words, for the combo log.'),
       outfit: str('The full outfit, top to bottom, without footwear or jewelry.'),
@@ -407,6 +457,8 @@ export function scenePlanJsonSchema(sc: ScenesConfig, views: ViewsConfig): Recor
       view: { type: 'string', enum: Object.keys(views.views) },
       expression: { type: 'string', enum: ids(sc.expressions) },
       camera: { type: 'string', enum: ids(sc.cameras) },
+      distance: str('How far the camera is from the character, for example "about 1 metre" or "3 metres".'),
+      phone: { type: 'string', enum: ['rear', 'front'], description: 'The phone camera: rear (someone else films, or a mirror shot) or front (a selfie).' },
       height: { type: 'string', enum: ids(sc.heights) },
       foreground: str('Blurred foreground objects for a long-lens shot, or an empty string.'),
       framing: { type: 'string', enum: ids(sc.framings) },

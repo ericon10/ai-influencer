@@ -195,6 +195,34 @@ export function realismForReference(block: string): string {
   return hasRealismBlock(out) ? out : DEFAULT_REFERENCE_REALISM
 }
 
+// Framing-aware skin detail (owner, 2026-10-13, from the ultra-realism
+// guide): the full block close and chest-up; waist-up its skin details
+// become "natural skin texture"; full-body and wide name no skin detail at
+// all (pore-level words on a small face read wrong). "No beauty smoothing"
+// and "no retouching" are never dropped: added when the block lacks them.
+export type SkinDetail = 'full' | 'natural' | 'none'
+const SKIN_DETAIL = /\b(?:pores?|peach fuzz|stray|baby hairs?|brow hairs?|flyaways?|redness|colou?r variation|shine|sheen|freckles?|skin texture|imperfections?|under-eye|creases|expression lines|fine lines|blemish(?:es)?)\b/i
+const NO_SMOOTHING = /\bno (?:beauty |skin )?smoothing\b/i
+const NO_RETOUCHING = /\bno (?:beauty )?retouch(?:ing|ed)?\b/i
+
+export function realismForFraming(block: string, skin: SkinDetail = 'full'): string {
+  let out = block
+  if (skin !== 'full' && SKIN_DETAIL.test(block)) {
+    let first = true
+    const edited = editClauses(block, c => c !== '', c => {
+      if (!SKIN_DETAIL.test(c) || NO_SMOOTHING.test(c) || NO_RETOUCHING.test(c)) return c
+      if (skin === 'natural' && first) { first = false; return 'natural skin texture' }
+      return ''
+    })
+    out = hasRealismBlock(edited) ? edited : out
+  }
+  const missing = [NO_SMOOTHING.test(out) ? '' : 'no beauty smoothing', NO_RETOUCHING.test(out) ? '' : 'no retouching'].filter(Boolean)
+  if (!missing.length) return out
+  const body = out.trim().replace(/[.\s]+$/, '')
+  const add = missing.join(', ')
+  return `${body}. ${add.charAt(0).toUpperCase()}${add.slice(1)}.`
+}
+
 // Hero and sheet with the background switch off: bare-faced still, the
 // background clause kept.
 const bareFaceRealism = (block: string) => (MAKEUP_ALLOWANCE.test(block) ? editClauses(block, () => true, c => c.replace(MAKEUP_ALLOWANCE, '')) : block)
@@ -232,7 +260,7 @@ export interface FinalPrompt {
 // out heavier flaw words the character does not have. `plainBackground`
 // (default rule sheet-background) drops a REALISM background clause from
 // hero and sheet prompts, which use their own background.
-export function finalizeImagePrompt(prompt: string, opts: { stage?: string; realism?: string | null; avoid?: string | null; allowedFlaws?: string; flawDose?: boolean; plainBackground?: boolean; makeup?: string } = {}): FinalPrompt {
+export function finalizeImagePrompt(prompt: string, opts: { stage?: string; realism?: string | null; avoid?: string | null; allowedFlaws?: string; flawDose?: boolean; plainBackground?: boolean; makeup?: string; skin?: SkinDetail } = {}): FinalPrompt {
   const warnings: RealismWarning[] = []
   const stripped = stripBannedTerms(prompt)
   let out = stripped.prompt
@@ -265,8 +293,8 @@ export function finalizeImagePrompt(prompt: string, opts: { stage?: string; real
     if (!out.includes(BARE_FACE_LINE)) out = `${out} ${BARE_FACE_LINE}`
   }
   const block = realismBlock(opts.realism)
-  const realism = !isBareFaceStage(opts.stage) ? realismForMakeup(block, opts.makeup)
-    : opts.plainBackground !== false ? realismForReference(block) : bareFaceRealism(block)
+  const realism = realismForFraming(!isBareFaceStage(opts.stage) ? realismForMakeup(block, opts.makeup)
+    : opts.plainBackground !== false ? realismForReference(block) : bareFaceRealism(block), opts.skin)
   if (!hasRealismBlock(out)) out = `${out}\n${realism}`
   if (!/\bAVOID:/.test(out)) out = `${out}\n${avoidBlock(opts.avoid)}`
   return { prompt: out.trim(), warnings }

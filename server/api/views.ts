@@ -250,7 +250,8 @@ export async function scenesView(deps: Deps, ctx: Ctx, characterId: string) {
       signatureJewelry: ch.marks.filter(m => m.kind === 'jewelry').map(m => `${m.description} (${m.side} ${m.region})`),
       makeup: sc.makeup, destinations: sc.destinations,
       views: Object.entries(views.views).map(([id, v]) => ({ id, label: v.label })),
-      editPresets: sc.edits.presets.map(e => ({ id: e.id, label: e.label, text: withPronouns(e.text, p), face: e.face })),
+      editPresets: sc.edits.presets.map(e => ({ id: e.id, label: e.label, text: withPronouns(e.text, p), face: e.face, group: e.group, hint: e.hint ?? '' })),
+      diagnose: sc.diagnose,
       stillModels, editModels, defaultModels: stillModels.slice(0, 1).map(m => m.ref),
       maxVariations: sc.settings.max_variations, maxModels: sc.settings.max_models,
       accountConnected: connected, mode: await providerMode(deps.db, ctx.accountId),
@@ -258,6 +259,7 @@ export async function scenesView(deps: Deps, ctx: Ctx, characterId: string) {
       // it runs live, its word ranges, and the REALISM block it always gets.
       promptWriter: {
         on: sw.on('scene-prompt-writer'), model: modelLabel(deps, (await liveRoute(deps, ctx, 'prompt_writer')).model),
+        directorsPass: sw.on('scene-directors-pass'),
         words: sc.settings.prompt_words, realism: realismBlock(ch.realism?.block),
       },
       // Video defaults (Stage 9), all editable on the video card. The model

@@ -21,6 +21,7 @@ import { identityForModel } from '../core/identity.js'
 import type { RealismWarning } from '../core/realism.js'
 import { assertSuiteCap, buildModelSuite, buildModelTest, startModelSuite, startModelTest } from './modelTests.js'
 import { approvedAssets, getCandidate, getCharacter, getRef, inspirationAssetIds, setCharacterFields, sheetState, toData } from './characters.js'
+import { skinFor } from '../core/scenes.js'
 import { buildSceneEndFrame, buildSceneIdeas, buildScenePlan, buildScenePromptWrite, buildSceneRecheck, buildSceneRun, buildSceneEdit, buildSceneUpscale, buildSceneVideo, buildVideoUpscale, type SceneBuilt } from './sceneActions.js'
 import { markSceneBusy, saveVideoModel } from './scenes.js'
 import { buildContentCaptions, buildContentSlides } from './content.js'
@@ -62,8 +63,11 @@ export const actionSchema = z.discriminatedUnion('type', [
   // final still or video prompt from the scene details.
   z.object({
     type: z.literal('scene_prompt'), characterId: z.string(), sceneId: z.string(), target: z.enum(['still', 'video']),
-    motion: z.string().max(600).optional(), directions: z.string().max(600).optional(),
+    motion: z.string().max(3000).optional(), directions: z.string().max(600).optional(),
     startCandidateId: z.string().optional(), endCandidateId: z.string().optional(),
+    // The director's notes the owner set (followed as given), and the take's
+    // length, shape and sound for the FORMAT and AUDIO lines.
+    notes: z.string().max(600).optional(), durationSec: z.number().int().min(2).max(15).optional(), audio: z.boolean().optional(), aspect: z.string().max(8).optional(),
   }),
   z.object({
     type: z.literal('scene'), characterId: z.string(), sceneId: z.string(),
@@ -88,7 +92,7 @@ export const actionSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('scene_video'), characterId: z.string(), candidateId: z.string(), endCandidateId: z.string().optional(),
     model: z.string().max(80).optional(),
-    motion: z.string().max(600), directions: z.string().max(600).default(''), durationSec: z.number().int().min(2).max(15).default(5),
+    motion: z.string().max(3000), directions: z.string().max(600).default(''), durationSec: z.number().int().min(2).max(15).default(5),
     aspect: z.string().max(8).default('9:16'), audio: z.boolean().default(false), takes: z.number().int().min(1).max(8).default(1), test: z.boolean().default(false),
   }),
   z.object({ type: z.literal('scene_video_upscale'), characterId: z.string(), candidateId: z.string() }),
@@ -329,7 +333,7 @@ export async function buildAction(deps: Deps, ctx: Ctx, action: StudioAction): P
       const addendum = reasonAction ? deps.config.pipeline.review.actions[reasonAction]?.prompt_addendum ?? '' : ''
       const identity = identityForModel(ch.identities, lockedModel)
       const realism: RealismWarning[] = []
-      const prompt = buildSheetPrompt(tpl, views, shot, ch, addendum, { identityBlock: identity?.promptBlock, warnings: realism, ...looks })
+      const prompt = buildSheetPrompt(tpl, views, shot, ch, addendum, { identityBlock: identity?.promptBlock, warnings: realism, ...looks, skin: skinFor(deps.config.pipeline.scenes, shot.framing) })
       const specs: JobSpec[] = []
       let warnings: RuleViolation[] = []
       for (let v = 0; v < action.variations; v++) {
