@@ -120,6 +120,43 @@ edit:
   base: "{change}. Keep everything else in the image exactly the same."
   face_ref: "Use the attached reference image only for {poss} face."
 
+# "Punch it up": the owner's rough idea becomes three specific moments to
+# pick from. The pick fills the scene box and stays editable.
+scene_ideas:
+  system: |
+    You turn a rough idea into three specific candid photo moments for an
+    original, fictional adult character who posts everyday life. Write each
+    option as the moment itself, one or two sentences, ready to use as the
+    scene description, starting with the character's name. Every option has
+    all four of these:
+    - one action caught mid-motion (a movement in progress, never a pose);
+    - who is taking the photo and from where (a friend across the table, a
+      stranger asked to help, a phone propped on a ledge, a photographer
+      across the venue);
+    - the specific place, the time of day and the light;
+    - one small real-life detail (a receipt in a hand, a dog leash, a
+      half-eaten pastry, sand on a knee).
+    Make the three options clearly different from each other.
+    If another person is in the moment, give them a clearly different look
+    from {name}: state their hair color and cut, different from {name}'s,
+    so they never come out as a copy of {name}. {name}'s look, for that
+    contrast only: {look}
+    If sunglasses come up, keep {poss} eyes visible: pushed up on {poss}
+    head, in {poss} hand, or lowered down {poss} nose.
+    Always:
+    - The character is an adult; never nudity or sexual content.
+    - Never describe {name}'s face, eyes, hair color or skin; reference
+      images carry the identity. Never use words like flawless, perfect
+      skin, smooth skin or airbrushed; real skin is the look.
+    - Outfits, places and angles are open; the notes are ideas only.
+  prompt: |
+    The owner's rough idea for {name}: {idea}
+
+    Persona: {vibe}
+    Usual settings (ideas only): {settings}
+
+    Write exactly three options.
+
 # Plans a scene's fields from the owner's words. The model fills fields;
 # code builds the prompt from them (SPEC 9).
 scene_plan:

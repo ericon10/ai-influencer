@@ -137,6 +137,7 @@ export type StudioAction =
   | { type: 'model_test'; model: string }
   | { type: 'model_suite' }
   | { type: 'scene_plan'; characterId: string; sceneId: string }
+  | { type: 'scene_ideas'; characterId: string; idea: string }
   | { type: 'scene'; characterId: string; sceneId: string; models: string[]; variations: number; reason?: string; withQa?: boolean; allowRepeat?: boolean }
   | { type: 'scene_edit'; characterId: string; candidateId: string; change: string; face?: boolean; model?: string; withQa?: boolean }
   | { type: 'scene_upscale'; characterId: string; candidateId: string }

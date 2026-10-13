@@ -15,7 +15,7 @@ import { cancelJob, getJob, resolveJob, wakeFromWebhook } from '../jobs/runner.j
 import { wakeWorker } from '../jobs/wake.js'
 import { actionSchema, estimateAction, runAction } from '../pipeline/actions.js'
 import { createCharacter, getCandidate, getCharacter, linkInspiration, listCharacters, setCharacterFields, updateCharacter } from '../pipeline/characters.js'
-import { approveSceneCandidate, archiveScene, createScene, cropCandidate, updateScene } from '../pipeline/scenes.js'
+import { approveSceneCandidate, archiveScene, copyScene, createScene, cropCandidate, updateScene } from '../pipeline/scenes.js'
 import { rulesView, setRuleSwitch } from '../pipeline/rules.js'
 import { chooseConcept } from '../pipeline/concepts.js'
 import { approveCandidate, keepStale, pickHero, rejectCandidate, reopenCandidate, setFavorite, mirrorCandidate } from '../pipeline/review.js'
@@ -311,6 +311,13 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
     const body = parse(sceneBody, await json(c))
     const row = await createScene(deps, ctx, c.req.param('id'), body as Parameters<typeof createScene>[3])
     return c.json({ id: row.id }, 201)
+  })
+  // Use this scene for other characters: one new draft per character.
+  app.post('/scenes/:id/copy', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    const body = parse(z.object({ characterIds: z.array(z.string()).min(1).max(20) }), await json(c))
+    return c.json({ copies: await copyScene(deps, ctx, c.req.param('id'), body.characterIds) }, 201)
   })
   app.patch('/scenes/:id', async c => {
     const ctx = c.get('ctx')

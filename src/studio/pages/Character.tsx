@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { ArrowLeft, Pencil } from 'lucide-react'
 import { useCharacter } from '../hooks'
 import { Img, MarkChip, Meter, STAGES, Stepper } from '../ui'
@@ -23,10 +23,15 @@ function defaultTab(stage: number): Tab {
 export default function Character() {
   const { id = '' } = useParams()
   const q = useCharacter(id)
+  const [params] = useSearchParams()
   const [tab, setTab] = useState<Tab | null>(null)
   const [editing, setEditing] = useState(false)
   const v = q.data
   useEffect(() => { if (v && tab === null) setTab(defaultTab(v.stage)) }, [v, tab])
+  // A link can open a tab and a scene (a scene copied to this character).
+  const wantTab = params.get('tab') as Tab | null
+  const wantScene = params.get('scene')
+  useEffect(() => { if (wantTab && ['start', 'hero', 'sheet', 'scenes', 'file'].includes(wantTab)) setTab(wantTab) }, [wantTab, id])
 
   if (q.isLoading) return <div className="st-page wide"><div className="st-skel" style={{ height: 40, width: 260, marginBottom: 24 }} /><div className="st-character"><div className="st-skel" style={{ aspectRatio: '3/4', borderRadius: 26 }} /><div className="st-skel" style={{ height: 320, borderRadius: 26 }} /></div></div>
   if (!v) return <div className="st-page"><div className="st-empty"><h2 className="st-h1">Not found</h2><Link className="st-btn" to="/studio">Back to characters</Link></div></div>
@@ -54,7 +59,7 @@ export default function Character() {
           {current === 'start' && <StartTab v={v} onEditCard={() => setEditing(true)} goHero={() => setTab('hero')} />}
           {current === 'hero' && <HeroTab v={v} onEditCard={() => setEditing(true)} goSheet={() => setTab('sheet')} />}
           {current === 'sheet' && <SheetTab v={v} goHero={() => setTab('hero')} goFile={() => setTab('file')} />}
-          {current === 'scenes' && <ScenesTab v={v} goSheet={() => setTab('sheet')} />}
+          {current === 'scenes' && <ScenesTab key={`${v.id}-${wantScene ?? ''}`} v={v} openScene={wantScene} goSheet={() => setTab('sheet')} />}
           {current === 'file' && <FileTab v={v} />}
         </div>
       </div>

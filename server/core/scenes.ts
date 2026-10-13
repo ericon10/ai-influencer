@@ -259,6 +259,49 @@ export function comboEntryFor(sc: ScenesConfig, f: SceneFields, date: string): C
 const PLANNED = ['title', 'momentType', 'moment', 'setting', 'location', 'outfit', 'footwear', 'jewelry', 'makeup', 'hair', 'pose', 'view', 'expression', 'camera', 'foreground', 'height', 'framing', 'light', 'destination'] as const
 export const PLANNED_FIELDS: readonly string[] = PLANNED
 
+// "Punch it up": three specific moments from a rough idea.
+export interface SceneIdea { moment: string; action: string; shooter: string; place: string; detail: string; other_person: string }
+
+export function sceneIdeasJsonSchema(): Record<string, unknown> {
+  const str = (description: string) => ({ type: 'string', description })
+  return {
+    type: 'object',
+    additionalProperties: false,
+    required: ['options'],
+    properties: {
+      options: {
+        type: 'array',
+        description: 'Exactly three options.',
+        items: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['moment', 'action', 'shooter', 'place', 'detail', 'other_person'],
+          properties: {
+            moment: str('The whole moment in one or two sentences, starting with the character\'s name. This is what fills the scene box.'),
+            action: str('The one action caught mid-motion.'),
+            shooter: str('Who takes the photo and from where.'),
+            place: str('The specific place, the time of day and the light.'),
+            detail: str('One small real-life detail.'),
+            other_person: str('The other person and their look (hair color and cut), or an empty string when nobody else is in it.'),
+          },
+        },
+      },
+    },
+  }
+}
+
+// Demo mode: three plain options made from the owner's words.
+export function mockSceneIdeas(name: string, idea: string, poss: string): { options: SceneIdea[] } {
+  const what = idea.trim().replace(/[.!?]+$/, '').replace(new RegExp(`^${name}\\s+`, 'i'), '') || 'out for the day'
+  return {
+    options: [
+      { moment: `${name} ${what}, caught mid-laugh as she turns back toward a friend who snaps it on a phone from a few steps behind, late-morning sun on a busy sidewalk, a paper coffee cup in ${poss} hand.`, action: 'turning back mid-laugh', shooter: 'a friend on a phone, a few steps behind', place: 'a busy sidewalk, late morning, bright sun', detail: 'a paper coffee cup', other_person: '' },
+      { moment: `${name} ${what}, reaching up to tuck hair behind ${poss} ear as a stranger she asked takes the shot from across a small cafe table, soft window light at 4 p.m., a half-eaten croissant on the plate.`, action: 'tucking hair behind an ear', shooter: 'a stranger across the table', place: 'a small cafe, 4 p.m., soft window light', detail: 'a half-eaten croissant', other_person: '' },
+      { moment: `${name} ${what}, mid-step down a few stone stairs while a friend with a short black bob films from the landing below, golden hour by the water, sunglasses pushed up on ${poss} head.`, action: 'stepping down the stairs', shooter: 'a friend on the landing below', place: 'stone stairs by the water, golden hour', detail: 'sunglasses pushed up on her head', other_person: 'A friend with a short black bob' },
+    ],
+  }
+}
+
 export function scenePlanJsonSchema(sc: ScenesConfig, views: ViewsConfig): Record<string, unknown> {
   const ids = (list: Array<{ id: string }>) => list.map(x => x.id)
   const str = (description: string) => ({ type: 'string', description })

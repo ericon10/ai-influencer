@@ -630,4 +630,6 @@ button.st-chip:hover { color: var(--st-text); border-color: var(--st-text-3); }
 .st-price.loading { display: inline-flex; align-items: center; gap: 6px; }
 .st-price-error { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 10px 14px; border-radius: 12px; border: 1.5px solid var(--st-bad); background: var(--st-bad-soft); font-size: 13px; }
 .st-price-error .msg { flex: 1 1 260px; min-width: 0; }
+.st-ideas { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+.st-ideas .st-choice { text-align: left; line-height: 1.45; gap: 6px; }
 

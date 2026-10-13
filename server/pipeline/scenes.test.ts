@@ -5,15 +5,16 @@ import { eq } from 'drizzle-orm'
 import { createHarness, drain, type Harness } from '../testing/harness.js'
 import { registerPipelineHooks } from './hooks.js'
 import { estimateAction, runAction, type StudioAction } from './actions.js'
-import { getCharacter, toData } from './characters.js'
+import { createCharacter, getCharacter, toData } from './characters.js'
 import { importCharacter } from './files.js'
 import { mirrorCandidate, rejectCandidate } from './review.js'
 import { setSetting } from './settings.js'
 import { setRuleSwitch } from './rules.js'
-import { approveSceneCandidate, createScene, cropCandidate, getScene, sceneCandidates, updateScene } from './scenes.js'
+import { approveSceneCandidate, copyScene, createScene, cropCandidate, getScene, sceneCandidates, updateScene } from './scenes.js'
 import { scenesView } from '../api/views.js'
 import { renderPlaceholderPortrait } from '../providers/mock.js'
 import { candidates } from '../db/schema.js'
+import { getJob } from '../jobs/runner.js'
 import { parseComboLog } from '../core/scenes.js'
 import type { LlmRequest } from '../providers/types.js'
 import type { Observation } from '../core/qa/perception.js'
@@ -77,6 +78,38 @@ describe('scenes (Stage 7, demo mode)', () => {
     expect(view.fields.footwear).toBeTruthy()
     expect(view.comboProblem).toBeNull()
     expect(view.title).toBe('Picking out peaches at')
+  })
+
+  it('"Punch it up" turns a rough idea into three specific moments, priced first', async () => {
+    const { quote, preview, jobs } = await run({ type: 'scene_ideas', characterId, idea: 'coffee run downtown' })
+    expect(quote.items.map(i => i.model)).toEqual(['mock/llm'])
+    const text = preview.prompts[0]!.text
+    expect(text).toContain('coffee run downtown')
+    expect(text).toMatch(/one action caught mid-motion/)
+    expect(text).toMatch(/hair color and cut, different from Callie's/)
+    expect(text).toMatch(/pushed up on her\s+head, in her hand, or lowered down her nose/)
+    const job = await getJob(h.deps, h.ctx, jobs[0]!.id)
+    expect(job.status).toBe('completed')
+    const options = ((job.resultMeta as { data?: { options?: Array<{ moment: string }> } }).data?.options) ?? []
+    expect(options).toHaveLength(3)
+    for (const o of options) expect(o.moment).toMatch(/^Callie coffee run downtown/)
+  })
+
+  it('a scene can be reused for other characters: name swapped, their own refs and jewelry', async () => {
+    const ava = await createCharacter(h.deps, h.ctx, { name: 'Ava', data: { age: 26, card: '26, short dark curly hair' } })
+    const bea = await createCharacter(h.deps, h.ctx, { name: 'Bea', data: { age: 29, card: '29, long red hair', marks: [{ name: 'cuff', description: 'thin silver ear cuff', side: 'RIGHT', region: 'ear', kind: 'jewelry', subtle: true }] } })
+    const src = await createScene(h.deps, h.ctx, bea.id, {
+      brief: 'Bea on a coffee run downtown', title: 'Bea coffee run',
+      fields: { moment: 'Bea laughs mid-step with a coffee', jewelry: 'a thin gold chain, thin silver ear cuff (RIGHT ear)', refs: ['REF-00', 'REF-03'], brands: true, camera: 'friend_phone' },
+    })
+    const [copy] = await copyScene(h.deps, h.ctx, src.id, [ava.id, bea.id])
+    expect(copy).toMatchObject({ characterId: ava.id, name: 'Ava' })
+    const row = await getScene(h.deps, h.ctx, copy!.sceneId)
+    expect(row.characterId).toBe(ava.id)
+    expect(row.brief).toBe('Ava on a coffee run downtown')
+    expect(row.title).toBe('Ava coffee run')
+    expect(row.fields).toMatchObject({ moment: 'Ava laughs mid-step with a coffee', jewelry: 'a thin gold chain', brands: true, camera: 'friend_phone' })
+    expect((row.fields as { refs?: string[] }).refs).toBeUndefined()
   })
 
   it('only the moment is required: the owner\'s words count as the moment, and the rest starts pre-filled', async () => {

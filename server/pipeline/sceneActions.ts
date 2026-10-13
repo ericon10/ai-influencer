@@ -6,8 +6,8 @@ import { identityForModel } from '../core/identity.js'
 import { pronounVars } from '../core/prompts.js'
 import type { RealismWarning } from '../core/realism.js'
 import {
-  aspectFor, buildEditPrompt, buildScenePrompt, comboConflict, comboEntryFor, oneChangeProblem, plannerRules,
-  scenePlanJsonSchema, scenePlanPrompt, type ReferenceMode, type SceneFields,
+  aspectFor, buildEditPrompt, buildScenePrompt, comboConflict, comboEntryFor, mockSceneIdeas, oneChangeProblem, plannerRules,
+  sceneIdeasJsonSchema, scenePlanJsonSchema, scenePlanPrompt, type ReferenceMode, type SceneFields,
 } from '../core/scenes.js'
 import { ruleSwitches } from './rules.js'
 import { idealObservation } from '../core/qa/ideal.js'
@@ -151,6 +151,32 @@ function mockPlan(deps: Deps, ch: Ch, brief: string): SceneFields {
     destination: 'vertical',
     brands: false,
     refs: [],
+  }
+}
+
+// "Punch it up": a rough idea becomes three specific moments to pick from.
+// The answer stays on the job; the owner's pick fills the scene box.
+export async function buildSceneIdeas(deps: Deps, ctx: Ctx, row: CharacterRow, idea: string): Promise<SceneBuilt> {
+  const ch = toData(row)
+  const t = deps.config.pipeline.templates
+  const route = await resolveRoute(deps, ctx, 'scene_ideas')
+  const pv = pronounVars(ch.pronouns)
+  const system = fill(t.scene_ideas.system, { ...pv, name: ch.name, look: ch.card.trim() || 'not given' })
+  const prompt = fill(t.scene_ideas.prompt, {
+    ...pv, name: ch.name, idea: idea.trim(),
+    vibe: ch.persona.vibe ?? 'not given',
+    settings: ch.persona.settings?.length ? ch.persona.settings.join('; ') : 'none given',
+  })
+  return {
+    purpose: 'scene_ideas',
+    preview: { title: 'Punch it up', prompts: [{ label: 'Three moment options', text: `${system}\n${prompt}`, wrapped: hardWrap(`${system}\n${prompt}`) }], warnings: [], invalidates: [] },
+    specs: [{
+      type: 'llm', stage: 'scene', purpose: 'scene_ideas', label: 'Punch it up: three moment options',
+      request: {
+        model: route.model, system, prompt, schema: sceneIdeasJsonSchema(), schemaName: 'scene_ideas',
+        maxTokens: 1500, effort: route.effort ?? 'low', meta: { mockIdeas: mockSceneIdeas(ch.name, idea, pv.poss ?? 'her') },
+      },
+    }],
   }
 }
 

@@ -41,6 +41,7 @@ const DEFAULTS: Record<string, LlmResponder> = {
   }),
   // Demo mode: the builder passes a plan made from the owner's words.
   scene_plan: req => req.meta?.mockPlan ?? {},
+  scene_ideas: req => req.meta?.mockIdeas ?? { options: [] },
   qa_perception: req => req.meta?.mockObservation ?? {
     pose: 'frontal', nose: 'toward_camera', confidence: 0.9,
     framing: 'chest_up', standing: true, ears: [], skin_marks: [], other_jewelry: [],

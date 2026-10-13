@@ -75,6 +75,35 @@ export async function createScene(deps: Deps, ctx: Ctx, characterId: string, inp
   return row!
 }
 
+// Reuse a scene for other characters (owner, 2026-10-13). The words and
+// choices carry over with the name swapped; the sheet refs and signature
+// jewelry belong to each character, so they stay behind. Each copy is a new
+// draft for its character; nothing runs and nothing is charged.
+export async function copyScene(deps: Deps, ctx: Ctx, sceneId: string, characterIds: string[]): Promise<Array<{ characterId: string; sceneId: string; name: string }>> {
+  const src = await getScene(deps, ctx, sceneId)
+  const from = toData(await getCharacter(deps, ctx, src.characterId))
+  const name = from.name.trim()
+  const signature = from.marks.filter(m => m.kind === 'jewelry').map(m => `${m.description} (${m.side} ${m.region})`)
+  const out: Array<{ characterId: string; sceneId: string; name: string }> = []
+  for (const id of [...new Set(characterIds)].filter(x => x !== src.characterId).slice(0, 20)) {
+    const to = toData(await getCharacter(deps, ctx, id))
+    const swap = (s: string) => (name ? s.replace(new RegExp(`\\b${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'g'), to.name) : s)
+    const fields: Record<string, unknown> = {}
+    for (const [k, v] of Object.entries(draftFields(src))) {
+      if (k === 'refs') continue
+      let value = typeof v === 'string' ? swap(v) : v
+      if (k === 'jewelry' && typeof value === 'string') {
+        for (const piece of signature) value = (value as string).split(piece).join('')
+        value = (value as string).split(',').map(p => p.trim()).filter(Boolean).join(', ')
+      }
+      fields[k] = value
+    }
+    const row = await createScene(deps, ctx, id, { brief: swap(src.brief), title: swap(src.title), fields: fields as Partial<SceneFields> })
+    out.push({ characterId: id, sceneId: row.id, name: to.name })
+  }
+  return out
+}
+
 // Only known fields are kept, trimmed to their limits.
 function cleanFields(f: Partial<SceneFields>): Partial<SceneFields> {
   const shape = sceneFieldsSchema.shape

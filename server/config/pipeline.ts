@@ -133,6 +133,7 @@ const templatesSchema = z.object({
   }),
   edit: z.object({ base: z.string(), face_ref: z.string() }),
   scene_plan: z.object({ system: z.string(), prompt: z.string() }),
+  scene_ideas: z.object({ system: z.string(), prompt: z.string() }),
 })
 
 const preset = z.object({ id: z.string(), label: z.string(), hint: z.string().optional() })

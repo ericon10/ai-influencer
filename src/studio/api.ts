@@ -71,6 +71,7 @@ export const api = {
 
   // Scenes (Stage 7) and still edits (Stage 8).
   scenes: (characterId: string) => request<ScenesData>('GET', `/characters/${characterId}/scenes`),
+  copyScene: (id: string, characterIds: string[]) => request<{ copies: Array<{ characterId: string; sceneId: string; name: string }> }>('POST', `/scenes/${id}/copy`, { characterIds }),
   createScene: (characterId: string, body: { brief?: string; title?: string; fields?: Partial<SceneFields> }) => request<{ id: string }>('POST', `/characters/${characterId}/scenes`, body),
   updateScene: (sceneId: string, body: { brief?: string; title?: string; fields?: Partial<SceneFields> }) => request<{ id: string }>('PATCH', `/scenes/${sceneId}`, body),
   archiveScene: (sceneId: string) => request<{ ok: true }>('DELETE', `/scenes/${sceneId}`),
@@ -85,6 +86,7 @@ export const api = {
     if (opts.active) q.set('active', '1')
     return request<{ jobs: JobView[] }>('GET', `/jobs?${q}`)
   },
+  job: (id: string) => request<{ job: { id: string; status: string; error: { message?: string } | null }; result: unknown }>('GET', `/jobs/${id}`),
   cancelJob: (id: string) => request<{ ok: true }>('POST', `/jobs/${id}/cancel`, {}),
   resolveJob: (id: string, body: { action: 'not_charged' } | { action: 'attach'; providerJobId: string }) => request<{ ok: true }>('POST', `/jobs/${id}/resolve`, body),
 

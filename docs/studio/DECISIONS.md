@@ -518,3 +518,16 @@ changes what the Studio suggests and checks, never what the owner types.
   price or the price book's credit cost, marked as not confirmed and with
   the reason shown. Identical stills in one run are priced once.
 
+### G6. Punch it up, and scenes reused across characters (owner)
+- **Punch it up** (Scenes tab, next to "What is she doing?"): a quoted
+  Claude call turns a rough idea into three specific moments. Each has one
+  action caught mid-motion, who shoots and from where, the place, time and
+  light, and one small real-life detail. A second person gets a clearly
+  different hair color and cut; sunglasses keep the eyes visible (pushed
+  up, in hand or lowered). The pick fills the box and stays editable.
+- **Use for other characters** (scene page): copies a scene's words and
+  choices to any other characters, with the name swapped. Each character's
+  own sheet refs and signature pieces apply, so those are not copied. A
+  copy is a free draft until it is generated. This is the first step of
+  the Scene library and multi-character runs (SPEC 13.1, R3 and R4).
+

@@ -1,8 +1,10 @@
-import { useState } from 'react'
-import { ArrowRight, Clapperboard, History, Loader2, Plus } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { ArrowRight, Check, Clapperboard, History, Loader2, Plus } from 'lucide-react'
 import { api } from '../../api'
 import { useRefresh, useScenes } from '../../hooks'
 import { Field, Img, Todo, errorMessage, useToast } from '../../ui'
+import { PriceButton } from '../../PriceButton'
 import type { CharacterView, SceneView, ScenesData } from '../../types'
 import { SceneEditor } from './SceneEditor'
 
@@ -10,9 +12,9 @@ import { SceneEditor } from './SceneEditor'
 // Claude plan the details (or fill them in), see the price, generate. The
 // character's rules (outfit, footwear, refs by angle, no logos, the combo
 // log) are applied for you.
-export function ScenesTab({ v, goSheet }: { v: CharacterView; goSheet: () => void }) {
+export function ScenesTab({ v, goSheet, openScene = null }: { v: CharacterView; goSheet: () => void; openScene?: string | null }) {
   const q = useScenes(v.id)
-  const [open, setOpen] = useState<string | null>(null)
+  const [open, setOpen] = useState<string | null>(openScene)
   const ready = !!v.sheet.shots[0]?.approved
 
   if (!ready) {
@@ -52,6 +54,10 @@ function NewScene({ v, onCreated }: { v: CharacterView; onCreated: (id: string) 
   const refresh = useRefresh()
   const [brief, setBrief] = useState('')
   const [busy, setBusy] = useState(false)
+  const [ideasJob, setIdeasJob] = useState<string | null>(null)
+  // The rough idea the price is for, settled while typing.
+  const [rough, setRough] = useState('')
+  useEffect(() => { const t = setTimeout(() => setRough(brief.trim()), 500); return () => clearTimeout(t) }, [brief])
   const ideas = ((v.data.persona as { settings?: string[] }).settings ?? []).slice(0, 8)
   async function start() {
     if (!brief.trim() || busy) return
@@ -76,6 +82,13 @@ function NewScene({ v, onCreated }: { v: CharacterView; onCreated: (id: string) 
           onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) void start() }}
         />
       </Field>
+      <div className="st-row" style={{ gap: 10, flexWrap: 'wrap' }}>
+        {rough.length >= 3
+          ? <PriceButton action={{ type: 'scene_ideas', characterId: v.id, idea: rough }} label="Punch it up" variant="secondary" size="sm" onStarted={ids => setIdeasJob(ids[0] ?? null)} />
+          : null}
+        <span className="st-hint">{rough.length >= 3 ? 'Turns your rough idea into 3 specific moments to pick from. You can still edit the one you pick.' : 'Write a rough idea, then Punch it up turns it into 3 specific moments to pick from.'}</span>
+      </div>
+      {ideasJob && <IdeaOptions jobId={ideasJob} current={brief} onPick={text => setBrief(text)} onClose={() => setIdeasJob(null)} />}
       {ideas.length > 0 && (
         <div className="st-row" style={{ gap: 6, flexWrap: 'wrap' }}>
           <span className="st-hint">Ideas:</span>
@@ -86,6 +99,47 @@ function NewScene({ v, onCreated }: { v: CharacterView; onCreated: (id: string) 
       <div className="st-row">
         <button className="st-btn primary" disabled={!brief.trim() || busy} onClick={start}>{busy ? <Loader2 size={16} className="st-spin" /> : <Plus size={16} />}Start this scene</button>
         <span className="st-hint">Free. Next you plan the details and see the price before anything runs.</span>
+      </div>
+    </div>
+  )
+}
+
+interface Idea { moment: string; shooter: string; place: string; detail: string; other_person: string }
+const DONE = ['completed', 'failed', 'canceled', 'needs_attention']
+// No em-dashes in anything shown or saved (SPEC 5.7 rule 42).
+const clean = (s: string) => s.replace(/\s*\u2014\s*/g, ', ').trim()
+
+// The three options from "Punch it up". Picking one fills the box; it stays
+// editable, and another option can still be picked.
+function IdeaOptions({ jobId, current, onPick, onClose }: { jobId: string; current: string; onPick: (text: string) => void; onClose: () => void }) {
+  const q = useQuery({
+    queryKey: ['job', jobId],
+    queryFn: () => api.job(jobId),
+    refetchInterval: query => (DONE.includes(query.state.data?.job.status ?? '') ? false : 1500),
+  })
+  const status = q.data?.job.status
+  const options = ((q.data?.result as { options?: Idea[] } | null)?.options ?? []).slice(0, 3)
+  if (!status || !DONE.includes(status)) {
+    return <div className="st-row st-hint" style={{ gap: 8 }}><Loader2 size={14} className="st-spin" />Writing 3 specific moments...</div>
+  }
+  if (status !== 'completed' || !options.length) {
+    return <div className="st-price-error" role="alert"><span className="msg">{q.data?.job.error?.message ?? 'No options came back.'} Press Punch it up to try again; a failed run is not charged.</span><button className="st-btn sm ghost" onClick={onClose}>Close</button></div>
+  }
+  return (
+    <div className="st-col" style={{ gap: 8 }}>
+      <div className="st-row"><span className="st-label">Pick one</span><span className="st-spacer" /><button className="st-btn sm ghost" onClick={onClose}>Hide</button></div>
+      <div className="st-ideas">
+        {options.map((o, i) => {
+          const text = clean(o.moment)
+          const on = current.trim() === text
+          return (
+            <button key={i} type="button" className={`st-choice ${on ? 'on' : ''}`} onClick={() => onPick(text)}>
+              <span className="st-row" style={{ gap: 8, alignItems: 'flex-start' }}><span style={{ flex: 1 }}>{text}</span>{on && <Check size={14} />}</span>
+              <span className="st-hint">{[o.shooter, o.place, o.detail].map(clean).filter(Boolean).join(' · ')}</span>
+              {o.other_person && <span className="st-hint">Also in it: {clean(o.other_person)}</span>}
+            </button>
+          )
+        })}
       </div>
     </div>
   )

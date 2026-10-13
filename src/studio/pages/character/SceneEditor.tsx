@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Check, Info, Loader2, Sparkles, Trash2, Wand2 } from 'lucide-react'
+import { ArrowLeft, Check, Copy, Info, Loader2, Sparkles, Trash2, Wand2 } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import { api } from '../../api'
-import { useRefresh } from '../../hooks'
+import { useCharacters, useRefresh } from '../../hooks'
 import { PriceButton } from '../../PriceButton'
-import { Field, Img, SectionProgress, errorMessage, useToast, type TodoItem } from '../../ui'
+import { Field, Img, Modal, SectionProgress, errorMessage, useToast, type TodoItem } from '../../ui'
 import type { CharacterView, SceneFields, SceneStill, SceneView, ScenesData } from '../../types'
 import { StillDrawer, STILL_STATUS, OP_LABEL } from './StillDrawer'
 
@@ -59,6 +60,7 @@ export function SceneEditor({ v, data, scene, onBack }: { v: CharacterView; data
   const [title, setTitle] = useState(scene.title)
   const [saving, setSaving] = useState<'idle' | 'saving' | 'saved'>('idle')
   const [open, setOpen] = useState<string | null>(null)
+  const [copying, setCopying] = useState(false)
   const dirty = useRef<Partial<SceneFields>>({})
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -115,6 +117,7 @@ export function SceneEditor({ v, data, scene, onBack }: { v: CharacterView; data
         <button className="st-btn ghost sm" onClick={async () => { if (timer.current) { clearTimeout(timer.current); timer.current = null; await flush() } onBack() }}><ArrowLeft size={14} />Scenes</button>
         <span className="st-spacer" />
         <SaveState state={saving} />
+        <button className="st-btn ghost sm" onClick={async () => { if (timer.current) { clearTimeout(timer.current); timer.current = null; await flush() } setCopying(true) }} title="Copy this scene to other characters"><Copy size={14} />Use for other characters</button>
         <button className="st-btn ghost sm" onClick={archive} title="Archive this scene (its stills are kept)"><Trash2 size={14} />Archive</button>
       </div>
 
@@ -149,7 +152,57 @@ export function SceneEditor({ v, data, scene, onBack }: { v: CharacterView; data
       </section>
 
       <StillDrawer v={v} data={data} scene={scene} still={still} onClose={() => setOpen(null)} onOpen={setOpen} />
+      <CopyScene v={v} scene={scene} open={copying} onClose={() => setCopying(false)} />
     </div>
+  )
+}
+
+// Reuse this scene for other characters: their own sheet refs and signature
+// pieces apply, and each copy is a free draft until it is generated.
+function CopyScene({ v, scene, open, onClose }: { v: CharacterView; scene: SceneView; open: boolean; onClose: () => void }) {
+  const chars = useCharacters()
+  const toast = useToast()
+  const nav = useNavigate()
+  const [picked, setPicked] = useState<string[]>([])
+  const [busy, setBusy] = useState(false)
+  const [done, setDone] = useState<Array<{ characterId: string; sceneId: string; name: string }>>([])
+  useEffect(() => { if (open) { setPicked([]); setDone([]) } }, [open])
+  const others = (chars.data?.characters ?? []).filter(c => c.id !== v.id)
+  async function copy() {
+    setBusy(true)
+    try { setDone((await api.copyScene(scene.id, picked)).copies) } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) } finally { setBusy(false) }
+  }
+  return (
+    <Modal open={open} onClose={onClose}>
+      <div className="st-card-body st-col" style={{ gap: 14 }}>
+        <div><div className="st-kicker">Use for other characters</div><div className="st-h2">{scene.title || 'This scene'}</div><p className="st-sub" style={{ margin: '6px 0 0' }}>The words and choices carry over with the name swapped. Each character uses their own sheet and signature pieces. Free; nothing runs until you generate.</p></div>
+        {done.length ? (
+          <div className="st-col" style={{ gap: 8 }}>
+            {done.map(d => (
+              <div key={d.sceneId} className="st-row" style={{ gap: 8 }}><Check size={14} style={{ color: 'var(--st-ok)' }} /><span className="grow">Copied to {d.name}</span><button className="st-btn sm" onClick={() => { onClose(); nav(`/studio/c/${d.characterId}?tab=scenes&scene=${d.sceneId}`) }}>Open</button></div>
+            ))}
+            <div className="st-row"><span className="st-spacer" /><button className="st-btn primary" onClick={onClose}>Done</button></div>
+          </div>
+        ) : others.length === 0 ? (
+          <p className="st-hint" style={{ margin: 0 }}>No other characters yet. Create or import one, then come back.</p>
+        ) : (
+          <>
+            <Field id="copy-characters" label="Characters" required done={picked.length > 0} group>
+              <div className="st-col" style={{ gap: 6 }}>
+                {others.map(c => (
+                  <label key={c.id} className="st-row" style={{ gap: 10, cursor: 'pointer' }}>
+                    <input type="checkbox" checked={picked.includes(c.id)} onChange={e => setPicked(p => (e.target.checked ? [...p, c.id] : p.filter(x => x !== c.id)))} />
+                    <span>{c.name}</span>
+                    {c.progress.approved === 0 && <span className="st-hint">no sheet yet; the copy waits until REF-00 is approved</span>}
+                  </label>
+                ))}
+              </div>
+            </Field>
+            <div className="st-row"><span className="st-spacer" /><button className="st-btn ghost" onClick={onClose}>Cancel</button><button className="st-btn primary" disabled={!picked.length || busy} onClick={copy}>{busy ? <Loader2 size={15} className="st-spin" /> : <Copy size={15} />}{picked.length > 1 ? `Copy to ${picked.length} characters` : 'Copy'}</button></div>
+          </>
+        )}
+      </div>
+    </Modal>
   )
 }
 

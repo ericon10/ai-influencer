@@ -305,6 +305,11 @@ Decisions: `DECISIONS.md` F1 to F6, then G1 to G3 (defaults, not locks).
 - [x] Tests: no default can block a run (`rulebook.test.ts`)
 - [ ] Re-import Callie's updated file in production (only the mole fixed)
 
+### 2.4c Faster scenes (DECISIONS G6)
+- [x] Punch it up: three specific moments from a rough idea (quoted)
+- [x] Use a scene for other characters (free copies, name swapped)
+- [x] QA leads with where the mole belongs when a side is in doubt
+
 ### 2.5 Live
 - [ ] First live scene for Callie (Nano Banana 2.1 on the account, GPT Image
       2.5 Flare on the API), after the owner sees the quote

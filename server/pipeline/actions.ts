@@ -20,7 +20,7 @@ import { identityForModel } from '../core/identity.js'
 import type { RealismWarning } from '../core/realism.js'
 import { assertSuiteCap, buildModelSuite, buildModelTest, startModelSuite, startModelTest } from './modelTests.js'
 import { approvedAssets, getCandidate, getCharacter, getRef, inspirationAssetIds, setCharacterFields, sheetState, toData } from './characters.js'
-import { buildScenePlan, buildSceneRecheck, buildSceneRun, buildSceneEdit, buildSceneUpscale, type SceneBuilt } from './sceneActions.js'
+import { buildSceneIdeas, buildScenePlan, buildSceneRecheck, buildSceneRun, buildSceneEdit, buildSceneUpscale, type SceneBuilt } from './sceneActions.js'
 import { markSceneBusy } from './scenes.js'
 import { ruleSwitches } from './rules.js'
 import { readBilling } from '../providers/billing.js'
@@ -52,6 +52,7 @@ export const actionSchema = z.discriminatedUnion('type', [
   // Scenes (Stage 7): plan the fields from the owner's words, then stills on
   // one or two models with QA (and the drift lock after a trained character).
   z.object({ type: z.literal('scene_plan'), characterId: z.string(), sceneId: z.string() }),
+  z.object({ type: z.literal('scene_ideas'), characterId: z.string(), idea: z.string().trim().min(3).max(600) }),
   z.object({
     type: z.literal('scene'), characterId: z.string(), sceneId: z.string(),
     models: z.array(z.string()).min(1).max(4), variations: z.number().int().min(1).max(8),
@@ -164,6 +165,7 @@ export async function buildAction(deps: Deps, ctx: Ctx, action: StudioAction): P
 
   switch (action.type) {
     case 'scene_plan': return scene(await buildScenePlan(deps, ctx, row, action.sceneId))
+    case 'scene_ideas': return scene(await buildSceneIdeas(deps, ctx, row, action.idea))
     case 'scene': return scene(await buildSceneRun(deps, ctx, row, action))
     case 'scene_edit': return scene(await buildSceneEdit(deps, ctx, row, action))
     case 'scene_upscale': return scene(await buildSceneUpscale(deps, ctx, row, action.candidateId))
