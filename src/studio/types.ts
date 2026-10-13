@@ -246,3 +246,10 @@ export interface ContentData {
     maxUploadMb: number
   }
 }
+
+// The worker light in the header (server/jobs/workerStatus.ts).
+export interface WorkerStatus {
+  state: 'ready' | 'restarting' | 'down'; message: string; version: string | null; expected: string | null
+  commit: string | null; startedAt: string | null; lastSeenAt: string | null; inProcess: boolean
+}
+

@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { AlertTriangle, Info, Loader2, Receipt, RotateCcw, Sparkles } from 'lucide-react'
 import { api, ApiError } from './api'
-import { useRefresh } from './hooks'
+import { useRefresh, useWorkerGate } from './hooks'
 import type { StudioAction } from './types'
 import { Callout, Modal, PromptViewer, Todo, errorMessage, useToast, type TodoItem } from './ui'
 
@@ -57,7 +57,10 @@ export function PriceButton({ action, label, variant = 'primary', size = 'normal
   const [details, setDetails] = useState(false)
   const key = ['estimate', JSON.stringify(action)]
   const blockers: TodoItem[] = [...todo, ...(disabledReason ? [{ label: disabledReason }] : [])]
-  const held = blockers.length > 0 || !!waiting
+  // While the worker restarts or is down, nothing starts (it would wait, or
+  // run on old code); the reason shows instead.
+  const worker = useWorkerGate()
+  const held = blockers.length > 0 || !!waiting || !worker.ready
   const est = useQuery({
     queryKey: key,
     queryFn: ({ signal }) => estimateWithin(action!, signal),
@@ -110,6 +113,7 @@ export function PriceButton({ action, label, variant = 'primary', size = 'normal
   return (
     <div className="st-col" style={{ gap: 8, alignItems: 'flex-start' }}>
       <Todo items={blockers} />
+      {!worker.ready && <span className="st-hint st-warntext" role="status"><AlertTriangle size={12} style={{ verticalAlign: -2 }} /> {worker.reason}</span>}
       {waiting && !blockers.length && <span className="st-hint st-row" style={{ gap: 6 }}><Loader2 size={13} className="st-spin" />{waiting}</span>}
       <div className="st-row" style={{ gap: 6 }}>
         <button className={cls} disabled={disabled} onClick={go} title={blockers.map(b => b.label).join(', ') || estimateError || undefined}>

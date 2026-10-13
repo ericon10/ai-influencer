@@ -3,6 +3,7 @@ import { timingSafeEqual } from 'node:crypto'
 import { buildDeps } from './bootstrap.js'
 import { startWorker } from './jobs/runner.js'
 import { wakeToken } from './jobs/wake.js'
+import { workerVersion } from './jobs/workerStatus.js'
 
 // The job worker (Railway). Generation runs on the providers' side; this
 // process submits, polls, downloads, strips audio, and runs QA, seam joins
@@ -25,7 +26,7 @@ const server = port
   ? createServer((req, res) => {
       if (req.method === 'GET' && req.url === '/health') {
         // The commit it runs (Railway sets it), so a deploy can be confirmed.
-        res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ ok: true, commit: process.env.RAILWAY_GIT_COMMIT_SHA?.slice(0, 7) ?? null }))
+        res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ ok: true, commit: process.env.RAILWAY_GIT_COMMIT_SHA?.slice(0, 7) ?? null, version: workerVersion() }))
         return
       }
       if (req.method === 'POST' && req.url === '/wake') {

@@ -13,6 +13,8 @@ import { hashPassword, verifyPassword } from './lib/passwords.js'
 import { registerPipelineHooks } from './pipeline/hooks.js'
 import { createFaceMatcher } from './qa/faces.js'
 import { systemClock, type Deps } from './context.js'
+import { setWakeFailureHandler } from './jobs/wake.js'
+import { recordWakeFailure } from './jobs/workerStatus.js'
 
 // Builds every service from the environment. Used by the dev server, the
 // worker, and the Vercel function.
@@ -34,6 +36,8 @@ export async function buildDeps(env: Env = loadEnv()): Promise<{ deps: Deps; han
   const deps: Deps = { db: handle.db, store, vault, env, config, providers, faces, clock: systemClock, log: logger }
   depsRef.current = deps
   registerPipelineHooks()
+  // A wake call the worker refused or never received shows as "Worker down".
+  setWakeFailureHandler(message => recordWakeFailure(deps, message).catch(() => undefined))
   await ensureOwner(deps)
   return { deps, handle }
 }

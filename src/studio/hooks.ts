@@ -16,6 +16,7 @@ export const keys = {
   settings: ['settings'] as const,
   higgsfieldAccount: ['higgsfield-account'] as const,
   content: ['content'] as const,
+  worker: ['worker'] as const,
 }
 
 export function useMe() {
@@ -75,6 +76,27 @@ export function useScenes(characterId: string) {
     // Keep looking while a job runs or anything is still being checked.
     refetchInterval: q => (busy || q.state.data?.scenes.some(s => s.candidates.some(c => c.status === 'qa_pending')) ? 1500 : false),
   })
+}
+
+// The worker light: read from the database (it never wakes the worker), every
+// 30 seconds, and every 5 while the worker is not ready.
+export function useWorker() {
+  return useQuery({
+    queryKey: keys.worker,
+    queryFn: api.worker,
+    refetchInterval: q => (q.state.data && q.state.data.state !== 'ready' ? 5000 : 30_000),
+    retry: false,
+  })
+}
+
+// Whether work can start now. While the worker is restarting or down, every
+// button that starts work says why instead of queueing a job that would wait
+// (or run on old code).
+export function useWorkerGate(): { ready: boolean; reason: string | null } {
+  const w = useWorker()
+  const s = w.data
+  if (!s || s.state === 'ready') return { ready: true, reason: null }
+  return { ready: false, reason: s.state === 'restarting' ? 'The worker is restarting after an update. Try again in a few minutes.' : 'The worker is down, so nothing would run. Check Railway.' }
 }
 
 // The content builder: polls while a render or a B-roll upload is working.

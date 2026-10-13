@@ -255,6 +255,26 @@ export const scenes = pgTable('scenes', {
   archivedAt: timestamp('archived_at', { withTimezone: true }),
 }, t => [index('scenes_char_idx').on(t.characterId, t.createdAt)])
 
+// ── System: the job worker's status (shared infrastructure, no tenant data)
+
+// One row ('main'). The worker writes its code version when it starts and
+// "last seen" while it works; the API writes failed wake calls. The Studio
+// reads it for the worker light in the header, without waking the worker.
+export const workerStatus = pgTable('worker_status', {
+  id: text('id').primaryKey(),
+  version: text('version'),
+  commit: text('commit'),
+  startedAt: timestamp('started_at', { withTimezone: true }),
+  lastSeenAt: timestamp('last_seen_at', { withTimezone: true }),
+  wakeFailedAt: timestamp('wake_failed_at', { withTimezone: true }),
+  wakeError: text('wake_error'),
+  // The code version the API has waited for the worker to report, and since
+  // when (a deploy that never arrives turns the light red).
+  waitingFor: text('waiting_for'),
+  waitingSince: timestamp('waiting_since', { withTimezone: true }),
+  updatedAt: updatedAt(),
+})
+
 // ── Content builder (text overlays, owner 2026-10-13) ───────────────
 
 // The owner's own clips (screen recordings, phone video of a laptop), tagged

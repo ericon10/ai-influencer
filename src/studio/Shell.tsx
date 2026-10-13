@@ -3,7 +3,7 @@ import { Link, NavLink } from 'react-router-dom'
 import { Activity, AlertTriangle, CheckCircle2, Circle, Clapperboard, Gauge, Loader2, Moon, Settings2, Sparkle, Sun, Users, XCircle } from 'lucide-react'
 import { useTheme } from '../context/theme'
 import { api } from './api'
-import { useActiveJobs, useMe, useRefresh, useUsage } from './hooks'
+import { useActiveJobs, useMe, useRefresh, useUsage, useWorker } from './hooks'
 import { Drawer, JobBadge, Meter, errorMessage, useToast } from './ui'
 import type { JobView } from './types'
 
@@ -24,6 +24,7 @@ export function Shell({ children }: { children: ReactNode }) {
           <span className="st-brand-mark"><Sparkle size={17} strokeWidth={2.4} /></span>
           <span className="st-brand-name">Character <em>Studio</em></span>
         </Link>
+        <WorkerLight />
         <nav className="st-nav">
           <NavLink to="/studio" end className={({ isActive }) => `st-nav-item ${isActive ? 'active' : ''}`}><Users size={17} />Characters</NavLink>
           <NavLink to="/studio/content" className={({ isActive }) => `st-nav-item ${isActive ? 'active' : ''}`}><Clapperboard size={17} />Content</NavLink>
@@ -101,3 +102,22 @@ export function ActivityList({ jobs }: { jobs: JobView[] }) {
     </div>
   )
 }
+
+// Green "Worker ready" with the code version, yellow "Worker restarting"
+// after a push, red "Worker down". The message says what it means.
+function WorkerLight() {
+  const w = useWorker()
+  const s = w.data
+  if (!s) return null
+  const label = s.state === 'ready' ? 'Worker ready' : s.state === 'restarting' ? 'Worker restarting' : 'Worker down'
+  const version = s.inProcess ? 'local' : s.commit ?? s.version ?? ''
+  return (
+    <div className={`st-worker ${s.state}`} title={`${s.message}${s.version ? ` Code version ${s.version}${s.commit ? ` (commit ${s.commit})` : ''}.` : ''}`} role="status">
+      <span className="st-worker-dot" />
+      <span className="grow">{label}</span>
+      {s.state === 'ready' && version && <span className="st-worker-ver">{version}</span>}
+      {s.state !== 'ready' && <span className="st-worker-msg">{s.message}</span>}
+    </div>
+  )
+}
+

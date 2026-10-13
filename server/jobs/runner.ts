@@ -9,6 +9,7 @@ import type { Ctx, Deps } from '../context.js'
 import { newId, newToken } from '../lib/ids.js'
 import { AppError, notFound } from '../lib/errors.js'
 import { safeEqual, sha256Hex } from '../lib/passwords.js'
+import { reportWorkerStart, touchWorker, workerVersion } from './workerStatus.js'
 import { appendLedger } from '../costs/ledger.js'
 import { actualGen } from '../costs/pricebook.js'
 import { consumeQuote, createQuote, type QuoteItem, type QuoteView } from '../costs/quotes.js'
@@ -627,10 +628,18 @@ export function startWorker(deps: Deps, opts: { intervalMs?: number; batch?: num
     wakeUp = () => { if (timer) clearTimeout(timer); wakeUp = null; resolve() }
   })
   const running = (async () => {
+    // The worker light in the Studio header: this code's version, then
+    // "still here" while there is work (server/jobs/workerStatus.ts).
+    try {
+      await reportWorkerStart(deps, { version: workerVersion(), commit: process.env.RAILWAY_GIT_COMMIT_SHA?.slice(0, 7) ?? null })
+    } catch (e) {
+      deps.log.error({ err: e }, 'worker could not report its version')
+    }
     while (!stopped) {
       let n = 0
       try {
         n = await tick(deps, opts.batch ?? 5)
+        if (n > 0) await touchWorker(deps)
       } catch (e) {
         deps.log.error({ err: e }, 'worker tick failed')
       }

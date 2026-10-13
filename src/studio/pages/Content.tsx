@@ -4,7 +4,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { Archive, Check, Clapperboard, Copy, Download, Film, Images, Layers, Loader2, Plus, RotateCcw, Upload, X } from 'lucide-react'
 import '@fontsource/tiktok-sans/600.css'
 import { api, assetUrl, downloadUrl } from '../api'
-import { keys, useCharacters, useContent, useScenes } from '../hooks'
+import { keys, useCharacters, useContent, useScenes, useWorkerGate } from '../hooks'
 import { PriceButton } from '../PriceButton'
 import { Callout, Field, Img, Todo, errorMessage, useToast, type TodoItem } from '../ui'
 import type { BatchSpec, BrollClip, ContentData, ContentItem, ContentKind, MemeSpec, SceneStill, ScenesData, SlideshowSpec } from '../types'
@@ -254,17 +254,19 @@ function ExportPanel({ item, todo, saving, flush, label, children }: { item: Con
   }
   const o = item.outputs
   const rendering = item.status === 'rendering'
+  const worker = useWorkerGate()
   return (
     <div className="st-col" style={{ gap: 10 }}>
       <Todo items={todo} />
       <div className="st-row" style={{ gap: 10, flexWrap: 'wrap' }}>
-        <button className="st-btn primary big" disabled={todo.length > 0 || saving || starting || rendering} onClick={go}>
+        <button className="st-btn primary big" disabled={todo.length > 0 || saving || starting || rendering || !worker.ready} onClick={go}>
           {starting || rendering ? <Loader2 size={16} className="st-spin" /> : item.status === 'ready' || item.status === 'failed' ? <RotateCcw size={16} /> : <Download size={16} />}
           {rendering ? (o.total ? `Rendering ${Math.min((o.done ?? 0) + (o.failed ?? 0) + 1, o.total)} of ${o.total}...` : 'Rendering...') : item.status === 'ready' || item.status === 'failed' ? `${label} again` : label}
           <span className="st-price">Free</span>
         </button>
         {saving && <span className="st-hint st-row" style={{ gap: 6 }}><Loader2 size={13} className="st-spin" />Saving...</span>}
       </div>
+      {!worker.ready && <span className="st-hint st-warntext" role="status">{worker.reason}</span>}
       <span className="st-hint">Renders on the Studio's worker: no provider, no cost. 9:16, no sound. {AI_LABEL}</span>
       {item.status === 'failed' && item.error && <Callout tone="bad">{item.error}</Callout>}
       {children}
@@ -485,6 +487,7 @@ function BrollTab({ data }: { data: ContentData }) {
   const [filter, setFilter] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const input = useRef<HTMLInputElement | null>(null)
+  const worker = useWorkerGate()
   async function upload(files: File[]) {
     const videos = files.filter(f => f.type.startsWith('video/') || /\.(mp4|mov|webm)$/i.test(f.name))
     if (!videos.length) { toast({ tone: 'bad', text: 'Pick video files (MP4, MOV or WebM).' }); return }
@@ -506,8 +509,9 @@ function BrollTab({ data }: { data: ContentData }) {
           <input className="st-input" style={{ maxWidth: 260 }} list="broll-products" value={product} onChange={e => setProduct(e.target.value)} placeholder="Product, e.g. Notion" aria-label="Product" />
           <datalist id="broll-products">{data.products.map(p => <option key={p} value={p} />)}</datalist>
           <input ref={input} type="file" accept="video/mp4,video/quicktime,video/webm" multiple hidden onChange={e => { const f = Array.from(e.target.files ?? []); e.target.value = ''; void upload(f) }} />
-          <button className="st-btn primary" disabled={!!busy} onClick={() => input.current?.click()}>{busy ? <Loader2 size={15} className="st-spin" /> : <Upload size={15} />}Upload videos</button>
+          <button className="st-btn primary" disabled={!!busy || !worker.ready} onClick={() => input.current?.click()}>{busy ? <Loader2 size={15} className="st-spin" /> : <Upload size={15} />}Upload videos</button>
           {busy && <span className="st-hint">{busy}</span>}
+          {!worker.ready && <span className="st-hint st-warntext" role="status">{worker.reason} Uploads are prepared by the worker.</span>}
         </div>
       </div></section>
       {data.products.length > 0 && (

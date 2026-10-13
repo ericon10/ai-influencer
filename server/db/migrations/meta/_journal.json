@@ -50,6 +50,13 @@
       "when": 1791920325021,
       "tag": "0006_content_builder",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1791922934565,
+      "tag": "0007_worker_status",
+      "breakpoints": true
     }
   ]
 }

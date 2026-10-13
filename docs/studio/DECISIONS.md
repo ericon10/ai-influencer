@@ -674,3 +674,25 @@ changes what the Studio suggests and checks, never what the owner types.
   file; the owner is getting written permission from its author
   (SPEC 2).
 
+
+### G14. Worker light (owner)
+- The header shows the worker's state: green "Worker ready" with the
+  code version, yellow "Worker restarting" after a push, red "Worker
+  down". It is read from the database (`worker_status`), never by
+  calling the worker, so an open tab does not keep it awake.
+- The code version is a hash of the files the worker is built from
+  (`server/lib/codeVersion.ts`). The API and the worker compute it the
+  same way, so a mismatch means the worker deploy is still rolling out.
+- While the light is not green, every button that starts work is held,
+  with the reason shown, instead of leaving jobs at "Preparing...".
+
+### G15. UX plan approved (owner)
+- `UX-PLAN.md` is the layout: Posts home, one workspace per post with a
+  stepper, drawers for the Library and characters, Settings tabs for
+  Usage and Rules. Every new feature fits it or updates it first.
+- Picking a take keeps it. "Write and generate" and the auto-written
+  video prompt (when a still is used) are in, both priced first.
+- The mole above the left brow is the only fixed mark; the ear cuff is
+  jewelry, a default like any outfit choice.
+- Batch rotates several clips and B-roll clips across its captions.
+- Every post has "Make another like this" and an account tag.

@@ -13,6 +13,11 @@ export function wakeToken(sessionSecret: string): string {
 
 let last = 0
 
+// Set at boot (bootstrap) so a failed wake is recorded for the worker light,
+// without this module depending on the database.
+let onWakeFailure: ((message: string) => Promise<void>) | null = null
+export function setWakeFailureHandler(fn: ((message: string) => Promise<void>) | null): void { onWakeFailure = fn }
+
 // The worker's address as people paste it: with or without https://, with
 // or without a trailing slash.
 export function workerBaseUrl(raw: string | undefined): string | null {
@@ -39,10 +44,13 @@ async function send(deps: Pick<Deps, 'env' | 'log'>, url: string): Promise<void>
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), 2500)
   try {
-    await fetch(`${url}/wake`, { method: 'POST', headers: { Authorization: `Bearer ${wakeToken(deps.env.STUDIO_SESSION_SECRET)}` }, signal: controller.signal })
+    const res = await fetch(`${url}/wake`, { method: 'POST', headers: { Authorization: `Bearer ${wakeToken(deps.env.STUDIO_SESSION_SECRET)}` }, signal: controller.signal })
+    // A refusal or a server error is a worker that is down (the header shows it).
+    if (!res.ok) await onWakeFailure?.(`the worker answered ${res.status}`)
   } catch (e) {
     // A cold worker may take longer than the timeout to answer; the request
-    // still starts it.
+    // still starts it. Anything else (no route, refused) is a failure.
+    if ((e as Error).name !== 'AbortError') await onWakeFailure?.((e as Error).message)
     deps.log.info({ err: (e as Error).message }, 'worker wake sent')
   } finally {
     clearTimeout(timer)

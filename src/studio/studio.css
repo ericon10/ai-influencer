@@ -705,3 +705,17 @@ button.st-chip:hover { color: var(--st-text); border-color: var(--st-text-3); }
 .st-captionbox span {
   box-decoration-break: clone; -webkit-box-decoration-break: clone; white-space: pre-wrap;
 }
+
+/* The worker light: green ready, yellow restarting, red down. */
+.st-worker {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin: 0 6px 12px; padding: 7px 10px;
+  border-radius: 10px; border: 1px solid var(--st-line); font-size: 12px; font-weight: 600; color: var(--st-text);
+}
+.st-worker-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--st-ok); box-shadow: 0 0 0 3px var(--st-ok-soft); }
+.st-worker.restarting .st-worker-dot { background: var(--st-warn); box-shadow: 0 0 0 3px rgba(245, 180, 60, 0.18); }
+.st-worker.down .st-worker-dot { background: var(--st-bad); box-shadow: 0 0 0 3px rgba(240, 80, 70, 0.18); }
+.st-worker.restarting { border-color: rgba(245, 180, 60, 0.45); }
+.st-worker.down { border-color: rgba(240, 80, 70, 0.5); }
+.st-worker-ver { font-family: var(--st-mono, ui-monospace, monospace); font-size: 11px; font-weight: 500; color: var(--st-text-2); }
+.st-worker-msg { flex-basis: 100%; font-size: 11px; font-weight: 400; line-height: 1.4; color: var(--st-text-2); }
+

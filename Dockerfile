@@ -10,8 +10,12 @@ COPY package.json package-lock.json ./
 RUN npm ci --no-audit --no-fund
 COPY tsconfig.json ./
 COPY server ./server
+COPY config ./config
 COPY scripts ./scripts
-RUN npm run build:worker && STUDIO_MODELS_DIR=/app/models node scripts/fetch-models.mjs
+# The code version the worker reports (server/lib/codeVersion.ts); the API
+# hashes the same files, so a mismatch means this deploy is still rolling out.
+RUN npm run build:worker && npx tsx scripts/code-version.ts > dist-worker/code-version.txt \
+  && STUDIO_MODELS_DIR=/app/models node scripts/fetch-models.mjs
 
 # Run: production dependencies, ffmpeg, the bundle, config and migrations.
 FROM node:22-slim

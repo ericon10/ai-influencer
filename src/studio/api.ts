@@ -1,4 +1,4 @@
-import type { ActionPreview, CharacterSummary, CharacterView, HiggsfieldAccount, JobView, Me, QuoteView, RulesView, SceneFields, ScenesData, SettingsView, StudioAction, Usage, VideoPrice, BrollClip, ContentData, ContentKind } from './types'
+import type { ActionPreview, CharacterSummary, CharacterView, HiggsfieldAccount, JobView, Me, QuoteView, RulesView, SceneFields, ScenesData, SettingsView, StudioAction, Usage, VideoPrice, BrollClip, ContentData, ContentKind, WorkerStatus } from './types'
 import { sheetRefOf, typeOf, uploadFiles } from './files'
 
 // Thin client for /api/v1. Every write sends the CSRF header the server
@@ -78,6 +78,7 @@ export const api = {
   updateScene: (sceneId: string, body: { brief?: string; title?: string; fields?: Partial<SceneFields>; prompts?: { still?: string; video?: string }; fromTemplate?: boolean }) => request<{ id: string }>('PATCH', `/scenes/${sceneId}`, body),
   videoPrices: (characterId: string, duration: number, aspect: string) => request<{ prices: VideoPrice[] }>('GET', `/characters/${characterId}/video-prices?duration=${duration}&aspect=${encodeURIComponent(aspect)}`),
   setVideoModel: (model: string) => request<{ model: string }>('PUT', '/settings/video-model', { model }),
+  worker: () => request<WorkerStatus>('GET', '/worker'),
   // The content builder.
   content: () => request<ContentData>('GET', '/content'),
   addBroll: async (file: File, product: string, onProgress?: (done: number, total: number) => void) => {

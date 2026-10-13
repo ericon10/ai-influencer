@@ -17,6 +17,7 @@ import { actionSchema, estimateAction, runAction } from '../pipeline/actions.js'
 import { createCharacter, getCandidate, getCharacter, linkInspiration, listCharacters, setCharacterFields, updateCharacter } from '../pipeline/characters.js'
 import { approveSceneCandidate, archiveScene, copyScene, createScene, cropCandidate, saveVideoModel, updateScene } from '../pipeline/scenes.js'
 import { videoPrices } from '../pipeline/sceneActions.js'
+import { expectedVersion, readWorkerStatus } from '../jobs/workerStatus.js'
 import { addBroll, archiveBroll, archiveContent, contentView, createContent, startRender, updateBroll, updateContent } from '../pipeline/content.js'
 import { rulesView, setRuleSwitch } from '../pipeline/rules.js'
 import { chooseConcept } from '../pipeline/concepts.js'
@@ -121,7 +122,7 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
   app.notFound(c => c.json({ error: { code: 'not_found', message: 'No such endpoint.' } }, 404))
 
   // ── Public: health, webhooks, signed asset links ──
-  app.get('/health', c => c.json({ ok: true }))
+  app.get('/health', c => c.json({ ok: true, version: expectedVersion() }))
 
   app.post('/webhooks/:provider/:jobId', async c => {
     const ok = await wakeFromWebhook(deps, c.req.param('provider'), c.req.param('jobId'), c.req.query('t') ?? '')
@@ -536,6 +537,9 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
     }
     return new Response(new Uint8Array(data), { headers })
   })
+
+  // The worker light in the header (read from the database; never wakes it).
+  app.get('/worker', async c => c.json(await readWorkerStatus(deps)))
 
   // ── Content builder: B-roll, meme videos, slideshows, batches ──
   app.get('/content', async c => c.json(await contentView(deps, c.get('ctx'))))

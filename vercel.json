@@ -2,7 +2,7 @@
   "regions": ["iad1"],
   "functions": {
     "api/studio.ts": {
-      "includeFiles": "{config/**,server/db/migrations/**}",
+      "includeFiles": "{config/**,server/**,package.json,package-lock.json}",
       "excludeFiles": "{.data/**,.vercel/**,dist/**,dist-worker/**,fixtures/**,docs/**}"
     }
   },

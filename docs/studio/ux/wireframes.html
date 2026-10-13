@@ -1,0 +1,355 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Studio Wireframes</title>
+<style>
+  :root { --ink: #222; --mid: #777; --line: #bbb; --soft: #eee; --paper: #fafafa; --note: #1f6feb; --ok: #2e9d5b; --warn: #c98a00; --accent: #333; }
+  body { margin: 0; background: #ddd; font: 13px/1.4 system-ui, -apple-system, Segoe UI, sans-serif; color: var(--ink); }
+  .frame { width: 1440px; height: 900px; background: var(--paper); margin: 24px auto; display: flex; position: relative; overflow: hidden; border: 1px solid #999; }
+  .frame.phone { width: 390px; height: 844px; flex-direction: column; border-radius: 28px; }
+  .label { position: absolute; top: 8px; right: 12px; background: #fff; border: 1px dashed var(--note); color: var(--note); padding: 3px 8px; font-weight: 700; font-size: 12px; z-index: 5; }
+  .side { width: 232px; border-right: 1px solid var(--line); padding: 14px 12px; display: flex; flex-direction: column; gap: 6px; background: #f2f2f2; flex: none; }
+  .brand { font-weight: 800; font-size: 16px; margin-bottom: 4px; }
+  .worker { display: flex; align-items: center; gap: 6px; border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; font-weight: 600; font-size: 12px; background: #fff; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--ok); display: inline-block; }
+  .dot.warn { background: var(--warn); } .ver { color: var(--mid); font-family: ui-monospace, monospace; font-size: 11px; margin-left: auto; }
+  .newpost { background: var(--accent); color: #fff; border-radius: 10px; padding: 10px; font-weight: 700; text-align: center; margin: 6px 0; }
+  .nav { padding: 8px 10px; border-radius: 8px; font-weight: 600; }
+  .nav.on { background: #fff; border: 1px solid var(--line); }
+  .foot { margin-top: auto; display: flex; flex-direction: column; gap: 6px; color: var(--mid); font-size: 12px; }
+  .meter { height: 6px; background: var(--soft); border-radius: 4px; } .meter i { display: block; width: 18%; height: 100%; background: #999; border-radius: 4px; }
+  .main { flex: 1; padding: 22px 28px; overflow: hidden; display: flex; flex-direction: column; gap: 14px; position: relative; }
+  .kicker { font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: var(--mid); font-weight: 700; }
+  h1 { margin: 0; font-size: 28px; font-weight: 800; }
+  .row { display: flex; gap: 10px; align-items: center; } .col { display: flex; flex-direction: column; gap: 10px; }
+  .grow { flex: 1; min-width: 0; }
+  .btn { border: 1px solid var(--ink); border-radius: 8px; padding: 6px 12px; font-weight: 600; background: #fff; white-space: nowrap; display: inline-flex; gap: 6px; align-items: center; }
+  .btn.p { background: var(--accent); color: #fff; } .btn.ghost { border-color: var(--line); color: var(--mid); }
+  .btn.big { padding: 10px 18px; font-size: 15px; }
+  .price { background: rgba(255,255,255,.2); border-radius: 5px; padding: 0 6px; } .btn:not(.p) .price { background: var(--soft); }
+  .model { font-size: 11px; color: var(--mid); border: 1px solid var(--line); border-radius: 6px; padding: 2px 6px; }
+  .chip { border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; background: #fff; font-size: 12px; font-weight: 600; }
+  .chip.on { border-color: var(--ink); background: #e4e4e4; }
+  .box { border: 1px solid var(--line); border-radius: 12px; background: #fff; }
+  .pad { padding: 14px; }
+  .img { background: repeating-linear-gradient(45deg, #ddd, #ddd 6px, #e9e9e9 6px, #e9e9e9 12px); border-radius: 8px; position: relative; }
+  .img.v::after { content: "▶"; position: absolute; inset: 0; display: grid; place-items: center; color: #999; font-size: 18px; }
+  .p916 { aspect-ratio: 9 / 16; }
+  .cap { position: absolute; top: 12%; left: 12%; right: 12%; text-align: center; }
+  .cap span { background: #fff; padding: 2px 6px; border-radius: 4px; font-weight: 700; font-size: 11px; box-decoration-break: clone; -webkit-box-decoration-break: clone; line-height: 1.6; }
+  .step { border: 1px solid var(--line); border-radius: 12px; background: #fff; }
+  .step .head { display: flex; align-items: center; gap: 10px; padding: 10px 14px; }
+  .num { width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid var(--ink); display: grid; place-items: center; font-weight: 800; font-size: 12px; flex: none; }
+  .num.done { background: var(--ok); border-color: var(--ok); color: #fff; } .num.wait { border-color: var(--line); color: var(--line); }
+  .step.wait { opacity: .55; } .step.cur { border: 2px solid var(--ink); }
+  .step .body { border-top: 1px solid var(--soft); padding: 14px; display: flex; flex-direction: column; gap: 12px; }
+  .muted { color: var(--mid); } .small { font-size: 11px; }
+  .field { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; background: #fff; color: var(--mid); }
+  .field.req { border: 2px solid #c55; } .field.ok { border: 2px solid var(--ok); color: var(--ink); }
+  .badge { font-size: 10px; font-weight: 800; padding: 1px 6px; border-radius: 5px; background: #fde2e2; color: #b33; }
+  .badge.ok { background: #dff3e6; color: var(--ok); }
+  .tabs { display: inline-flex; border: 1px solid var(--line); border-radius: 10px; padding: 3px; gap: 2px; background: #f0f0f0; }
+  .tabs span { padding: 5px 12px; border-radius: 7px; font-weight: 600; color: var(--mid); }
+  .tabs span.on { background: #fff; color: var(--ink); border: 1px solid var(--line); }
+  .grid { display: grid; gap: 10px; }
+  .note { color: var(--note); font-size: 12px; font-weight: 600; border-left: 3px solid var(--note); padding-left: 8px; }
+  .drawer { position: absolute; top: 0; right: 0; bottom: 0; width: 380px; background: #fff; border-left: 2px solid var(--ink); box-shadow: -12px 0 30px rgba(0,0,0,.12); padding: 16px; display: flex; flex-direction: column; gap: 12px; z-index: 3; }
+  .shade { position: absolute; inset: 0; background: rgba(0,0,0,.18); z-index: 2; }
+  .preview { width: 230px; flex: none; display: flex; flex-direction: column; gap: 8px; }
+  .modeltile { border: 1px solid var(--line); border-radius: 8px; padding: 8px; display: flex; flex-direction: column; gap: 2px; background: #fff; }
+  .modeltile.on { border: 2px solid var(--ink); }
+  .menu { position: absolute; top: 92px; left: 262px; width: 270px; background: #fff; border: 2px solid var(--ink); border-radius: 12px; box-shadow: 0 12px 30px rgba(0,0,0,.15); padding: 8px; z-index: 4; display: flex; flex-direction: column; gap: 4px; }
+  .menu div { padding: 8px 10px; border-radius: 8px; } .menu div b { display: block; }
+  .menu div:hover, .menu .hi { background: #eee; }
+  .empty { border: 2px dashed var(--line); border-radius: 12px; padding: 18px; text-align: center; display: flex; flex-direction: column; gap: 10px; align-items: center; }
+  .editor { position: absolute; inset: 40px; background: #2a2a2a; color: #eee; border-radius: 14px; z-index: 4; display: flex; flex-direction: column; padding: 14px; gap: 10px; box-shadow: 0 20px 60px rgba(0,0,0,.4); }
+  .editor .btn { background: #fff; color: #222; }
+  .track { height: 34px; border-radius: 6px; display: flex; gap: 4px; }
+  .track i { display: block; border-radius: 5px; }
+  .stepper { display: flex; gap: 6px; align-items: center; }
+  .stepper .s { display: flex; align-items: center; gap: 6px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 999px; background: #fff; font-weight: 600; }
+  .stepper .s.cur { border: 2px solid var(--ink); }
+  .stepper .arrow { color: var(--mid); }
+  #f3 .label { right: auto; left: 250px; }
+  .tabbar { margin-top: auto; display: flex; justify-content: space-around; border-top: 1px solid var(--line); padding: 10px 6px 18px; background: #f2f2f2; font-size: 11px; font-weight: 700; }
+  .sheet { position: absolute; left: 0; right: 0; bottom: 0; height: 46%; background: #fff; border-top: 2px solid var(--ink); border-radius: 18px 18px 0 0; padding: 14px; z-index: 3; display: flex; flex-direction: column; gap: 10px; box-shadow: 0 -10px 30px rgba(0,0,0,.15); }
+</style>
+</head>
+<body>
+
+<!-- ── Sidebar used by the desktop frames ── -->
+<template id="side">
+  <div class="side">
+    <div class="brand">Character Studio</div>
+    <div class="worker"><span class="dot"></span>Worker ready<span class="ver">bb4a319</span></div>
+    <div class="newpost">+ New post</div>
+    <div class="nav" data-k="posts">Posts</div>
+    <div class="nav" data-k="characters">Characters</div>
+    <div class="nav" data-k="library">Library</div>
+    <div class="nav" data-k="settings">Settings</div>
+    <div class="foot">
+      <div class="nav" style="padding-left:0">Activity <span class="chip">2 running</span></div>
+      <div>This month · $3.23 / $200</div><div class="meter"><i></i></div>
+      <div class="box pad small">Live · every run shows its price first</div>
+    </div>
+  </div>
+</template>
+
+<!-- 1. Posts home -->
+<div class="frame" id="f1" data-side="posts">
+  <div class="label">1 · Posts (home) · New post menu</div>
+  <div class="main">
+    <div class="row"><div class="grow"><div class="kicker">Posts</div><h1>Your posts</h1></div><span class="btn p big">+ New post ▾</span></div>
+    <div class="row"><div class="tabs"><span class="on">All</span><span>Drafts</span><span>Ready</span><span>Exported</span></div><span class="chip">Callie ▾</span><span class="grow"></span><span class="muted small">Library has every still, clip and B-roll</span></div>
+    <div class="grid" style="grid-template-columns: repeat(6, 1fr)">
+      <div class="col"><div class="img v p916"><div class="cap"><span>me when the AI fixes my code 💀</span></div></div><b>Laptop meltdown</b><span class="small muted">Video post · Ready · Callie</span></div>
+      <div class="col"><div class="img p916"><div class="cap"><span>5 apps that saved my semester</span></div></div><b>5 apps</b><span class="small muted">Slideshow · Exported</span></div>
+      <div class="col"><div class="img v p916"></div><b>Study night x20</b><span class="small muted">Batch · Rendering 12 of 20</span></div>
+      <div class="col"><div class="img p916"></div><b>Cafe morning</b><span class="small muted">Video post · Draft, at step 3 Video</span></div>
+      <div class="col"><div class="img v p916"></div><b>Dance trend clone</b><span class="small muted">Video post · Draft, cloning…</span></div>
+      <div class="col"><div class="empty" style="height:100%;justify-content:center"><b>Start a post</b><span class="small muted">Video post, slideshow or batch</span></div></div>
+    </div>
+    <div class="note">One click opens any post at the step it was left on. Drafts save as you type.</div>
+  </div>
+  <div class="menu">
+    <div class="hi"><b>Video post</b><span class="small muted">A clip (made, cloned or uploaded) with a caption</span></div>
+    <div><b>Slideshow</b><span class="small muted">Stills with a hook and slides</span></div>
+    <div><b>Batch</b><span class="small muted">One clip, many captions, many videos</span></div>
+    <div><b>From a TikTok or Reel</b><span class="small muted">Clone it with your character</span></div>
+  </div>
+</div>
+
+<!-- 2. Video post workspace -->
+<div class="frame" id="f2" data-side="posts">
+  <div class="label">2 · Video post workspace · one page, steps top to bottom</div>
+  <div class="main">
+    <div class="row"><div class="grow"><div class="kicker">Video post · Draft · saved</div><h1>Make a video post</h1></div><span class="chip">Callie ▾</span><span class="model">Spent on this post: 9.1 credits</span></div>
+    <div class="row" style="align-items:flex-start;gap:22px">
+      <div class="col grow">
+        <div class="step"><div class="head"><span class="num done">✓</span><b>Idea</b><span class="muted grow">Callie laughs at her laptop in a cafe when the code finally works</span><span class="btn ghost">Change</span></div></div>
+        <div class="step"><div class="head"><span class="num done">✓</span><b>Stills</b><div class="img" style="width:28px;height:44px"></div><span class="muted grow">1 still used (Nano Banana 2.1)</span><span class="btn ghost">Change</span></div></div>
+        <div class="step cur"><div class="head"><span class="num">3</span><b>Video</b><span class="muted grow">Pick where the clip comes from</span></div>
+          <div class="body">
+            <div class="tabs"><span class="on">Animate a still</span><span>Clone a TikTok or Reel</span><span>Upload a video</span><span>From Library</span></div>
+            <div class="row" style="align-items:flex-start;gap:14px">
+              <div class="col" style="width:90px"><span class="small muted">Start frame</span><div class="img p916"></div></div>
+              <div class="col grow">
+                <span class="small"><b>What happens</b> <span class="badge ok">DONE</span></span>
+                <div class="field ok">Callie laughs and leans back from the laptop</div>
+                <span class="small"><b>Video model</b></span>
+                <div class="grid" style="grid-template-columns:repeat(5,1fr)">
+                  <div class="modeltile on"><b>Kling 3.0 Pro</b><span class="small">7.5 credits</span></div>
+                  <div class="modeltile"><b>Kling 3.0 Std</b><span class="small">5 credits</span></div>
+                  <div class="modeltile"><b>Seedance 2.0</b><span class="small">from $0.71</span></div>
+                  <div class="modeltile"><b>Seedance 2.5</b><span class="small">35 credits</span></div>
+                  <div class="modeltile"><b>Wan 3.0 Prime</b><span class="small">from $0.34</span></div>
+                </div>
+                <div class="field ok" style="height:46px">Callie bursts out laughing as the build passes, leans back in her chair… <span class="small">(video prompt, editable · Rewrite)</span></div>
+                <div class="row"><span class="btn p big">Generate a take <span class="price">7.5 credits</span></span><span class="model">Kling 3.0 Pro</span><span class="small muted">Then: upscale a take you use, 10 credits</span></div>
+              </div>
+            </div>
+            <div class="row" style="gap:10px">
+              <div class="col" style="width:90px"><div class="img v p916"></div><span class="btn">Use this take</span></div>
+              <div class="col" style="width:90px"><div class="img v p916"></div><span class="btn">Use this take</span></div>
+              <div class="note grow">Picking a take uses it: no separate Keep. It also lands in Library › Clips.</div>
+            </div>
+          </div>
+        </div>
+        <div class="step wait"><div class="head"><span class="num wait">4</span><b>Caption</b><span class="muted">TikTok caption box, optional B-roll from the Library drawer</span></div></div>
+        <div class="step wait"><div class="head"><span class="num wait">5</span><b>Finish</b><span class="muted">Preview · Export MP4 · Fine-tune (Phase 4)</span></div></div>
+      </div>
+      <div class="preview"><span class="small muted">Live preview</span><div class="img v p916"><div class="cap"><span>caption shows here</span></div></div>
+        <div class="empty small"><b>No clip yet?</b><span class="btn">Animate a still</span><span class="btn">Clone a TikTok or Reel</span><span class="btn">Upload a video</span><span class="btn ghost">Pick from Library</span><span class="muted">Empty state: never a dead end</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 3. Clone inline + Library drawer -->
+<div class="frame" id="f3" data-side="posts">
+  <div class="label">3 · Video step: Clone a TikTok or Reel (inline) · Library drawer open</div>
+  <div class="main">
+    <div class="row"><div class="grow"><div class="kicker">Video post · Draft</div><h1>Make a video post</h1></div><span class="chip">Callie ▾</span></div>
+    <div class="step cur"><div class="head"><span class="num">3</span><b>Video</b></div>
+      <div class="body">
+        <div class="tabs"><span>Animate a still</span><span class="on">Clone a TikTok or Reel</span><span>Upload a video</span><span>From Library</span></div>
+        <div class="row" style="align-items:flex-start;gap:14px">
+          <div class="empty" style="width:230px"><b>Drop the saved TikTok or Reel file</b><span class="small muted">MP4 or MOV, up to 200 MB. No links: save it first.</span><span class="btn">Choose file</span></div>
+          <div class="col grow">
+            <span class="small"><b>Who is in it</b></span>
+            <div class="row"><span class="chip on">Callie ✓</span><span class="chip">+ second character</span><span class="small muted">Same motion and framing, your character</span></div>
+            <span class="small"><b>Model</b> <span class="muted">(motion-transfer models from the Higgsfield catalog, each priced for this clip's length)</span></span>
+            <div class="grid" style="grid-template-columns:repeat(4,1fr)">
+              <div class="modeltile on"><b>Model A</b><span class="small">price</span></div>
+              <div class="modeltile"><b>Model B</b><span class="small">price</span></div>
+              <div class="modeltile"><b>Model C</b><span class="small">price</span></div>
+              <div class="modeltile"><b>Model D</b><span class="small">price</span></div>
+            </div>
+            <div class="row"><span class="chip">Original sound: Off</span><span class="small muted">Off by default; switch on to keep the clip's audio</span></div>
+            <div class="row"><span class="btn p big">Clone it <span class="price">price</span></span><span class="model">model name</span><span class="btn ghost">Pick a clip from Library</span></div>
+          </div>
+        </div>
+        <div class="note">The result appears here, selected, and in Library › Clips. Models and prices get confirmed when Clone Video is built.</div>
+      </div>
+    </div>
+  </div>
+  <div class="shade"></div>
+  <div class="drawer">
+    <div class="row"><b class="grow" style="font-size:16px">Library</b><span class="btn ghost">×</span></div>
+    <div class="tabs"><span>Stills</span><span class="on">Clips</span><span>B-roll</span><span>Posts</span></div>
+    <div class="row"><span class="chip on">Callie</span><span class="chip">All</span><span class="chip">Kept</span><span class="chip">Clones</span><span class="chip">Uploads</span></div>
+    <div class="grid" style="grid-template-columns:repeat(3,1fr)">
+      <div class="col"><div class="img v p916"></div><span class="btn">Use</span></div>
+      <div class="col"><div class="img v p916"></div><span class="btn">Use</span></div>
+      <div class="col"><div class="img v p916"></div><span class="btn">Use</span></div>
+      <div class="col"><div class="img v p916"></div><span class="btn">Use</span></div>
+      <div class="col"><div class="empty small" style="height:100%;justify-content:center"><b>Upload a video</b></div></div>
+    </div>
+    <div class="note">Pick drops it into the step and closes the drawer. Esc returns to the same spot.</div>
+  </div>
+</div>
+
+<!-- 4. Finish + editor overlay -->
+<div class="frame" id="f4" data-side="posts">
+  <div class="label">4 · Finish step: preview, Export (free) or Fine-tune</div>
+  <div class="main">
+    <div class="row"><div class="grow"><div class="kicker">Video post · Ready</div><h1>Make a video post</h1></div><span class="chip">Callie ▾</span></div>
+    <div class="step"><div class="head"><span class="num done">✓</span><b>Caption</b><span class="muted grow">“me when the AI finally fixes my code 💀” · B-roll: Notion screen (4 s, after the clip)</span><span class="btn ghost">Change</span></div></div>
+    <div class="step cur"><div class="head"><span class="num">5</span><b>Finish</b></div>
+      <div class="body"><div class="row" style="align-items:flex-start;gap:18px">
+        <div class="img v p916" style="width:200px"><div class="cap"><span>me when the AI finally fixes my code 💀</span></div></div>
+        <div class="col grow">
+          <div class="row"><span class="btn p big">Export MP4 <span class="price">Free</span></span><span class="btn big">Fine-tune in the editor</span></div>
+          <div class="row"><span class="btn">Download MP4</span><span class="btn ghost">Publish to TikTok (later)</span><span class="btn ghost">Copy caption</span></div>
+          <span class="small muted">Turn on TikTok's AI-generated content label when you post.</span>
+          <div class="note">Most posts: Export. Fine-tune only when you want to adjust timing or text.</div>
+        </div>
+      </div></div>
+    </div>
+  </div>
+</div>
+
+<!-- 4b. Editor overlay -->
+<div class="frame" id="f4b" data-side="posts">
+  <div class="label">4b · Fine-tune: OpenCut over the workspace (Phase 4) · Done returns to step 5</div>
+  <div class="main">
+    <div class="row"><div class="grow"><div class="kicker">Video post · Ready</div><h1>Make a video post</h1></div><span class="chip">Callie ▾</span></div>
+    <div class="step"><div class="head"><span class="num done">✓</span><b>Caption</b><span class="muted grow">“me when the AI finally fixes my code 💀” · B-roll: Notion screen (4 s, after the clip)</span><span class="btn ghost">Change</span></div></div>
+    <div class="step cur"><div class="head"><span class="num">5</span><b>Finish</b></div>
+      <div class="body"><div class="row" style="align-items:flex-start;gap:18px">
+        <div class="img v p916" style="width:200px"><div class="cap"><span>me when the AI finally fixes my code 💀</span></div></div>
+        <div class="col grow">
+          <div class="row"><span class="btn p big">Export MP4 <span class="price">Free</span></span><span class="btn big">Fine-tune in the editor</span></div>
+          <div class="row"><span class="btn">Download MP4</span><span class="btn ghost">Publish to TikTok (later)</span><span class="btn ghost">Copy caption</span></div>
+          <span class="small muted">Turn on TikTok's AI-generated content label when you post.</span>
+          <div class="note">Most posts: Export. Fine-tune only when you want to adjust timing or text.</div>
+        </div>
+      </div></div>
+    </div>
+  </div>
+  <div class="editor">
+    <div class="row"><b class="grow">OpenCut editor · Laptop meltdown</b><span class="btn">Done (saves the MP4 to the post)</span><span class="btn">Cancel</span></div>
+    <div class="row" style="flex:1;gap:14px"><div class="col" style="width:200px"><span class="small">Assets (from R2)</span><div class="img v" style="height:60px"></div><div class="img v" style="height:60px"></div></div><div class="grow" style="display:grid;place-items:center"><div class="img v p916" style="height:330px"><div class="cap"><span>editable text layer</span></div></div></div></div>
+    <div class="col" style="gap:6px"><div class="track"><i style="width:55%;background:#888"></i><i style="width:30%;background:#666"></i></div><div class="track"><i style="width:85%;background:#d8c37a"></i></div><span class="small">Clip · B-roll (hard cut) · caption as a text layer · no folders, no downloads</span></div>
+  </div>
+</div>
+
+<!-- 5. Slideshow -->
+<div class="frame" id="f5" data-side="posts">
+  <div class="label">5 · Slideshow workspace</div>
+  <div class="main">
+    <div class="row"><div class="grow"><div class="kicker">Slideshow · Draft</div><h1>Make a slideshow</h1></div><span class="chip">Callie ▾</span></div>
+    <div class="row" style="align-items:flex-start;gap:22px">
+      <div class="col grow">
+        <div class="step"><div class="head"><span class="num done">✓</span><b>Idea</b><span class="muted grow">5 apps that saved my semester</span><span class="btn ghost">Change</span></div></div>
+        <div class="step cur"><div class="head"><span class="num">2</span><b>Stills</b><span class="muted grow">In order; the hook goes on the first</span></div>
+          <div class="body"><div class="row" style="gap:8px">
+            <div class="col" style="width:70px"><div class="img p916"></div><span class="small">1</span></div>
+            <div class="col" style="width:70px"><div class="img p916"></div><span class="small">2</span></div>
+            <div class="col" style="width:70px"><div class="img p916"></div><span class="small">3</span></div>
+            <div class="empty small" style="width:150px"><span class="btn">Make stills from my idea</span><span class="btn ghost">Pick from Library</span></div>
+          </div></div>
+        </div>
+        <div class="step cur"><div class="head"><span class="num">3</span><b>Slides</b></div>
+          <div class="body">
+            <div class="row"><span class="btn p">Write the slides <span class="price">$0.01</span></span><span class="model">Claude Sonnet 5.5</span></div>
+            <div class="field ok">Hook: 5 apps that saved my semester</div>
+            <div class="field">Slide 2: …</div><div class="field">Slide 3: …</div>
+            <div class="field">Caption + hashtags</div>
+          </div>
+        </div>
+        <div class="step wait"><div class="head"><span class="num wait">4</span><b>Finish</b><span class="muted">Export images in order (zip) · Download</span></div></div>
+      </div>
+      <div class="preview"><span class="small muted">Slides preview</span><div class="row" style="gap:6px"><div class="img p916 grow"><div class="cap"><span>5 apps that saved my semester</span></div></div><div class="img p916 grow"><div class="cap"><span>slide 2</span></div></div></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- 6. Library -->
+<div class="frame" id="f6" data-side="library">
+  <div class="label">6 · Library (browse everything)</div>
+  <div class="main">
+    <div class="row"><div class="grow"><div class="kicker">Library</div><h1>Your library</h1></div><span class="btn">Upload video</span></div>
+    <div class="row"><div class="tabs"><span>Stills</span><span class="on">Clips</span><span>B-roll</span><span>Posts</span></div><span class="chip on">Callie</span><span class="chip">All characters</span><span class="chip">Kept takes</span><span class="chip">Clones</span><span class="chip">Uploads</span></div>
+    <div class="grid" style="grid-template-columns: repeat(7, 1fr)">
+      <div class="col"><div class="img v p916"></div><span class="small">Take · Cafe laugh</span><div class="row"><span class="btn">Use in a new post</span></div><span class="small muted">Download · Upscale</span></div>
+      <div class="col"><div class="img v p916"></div><span class="small">Clone · dance trend</span><div class="row"><span class="btn">Use in a new post</span></div></div>
+      <div class="col"><div class="img v p916"></div><span class="small">Upload · reaction</span><div class="row"><span class="btn">Use in a new post</span></div></div>
+      <div class="col"><div class="img v p916"></div><span class="small">Take · Park bench</span></div>
+      <div class="col"><div class="img v p916"></div><span class="small">Take · Rooftop</span></div>
+      <div class="col"><div class="img v p916"></div><span class="small">Clone · lip sync</span></div>
+      <div class="col"><div class="empty" style="height:100%;justify-content:center"><b>Upload a video</b><span class="small muted">or clone a TikTok in a post</span></div></div>
+    </div>
+    <div class="note">Browsing only. "Use in a new post" opens a post workspace with this item already in its step. The same Library opens as a drawer inside any post.</div>
+  </div>
+</div>
+
+<!-- 7. Character setup -->
+<div class="frame" id="f7" data-side="characters">
+  <div class="label">7 · Character setup (setup page, stepper)</div>
+  <div class="main">
+    <div class="row"><div class="grow"><div class="kicker">Characters › Callie</div><h1>Set up Callie</h1></div><span class="btn p">Start a post with Callie</span></div>
+    <div class="stepper"><span class="s"><span class="num done">✓</span>Inspiration</span><span class="arrow">›</span><span class="s"><span class="num done">✓</span>Face</span><span class="arrow">›</span><span class="s cur"><span class="num">3</span>Reference sheet 11/12</span><span class="arrow">›</span><span class="s"><span class="num wait">4</span>Character file</span></div>
+    <div class="row" style="align-items:flex-start;gap:22px">
+      <div class="col" style="width:240px"><div class="img" style="aspect-ratio:3/4"></div><b>24 · warm hazel-brown eyes</b><span class="small muted">mole LEFT brow · ear cuff LEFT ear</span><span class="btn ghost">Edit card</span></div>
+      <div class="col grow">
+        <div class="grid" style="grid-template-columns: repeat(6, 1fr)">
+          <div class="img p916"></div><div class="img p916"></div><div class="img p916"></div><div class="img p916"></div><div class="img p916"></div><div class="img p916"></div>
+          <div class="img p916"></div><div class="img p916"></div><div class="img p916"></div><div class="img p916"></div><div class="img p916"></div><div class="empty small" style="height:100%;justify-content:center"><b>REF-11</b><span class="btn">Generate</span></div>
+        </div>
+        <div class="note">Setup is the one place that is not a post: once the sheet is done, "Start a post with Callie" opens a new post.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 8. Phone -->
+<div class="frame phone" id="f8">
+  <div class="label">8 · Phone · video post</div>
+  <div style="padding:14px 16px;display:flex;flex-direction:column;gap:10px;flex:1;overflow:hidden">
+    <div class="row"><span class="dot"></span><span class="small"><b>Worker ready</b></span><span class="grow"></span><span class="chip">Callie ▾</span></div>
+    <h1 style="font-size:22px">Make a video post</h1>
+    <div class="step"><div class="head"><span class="num done">✓</span><b>Idea</b><span class="muted small grow">Callie laughs at her laptop…</span></div></div>
+    <div class="step"><div class="head"><span class="num done">✓</span><b>Stills</b><span class="muted small grow">1 used</span></div></div>
+    <div class="step cur"><div class="head"><span class="num">3</span><b>Video</b></div>
+      <div class="body"><div class="row" style="gap:6px;flex-wrap:wrap"><span class="chip on">Animate</span><span class="chip">Clone</span><span class="chip">Upload</span><span class="chip">Library</span></div>
+      <span class="btn p">Generate a take <span class="price">7.5 cr</span></span></div>
+    </div>
+    <div class="step wait"><div class="head"><span class="num wait">4</span><b>Caption</b></div></div>
+  </div>
+  <div class="sheet"><div class="row"><b class="grow">Library</b><span class="btn ghost">×</span></div><div class="tabs"><span class="on">Clips</span><span>Stills</span><span>B-roll</span></div><div class="grid" style="grid-template-columns:repeat(3,1fr)"><div class="img v p916"></div><div class="img v p916"></div><div class="img v p916"></div></div></div>
+  <div class="tabbar" style="position:relative;z-index:4"><span>Posts</span><span>+ New</span><span>Library</span><span>Characters</span><span>Settings</span></div>
+</div>
+
+<script>
+  const tpl = document.getElementById('side')
+  document.querySelectorAll('.frame[data-side]').forEach(f => {
+    const side = tpl.content.firstElementChild.cloneNode(true)
+    side.querySelectorAll('.nav[data-k]').forEach(n => { if (n.dataset.k === f.dataset.side) n.classList.add('on') })
+    f.prepend(side)
+  })
+</script>
+</body>
+</html>
