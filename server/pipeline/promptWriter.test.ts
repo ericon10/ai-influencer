@@ -124,7 +124,7 @@ describe('the prompt writer (default on)', () => {
     expect(preview.prompts[0]!.text).toMatch(/REALISM: .{20,}/)
   })
 
-  it('writes the video prompt from what happens (40 to 80 words), looking at the start frame; the take adds the directions, silence and REALISM', async () => {
+  it('writes the motion only (40 to 80 words), looking at the start frame; the take adds the directions, silence and REALISM', async () => {
     await run(generate(sceneId))
     const still = (await sceneCandidates(h.deps, h.ctx, [sceneId])).find(c => c.op === 'generate' && c.assetId)!
     const action: StudioAction = { type: 'scene_prompt', characterId, sceneId, target: 'video', motion: 'Callie bites into a peach and laughs', directions: 'No talking, no winking, steady eye contact.', startCandidateId: still.id }
@@ -134,12 +134,17 @@ describe('the prompt writer (default on)', () => {
     expect(seen.imageAssetIds).toEqual([still.assetId])
     expect(seen.system).toMatch(/40 to 80 words/)
     expect(seen.system).toContain('No talking, no winking, steady eye contact.')
+    // Motion only: the still's scene description is not handed to the writer.
+    expect(seen.system).toMatch(/Write ONLY\s+the motion/)
+    expect(seen.prompt).not.toMatch(/scene in the still/i)
+    expect(seen.prompt).not.toContain('farmers market')
     const written = (await view(sceneId)).prompts.video!
     expect(written).toMatchObject({ source: 'claude', motion: 'Callie bites into a peach and laughs' })
     expect(written.words).toBeGreaterThanOrEqual(40)
     expect(written.words).toBeLessThanOrEqual(80)
+    // The box holds the written motion; the take sends exactly that.
     const take = await estimateAction(h.deps, h.ctx, {
-      type: 'scene_video', characterId, candidateId: still.id, motion: 'Callie bites into a peach and laughs',
+      type: 'scene_video', characterId, candidateId: still.id, motion: written.text,
       directions: 'No talking, no winking, steady eye contact.', durationSec: 5, aspect: '9:16', audio: false, takes: 1, test: false,
     })
     const text = take.preview.prompts[0]!.text

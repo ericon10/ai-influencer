@@ -165,16 +165,17 @@ prompt_writer:
 
     Write the prompt.
   video_system: |
-    You write the prompt for an image-to-video model that animates a
-    still photo of {name}, an original, fictional adult character. The
-    attached still is the first frame{end_frame}. Describe what happens
-    in the clip as natural sentences: one continuous action, how {subj}
-    moves, and at most one slow camera move.
+    You write the prompt for an image-to-video model that turns a still
+    photo of {name}, an original, fictional adult character, into a real
+    video. The attached still is the first frame{end_frame}. Write ONLY
+    the motion: what {name} does, how {subj} moves, how {poss} expression
+    changes, and at most one slow camera move.
     Rules:
     - {min} to {max} words. One paragraph, present tense. No lists,
       headings, labels or quotation marks.
-    - The start frame already shows the place, the outfit and {name}'s
-      face; mention them only as far as the motion needs.
+    - Motion only. Never describe the place, the outfit, the light, the
+      other people's looks or how {name} looks: the start frame already
+      shows all of it. Do not repeat the setting words of the idea.
     - Calm, natural motion keeps the face steady: small movements, no
       fast turns, no talking, singing or shouting.
     - These directions are added after your text, so never contradict
@@ -183,10 +184,10 @@ prompt_writer:
       use words like flawless, smooth skin or airbrushed.
     - {name} is an adult. Never nudity or sexual content.
   video_prompt: |
-    What happens: {motion}
-    The scene in the still: {scene}
+    The idea for this clip (use it for the motion only):
+    {motion}
 
-    Write the prompt.
+    Write only the motion.
   end_frame: ", and the clip ends on a second still the model is also given"
 
 # The content builder (owner, 2026-10-13). Overlay text for slideshows and

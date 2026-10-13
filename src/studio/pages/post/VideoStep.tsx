@@ -9,7 +9,7 @@ import { BrollPicker } from './parts'
 import type { PostCtx } from './ctx'
 
 // The Video step. A video post gets its clip four ways, all right here:
-// animate a still (takes; picking one keeps it), clone a TikTok or Reel
+// a video from a still (takes; picking one keeps it), clone a TikTok or Reel
 // (next), upload a video, or pick one from the Library drawer. A batch
 // picks several clips, rotated across its captions. B-roll is optional.
 
@@ -38,7 +38,7 @@ function PostClip({ ctx }: { ctx: PostCtx }) {
   const clip = clips.find(c => c.id === spec.clipId) ?? null
   const hasStills = !!scene?.candidates.some(c => c.media === 'image' && c.assetId)
   const [way, setWay] = useState<Way | null>(spec.stillId || (hasStills && !clip) ? 'animate' : null)
-  // A still picked in the Stills step opens "Animate a still" here.
+  // A still picked in the Stills step opens "Make a video from a still" here.
   useEffect(() => { if (spec.stillId && !spec.clipId) setWay('animate') }, [spec.stillId]) // eslint-disable-line react-hooks/exhaustive-deps
   const [changing, setChanging] = useState(false)
   const [library, setLibrary] = useState(false)
@@ -62,7 +62,7 @@ function PostClip({ ctx }: { ctx: PostCtx }) {
       {showWays && (
         <>
           <div className="st-ways">
-            <button type="button" className={`st-way ${way === 'animate' ? 'on' : ''}`} onClick={() => setWay(w => (w === 'animate' ? null : 'animate'))}><Wand2 size={18} /><b>Animate a still</b><span className="st-hint">A take from a still of this post</span></button>
+            <button type="button" className={`st-way ${way === 'animate' ? 'on' : ''}`} onClick={() => setWay(w => (w === 'animate' ? null : 'animate'))}><Wand2 size={18} /><b>Make a video from a still</b><span className="st-hint">Real video starting from your photo (Kling, Seedance...)</span></button>
             <button type="button" className="st-way" disabled title="Clone Video is the next update"><Clapperboard size={18} /><b>Clone a TikTok or Reel</b><span className="st-hint">Next update</span></button>
             {item.characterId && (
               <div className="st-way as-upload">
@@ -73,8 +73,8 @@ function PostClip({ ctx }: { ctx: PostCtx }) {
             <button type="button" className="st-way" onClick={() => setLibrary(true)}><Images size={18} /><b>Pick from the Library</b><span className="st-hint">{clips.filter(c => c.status === 'approved').length} kept clips of {name}</span></button>
           </div>
           {way === 'animate' && (
-            !scene || !scenes || !v ? <Callout tone="info">Animating starts from a still. Make one in the Stills step, or pick one there from the Library.</Callout>
-              : !hasStills ? <Callout tone="info">No stills in this post yet. Generate one in the Stills step above, then animate it here.</Callout>
+            !scene || !scenes || !v ? <Callout tone="info">A video from a still starts from a photo of this post. Make one in the Stills step, or pick one there from the Library.</Callout>
+              : !hasStills ? <Callout tone="info">No stills in this post yet. Make one in the Stills step above, then make the video from it here.</Callout>
               : <VideoSection v={v} data={scenes} scene={scene} startId={spec.stillId} setStartId={id => draft.setSpec({ stillId: id })} onUseTake={use} usedId={spec.clipId} />
           )}
         </>

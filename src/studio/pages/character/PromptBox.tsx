@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Check, Copy, FileText, Info, Loader2, PenLine } from 'lucide-react'
 import { api } from '../../api'
-import { useRefresh } from '../../hooks'
+import { isActiveJob, useLiveJobs, useRefresh } from '../../hooks'
 import { PriceButton } from '../../PriceButton'
 import { ReqBadge, errorMessage, useToast, type TodoItem } from '../../ui'
 import type { JobView, StudioAction, WrittenPrompt } from '../../types'
@@ -16,13 +16,14 @@ import type { JobView, StudioAction, WrittenPrompt } from '../../types'
 
 const SOURCE: Record<WrittenPrompt['source'], string> = { claude: 'Written by', owner: 'Edited by you', template: 'From the template' }
 
-export function PromptBox({ id, characterId, sceneId, target, written, writeAction, writeTodo = [], templateText, words, model, realism, addedNote, changedNote, onDirty, watch }: {
+export function PromptBox({ id, characterId, sceneId, target, written, writeAction, writeTodo = [], templateText, words, model, realism, addedNote, changedNote, onDirty, watch, label, placeholder, onText, children }: {
   id: string
   characterId: string
   sceneId: string
   target: 'still' | 'video'
   written: WrittenPrompt | null
-  writeAction: StudioAction | null
+  // The write action, or one built from the box's current text.
+  writeAction: StudioAction | null | ((text: string) => StudioAction | null)
   writeTodo?: TodoItem[]
   templateText: string | null
   words: [number, number]
@@ -35,11 +36,21 @@ export function PromptBox({ id, characterId, sceneId, target, written, writeActi
   onDirty?: (dirty: boolean) => void
   // Writer runs started elsewhere ("Use this still") show here too.
   watch?: (j: JobView) => boolean
+  label?: string
+  placeholder?: string
+  // The text as it is typed (the take sends it).
+  onText?: (text: string) => void
+  // A line under the box (the video directions).
+  children?: ReactNode
 }) {
   const toast = useToast()
   const refresh = useRefresh()
   const qc = useQueryClient()
   const [text, setText] = useState(written?.text ?? '')
+  useEffect(() => { onText?.(text) }, [text]) // eslint-disable-line react-hooks/exhaustive-deps
+  // A writer run started from elsewhere (the still's "Use this still").
+  const live = useLiveJobs()
+  const liveWriting = !!watch && (live.data?.jobs ?? []).some(j => watch(j) && isActiveJob(j) && j.status !== 'needs_attention')
   const [writing, setWriting] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
   const dirty = useRef(false)
@@ -95,13 +106,13 @@ export function PromptBox({ id, characterId, sceneId, target, written, writeActi
   return (
     <div className="st-promptbox" data-field={id}>
       <div className="st-row" style={{ gap: 8, flexWrap: 'wrap' }}>
-        <span className="st-label" style={{ margin: 0 }}><PenLine size={14} style={{ verticalAlign: -2 }} /> {target === 'still' ? 'The prompt' : 'The video prompt'}<ReqBadge done={has} /></span>
+        <span className="st-label" style={{ margin: 0 }}><PenLine size={14} style={{ verticalAlign: -2 }} /> {label ?? (target === 'still' ? 'The prompt' : 'The video prompt')}<ReqBadge done={has} /></span>
         <span className="st-spacer" />
         {written && has && <span className="st-hint">{SOURCE[written.source]}{written.source === 'claude' && written.model ? ` ${written.model}` : ''}</span>}
         {has && <span className={`st-hint ${inRange ? '' : 'st-warntext'}`} title={`Aim for ${words[0]} to ${words[1]} words`}>{count} words</span>}
       </div>
-      {writing !== null ? (
-        <div className="st-promptbox-writing"><Loader2 size={16} className="st-spin" />Claude is writing the prompt from your details...</div>
+      {writing !== null || liveWriting ? (
+        <div className="st-promptbox-writing"><Loader2 size={16} className="st-spin" />{target === 'video' ? 'Claude is writing the motion from the still...' : 'Claude is writing the prompt from your details...'}</div>
       ) : (
         <textarea
           className={`st-textarea st-prompt-edit ${has ? '' : 'empty'}`}
@@ -109,19 +120,19 @@ export function PromptBox({ id, characterId, sceneId, target, written, writeActi
           maxLength={4000}
           value={text}
           onChange={e => edit(e.target.value)}
-          placeholder={target === 'still'
+          placeholder={placeholder ?? (target === 'still'
             ? 'Press "Write the prompt" and Claude writes it from the details above, or type your own.'
-            : 'Press "Write the video prompt" and Claude writes it from "What happens", or type your own.'}
-          aria-label={target === 'still' ? 'The prompt' : 'The video prompt'}
+            : 'Press "Write the video prompt" and Claude writes it, or type your own.')}
+          aria-label={label ?? (target === 'still' ? 'The prompt' : 'The video prompt')}
         />
       )}
       {changedNote && <span className="st-hint st-warntext"><Info size={12} style={{ verticalAlign: -2 }} /> {changedNote}</span>}
       {has && !inRange && <span className="st-hint">Aim for {words[0]} to {words[1]} words. Longer or shorter still runs.</span>}
       <div className="st-row" style={{ gap: 8, flexWrap: 'wrap', alignItems: 'flex-start' }}>
         <PriceButton
-          action={writeAction}
+          action={typeof writeAction === 'function' ? writeAction(written?.text ?? '') : writeAction}
           todo={writeTodo}
-          label={has ? 'Rewrite' : target === 'still' ? 'Write the prompt' : 'Write the video prompt'}
+          label={has ? 'Rewrite' : target === 'still' ? 'Write the prompt' : 'Write it'}
           variant={has ? 'secondary' : 'primary'}
           size="sm"
           icon={!has}
@@ -132,6 +143,7 @@ export function PromptBox({ id, characterId, sceneId, target, written, writeActi
         {has && <button type="button" className="st-btn ghost sm" onClick={copy}>{copied ? <Check size={14} /> : <Copy size={14} />}{copied ? 'Copied' : 'Copy'}</button>}
       </div>
       {has && written?.source === 'owner' && <span className="st-hint">Rewrite replaces your edits with a new version from Claude ({model}).</span>}
+      {children}
       <details className="st-promptbox-added">
         <summary>{addedNote}</summary>
         <p className="st-promptbox-realism">{realism}</p>

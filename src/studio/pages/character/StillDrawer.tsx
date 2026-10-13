@@ -108,7 +108,6 @@ export function StillDrawer({ v, data, scene, still, onClose, onOpen, action }: 
           {parent && <button className="st-btn sm ghost" onClick={() => onOpen(parent.id)}>Made from: {OP_LABEL[parent.op].toLowerCase()}</button>}
           <span className="st-spacer" />
           {ref00 && still.assetId && <button className={`st-btn sm ${compare ? 'secondary' : 'ghost'}`} onClick={() => setCompare(c => !c)}>{compare ? 'Hide' : 'Compare with'} REF-00</button>}
-          {action && still.assetId && !['failed', 'qa_pending', 'qa_failed', 'rejected'].includes(still.status) && action(still)}
         </div>
         {still.assetId ? (
           <div className={compare ? 'st-grid two' : ''} style={{ gap: 10 }}>
@@ -129,9 +128,12 @@ export function StillDrawer({ v, data, scene, still, onClose, onOpen, action }: 
 
         {still.assetId && !fixes && !rejecting && (
           <div className="st-row" style={{ gap: 8, flexWrap: 'wrap' }}>
-            {still.status === 'approved' ? <span className="st-badge ok"><CheckCircle2 size={13} /> Picked</span> : (
-              <button className="st-btn ok" disabled={!canPick || busy} onClick={() => pick()} title={plastic ? 'Real skin is a fixed rule: regenerate this one.' : undefined}><CheckCircle2 size={16} />Pick this still</button>
-            )}
+            {/* In a post, its next step ("Use this still") is the only way to
+                pick: one button, which also writes the video prompt. */}
+            {action ? (['failed', 'qa_pending', 'qa_failed', 'rejected'].includes(still.status) ? null : action(still))
+              : still.status === 'approved' ? <span className="st-badge ok"><CheckCircle2 size={13} /> Picked</span> : (
+                <button className="st-btn ok" disabled={!canPick || busy} onClick={() => pick()} title={plastic ? 'Real skin is a fixed rule: regenerate this one.' : undefined}><CheckCircle2 size={16} />Pick this still</button>
+              )}
             {['in_review', 'qa_failed', 'approved'].includes(still.status) && <button className="st-btn bad" disabled={busy} onClick={() => setRejecting(true)}><XCircle size={16} />Reject</button>}
             {['rejected', 'superseded'].includes(still.status) && <button className="st-btn ghost" onClick={reopen}><RotateCcw size={14} />Back to review</button>}
             <button className={`st-btn ${r?.mirrorFix?.available ? 'secondary' : 'ghost'}`} disabled={busy} onClick={mirror} title={r?.mirrorFix?.available ? r.mirrorFix.message : 'Flip the still horizontally. Free; any text in the frame is mirrored too.'}><FlipHorizontal2 size={16} />Mirror (free)</button>

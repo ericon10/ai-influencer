@@ -66,7 +66,7 @@ flow, not what the rules are.
  │ Characters            │   │ Post workspace  (Video post, Slideshow or Batch)     │   │ Export       │
  │  Inspiration          │   │  1 Idea        what the post is, character           │   │  MP4 / JPEGs │
  │  Face (hero)          │──>│  2 Stills      make them here, or pick from Library  │──>│  zip         │
- │  Reference sheet      │   │  3 Video       animate a still | clone a TikTok/Reel │   │ Publish      │
+ │  Reference sheet      │   │  3 Video       video from a still | clone TikTok/Reel│   │ Publish      │
  │  Character file       │   │                | upload a clip | pick from Library   │   │  (TikTok     │
  └───────────────────────┘   │  4 Text        caption | hook and slides | captions  │   │  prepare and │
                              │  5 Finish      preview > Export or Fine-tune          │   │  notify, R7) │
@@ -149,7 +149,7 @@ top; Activity, the month's spend and Demo/Live sit at the bottom.
    section header.
 2. **Empty states are never a dead end.** Every empty step, list or tab
    shows the next-step buttons right there:
-   - No clip: [Animate a still] [Clone a TikTok or Reel] [Upload a video]
+   - No clip: [Make a video from a still] [Clone a TikTok or Reel] [Upload a video]
      [Pick from Library].
    - No stills: [Make stills from my idea] [Pick from Library].
    - No characters: [Set up a character] [Import one].
@@ -235,7 +235,7 @@ Rough, grayscale, desktop unless noted. Files in `docs/studio/ux/`.
 | **Sidebar:** Characters, Content, Activity, Usage, Settings | **Sidebar:** New post, Posts, Characters, Library, Settings. Footer: Activity, spend (opens Settings > Usage), Demo/Live. Worker light at the top |
 | **Character page:** tabs Start, Hero, Sheet, Scenes, Character file | **Character setup stepper:** Inspiration, Face, Reference sheet, Character file. The Scenes tab goes; making stills moves into a post |
 | **Scene editor** (on the character page) | The **Stills step** of a post: the same idea box, Punch it up, planner, prompt writer, models and Generate, with the still drawer for fixes. A post creates its scene behind the scenes |
-| **Make a video** card (inside the scene editor) | The **Video step**, "Animate a still": the same model picker, prompt writer, takes, Keep and Upscale |
+| **Make a video** card (inside the scene editor) | The **Video step**, "Make a video from a still" (real video starting from your photo): the same model picker, takes and Upscale. One box, "What happens in the video": "Use this still" has Claude write the motion into it (motion only, priced); edit it or Rewrite; the directions are a small line under it |
 | Clone Video (roadmap R1, not built) | The Video step's **"Clone a TikTok or Reel"** option, inline |
 | **Content page:** tabs Meme video, Slideshow, Batch, B-roll | Post types in the workspace: **Video post** (was Meme video), **Slideshow**, **Batch**. The "Text-overlay content" title goes; captions are a step |
 | B-roll tab | **Library > B-roll** (browse, upload, tag), and the Library drawer inside the Video and Caption steps |

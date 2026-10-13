@@ -261,11 +261,11 @@ export async function buildScenePromptWrite(deps: Deps, ctx: Ctx, row: Character
   const start = input.startCandidateId ? await getCandidate(deps, ctx, input.startCandidateId) : null
   if (start && (start.sceneId !== scene.id || !start.assetId || isVideoCandidate(start))) throw new AppError('bad_request', 'The start frame must be a still from this scene.')
   const directions = (input.directions ?? sc.video.directions).trim()
-  const still = scenePrompts(scene.prompts).still?.text
-  const sceneText = still ?? [f.moment, f.setting, f.outfit].map(x => x.trim().replace(/[.\s]+$/, '')).filter(Boolean).join('. ')
+  // Motion only (owner, 2026-10-13): the idea goes in for what happens; the
+  // still's scene description does not (the start frame shows the scene).
   const range = sc.settings.prompt_words.video
   const system = fill(t.prompt_writer.video_system, { ...pv, name: ch.name, min: String(range[0]), max: String(range[1]), directions, end_frame: input.endCandidateId ? t.prompt_writer.end_frame : '' })
-  const prompt = fill(t.prompt_writer.video_prompt, { motion, scene: sceneText })
+  const prompt = fill(t.prompt_writer.video_prompt, { motion })
   return llm(system, prompt, { imageAssetIds: start?.assetId ? [start.assetId] : [], meta: { motion, directions, mockPrompt: mockWrittenPrompt('video', { motion }, range) } })
 }
 
@@ -512,17 +512,13 @@ export async function buildSceneVideo(deps: Deps, ctx: Ctx, row: CharacterRow, i
   if (end && !endFrame) warnings.push({ ruleId: 'video-single-take', spec: '4.3', title: 'Start frame only', severity: 'warning', message: `${entry.label} takes a start frame only, so the end frame is left out of this test.` })
   if (!input.test && !v.durations.includes(durationSec)) warnings.push({ ruleId: 'video-single-take', spec: '5.4.31', title: 'Unusual length', severity: 'warning', message: `${durationSec} s is not one of the usual lengths (${v.durations.join(' or ')} s). Running anyway.` })
   const run = await runModel(deps, ctx, model, 'video')
+  // "What happens in the video" (owner, 2026-10-13: one box): the motion
+  // Claude wrote when the still was used, or the owner's own words. The
+  // directions, the silent line and the REALISM block are added after it.
   const motion = input.motion.trim().replace(/[.\s]+$/, '')
-  if (motion.length < 3) throw new AppError('invalid_request', 'Say what happens in the clip.')
-  // Default rule scene-prompt-writer: the written video prompt (Claude's or
-  // the owner's edit) replaces "what happens". The directions, the silent
-  // line and the REALISM block are added either way.
+  if (motion.length < 3) throw new AppError('invalid_request', 'Say what happens in the video.')
   const ch = toData(row)
-  const written = sw.on('scene-prompt-writer') ? scenePrompts(scene.prompts).video : undefined
-  if (sw.on('scene-prompt-writer') && !written) {
-    warnings.push({ ruleId: 'scene-prompt-writer', spec: '9', title: 'No written video prompt yet', severity: 'warning', message: 'This take uses "what happens" as the prompt. Write the video prompt above Generate to use natural sentences instead.' })
-  }
-  const prompt = assembleVideoPrompt(t, written?.text ?? `${motion}.`, { directions: input.directions, audio: input.audio, realism: ch.realism?.block })
+  const prompt = assembleVideoPrompt(t, `${motion}.`, { directions: input.directions, audio: input.audio, realism: ch.realism?.block })
   const request: GenRequest = {
     kind: 'video', model: run.model, prompt, aspect: input.aspect, resolution, durationSec, audio: input.audio,
     startFrame: { assetId: start.assetId },

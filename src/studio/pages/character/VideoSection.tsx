@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { AlertTriangle, Check, CheckCircle2, Download, Film, Info, Loader2, RotateCcw, Wand2, XCircle } from 'lucide-react'
+import { AlertTriangle, Check, CheckCircle2, Download, Film, Loader2, RotateCcw, Wand2, XCircle } from 'lucide-react'
 import { api, ApiError, assetUrl } from '../../api'
 import { useRefresh } from '../../hooks'
 import { PriceButton } from '../../PriceButton'
@@ -29,7 +29,6 @@ export function VideoSection({ v, data, scene, startId, setStartId, onUseTake, u
   const clips = scene.candidates.filter(c => c.media === 'video' && (c.assetId || c.status === 'failed'))
   const start = stills.find(c => c.id === startId) ?? stills.find(c => c.status === 'approved') ?? null
   const [endId, setEndId] = useState<string | null>(null)
-  const [motion, setMotion] = useState(String(scene.fields.moment ?? ''))
   const [directions, setDirections] = useState(o.directions)
   const [duration, setDuration] = useState(o.duration)
   const [aspect, setAspect] = useState(o.aspect)
@@ -50,19 +49,20 @@ export function VideoSection({ v, data, scene, startId, setStartId, onUseTake, u
   const pw = data.options.promptWriter
   const [promptDirty, setPromptDirty] = useState(false)
   const written = scene.prompts.video
-  const needsPrompt = pw.on && !(written?.text ?? '').trim()
+  // "What happens in the video" (owner, 2026-10-13: one box). "Use this
+  // still" has Claude write the motion into it; edit it, or press Rewrite.
+  // The take sends exactly what is in it.
+  const [motion, setMotion] = useState(written?.text ?? '')
+  // What the writer starts from: the box's saved text, else the idea.
+  const seed = (scene.fields.moment || scene.brief || '').trim()
   const [open, setOpen] = useState<string | null>(null)
   useEffect(() => { if (endId && (endId === start?.id || !stills.some(s => s.id === endId))) setEndId(null) }, [endId, start?.id, stills])
   const ends = stills.filter(c => c.id !== start?.id).sort((a, b) => Number(b.op === 'end_frame') - Number(a.op === 'end_frame'))
-  const writeTodo: TodoItem[] = [
-    ...(!start ? [{ label: 'Pick a start frame', target: 'video-start' }] : []),
-    ...(motion.trim().length < 3 ? [{ label: 'What happens', target: 'video-motion' }] : []),
-  ]
+  const writeTodo: TodoItem[] = !start ? [{ label: 'Pick a start frame', target: 'video-start' }] : []
   const todo: TodoItem[] = [
     ...writeTodo,
-    ...(needsPrompt ? [{ label: 'The video prompt (write it, or type your own)', target: 'video-prompt' }] : []),
+    ...(motion.trim().length < 3 ? [{ label: pw.on ? 'What happens in the video (write it, or type your own)' : 'What happens in the video', target: 'video-motion' }] : []),
   ]
-  const motionChanged = !!written?.motion && written.motion.trim() !== motion.trim()
   const clip = clips.find(c => c.id === open) ?? null
   // Keep (if not kept yet), then pick it for the post. A face that does not
   // match REF-00 asks first (a strong warning; the owner decides).
@@ -113,12 +113,33 @@ export function VideoSection({ v, data, scene, startId, setStartId, onUseTake, u
                 {start && <button type="button" className="st-btn sm ghost" style={{ alignSelf: 'flex-start' }} onClick={() => setHelper(x => !x)}><Wand2 size={14} />{helper ? 'Hide the end frame helper' : 'Make an end frame from the start frame'}</button>}
               </Field>
               {helper && start && <EndFrameHelper v={v} data={data} start={start} />}
-              <Field id="video-motion" label="What happens" required done={motion.trim().length >= 3} hint="One action and at most one camera move. Calm motion keeps the face steady.">
-                <textarea className="st-textarea" rows={2} style={{ minHeight: 0 }} maxLength={600} value={motion} onChange={e => setMotion(e.target.value)} placeholder={`e.g. ${v.data.name} laughs softly and turns toward the camera`} />
-              </Field>
-              <Field id="video-directions" label="Directions" hint="Added to the prompt. Edit freely.">
-                <textarea className="st-textarea" rows={2} style={{ minHeight: 0 }} maxLength={600} value={directions} onChange={e => setDirections(e.target.value)} />
-              </Field>
+              {pw.on ? (
+                <PromptBox
+                  id="video-motion" characterId={v.id} sceneId={scene.id} target="video"
+                  label="What happens in the video"
+                  placeholder={`Press "Use this still" or "Write it" and Claude writes the motion, or type your own: e.g. ${v.data.name} laughs softly and turns toward the camera.`}
+                  written={written} templateText={null} words={pw.words.video} model={pw.model} realism={pw.realism}
+                  writeTodo={writeTodo}
+                  writeAction={saved => (!start || (saved.trim() || seed).length < 3 ? null : { type: 'scene_prompt', characterId: v.id, sceneId: scene.id, target: 'video', motion: (saved.trim() || seed).slice(0, 600), directions: directions.trim(), startCandidateId: start.id, ...(endId ? { endCandidateId: endId } : {}) })}
+                  addedNote="Added when it runs: the directions, the silent line when sound is off, and the REALISM block (always)."
+                  onDirty={setPromptDirty}
+                  onText={setMotion}
+                  watch={j => j.purpose === `scene_prompt:${scene.id}:video`}
+                >
+                  <details className="st-directions">
+                  <summary>Directions, added after it: <span className="st-muted">{directions.trim() || 'none'}</span></summary>
+                  <textarea className="st-textarea" rows={2} style={{ minHeight: 0 }} maxLength={600} value={directions} onChange={e => setDirections(e.target.value)} aria-label="Directions" />
+                </details>
+                </PromptBox>
+              ) : (
+                <Field id="video-motion" label="What happens in the video" required done={motion.trim().length >= 3} hint="Motion only: one action and at most one camera move. Calm motion keeps the face steady.">
+                  <textarea className="st-textarea" rows={3} style={{ minHeight: 0 }} maxLength={600} value={motion} onChange={e => setMotion(e.target.value)} placeholder={`e.g. ${v.data.name} laughs softly and turns toward the camera`} />
+                  <details className="st-directions">
+                  <summary>Directions, added after it: <span className="st-muted">{directions.trim() || 'none'}</span></summary>
+                  <textarea className="st-textarea" rows={2} style={{ minHeight: 0 }} maxLength={600} value={directions} onChange={e => setDirections(e.target.value)} aria-label="Directions" />
+                </details>
+                </Field>
+              )}
               {!test && (
                 <Field id="video-model" label="Video model" group hint={data.options.mode === 'demo' ? 'Demo mode runs a free mock for every model.' : 'Price of one take at this length and shape. Your pick is remembered for the next take.'}>
                   <div className="st-videomodels" role="radiogroup" aria-label="Video model">
@@ -165,20 +186,6 @@ export function VideoSection({ v, data, scene, startId, setStartId, onUseTake, u
                   <span className="st-hint">{o.test.model.label}, {o.test.duration} s, cheap. Only for checking complex motion before a real take; off for real takes.</span>
                 </span>
               </label>
-              {pw.on ? (
-                <PromptBox
-                  id="video-prompt" characterId={v.id} sceneId={scene.id} target="video"
-                  written={written} templateText={motion.trim().length >= 3 ? `${motion.trim().replace(/[.\s]+$/, '')}.` : null} words={pw.words.video} model={pw.model} realism={pw.realism}
-                  writeTodo={writeTodo}
-                  writeAction={writeTodo.length || !start ? null : { type: 'scene_prompt', characterId: v.id, sceneId: scene.id, target: 'video', motion: motion.trim(), directions: directions.trim(), startCandidateId: start.id, ...(endId ? { endCandidateId: endId } : {}) }}
-                  addedNote="Added when it runs: the directions, the silent line when sound is off, and the REALISM block (always)."
-                  changedNote={motionChanged ? 'You changed "What happens" after this was written. Rewrite to use it, or keep it as it is.' : null}
-                  onDirty={setPromptDirty}
-                  watch={j => j.purpose === `scene_prompt:${scene.id}:video`}
-                />
-              ) : (
-                <span className="st-hint"><Info size={12} style={{ verticalAlign: -2 }} /> The prompt writer is off, so "What happens" and the directions are the prompt. Switch it on in Settings, Claude models.</span>
-              )}
               <PriceButton
                 watch={j => new RegExp(`^(scene_video|scene_video_upscale):${scene.id}(:|$)`).test(j.purpose)}
                 size="big"
