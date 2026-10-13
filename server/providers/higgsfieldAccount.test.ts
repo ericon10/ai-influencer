@@ -228,6 +228,30 @@ describe('account adapter edge cases', () => {
     expect((await a.status('00000000-0000-0000-0000-000000000000')).state).toBe('failed')
   })
 
+  it('falls back to the price book when Higgsfield is slow to price, and never stalls the estimate', async () => {
+    const slow = createHiggsfieldAccountAdapter({ config: h.deps.config, client: client(2000), creditUsd: 0, fetchImpl: fake.fetch, estimateWaitMs: 50 })
+    fake.hangOn = 'generate_video'
+    try {
+      const started = Date.now()
+      const est = await slow.estimate(video)
+      expect(est.credits).toBe(70)
+      expect(Date.now() - started).toBeLessThan(1000)
+    } finally {
+      fake.hangOn = null
+    }
+    // Nano Banana 2.1 has no credit cost in the price book: a clear message, fast.
+    fake.hangOn = 'generate_image'
+    try {
+      const started = Date.now()
+      const err = await slow.estimate(still().request as GenRequest).catch(e => e)
+      expect(err).toBeInstanceOf(ProviderError)
+      expect((err as ProviderError).message).toMatch(/did not price .* in time/)
+      expect(Date.now() - started).toBeLessThan(1000)
+    } finally {
+      fake.hangOn = null
+    }
+  })
+
   it('prices an upscale from the price book, since Higgsfield needs the image first', async () => {
     const est = await adapter().estimate({ kind: 'upscale', model: 'higgsfield/bytedance-upscale', prompt: 'Upscale.', resolution: '2k', scale: 2 })
     expect(est.credits).toBe(2)

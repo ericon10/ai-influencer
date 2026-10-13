@@ -1,6 +1,6 @@
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import { z } from 'zod'
-import { refImages } from '../db/schema.js'
+import { quotes, refImages } from '../db/schema.js'
 import type { Ctx, Deps } from '../context.js'
 import { fill, hardWrap } from '../core/text.js'
 import { buildHeroPrompts, buildSheetPrompt } from '../core/prompts.js'
@@ -18,7 +18,7 @@ import type { GenRequest } from '../providers/types.js'
 import { forMode, liveRoute, resolveRoute } from './settings.js'
 import { identityForModel } from '../core/identity.js'
 import type { RealismWarning } from '../core/realism.js'
-import { buildModelSuite, buildModelTest, startModelSuite, startModelTest } from './modelTests.js'
+import { assertSuiteCap, buildModelSuite, buildModelTest, startModelSuite, startModelTest } from './modelTests.js'
 import { approvedAssets, getCandidate, getCharacter, getRef, inspirationAssetIds, setCharacterFields, sheetState, toData } from './characters.js'
 
 // Every paid step is an action. The same builder produces the job specs for
@@ -270,10 +270,16 @@ export async function buildAction(deps: Deps, ctx: Ctx, action: StudioAction): P
 export async function estimateAction(deps: Deps, ctx: Ctx, action: StudioAction): Promise<{ quote: QuoteView; preview: ActionPreview }> {
   const built = await buildAction(deps, ctx, action)
   const quote = await quoteJobs(deps, ctx, { purpose: built.purpose, characterId: built.characterId, specs: built.specs })
+  if (action.type === 'model_suite') assertSuiteCap(deps, quote.totalMicros)
   return { quote, preview: built.preview }
 }
 
 export async function runAction(deps: Deps, ctx: Ctx, action: StudioAction, quoteId: string | undefined, confirmed: boolean) {
+  if (action.type === 'model_suite') {
+    const [q] = quoteId ? await deps.db.select({ total: quotes.totalMicros }).from(quotes).where(and(eq(quotes.accountId, ctx.accountId), eq(quotes.id, quoteId))) : []
+    if (!q) throw new AppError('quote_required', 'Get an estimate for the model tests first.')
+    assertSuiteCap(deps, q.total)
+  }
   const built = await buildAction(deps, ctx, action)
   const jobs = await runJobs(deps, ctx, { quoteId, confirmed, purpose: built.purpose, characterId: built.characterId, specs: built.specs })
   if (action.type === 'model_test') await startModelTest(deps, ctx, action.model, jobs[0]!.id)

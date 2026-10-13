@@ -22,7 +22,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   try { json = text ? JSON.parse(text) : null } catch { /* non-JSON */ }
   if (!res.ok) {
     const e = (json as { error?: { code?: string; message?: string; details?: unknown } } | null)?.error
-    throw new ApiError(res.status, e?.code ?? 'error', e?.message ?? (res.status === 502 || res.status === 504 ? 'The Studio API is not running. Start it with npm run studio.' : `Request failed (${res.status}).`), e?.details)
+    throw new ApiError(res.status, e?.code ?? 'error', e?.message ?? (res.status === 502 || res.status === 504 ? 'The Studio did not answer in time. Try again in a moment.' : `Request failed (${res.status}).`), e?.details)
   }
   return json as T
 }

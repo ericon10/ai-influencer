@@ -73,22 +73,34 @@ function guardRealism(specs: JobSpec[]): void {
   }
 }
 
+// Prices every spec, a few at a time: a live price (the Higgsfield account
+// path asks Higgsfield) can take seconds, and an estimate must answer well
+// inside the API's time limit. The order of the items is kept.
+const QUOTE_CONCURRENCY = 4
+
 export async function quoteItemsFor(deps: Deps, ctx: Ctx, specs: JobSpec[]): Promise<QuoteItem[]> {
   guardRealism(specs)
-  const items: QuoteItem[] = []
-  for (const s of specs) {
+  const priceOne = async (s: JobSpec): Promise<QuoteItem> => {
     const [provider, model] = s.request.model.split('/') as [string, string]
     if (s.type === 'gen') {
       // Higgsfield requests carry the billing path they are quoted on.
       const request = await withBilling(deps.db, ctx.accountId, s.request)
       const adapter = await deps.providers.gen(ctx.accountId, request.model, { billing: request.billing })
-      items.push({ label: s.label, provider, model, kind: request.kind, request, estimate: await adapter.estimate(request) })
-    } else {
-      const llm = await deps.providers.llm(ctx.accountId, s.request.model)
-      const { meta: _meta, ...fingerprinted } = s.request
-      items.push({ label: s.label, provider, model, kind: 'llm', request: fingerprinted, estimate: await llm.estimate(await llmEstimateRequest(deps, ctx, s.request)) })
+      return { label: s.label, provider, model, kind: request.kind, request, estimate: await adapter.estimate(request) }
+    }
+    const llm = await deps.providers.llm(ctx.accountId, s.request.model)
+    const { meta: _meta, ...fingerprinted } = s.request
+    return { label: s.label, provider, model, kind: 'llm', request: fingerprinted, estimate: await llm.estimate(await llmEstimateRequest(deps, ctx, s.request)) }
+  }
+  const items: QuoteItem[] = new Array(specs.length)
+  let next = 0
+  const lane = async () => {
+    while (next < specs.length) {
+      const i = next++
+      items[i] = await priceOne(specs[i]!)
     }
   }
+  await Promise.all(Array.from({ length: Math.min(QUOTE_CONCURRENCY, specs.length) }, lane))
   return items
 }
 

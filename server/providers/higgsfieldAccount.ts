@@ -5,6 +5,9 @@ import { forceBeautifyOff } from '../core/realism.js'
 import type { McpClient } from './mcpClient.js'
 import { ProviderError, type CostEstimate, type GenRequest, type JobState, type JobStatus, type Output, type ProviderAdapter } from './types.js'
 
+// How long an estimate waits for Higgsfield's live price on the account path.
+const ESTIMATE_WAIT_MS = 20_000
+
 // The owner's own Higgsfield account (the MCP connector, plan credits), next
 // to the pay-per-use REST API adapter that customers and production use.
 // Which one runs is a per-account default (Settings, Higgsfield billing).
@@ -30,6 +33,8 @@ export interface HiggsfieldAccountOptions {
   creditUsd: number
   fetchImpl?: typeof fetch
   timeoutMs?: number
+  // How long an estimate waits for Higgsfield's live price.
+  estimateWaitMs?: number
 }
 
 export interface AccountBalance { credits: number | null; plan: string | null }
@@ -194,7 +199,12 @@ export function createHiggsfieldAccountAdapter(o: HiggsfieldAccountOptions): Pro
       const entry = accountModel(o.config, req.model)
       if (req.kind !== 'upscale') {
         try {
-          const value = await o.client.callTool(tools(req).cost, { params: { ...accountParams(entry, req, false), get_cost: true, use_unlim: false } })
+          // A live price from Higgsfield, but never long enough to stall the
+          // estimate: past the wait, the price book answers instead.
+          let timer: ReturnType<typeof setTimeout> | undefined
+          const slow = new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new ProviderError('Higgsfield took too long to price this.', { retryable: true, submitted: 'no', code: 'slow_price' })), o.estimateWaitMs ?? ESTIMATE_WAIT_MS) })
+          const value = await Promise.race([o.client.callTool(tools(req).cost, { params: { ...accountParams(entry, req, false), get_cost: true, use_unlim: false } }), slow])
+            .finally(() => clearTimeout(timer))
           const cost = isObj(value) && isObj(value.cost) ? value.cost : undefined
           const credits = typeof cost?.credits_exact === 'number' ? cost.credits_exact : typeof cost?.credits === 'number' ? cost.credits : null
           if (credits != null) return creditEstimate(credits, true, 'higgsfield-account-live')
@@ -203,7 +213,7 @@ export function createHiggsfieldAccountAdapter(o: HiggsfieldAccountOptions): Pro
         }
       }
       const credits = bookCredits(req)
-      if (credits == null) throw new ProviderError(`Higgsfield did not price ${entry.label}, and the price book has no credit cost for it.`, { retryable: true, submitted: 'no' })
+      if (credits == null) throw new ProviderError(`Higgsfield did not price ${entry.label} in time, and the price book has no credit cost for it. Try again in a moment.`, { retryable: true, submitted: 'no' })
       return creditEstimate(credits, true, `${o.config.pricebook.version} credits`)
     },
     async uploadAsset(data, mime) {

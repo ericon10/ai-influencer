@@ -12,7 +12,7 @@ import { lintPrompt, blocking, type RuleViolation } from '../core/rules.js'
 import { finalizeImagePrompt } from '../core/realism.js'
 import { renderPlaceholderPortrait } from '../providers/mock.js'
 import { saveAsset } from '../storage/assets.js'
-import { quoteItemsFor, type JobSpec } from '../jobs/runner.js'
+import type { JobSpec } from '../jobs/runner.js'
 import type { JobOutcome, JobRow } from '../jobs/hooks.js'
 import { effectiveModel, MODEL_OVERRIDES_KEY, readModelOverrides, type ModelOverrides } from '../providers/modelOverrides.js'
 import { providerMode, setSetting } from './settings.js'
@@ -203,10 +203,9 @@ export async function buildModelSuite(deps: Deps, ctx: Ctx): Promise<BuiltModelT
       : 'Enter the models\' endpoints from the official Model API Reference first (Settings, Higgsfield models).')
   }
 
-  // The cap covers the whole run, before anything is quoted or spent.
+  // The cap covers the whole run; it is checked against the run's quote
+  // (assertSuiteCap), so the models are priced once.
   const cap = Math.round(suite.cap_usd * 1_000_000)
-  const total = (await quoteItemsFor(deps, ctx, specs)).reduce((sum, i) => sum + i.estimate.totalMicros, 0)
-  if (total > cap) throw new AppError('budget_exceeded', `These model tests would cost about ${formatUsd(total)}, over the ${formatUsd(cap)} cap for one run.`)
 
   const warnings: RuleViolation[] = [
     ...(skipped.length ? [{ ruleId: 'model-suite-skipped', spec: '7.1', title: 'Skipped: no endpoint yet', severity: 'warning' as const, message: `Not tested this run: ${skipped.join(', ')}. Enter each endpoint from the official Model API Reference, then run the tests again.` }] : []),
@@ -216,6 +215,13 @@ export async function buildModelSuite(deps: Deps, ctx: Ctx): Promise<BuiltModelT
     purpose: 'model_suite', characterId: null, specs, cap,
     preview: { title: `Model tests: ${specs.length} model${specs.length === 1 ? '' : 's'}, capped at ${formatUsd(cap)}`, prompts, warnings, invalidates: [] },
   }
+}
+
+// The whole suite run stays under its cap: checked when it is estimated and
+// again, from the stored quote, when it is started.
+export function assertSuiteCap(deps: Deps, totalMicros: number): void {
+  const cap = Math.round(deps.config.runtime.model_suite.cap_usd * 1_000_000)
+  if (totalMicros > cap) throw new AppError('budget_exceeded', `These model tests would cost about ${formatUsd(totalMicros)}, over the ${formatUsd(cap)} cap for one run.`)
 }
 
 // Records the endpoint each suite job tests, like a single test.
