@@ -25,6 +25,47 @@ export interface QaReport {
   texture?: { ratio: number; smoothed: boolean; region: string; message: string } | null
 }
 
+// Scenes (Stage 7) and still edits (Stage 8).
+export interface SceneFields {
+  title: string; momentType: string; moment: string; setting: string; location: string
+  outfit: string; footwear: string; jewelry: string; makeup: 'bare' | 'natural' | 'soft_glam'
+  hair: string; pose: string; view: string; expression: string; camera: string; foreground: string
+  framing: string; light: string; destination: string
+}
+
+export interface SceneEdit { code: string; change: string; face: boolean }
+
+export interface SceneStill extends Candidate {
+  op: 'generate' | 'edit' | 'crop' | 'upscale' | 'mirror' | 'drift_lock'
+  parentId: string | null; sceneId: string
+  qaReport: (QaReport & { edits?: SceneEdit[] }) | null
+}
+
+export interface SceneView {
+  id: string; title: string; brief: string; fields: Partial<SceneFields>; status: 'draft' | 'generating' | 'in_review' | 'approved'; busy: boolean
+  createdAt: string; comboLogged: boolean; aspect: string; complete: boolean; missing: string[]
+  combo: { moment: string; camera: string; light: string; location: string } | null
+  comboProblem: string | null
+  refs: Array<{ refId: string; role: 'face' | 'angle' | 'body' | 'expression'; assetId: string }>
+  candidates: SceneStill[]
+}
+
+export interface ScenePreset { id: string; label: string; hint?: string }
+export interface SceneModel { ref: string; label: string; path: 'api' | 'account'; refs: number; trained: boolean; note: string }
+
+export interface ScenesData {
+  scenes: SceneView[]
+  combos: Array<{ date: string; moment: string; camera: string; light: string; location: string }>
+  reasons: Array<{ id: string; label: string }>
+  options: {
+    moments: ScenePreset[]; cameras: ScenePreset[]; lights: ScenePreset[]; framings: ScenePreset[]; expressions: ScenePreset[]
+    makeup: ScenePreset[]; destinations: Array<ScenePreset & { aspect: string }>; views: ScenePreset[]
+    editPresets: Array<ScenePreset & { text: string; face: boolean }>
+    stillModels: SceneModel[]; editModels: SceneModel[]; defaultModels: string[]
+    maxVariations: number; maxModels: number; accountConnected: boolean; mode: 'demo' | 'live'
+  }
+}
+
 export interface Candidate {
   id: string; assetId: string | null; status: string; refId: string | null; heroPromptIndex: number | null; prompt: string
   qaVerdict: QaReport['verdict'] | null; qaReport: QaReport | null; rejectReasons: string[]; rejectNote: string; favorite: boolean; createdAt: string
@@ -81,6 +122,11 @@ export type StudioAction =
   | { type: 'qa'; characterId: string; candidateId: string }
   | { type: 'model_test'; model: string }
   | { type: 'model_suite' }
+  | { type: 'scene_plan'; characterId: string; sceneId: string }
+  | { type: 'scene'; characterId: string; sceneId: string; models: string[]; variations: number; reason?: string; withQa?: boolean }
+  | { type: 'scene_edit'; characterId: string; candidateId: string; change: string; face?: boolean; model?: string; withQa?: boolean }
+  | { type: 'scene_upscale'; characterId: string; candidateId: string }
+  | { type: 'scene_qa'; characterId: string; candidateId: string }
 
 export interface JobView { id: string; label: string; purpose: string; stage: string; status: string; kind: string; model: string; characterId: string | null; estimate: string; actual: string | null; error: string | null; createdAt: string; completedAt: string | null }
 

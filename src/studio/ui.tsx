@@ -113,7 +113,7 @@ export function Modal({ open, onClose, children, className = '' }: { open: boole
   )
 }
 
-export function Drawer({ open, onClose, title, children }: { open: boolean; onClose: () => void; title: ReactNode; children: ReactNode }) {
+export function Drawer({ open, onClose, title, children, wide = false }: { open: boolean; onClose: () => void; title: ReactNode; children: ReactNode; wide?: boolean }) {
   useEffect(() => {
     if (!open) return
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
@@ -124,7 +124,7 @@ export function Drawer({ open, onClose, title, children }: { open: boolean; onCl
   return createPortal(
     <div className="st-root" style={{ minHeight: 0, background: 'transparent' }}>
       <div className="st-overlay" onClick={onClose} />
-      <aside className="st-drawer" role="dialog" aria-modal="true">
+      <aside className={`st-drawer ${wide ? 'wide' : ''}`} role="dialog" aria-modal="true">
         <div className="st-drawer-head"><div className="st-h2" style={{ flex: 1 }}>{title}</div><button className="st-btn icon ghost" onClick={onClose} aria-label="Close"><X size={18} /></button></div>
         <div className="st-drawer-body">{children}</div>
       </aside>

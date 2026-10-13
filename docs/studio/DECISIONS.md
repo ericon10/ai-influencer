@@ -371,3 +371,51 @@ confirmed.
 - Prices: open.higgsfield.ai (the console and pricing page) is still not
   reachable from the build sandbox, so the price book keeps its "from" and
   placeholder prices until each test shows the real charge.
+
+## F. Phase 2 rulings, 2026-10-13
+
+### F1. Reference images keep the plain gray background (owner)
+Every reference image, the hero and REF-01 to REF-11, keeps its plain light
+gray background. A character's REALISM block is written for scenes, so a
+clause about the background ("ordinary background clutter") is left out of
+hero and sheet prompts (`realismForReference` in `server/core/realism.ts`).
+Scenes keep the block as written.
+
+### F2. The planner fills fields; code writes the prompt
+A scene is a set of fields (moment, setting, outfit, footwear, jewelry,
+makeup, hair, pose, angle, expression, camera, framing, light, destination).
+The owner writes a line in their own words; Claude fills the fields under
+the character's rules (a quoted LLM call); the scene template turns them
+into the prompt (SPEC 9: prompts are never written from scratch by an LLM).
+Every field stays editable and is saved as it is typed.
+
+### F3. Refs by angle come from the sheet graph
+The ref picker reads `sheet.yaml` (view, framing, expression per shot), so
+a character's "use when" table never needs REF math: REF-00 always, the
+closest angle close up, a full-body ref when more than the head shows, and
+the matching expression ref, at most 4. Models without image inputs use the
+saved character (Soul, with the drift lock pass after it) or the full card.
+
+### F4. Scene QA fixes what an edit can fix
+In scenes a logo, extra jewelry or the cuff on the wrong ear is an edit (or
+the free mirror when no text is in frame), not a regenerate; face drift and
+plastic or smoothed skin always regenerate. Jewelry the scene asked for is
+not extra. Framing and an unclear angle go to a person. Face matching skips
+faces under 64 px and sends a miss to a person when there are several
+faces in the frame. Logos and text are read by the vision model; OCR is not
+added (SPEC 6 lists OCR with the vision model; the vision model alone is
+judged enough for now).
+
+### F5. The combo log lives in the character file
+The "Combo log (last 10)" section of the character file is the log. A run
+whose moment and camera pair is in the last 10 entries is refused with the
+date and place of the earlier one; the first pick of a scene appends its
+entry (moment / camera / light / place) and keeps the newest 10. A rerun of
+a logged scene is allowed.
+
+### F6. Closer shots are crops, then an upscale
+A closer shot of a scene is a crop of the wide still at the scene's aspect
+(free, local), then a 2x upscale with the ByteDance upscaler on the
+owner's account (never Nano Banana, which re-composes). An upscale or edit
+whose skin detail falls below the texture threshold waits as failed QA and
+never replaces its source.

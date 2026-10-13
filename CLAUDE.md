@@ -92,6 +92,9 @@ requirements, not suggestions. Rule zero (Realism, above) comes first.
 | `config/*.yaml` | Rules engine, prompt templates, sheet graph, views, routing, price book, budgets |
 | `server/core/` | Pure, unit-tested logic (prompts, rules, sheet DAG, QA side logic, character file) |
 | `server/core/realism.ts` | Rule zero: bare-face line, REALISM and AVOID blocks, banned words, beautify filter |
+| `config/scenes.yaml`, `server/core/scenes.ts` | Stage 7 and 8 presets, scene and edit prompts, ref picker by angle, combo log |
+| `server/core/qa/scene.ts` | Scene QA: what an edit can fix, the free mirror, regenerate on face drift |
+| `server/pipeline/scenes.ts`, `sceneActions.ts`, `sceneHooks.ts` | Scene records, picks and crops; paid scene steps; what finished scene jobs do |
 | `server/qa/texture.ts` | Texture check after upscales and edits (skin smoothed) |
 | `server/providers/` | `ProviderAdapter` (SPEC 7.1), mock, Higgsfield API, Higgsfield account (MCP, plan credits), shared MCP connection flow (Dzine AI coming soon), Anthropic, contract tests |
 | `server/jobs/runner.ts` | Quotes required for every run, holds, submit, webhook/poll, ingest, ledger |

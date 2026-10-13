@@ -8,13 +8,15 @@ import { StartTab } from './character/StartTab'
 import { HeroTab } from './character/HeroTab'
 import { SheetTab } from './character/SheetTab'
 import { FileTab } from './character/FileTab'
+import { ScenesTab } from './character/ScenesTab'
 import type { CharacterView } from '../types'
 
-type Tab = 'start' | 'hero' | 'sheet' | 'file'
+type Tab = 'start' | 'hero' | 'sheet' | 'scenes' | 'file'
 
 function defaultTab(stage: number): Tab {
   if (stage <= 2) return 'start'
   if (stage === 3) return 'hero'
+  if (stage >= 5) return 'scenes'
   return 'sheet'
 }
 
@@ -45,13 +47,14 @@ export default function Character() {
         <Profile v={v} onEdit={() => setEditing(true)} />
         <div style={{ minWidth: 0 }}>
           <div className="st-seg" role="tablist" style={{ marginBottom: 20 }}>
-            {([['start', 'Start'], ['hero', 'Hero'], ['sheet', `Sheet ${v.sheet.progress.approved}/${v.sheet.progress.total}`], ['file', 'Character file']] as const).map(([k, label]) => (
+            {([['start', 'Start'], ['hero', 'Hero'], ['sheet', `Sheet ${v.sheet.progress.approved}/${v.sheet.progress.total}`], ['scenes', 'Scenes'], ['file', 'Character file']] as const).map(([k, label]) => (
               <button key={k} role="tab" aria-selected={current === k} className={current === k ? 'on' : ''} onClick={() => setTab(k)}>{label}</button>
             ))}
           </div>
           {current === 'start' && <StartTab v={v} onEditCard={() => setEditing(true)} goHero={() => setTab('hero')} />}
           {current === 'hero' && <HeroTab v={v} onEditCard={() => setEditing(true)} goSheet={() => setTab('sheet')} />}
           {current === 'sheet' && <SheetTab v={v} goHero={() => setTab('hero')} goFile={() => setTab('file')} />}
+          {current === 'scenes' && <ScenesTab v={v} goSheet={() => setTab('sheet')} />}
           {current === 'file' && <FileTab v={v} />}
         </div>
       </div>

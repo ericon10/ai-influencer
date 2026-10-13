@@ -1,4 +1,4 @@
-import type { ActionPreview, CharacterSummary, CharacterView, HiggsfieldAccount, JobView, Me, QuoteView, SettingsView, StudioAction, Usage } from './types'
+import type { ActionPreview, CharacterSummary, CharacterView, HiggsfieldAccount, JobView, Me, QuoteView, SceneFields, ScenesData, SettingsView, StudioAction, Usage } from './types'
 import { sheetRefOf, typeOf, uploadFiles } from './files'
 
 // Thin client for /api/v1. Every write sends the CSRF header the server
@@ -45,7 +45,7 @@ export const api = {
   },
   chooseConcept: (conceptId: string) => request<{ ok: true }>('POST', `/concepts/${conceptId}/choose`, {}),
 
-  approve: (candidateId: string) => request<{ invalidated: string[]; sheetComplete: boolean }>('POST', `/candidates/${candidateId}/approve`, {}),
+  approve: (candidateId: string) => request<{ invalidated: string[]; sheetComplete: boolean; comboLogged?: boolean }>('POST', `/candidates/${candidateId}/approve`, {}),
   reject: (candidateId: string, reasons: string[], note: string) => request<{ fixes: Array<{ reason: string; action: string; label: string; available: boolean }> }>('POST', `/candidates/${candidateId}/reject`, { reasons, note }),
   reopen: (candidateId: string) => request<{ ok: true }>('POST', `/candidates/${candidateId}/reopen`, {}),
   pickHero: (candidateId: string) => request<{ needsUpscale: boolean; height: number | null }>('POST', `/candidates/${candidateId}/pick-hero`, {}),
@@ -66,6 +66,13 @@ export const api = {
   },
   setModelEndpoint: (ref: string, endpoint: string) => request<SettingsView>('PUT', '/settings/models', { ref, endpoint }),
   mirror: (candidateId: string) => request<{ candidateId: string }>('POST', `/candidates/${candidateId}/mirror`),
+
+  // Scenes (Stage 7) and still edits (Stage 8).
+  scenes: (characterId: string) => request<ScenesData>('GET', `/characters/${characterId}/scenes`),
+  createScene: (characterId: string, body: { brief?: string; title?: string; fields?: Partial<SceneFields> }) => request<{ id: string }>('POST', `/characters/${characterId}/scenes`, body),
+  updateScene: (sceneId: string, body: { brief?: string; title?: string; fields?: Partial<SceneFields> }) => request<{ id: string }>('PATCH', `/scenes/${sceneId}`, body),
+  archiveScene: (sceneId: string) => request<{ ok: true }>('DELETE', `/scenes/${sceneId}`),
+  crop: (candidateId: string, rect: { x: number; y: number; w: number; h: number }) => request<{ candidateId: string; width: number; height: number }>('POST', `/candidates/${candidateId}/crop`, rect),
 
   estimate: (action: StudioAction) => request<{ quote: QuoteView; preview: ActionPreview }>('POST', '/actions/estimate', { action }),
   run: (action: StudioAction, quoteId: string, confirmed: boolean) => request<{ jobIds: string[] }>('POST', '/actions/run', { action, quoteId, confirmed }),

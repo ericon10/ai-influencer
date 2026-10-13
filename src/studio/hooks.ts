@@ -9,6 +9,7 @@ export const keys = {
   me: ['me'] as const,
   characters: ['characters'] as const,
   character: (id: string) => ['character', id] as const,
+  scenes: (id: string) => ['scenes', id] as const,
   jobs: (scope: string) => ['jobs', scope] as const,
   usage: ['usage'] as const,
   settings: ['settings'] as const,
@@ -49,6 +50,19 @@ export function useCharacter(id: string) {
   return useQuery({ queryKey: keys.character(id), queryFn: () => api.character(id), refetchInterval: busy ? 1500 : false })
 }
 
+// A character's scenes; polls while any of them is working.
+export function useScenes(characterId: string) {
+  const qc = useQueryClient()
+  const active = useActiveJobs()
+  const busy = (active.data?.jobs ?? []).some(j => j.characterId === characterId && /^(scene|scene_plan|scene_qa|scene_edit|scene_upscale|drift_lock):/.test(j.purpose))
+  const wasBusy = useRef(false)
+  useEffect(() => {
+    if (wasBusy.current && !busy) qc.invalidateQueries({ queryKey: keys.scenes(characterId) })
+    wasBusy.current = busy
+  }, [busy, characterId, qc])
+  return useQuery({ queryKey: keys.scenes(characterId), queryFn: () => api.scenes(characterId), refetchInterval: busy ? 1500 : false })
+}
+
 export function useCharacterJobs(id: string) {
   return useQuery({ queryKey: keys.jobs(id), queryFn: () => api.jobs({ characterId: id }), refetchInterval: 4000 })
 }
@@ -69,7 +83,10 @@ export function useHiggsfieldAccount(connected: boolean) {
 export function useRefresh() {
   const qc = useQueryClient()
   return (characterId?: string) => {
-    if (characterId) qc.invalidateQueries({ queryKey: keys.character(characterId) })
+    if (characterId) {
+      qc.invalidateQueries({ queryKey: keys.character(characterId) })
+      qc.invalidateQueries({ queryKey: keys.scenes(characterId) })
+    }
     qc.invalidateQueries({ queryKey: keys.characters })
     qc.invalidateQueries({ queryKey: ['jobs'] })
     qc.invalidateQueries({ queryKey: keys.usage })

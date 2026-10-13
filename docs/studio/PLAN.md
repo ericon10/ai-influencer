@@ -1,4 +1,4 @@
-# Character Studio: Phase 0 and Phase 1 Plan
+# Character Studio: Build Plan (Phases 0 to 2)
 
 Scope: SPEC.md section 13, Phase 0 (foundation) and Phase 1 (character
 creation, Stages 1 to 5). Decisions behind this plan are in
@@ -51,7 +51,8 @@ Guardrails that apply to every item:
       cancel, webhook token, own upload for reference images)
 - [x] Per-account model confirmation: path from the official Model API
       Reference, then one small quoted paid test per model
-- [ ] Confirm each model once the owner's key is in (waiting on the key)
+- [ ] Confirm each model once the owner's key is in (Flare, Seedance 2.5 and Kling 3.0
+      Turbo confirmed 2026-10-13; the others wait on their first paid test)
 - [x] Anthropic adapter for text and vision with token-based estimates
 - [x] Provider contract test suite (runs against the mock in CI)
 
@@ -167,9 +168,9 @@ Guardrails that apply to every item:
 
 ### 1.10 Acceptance: rebuild Callie
 - [x] Her character file is in `fixtures/callie/` and loaded in the Studio
-- [ ] Owner uploads REF-00 to REF-11 and the mirrored REF-04 to
+- [x] Owner uploads REF-00 to REF-11 and the mirrored REF-04 to
       `fixtures/callie/`
-- [ ] Studio attaches her real sheet images (the import path is built and
+- [x] Studio attaches her real sheet images (the import path is built and
       tested; waiting on the images)
 - [x] Regenerate any sheet shot from REF-00 (mock in tests; live only after a quote)
 - [x] QA flags the mirrored REF-04 (ear cuff on the wrong ear), tested
@@ -186,7 +187,7 @@ Guardrails that apply to every item:
 - [x] Per-account default in Settings; quotes show credits on the account path
 - [x] Server-side OAuth (PKCE, dynamic registration), tokens in the vault
 - [x] Tests against an in-memory fake of the MCP server and OAuth endpoints
-- [ ] Owner connects the account once from Settings (needs a deployed or
+- [x] Owner connects the account once from Settings (needs a deployed or
   local Studio that can reach mcp.higgsfield.ai)
 
 ## Rule zero: Realism principle (owner, 2026-10-13)
@@ -209,11 +210,13 @@ Guardrails that apply to every item:
 - [x] Railway worker: Dockerfile, wake on demand, app sleeping
 - [x] Production login with a throttle; 503 naming missing settings
 - [x] Model test suite: five real paths in one quoted run, capped at $10
-- [ ] Owner adds the secrets (docs/studio/DEPLOY.md) and creates the
+- [x] Owner adds the secrets (docs/studio/DEPLOY.md) and creates the
   Railway service
 - [x] Model endpoints from the official Model API Reference (DECISIONS E5)
-- [ ] Owner runs the model tests (Settings, Model tests)
-- [ ] Owner drags the "CALLIE MASTER CHARACTER" folder into Callie's
+- [x] Owner runs the model tests (Settings, Model tests): all five passed
+  2026-10-13 (GPT Image 2.5 Flare, Seedance 2.5 and Kling 3.0 Turbo confirmed
+  on the API; Nano Banana 2.1 and the upscaler on the account)
+- [x] Owner drags the "CALLIE MASTER CHARACTER" folder into Callie's
   Sheet tab; review any face or texture flags
 
 ## MCP connections
@@ -227,3 +230,64 @@ Guardrails that apply to every item:
 - [x] Untrack `.claude/settings.local.json` and ignore it
 - [x] "Made by Dan Kieft" badge removed from the product UI; README keeps
       a short thank-you (approved 2026-10-12)
+
+---
+
+## Phase 2: Scenes and edits (Stages 7 and 8, started 2026-10-13)
+
+Decisions: `DECISIONS.md` F1 to F6.
+
+### 2.1 Scenes as data
+- [x] `config/scenes.yaml`: moment types, cameras (who shoots, eye level),
+      framings, light, expressions, makeup, destinations (aspect), edit
+      presets, models offered for stills, edits and upscales
+- [x] Scene template, edit template and planner prompt in `templates.yaml`
+- [x] Rules as data: reference slot (5.2.14), footwear named (5.2.16),
+      plain and unbranded (5.2.17), eye-level angles and no tight crops on
+      the body (5.2.20), aspect by destination (5.2.22); the sheet's
+      chest-up legwear rule applies to hero and sheet only
+
+### 2.2 Stage 7: scene stills
+- [x] Scene records with the owner's words and structured fields
+- [x] Planner: Claude fills the fields from the owner's words (quoted);
+      code builds the prompt (SPEC 9); every field stays editable
+- [x] Reference slot by model: 2 to 4 sheet refs picked by angle with REF-00
+      always (edit models), the saved character with no attachments (Soul),
+      or the full card (text only)
+- [x] Outfit written out in full and replacing the sheet outfit; footwear
+      always named; the constant mark (ear cuff) added for you; colors stated
+      when water, wind or harsh sun change how hair looks
+- [x] Combo log: a repeated moment and camera pair from the last 10 entries
+      is refused; the first pick writes the entry to the character file
+- [x] One or two models side by side, 1 to 4 stills each, one quote
+- [x] Drift lock after a still from a trained character (DECISIONS D3)
+- [x] Scene QA: face match against the face and closest-angle refs (small
+      faces skipped; a miss with other people in frame goes to a person),
+      marks by side, logos and text, jewelry the scene did not ask for,
+      framing, skin texture; plain-language verdict with ready fixes
+- [x] Human gate: pick one or more stills per scene
+
+### 2.3 Stage 8: still edits
+- [x] One change per pass (5.3.24), never for face drift (5.3.25)
+- [x] QA findings become ready-made edits (remove the logo, the extra
+      jewelry, the cuff on the wrong ear); presets for expression edits with
+      REF-00 attached for the face
+- [x] Free mirror when the cuff is on the wrong ear and no text is in frame
+- [x] A closer shot is a free crop of the wide still (scene aspect), then a
+      2x upscale with the upscaler; texture must hold or it never replaces
+      its source
+- [x] Re-check any still (QA, quoted)
+
+### 2.4 UI
+- [x] Scenes tab: "What is she doing?", scene cards, combo log
+- [x] Scene page: your words and Plan the details, the fields grouped by
+      moment, outfit and camera (saved as you type), attached refs with
+      their roles, models, price, stills
+- [x] Still panel: compare with REF-00, QA in plain words, pick, reject with
+      reasons, fix one thing, mirror, crop closer, upscale, prompt with copy
+- [x] Verified in the browser against the mock (desktop and phone)
+
+### 2.5 Live
+- [ ] First live scene for Callie (Nano Banana 2.1 on the account, GPT Image
+      2.5 Flare on the API), after the owner sees the quote
+- [ ] Soul 2.0 model test, then a Soul scene with its drift lock
