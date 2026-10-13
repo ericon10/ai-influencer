@@ -152,9 +152,13 @@ the Studio; they are not creative limits on a character.
 | `server/core/safety.ts` | Fixed: no nudity or explicit content (lint and runner) |
 | `config/rules.yaml`, `server/pipeline/rules.ts` | Rule one: the rule book (fixed or default), switches per account and per character, Settings > Rules |
 | `config/scenes.yaml`, `server/core/scenes.ts` | Stage 7 and 8 presets, scene and edit prompts, ref picker by angle, combo log |
-| `config/content.yaml`, `server/pipeline/content.ts`, `server/core/overlay.ts`, `server/media/meme.ts`, `src/studio/pages/Content.tsx` | Content builder: B-roll library, meme videos, slideshows, batches; TikTok caption box (bundled fonts); renders free on the worker |
+| `UX-PLAN.md` | The Studio's layout (approved): Posts home, one workspace per post, drawers, Library, Settings tabs. New features fit it or update it first |
+| `src/studio/pages/Post.tsx`, `src/studio/pages/post/` | The post workspace: Idea, Stills, Video, Text, Finish on one page (video post, slideshow, batch) |
+| `src/studio/pages/Posts.tsx`, `Library.tsx`, `src/studio/library.tsx` | Posts home (account and character filters, Make another like this); the Library and its drawer |
+| `config/content.yaml`, `server/pipeline/content.ts`, `server/core/overlay.ts`, `server/media/meme.ts` | Posts on the server: idea, scene, account tag, step; B-roll; video posts, slideshows, batches (clips rotate); TikTok caption box (bundled fonts); renders free on the worker |
+| `server/pipeline/clips.ts` | Uploaded clips (kept clips of a character) and the Library view |
 | `server/core/promptWriter.ts`, `src/studio/pages/character/PromptBox.tsx` | The prompt writer: Claude writes the final still or video prompt (editable above Generate); code adds the reference line, mark sides and REALISM |
-| `src/studio/pages/character/VideoSection.tsx`, `server/pipeline/videoAssets.ts`, `server/media/mask.ts` | Stage 9 video: takes, upscale this take, end frame helper (head mask), clip QA |
+| `src/studio/pages/character/SceneStills.tsx`, `VideoSection.tsx`, `server/pipeline/videoAssets.ts`, `server/media/mask.ts` | A post's Stills (details, Write and generate, Use this still) and Video (takes, Use this take, upscale this take, end frame helper, clip QA) |
 | `server/core/qa/scene.ts` | Scene QA as advice: one-click fixes, the free mirror, face drift as a strong warning |
 | `server/pipeline/scenes.ts`, `sceneActions.ts`, `sceneHooks.ts` | Scene records, picks and crops; paid scene steps; what finished scene jobs do |
 | `server/qa/texture.ts` | Texture check after upscales and edits (skin smoothed) |

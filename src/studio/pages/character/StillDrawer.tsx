@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { AlertTriangle, Check, CheckCircle2, Crop, Film, FlipHorizontal2, Loader2, RotateCcw, XCircle } from 'lucide-react'
+import { useEffect, useState, type ReactNode } from 'react'
+import { AlertTriangle, Check, CheckCircle2, Crop, FlipHorizontal2, Loader2, RotateCcw, XCircle } from 'lucide-react'
 import { api, ApiError } from '../../api'
 import { useRefresh } from '../../hooks'
 import { PriceButton } from '../../PriceButton'
@@ -23,7 +23,7 @@ export const STILL_STATUS: Record<string, { label: string; tone: string }> = {
 
 export const OP_LABEL: Record<SceneStill['op'], string> = {
   generate: 'Still', edit: 'Edit', crop: 'Crop', upscale: 'Upscale 2x', mirror: 'Mirrored', drift_lock: 'Drift lock',
-  end_frame: 'End frame', video: 'Take', video_upscale: 'Upscaled take',
+  end_frame: 'End frame', video: 'Take', video_upscale: 'Upscaled take', upload: 'Uploaded clip', clone: 'Clone',
 }
 
 export function wrap(text: string, width = 72): string {
@@ -38,7 +38,9 @@ export function wrap(text: string, width = 72): string {
   return out.join('\n')
 }
 
-export function StillDrawer({ v, data, scene, still, onClose, onOpen, onMakeVideo }: { v: CharacterView; data: ScenesData; scene: SceneView; still: SceneStill | null; onClose: () => void; onOpen: (id: string) => void; onMakeVideo?: (id: string) => void }) {
+// `action` is the post's next step for this still ("Use this still", or add
+// it to a slideshow), shown at the top.
+export function StillDrawer({ v, data, scene, still, onClose, onOpen, action }: { v: CharacterView; data: ScenesData; scene: SceneView; still: SceneStill | null; onClose: () => void; onOpen: (id: string) => void; action?: (c: SceneStill) => ReactNode }) {
   const toast = useToast()
   const refresh = useRefresh()
   const [compare, setCompare] = useState(false)
@@ -106,7 +108,7 @@ export function StillDrawer({ v, data, scene, still, onClose, onOpen, onMakeVide
           {parent && <button className="st-btn sm ghost" onClick={() => onOpen(parent.id)}>Made from: {OP_LABEL[parent.op].toLowerCase()}</button>}
           <span className="st-spacer" />
           {ref00 && still.assetId && <button className={`st-btn sm ${compare ? 'secondary' : 'ghost'}`} onClick={() => setCompare(c => !c)}>{compare ? 'Hide' : 'Compare with'} REF-00</button>}
-          {onMakeVideo && still.assetId && !['failed', 'qa_pending', 'qa_failed', 'rejected'].includes(still.status) && <button className="st-btn sm" onClick={() => onMakeVideo(still.id)}><Film size={14} />Make a video from this</button>}
+          {action && still.assetId && !['failed', 'qa_pending', 'qa_failed', 'rejected'].includes(still.status) && action(still)}
         </div>
         {still.assetId ? (
           <div className={compare ? 'st-grid two' : ''} style={{ gap: 10 }}>

@@ -168,9 +168,16 @@ describe('posts (UX-PLAN.md)', () => {
     const item = await createContent(h.deps, h.ctx, { kind: 'meme', characterId, idea: 'Callie picks peaches at the market' })
     const first = await postScene(h.deps, h.ctx, item.id)
     expect(first.sceneId).toBeTruthy()
-    expect(first.step).toBe('stills')
+    expect(first.step).toBe('idea')
     expect((await getScene(h.deps, h.ctx, first.sceneId!)).brief).toBe('Callie picks peaches at the market')
     expect((await postScene(h.deps, h.ctx, item.id)).sceneId).toBe(first.sceneId)
+    // The scene's words follow the idea while they still match it.
+    await updateContent(h.deps, h.ctx, item.id, { idea: 'Callie picks ripe peaches at the farmers market' })
+    expect((await getScene(h.deps, h.ctx, first.sceneId!)).brief).toBe('Callie picks ripe peaches at the farmers market')
+    // A picked scene keeps its own words.
+    await updateContent(h.deps, h.ctx, item.id, { sceneId })
+    await updateContent(h.deps, h.ctx, item.id, { idea: 'Something else' })
+    expect((await getScene(h.deps, h.ctx, sceneId)).brief).toBe('Callie laughs at her laptop in a cafe')
   })
 
   it('switching the character drops its scene, clips and stills, and keeps the idea and B-roll', async () => {

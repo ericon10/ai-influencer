@@ -54,11 +54,13 @@ describe('character file', () => {
     const r = importFreeform(md)
     expect(r.character.name).toBe('Callie')
     expect(r.character.age).toBe(24)
+    // The mole is the only fixed mark; jewelry is a style idea (a default).
     expect(r.character.marks.map(m => [m.name, m.side, m.region, m.kind])).toEqual([
       ['mole', 'LEFT', 'brow', 'skin'],
-      ['ear cuff', 'LEFT', 'ear', 'jewelry'],
     ])
+    expect(r.character.style.ideas).toContain('Gold double-band ear cuff on her LEFT ear')
     expect(r.warnings[0]).toMatch(/Check the fields/)
+    expect(r.warnings.join(' ')).toMatch(/Jewelry is not a fixed mark/)
   })
 
   it('splits on level-two headings only, ignoring code fences', () => {

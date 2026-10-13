@@ -342,6 +342,22 @@ Decisions: `DECISIONS.md` G12.
 - [x] Slideshow: Claude writes hook, slides, caption, hashtags; images in order
 - [x] Batch: captions pasted or written by Claude, one video each, zip
 
+## The UX plan (approved 2026-10-13; `UX-PLAN.md`)
+
+Decisions: `DECISIONS.md` G14, G15.
+
+- [x] Worker light in the header; buttons held while it is not green
+- [x] Posts home with account and character filters; Make another like this
+- [x] One workspace per post: Idea, Stills, Video, Text, Finish
+- [x] Write and generate (one price); Use this still writes the video prompt
+- [x] Use this take keeps it; uploads become kept clips
+- [x] Batches rotate several clips and B-roll clips
+- [x] Library page and drawer (Stills, Clips, B-roll, Posts)
+- [x] Settings tabs (General, Models, Rules, Budgets and usage, Notices)
+- [x] Character setup as a stepper; the mole is the only fixed mark
+- [x] Old addresses redirect
+- [ ] Clone Video in the Video step (next)
+
 ## Phase 4: OpenCut embedded (planned, not started)
 
 Decisions: `DECISIONS.md` G13. Export or Fine-tune from the post screen;

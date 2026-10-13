@@ -8,14 +8,15 @@ import { useMe } from './hooks'
 import { ToastProvider } from './ui'
 import { Shell } from './Shell'
 import { Login } from './pages/Login'
+import { OldCharacter, OldContent, OldReview, OldRules, OldUsage } from './pages/Redirects'
 
+const Posts = lazy(() => import('./pages/Posts'))
+const Post = lazy(() => import('./pages/Post'))
 const Characters = lazy(() => import('./pages/Characters'))
 const Character = lazy(() => import('./pages/Character'))
 const Review = lazy(() => import('./pages/Review'))
-const Usage = lazy(() => import('./pages/Usage'))
+const Library = lazy(() => import('./pages/Library'))
 const Settings = lazy(() => import('./pages/Settings'))
-const Rules = lazy(() => import('./pages/Rules'))
-const Content = lazy(() => import('./pages/Content'))
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { staleTime: 5_000, refetchOnWindowFocus: true } } })
 
@@ -34,17 +35,23 @@ function Gate() {
   }
   return (
     <Routes>
-      <Route path="c/:id/review/:refId?" element={<Suspense fallback={<Loading />}><Review /></Suspense>} />
+      <Route path="characters/:id/review/:refId?" element={<Suspense fallback={<Loading />}><Review /></Suspense>} />
+      <Route path="c/:id/review/:refId?" element={<OldReview />} />
       <Route path="*" element={
         <Shell>
           <Suspense fallback={<Loading />}>
             <Routes>
-              <Route index element={<Characters />} />
-              <Route path="c/:id" element={<Character />} />
-              <Route path="usage" element={<Usage />} />
-              <Route path="content" element={<Content />} />
+              <Route index element={<Posts />} />
+              <Route path="posts/:id" element={<Post />} />
+              <Route path="characters" element={<Characters />} />
+              <Route path="characters/:id" element={<Character />} />
+              <Route path="library" element={<Library />} />
               <Route path="settings" element={<Settings />} />
-              <Route path="settings/rules" element={<Rules />} />
+              {/* Old addresses (UX-PLAN.md section 2) */}
+              <Route path="c/:id" element={<OldCharacter />} />
+              <Route path="content" element={<OldContent />} />
+              <Route path="usage" element={<OldUsage />} />
+              <Route path="settings/rules" element={<OldRules />} />
             </Routes>
           </Suspense>
         </Shell>

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { FileUp, FolderOpen, Plus, Upload } from 'lucide-react'
 import { api } from '../api'
 import { useCharacters, useRefresh } from '../hooks'
@@ -11,12 +11,13 @@ export default function Characters() {
   const list = useCharacters()
   const nav = useNavigate()
   const toast = useToast()
-  const [importing, setImporting] = useState(false)
+  const [params] = useSearchParams()
+  const [importing, setImporting] = useState(params.get('import') === '1')
   const [creating, setCreating] = useState(false)
 
   async function create() {
     setCreating(true)
-    try { const { id } = await api.createCharacter('New character'); nav(`/studio/c/${id}`) } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) } finally { setCreating(false) }
+    try { const { id } = await api.createCharacter('New character'); nav(`/studio/characters/${id}`) } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) } finally { setCreating(false) }
   }
 
   const chars = list.data?.characters ?? []
@@ -24,9 +25,9 @@ export default function Characters() {
     <div className="st-page wide">
       <div className="st-pagehead">
         <div className="grow">
-          <div className="st-kicker">Your cast</div>
-          <h1 className="st-h1">Characters</h1>
-          <p className="st-sub">Each character goes from inspiration to a 12-shot reference sheet and a character file. One clear next step at a time.</p>
+          <div className="st-kicker">Setup</div>
+          <h1 className="st-h1">Your characters</h1>
+          <p className="st-sub">Set each one up once: inspiration, face, a 12-shot reference sheet and a character file. Posts use them after that.</p>
         </div>
         <button className="st-btn" onClick={() => setImporting(true)}><FileUp size={16} />Import</button>
         <button className="st-btn primary" onClick={create} disabled={creating}><Plus size={16} />New character</button>
@@ -48,7 +49,7 @@ export default function Characters() {
 
       <div className="st-grid cards">
         {chars.map(c => (
-          <Link to={`/studio/c/${c.id}`} key={c.id} className="st-casting">
+          <Link to={`/studio/characters/${c.id}`} key={c.id} className="st-casting">
             <Img assetId={c.portraitAssetId} width={520} alt={c.name} />
             <div className="st-casting-body">
               <div className="st-casting-name">{c.name}</div>
@@ -102,7 +103,7 @@ function ImportDialog({ open, onClose }: { open: boolean; onClose: () => void })
     } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) } finally { setBusy(null) }
   }
   function close() { setDone(null); onClose() }
-  function open_() { if (done) nav(`/studio/c/${done.characterId}?tab=sheet`); close() }
+  function open_() { if (done) nav(`/studio/characters/${done.characterId}?tab=sheet`); close() }
 
   if (done) {
     return (

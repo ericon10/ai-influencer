@@ -1,7 +1,10 @@
 # Character Studio UX plan
 
 Status: APPROVED by the owner (2026-10-13), with the decisions in section 0.
-Every new feature must fit this plan or update it first.
+Built (the refactor, step 2 of section 7): every page below exists, the old
+addresses redirect, and the click counts in section 6 were measured in the
+browser in demo mode. Clone Video is the next step. Every new feature must
+fit this plan or update it first.
 
 Wireframes: `docs/studio/ux/` (rough, grayscale; numbers match section 4).
 
@@ -233,14 +236,18 @@ Rough, grayscale, desktop unless noted. Files in `docs/studio/ux/`.
 | No way to repeat a post | "Make another like this" on every post: a filled-in copy that opens at the Text step |
 | Posts have no account | Each post has an account tag (e.g. "Callie TikTok"), set in the Idea step; Posts home filters by account and character |
 
-**Data changes:**
+**Data changes (built, migration 0008):**
 
-- `content_items` becomes posts: `type`, `idea`, `scene_id`, `step`,
-  `account_tag`, and `video` (kind and candidate). A batch holds a list of
-  clips and B-roll clips that rotate across its captions.
-- `scenes` gets `post_id`.
-- Uploaded and cloned clips are candidates with `op` set to `upload` or
-  `clone`, so they show in Library > Clips and in every clip picker.
+- `content_items` are the posts: `kind` (meme is a video post), `idea`,
+  `scene_id`, `account_tag` and `step`. A video post's spec keeps its clip
+  and the still it was made from; a batch's spec keeps lists of clips and
+  B-roll clips that rotate across its captions.
+- A post points at its scene (`scene_id`), so scenes need no post column.
+  The scene is made from the idea once there is one, and its words follow
+  the idea while they still match.
+- Uploaded clips are candidates with `op` `upload` (and a `label`, the file
+  name), so they show in Library > Clips and in every clip picker. Clones
+  will use `op` `clone`.
 
 ---
 
@@ -249,7 +256,12 @@ Rough, grayscale, desktop unless noted. Files in `docs/studio/ux/`.
 Clicks only; typing the idea or a caption isn't counted. "Today" is the
 current app; "Plan" is this layout.
 
-| Flow | Today | Plan | How the plan saves clicks |
+Measured in the browser after the refactor (demo mode): video post from an
+idea **8**, slideshow from an idea **8** (with 2 stills; one more click per
+extra still), batch **9** with one uploaded clip and one from the Library
+(**8** with one clip from the Library).
+
+| Flow | Before | Plan | How the plan saves clicks |
 |---|---|---|---|
 | **Video post from an idea** (still > take > caption > MP4) | 18 clicks, 3 pages | **8**, 1 page | No page changes; "Write and generate"; the video prompt is written when a still is used; picking a take keeps it; the clip and caption steps are already open below |
 | **Video post from a TikTok** (clone > caption > MP4) | not possible | **8**, 1 page | "New post from a TikTok" opens the clone option directly; the character comes from the post |
@@ -290,8 +302,8 @@ character.
 
 ## 7. Order of work after approval
 
-1. Ship the worker light (done first, on its own).
-2. Refactor the existing pages to this layout (routes, sidebar, post
+1. Ship the worker light (done first, on its own). Done.
+2. Done: refactor the existing pages to this layout (routes, sidebar, post
    workspace with the stepper, drawers, Library, Settings tabs, redirects),
    with the four items folded in from section 0 (mole as the only fixed
    mark, batch clip rotation, "Make another like this", account tag). No

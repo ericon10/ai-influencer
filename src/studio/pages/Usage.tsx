@@ -4,12 +4,13 @@ import { Meter } from '../ui'
 
 // Money is always visible (SPEC 9 and 11). The ledger is append-only and
 // detailed enough to become metering and billing later.
-export default function Usage() {
+// Settings, Budgets and usage.
+export function UsagePanel() {
   const u = useUsage()
   const d = u.data
   return (
-    <div className="st-page">
-      <div className="st-pagehead"><div className="grow"><div className="st-kicker">Usage</div><h1 className="st-h1">Spend</h1><p className="st-sub">Estimates are reserved when a run starts and settled when it finishes. Failed runs cost nothing.</p></div></div>
+    <div>
+      <p className="st-sub" style={{ margin: '0 0 16px' }}>Estimates are reserved when a run starts and settled when it finishes. Failed runs cost nothing.</p>
       {!d ? <div className="st-skel" style={{ height: 160, borderRadius: 18 }} /> : (
         <div className="st-col" style={{ gap: 20 }}>
           <div className="st-card pad">
@@ -20,14 +21,14 @@ export default function Usage() {
               {d.heldMicros > 0 && <span className="st-badge accent">{d.held} reserved by running jobs</span>}
             </div>
             <Meter value={d.month.spentMicros + d.heldMicros} max={d.month.capMicros} />
-            <div className="st-row" style={{ marginTop: 10 }}><span className="st-hint">Caps block runs before they reach a provider.</span><span className="st-spacer" /><Link to="/studio/settings" className="st-btn sm ghost">Edit budgets</Link></div>
+            <div className="st-row" style={{ marginTop: 10 }}><span className="st-hint">Caps block runs before they reach a provider. Edit them above.</span></div>
           </div>
           <div className="st-grid two">
             <div className="st-card">
               <div className="st-card-head"><div className="st-h2">By character</div></div>
               <table className="st-table"><tbody>
                 {d.byCharacter.length === 0 && <tr><td className="st-muted">No spend yet this month.</td></tr>}
-                {d.byCharacter.map(c => <tr key={c.characterId ?? 'acct'}><td className="strong">{c.characterId ? <Link to={`/studio/c/${c.characterId}`}>{c.name}</Link> : c.name}</td><td style={{ textAlign: 'right' }}>{c.amount}</td></tr>)}
+                {d.byCharacter.map(c => <tr key={c.characterId ?? 'acct'}><td className="strong">{c.characterId ? <Link to={`/studio/characters/${c.characterId}`}>{c.name}</Link> : c.name}</td><td style={{ textAlign: 'right' }}>{c.amount}</td></tr>)}
               </tbody></table>
             </div>
             <div className="st-card">

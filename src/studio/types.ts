@@ -46,7 +46,7 @@ export interface RulesView { areas: Record<string, string>; rules: RuleRow[] }
 export interface SceneEdit { code: string; change: string; face: boolean }
 
 export interface SceneStill extends Candidate {
-  op: 'generate' | 'edit' | 'crop' | 'upscale' | 'mirror' | 'drift_lock' | 'end_frame' | 'video' | 'video_upscale'
+  op: 'generate' | 'edit' | 'crop' | 'upscale' | 'mirror' | 'drift_lock' | 'end_frame' | 'video' | 'video_upscale' | 'upload' | 'clone'
   media: 'image' | 'video'
   parentId: string | null; sceneId: string
   qaReport: (QaReport & { edits?: SceneEdit[] }) | null
@@ -161,7 +161,7 @@ export type StudioAction =
   | { type: 'scene_video'; characterId: string; candidateId: string; endCandidateId?: string; model?: string; motion: string; directions: string; durationSec: number; aspect: string; audio: boolean; takes: number; test: boolean }
   | { type: 'scene_video_upscale'; characterId: string; candidateId: string }
   | { type: 'scene_end_frame'; characterId: string; candidateId: string; change: string; withQa?: boolean }
-  | { type: 'scene'; characterId: string; sceneId: string; models: string[]; variations: number; reason?: string; withQa?: boolean; allowRepeat?: boolean }
+  | { type: 'scene'; characterId: string; sceneId: string; models: string[]; variations: number; reason?: string; withQa?: boolean; allowRepeat?: boolean; write?: boolean }
   | { type: 'scene_edit'; characterId: string; candidateId: string; change: string; face?: boolean; model?: string; withQa?: boolean }
   | { type: 'scene_upscale'; characterId: string; candidateId: string }
   | { type: 'scene_qa'; characterId: string; candidateId: string }
@@ -224,19 +224,23 @@ export interface VideoPrice { model: string; label: string; display: string | nu
 // The content builder (text overlays): B-roll, meme videos, slideshows, batches.
 export type ContentKind = 'meme' | 'slideshow' | 'batch'
 export interface BrollClip { id: string; title: string; product: string; status: 'processing' | 'ready' | 'failed'; error: string | null; assetId: string | null; durationSec: number | null; createdAt: string }
-export interface MemeSpec { clipId: string | null; brollId: string | null; order: 'clip_first' | 'broll_first'; brollStart: number; brollSeconds: number; caption: string }
+export interface BrollTiming { order: 'clip_first' | 'broll_first'; brollStart: number; brollSeconds: number }
+export interface MemeSpec extends BrollTiming { clipId: string | null; stillId: string | null; brollId: string | null; caption: string }
 export interface SlideshowSpec { stillIds: string[]; topic: string; hook: string; slides: string[]; caption: string; hashtags: string[] }
-export interface BatchSpec extends Omit<MemeSpec, 'caption'> { topic: string; count: number; captions: string[] }
+// A batch rotates its clips and B-roll across the captions.
+export interface BatchSpec extends BrollTiming { clipIds: string[]; brollIds: string[]; topic: string; count: number; captions: string[] }
+export type PostStep = 'idea' | 'stills' | 'video' | 'text' | 'finish'
 export interface ContentOutputs {
-  videoAssetId?: string; imageAssetIds?: string[]; videos?: Array<{ caption: string; assetId: string } | null>; zipAssetId?: string
+  videoAssetId?: string; imageAssetIds?: string[]; videos?: Array<{ caption: string; assetId: string; clipId?: string; brollId?: string | null } | null>; zipAssetId?: string
   done?: number; failed?: number; total?: number; dropped?: string[]; renderedAt?: string
 }
 export interface ContentItem {
   id: string; kind: ContentKind; characterId: string | null; title: string; spec: Record<string, unknown>
+  idea: string; sceneId: string | null; accountTag: string; step: PostStep
   status: 'draft' | 'rendering' | 'ready' | 'failed'; outputs: ContentOutputs; error: string | null; createdAt: string; updatedAt: string
 }
 export interface ContentData {
-  broll: BrollClip[]; products: string[]; items: ContentItem[]
+  broll: BrollClip[]; products: string[]; items: ContentItem[]; accountTags: string[]
   options: {
     caption: { size: number; safe: { top: number; bottom: number; left: number; right: number }; position: 'top' | 'middle' | 'bottom'; maxChars: number; box: { fill: string; text: string; radius: number; pad_x: number; pad_y: number } }
     canvas: { width: number; height: number; fps: number }
@@ -253,3 +257,8 @@ export interface WorkerStatus {
   commit: string | null; startedAt: string | null; lastSeenAt: string | null; inProcess: boolean
 }
 
+
+// The Library: everything made, across characters (server/pipeline/clips.ts).
+export interface LibraryStill { id: string; assetId: string; characterId: string; characterName: string; sceneId: string | null; sceneTitle: string; status: string; op: string; createdAt: string }
+export interface LibraryClip extends LibraryStill { posterId: string | null; durationSec: number | null; title: string; error: string | null }
+export interface LibraryData { stills: LibraryStill[]; clips: LibraryClip[] }

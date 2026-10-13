@@ -16,6 +16,7 @@ export const keys = {
   settings: ['settings'] as const,
   higgsfieldAccount: ['higgsfield-account'] as const,
   content: ['content'] as const,
+  library: (characterId: string | null) => ['library', characterId ?? 'all'] as const,
   worker: ['worker'] as const,
 }
 
@@ -104,7 +105,7 @@ export function useContent() {
   const qc = useQueryClient()
   const active = useActiveJobs()
   // Claude writing slides or captions, a render, or a B-roll upload.
-  const busy = (active.data?.jobs ?? []).some(j => /^(content_slides|content_captions|content_render|broll_ingest):/.test(j.purpose))
+  const busy = (active.data?.jobs ?? []).some(j => /^(content_slides|content_captions|content_render|broll_ingest|clip_ingest):/.test(j.purpose))
   const wasBusy = useRef(false)
   useEffect(() => {
     if (wasBusy.current && !busy) qc.invalidateQueries({ queryKey: keys.content })
@@ -114,6 +115,24 @@ export function useContent() {
     queryKey: keys.content,
     queryFn: api.content,
     refetchInterval: q => (busy || q.state.data?.items.some(i => i.status === 'rendering') || q.state.data?.broll.some(b => b.status === 'processing') ? 2000 : false),
+  })
+}
+
+// The Library (stills and clips across characters); polls while an upload is
+// being prepared, and looks again when a job that makes clips or stills ends.
+export function useLibrary(characterId: string | null = null) {
+  const qc = useQueryClient()
+  const active = useActiveJobs()
+  const busy = (active.data?.jobs ?? []).some(j => /^(clip_ingest|scene|scene_edit|scene_upscale|scene_video|scene_video_upscale|drift_lock):/.test(j.purpose))
+  const wasBusy = useRef(false)
+  useEffect(() => {
+    if (wasBusy.current && !busy) qc.invalidateQueries({ queryKey: ['library'] })
+    wasBusy.current = busy
+  }, [busy, qc])
+  return useQuery({
+    queryKey: keys.library(characterId),
+    queryFn: () => api.library(characterId),
+    refetchInterval: q => (busy || q.state.data?.clips.some(c => c.status === 'generating') ? 2000 : false),
   })
 }
 
@@ -150,6 +169,7 @@ export function useRefresh() {
     qc.invalidateQueries({ queryKey: keys.usage })
     qc.invalidateQueries({ queryKey: keys.settings })
     qc.invalidateQueries({ queryKey: keys.content })
+    qc.invalidateQueries({ queryKey: ['library'] })
   }
 }
 

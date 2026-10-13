@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Check, Copy, Info, Loader2, Sparkles, Trash2, Wand2 } from 'lucide-react'
+import { Check, Copy, Info, Loader2, PenLine, Sparkles, Wand2 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../../api'
 import { useCharacters, useRefresh } from '../../hooks'
@@ -8,11 +8,12 @@ import { PriceButton } from '../../PriceButton'
 import { Field, Img, Modal, SectionProgress, errorMessage, scrollToField, useToast, type TodoItem } from '../../ui'
 import type { CharacterView, SceneFields, SceneStill, SceneView, ScenesData } from '../../types'
 import { StillDrawer, STILL_STATUS, OP_LABEL, claudeChecked } from './StillDrawer'
-import { VideoSection } from './VideoSection'
 import { PromptBox } from './PromptBox'
 
-// One scene: the owner's words, the planned fields (all editable, saved as
-// you type), the refs it will attach, and the stills it made.
+// The stills of a post (UX-PLAN.md, the Stills step): its scene's details
+// (planned by Claude or filled in, all optional, saved as you type), the
+// models and the prompt, Write and generate, and the stills it made, each
+// with the post's next step ("Use this still", or add it to a slideshow).
 
 const FIELD_LABEL: Record<string, string> = {
   momentType: 'Moment type', moment: 'The moment', setting: 'Setting', location: 'Place', outfit: 'Outfit', footwear: 'Footwear',
@@ -25,8 +26,9 @@ const ROLE: Record<string, string> = { face: 'Face', angle: 'Closest angle', bod
 
 // Only the moment itself is required (owner, 2026-10-13: keep required fields
 // to the minimum). Moment type, camera and light start pre-filled, and the
-// owner's own words count as the moment until one is planned or written. A
-// preset that no longer exists is flagged too, so it can be picked again.
+// owner's own words (the post's idea) count as the moment until one is
+// planned or written. A preset that no longer exists is flagged too, so it
+// can be picked again.
 const REQUIRED = new Set<keyof SceneFields>(['moment'])
 const SECTIONS: Record<'moment' | 'wear' | 'camera', Array<keyof SceneFields>> = {
   moment: ['moment', 'setting', 'location', 'momentType'],
@@ -54,16 +56,23 @@ function sceneChecks(data: ScenesData, draft: Partial<SceneFields>, missing: str
   return { required, done, progress, left }
 }
 
-export function SceneEditor({ v, data, scene, onBack }: { v: CharacterView; data: ScenesData; scene: SceneView; onBack: () => void }) {
+export function SceneStills({ v, data, scene, action, picked = [], onStarted }: {
+  v: CharacterView; data: ScenesData; scene: SceneView
+  // Called when a run starts (the post moves to this step).
+  onStarted?: () => void
+  // The post's next step for a still, on its tile and in its drawer.
+  action?: (c: SceneStill) => ReactNode
+  // Stills the post already uses (marked on their tiles).
+  picked?: string[]
+}) {
   const toast = useToast()
   const refresh = useRefresh()
   const qc = useQueryClient()
   const [draft, setDraft] = useState<Partial<SceneFields>>(scene.fields)
-  const [title, setTitle] = useState(scene.title)
   const [saving, setSaving] = useState<'idle' | 'saving' | 'saved'>('idle')
   const [open, setOpen] = useState<string | null>(null)
   const [copying, setCopying] = useState(false)
-  const [videoStart, setVideoStart] = useState<string | null>(null)
+  const [details, setDetails] = useState(false)
   const dirty = useRef<Partial<SceneFields>>({})
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -72,7 +81,6 @@ export function SceneEditor({ v, data, scene, onBack }: { v: CharacterView; data
   useEffect(() => {
     setDraft(d => ({ ...scene.fields, ...Object.fromEntries(Object.entries(d).filter(([k]) => k in dirty.current)) }))
   }, [serverKey]) // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { if (!title) setTitle(scene.title) }, [scene.title]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function flush() {
     const patch = dirty.current
@@ -100,63 +108,47 @@ export function SceneEditor({ v, data, scene, onBack }: { v: CharacterView; data
     timer.current = setTimeout(() => { timer.current = null; void flush() }, 600)
   }
 
-  async function saveTitle() {
-    if (title === scene.title) return
-    try { await api.updateScene(scene.id, { title }); refresh(v.id) } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) }
-  }
-
-  async function archive() {
-    try { await api.archiveScene(scene.id); refresh(v.id); onBack(); toast({ tone: '', text: 'Scene archived. Its stills are kept.' }) } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) }
-  }
-
-  const planned = scene.planned
   const checks = sceneChecks(data, draft, scene.missing)
-  const todo: TodoItem[] = checks.left.map(k => ({ label: FIELD_LABEL[k] ?? k, target: `scene-${k}` }))
+  const todo: TodoItem[] = checks.left.map(k => ({ label: FIELD_LABEL[k] ?? k, target: `scene-${k}`, onGo: () => { setDetails(true); window.setTimeout(() => scrollToField(`scene-${k}`), 120) } }))
   const still = scene.candidates.find(c => c.id === open && c.media !== 'video') ?? null
+  const tiles = scene.candidates.filter(c => c.media !== 'video' && (c.assetId || c.status === 'failed'))
+  const summary = [data.options.moments.find(m => m.id === draft.momentType)?.label, data.options.cameras.find(m => m.id === draft.camera)?.label, data.options.lights.find(m => m.id === draft.light)?.label, draft.outfit].filter(Boolean).join(' · ')
 
   return (
-    <div className="st-col" style={{ gap: 22 }}>
-      <div className="st-row" style={{ gap: 10 }}>
-        <button className="st-btn ghost sm" onClick={async () => { if (timer.current) { clearTimeout(timer.current); timer.current = null; await flush() } onBack() }}><ArrowLeft size={14} />Scenes</button>
-        <span className="st-spacer" />
-        <SaveState state={saving} />
-        <button className="st-btn ghost sm" onClick={async () => { if (timer.current) { clearTimeout(timer.current); timer.current = null; await flush() } setCopying(true) }} title="Copy this scene to other characters"><Copy size={14} />Use for other characters</button>
-        <button className="st-btn ghost sm" onClick={archive} title="Archive this scene (its stills are kept)"><Trash2 size={14} />Archive</button>
-      </div>
-
-      <input className="st-input st-scene-title" value={title} placeholder="Name this scene" maxLength={80} onChange={e => setTitle(e.target.value)} onBlur={saveTitle} aria-label="Scene name" />
-
+    <div className="st-col" style={{ gap: 18 }}>
       <section className="st-card">
-        <div className="st-card-head"><Wand2 size={16} /><div className="grow"><div className="st-h3">Your words</div><div className="st-hint">Claude plans every detail from this, following {v.data.name}'s rules. Change anything after.</div></div></div>
+        <div className="st-card-head">
+          <Wand2 size={16} />
+          <div className="grow"><div className="st-h3">Details <span className="st-muted" style={{ fontWeight: 400 }}>(optional)</span></div><div className="st-hint">{scene.planned ? summary || 'Planned.' : `Outfit, place, camera and light. Claude can plan them from your idea, following ${v.data.name}'s rules, or leave them to the prompt writer.`}</div></div>
+          <SaveState state={saving} />
+          <button className="st-btn sm ghost" onClick={() => setDetails(d => !d)} aria-expanded={details}>{details ? 'Hide' : 'Show'} the details</button>
+        </div>
         <div className="st-card-body st-col" style={{ gap: 12 }}>
-          <p className="st-cardtext" style={{ margin: 0 }}>{scene.brief || <span className="st-muted">No description. Fill in the details below yourself.</span>}</p>
-          {scene.brief && (
-            <PriceButton action={{ type: 'scene_plan', characterId: v.id, sceneId: scene.id }} label={planned ? 'Plan it again' : 'Plan the details'} variant={planned ? 'secondary' : 'primary'} />
-          )}
+          <div className="st-row" style={{ gap: 10, flexWrap: 'wrap' }}>
+            {scene.brief && <PriceButton action={{ type: 'scene_plan', characterId: v.id, sceneId: scene.id }} label={scene.planned ? 'Plan it again' : 'Plan the details'} variant="secondary" size="sm" onStarted={() => setDetails(true)} />}
+            <button className="st-btn sm ghost" onClick={async () => { if (timer.current) { clearTimeout(timer.current); timer.current = null; await flush() } setCopying(true) }} title="Copy this scene to other characters"><Copy size={14} />Use for other characters</button>
+          </div>
+          {details && <SceneForm data={data} draft={draft} set={set} checks={checks} v={v} />}
         </div>
       </section>
 
-      <SceneForm data={data} draft={draft} set={set} checks={checks} v={v} />
-
-      <GenerateCard v={v} data={data} scene={scene} todo={todo} saving={saving === 'saving' || Object.keys(dirty.current).length > 0} setRefs={refs => set('refs', refs)} />
+      <GenerateCard v={v} data={data} scene={scene} todo={todo} saving={saving === 'saving' || Object.keys(dirty.current).length > 0} setRefs={refs => set('refs', refs)} onStarted={onStarted} />
 
       <section>
-        <div className="st-section-head"><div className="st-h2">Stills</div><span className="st-muted">{scene.candidates.filter(c => c.assetId).length}</span></div>
+        <div className="st-section-head"><div className="st-h2">Stills</div><span className="st-muted">{tiles.filter(c => c.assetId).length}</span></div>
         {scene.busy && (
           <div className="st-card pad st-row" style={{ gap: 14, marginBottom: 14 }}>
             <Loader2 className="st-spin" size={18} />
-            <div className="grow"><div className="st-h3">Working on this scene</div><div className="st-hint">Rendering, then the free checks: face match against REF-00 and skin texture. Look each still over yourself; Check this asks Claude.</div></div>
+            <div className="grow"><div className="st-h3">Working on these stills</div><div className="st-hint">Writing the prompt or rendering, then the free checks: face match against REF-00 and skin texture. Look each still over yourself; Check this asks Claude.</div></div>
           </div>
         )}
-        {scene.candidates.filter(c => c.media !== 'video').length === 0 && !scene.busy && <span className="st-hint">No stills yet. Generate to see them here.</span>}
+        {tiles.length === 0 && !scene.busy && <span className="st-hint">No stills yet. Generate to see them here.</span>}
         <div className="st-grid scenes">
-          {scene.candidates.filter(c => c.media !== 'video' && (c.assetId || c.status === 'failed')).map(c => <StillTile key={c.id} c={c} aspect={scene.aspect} onOpen={() => setOpen(c.id)} />)}
+          {tiles.map(c => <StillTile key={c.id} c={c} aspect={scene.aspect} onOpen={() => setOpen(c.id)} action={action} picked={picked.indexOf(c.id)} />)}
         </div>
       </section>
 
-      <VideoSection v={v} data={data} scene={scene} startId={videoStart} setStartId={setVideoStart} />
-
-      <StillDrawer v={v} data={data} scene={scene} still={still} onClose={() => setOpen(null)} onOpen={setOpen} onMakeVideo={id => { setVideoStart(id); setOpen(null); window.setTimeout(() => scrollToField('video-card'), 150) }} />
+      <StillDrawer v={v} data={data} scene={scene} still={still} onClose={() => setOpen(null)} onOpen={setOpen} action={action} />
       <CopyScene v={v} scene={scene} open={copying} onClose={() => setCopying(false)} />
     </div>
   )
@@ -177,6 +169,14 @@ function CopyScene({ v, scene, open, onClose }: { v: CharacterView; scene: Scene
     setBusy(true)
     try { setDone((await api.copyScene(scene.id, picked)).copies) } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) } finally { setBusy(false) }
   }
+  // Each copy opens as a new video post of that character, at its stills.
+  async function openCopy(d: { characterId: string; sceneId: string }) {
+    try {
+      const { id } = await api.createContent({ kind: 'meme', characterId: d.characterId, sceneId: d.sceneId, idea: scene.brief, step: 'stills' })
+      onClose()
+      nav(`/studio/posts/${id}`)
+    } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) }
+  }
   return (
     <Modal open={open} onClose={onClose}>
       <div className="st-card-body st-col" style={{ gap: 14 }}>
@@ -184,7 +184,7 @@ function CopyScene({ v, scene, open, onClose }: { v: CharacterView; scene: Scene
         {done.length ? (
           <div className="st-col" style={{ gap: 8 }}>
             {done.map(d => (
-              <div key={d.sceneId} className="st-row" style={{ gap: 8 }}><Check size={14} style={{ color: 'var(--st-ok)' }} /><span className="grow">Copied to {d.name}</span><button className="st-btn sm" onClick={() => { onClose(); nav(`/studio/c/${d.characterId}?tab=scenes&scene=${d.sceneId}`) }}>Open</button></div>
+              <div key={d.sceneId} className="st-row" style={{ gap: 8 }}><Check size={14} style={{ color: 'var(--st-ok)' }} /><span className="grow">Copied to {d.name}</span><button className="st-btn sm" onClick={() => void openCopy(d)}>Open as a post</button></div>
             ))}
             <div className="st-row"><span className="st-spacer" /><button className="st-btn primary" onClick={onClose}>Done</button></div>
           </div>
@@ -217,18 +217,23 @@ function SaveState({ state }: { state: 'idle' | 'saving' | 'saved' }) {
   return null
 }
 
-function StillTile({ c, aspect, onOpen }: { c: SceneStill; aspect: string; onOpen: () => void }) {
+function StillTile({ c, aspect, onOpen, action, picked }: { c: SceneStill; aspect: string; onOpen: () => void; action?: (c: SceneStill) => ReactNode; picked: number }) {
   const s = STILL_STATUS[c.status] ?? { label: c.status, tone: '' }
+  const usable = !!c.assetId && !['failed', 'qa_pending', 'qa_failed', 'rejected'].includes(c.status)
   return (
-    <button className="st-tile st-scene-tile" onClick={onOpen}>
-      <Img assetId={c.assetId} width={420} style={{ aspectRatio: aspect.replace(':', ' / ') }} />
-      <span className={`st-badge ${s.tone}`}>{s.label}</span>
+    <div className={`st-tile st-scene-tile ${picked >= 0 ? 'picked' : ''}`}>
+      <button type="button" className="st-tile-open" onClick={onOpen} aria-label={`Open ${OP_LABEL[c.op]}`}>
+        <Img assetId={c.assetId} width={420} style={{ aspectRatio: aspect.replace(':', ' / ') }} />
+        <span className={`st-badge ${s.tone}`}>{picked >= 0 ? `Used${picked > 0 ? ` ${picked + 1}` : ''}` : s.label}</span>
+      </button>
       <div className="st-row" style={{ gap: 6, padding: '0 4px 2px' }}>
         <span className="st-tile-label">{OP_LABEL[c.op]}</span>
         <span className="st-spacer" />
         {c.qaVerdict && c.status !== 'qa_pending' && <span className={`st-badge plain ${c.qaVerdict === 'post' ? 'ok' : c.qaVerdict === 'regenerate' ? 'bad' : 'warn'}`}>{c.qaVerdict === 'post' ? (claudeChecked(c.qaReport) ? 'QA ok' : 'Free checks ok') : c.qaVerdict === 'edit' ? 'Fixable' : c.qaVerdict === 'regenerate' ? 'Redo' : 'Look'}</span>}
       </div>
-    </button>
+      {c.status === 'failed' && c.rejectNote && <span className="st-hint" style={{ padding: '0 4px' }}>{c.rejectNote}</span>}
+      {action && usable && <div className="st-tile-action">{action(c)}</div>}
+    </div>
   )
 }
 
@@ -328,7 +333,7 @@ function SceneForm({ v, data, draft, set, checks }: { v: CharacterView; data: Sc
 
 // ── Generate ──────────────────────────────────────────────────────────
 
-function GenerateCard({ v, data, scene, todo, saving, setRefs }: { v: CharacterView; data: ScenesData; scene: SceneView; todo: TodoItem[]; saving: boolean; setRefs: (refs: string[]) => void }) {
+function GenerateCard({ v, data, scene, todo, saving, setRefs, onStarted }: { v: CharacterView; data: ScenesData; scene: SceneView; todo: TodoItem[]; saving: boolean; setRefs: (refs: string[]) => void; onStarted?: () => void }) {
   const o = data.options
   const usable = (m: (typeof o.stillModels)[number]) => !(o.mode === 'live' && m.path === 'account' && !o.accountConnected)
   const [models, setModels] = useState<string[]>(() => o.defaultModels.filter(r => usable(o.stillModels.find(m => m.ref === r)!)).slice(0, 1))
@@ -342,12 +347,15 @@ function GenerateCard({ v, data, scene, todo, saving, setRefs }: { v: CharacterV
   // written by Claude, typed, or the template's, before Generate runs.
   const pw = o.promptWriter
   const [promptDirty, setPromptDirty] = useState(false)
+  // With nothing written yet, Generate writes the prompt first ("Write and
+  // generate", one price); the box stays for typing or writing it first.
   const needsPrompt = pw.on && !(scene.prompts.still?.text ?? '').trim()
+  const [showBox, setShowBox] = useState(false)
   const left: TodoItem[] = [
     ...todo,
     ...(!models.length ? [{ label: 'Pick a model', target: 'scene-models' }] : []),
-    ...(needsPrompt ? [{ label: 'The prompt (write it, or type your own)', target: 'scene-prompt' }] : []),
   ]
+  const count = chosen.length > 1 ? variations * chosen.length : variations
   const trained = chosen.find(m => m.trained)
   const picked = scene.refs.map(r => r.refId)
   function toggleRef(id: string) {
@@ -405,7 +413,9 @@ function GenerateCard({ v, data, scene, todo, saving, setRefs }: { v: CharacterV
           <span className="st-label">Stills per model</span>
           <div className="st-stepnum"><button onClick={() => setVariations(n => Math.max(1, n - 1))} aria-label="Fewer">-</button><span>{variations}</span><button onClick={() => setVariations(n => Math.min(o.maxVariations, n + 1))} aria-label="More">+</button></div>
         </div>
-        {pw.on ? (
+        {pw.on && needsPrompt && !showBox ? (
+          <button type="button" className="st-btn ghost sm" style={{ alignSelf: 'flex-start' }} onClick={() => setShowBox(true)}><PenLine size={14} />See or type the prompt first</button>
+        ) : pw.on ? (
           <PromptBox
             id="scene-prompt" characterId={v.id} sceneId={scene.id} target="still"
             written={scene.prompts.still} templateText={scene.templateText} words={pw.words.still} model={pw.model} realism={pw.realism}
@@ -420,11 +430,13 @@ function GenerateCard({ v, data, scene, todo, saving, setRefs }: { v: CharacterV
         )}
         <PriceButton
           size="big"
-          label={chosen.length > 1 ? `Generate ${variations * chosen.length} stills` : `Generate ${variations} still${variations > 1 ? 's' : ''}`}
+          label={`${needsPrompt ? 'Write and generate' : 'Generate'} ${count} still${count > 1 ? 's' : ''}`}
           todo={left}
           waiting={saving || promptDirty ? 'Saving your changes...' : undefined}
-          action={left.length || saving || promptDirty ? null : { type: 'scene', characterId: v.id, sceneId: scene.id, models, variations, withQa: o.autoQa, allowRepeat: true }}
+          action={left.length || saving || promptDirty ? null : { type: 'scene', characterId: v.id, sceneId: scene.id, models, variations, withQa: o.autoQa, allowRepeat: true, ...(needsPrompt ? { write: true } : {}) }}
+          onStarted={() => onStarted?.()}
         />
+        {needsPrompt && <span className="st-hint">Claude writes the prompt from your idea and the details, then the stills run on it. One price for both; the prompt shows here after, editable for the next run.</span>}
         {scene.combo && <span className="st-hint">Logged on your first pick as: {[scene.combo.moment, scene.combo.camera, scene.combo.light, scene.combo.location].filter(Boolean).join(' / ')}</span>}
       </div>
     </section>

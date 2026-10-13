@@ -19,7 +19,11 @@ import { PromptBox } from './PromptBox'
 
 const usable = (c: SceneStill) => c.media === 'image' && !!c.assetId && !['failed', 'rejected', 'superseded', 'qa_failed', 'qa_pending'].includes(c.status)
 
-export function VideoSection({ v, data, scene, startId, setStartId }: { v: CharacterView; data: ScenesData; scene: SceneView; startId: string | null; setStartId: (id: string | null) => void }) {
+// In a post, `onUseTake` picks a take for the post; picking it keeps it
+// (owner, 2026-10-13), so there is no separate Keep click.
+export function VideoSection({ v, data, scene, startId, setStartId, onUseTake, usedId = null }: { v: CharacterView; data: ScenesData; scene: SceneView; startId: string | null; setStartId: (id: string | null) => void; onUseTake?: (id: string) => void; usedId?: string | null }) {
+  const toast = useToast()
+  const refresh = useRefresh()
   const o = data.options.video
   const stills = scene.candidates.filter(usable).sort((a, b) => Number(b.status === 'approved') - Number(a.status === 'approved'))
   const clips = scene.candidates.filter(c => c.media === 'video' && (c.assetId || c.status === 'failed'))
@@ -60,10 +64,25 @@ export function VideoSection({ v, data, scene, startId, setStartId }: { v: Chara
   ]
   const motionChanged = !!written?.motion && written.motion.trim() !== motion.trim()
   const clip = clips.find(c => c.id === open) ?? null
+  // Keep (if not kept yet), then pick it for the post. A face that does not
+  // match REF-00 asks first (a strong warning; the owner decides).
+  async function useTake(id: string, acknowledge = false) {
+    const c = clips.find(x => x.id === id)
+    if (!c || !onUseTake) return
+    try {
+      if (c.status !== 'approved') await api.approve(c.id, acknowledge)
+      refresh(v.id)
+      onUseTake(c.id)
+      setOpen(null)
+    } catch (e) {
+      if (e instanceof ApiError && e.code === 'confirm_required') toast({ tone: 'bad', text: 'The face in this take does not match REF-00.', action: { label: 'Use it anyway', run: () => void useTake(id, true) } })
+      else toast({ tone: 'bad', text: errorMessage(e) })
+    }
+  }
 
   return (
     <section className="st-col" style={{ gap: 14 }}>
-      <div className="st-section-head"><div className="st-h2">Videos</div><span className="st-muted">{clips.filter(c => c.assetId).length}</span></div>
+
       <div className="st-card" data-field="video-card">
         <div className="st-card-head"><Film size={16} /><div className="grow"><div className="st-h3">Make a video</div><div className="st-hint">Straight to {picked.label}{picked.resolution ? ` at ${picked.resolution}` : ''}. Keep a take you like, then upscale that exact take.</div></div></div>
         <div className="st-card-body st-col" style={{ gap: 16 }}>
@@ -174,11 +193,14 @@ export function VideoSection({ v, data, scene, startId, setStartId }: { v: Chara
         </div>
       </div>
       {clips.length > 0 && (
-        <div className="st-grid scenes">
-          {clips.map(c => <ClipTile key={c.id} c={c} aspect={scene.aspect} onOpen={() => setOpen(c.id)} />)}
-        </div>
+        <>
+          <div className="st-section-head" style={{ margin: '6px 0 0' }}><div className="st-h3">Takes</div><span className="st-muted">{clips.filter(c => c.assetId).length}</span></div>
+          <div className="st-grid scenes">
+            {clips.map(c => <ClipTile key={c.id} c={c} aspect={scene.aspect} onOpen={() => setOpen(c.id)} used={c.id === usedId} onUse={onUseTake ? () => void useTake(c.id) : undefined} />)}
+          </div>
+        </>
       )}
-      <ClipDrawer v={v} scene={scene} clip={clip} onClose={() => setOpen(null)} onOpen={setOpen} />
+      <ClipDrawer v={v} scene={scene} clip={clip} onClose={() => setOpen(null)} onOpen={setOpen} onUse={onUseTake ? (ack: boolean) => useTake(clip!.id, ack) : undefined} used={clip?.id === usedId} />
     </section>
   )
 }
@@ -208,25 +230,29 @@ function EndFrameHelper({ v, data, start }: { v: CharacterView; data: ScenesData
   )
 }
 
-function ClipTile({ c, aspect, onOpen }: { c: SceneStill; aspect: string; onOpen: () => void }) {
+function ClipTile({ c, aspect, onOpen, onUse, used }: { c: SceneStill; aspect: string; onOpen: () => void; onUse?: () => void; used: boolean }) {
   const s = STILL_STATUS[c.status] ?? { label: c.status, tone: '' }
   const test = JSON.stringify(c.qaReport ?? '').includes('faces not representative')
+  const usable = !!c.assetId && ['in_review', 'approved', 'rejected', 'superseded'].includes(c.status)
   return (
-    <button className="st-tile st-scene-tile" onClick={onOpen}>
-      {c.assetId
-        ? <video className="st-clip" src={assetUrl(c.assetId)} muted loop playsInline preload="metadata" style={{ aspectRatio: aspect.replace(':', ' / ') }} onMouseEnter={e => void e.currentTarget.play().catch(() => {})} onMouseLeave={e => e.currentTarget.pause()} />
-        : <div className="st-clip st-clip-empty" style={{ aspectRatio: aspect.replace(':', ' / ') }}><AlertTriangle size={18} /></div>}
-      <span className={`st-badge ${s.tone}`}>{s.label}</span>
+    <div className={`st-tile st-scene-tile ${used ? 'picked' : ''}`}>
+      <button type="button" className="st-tile-open" onClick={onOpen} aria-label={`Open ${test ? 'motion test' : OP_LABEL[c.op]}`}>
+        {c.assetId
+          ? <video className="st-clip" src={assetUrl(c.assetId)} muted loop playsInline preload="metadata" style={{ aspectRatio: aspect.replace(':', ' / ') }} onMouseEnter={e => void e.currentTarget.play().catch(() => {})} onMouseLeave={e => e.currentTarget.pause()} />
+          : <div className="st-clip st-clip-empty" style={{ aspectRatio: aspect.replace(':', ' / ') }}><AlertTriangle size={18} /></div>}
+        <span className={`st-badge ${used ? 'ok' : s.tone}`}>{used ? 'Used' : s.label}</span>
+      </button>
       <div className="st-row" style={{ gap: 6, padding: '0 4px 2px' }}>
         <span className="st-tile-label">{test ? 'Motion test' : OP_LABEL[c.op]}</span>
         <span className="st-spacer" />
         {c.qaVerdict && <span className={`st-badge plain ${c.qaVerdict === 'post' ? 'ok' : c.qaVerdict === 'regenerate' ? 'bad' : 'warn'}`}>{c.qaVerdict === 'post' ? (claudeChecked(c.qaReport) ? 'QA ok' : 'Free checks ok') : c.qaVerdict === 'regenerate' ? 'Face?' : 'Look'}</span>}
       </div>
-    </button>
+      {onUse && usable && !used && !test && <div className="st-tile-action"><button type="button" className="st-btn sm ok" onClick={onUse}><CheckCircle2 size={14} />Use this take</button></div>}
+    </div>
   )
 }
 
-function ClipDrawer({ v, scene, clip, onClose, onOpen }: { v: CharacterView; scene: SceneView; clip: SceneStill | null; onClose: () => void; onOpen: (id: string) => void }) {
+function ClipDrawer({ v, scene, clip, onClose, onOpen, onUse, used = false }: { v: CharacterView; scene: SceneView; clip: SceneStill | null; onClose: () => void; onOpen: (id: string) => void; onUse?: (acknowledge: boolean) => Promise<void>; used?: boolean }) {
   const toast = useToast()
   const refresh = useRefresh()
   const [busy, setBusy] = useState(false)
@@ -241,6 +267,10 @@ function ClipDrawer({ v, scene, clip, onClose, onOpen }: { v: CharacterView; sce
 
   async function keep(acknowledge = false) {
     setBusy(true)
+    if (onUse) {
+      try { await onUse(acknowledge) } finally { setBusy(false) }
+      return
+    }
     try {
       await api.approve(clip!.id, acknowledge)
       setConfirm(false)
@@ -285,7 +315,8 @@ function ClipDrawer({ v, scene, clip, onClose, onOpen }: { v: CharacterView; sce
           </div>
         )}
         <div className="st-row" style={{ gap: 8, flexWrap: 'wrap' }}>
-          {canKeep && <button className="st-btn ok" disabled={busy} onClick={() => keep()}>{busy ? <Loader2 size={15} className="st-spin" /> : <CheckCircle2 size={15} />}Keep this take</button>}
+          {onUse && !used && !!clip.assetId && (canKeep || clip.status === 'approved') && <button className="st-btn ok" disabled={busy} onClick={() => keep()}>{busy ? <Loader2 size={15} className="st-spin" /> : <CheckCircle2 size={15} />}Use this take</button>}
+          {!onUse && canKeep && <button className="st-btn ok" disabled={busy} onClick={() => keep()}>{busy ? <Loader2 size={15} className="st-spin" /> : <CheckCircle2 size={15} />}Keep this take</button>}
           {clip.assetId && clip.status !== 'rejected' && <button className="st-btn bad ghost" disabled={busy} onClick={reject}><XCircle size={15} />Reject</button>}
           {clip.status === 'rejected' && <button className="st-btn ghost" onClick={async () => { await api.reopen(clip.id); refresh(v.id) }}><RotateCcw size={14} />Undo reject</button>}
           {clip.assetId && <a className="st-btn ghost" href={`${assetUrl(clip.assetId)}?download=1`}><Download size={14} />Download</a>}

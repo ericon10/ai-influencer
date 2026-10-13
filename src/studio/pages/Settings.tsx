@@ -1,32 +1,52 @@
 import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
-import { Bot, CheckCircle2, CreditCard, KeyRound, Link2, ListChecks, Loader2, RefreshCw, ShieldCheck, Trash2, UserRound } from 'lucide-react'
+import { Bot, CheckCircle2, CreditCard, KeyRound, Link2, Loader2, RefreshCw, ShieldCheck, Trash2, UserRound } from 'lucide-react'
 import { api } from '../api'
 import { keys, useHiggsfieldAccount, useSettings } from '../hooks'
 import { Callout, Field, PromptViewer, errorMessage, useToast } from '../ui'
 import { PriceButton } from '../PriceButton'
 import type { SettingsView } from '../types'
+import { RulesPanel } from './Rules'
+import { UsagePanel } from './Usage'
+
+// Settings (UX-PLAN.md): General, Models, Rules, Budgets and usage, Notices.
+type Tab = 'general' | 'models' | 'rules' | 'usage' | 'notices'
+const TABS: Array<[Tab, string]> = [['general', 'General'], ['models', 'Models'], ['rules', 'Rules'], ['usage', 'Budgets and usage'], ['notices', 'Notices']]
 
 export default function Settings() {
   const s = useSettings()
   const d = s.data
+  const [params, setParams] = useSearchParams()
+  const tab = (TABS.some(([k]) => k === params.get('tab')) ? params.get('tab') : 'general') as Tab
+  function open(k: Tab) {
+    const next = new URLSearchParams(params)
+    if (k === 'general') next.delete('tab'); else next.set('tab', k)
+    setParams(next, { replace: true })
+  }
   return (
     <div className="st-page">
-      <div className="st-pagehead"><div className="grow"><div className="st-kicker">Settings</div><h1 className="st-h1">Studio settings</h1></div>
-        <Link className="st-btn secondary" to="/studio/settings/rules"><ListChecks size={16} />Rules</Link>
+      <div className="st-pagehead"><div className="grow"><div className="st-kicker">Settings</div><h1 className="st-h1">Studio settings</h1></div></div>
+      <div className="st-seg st-tabs" role="tablist" style={{ marginBottom: 20 }}>
+        {TABS.map(([k, label]) => <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => open(k)}>{label}</button>)}
       </div>
-      {!d ? <div className="st-skel" style={{ height: 240, borderRadius: 18 }} /> : (
+      {tab === 'rules' ? <RulesPanel /> : tab === 'usage' ? (
+        <div className="st-col" style={{ gap: 20 }}>
+          {d ? <BudgetsCard d={d} /> : <div className="st-skel" style={{ height: 160, borderRadius: 18 }} />}
+          <UsagePanel />
+        </div>
+      ) : tab === 'notices' ? <NoticesCard /> : !d ? <div className="st-skel" style={{ height: 240, borderRadius: 18 }} /> : tab === 'models' ? (
+        <div className="st-col" style={{ gap: 20 }}>
+          <ClaudeCard d={d} />
+          <ModelsCard d={d} />
+        </div>
+      ) : (
         <div className="st-col" style={{ gap: 20 }}>
           <ModeCard d={d} />
           <KeysCard d={d} />
           <BillingCard d={d} />
-          <ClaudeCard d={d} />
           <ConnectionsCard d={d} />
           <StorageCard />
-          <BudgetsCard d={d} />
-          <ModelsCard d={d} />
-          <NoticesCard />
         </div>
       )}
     </div>

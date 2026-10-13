@@ -306,9 +306,14 @@ export function importFreeform(md: string, opts: ImportOptions = {}): ImportResu
   // sides for unrelated reasons, like hair tucked behind an ear).
   const marksSec = find(sections, /marks?$/)
   if (marksSec) parsedOnly.add(marksSec)
+  // Jewelry is a default, picked per scene (owner, 2026-10-13: the mole is
+  // the only fixed mark), so a piece listed with the marks becomes a style
+  // idea instead.
   const marks: CharacterMark[] = []
+  const jewelry: string[] = []
   for (const line of (marksSec?.body ?? md).split('\n')) {
     const m = parseMark(line)
+    if (m?.kind === 'jewelry') { if (marksSec) jewelry.push(line.replace(/^\s*[-*+]\s*/, '').replace(/\*\*/g, '').trim()); continue }
     if (m && !marks.some(x => x.kind === m.kind && x.region === m.region && x.side === m.side)) marks.push(m)
   }
   if (!marks.length) warnings.push('No side-specific marks found. Marks are optional; add any the face really has.')
@@ -337,6 +342,10 @@ export function importFreeform(md: string, opts: ImportOptions = {}): ImportResu
     } else styleNotes.push(b.key ? `${b.key}: ${b.value}` : b.value)
   }
   if (styleNotes.length) style.notes = styleNotes.map(n => (/[.!?]$/.test(n) ? n : `${n}.`)).join(' ')
+  if (jewelry.length) {
+    style.ideas = [...(style.ideas ?? []), ...jewelry.filter(j => !(style.ideas ?? []).includes(j))]
+    warnings.push(`Jewelry is not a fixed mark, so ${jewelry.length === 1 ? 'it is' : 'they are'} kept as a style idea: ${jewelry.join('; ')}.`)
+  }
   if (style.ideas?.length || style.palette?.length || style.pieces?.length) warnings.push('Style is kept as optional ideas only; it never goes into a prompt, and every scene names its own outfit.')
 
   // Persona.

@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Lock, RotateCcw } from 'lucide-react'
+import { Lock, RotateCcw } from 'lucide-react'
 import { api } from '../api'
 import { useCharacters, useRules } from '../hooks'
 import { Callout, errorMessage, useToast } from '../ui'
@@ -13,7 +12,7 @@ import type { RuleRow } from '../types'
 
 const ORDER = ['safety', 'realism', 'money', 'character', 'hero', 'sheet', 'scene', 'qa', 'edit', 'video', 'copy']
 
-export default function Rules() {
+export function RulesPanel() {
   const chars = useCharacters()
   const [scope, setScope] = useState<string | null>(null)
   const q = useRules(scope)
@@ -24,16 +23,8 @@ export default function Rules() {
   const off = defaults.filter(r => !(scope ? r.character?.on : r.global.on)).length
 
   return (
-    <div className="st-page">
-      <Link to="/studio/settings" className="st-btn ghost sm" style={{ marginBottom: 14 }}><ArrowLeft size={14} />Settings</Link>
-      <div className="st-pagehead">
-        <div className="grow">
-          <div className="st-kicker">Settings</div>
-          <h1 className="st-h1">Rules</h1>
-          <p className="st-sub" style={{ margin: '6px 0 0' }}>Defaults, not locks. Only the fixed rules can stop a run; every default starts on, only ever warns, and can be switched off for all characters or just one.</p>
-        </div>
-      </div>
-
+    <div>
+      <p className="st-sub" style={{ margin: '0 0 16px' }}>Defaults, not locks. Only the fixed rules can stop a run; every default starts on, only ever warns, and can be switched off for all characters or just one.</p>
       <div className="st-row" style={{ gap: 10, flexWrap: 'wrap', marginBottom: 18 }}>
         <span className="st-label">Rules for</span>
         <select className="st-select" style={{ width: 'auto', minWidth: 220 }} value={scope ?? ''} onChange={e => setScope(e.target.value || null)}>

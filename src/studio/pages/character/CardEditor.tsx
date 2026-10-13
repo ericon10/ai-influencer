@@ -48,7 +48,7 @@ export function CardEditor({ v, open, onClose }: { v: CharacterView; open: boole
         </div>
         <div className="st-field" data-field="card-marks">
           <span className="st-label">Distinguishing marks</span>
-          <span className="st-hint">Optional. Subtle marks that are part of the face, each on the character's own LEFT or RIGHT side.</span>
+          <span className="st-hint">Optional. Skin marks that are part of the face (a mole, a freckle cluster, a scar), each on the character's own LEFT or RIGHT side. These are the only fixed details; jewelry, like any outfit choice, is picked per post.</span>
           {form.marks.map((m, i) => (
             <div key={i} className="st-card" style={{ padding: 12, boxShadow: 'none', display: 'grid', gap: 8 }}>
               <div className="st-row">
@@ -59,7 +59,7 @@ export function CardEditor({ v, open, onClose }: { v: CharacterView; open: boole
               <input className="st-input" value={m.description} placeholder="e.g. Subtle mole above the left brow" onChange={e => setMark(i, { description: e.target.value })} />
               <div className="st-row">
                 <select className="st-select" style={{ flex: 1 }} value={m.region} onChange={e => setMark(i, { region: e.target.value })}>{REGIONS.map(r => <option key={r}>{r}</option>)}</select>
-                <div className="st-seg">{(['skin', 'jewelry'] as const).map(k => <button key={k} className={m.kind === k ? 'on' : ''} onClick={() => setMark(i, { kind: k })}>{k}</button>)}</div>
+                {m.kind === 'jewelry' && <span className="st-hint st-warntext">Jewelry is not a fixed mark. Remove this and name it per post instead.</span>}
               </div>
             </div>
           ))}

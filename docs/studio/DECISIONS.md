@@ -696,3 +696,12 @@ changes what the Studio suggests and checks, never what the owner types.
   jewelry, a default like any outfit choice.
 - Batch rotates several clips and B-roll clips across its captions.
 - Every post has "Make another like this" and an account tag.
+- Built: Posts home with account and character filters; the post
+  workspace (steps fold into a line when done; the current one and those
+  after it stay open, so no Next clicks); the Library page and drawer;
+  Settings tabs; character setup as a stepper. A post's scene is made from
+  its idea; "Use this still" also writes the video prompt (priced on the
+  button); "Use this take" keeps and picks it. Uploaded videos become kept
+  clips. Old addresses redirect.
+- Importing a character file: jewelry listed with the marks becomes a
+  style idea, with a note; marks are skin features.

@@ -192,7 +192,7 @@ function NextUp({ v, shot, action }: { v: CharacterView; shot: Shot; action: 'ge
 
         {action === 'review' && (
           <div className="st-row">
-            <button className="st-btn primary big" onClick={() => nav(`/studio/c/${v.id}/review/${shot.id}`)}><Eye size={18} />Review {reviewing.length > 1 ? `${reviewing.length} results` : 'now'}</button>
+            <button className="st-btn primary big" onClick={() => nav(`/studio/characters/${v.id}/review/${shot.id}`)}><Eye size={18} />Review {reviewing.length > 1 ? `${reviewing.length} results` : 'now'}</button>
             {reviewing[0]?.qaVerdict && <span className={`st-badge ${reviewing[0].qaVerdict === 'post' ? 'ok' : 'warn'}`}>QA: {reviewing[0].qaVerdict === 'post' ? 'looks right' : 'needs your eye'}</span>}
           </div>
         )}
@@ -232,7 +232,7 @@ function ShotDrawer({ v, shot, onClose }: { v: CharacterView; shot: Shot | null;
       <div className="st-col" style={{ gap: 16 }}>
         <div className="st-row"><ShotBadge status={shot.status} /><span className="st-hint">{shot.framing === 'chest_up' ? 'Chest-up' : 'Full body'} · {shot.aspect} · uses {shot.attach.join(', ') || 'the hero'}</span></div>
         {shot.approved && <Img assetId={shot.approved.assetId} width={900} contain style={{ aspectRatio: shot.framing === 'full_body' ? '9/16' : '3/4' }} />}
-        {shot.candidates.some(c => c.status === 'in_review') && <button className="st-btn primary" onClick={() => nav(`/studio/c/${v.id}/review/${shot.id}`)}><Eye size={16} />Review</button>}
+        {shot.candidates.some(c => c.status === 'in_review') && <button className="st-btn primary" onClick={() => nav(`/studio/characters/${v.id}/review/${shot.id}`)}><Eye size={16} />Review</button>}
         {shot.id !== 'REF-00' && (
           <div className="st-card" style={{ padding: 14, boxShadow: 'none' }}>
             <div className="st-h3" style={{ marginBottom: 8 }}>Regenerate this shot</div>

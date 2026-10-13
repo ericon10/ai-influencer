@@ -1,0 +1,134 @@
+import { useState, type ReactNode } from 'react'
+import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
+import { Archive, ArrowLeft, Check, CopyPlus, Loader2 } from 'lucide-react'
+import { api } from '../api'
+import { keys, useCharacter, useCharacters, useContent, useLibrary, useScenes } from '../hooks'
+import { Callout, errorMessage, scrollToField, useToast } from '../ui'
+import type { ContentData, ContentItem, PostStep } from '../types'
+import { KIND_LABEL, STEPS, postName, useDuplicate, usePostDraft } from './post/parts'
+import { IdeaStep, ideaSummary } from './post/IdeaStep'
+import { StillsStep, stillsSummary } from './post/StillsStep'
+import { VideoStep, videoSummary } from './post/VideoStep'
+import { TextStep, textSummary } from './post/TextStep'
+import { FinishStep } from './post/FinishStep'
+import type { PostCtx } from './post/ctx'
+
+// One post, idea to export, on one page (UX-PLAN.md rule 1). The steps flow
+// top to bottom: the ones done fold into a line with Change, the current one
+// and those after it stay open, so nothing needs a Next click. Pickers open
+// as drawers; uploads happen in the step that needs them.
+
+export default function Post() {
+  const { id = '' } = useParams()
+  const content = useContent()
+  const item = content.data?.items.find(i => i.id === id)
+  if (!content.data) return <div className="st-page"><div className="st-skel" style={{ height: 48, width: 320, marginBottom: 20 }} /><div className="st-skel" style={{ height: 360, borderRadius: 18 }} /></div>
+  if (!item) {
+    return (
+      <div className="st-page">
+        <div className="st-empty">
+          <h2 className="st-h1">This post is not here</h2>
+          <p className="st-sub" style={{ margin: 0 }}>It may have been archived. Your other posts are on the Posts page.</p>
+          <Link className="st-btn primary" to="/studio">Back to posts</Link>
+        </div>
+      </div>
+    )
+  }
+  return <Workspace key={item.id} item={item} data={content.data} />
+}
+
+function Workspace({ item, data }: { item: ContentItem; data: ContentData }) {
+  const nav = useNavigate()
+  const toast = useToast()
+  const qc = useQueryClient()
+  const duplicate = useDuplicate()
+  const draft = usePostDraft<Record<string, unknown>>(item)
+  const chars = useCharacters()
+  const characterId = item.characterId ?? ''
+  const character = useCharacter(characterId)
+  const scenes = useScenes(characterId)
+  const lib = useLibrary(characterId)
+  const steps = STEPS[item.kind]
+  const current: PostStep = steps.some(([k]) => k === item.step) ? item.step : 'idea'
+  const ci = steps.findIndex(([k]) => k === current)
+  const ctx: PostCtx = {
+    item, data, draft, characters: chars.data?.characters ?? [], v: character.data, scenes: scenes.data, lib: lib.data,
+    scene: scenes.data?.scenes.find(s => s.id === item.sceneId),
+    current,
+    // Moves the post forward to a step (never back; Change goes back).
+    advance: async (step: PostStep, spec?: Record<string, unknown>) => {
+      const to = steps.findIndex(([k]) => k === step)
+      if (to > ci) await draft.go(step, spec ? { spec } : {})
+      else if (spec) { draft.setSpec(spec); await draft.flush() }
+    },
+  }
+
+  async function archive() {
+    try {
+      await api.archiveContent(item.id)
+      await qc.invalidateQueries({ queryKey: keys.content })
+      nav('/studio')
+      toast({ tone: '', text: 'Post archived. Its stills and clips stay in the Library.' })
+    } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) }
+  }
+  function jump(step: PostStep, state: 'done' | 'current' | 'waiting') {
+    if (state === 'done') void draft.go(step)
+    window.setTimeout(() => scrollToField(`step-${step}`), 60)
+  }
+
+  const summary: Record<PostStep, ReactNode> = {
+    idea: ideaSummary(ctx), stills: stillsSummary(ctx), video: videoSummary(ctx), text: textSummary(ctx), finish: null,
+  }
+  const body: Record<PostStep, ReactNode> = {
+    idea: <IdeaStep ctx={ctx} />, stills: <StillsStep ctx={ctx} />, video: <VideoStep ctx={ctx} />, text: <TextStep ctx={ctx} />, finish: <FinishStep ctx={ctx} />,
+  }
+
+  return (
+    <div className="st-page">
+      <div className="st-row" style={{ gap: 10, marginBottom: 10 }}>
+        <Link to="/studio" className="st-btn ghost sm"><ArrowLeft size={14} />Posts</Link>
+        <span className="st-spacer" />
+        {draft.saving ? <span className="st-hint"><Loader2 size={12} className="st-spin" style={{ verticalAlign: -2 }} /> Saving</span> : <span className="st-hint"><Check size={12} style={{ verticalAlign: -2 }} /> Saved</span>}
+        <button className="st-btn ghost sm" onClick={() => void duplicate(item.id)} title="A copy with everything filled in, opened at the text"><CopyPlus size={14} />Make another like this</button>
+        <button className="st-btn ghost sm" onClick={archive} title="Archive this post (its stills and clips stay)"><Archive size={14} />Archive</button>
+      </div>
+      <div className="st-pagehead" style={{ marginBottom: 14 }}>
+        <div className="grow" style={{ minWidth: 0 }}>
+          <div className="st-kicker">{KIND_LABEL[item.kind]}{item.accountTag ? ` · ${item.accountTag}` : ''}</div>
+          <input className="st-input st-scene-title" value={draft.fields.title} placeholder={postName({ ...item, title: '' })} maxLength={120} onChange={e => draft.setFields({ title: e.target.value })} aria-label="Post name" />
+        </div>
+      </div>
+      <nav className="st-steps st-poststeps" aria-label="Steps">
+        {steps.map(([k, label], i) => {
+          const state = i < ci ? 'done' : i === ci ? 'current' : 'waiting'
+          return (
+            <button key={k} type="button" className={`st-step ${state === 'done' ? 'done' : state === 'current' ? 'current' : ''}`} aria-current={state === 'current' ? 'step' : undefined} onClick={() => jump(k, state)}>
+              <span className="dot">{state === 'done' ? <Check size={12} strokeWidth={3} /> : i + 1}</span>{label}
+            </button>
+          )
+        })}
+      </nav>
+      {!character.data && character.isError && <Callout tone="bad">This post's character could not be loaded. Pick another one in the Idea step.</Callout>}
+      <div className="st-col" style={{ gap: 14 }}>
+        {steps.map(([k, label], i) => {
+          const state = i < ci ? 'done' : i === ci ? 'current' : 'waiting'
+          return (
+            <section key={k} className={`st-poststep ${state}`} data-field={`step-${k}`}>
+              <header className="st-poststep-head">
+                <span className="st-poststep-dot">{state === 'done' ? <Check size={13} strokeWidth={3} /> : i + 1}</span>
+                <div className="grow" style={{ minWidth: 0 }}>
+                  <div className="st-h3">{label}</div>
+                  {state === 'done' && summary[k] && <div className="st-hint st-poststep-sum">{summary[k]}</div>}
+                </div>
+                {state === 'done' && <button className="st-btn sm ghost" onClick={() => jump(k, state)}>Change</button>}
+                {state === 'current' && <span className="st-badge accent">Now</span>}
+              </header>
+              {state !== 'done' && <div className="st-poststep-body">{body[k]}</div>}
+            </section>
+          )
+        })}
+      </div>
+    </div>
+  )
+}

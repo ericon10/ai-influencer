@@ -18,7 +18,7 @@ import { withTempDir } from '../media/ffmpeg.js'
 import { getAsset, readAsset, saveAsset } from '../storage/assets.js'
 import { uploadKey } from '../storage/uploads.js'
 import { getCharacter, toData, type CharacterRow } from './characters.js'
-import { createScene, getScene } from './scenes.js'
+import { createScene, getScene, updateScene } from './scenes.js'
 import { resolveRoute } from './settings.js'
 import type { SceneBuilt } from './sceneActions.js'
 
@@ -250,6 +250,12 @@ export async function updateContent(deps: Deps, ctx: Ctx, itemId: string, patch:
     spec = parseSpec(kind, { ...(row.spec as object), ...((patch.spec as object) ?? {}), ...(switching ? CHARACTER_PICKS[kind] : {}) })
   }
   const sceneId = patch.sceneId !== undefined ? await checkScene(deps, ctx, patch.sceneId, characterId) : switching ? null : row.sceneId
+  // The scene made from the idea follows the idea while it still reads the
+  // same (a scene picked from the Library keeps its own words).
+  if (patch.idea !== undefined && sceneId && sceneId === row.sceneId && patch.idea.trim() !== row.idea.trim()) {
+    const scene = await getScene(deps, ctx, sceneId)
+    if (scene.brief.trim() === row.idea.trim()) await updateScene(deps, ctx, sceneId, { brief: patch.idea.trim() })
+  }
   const [out] = await deps.db.update(contentItems).set({
     title: patch.title !== undefined ? patch.title.slice(0, 120) : row.title, spec,
     idea: patch.idea !== undefined ? patch.idea.slice(0, 2000) : row.idea,
@@ -272,13 +278,13 @@ export async function duplicateContent(deps: Deps, ctx: Ctx, itemId: string): Pr
   return out!
 }
 
-// The post's scene: made from the post's idea the first time stills are
-// asked for (free; nothing runs until Generate).
+// The post's scene: made from the post's idea once there is one (free;
+// nothing runs until Generate). The post stays on the step it is on.
 export async function postScene(deps: Deps, ctx: Ctx, itemId: string): Promise<ContentRow> {
   const row = await getContent(deps, ctx, itemId)
   if (row.sceneId) return row
   const scene = await createScene(deps, ctx, row.characterId!, { brief: row.idea.trim(), title: row.title || undefined })
-  return updateContent(deps, ctx, row.id, { sceneId: scene.id, step: 'stills' })
+  return updateContent(deps, ctx, row.id, { sceneId: scene.id })
 }
 
 export async function archiveContent(deps: Deps, ctx: Ctx, itemId: string): Promise<void> {

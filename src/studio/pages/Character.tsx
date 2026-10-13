@@ -1,23 +1,27 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
-import { ArrowLeft, Pencil } from 'lucide-react'
+import { ArrowLeft, Check, Film, Pencil } from 'lucide-react'
 import { useCharacter } from '../hooks'
-import { Img, MarkChip, Meter, STAGES, Stepper } from '../ui'
+import { Img, MarkChip, Meter } from '../ui'
 import { CardEditor } from './character/CardEditor'
 import { StartTab } from './character/StartTab'
 import { HeroTab } from './character/HeroTab'
 import { SheetTab } from './character/SheetTab'
 import { FileTab } from './character/FileTab'
-import { ScenesTab } from './character/ScenesTab'
+import { useNewPost } from './post/parts'
 import type { CharacterView } from '../types'
 
-type Tab = 'start' | 'hero' | 'sheet' | 'scenes' | 'file'
+// Character setup (UX-PLAN.md), once per character, as a stepper:
+// inspiration, face, reference sheet, character file. Making stills and
+// clips happens in posts.
 
-function defaultTab(stage: number): Tab {
-  if (stage <= 2) return 'start'
-  if (stage === 3) return 'hero'
-  if (stage >= 5) return 'scenes'
-  return 'sheet'
+type Tab = 'start' | 'hero' | 'sheet' | 'file'
+const TABS: Tab[] = ['start', 'hero', 'sheet', 'file']
+
+function defaultTab(v: CharacterView): Tab {
+  if (v.stage <= 2) return 'start'
+  if (v.stage === 3) return 'hero'
+  return v.sheet.progress.complete ? 'file' : 'sheet'
 }
 
 export default function Character() {
@@ -26,40 +30,47 @@ export default function Character() {
   const [params] = useSearchParams()
   const [tab, setTab] = useState<Tab | null>(null)
   const [editing, setEditing] = useState(false)
+  const newPost = useNewPost()
   const v = q.data
-  useEffect(() => { if (v && tab === null) setTab(defaultTab(v.stage)) }, [v, tab])
-  // A link can open a tab and a scene (a scene copied to this character).
+  useEffect(() => { if (v && tab === null) setTab(defaultTab(v)) }, [v, tab])
+  // A link can open a step (an import opens the sheet).
   const wantTab = params.get('tab') as Tab | null
-  const wantScene = params.get('scene')
-  useEffect(() => { if (wantTab && ['start', 'hero', 'sheet', 'scenes', 'file'].includes(wantTab)) setTab(wantTab) }, [wantTab, id])
+  useEffect(() => { if (wantTab && TABS.includes(wantTab)) setTab(wantTab) }, [wantTab, id])
 
   if (q.isLoading) return <div className="st-page wide"><div className="st-skel" style={{ height: 40, width: 260, marginBottom: 24 }} /><div className="st-character"><div className="st-skel" style={{ aspectRatio: '3/4', borderRadius: 26 }} /><div className="st-skel" style={{ height: 320, borderRadius: 26 }} /></div></div>
-  if (!v) return <div className="st-page"><div className="st-empty"><h2 className="st-h1">Not found</h2><Link className="st-btn" to="/studio">Back to characters</Link></div></div>
+  if (!v) return <div className="st-page"><div className="st-empty"><h2 className="st-h1">Not found</h2><Link className="st-btn" to="/studio/characters">Back to characters</Link></div></div>
 
-  const current = tab ?? defaultTab(v.stage)
+  const current = tab ?? defaultTab(v)
+  const ready = !!v.sheet.shots[0]?.approved
+  const done: Record<Tab, boolean> = { start: v.stage > 2, hero: ready, sheet: v.sheet.progress.complete, file: false }
+  const label: Record<Tab, string> = { start: 'Inspiration', hero: 'Face', sheet: `Reference sheet ${v.sheet.progress.approved}/${v.sheet.progress.total}`, file: 'Character file' }
   return (
     <div className="st-page wide">
-      <Link to="/studio" className="st-btn ghost sm" style={{ marginBottom: 14 }}><ArrowLeft size={14} />Characters</Link>
-      <div className="st-pagehead" style={{ marginBottom: 22 }}>
+      <Link to="/studio/characters" className="st-btn ghost sm" style={{ marginBottom: 14 }}><ArrowLeft size={14} />Characters</Link>
+      <div className="st-pagehead" style={{ marginBottom: 18 }}>
         <div className="grow">
-          <div className="st-kicker">Character · revision {v.revision}</div>
+          <div className="st-kicker">Set up · revision {v.revision}</div>
           <h1 className="st-h1">{v.data.name}</h1>
         </div>
-        <Stepper steps={STAGES} current={Math.min(5, v.stage)} done={[v.stage > 1, v.stage > 2, !!v.sheet.shots[0]?.approved, v.sheet.progress.complete, false]} />
+        {ready && <button className="st-btn primary" disabled={!!newPost.busy} onClick={() => void newPost.create('meme', { characterId: v.id })}><Film size={16} />Make a post with {v.data.name}</button>}
       </div>
+      <nav className="st-steps st-poststeps" aria-label="Setup steps" style={{ marginBottom: 22 }}>
+        {TABS.map((k, i) => {
+          const state = k === current ? 'current' : done[k] ? 'done' : ''
+          return (
+            <button key={k} type="button" className={`st-step ${state}`} aria-current={state === 'current' ? 'step' : undefined} onClick={() => setTab(k)}>
+              <span className="dot">{state === 'done' ? <Check size={12} strokeWidth={3} /> : i + 1}</span>{label[k]}
+            </button>
+          )
+        })}
+      </nav>
 
       <div className="st-character">
         <Profile v={v} onEdit={() => setEditing(true)} />
         <div style={{ minWidth: 0 }}>
-          <div className="st-seg" role="tablist" style={{ marginBottom: 20 }}>
-            {([['start', 'Start'], ['hero', 'Hero'], ['sheet', `Sheet ${v.sheet.progress.approved}/${v.sheet.progress.total}`], ['scenes', 'Scenes'], ['file', 'Character file']] as const).map(([k, label]) => (
-              <button key={k} role="tab" aria-selected={current === k} className={current === k ? 'on' : ''} onClick={() => setTab(k)}>{label}</button>
-            ))}
-          </div>
           {current === 'start' && <StartTab v={v} onEditCard={() => setEditing(true)} goHero={() => setTab('hero')} />}
           {current === 'hero' && <HeroTab v={v} onEditCard={() => setEditing(true)} goSheet={() => setTab('sheet')} />}
           {current === 'sheet' && <SheetTab v={v} goHero={() => setTab('hero')} goFile={() => setTab('file')} />}
-          {current === 'scenes' && <ScenesTab key={`${v.id}-${wantScene ?? ''}`} v={v} openScene={wantScene} goSheet={() => setTab('sheet')} />}
           {current === 'file' && <FileTab v={v} />}
         </div>
       </div>

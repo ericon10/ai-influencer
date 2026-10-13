@@ -1,4 +1,4 @@
-import type { ActionPreview, CharacterSummary, CharacterView, HiggsfieldAccount, JobView, Me, QuoteView, RulesView, SceneFields, ScenesData, SettingsView, StudioAction, Usage, VideoPrice, BrollClip, ContentData, ContentKind, WorkerStatus } from './types'
+import type { ActionPreview, CharacterSummary, CharacterView, HiggsfieldAccount, JobView, Me, QuoteView, RulesView, SceneFields, ScenesData, SettingsView, StudioAction, Usage, VideoPrice, BrollClip, ContentData, ContentKind, LibraryData, PostStep, WorkerStatus } from './types'
 import { sheetRefOf, typeOf, uploadFiles } from './files'
 
 // Thin client for /api/v1. Every write sends the CSRF header the server
@@ -87,8 +87,17 @@ export const api = {
   },
   updateBroll: (id: string, patch: { title?: string; product?: string }) => request<BrollClip>('PATCH', `/broll/${id}`, patch),
   archiveBroll: (id: string) => request<{ ok: true }>('DELETE', `/broll/${id}`),
-  createContent: (body: { kind: ContentKind; characterId: string; title?: string; spec?: Record<string, unknown> }) => request<{ id: string }>('POST', '/content', body),
-  updateContent: (id: string, patch: { title?: string; spec?: Record<string, unknown> }) => request<{ id: string }>('PATCH', `/content/${id}`, patch),
+  createContent: (body: { kind: ContentKind; characterId: string; title?: string; spec?: Record<string, unknown>; idea?: string; accountTag?: string; sceneId?: string | null; step?: PostStep }) => request<{ id: string }>('POST', '/content', body),
+  updateContent: (id: string, patch: { title?: string; spec?: Record<string, unknown>; idea?: string; accountTag?: string; sceneId?: string | null; step?: PostStep; characterId?: string }) => request<{ id: string }>('PATCH', `/content/${id}`, patch),
+  duplicateContent: (id: string) => request<{ id: string }>('POST', `/content/${id}/duplicate`, {}),
+  postScene: (id: string) => request<{ id: string; sceneId: string }>('POST', `/content/${id}/scene`, {}),
+  library: (characterId?: string | null) => request<LibraryData>('GET', `/library${characterId ? `?characterId=${encodeURIComponent(characterId)}` : ''}`),
+  // Any video file becomes a kept clip of the character (and is picked in
+  // the post it was uploaded from).
+  addClip: async (characterId: string, file: File, contentId?: string, onProgress?: (done: number, total: number) => void) => {
+    const [up] = await uploadFiles([file], onProgress)
+    return request<{ id: string }>('POST', `/characters/${characterId}/clips`, { uploadId: up!.uploadId, name: file.name, ...(contentId ? { contentId } : {}) })
+  },
   archiveContent: (id: string) => request<{ ok: true }>('DELETE', `/content/${id}`),
   renderContent: (id: string) => request<{ id: string; status: string }>('POST', `/content/${id}/render`, {}),
   archiveScene: (sceneId: string) => request<{ ok: true }>('DELETE', `/scenes/${sceneId}`),

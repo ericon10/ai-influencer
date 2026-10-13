@@ -39,7 +39,7 @@ export default function Review() {
         <div className="st-col" style={{ alignItems: 'center', gap: 14 }}>
           <CheckCircle2 size={40} color="#3fd18f" />
           <div className="st-h1" style={{ fontSize: 36 }}>Nothing waiting for review</div>
-          <button className="st-btn primary" onClick={() => nav(`/studio/c/${id}`)}>Back to {v.data.name}</button>
+          <button className="st-btn primary" onClick={() => nav(`/studio/characters/${id}`)}>Back to {v.data.name}</button>
         </div>
       </div>
     )
@@ -69,7 +69,7 @@ function ReviewShot({ v, shot }: { v: CharacterView; shot: Shot }) {
 
   useEffect(() => { setView(FIT) }, [cand?.id])
 
-  const back = () => nav(`/studio/c/${v.id}`)
+  const back = () => nav(`/studio/characters/${v.id}`)
 
   async function approve() {
     if (!cand || busy) return
@@ -79,7 +79,7 @@ function ReviewShot({ v, shot }: { v: CharacterView; shot: Shot }) {
       refresh(v.id)
       toast({ tone: 'ok', text: r.sheetComplete ? 'Sheet complete. All 12 shots approved.' : r.invalidated.length ? `${shot.id} approved. ${r.invalidated.join(' and ')} need a re-check.` : `${shot.id} approved.` })
       const nextReview = v.sheet.shots.find(s => s.id !== shot.id && s.candidates.some(c => c.status === 'in_review'))
-      nav(nextReview ? `/studio/c/${v.id}/review/${nextReview.id}` : `/studio/c/${v.id}`)
+      nav(nextReview ? `/studio/characters/${v.id}/review/${nextReview.id}` : `/studio/characters/${v.id}`)
     } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) } finally { setBusy(false) }
   }
 
@@ -161,7 +161,7 @@ function ReviewShot({ v, shot }: { v: CharacterView; shot: Shot }) {
             <div className="st-col" style={{ gap: 10 }}>
               <div className="st-verdict-title">Fix: {fixes.map(f => f.label).join(', ')}</div>
               <div className="st-row">
-                <PriceButton action={{ type: 'sheet', characterId: v.id, refId: shot.id, variations: 1, reason: fixes.find(f => f.available)?.reason ?? reasons[0], refsMode: 'graph' }} label="Regenerate with the fix" onStarted={() => nav(`/studio/c/${v.id}`)} />
+                <PriceButton action={{ type: 'sheet', characterId: v.id, refId: shot.id, variations: 1, reason: fixes.find(f => f.available)?.reason ?? reasons[0], refsMode: 'graph' }} label="Regenerate with the fix" onStarted={() => nav(`/studio/characters/${v.id}`)} />
                 <button className="st-btn ghost" onClick={back}>Later</button>
               </div>
             </div>
