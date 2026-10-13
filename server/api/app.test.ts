@@ -2,14 +2,14 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { beforeAll, afterAll, describe, expect, it } from 'vitest'
 import { eq } from 'drizzle-orm'
-import { createHarness, drain, type Harness } from '../testing/harness'
-import { createApp } from './app'
-import { createPassphraseAuth } from '../auth/provider'
-import { createAccount } from '../auth/accounts'
-import { hashPassword } from '../lib/passwords'
-import { registerPipelineHooks } from '../pipeline/hooks'
-import { renderPlaceholderPortrait } from '../providers/mock'
-import { providerCredentials } from '../db/schema'
+import { createHarness, drain, type Harness } from '../testing/harness.js'
+import { createApp } from './app.js'
+import { createPassphraseAuth } from '../auth/provider.js'
+import { createAccount } from '../auth/accounts.js'
+import { hashPassword } from '../lib/passwords.js'
+import { registerPipelineHooks } from '../pipeline/hooks.js'
+import { renderPlaceholderPortrait } from '../providers/mock.js'
+import { providerCredentials } from '../db/schema.js'
 
 let h: Harness
 let app: ReturnType<typeof createApp>
@@ -52,6 +52,20 @@ describe('Studio API', () => {
   it('requires a session', async () => {
     expect((await call('GET', '/characters')).status).toBe(401)
     expect((await call('POST', '/auth/login', { body: { email: 'a@example.com', passphrase: 'wrong' } })).status).toBe(401)
+  })
+
+  it('pauses sign-in after repeated wrong passphrases, per email', async () => {
+    await createAccount(h.deps.db, { name: 'Studio C', ownerEmail: 'c@example.com', passwordHash: await hashPassword('third long phrase') })
+    const attempt = (passphrase: string, email = 'c@example.com') => call('POST', '/auth/login', { body: { email, passphrase } })
+    // A good sign-in clears earlier strikes.
+    for (let i = 0; i < 4; i++) expect((await attempt('wrong')).status).toBe(401)
+    expect((await attempt('third long phrase')).status).toBe(200)
+    for (let i = 0; i < 5; i++) expect((await attempt('wrong')).status).toBe(401)
+    const paused = await attempt('third long phrase')
+    expect(paused.status).toBe(429)
+    expect(paused.json.error.message).toMatch(/Too many sign-in attempts/)
+    // Other people are not locked out.
+    expect((await attempt('another long phrase', 'b@example.com')).status).toBe(200)
   })
 
   it('requires the CSRF header on writes', async () => {
@@ -140,6 +154,49 @@ describe('Studio API', () => {
     // Another account cannot touch her.
     const foreign = await call('POST', `/characters/${id}/import-file`, { cookie: cookieB, form: again })
     expect(foreign.status).toBe(404)
+  })
+
+  it("imports a dropped sheet folder: direct uploads, 'REF 00' names normalized, then a free face and texture check", async () => {
+    const md = readFileSync(join(process.cwd(), 'fixtures/callie/character-callie.md'), 'utf8')
+    const face = readFileSync(join(process.cwd(), 'fixtures/faces/person-a-1.jpg'))
+    const files = [
+      { name: 'REF 00.jpg', type: 'image/jpeg', data: face },
+      { name: 'REF 01.jpg', type: 'image/jpeg', data: face },
+      { name: 'notes.txt', type: 'image/jpeg', data: face },
+    ]
+    // 1. Ask for upload slots (local storage here, so the slot is the API's own).
+    const slots = await call('POST', '/uploads', { cookie: cookieA, body: { files: files.map(f => ({ name: f.name, type: f.type, size: f.data.length })) } })
+    expect(slots.status).toBe(200)
+    expect(slots.json.direct).toBe(false)
+    // 2. PUT each file to its slot.
+    for (const [i, slot] of slots.json.slots.entries()) {
+      const res = await app.request(slot.url, { method: 'PUT', headers: { cookie: cookieA, 'x-studio-request': '1', 'content-type': files[i]!.type }, body: new Uint8Array(files[i]!.data) })
+      expect(res.status).toBe(200)
+    }
+    // Another account cannot use these upload ids.
+    const stolen = await call('POST', '/characters/import', { cookie: cookieB, body: { markdown: md, uploads: slots.json.slots.slice(0, 1).map((s: { uploadId: string; name: string }) => ({ uploadId: s.uploadId, name: s.name, type: 'image/jpeg' })) } })
+    expect(stolen.status).toBe(400)
+    // 3. Import the file with the uploads named by id.
+    const r = await call('POST', '/characters/import', { cookie: cookieA, body: { markdown: md, uploads: slots.json.slots.map((s: { uploadId: string; name: string }, i: number) => ({ uploadId: s.uploadId, name: s.name, type: files[i]!.type })) } })
+    expect(r.status).toBe(201)
+    expect(r.json.importedShots).toEqual(['REF-00', 'REF-01'])
+    expect(r.json.checkJobId).toMatch(/^job_/)
+    await drain(h)
+    const job = await call('GET', `/jobs?characterId=${r.json.characterId}`, { cookie: cookieA })
+    const check = job.json.jobs.find((j: { purpose: string }) => j.purpose === 'import_check')
+    expect(check.status).toBe('completed')
+    expect(check.actual === null || check.actual === '$0.00').toBe(true)
+    const view = await call('GET', `/characters/${r.json.characterId}`, { cookie: cookieA })
+    const ref01 = view.json.sheet.shots.find((s: { id: string }) => s.id === 'REF-01')
+    const approved = ref01.candidates.find((c: { id: string }) => c.id === ref01.approved.candidateId)
+    // The same image as REF-00 keeps all of its skin detail.
+    expect(approved.qaReport.texture.smoothed).toBe(false)
+    expect(ref01.status).toBe('approved')
+  })
+
+  it('refuses unsupported upload types and oversized files', async () => {
+    expect((await call('POST', '/uploads', { cookie: cookieA, body: { files: [{ name: 'x.exe', type: 'application/x-msdownload', size: 10 }] } })).status).toBe(400)
+    expect((await call('POST', '/uploads', { cookie: cookieA, body: { files: [{ name: 'x.png', type: 'image/png', size: 30 * 1024 * 1024 }] } })).status).toBe(400)
   })
 
   it('stores provider keys encrypted and only ever returns the last 4', async () => {

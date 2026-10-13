@@ -1,4 +1,4 @@
-import { ffmpeg, MediaError, probeFile } from './ffmpeg'
+import { ffmpeg, MediaError, probeFile } from './ffmpeg.js'
 
 export interface AudioLayer {
   path: string

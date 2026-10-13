@@ -2,12 +2,12 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { ffmpeg, probeFile } from './ffmpeg'
-import { extractLastFrame, sharpness } from './frames'
-import { clipFrames, encodeArgs, normalizeClip, stripAudio, trimClip } from './edit'
-import { joinClips } from './join'
-import { mixOntoVideo } from './mix'
-import { makeClip, makeTone } from './testClips'
+import { ffmpeg, probeFile } from './ffmpeg.js'
+import { extractLastFrame, sharpness } from './frames.js'
+import { clipFrames, encodeArgs, normalizeClip, stripAudio, trimClip } from './edit.js'
+import { joinClips } from './join.js'
+import { mixOntoVideo } from './mix.js'
+import { makeClip, makeTone } from './testClips.js'
 
 let dir: string
 const p = (name: string) => join(dir, name)

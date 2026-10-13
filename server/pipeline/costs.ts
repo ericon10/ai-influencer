@@ -1,9 +1,9 @@
 import { and, desc, eq, sql } from 'drizzle-orm'
-import { candidates, characters, ledgerEntries } from '../db/schema'
-import type { Ctx, Deps } from '../context'
-import { effectiveBudgets } from '../costs/budgets'
-import { heldMicros, monthWindow, spendByStage, spentMicros } from '../costs/ledger'
-import { formatUsd } from '../costs/money'
+import { candidates, characters, ledgerEntries } from '../db/schema.js'
+import type { Ctx, Deps } from '../context.js'
+import { effectiveBudgets } from '../costs/budgets.js'
+import { heldMicros, monthWindow, spendByStage, spentMicros } from '../costs/ledger.js'
+import { formatUsd } from '../costs/money.js'
 
 // Money views (SPEC 9): the KPI is cost per approved asset, not per run.
 

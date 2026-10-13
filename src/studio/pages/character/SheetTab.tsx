@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowRight, CheckCircle2, Eye, FlipHorizontal2, Loader2, RotateCcw, ShieldAlert, Sparkles, Download } from 'lucide-react'
+import { ArrowRight, CheckCircle2, Eye, FlipHorizontal2, FolderOpen, Loader2, RotateCcw, ShieldAlert, Sparkles, Download } from 'lucide-react'
 import { api } from '../../api'
-import { useRefresh } from '../../hooks'
+import { useActiveJobs, useRefresh } from '../../hooks'
+import { filesFromDrop, sheetRefOf, typeOf } from '../../files'
 import { PriceButton } from '../../PriceButton'
 import { Callout, Drawer, Img, ShotBadge, errorMessage, useToast } from '../../ui'
 import type { Candidate, CharacterView, Shot } from '../../types'
@@ -23,10 +24,11 @@ export function SheetTab({ v, goHero, goFile }: { v: CharacterView; goHero: () =
       <div className="st-col" style={{ gap: 24 }}>
       <div className="st-empty">
         <h2 className="st-h1">{imported ? <>Bring in the <em>sheet</em></> : <>Pick a hero <em>first</em></>}</h2>
-        <p className="st-sub" style={{ margin: 0 }}>{imported ? `Add ${v.name}'s approved images named REF-00 to REF-11, or pick a new hero to build the sheet here.` : 'The sheet is built from REF-00, the hero you pick.'}</p>
+        <p className="st-sub" style={{ margin: 0 }}>{imported ? `Drop ${v.name}'s sheet folder (images named REF 00 to REF 11), or pick a new hero to build the sheet here.` : 'The sheet is built from REF-00, the hero you pick.'}</p>
+        {imported && <SheetFolderDrop v={v} />}
         <div className="st-row" style={{ justifyContent: 'center' }}>
-          {imported && <button className="st-btn primary" onClick={goFile}>Import sheet images<ArrowRight size={15} /></button>}
           <button className={`st-btn ${imported ? '' : 'primary'}`} onClick={goHero}>Go to hero<ArrowRight size={15} /></button>
+          {imported && <button className="st-btn ghost" onClick={goFile}>Character file</button>}
         </div>
       </div>
       <ToCheck v={v} />
@@ -55,7 +57,9 @@ export function SheetTab({ v, goHero, goFile }: { v: CharacterView; goHero: () =
         </div>
       )}
 
+      <ImportCheck v={v} />
       <ToCheck v={v} />
+      {!v.sheet.progress.complete && <SheetFolderDrop v={v} compact />}
 
       <section>
         <div className="st-section-head"><div className="st-h2">Reference sheet</div><span className="st-muted">{v.sheet.progress.approved} of {v.sheet.progress.total} approved{v.sheet.progress.stale ? `, ${v.sheet.progress.stale} to re-check` : ''}</span><span className="st-spacer" />{v.sheetLock && <span className="st-badge plain" title="One model for the whole sheet (SPEC 5.1 rule 7)">{v.sheetLock.model}</span>}</div>
@@ -72,6 +76,60 @@ export function SheetTab({ v, goHero, goFile }: { v: CharacterView; goHero: () =
 
       <ShotDrawer v={v} shot={shots.find(s => s.id === open) ?? null} onClose={() => setOpen(null)} />
     </div>
+  )
+}
+
+// Drop the whole sheet folder: "REF 00" to "REF 11" become REF-00 to
+// REF-11, go straight to storage, and are checked against REF-00 (face match
+// and skin texture) on the worker.
+function SheetFolderDrop({ v, compact = false }: { v: CharacterView; compact?: boolean }) {
+  const toast = useToast()
+  const refresh = useRefresh()
+  const [over, setOver] = useState(false)
+  const [busy, setBusy] = useState<string | null>(null)
+  async function send(files: File[]) {
+    const sheet = files.filter(f => typeOf(f).startsWith('image/') && sheetRefOf(f.name))
+    if (!sheet.length) { toast({ tone: 'bad', text: 'No images named REF 00 to REF 11 in that drop.' }); return }
+    setBusy(`Uploading 0 of ${sheet.length}...`)
+    try {
+      const r = await api.applyFile(v.id, sheet, (n, total) => setBusy(`Uploading ${n} of ${total}...`))
+      refresh(v.id)
+      toast({ tone: 'ok', text: `Added ${r.importedShots.join(', ')}.${r.checkJobId ? ' Checking faces and skin texture against REF-00 now.' : ''}` })
+    } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) } finally { setBusy(null) }
+  }
+  return (
+    <label className={`st-drop ${over ? 'over' : ''}`} style={compact ? { padding: 14 } : { maxWidth: 520, margin: '0 auto', width: '100%' }}
+      onDragOver={e => { e.preventDefault(); setOver(true) }} onDragLeave={() => setOver(false)}
+      onDrop={async e => { e.preventDefault(); setOver(false); if (!busy) await send(await filesFromDrop(e.dataTransfer)) }}>
+      {busy ? <Loader2 size={20} className="st-spin" /> : <FolderOpen size={20} />}
+      <span>{busy ?? (compact ? 'Drop sheet images or the sheet folder here to add them' : 'Drop the sheet folder here, or choose it')}</span>
+      <input type="file" multiple hidden {...({ webkitdirectory: '', directory: '' } as Record<string, string>)} onChange={e => e.target.files && void send(Array.from(e.target.files))} />
+    </label>
+  )
+}
+
+// Results of the free check on imported images: face match against REF-00
+// and skin texture. Only shots that need a look are listed.
+function ImportCheck({ v }: { v: CharacterView }) {
+  const active = useActiveJobs()
+  const checking = (active.data?.jobs ?? []).some(j => j.purpose === 'import_check' && j.characterId === v.id)
+  const flagged = v.sheet.shots.flatMap(s => {
+    const c = s.approved ? s.candidates.find(x => x.id === s.approved!.candidateId) : undefined
+    return c?.qaReport && c.qaReport.verdict !== 'post' ? [{ shot: s, report: c.qaReport }] : []
+  })
+  if (!checking && !flagged.length) return null
+  return (
+    <section className="st-card">
+      <div className="st-card-head"><div className="grow"><div className="st-h2">Import check</div><div className="st-hint">Each imported image against REF-00: face match and skin texture. Free; runs on the worker.</div></div>{checking && <Loader2 size={16} className="st-spin" />}</div>
+      <div className="st-card-body st-col" style={{ gap: 10 }}>
+        {checking && !flagged.length && <span className="st-hint">Checking the imported images...</span>}
+        {flagged.map(({ shot, report }) => (
+          <Callout key={shot.id} tone={report.verdict === 'regenerate' ? 'bad' : 'warn'} icon={<ShieldAlert size={16} />}>
+            <b>{shot.id}</b> {shot.label}: {report.findings.filter(f => f.severity !== 'info').map(f => f.message).join(' ') || report.summary}
+          </Callout>
+        ))}
+      </div>
+    </section>
   )
 }
 

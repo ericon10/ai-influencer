@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import sharp from 'sharp'
-import { compareTexture, laplacianVariance } from './texture'
-import { FACE_MODELS, createFaceMatcher } from './faces'
+import { compareTexture, laplacianVariance } from './texture.js'
+import { FACE_MODELS, createFaceMatcher } from './faces.js'
 
 // Realism principle: an upscale or edit that smooths the face is flagged.
 

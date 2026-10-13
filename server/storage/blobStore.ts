@@ -12,6 +12,18 @@ export interface BlobStore {
   // A short-lived direct URL when the driver supports it; otherwise null and
   // the API streams the bytes after its own auth check.
   presignGet(key: string, ttlSeconds: number): Promise<string | null>
+  // A short-lived URL the browser PUTs a file to directly (R2), so uploads
+  // never pass through the API (Vercel caps request bodies at 4.5 MB).
+  // Null when the driver has none; the API then takes the bytes itself.
+  presignPut(key: string, contentType: string, ttlSeconds: number): Promise<string | null>
+  // Lets the Studio's own pages upload straight to the bucket (CORS).
+  ensureCors?(origins: string[]): Promise<{ ok: boolean; message: string }>
+}
+
+// The bucket's CORS rules for direct browser uploads. Also shown in Settings
+// for pasting into the Cloudflare dashboard when the key cannot set them.
+export function corsRules(origins: string[]) {
+  return [{ AllowedOrigins: origins, AllowedMethods: ['PUT', 'GET', 'HEAD'], AllowedHeaders: ['content-type'], ExposeHeaders: ['etag'], MaxAgeSeconds: 3600 }]
 }
 
 const KEY_RE = /^[a-zA-Z0-9][a-zA-Z0-9._\-/]*$/
@@ -43,6 +55,7 @@ export function createLocalStore(rootDir: string): BlobStore {
     },
     async delete(key) { await rm(pathFor(key), { force: true }) },
     async presignGet() { return null },
+    async presignPut() { return null },
   }
 }
 
@@ -59,6 +72,7 @@ export function createMemoryStore(): BlobStore {
     async exists(key) { return files.has(key) },
     async delete(key) { files.delete(key) },
     async presignGet() { return null },
+    async presignPut() { return null },
   }
 }
 
@@ -71,7 +85,7 @@ export interface S3Options {
 }
 
 export async function createS3Store(o: S3Options): Promise<BlobStore> {
-  const { S3Client, PutObjectCommand, GetObjectCommand, HeadObjectCommand, DeleteObjectCommand } = await import('@aws-sdk/client-s3')
+  const { S3Client, PutObjectCommand, GetObjectCommand, HeadObjectCommand, DeleteObjectCommand, GetBucketCorsCommand, PutBucketCorsCommand } = await import('@aws-sdk/client-s3')
   const { getSignedUrl } = await import('@aws-sdk/s3-request-presigner')
   const client = new S3Client({
     region: o.region,
@@ -94,6 +108,24 @@ export async function createS3Store(o: S3Options): Promise<BlobStore> {
     async delete(key) { await client.send(new DeleteObjectCommand({ Bucket: o.bucket, Key: key })) },
     async presignGet(key, ttlSeconds) {
       return getSignedUrl(client, new GetObjectCommand({ Bucket: o.bucket, Key: key }), { expiresIn: ttlSeconds })
+    },
+    async presignPut(key, contentType, ttlSeconds) {
+      assertSafeKey(key)
+      return getSignedUrl(client, new PutObjectCommand({ Bucket: o.bucket, Key: key, ContentType: contentType }), { expiresIn: ttlSeconds })
+    },
+    async ensureCors(origins) {
+      const want = corsRules(origins)
+      try {
+        const current = await client.send(new GetBucketCorsCommand({ Bucket: o.bucket })).catch(() => null)
+        const have = current?.CORSRules ?? []
+        const covered = origins.every(origin => have.some(r => (r.AllowedOrigins ?? []).includes(origin) && (r.AllowedMethods ?? []).includes('PUT')))
+        if (covered) return { ok: true, message: 'Direct uploads are allowed for this Studio.' }
+        await client.send(new PutBucketCorsCommand({ Bucket: o.bucket, CORSConfiguration: { CORSRules: want } }))
+        return { ok: true, message: 'Set the bucket CORS rules for direct uploads.' }
+      } catch (e) {
+        const name = (e as { name?: string }).name ?? ''
+        return { ok: false, message: name === 'AccessDenied' || /denied|forbidden/i.test((e as Error).message) ? 'The storage key cannot change the bucket CORS rules. Add them in the Cloudflare dashboard (Settings, Storage shows them).' : `Could not check the bucket CORS rules: ${(e as Error).message}` }
+      }
     },
   }
 }

@@ -1,8 +1,8 @@
 import { serve } from '@hono/node-server'
-import { buildDeps } from './bootstrap'
-import { createApp } from './api/app'
-import { createPassphraseAuth } from './auth/provider'
-import { startWorker } from './jobs/runner'
+import { buildDeps } from './bootstrap.js'
+import { createApp } from './api/app.js'
+import { createPassphraseAuth } from './auth/provider.js'
+import { startWorker } from './jobs/runner.js'
 
 // Local development: the API and the job worker in one process. Vite proxies
 // /api/v1 here. Signs the owner in automatically unless a passphrase is set.

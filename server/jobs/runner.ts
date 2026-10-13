@@ -3,24 +3,25 @@ import sharp from 'sharp'
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { jobEvents, jobOutputs, jobs } from '../db/schema'
-import type { Db } from '../db/client'
-import type { Ctx, Deps } from '../context'
-import { newId, newToken } from '../lib/ids'
-import { AppError, notFound } from '../lib/errors'
-import { safeEqual, sha256Hex } from '../lib/passwords'
-import { appendLedger } from '../costs/ledger'
-import { actualGen } from '../costs/pricebook'
-import { consumeQuote, createQuote, type QuoteItem, type QuoteView } from '../costs/quotes'
-import { getAsset, readAsset, saveAsset, type AssetRow } from '../storage/assets'
-import { probeFile } from '../media/ffmpeg'
-import { stripAudio } from '../media/edit'
-import { ProviderError, type GenRequest, type LlmImage, type LlmRequest, type Output, type ProviderAdapter } from '../providers/types'
-import { withBilling } from '../providers/billing'
-import { realismBlockers } from '../core/realism'
-import { publicAssetUrl } from './assetUrls'
-import { safeDownload } from './download'
-import { hookFor, type JobOutcome, type JobRow } from './hooks'
+import { jobEvents, jobOutputs, jobs } from '../db/schema.js'
+import type { Db } from '../db/client.js'
+import type { Ctx, Deps } from '../context.js'
+import { newId, newToken } from '../lib/ids.js'
+import { AppError, notFound } from '../lib/errors.js'
+import { safeEqual, sha256Hex } from '../lib/passwords.js'
+import { appendLedger } from '../costs/ledger.js'
+import { actualGen } from '../costs/pricebook.js'
+import { consumeQuote, createQuote, type QuoteItem, type QuoteView } from '../costs/quotes.js'
+import { getAsset, readAsset, saveAsset, type AssetRow } from '../storage/assets.js'
+import { probeFile } from '../media/ffmpeg.js'
+import { stripAudio } from '../media/edit.js'
+import { ProviderError, type GenRequest, type LlmImage, type LlmRequest, type Output, type ProviderAdapter } from '../providers/types.js'
+import { withBilling } from '../providers/billing.js'
+import { realismBlockers } from '../core/realism.js'
+import { publicAssetUrl } from './assetUrls.js'
+import { safeDownload } from './download.js'
+import { hookFor, localJobFor, type JobOutcome, type JobRow } from './hooks.js'
+import { wakeWorker } from './wake.js'
 
 // Async job runner (SPEC 3): every generation is a Job. Submit, then wake on
 // a webhook or poll; on completion copy every output into our own storage
@@ -98,6 +99,25 @@ export async function quoteJobs(deps: Deps, ctx: Ctx, input: { purpose: string; 
 
 // Creates the jobs for an approved quote and reserves their cost.
 export async function runJobs(deps: Deps, ctx: Ctx, input: { quoteId?: string; confirmed?: boolean; purpose: string; characterId: string | null; specs: JobSpec[] }): Promise<JobRow[]> {
+  const rows = await createJobs(deps, ctx, input)
+  await wakeWorker(deps)
+  return rows
+}
+
+// Queues free work the worker does itself: no provider, no quote, no money.
+export async function enqueueLocalJob(deps: Deps, ctx: Ctx, input: { stage: string; purpose: string; label: string; characterId: string | null; request: Record<string, unknown> }): Promise<JobRow> {
+  const id = newId('job')
+  const [row] = await deps.db.insert(jobs).values({
+    id, accountId: ctx.accountId, userId: ctx.userId, characterId: input.characterId,
+    stage: input.stage, purpose: input.purpose, provider: 'local', model: input.purpose.split(':')[0]!, kind: 'check',
+    request: input.request, idempotencyKey: id, quoteId: null, estimateMicros: 0, status: 'queued', nextPollAt: deps.clock.now(),
+  }).returning()
+  await deps.db.insert(jobEvents).values({ id: newId('jev'), accountId: ctx.accountId, jobId: id, type: 'created', data: { label: input.label } })
+  await wakeWorker(deps)
+  return row!
+}
+
+async function createJobs(deps: Deps, ctx: Ctx, input: { quoteId?: string; confirmed?: boolean; purpose: string; characterId: string | null; specs: JobSpec[] }): Promise<JobRow[]> {
   const items = await quoteItemsFor(deps, ctx, input.specs)
   return deps.db.transaction(async tx => {
     const quote = await consumeQuote(tx as unknown as Db, deps, ctx, input.quoteId, input.purpose, input.characterId, items, !!input.confirmed)
@@ -185,7 +205,7 @@ export async function tick(deps: Deps, limit = 10): Promise<number> {
 
 async function processJob(deps: Deps, job: JobRow): Promise<void> {
   switch (job.status as JobStatusName) {
-    case 'queued': return job.kind === 'llm' ? runLlm(deps, job) : submitGen(deps, job)
+    case 'queued': return job.provider === 'local' ? runLocal(deps, job) : job.kind === 'llm' ? runLlm(deps, job) : submitGen(deps, job)
     case 'submitting':
       // The lock expired mid-submit: the worker died and we cannot know if the
       // provider accepted (and charged) the job. Never resubmit blindly.
@@ -415,6 +435,27 @@ async function runLlm(deps: Deps, job: JobRow): Promise<void> {
   }
 }
 
+// Free work done by the worker itself. Nothing to settle: no money moves.
+async function runLocal(deps: Deps, job: JobRow): Promise<void> {
+  const ctx = systemCtx(deps, job)
+  const run = localJobFor(job.purpose)
+  await update(deps, job, { status: 'submitting', attempts: job.attempts + 1, submittedAt: deps.clock.now() })
+  if (!run) return finishLocal(deps, ctx, job, 'failed', undefined, `No worker step for "${job.purpose}".`)
+  try {
+    const data = await run(deps, ctx, job)
+    await finishLocal(deps, ctx, job, 'completed', data)
+  } catch (e) {
+    ctx.log.error({ err: e }, 'local job failed')
+    await finishLocal(deps, ctx, job, 'failed', undefined, (e as Error).message)
+  }
+}
+
+async function finishLocal(deps: Deps, ctx: Ctx, job: JobRow, status: 'completed' | 'failed', data?: unknown, message?: string): Promise<void> {
+  await update(deps, job, { status, resultMeta: data === undefined ? null : { data }, actualMicros: 0, actualSource: 'computed', completedAt: deps.clock.now(), lockedUntil: null, nextPollAt: null, error: message ? { message } : null })
+  await event(deps.db, job, status, message ? { message } : {})
+  await runHook(deps, ctx, job, status === 'completed' ? { status, data } : { status, error: message })
+}
+
 // Final ledger entries for a finished job: release the hold, record the
 // actual charge (computed from the price book until reconciled).
 async function settle(deps: Deps, job: JobRow, status: 'completed', actualMicros: number, note: string, amount: { quantity?: number; unit?: string } = {}): Promise<void> {
@@ -490,6 +531,7 @@ export async function wakeFromWebhook(deps: Deps, provider: string, jobId: strin
   await event(deps.db, job, 'webhook', {})
   if (job.status === 'running' || job.status === 'submitting') {
     await deps.db.update(jobs).set({ nextPollAt: deps.clock.now(), updatedAt: deps.clock.now() }).where(eq(jobs.id, job.id))
+    await wakeWorker(deps, { force: true })
   }
   return true
 }
@@ -519,23 +561,61 @@ export async function resolveJob(deps: Deps, ctx: Ctx, id: string, resolution: {
   } else {
     await update(deps, job, { status: 'running', providerJobId: resolution.providerJobId, nextPollAt: deps.clock.now(), error: null })
     await event(deps.db, job, 'resolved_attach', { providerJobId: resolution.providerJobId })
+    await wakeWorker(deps)
   }
 }
 
-export function startWorker(deps: Deps, opts: { intervalMs?: number; batch?: number } = {}): () => Promise<void> {
+// When the next job is due, or null when nothing is queued or running.
+async function nextDueAt(deps: Deps): Promise<Date | null> {
+  const res = await deps.db.execute(sql`
+    select min(coalesce(next_poll_at, created_at)) as due from jobs
+    where status in ('queued', 'submitting', 'running', 'ingesting')`)
+  const due = (res as unknown as { rows: Array<{ due: string | Date | null }> }).rows[0]?.due
+  return due ? new Date(due) : null
+}
+
+export type WorkerHandle = (() => Promise<void>) & { wake(): void }
+
+// "poll" checks every second (local development). "wake" runs while work is
+// due and otherwise waits for wake() (an HTTP call from the API), so a
+// hosted worker sends no queries when idle and the database can suspend.
+export function startWorker(deps: Deps, opts: { intervalMs?: number; batch?: number; idle?: 'poll' | 'wake'; maxWaitMs?: number } = {}): WorkerHandle {
   const interval = opts.intervalMs ?? 1000
+  const idle = opts.idle ?? 'poll'
   let stopped = false
-  let running: Promise<void> | null = null
-  let timer: NodeJS.Timeout | null = null
-  const loop = () => {
-    if (stopped) return
-    running = tick(deps, opts.batch ?? 5).then(() => undefined, e => { deps.log.error({ err: e }, 'worker tick failed') })
-      .finally(() => { running = null; if (!stopped) timer = setTimeout(loop, interval) })
-  }
-  loop()
-  return async () => {
+  let wakeUp: (() => void) | null = null
+  let woken = false
+  const sleep = (ms: number) => new Promise<void>(resolve => {
+    if (woken) { woken = false; resolve(); return }
+    const timer = Number.isFinite(ms) ? setTimeout(() => { wakeUp = null; resolve() }, ms) : null
+    wakeUp = () => { if (timer) clearTimeout(timer); wakeUp = null; resolve() }
+  })
+  const running = (async () => {
+    while (!stopped) {
+      let n = 0
+      try {
+        n = await tick(deps, opts.batch ?? 5)
+      } catch (e) {
+        deps.log.error({ err: e }, 'worker tick failed')
+      }
+      if (stopped) break
+      if (n > 0) continue
+      if (idle === 'poll') { await sleep(interval); continue }
+      let due: Date | null = null
+      try { due = await nextDueAt(deps) } catch (e) { deps.log.error({ err: e }, 'worker could not read the queue') }
+      if (!due) {
+        deps.log.info('worker idle until woken')
+        await sleep(opts.maxWaitMs ?? Number.POSITIVE_INFINITY)
+      } else {
+        await sleep(Math.min(30_000, Math.max(interval, due.getTime() - deps.clock.now().getTime())))
+      }
+    }
+  })()
+  const stop = (async () => {
     stopped = true
-    if (timer) clearTimeout(timer)
-    if (running) await running
-  }
+    wakeUp?.()
+    await running
+  }) as WorkerHandle
+  stop.wake = () => { if (wakeUp) wakeUp(); else woken = true }
+  return stop
 }

@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
-import { createKeyVault } from './vault'
+import { createKeyVault } from './vault.js'
 
 const key = () => randomBytes(32).toString('base64')
 

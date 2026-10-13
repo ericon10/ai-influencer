@@ -1,6 +1,6 @@
-import type { SheetShot, ViewsConfig } from '../../config/pipeline'
-import { imageSideOf, markExpectation, type Mark } from '../marks'
-import type { Observation } from './perception'
+import type { SheetShot, ViewsConfig } from '../../config/pipeline.js'
+import { imageSideOf, markExpectation, type Mark } from '../marks.js'
+import type { Observation } from './perception.js'
 
 // The observation a perfect render of a shot would produce. Demo mode uses
 // it as the mock inspector's answer, so the whole flow can be tried free.

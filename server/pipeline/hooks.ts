@@ -1,20 +1,21 @@
 import { and, eq, sql } from 'drizzle-orm'
-import { candidates, concepts, jobs, refImages } from '../db/schema'
-import type { Ctx, Deps } from '../context'
-import { newId } from '../lib/ids'
-import { registerJobHook, type JobOutcome, type JobRow } from '../jobs/hooks'
-import { activateChildren, cancelChildren, childJobs } from '../jobs/runner'
-import { breakdownSchema, conceptsSchema } from '../core/llmSchemas'
-import { validateCharacter } from '../core/character'
-import { evaluateSheetShot, finalize, mirrorFixFor, type QaReport } from '../core/qa/marks'
-import { parseObservation } from '../core/qa/perception'
-import { getCharacter, getRef, setCharacterFields, toData } from './characters'
-import { refreshRefStatus } from './review'
-import { scoreDistinctness, scoreIdentity } from './identity'
-import { onModelTest } from './modelTests'
-import { readAsset } from '../storage/assets'
-import { compareTexture, type TextureResult } from '../qa/texture'
-import type { GenRequest } from '../providers/types'
+import { candidates, concepts, jobs, refImages } from '../db/schema.js'
+import type { Ctx, Deps } from '../context.js'
+import { newId } from '../lib/ids.js'
+import { registerJobHook, type JobOutcome, type JobRow } from '../jobs/hooks.js'
+import { activateChildren, cancelChildren, childJobs } from '../jobs/runner.js'
+import { breakdownSchema, conceptsSchema } from '../core/llmSchemas.js'
+import { validateCharacter } from '../core/character.js'
+import { evaluateSheetShot, finalize, mirrorFixFor, type QaReport } from '../core/qa/marks.js'
+import { parseObservation } from '../core/qa/perception.js'
+import { getCharacter, getRef, setCharacterFields, toData } from './characters.js'
+import { refreshRefStatus } from './review.js'
+import { scoreDistinctness, scoreIdentity } from './identity.js'
+import { onModelTest } from './modelTests.js'
+import { registerImportCheck } from './importCheck.js'
+import { readAsset } from '../storage/assets.js'
+import { compareTexture, type TextureResult } from '../qa/texture.js'
+import type { GenRequest } from '../providers/types.js'
 
 // What each finished job does to the character. Registered once at boot.
 
@@ -195,4 +196,5 @@ export function registerPipelineHooks(): void {
   registerJobHook('sheet', onSheet)
   registerJobHook('qa', onQa)
   registerJobHook('model_test', onModelTest)
+  registerImportCheck()
 }

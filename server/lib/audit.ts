@@ -1,7 +1,7 @@
-import { auditLog } from '../db/schema'
-import type { Db } from '../db/client'
-import type { Ctx } from '../context'
-import { newId } from './ids'
+import { auditLog } from '../db/schema.js'
+import type { Db } from '../db/client.js'
+import type { Ctx } from '../context.js'
+import { newId } from './ids.js'
 
 // Security-relevant actions (keys, budgets, run approvals, logins) are kept
 // in an append-only audit trail per account.

@@ -1,8 +1,8 @@
-import { mkdirSync } from 'node:fs'
+import { existsSync, mkdirSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join, resolve } from 'node:path'
 import type { PgDatabase, PgQueryResultHKT } from 'drizzle-orm/pg-core'
-import * as schema from './schema'
+import * as schema from './schema.js'
 
 export type Schema = typeof schema
 export type Db = PgDatabase<PgQueryResultHKT, Schema>
@@ -13,18 +13,35 @@ export interface DbHandle {
   close(): Promise<void>
 }
 
-const MIGRATIONS = join(dirname(fileURLToPath(import.meta.url)), 'migrations')
+// Next to this file in the source tree; from the working directory when the
+// code runs bundled (the worker image, the Vercel function).
+const MIGRATIONS = [join(dirname(fileURLToPath(import.meta.url)), 'migrations'), resolve(process.cwd(), 'server/db/migrations')]
+  .find(dir => existsSync(join(dir, 'meta', '_journal.json'))) ?? resolve(process.cwd(), 'server/db/migrations')
 
 // Postgres everywhere: a real server (Neon) when DATABASE_URL is set,
 // otherwise embedded PGlite in a local folder, or in memory for tests.
-export async function openDb(opts: { url?: string; pgliteDir?: string; memory?: boolean }): Promise<DbHandle> {
+export async function openDb(opts: { url?: string; migrateUrl?: string; pgliteDir?: string; memory?: boolean }): Promise<DbHandle> {
   if (opts.url) {
-    const { Pool } = await import('pg')
+    const { default: pg } = await import('pg')
     const { drizzle } = await import('drizzle-orm/node-postgres')
     const { migrate } = await import('drizzle-orm/node-postgres/migrator')
-    const pool = new Pool({ connectionString: opts.url, max: 10 })
+    // Migrations run on one direct connection under an advisory lock, so the
+    // API and the worker can boot at the same moment on a fresh database.
+    // Neon's pooled address cannot hold a session lock, so the lock uses the
+    // direct address of the same database.
+    const mc = new pg.Client({ connectionString: opts.migrateUrl || directUrl(opts.url), connectionTimeoutMillis: 15_000 })
+    await mc.connect()
+    try {
+      await mc.query('select pg_advisory_lock($1)', [MIGRATION_LOCK])
+      await migrate(drizzle(mc, { schema }), { migrationsFolder: MIGRATIONS })
+    } finally {
+      await mc.query('select pg_advisory_unlock($1)', [MIGRATION_LOCK]).catch(() => undefined)
+      await mc.end()
+    }
+    // Small pool, short idle life: serverless functions open few connections,
+    // and closing idle ones lets Neon suspend the database between bursts.
+    const pool = new pg.Pool({ connectionString: opts.url, max: 4, idleTimeoutMillis: 10_000, connectionTimeoutMillis: 15_000 })
     const db = drizzle(pool, { schema })
-    await migrate(db, { migrationsFolder: MIGRATIONS })
     return { db: db as unknown as Db, driver: 'postgres', close: () => pool.end() }
   }
 
@@ -54,3 +71,17 @@ export async function openDb(opts: { url?: string; pgliteDir?: string; memory?: 
 }
 
 let template: Promise<File | Blob> | null = null
+
+const MIGRATION_LOCK = 727274
+
+// Neon names its pooled endpoint "<endpoint>-pooler.<region>..."; the same
+// host without "-pooler" is the direct endpoint of the same database.
+export function directUrl(url: string): string {
+  try {
+    const u = new URL(url)
+    u.hostname = u.hostname.replace(/-pooler\./, '.')
+    return u.toString()
+  } catch {
+    return url
+  }
+}

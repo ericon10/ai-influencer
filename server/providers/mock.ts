@@ -2,11 +2,11 @@ import sharp from 'sharp'
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import type { StudioConfig } from '../config/load'
-import { estimateGen } from '../costs/pricebook'
-import { ffmpeg } from '../media/ffmpeg'
-import { newId } from '../lib/ids'
-import { ProviderError, type GenRequest, type JobStatus, type ModelInfo, type Output, type ProviderAdapter } from './types'
+import type { StudioConfig } from '../config/load.js'
+import { estimateGen } from '../costs/pricebook.js'
+import { ffmpeg } from '../media/ffmpeg.js'
+import { newId } from '../lib/ids.js'
+import { ProviderError, type GenRequest, type JobStatus, type ModelInfo, type Output, type ProviderAdapter } from './types.js'
 
 // A free, deterministic provider for tests and demo mode. It produces real
 // image and video files (so storage, probing and QA all run for real) and

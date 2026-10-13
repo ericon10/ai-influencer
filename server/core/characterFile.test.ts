@@ -1,9 +1,9 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { exportCharacterFile, importCharacterFile, importFreeform, splitSections } from './characterFile'
-import { validateCharacter, type CharacterData } from './character'
-import { loadConfig } from '../config/load'
+import { exportCharacterFile, importCharacterFile, importFreeform, splitSections } from './characterFile.js'
+import { validateCharacter, type CharacterData } from './character.js'
+import { loadConfig } from '../config/load.js'
 
 const fx = JSON.parse(readFileSync(join(process.cwd(), 'fixtures/callie/appendix-a.json'), 'utf8'))
 const callie: CharacterData = {
@@ -143,16 +143,18 @@ describe("Callie's character file", () => {
 
   it('keeps every section it does not model, word for word', () => {
     expect(c.sections.map(s => s.title)).toEqual([
-      'Style (evolves over time, never a uniform)', 'Persona', 'Reference sheet', 'Fixed blocks', 'Models', 'Scene rules learned',
+      'Realism principle (most important rule)', 'Style (evolves over time, never a uniform)', 'Persona', 'Reference sheet', 'Fixed blocks', 'Models', 'Scene rules learned',
       'Proven recipe: the candid "caught you" shot', 'Video rules', 'Combo log (last 10)',
     ])
     const original = splitSections(md).sections
     for (const kept of c.sections) expect(kept.body).toBe(original.find(s => s.title === kept.title)!.body)
   })
 
-  it('reads her REALISM and AVOID blocks, which go into every image prompt', () => {
+  it('reads her REALISM and AVOID blocks, which go into every image prompt, and her Realism principle', () => {
     expect(c.realism.block).toMatch(/^REALISM: Candid phone photo, natural skin texture with visible pores/)
-    expect(c.realism.avoid).toMatch(/^AVOID: studio lighting, perfect symmetry, plastic skin/)
+    expect(c.realism.avoid).toBe('AVOID: studio lighting, perfect symmetry, plastic skin, airbrushed or smoothed skin, beauty filter, heavy makeup, text, watermarks.')
+    expect(c.realism.notes?.[0]).toMatch(/^Callie looks real because she is not perfect/)
+    expect(c.realism.notes).toContain('Hero and sheet: always bare-faced, no makeup, no retouching.')
     expect(r.warnings.some(w => /REALISM block and AVOID block read/.test(w))).toBe(true)
   })
 

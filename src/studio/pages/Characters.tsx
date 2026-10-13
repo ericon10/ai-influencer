@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { FileUp, Plus, Upload } from 'lucide-react'
+import { FileUp, FolderOpen, Plus, Upload } from 'lucide-react'
 import { api } from '../api'
 import { useCharacters, useRefresh } from '../hooks'
-import { Img, Modal, STAGES, errorMessage, useToast } from '../ui'
+import { Callout, Img, Modal, STAGES, errorMessage, useToast } from '../ui'
 import { REALISM_LINE } from '../copy'
+import { filesFromDrop, sheetRefOf, typeOf } from '../files'
 
 export default function Characters() {
   const list = useCharacters()
@@ -71,39 +72,44 @@ function ImportDialog({ open, onClose }: { open: boolean; onClose: () => void })
   const refresh = useRefresh()
   const [file, setFile] = useState<File | null>(null)
   const [images, setImages] = useState<File[]>([])
-  const [busy, setBusy] = useState(false)
+  const [busy, setBusy] = useState<string | null>(null)
   const [over, setOver] = useState(false)
-  const [done, setDone] = useState<{ characterId: string; importedShots: string[]; checkShots: string[]; warnings: string[] } | null>(null)
+  const [done, setDone] = useState<{ characterId: string; importedShots: string[]; checkShots: string[]; checkJobId: string | null; warnings: string[] } | null>(null)
 
   function take(files: FileList | File[]) {
     for (const f of Array.from(files)) {
       if (f.name.toLowerCase().endsWith('.md')) setFile(f)
-      else if (f.type.startsWith('image/')) setImages(prev => [...prev.filter(p => p.name !== f.name), f])
+      else if (typeOf(f).startsWith('image/')) setImages(prev => [...prev.filter(p => p.name !== f.name), f])
     }
   }
-  const mapped = images.map(f => ({ f, ref: f.name.toUpperCase().match(/REF-(\d{2})/)?.[0] ?? null, mirrored: /mirror/i.test(f.name) }))
+  // A whole folder can be dropped ("CALLIE MASTER CHARACTER" with "REF 00"
+  // to "REF 11"); names are normalized to REF-00 to REF-11.
+  async function drop(dt: DataTransfer) {
+    try { take(await filesFromDrop(dt)) } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) }
+  }
+  const mapped = images.map(f => ({ f, ref: sheetRefOf(f.name), mirrored: /mirror/i.test(f.name) }))
+    .sort((a, b) => (a.ref ?? 'ZZ').localeCompare(b.ref ?? 'ZZ'))
+  const missing = Array.from({ length: 12 }, (_, i) => `REF-${String(i).padStart(2, '0')}`).filter(id => images.length && !mapped.some(m => m.ref === id && !m.mirrored))
 
   async function submit() {
     if (!file) return
-    setBusy(true)
+    setBusy('Reading the file...')
     try {
-      const form = new FormData()
-      form.append('file', file)
-      for (const m of mapped) if (m.ref) form.append('images', m.f)
-      const r = await api.importCharacter(form)
+      const r = await api.importCharacter(await file.text(), mapped.filter(m => m.ref).map(m => m.f), (n, total) => setBusy(`Uploading images ${n} of ${total}...`))
       refresh()
       // Show what was read before opening the character.
       setDone(r); setFile(null); setImages([])
-    } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) } finally { setBusy(false) }
+    } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) } finally { setBusy(null) }
   }
   function close() { setDone(null); onClose() }
-  function open_() { if (done) nav(`/studio/c/${done.characterId}`); close() }
+  function open_() { if (done) nav(`/studio/c/${done.characterId}?tab=sheet`); close() }
 
   if (done) {
     return (
       <Modal open={open} onClose={close}>
         <div className="st-card-body st-col" style={{ gap: 16 }}>
           <div><div className="st-kicker">Imported</div><div className="st-h2">Here is what the Studio read</div><p className="st-sub">{done.importedShots.length ? `${done.importedShots.length} approved sheet shot${done.importedShots.length === 1 ? '' : 's'}: ${done.importedShots.join(', ')}.` : 'No sheet images yet. Add them any time from the Sheet tab.'}{done.checkShots.length ? ` To check with QA: ${done.checkShots.join(', ')}.` : ''}</p></div>
+          {done.checkJobId && <Callout tone="info">Checking each image against REF-00: face match and skin texture. It is free and runs in the background; any failures show on the Sheet tab.</Callout>}
           {done.warnings.length > 0 && <ul className="st-notes">{done.warnings.map((w, i) => <li key={i}>{w}</li>)}</ul>}
           <div className="st-row"><span className="st-spacer" /><button className="st-btn primary" onClick={open_}>Open character</button></div>
         </div>
@@ -114,19 +120,24 @@ function ImportDialog({ open, onClose }: { open: boolean; onClose: () => void })
   return (
     <Modal open={open} onClose={close}>
       <div className="st-card-body st-col" style={{ gap: 16 }}>
-        <div><div className="st-kicker">Import</div><div className="st-h2">Bring in a character you already built</div><p className="st-sub">Drop the character file (.md) and any approved sheet images named REF-00 to REF-11.</p></div>
-        <label className={`st-drop ${over ? 'over' : ''}`} onDragOver={e => { e.preventDefault(); setOver(true) }} onDragLeave={() => setOver(false)} onDrop={e => { e.preventDefault(); setOver(false); take(e.dataTransfer.files) }}>
+        <div><div className="st-kicker">Import</div><div className="st-h2">Bring in a character you already built</div><p className="st-sub">Drop the character file (.md) and the sheet folder. Images named REF 00 to REF 11 (or REF-00) become the approved sheet.</p></div>
+        <label className={`st-drop ${over ? 'over' : ''}`} onDragOver={e => { e.preventDefault(); setOver(true) }} onDragLeave={() => setOver(false)} onDrop={e => { e.preventDefault(); setOver(false); void drop(e.dataTransfer) }}>
           <Upload size={22} />
-          <span>Drop files here, or <u>browse</u></span>
+          <span>Drop the file and the folder here, or <u>browse</u></span>
           <input type="file" multiple accept=".md,image/*" hidden onChange={e => e.target.files && take(e.target.files)} />
+        </label>
+        <label className="st-btn sm ghost" style={{ alignSelf: 'flex-start', cursor: 'pointer' }}>
+          <FolderOpen size={14} />Choose a folder
+          <input type="file" multiple hidden {...({ webkitdirectory: '', directory: '' } as Record<string, string>)} onChange={e => e.target.files && take(e.target.files)} />
         </label>
         {file && <div className="st-chip on">{file.name}</div>}
         {mapped.length > 0 && (
           <div className="st-row" style={{ gap: 6 }}>
-            {mapped.map(m => <span key={m.f.name} className={`st-badge ${m.mirrored ? 'warn' : m.ref ? 'ok' : 'bad'} plain`} title={m.f.name}>{m.mirrored ? `${m.ref ?? '?'} mirrored, to check` : m.ref ?? 'No REF id'}</span>)}
+            {mapped.map(m => <span key={m.f.name} className={`st-badge ${m.mirrored ? 'warn' : m.ref ? 'ok' : 'bad'} plain`} title={m.f.name}>{m.mirrored ? `${m.ref ?? '?'} mirrored, to check` : m.ref ?? `Skipped: ${m.f.name}`}</span>)}
           </div>
         )}
-        <div className="st-row"><span className="st-spacer" /><button className="st-btn ghost" onClick={onClose}>Cancel</button><button className="st-btn primary" disabled={!file || busy} onClick={submit}>{busy ? 'Importing...' : 'Import character'}</button></div>
+        {missing.length > 0 && <span className="st-hint">Not in this folder: {missing.join(', ')}. You can add them later from the Sheet tab.</span>}
+        <div className="st-row"><span className="st-spacer" />{busy && <span className="st-hint">{busy}</span>}<button className="st-btn ghost" onClick={onClose}>Cancel</button><button className="st-btn primary" disabled={!file || !!busy} onClick={submit}>{busy ? 'Importing...' : 'Import character'}</button></div>
       </div>
     </Modal>
   )

@@ -1,7 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk'
-import type { StudioConfig } from '../config/load'
-import { actualLlm, estimateLlm } from '../costs/pricebook'
-import { ProviderError, type LlmProvider, type LlmRequest } from './types'
+import type { StudioConfig } from '../config/load.js'
+import { actualLlm, estimateLlm } from '../costs/pricebook.js'
+import { ProviderError, type LlmProvider, type LlmRequest } from './types.js'
 
 // Claude for breakdowns, concepts, card updates and QA perception. Called
 // server side with the account's own key. Structured JSON output via

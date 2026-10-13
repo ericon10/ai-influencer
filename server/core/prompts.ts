@@ -1,8 +1,8 @@
-import type { SheetShot, TemplatesConfig, ViewDef, ViewsConfig } from '../config/pipeline'
-import type { CharacterData, Pronouns } from './character'
-import { imageSideOf, markExpectation, otherSide, regionVisible, type Mark } from './marks'
-import { finalizeImagePrompt, type RealismWarning } from './realism'
-import { capitalize, fill, normalizePrompt } from './text'
+import type { SheetShot, TemplatesConfig, ViewDef, ViewsConfig } from '../config/pipeline.js'
+import type { CharacterData, Pronouns } from './character.js'
+import { imageSideOf, markExpectation, otherSide, regionVisible, type Mark } from './marks.js'
+import { finalizeImagePrompt, type RealismWarning } from './realism.js'
+import { capitalize, fill, normalizePrompt } from './text.js'
 
 // Prompts are filled by code from templates and the character record
 // (SPEC 9: never written from scratch by an LLM).
@@ -69,10 +69,12 @@ export interface BuildOptions {
 
 type RealismSource = { realism?: CharacterData['realism'] }
 
-function finish(prompt: string, stage: 'hero' | 'sheet', ch: RealismSource, o: BuildOptions): string {
+function finish(prompt: string, stage: 'hero' | 'sheet', ch: RealismSource & { card?: string; marks?: CharacterData['marks'] }, o: BuildOptions): string {
   const block = o.identityBlock?.trim()
   const body = block && !prompt.includes(block) ? `${prompt} ${block}` : prompt
-  const done = finalizeImagePrompt(body, { stage, realism: ch.realism?.block, avoid: ch.realism?.avoid })
+  // Flaw words the character really has (card, marks, realism notes) stay.
+  const allowedFlaws = [ch.card ?? '', ...(ch.marks ?? []).map(m => m.description), ...(ch.realism?.notes ?? [])].join(' ')
+  const done = finalizeImagePrompt(body, { stage, realism: ch.realism?.block, avoid: ch.realism?.avoid, allowedFlaws })
   o.warnings?.push(...done.warnings)
   return done.prompt
 }

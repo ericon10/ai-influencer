@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 import {
   FACE_MODELS, SFACE_TEMPLATE, alignFace, applySimilarity, cosineSimilarity, createFaceMatcher, decodeYunet, iou, nms,
   similarityTransform, unavailableFaceMatcher, type DetectedFace, type Point,
-} from './faces'
+} from './faces.js'
 
 describe('face math', () => {
   it('cosine similarity is 1 for the same direction, 0 for orthogonal, -1 for opposite', () => {

@@ -2,7 +2,7 @@ import { mkdtemp } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { createLocalStore } from './blobStore'
+import { createLocalStore } from './blobStore.js'
 
 describe('local blob store', () => {
   it('writes, reads, checks and deletes', async () => {

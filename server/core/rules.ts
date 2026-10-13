@@ -1,7 +1,7 @@
-import type { Rule, RulesConfig } from '../config/pipeline'
-import type { GenRequest } from '../providers/types'
-import type { Mark } from './marks'
-import { BARE_FACE_LINE, findBannedTerms, findMakeupTerms, hasRealismBlock, isBareFaceStage } from './realism'
+import type { Rule, RulesConfig } from '../config/pipeline.js'
+import type { GenRequest } from '../providers/types.js'
+import type { Mark } from './marks.js'
+import { BARE_FACE_LINE, findBannedTerms, findMakeupTerms, hasRealismBlock, isBareFaceStage } from './realism.js'
 
 // The rules engine (SPEC 5). Rules are data (config/rules.yaml); this file
 // only knows how to evaluate each check type against a prompt and request.

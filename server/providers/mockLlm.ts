@@ -1,6 +1,6 @@
-import type { StudioConfig } from '../config/load'
-import { actualLlm, estimateLlm, estimateLlmTokens } from '../costs/pricebook'
-import type { LlmProvider, LlmRequest } from './types'
+import type { StudioConfig } from '../config/load.js'
+import { actualLlm, estimateLlm, estimateLlmTokens } from '../costs/pricebook.js'
+import type { LlmProvider, LlmRequest } from './types.js'
 
 // Free stand-in for the LLM. Answers by schema name with plausible data, or
 // with a responder supplied by a test (for example a recorded perception of

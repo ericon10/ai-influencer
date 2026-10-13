@@ -1,4 +1,4 @@
-import { ProviderError } from './types'
+import { ProviderError } from './types.js'
 
 // A small client for the MCP streamable HTTP transport: JSON-RPC over POST,
 // answered with JSON or an SSE stream, one session per client. A 401 (or a

@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { wordCount } from './text'
+import { wordCount } from './text.js'
 
 // The character record shared by the pipeline, the character file and QA.
 

@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import sharp from 'sharp'
-import type { Logger } from '../lib/logger'
+import type { Logger } from '../lib/logger.js'
 
 // Face identity for QA (SPEC 6): detect the face, align it on five
 // landmarks, embed it, and compare embeddings with cosine similarity.

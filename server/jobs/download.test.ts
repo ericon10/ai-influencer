@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { assertSafeUrl, hostAllowed } from './download'
+import { assertSafeUrl, hostAllowed } from './download.js'
 
 describe('output download guards', () => {
   it('matches allowlisted hosts by suffix only', () => {

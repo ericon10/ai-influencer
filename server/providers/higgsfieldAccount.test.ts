@@ -1,21 +1,21 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { createHash } from 'node:crypto'
 import { eq } from 'drizzle-orm'
-import { createHarness, drain, type Harness } from '../testing/harness'
-import { createFakeHiggsfield, type FakeHiggsfield } from '../testing/fakeHiggsfield'
-import { quoteJobs, runJobs, getJob, type JobSpec } from '../jobs/runner'
-import { ledgerEntries } from '../db/schema'
-import { saveAsset } from '../storage/assets'
-import { renderPlaceholderPortrait } from './mock'
-import { setSetting } from '../pipeline/settings'
-import { readBilling, saveBilling, withBilling } from './billing'
-import { accountModel, accountParams, createHiggsfieldAccountAdapter } from './higgsfieldAccount'
-import { ACCOUNT_PROVIDER, disconnectAccount, finishAccountConnect, readAccountTokens, startAccountConnect } from './higgsfieldOAuth'
-import { createMcpClient } from './mcpClient'
-import { storeSecret } from './credentials'
-import { estimateGen } from '../costs/pricebook'
-import { finalizeImagePrompt } from '../core/realism'
-import { ProviderError, type GenRequest, type ProviderAdapter } from './types'
+import { createHarness, drain, type Harness } from '../testing/harness.js'
+import { createFakeHiggsfield, type FakeHiggsfield } from '../testing/fakeHiggsfield.js'
+import { quoteJobs, runJobs, getJob, type JobSpec } from '../jobs/runner.js'
+import { ledgerEntries } from '../db/schema.js'
+import { saveAsset } from '../storage/assets.js'
+import { renderPlaceholderPortrait } from './mock.js'
+import { setSetting } from '../pipeline/settings.js'
+import { readBilling, saveBilling, withBilling } from './billing.js'
+import { accountModel, accountParams, createHiggsfieldAccountAdapter } from './higgsfieldAccount.js'
+import { ACCOUNT_PROVIDER, disconnectAccount, finishAccountConnect, readAccountTokens, startAccountConnect } from './higgsfieldOAuth.js'
+import { createMcpClient } from './mcpClient.js'
+import { storeSecret } from './credentials.js'
+import { estimateGen } from '../costs/pricebook.js'
+import { finalizeImagePrompt } from '../core/realism.js'
+import { ProviderError, type GenRequest, type ProviderAdapter } from './types.js'
 
 // The second Higgsfield path: the owner's own account (MCP connector, plan
 // credits). Every call here goes to an in-memory fake; nothing is real.
@@ -259,6 +259,16 @@ describe('connecting the account (OAuth with PKCE)', () => {
     expect(stored!.tokens).toMatchObject({ accessToken: 'at-1', refreshToken: 'rt-1', clientId: expect.stringMatching(/^client-/) })
     // The same link cannot be used twice.
     expect((await finishAccountConnect(h.deps, { code: 'good-code', state }, { fetchImpl: fake.fetch })).ok).toBe(false)
+    // Nothing chosen yet, so the connected account becomes the default payer.
+    expect((await readBilling(h.deps.db, account.accountId)).default).toBe('account')
+  })
+
+  it('connecting keeps a billing choice already made', async () => {
+    const account = await h.newAccount('Chose the API')
+    await saveBilling(h.deps, account, { default: 'api', creditUsd: 0 })
+    const { url } = await startAccountConnect(h.deps, account, { origin: 'http://localhost:5173' }, { fetchImpl: fake.fetch })
+    expect((await finishAccountConnect(h.deps, { code: 'good-code', state: new URL(url).searchParams.get('state')! }, { fetchImpl: fake.fetch })).ok).toBe(true)
+    expect((await readBilling(h.deps.db, account.accountId)).default).toBe('api')
   })
 
   it('rejects a forged or expired state', async () => {

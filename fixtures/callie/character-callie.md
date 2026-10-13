@@ -3,6 +3,16 @@
 ## Card
 Callie, 24 years old. Long honey-blonde hair, loose beachy waves, deep side part. Warm hazel-brown eyes, soft oval face, full light-brown brows, full lips. Fit, athletic build, toned legs, defined waist, naturally curvy hips. Distinguishing marks: small mole above her left brow, gold ear cuff on her left ear. Style: a regular girl whose style evolves; natural glow.
 
+## Realism principle (most important rule)
+Callie looks real because she is not perfect. Her hero and sheet were made with no makeup, real skin, visible pores, and small imperfections. That is the identity, not a flaw to fix.
+- Hero and sheet: always bare-faced, no makeup, no retouching.
+- Every scene prompt includes the REALISM block. No exceptions.
+- Keep: pores, faint texture, slight redness, uneven tone, shine, flyaways, smile lines, asymmetry, the subtle mole.
+- Never ask any model to smooth, retouch, beautify, perfect, or "enhance" skin. No beauty filters or face-enhance steps.
+- Upscales and edits must preserve skin texture; if skin comes back smoother or waxier than the input, reject it.
+- QA rejects plastic, airbrushed, or porcelain skin even when the face matches.
+- Makeup in scenes stays light and believable; soft glam is still real skin underneath.
+
 ## Distinguishing marks
 - Small, subtle mole just above her left brow (keep it subtle, never a feature)
 - Gold double-band ear cuff on her LEFT ear, always worn
@@ -43,7 +53,7 @@ Bonus: BONUS-01 (seated, near-front, logo removed). Old body build; keep out of 
 - REFERENCE: Using the attached reference images, keep this woman's face, hair, and features exactly the same.
 - SOUL IDENTITY (always include with the saved Soul character): Honey-blonde hair, light brown brows, fair skin with a light sun-kissed tan, soft oval face with a rounded chin, full lips. If hair is wet or slicked back, add "but still clearly blonde."
 - REALISM: Candid phone photo, natural skin texture with visible pores, small imperfections, ordinary background clutter, no retouching, not a professional shoot.
-- AVOID: studio lighting, perfect symmetry, plastic skin, text, watermarks.
+- AVOID: studio lighting, perfect symmetry, plastic skin, airbrushed or smoothed skin, beauty filter, heavy makeup, text, watermarks.
 
 ## Models
 - Soul 2.0 character "Callie" (soul_id 0fdc33c0-7a1a-40a9-9b12-0dc35f44e29e): trained after two attempts. Works well for stills when the SOUL IDENTITY block is in the prompt. Without it she drifts to a brunette, tan, slimmer-faced look, especially with moodboards like Siren or wet hair. Use the General moodboard as the neutral default.

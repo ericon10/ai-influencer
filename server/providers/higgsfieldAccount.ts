@@ -1,9 +1,9 @@
-import type { ModelEntry, StudioConfig } from '../config/load'
-import { findPrice, splitRef } from '../costs/pricebook'
-import { usdToMicros } from '../costs/money'
-import { forceBeautifyOff } from '../core/realism'
-import type { McpClient } from './mcpClient'
-import { ProviderError, type CostEstimate, type GenRequest, type JobState, type JobStatus, type Output, type ProviderAdapter } from './types'
+import type { ModelEntry, StudioConfig } from '../config/load.js'
+import { findPrice, splitRef } from '../costs/pricebook.js'
+import { usdToMicros } from '../costs/money.js'
+import { forceBeautifyOff } from '../core/realism.js'
+import type { McpClient } from './mcpClient.js'
+import { ProviderError, type CostEstimate, type GenRequest, type JobState, type JobStatus, type Output, type ProviderAdapter } from './types.js'
 
 // The owner's own Higgsfield account (the MCP connector, plan credits), next
 // to the pay-per-use REST API adapter that customers and production use.

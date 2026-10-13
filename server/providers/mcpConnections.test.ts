@@ -1,8 +1,8 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { createHarness, type Harness } from '../testing/harness'
-import { createFakeHiggsfield, type FakeHiggsfield } from '../testing/fakeHiggsfield'
-import { callbackPath, credentialFor, disconnect, finishConnect, liveConnection, startConnect } from './mcpConnections'
-import { settingsView } from '../api/views'
+import { createHarness, type Harness } from '../testing/harness.js'
+import { createFakeHiggsfield, type FakeHiggsfield } from '../testing/fakeHiggsfield.js'
+import { callbackPath, credentialFor, disconnect, finishConnect, liveConnection, startConnect } from './mcpConnections.js'
+import { settingsView } from '../api/views.js'
 
 // One connection flow for every MCP provider on the owner's own plan.
 // Dzine AI is a slot only: listed as coming soon, and never called.

@@ -1,10 +1,10 @@
 import { and, eq } from 'drizzle-orm'
-import { concepts } from '../db/schema'
-import type { Ctx, Deps } from '../context'
-import type { Concept } from '../core/llmSchemas'
-import { AppError, notFound } from '../lib/errors'
-import { audit } from '../lib/audit'
-import { getCharacter, setCharacterFields, updateCharacter } from './characters'
+import { concepts } from '../db/schema.js'
+import type { Ctx, Deps } from '../context.js'
+import type { Concept } from '../core/llmSchemas.js'
+import { AppError, notFound } from '../lib/errors.js'
+import { audit } from '../lib/audit.js'
+import { getCharacter, setCharacterFields, updateCharacter } from './characters.js'
 
 // Stage 2 gate: a person picks one of three concepts; it becomes the card.
 export async function chooseConcept(deps: Deps, ctx: Ctx, conceptId: string): Promise<void> {

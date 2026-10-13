@@ -1,7 +1,7 @@
-import type { Db } from '../db/client'
-import type { Ctx, Deps } from '../context'
-import { getSetting, setSetting } from '../pipeline/settings'
-import type { GenRequest, HiggsfieldBilling } from './types'
+import type { Db } from '../db/client.js'
+import type { Ctx, Deps } from '../context.js'
+import { getSetting, setSetting } from '../pipeline/settings.js'
+import type { GenRequest, HiggsfieldBilling } from './types.js'
 
 // Which Higgsfield balance pays, per account. "api" (the default) is the
 // pay-per-use REST API: customers and production. "account" is the owner's

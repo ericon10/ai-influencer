@@ -1,12 +1,12 @@
 import { and, asc, desc, eq, inArray, isNull } from 'drizzle-orm'
-import { assets, candidates, characterInspirations, characterRevisions, characters, concepts, refImages } from '../db/schema'
-import type { Ctx, Deps } from '../context'
-import type { CharacterData, CharacterIdentity, CharacterMark, FileSection, Pronouns } from '../core/character'
-import { validateCharacter } from '../core/character'
-import { nextUp, sheetProgress, type ShotState } from '../core/sheet'
-import { slugify } from '../core/text'
-import { newId } from '../lib/ids'
-import { AppError, notFound } from '../lib/errors'
+import { assets, candidates, characterInspirations, characterRevisions, characters, concepts, refImages } from '../db/schema.js'
+import type { Ctx, Deps } from '../context.js'
+import type { CharacterData, CharacterIdentity, CharacterMark, FileSection, Pronouns } from '../core/character.js'
+import { validateCharacter } from '../core/character.js'
+import { nextUp, sheetProgress, type ShotState } from '../core/sheet.js'
+import { slugify } from '../core/text.js'
+import { newId } from '../lib/ids.js'
+import { AppError, notFound } from '../lib/errors.js'
 
 export type CharacterRow = typeof characters.$inferSelect
 export type CandidateRow = typeof candidates.$inferSelect

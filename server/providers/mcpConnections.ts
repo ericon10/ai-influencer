@@ -1,16 +1,16 @@
 import { createHash, randomBytes } from 'node:crypto'
-import type { Db } from '../db/client'
-import type { Ctx, Deps } from '../context'
-import { hasRole } from '../context'
-import type { KeyVault } from '../lib/vault'
-import type { StudioConfig } from '../config/load'
-import { AppError } from '../lib/errors'
-import { safeEqual, sha256Hex } from '../lib/passwords'
-import { audit } from '../lib/audit'
-import { deleteSetting, getSetting, setSetting } from '../pipeline/settings'
-import { markVerified, readCredential, revokeCredential, storeSecret, updateSecret } from './credentials'
-import { readBilling, saveBilling } from './billing'
-import { ProviderError } from './types'
+import type { Db } from '../db/client.js'
+import type { Ctx, Deps } from '../context.js'
+import { hasRole } from '../context.js'
+import type { KeyVault } from '../lib/vault.js'
+import type { StudioConfig } from '../config/load.js'
+import { AppError } from '../lib/errors.js'
+import { safeEqual, sha256Hex } from '../lib/passwords.js'
+import { audit } from '../lib/audit.js'
+import { deleteSetting, getSetting, setSetting } from '../pipeline/settings.js'
+import { markVerified, readCredential, revokeCredential, storeSecret, updateSecret } from './credentials.js'
+import { BILLING_KEY, readBilling, saveBilling } from './billing.js'
+import { ProviderError } from './types.js'
 
 // One connection flow for every MCP-based provider that bills the owner's
 // own plan (Higgsfield today, Dzine AI coming soon): OAuth with PKCE and
@@ -203,6 +203,11 @@ export async function finishConnect(deps: Deps, provider: string, query: { code?
   }
   await storeSecret(deps, ctx, credentialFor(provider), JSON.stringify(tokens), `${label} account`, '')
   await audit(deps.db, ctx, `${credentialFor(provider)}.connected`, { type: 'credential', id: credentialFor(provider) }, {})
+  // Connecting the Higgsfield account makes it the default payer, unless the
+  // account already chose. Either way it stays one setting (Settings, Billing).
+  if (provider === 'higgsfield' && (await getSetting(deps.db, accountId, BILLING_KEY, null)) === null) {
+    await saveBilling(deps, ctx, { ...(await readBilling(deps.db, accountId)), default: 'account' })
+  }
   return { ok: true, returnTo }
 }
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { identityForModel, withIdentityBlock } from './identity'
-import type { CharacterIdentity } from './character'
+import { identityForModel, withIdentityBlock } from './identity.js'
+import type { CharacterIdentity } from './character.js'
 
 const soul: CharacterIdentity = { provider: 'higgsfield', kind: 'trained', name: 'Callie', externalId: 'soul-1', status: 'ready', model: 'higgsfield/soul-2', promptBlock: 'Honey-blonde hair, light brown brows.' }
 const element: CharacterIdentity = { provider: 'higgsfield', kind: 'element', name: 'Callie-1', externalId: 'el-1', status: 'ready' }

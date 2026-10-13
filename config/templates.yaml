@@ -9,17 +9,20 @@
 version: 1
 
 hero:
-  # Text only: never attach the inspiration image (SPEC 5.1 rule 1).
+  # How Callie's REF-00 was made: text only from the card, never the
+  # inspiration image (SPEC 5.1 rule 1); chest-up, facing the camera, relaxed
+  # neutral expression in all three prompts. Imperfections at the dose of a
+  # real person on a good day, never stacked.
   base: |
     Chest-up portrait of {card}. {variant} Plain light gray background, soft
-    even daylight, simple white crew-neck t-shirt, hair in its usual style.
+    even daylight, plain white crew-neck tee, hair in its usual style.
     {marks}
-    Photorealistic, real skin texture with visible pores and small natural
+    Photorealistic, natural skin with visible pores and small believable
     imperfections.
   variants:
     - "Facing the camera, relaxed neutral expression."
-    - "Facing the camera, a small relaxed closed-mouth smile."
-    - "Facing the camera, calm attentive expression, chin level, eyes on the lens."
+    - "Facing the camera, relaxed neutral expression, mouth softly closed."
+    - "Facing the camera, relaxed neutral expression, chin level, eyes on the lens."
 
 sheet:
   base: |
@@ -27,9 +30,9 @@ sheet:
     tone, and distinguishing marks exactly the same. {framing}. {view}.
     {marks}
     {expression}{body} Plain light gray background, soft even daylight,
-    {outfit}. Photorealistic, real skin texture with visible pores, the same
-    freckles, redness and small imperfections as the reference. Same person
-    as the reference, not a lookalike.
+    {outfit}. Photorealistic, natural skin with visible pores and the same
+    small imperfections as the reference. Same person as the reference, not
+    a lookalike.
 
 framing:
   chest_up: "Chest-up framing, from mid-chest to just above the top of the head"

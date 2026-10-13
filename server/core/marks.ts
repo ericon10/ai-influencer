@@ -1,4 +1,4 @@
-import type { Side, ViewDef } from '../config/pipeline'
+import type { Side, ViewDef } from '../config/pipeline.js'
 
 // Distinguishing marks are side-specific (SPEC 5.1 rule 11). Sides are always
 // the character's own LEFT and RIGHT, never the viewer's.

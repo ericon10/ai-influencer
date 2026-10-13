@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { parse as parseYaml } from 'yaml'
 import { z } from 'zod'
-import { pipelineSchemas, type PipelineConfig } from './pipeline'
+import { pipelineSchemas, type PipelineConfig } from './pipeline.js'
 
 // Rules, prompt templates, model routing, prices and limits are data in
 // /config, validated here at boot. A bad config file fails fast with the
@@ -123,6 +123,19 @@ const runtimeSchema = z.object({
   // Realism principle: after an upscale or edit, the face must keep at least
   // this share of its fine skin detail, or it is flagged as smoothed.
   qa: z.object({ texture_min_ratio: z.number().positive().max(1) }).default({ texture_min_ratio: 0.6 }),
+  // One quoted run that checks each real model path once (Settings).
+  model_suite: z.object({
+    cap_usd: z.number().positive(),
+    tests: z.array(z.object({
+      model: z.string(),
+      kind: z.enum(['image', 'video', 'upscale']),
+      refs: z.number().int().min(0).max(4).default(0),
+      frames: z.enum(['start', 'start_end']).default('start'),
+      aspect: z.string().optional(),
+      resolution: z.string().optional(),
+      duration_sec: z.number().positive().optional(),
+    })).min(1),
+  }),
   // MCP-based providers that bill the owner's own plan (OAuth sign-in, plan
   // credits). One connection flow serves all of them; coming_soon ones are
   // listed and never called.

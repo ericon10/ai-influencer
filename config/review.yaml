@@ -35,7 +35,7 @@ actions:
     prompt_addendum: "Bare face, exactly as in the reference."
   regenerate_texture:
     label: Regenerate with real skin texture
-    prompt_addendum: "Keep the real skin texture of the reference: visible pores, freckles, redness and small imperfections, unsmoothed."
+    prompt_addendum: "Keep the real skin texture of the reference: visible pores and the same small imperfections, unsmoothed."
   edit_one_detail:
     label: Fix with a one-change edit
     phase: 2

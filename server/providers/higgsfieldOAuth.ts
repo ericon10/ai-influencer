@@ -1,11 +1,11 @@
-import type { Db } from '../db/client'
-import type { Ctx, Deps } from '../context'
-import type { KeyVault } from '../lib/vault'
-import type { StudioConfig } from '../config/load'
+import type { Db } from '../db/client.js'
+import type { Ctx, Deps } from '../context.js'
+import type { KeyVault } from '../lib/vault.js'
+import type { StudioConfig } from '../config/load.js'
 import {
   connectionTokenSource, credentialFor, disconnect, finishConnect, readConnectionTokens, startConnect,
   type AccountTokens, type ConnectResult, type OAuthOptions,
-} from './mcpConnections'
+} from './mcpConnections.js'
 
 // The Higgsfield account (plan credits) on the shared MCP connection flow.
 

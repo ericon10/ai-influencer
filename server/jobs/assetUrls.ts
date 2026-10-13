@@ -1,8 +1,8 @@
 import { createHmac } from 'node:crypto'
-import type { Deps } from '../context'
-import { getAsset } from '../storage/assets'
-import { safeEqual } from '../lib/passwords'
-import type { Ctx } from '../context'
+import type { Deps } from '../context.js'
+import { getAsset } from '../storage/assets.js'
+import { safeEqual } from '../lib/passwords.js'
+import type { Ctx } from '../context.js'
 
 // Providers fetch reference images by URL. Cloud storage gives a short-lived
 // presigned URL; otherwise, when the deployment has a public URL, we sign a

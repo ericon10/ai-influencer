@@ -1,6 +1,6 @@
-import type { PriceBook, PriceEntry, StudioConfig } from '../config/load'
-import type { CostEstimate, CostLine, GenRequest, LlmRequest, LlmUsage, Output } from '../providers/types'
-import { usdToMicros } from './money'
+import type { PriceBook, PriceEntry, StudioConfig } from '../config/load.js'
+import type { CostEstimate, CostLine, GenRequest, LlmRequest, LlmUsage, Output } from '../providers/types.js'
+import { usdToMicros } from './money.js'
 
 // Estimates and actual costs come from the price book (data), so every
 // provider is priced the same way and prices can change without code.

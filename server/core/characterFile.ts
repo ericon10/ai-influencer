@@ -1,7 +1,7 @@
 import { parse as parseYaml, stringify as toYaml } from 'yaml'
 import { z } from 'zod'
-import { markSchema, pronounsSchema, type CharacterData, type CharacterIdentity, type CharacterMark, type FileSection, type Pronouns } from './character'
-import { capitalize, hardWrap, wordCount } from './text'
+import { markSchema, pronounsSchema, type CharacterData, type CharacterIdentity, type CharacterMark, type FileSection, type Pronouns } from './character.js'
+import { capitalize, hardWrap, wordCount } from './text.js'
 
 // character-[name].md is the human-readable source of truth (SPEC 8). It
 // round-trips with the Character record: structured fields live in a YAML
@@ -424,7 +424,9 @@ export function importFreeform(md: string, opts: ImportOptions = {}): ImportResu
       else if (b.key && /^avoid\b/i.test(b.key)) realism.avoid = `AVOID: ${b.value}`
       else notes.push(b.key ? `${b.key}: ${b.value}` : b.value)
     }
-    if (!lines.length && realismSec.body.trim()) notes.push(unwrap(realismSec.body))
+    // The section's own words before its list (the principle itself).
+    const lead = realismSec.body.split('\n').filter(l => !/^\s*[-*+]\s/.test(l) && !/^\s{2,}\S/.test(l)).join('\n').trim()
+    if (lead) notes.unshift(unwrap(lead))
     if (notes.length) realism.notes = notes
   }
   if (realism.block || realism.avoid) {

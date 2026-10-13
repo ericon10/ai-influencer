@@ -1,33 +1,40 @@
-import { buildDeps } from '../server/bootstrap'
-import { createApp } from '../server/api/app'
-import { createPassphraseAuth } from '../server/auth/provider'
-import { tick } from '../server/jobs/runner'
+import { buildDeps } from '../server/bootstrap.js'
+import { createApp } from '../server/api/app.js'
+import { createPassphraseAuth } from '../server/auth/provider.js'
+import { NotConfiguredError } from '../server/lib/env.js'
 
 // Vercel entry for /api/v1/*. vercel.json rewrites /api/v1/(.*) here with the
 // sub-path in __path (plain Vercel functions have no multi-segment routes).
-// A Vercel Cron call to /api/v1/cron/tick?key=... runs a worker sweep when no
-// separate worker container is deployed.
+// Long work never runs here: jobs go to the worker on Railway, which the API
+// wakes when it queues something.
 
-export const config = { runtime: 'nodejs', maxDuration: 300 }
+export const config = { maxDuration: 60 }
 
 let ready: ReturnType<typeof init> | null = null
 async function init() {
   const { deps } = await buildDeps()
-  const app = createApp(deps, createPassphraseAuth(deps, { devAutoLogin: false }))
-  return { deps, app }
+  return createApp(deps, createPassphraseAuth(deps, { devAutoLogin: false }))
 }
 
-export default async function handler(req: Request): Promise<Response> {
-  ready ??= init()
-  const { deps, app } = await ready
-  const url = new URL(req.url)
-  const sub = (url.searchParams.get('__path') ?? '').replace(/^\/+/, '')
-  url.searchParams.delete('__path')
-  url.pathname = `/api/v1/${sub}`
-  if (sub === 'cron/tick') {
-    if (url.searchParams.get('key') !== process.env.CRON_SECRET) return new Response('Forbidden', { status: 403 })
-    const n = await tick(deps, 20)
-    return Response.json({ processed: n })
-  }
-  return app.fetch(new Request(url, req))
+export default {
+  async fetch(req: Request): Promise<Response> {
+    // A failed cold start (say, the database was unreachable) is retried on
+    // the next request instead of being cached for the life of the instance.
+    ready ??= init().catch(e => { ready = null; throw e })
+    let app: Awaited<typeof ready>
+    try {
+      app = await ready
+    } catch (e) {
+      // A deployment without its settings says what is missing (names only).
+      if (e instanceof NotConfiguredError) return Response.json({ error: { code: 'not_configured', message: e.message, details: null } }, { status: 503 })
+      throw e
+    }
+    const url = new URL(req.url)
+    const sub = url.searchParams.get('__path')
+    if (sub !== null) {
+      url.searchParams.delete('__path')
+      url.pathname = `/api/v1/${sub.replace(/^\/+/, '')}`
+    }
+    return app.fetch(new Request(url, req))
+  },
 }

@@ -1,11 +1,11 @@
 import { and, eq, inArray } from 'drizzle-orm'
-import { candidates } from '../db/schema'
-import type { Ctx, Deps } from '../context'
-import type { SheetShot } from '../config/pipeline'
-import type { IdentityScore, QaFinding } from '../core/qa/marks'
-import { cosineSimilarity, type FaceAnalysis } from '../qa/faces'
-import { readAsset } from '../storage/assets'
-import { getRef, inspirationAssetIds } from './characters'
+import { candidates } from '../db/schema.js'
+import type { Ctx, Deps } from '../context.js'
+import type { SheetShot } from '../config/pipeline.js'
+import type { IdentityScore, QaFinding } from '../core/qa/marks.js'
+import { cosineSimilarity, type FaceAnalysis } from '../qa/faces.js'
+import { readAsset } from '../storage/assets.js'
+import { getRef, inspirationAssetIds } from './characters.js'
 
 // Face-embedding checks from SPEC 6: a sheet shot must be the same person
 // as REF-00 (or its closest-angle ref), and a hero must not be the person in

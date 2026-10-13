@@ -45,6 +45,17 @@ export const sessions = pgTable('sessions', {
   revokedAt: timestamp('revoked_at', { withTimezone: true }),
 }, t => [uniqueIndex('sessions_token_uq').on(t.tokenHash)])
 
+// Sign-in attempts, for the login throttle. They happen before anyone is
+// signed in, so account_id is set only when the email belongs to a user.
+export const loginAttempts = pgTable('login_attempts', {
+  id: text('id').primaryKey(),
+  accountId: text('account_id'),
+  email: text('email').notNull(),
+  ip: text('ip').notNull().default(''),
+  ok: boolean('ok').notNull(),
+  createdAt: createdAt(),
+}, t => [index('login_attempts_email_idx').on(t.email, t.createdAt), index('login_attempts_ip_idx').on(t.ip, t.createdAt)])
+
 export const auditLog = pgTable('audit_log', {
   id: text('id').primaryKey(),
   accountId: text('account_id').notNull().references(() => accounts.id),

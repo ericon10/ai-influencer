@@ -511,6 +511,18 @@ provider and change often. Each adapter returns an estimate, and
 the router picks the cheapest provider that supports the task at
 the requested tier. Re-check list prices monthly.
 
+**Product direction: bring your own platform (note only, nothing
+built yet).** Users connect any popular generation platform they
+already pay for, either with an API key (pay-per-use) or by signing
+in to their own account (plan credits, over MCP or OAuth). Every
+platform goes through the same `ProviderAdapter` (7.1) and the same
+connection flow, and the account picks which one pays, per account,
+in one setting, the way Higgsfield already offers both paths (the
+REST API and "My Higgsfield account"). Both Higgsfield paths stay
+permanently: the account path is a long-term customer option, not a
+stopgap. No new adapters are built until the owner asks for a
+specific platform; Dzine over MCP stays a "coming soon" stub.
+
 ### 7.3 Routing policy
 
 ```

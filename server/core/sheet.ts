@@ -1,4 +1,4 @@
-import type { SheetShot } from '../config/pipeline'
+import type { SheetShot } from '../config/pipeline.js'
 
 // The reference sheet as a dependency graph (SPEC 4.1): shots run in plain
 // number order, each depending only on lower numbers, so the next shot is

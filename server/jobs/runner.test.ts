@@ -1,16 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { eq } from 'drizzle-orm'
-import { createHarness, drain, type Harness } from '../testing/harness'
-import { cancelJob, getJob, quoteJobs, runJobs, tick, wakeFromWebhook, type JobSpec } from './runner'
-import { jobEvents, jobOutputs, jobs } from '../db/schema'
-import { heldMicros, spentMicros } from '../costs/ledger'
-import { setBudget } from '../costs/budgets'
-import { getAsset, readAsset } from '../storage/assets'
-import { probeMedia } from '../media/ffmpeg'
-import { saveAsset } from '../storage/assets'
-import { renderPlaceholderPortrait } from '../providers/mock'
-import type { GenRequest, ProviderAdapter } from '../providers/types'
-import { finalizeImagePrompt } from '../core/realism'
+import { createHarness, drain, type Harness } from '../testing/harness.js'
+import { cancelJob, getJob, quoteJobs, runJobs, tick, wakeFromWebhook, type JobSpec } from './runner.js'
+import { jobEvents, jobOutputs, jobs } from '../db/schema.js'
+import { heldMicros, spentMicros } from '../costs/ledger.js'
+import { setBudget } from '../costs/budgets.js'
+import { getAsset, readAsset } from '../storage/assets.js'
+import { probeMedia } from '../media/ffmpeg.js'
+import { saveAsset } from '../storage/assets.js'
+import { renderPlaceholderPortrait } from '../providers/mock.js'
+import type { GenRequest, ProviderAdapter } from '../providers/types.js'
+import { finalizeImagePrompt } from '../core/realism.js'
 
 // Image prompts go through the realism step like every built prompt.
 const img = (prompt: string, extra: Partial<GenRequest> = {}): JobSpec => ({
@@ -160,7 +160,7 @@ describe('job runner', () => {
       async submit(req, o) {
         calls++
         if (calls === 1) {
-          const { ProviderError } = await import('../providers/types')
+          const { ProviderError } = await import('../providers/types.js')
           throw new ProviderError('busy', { retryable: true, submitted: 'no', status: 503 })
         }
         return base.submit(req, o)

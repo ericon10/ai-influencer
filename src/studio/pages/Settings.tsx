@@ -4,7 +4,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { CheckCircle2, CreditCard, KeyRound, Link2, Loader2, RefreshCw, ShieldCheck, Trash2, UserRound } from 'lucide-react'
 import { api } from '../api'
 import { keys, useHiggsfieldAccount, useSettings } from '../hooks'
-import { Callout, errorMessage, useToast } from '../ui'
+import { Callout, PromptViewer, errorMessage, useToast } from '../ui'
 import { PriceButton } from '../PriceButton'
 import type { SettingsView } from '../types'
 
@@ -20,6 +20,7 @@ export default function Settings() {
           <KeysCard d={d} />
           <BillingCard d={d} />
           <ConnectionsCard d={d} />
+          <StorageCard />
           <BudgetsCard d={d} />
           <ModelsCard d={d} />
         </div>
@@ -67,10 +68,10 @@ function KeysCard({ d }: { d: SettingsView }) {
 function KeyRow({ p, cred }: { p: SettingsView['providers'][number]; cred?: SettingsView['credentials'][number] }) {
   const toast = useToast()
   const invalidate = useInvalidate()
-  const [editing, setEditing] = useState(!cred)
+  const [editing, setEditing] = useState(!cred && !p.serverKey)
   const [secret, setSecret] = useState('')
   const [busy, setBusy] = useState(false)
-  useEffect(() => setEditing(!cred), [cred])
+  useEffect(() => setEditing(!cred && !p.serverKey), [cred, p.serverKey])
   async function save() {
     setBusy(true)
     try {
@@ -89,6 +90,8 @@ function KeyRow({ p, cred }: { p: SettingsView['providers'][number]; cred?: Sett
       <div className="st-row">
         <KeyRound size={16} />
         <div className="grow" style={{ flex: 1 }}><div className="st-h3">{p.label}</div><div className="st-hint">{p.usedFor}</div></div>
+        {!cred && p.serverKey && <span className="st-badge ok">Set on the server</span>}
+        {!cred && p.serverKey && !editing && <button className="st-btn sm ghost" onClick={() => setEditing(true)}>Use another key</button>}
         {cred && <span className="st-mono">{'*'.repeat(8)}{cred.last4}</span>}
         {cred && <span className={`st-badge ${cred.verifyStatus === 'ok' ? 'ok' : cred.verifyStatus === 'failed' ? 'bad' : ''}`}>{cred.verifyStatus === 'ok' ? 'Verified' : cred.verifyStatus === 'failed' ? 'Check failed' : 'Not checked'}</span>}
         {cred && !editing && <button className="st-btn sm" onClick={() => setEditing(true)}>Replace</button>}
@@ -245,6 +248,36 @@ function ConnectionRow({ c }: { c: SettingsView['connections'][number] }) {
   )
 }
 
+// Where files live, and the bucket rules that let the browser upload
+// straight to R2 (CORS).
+function StorageCard() {
+  const toast = useToast()
+  const [info, setInfo] = useState<{ driver: string; bucket: string | null; origins: string[]; corsRules: unknown[] } | null>(null)
+  const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null)
+  const [busy, setBusy] = useState(false)
+  useEffect(() => { api.storage().then(setInfo).catch(() => undefined) }, [])
+  async function check() {
+    setBusy(true)
+    try { setResult(await api.checkStorage()) } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) } finally { setBusy(false) }
+  }
+  if (!info) return null
+  const r2 = info.driver === 's3'
+  return (
+    <div className="st-card">
+      <div className="st-card-head"><div className="grow"><div className="st-h2">Storage</div><div className="st-hint">{r2 ? `Cloudflare R2, bucket ${info.bucket}. Uploads go from your browser straight to the bucket.` : 'Local disk (development). Uploads go through the Studio.'}</div></div>
+        {r2 && <button className="st-btn sm" onClick={check} disabled={busy}>{busy ? <Loader2 size={14} className="st-spin" /> : <ShieldCheck size={14} />}Check uploads</button>}
+      </div>
+      {r2 && (
+        <div className="st-card-body st-col" style={{ gap: 12 }}>
+          {result && <Callout tone={result.ok ? 'ok' : 'warn'}>{result.message}</Callout>}
+          <span className="st-hint">If the check says the key cannot set them, paste these rules in Cloudflare: R2, the bucket, Settings, CORS policy, Edit.</span>
+          <PromptViewer label="CORS policy" text={JSON.stringify(info.corsRules, null, 2)} wrapped={JSON.stringify(info.corsRules, null, 2)} />
+        </div>
+      )}
+    </div>
+  )
+}
+
 function BudgetsCard({ d }: { d: SettingsView }) {
   const toast = useToast()
   const invalidate = useInvalidate()
@@ -277,11 +310,48 @@ function BudgetsCard({ d }: { d: SettingsView }) {
   )
 }
 
+function ModelSuiteCard({ d }: { d: SettingsView }) {
+  const { tests, cap } = d.modelSuite
+  const ready = tests.filter(t => t.endpoint).length
+  const running = tests.some(t => t.testing)
+  const result = (t: SettingsView['modelSuite']['tests'][number]) =>
+    t.testing ? <span className="st-badge plain info">Running</span>
+      : !t.lastTest ? <span className="st-badge plain">{t.endpoint ? 'Not run yet' : 'Needs its path'}</span>
+      : <span className={`st-badge ${t.lastTest.ok ? 'ok' : 'bad'}`}>{t.lastTest.ok ? 'Passed' : 'Failed'}</span>
+  return (
+    <div className="st-card">
+      <div className="st-card-head">
+        <div className="grow">
+          <div className="st-h2">Model tests</div>
+          <div className="st-hint">Each real model path once, on the pay-per-use API, with neutral test images (a mug and a plant, never a character). One estimate for the whole run, capped at {cap}. A model without its path is skipped.</div>
+        </div>
+        {d.mode === 'live' && ready > 0 && !running && <PriceButton action={{ type: 'model_suite' }} label="Run model tests" />}
+      </div>
+      <div style={{ overflowX: 'auto' }}>
+        <table className="st-table">
+          <thead><tr><th>Model</th><th>Test</th><th>Result</th><th>Cost</th></tr></thead>
+          <tbody>{tests.map(t => (
+            <tr key={t.ref}>
+              <td className="strong">{t.label}</td>
+              <td>{t.what}</td>
+              <td><div className="st-col" style={{ gap: 4 }}>{result(t)}{t.lastTest && !t.testing && <span className={`st-hint ${t.lastTest.ok ? '' : 'bad'}`}>{t.lastTest.message}</span>}</div></td>
+              <td className="st-mono">{t.cost ?? (t.estimate ? `about ${t.estimate}` : '')}</td>
+            </tr>
+          ))}</tbody>
+        </table>
+      </div>
+      {d.mode !== 'live' && <div className="st-card-body"><Callout tone="info">Model tests are real, paid runs, so they need live mode and your Higgsfield key.</Callout></div>}
+      {d.mode === 'live' && ready === 0 && <div className="st-card-body"><Callout tone="info">Enter each model's path from Higgsfield's official Model API Reference below, then run the tests.</Callout></div>}
+    </div>
+  )
+}
+
 function ModelsCard({ d }: { d: SettingsView }) {
   const hf = d.models.filter(m => m.ref.startsWith('higgsfield/'))
   const confirmed = hf.filter(m => m.verified).length
   return (
     <>
+      <ModelSuiteCard d={d} />
       <div className="st-card">
         <div className="st-card-head">
           <div className="grow">

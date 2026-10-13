@@ -17,7 +17,7 @@ export function FileTab({ v }: { v: CharacterView }) {
     try {
       const r = await api.applyFile(v.id, files)
       refresh(v.id)
-      const shots = r.importedShots.length ? ` Added ${r.importedShots.join(', ')} to the sheet.` : ''
+      const shots = r.importedShots.length ? ` Added ${r.importedShots.join(', ')} to the sheet${r.checkJobId ? '; checking faces and skin texture against REF-00' : ''}.` : ''
       const hasFile = files.some(f => f.name.toLowerCase().endsWith('.md'))
       toast({ tone: 'ok', text: `${hasFile ? 'Edits imported; the previous version is in history.' : 'Sheet images added.'}${shots}` })
     } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) } finally { setBusy(false) }
@@ -35,7 +35,7 @@ export function FileTab({ v }: { v: CharacterView }) {
               <input type="file" multiple accept=".md,text/markdown,image/*" hidden onChange={e => e.target.files?.length && applyEdits(Array.from(e.target.files))} />
             </label>
           </div>
-          <Callout tone="info">Edit the Card, Body and Notes sections freely. Marks and settings live in the block at the top. Images named REF-00 to REF-11 become approved sheet shots. Importing keeps the previous version in history.</Callout>
+          <Callout tone="info">Edit the Card, Body and Notes sections freely. Marks and settings live in the block at the top. Images named REF 00 to REF 11 (or REF-00) become approved sheet shots. Importing keeps the previous version in history.</Callout>
           {!v.sheet.progress.complete && <Callout tone="warn">The sheet is {v.sheet.progress.approved} of 12. The file records what is approved so far.</Callout>}
         </div>
       </section>

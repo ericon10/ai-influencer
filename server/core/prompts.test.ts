@@ -1,11 +1,11 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { loadConfig } from '../config/load'
-import { buildHeroPrompts, buildSheetPrompt } from './prompts'
-import { lintPrompt, blocking } from './rules'
-import { hardWrap, normalizePrompt } from './text'
-import { validateCharacter, type CharacterData } from './character'
+import { loadConfig } from '../config/load.js'
+import { buildHeroPrompts, buildSheetPrompt } from './prompts.js'
+import { lintPrompt, blocking } from './rules.js'
+import { hardWrap, normalizePrompt } from './text.js'
+import { validateCharacter, type CharacterData } from './character.js'
 
 const cfg = loadConfig()
 const { templates, views, rules, sheet } = cfg.pipeline
@@ -127,9 +127,9 @@ describe("a character's style never reaches a prompt", () => {
   it('keeps every style idea out of the hero and all twelve sheet prompts', async () => {
     const { readFileSync } = await import('node:fs')
     const { join } = await import('node:path')
-    const { importCharacterFile } = await import('./characterFile')
-    const { buildHeroPrompts, buildSheetPrompt } = await import('./prompts')
-    const { loadConfig } = await import('../config/load')
+    const { importCharacterFile } = await import('./characterFile.js')
+    const { buildHeroPrompts, buildSheetPrompt } = await import('./prompts.js')
+    const { loadConfig } = await import('../config/load.js')
     const cfg = loadConfig()
     const c = importCharacterFile(readFileSync(join(process.cwd(), 'fixtures/callie/character-callie.md'), 'utf8'), { models: cfg.models.models }).character
     const prompts = [
@@ -146,8 +146,8 @@ describe("a character's style never reaches a prompt", () => {
   })
 
   it('requires every scene to name its own outfit and never carry one over', async () => {
-    const { lintPrompt, blocking } = await import('./rules')
-    const { loadConfig } = await import('../config/load')
+    const { lintPrompt, blocking } = await import('./rules.js')
+    const { loadConfig } = await import('../config/load.js')
     const rules = loadConfig().pipeline.rules
     const ids = (p: string) => blocking(lintPrompt(rules, p, { stage: 'scene' })).map(v => v.ruleId)
     expect(ids('She laughs at a cafe table, same outfit as before.')).toEqual(expect.arrayContaining(['scene-names-outfit', 'scene-no-carried-outfit']))

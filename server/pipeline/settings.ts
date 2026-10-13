@@ -1,10 +1,10 @@
 import { and, eq } from 'drizzle-orm'
-import { accountSettings } from '../db/schema'
-import type { Db } from '../db/client'
-import type { Ctx, Deps } from '../context'
-import type { Route } from '../config/load'
-import { audit } from '../lib/audit'
-import { AppError } from '../lib/errors'
+import { accountSettings } from '../db/schema.js'
+import type { Db } from '../db/client.js'
+import type { Ctx, Deps } from '../context.js'
+import type { Route } from '../config/load.js'
+import { audit } from '../lib/audit.js'
+import { AppError } from '../lib/errors.js'
 
 // Per-account settings and overrides of config defaults.
 

@@ -1,5 +1,5 @@
 import sharp from 'sharp'
-import type { DetectedFace, FaceMatcher } from './faces'
+import type { DetectedFace, FaceMatcher } from './faces.js'
 
 // Texture check (Realism principle): after an upscale or an edit, the face
 // must keep its fine skin detail. Detail is the variance of a Laplacian

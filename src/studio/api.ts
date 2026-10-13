@@ -1,4 +1,5 @@
 import type { ActionPreview, CharacterSummary, CharacterView, HiggsfieldAccount, JobView, Me, QuoteView, SettingsView, StudioAction, Usage } from './types'
+import { sheetRefOf, typeOf, uploadFiles } from './files'
 
 // Thin client for /api/v1. Every write sends the CSRF header the server
 // requires; errors come back as ApiError with the server's plain message.
@@ -38,7 +39,10 @@ export const api = {
   character: (id: string) => request<CharacterView>('GET', `/characters/${id}`),
   updateCharacter: (id: string, patch: Record<string, unknown>, reason = 'edited') => request<CharacterView>('PATCH', `/characters/${id}`, { patch, reason }),
   archiveCharacter: (id: string) => request<{ ok: true }>('DELETE', `/characters/${id}`),
-  addInspiration: (id: string, file: File) => { const f = new FormData(); f.append('file', file); return request<{ assetId: string }>('POST', `/characters/${id}/inspirations`, f) },
+  addInspiration: async (id: string, file: File) => {
+    const [up] = await uploadFiles([file])
+    return request<{ assetId: string }>('POST', `/characters/${id}/inspirations`, { uploads: [up] })
+  },
   chooseConcept: (conceptId: string) => request<{ ok: true }>('POST', `/concepts/${conceptId}/choose`, {}),
 
   approve: (candidateId: string) => request<{ invalidated: string[]; sheetComplete: boolean }>('POST', `/candidates/${candidateId}/approve`, {}),
@@ -48,15 +52,17 @@ export const api = {
   favorite: (candidateId: string, favorite: boolean) => request<{ ok: true }>('POST', `/candidates/${candidateId}/favorite`, { favorite }),
   keepStale: (characterId: string, refId: string) => request<{ ok: true }>('POST', `/characters/${characterId}/sheet/${refId}/keep`, {}),
 
-  importCharacter: (form: FormData) => request<{ characterId: string; importedShots: string[]; checkShots: string[]; warnings: string[] }>('POST', '/characters/import', form),
+  // A character file and its sheet images. Images go straight to storage;
+  // names like "REF 00" are normalized; the face and skin checks run after.
+  importCharacter: async (markdown: string, images: File[], onProgress?: (done: number, total: number) => void) => {
+    const uploads = await uploadFiles(images.filter(f => sheetRefOf(f.name)), onProgress)
+    return request<{ characterId: string; importedShots: string[]; checkShots: string[]; checkJobId: string | null; warnings: string[] }>('POST', '/characters/import', { markdown, uploads })
+  },
   exportUrl: (id: string) => `/api/v1/characters/${id}/export`,
-  applyFile: (id: string, files: File[]) => {
-    const f = new FormData()
-    for (const file of files) {
-      if (file.name.toLowerCase().endsWith('.md')) f.append('file', file)
-      else if (file.type.startsWith('image/') && /REF-\d{2}/i.test(file.name)) f.append('images', file)
-    }
-    return request<{ warnings: string[]; importedShots: string[]; checkShots: string[]; view: CharacterView }>('POST', `/characters/${id}/import-file`, f)
+  applyFile: async (id: string, files: File[], onProgress?: (done: number, total: number) => void) => {
+    const md = files.find(f => f.name.toLowerCase().endsWith('.md'))
+    const uploads = await uploadFiles(files.filter(f => typeOf(f).startsWith('image/') && sheetRefOf(f.name)), onProgress)
+    return request<{ warnings: string[]; importedShots: string[]; checkShots: string[]; checkJobId: string | null; view: CharacterView }>('POST', `/characters/${id}/import-file`, { markdown: md ? await md.text() : undefined, uploads })
   },
   setModelEndpoint: (ref: string, endpoint: string) => request<SettingsView>('PUT', '/settings/models', { ref, endpoint }),
   mirror: (candidateId: string) => request<{ candidateId: string }>('POST', `/candidates/${candidateId}/mirror`),
@@ -81,6 +87,8 @@ export const api = {
   saveBudgets: (b: Partial<SettingsView['budgets']>) => request<SettingsView>('PUT', '/settings/budgets', b),
   setBilling: (b: { default?: 'api' | 'account'; creditUsd?: number }) => request<SettingsView>('PUT', '/settings/billing', b),
   higgsfieldAccount: (fresh = false) => request<HiggsfieldAccount>('GET', `/settings/higgsfield-account${fresh ? '?fresh=1' : ''}`),
+  storage: () => request<{ driver: string; bucket: string | null; origins: string[]; corsRules: unknown[] }>('GET', '/settings/storage'),
+  checkStorage: () => request<{ ok: boolean; message: string }>('POST', '/settings/storage/check', {}),
   // The shared MCP connection flow (Higgsfield account, Dzine AI soon).
   connect: (provider: string) => request<{ url: string }>('POST', `/oauth/${provider}/start`, {}),
   disconnect: (provider: string) => request<SettingsView>('DELETE', `/settings/connections/${provider}`),

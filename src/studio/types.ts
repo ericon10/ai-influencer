@@ -80,6 +80,7 @@ export type StudioAction =
   | { type: 'sheet'; characterId: string; refId: string; variations: number; reason?: string; refsMode?: 'graph' | 'ref00_only'; withQa?: boolean }
   | { type: 'qa'; characterId: string; candidateId: string }
   | { type: 'model_test'; model: string }
+  | { type: 'model_suite' }
 
 export interface JobView { id: string; label: string; purpose: string; stage: string; status: string; kind: string; model: string; characterId: string | null; estimate: string; actual: string | null; error: string | null; createdAt: string; completedAt: string | null }
 
@@ -87,8 +88,16 @@ export interface Me { email: string; role: string; accountId: string; mode: 'dem
 
 export interface SettingsView {
   mode: 'demo' | 'live'
+  modelSuite: {
+    cap: string
+    tests: Array<{
+      ref: string; label: string; what: string; endpoint: string; testing: boolean
+      lastTest: { at: string; ok: boolean; message: string; jobId: string } | null
+      cost: string | null; estimate: string | null
+    }>
+  }
   credentials: Array<{ id: string; provider: string; last4: string; verifyStatus: string; verifiedAt: string | null; createdAt: string }>
-  providers: Array<{ id: string; label: string; hint: string; placeholder: string; usedFor: string }>
+  providers: Array<{ id: string; label: string; hint: string; placeholder: string; usedFor: string; serverKey?: boolean }>
   budgets: { job: number; character: number; month: number; confirmAbove: number; warnPct: number }
   routing: Array<{ task: string; configured: string; effective: string }>
   models: Array<{

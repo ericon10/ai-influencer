@@ -1,12 +1,12 @@
 import { and, eq } from 'drizzle-orm'
-import { candidates, refImages } from '../db/schema'
-import type { Ctx, Deps } from '../context'
-import { exportCharacterFile, importCharacterFile, type ImportResult, type SheetEntry } from '../core/characterFile'
-import { newId } from '../lib/ids'
-import { AppError } from '../lib/errors'
-import { getAsset, saveAsset } from '../storage/assets'
-import { approvedAssets, createCharacter, getCharacter, getRef, refRows, setCharacterFields, toData, updateCharacter } from './characters'
-import { markDependentsStale } from './review'
+import { candidates, refImages } from '../db/schema.js'
+import type { Ctx, Deps } from '../context.js'
+import { exportCharacterFile, importCharacterFile, type ImportResult, type SheetEntry } from '../core/characterFile.js'
+import { newId } from '../lib/ids.js'
+import { AppError } from '../lib/errors.js'
+import { getAsset, saveAsset } from '../storage/assets.js'
+import { approvedAssets, createCharacter, getCharacter, getRef, refRows, setCharacterFields, toData, updateCharacter } from './characters.js'
+import { markDependentsStale } from './review.js'
 
 // Stage 5: character-[name].md export and import (SPEC 8).
 

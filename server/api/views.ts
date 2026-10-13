@@ -1,17 +1,18 @@
-import type { Ctx, Deps } from '../context'
-import { validateCharacter } from '../core/character'
-import { hardWrap } from '../core/text'
-import { listCredentials } from '../providers/credentials'
-import { effectiveBudgets } from '../costs/budgets'
-import { formatUsd, microsToUsd } from '../costs/money'
-import { and, desc, eq } from 'drizzle-orm'
-import { jobs } from '../db/schema'
-import { getAsset } from '../storage/assets'
-import { candidatesFor, getCharacter, inspirationAssetIds, listConcepts, sheetState, toData, type CharacterRow } from '../pipeline/characters'
-import { characterCosts } from '../pipeline/costs'
-import { providerMode, resolveRoute } from '../pipeline/settings'
-import { effectiveModel, readModelOverrides } from '../providers/modelOverrides'
-import { readBilling } from '../providers/billing'
+import type { Ctx, Deps } from '../context.js'
+import { validateCharacter } from '../core/character.js'
+import { hardWrap } from '../core/text.js'
+import { listCredentials } from '../providers/credentials.js'
+import { effectiveBudgets } from '../costs/budgets.js'
+import { formatUsd, microsToUsd } from '../costs/money.js'
+import { and, desc, eq, inArray } from 'drizzle-orm'
+import { jobs } from '../db/schema.js'
+import { getAsset } from '../storage/assets.js'
+import { candidatesFor, getCharacter, inspirationAssetIds, listConcepts, sheetState, toData, type CharacterRow } from '../pipeline/characters.js'
+import { characterCosts } from '../pipeline/costs.js'
+import { providerMode, resolveRoute } from '../pipeline/settings.js'
+import { effectiveModel, readModelOverrides } from '../providers/modelOverrides.js'
+import { readBilling } from '../providers/billing.js'
+import { serverKeyFor } from '../providers/serverKeys.js'
 
 // Response shapes for the UI. Plain data only; no secrets, no internals.
 
@@ -89,8 +90,30 @@ export async function settingsView(deps: Deps, ctx: Ctx) {
   const credentials = await listCredentials(deps.db, ctx.accountId)
   const account = credentials.find(c => c.provider === 'higgsfield_account')
   const connectionIds = Object.keys(deps.config.runtime.mcp_connections)
+  // The model test suite: each model's latest test, with what it cost.
+  const suite = deps.config.runtime.model_suite
+  const suiteJobIds = suite.tests.map(t => overrides[t.model]?.pendingTest?.jobId ?? overrides[t.model]?.lastTest?.jobId).filter((id): id is string => !!id)
+  const suiteJobs = suiteJobIds.length
+    ? await deps.db.select({ id: jobs.id, estimate: jobs.estimateMicros, actual: jobs.actualMicros }).from(jobs).where(and(eq(jobs.accountId, ctx.accountId), inArray(jobs.id, suiteJobIds)))
+    : []
   return {
     mode: await providerMode(deps.db, ctx.accountId),
+    modelSuite: {
+      cap: formatUsd(Math.round(suite.cap_usd * 1_000_000)),
+      tests: suite.tests.map(t => {
+        const base = deps.config.models.models.find(m => m.ref === t.model)
+        const o = overrides[t.model]
+        const job = suiteJobs.find(j => j.id === (o?.pendingTest?.jobId ?? o?.lastTest?.jobId))
+        const what = t.kind === 'video'
+          ? `Image to video, ${t.frames === 'start_end' ? 'start and end frame' : 'start frame'}, ${[t.resolution, `${t.duration_sec ?? 5} s`, t.aspect].filter(Boolean).join(', ')}, audio off`
+          : t.kind === 'upscale' ? `Upscale${t.resolution ? ` to ${t.resolution}` : ''}` : `Still${t.refs ? ` with ${t.refs} reference images` : ''}`
+        return {
+          ref: t.model, label: base?.label ?? t.model, what, endpoint: base ? (effectiveModel(base, o).endpoint ?? '') : '',
+          testing: !!o?.pendingTest, lastTest: o?.lastTest ?? null,
+          cost: job ? (job.actual != null ? formatUsd(job.actual) : null) : null, estimate: job ? formatUsd(job.estimate) : null,
+        }
+      }),
+    },
     credentials: credentials.filter(c => !connectionIds.some(id => c.provider === `${id}_account`)),
     // Accounts on the owner's own plan, over MCP (one connection flow).
     connections: Object.entries(deps.config.runtime.mcp_connections).map(([id, c]) => {
@@ -106,7 +129,11 @@ export async function settingsView(deps: Deps, ctx: Ctx) {
       accountModels: deps.config.models.models.filter(m => m.ref.startsWith('higgsfield/') && m.mcp_id && m.mcp).map(m => m.ref),
     },
     providers: [
-      { id: 'higgsfield', label: 'Higgsfield', hint: 'KEY_ID:KEY_SECRET from the Higgsfield Console (API keys, pay-per-use). Not your web login.', placeholder: 'kid_xxx:secret_xxx', usedFor: 'Images and video' },
+      {
+        id: 'higgsfield', label: 'Higgsfield', hint: 'KEY_ID:KEY_SECRET from the Higgsfield Console (API keys, pay-per-use). Not your web login.', placeholder: 'kid_xxx:secret_xxx', usedFor: 'Images and video',
+        // The owner's account can run on the server key (HF_CREDENTIALS).
+        serverKey: !!(await serverKeyFor(deps.db, { ownerEmail: deps.env.STUDIO_OWNER_EMAIL || 'owner@studio.local', higgsfield: deps.env.HF_CREDENTIALS }, ctx.accountId, 'higgsfield')),
+      },
       { id: 'anthropic', label: 'Anthropic', hint: 'An API key from the Anthropic Console.', placeholder: 'sk-ant-...', usedFor: 'Breakdowns, concepts and QA' },
     ],
     budgets: {

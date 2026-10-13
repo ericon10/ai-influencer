@@ -1,7 +1,7 @@
-import type { SheetShot, Side, ViewsConfig } from '../../config/pipeline'
-import { markExpectation, otherSide, subjectSide, type ImageSide, type Mark } from '../marks'
-import type { Observation } from './perception'
-import { describeFlaw, suggestsFixingFlaw, treatsFlawAsDefect } from '../realism'
+import type { SheetShot, Side, ViewsConfig } from '../../config/pipeline.js'
+import { markExpectation, otherSide, subjectSide, type ImageSide, type Mark } from '../marks.js'
+import type { Observation } from './perception.js'
+import { describeFlaw, suggestsFixingFlaw, treatsFlawAsDefect } from '../realism.js'
 
 // Deterministic QA for sheet shots. The vision model only reports what it
 // sees, in image positions. This module turns that into the character's own

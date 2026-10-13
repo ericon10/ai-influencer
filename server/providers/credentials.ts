@@ -1,11 +1,11 @@
 import { and, eq, isNull } from 'drizzle-orm'
-import { providerCredentials } from '../db/schema'
-import type { Db } from '../db/client'
-import type { Ctx, Deps } from '../context'
-import type { KeyVault } from '../lib/vault'
-import { newId } from '../lib/ids'
-import { audit } from '../lib/audit'
-import { AppError } from '../lib/errors'
+import { providerCredentials } from '../db/schema.js'
+import type { Db } from '../db/client.js'
+import type { Ctx, Deps } from '../context.js'
+import type { KeyVault } from '../lib/vault.js'
+import { newId } from '../lib/ids.js'
+import { audit } from '../lib/audit.js'
+import { AppError } from '../lib/errors.js'
 
 // Provider keys belong to an account (customers bring their own keys). They
 // are sealed with the key vault and only the last four characters are ever

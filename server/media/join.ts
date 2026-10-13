@@ -1,8 +1,8 @@
 import { copyFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { ffmpeg, MediaError, probeFile } from './ffmpeg'
-import { colorStats, extractFirstFrame, frameDifference } from './frames'
-import { clipFrames, encodeArgs, trimClip } from './edit'
+import { ffmpeg, MediaError, probeFile } from './ffmpeg.js'
+import { colorStats, extractFirstFrame, frameDifference } from './frames.js'
+import { clipFrames, encodeArgs, trimClip } from './edit.js'
 
 export interface JoinOptions {
   // Largest difference across a seam (1 - SSIM) that still cuts cleanly.

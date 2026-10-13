@@ -1,23 +1,23 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { beforeAll, describe, expect, it } from 'vitest'
-import { createHarness, drain, type Harness } from '../testing/harness'
-import { registerPipelineHooks } from './hooks'
-import { createCharacter, linkInspiration, listConcepts, getCharacter, candidatesFor, sheetState, toData, updateCharacter } from './characters'
-import { estimateAction, runAction, type StudioAction } from './actions'
-import { chooseConcept } from './concepts'
-import { approveCandidate, keepStale, mirrorCandidate, pickHero, rejectCandidate } from './review'
-import { exportCharacter, importCharacter } from './files'
-import { characterCosts } from './costs'
-import { setSetting } from './settings'
-import { readAsset, saveAsset } from '../storage/assets'
+import { createHarness, drain, type Harness } from '../testing/harness.js'
+import { registerPipelineHooks } from './hooks.js'
+import { createCharacter, linkInspiration, listConcepts, getCharacter, candidatesFor, sheetState, toData, updateCharacter } from './characters.js'
+import { estimateAction, runAction, type StudioAction } from './actions.js'
+import { chooseConcept } from './concepts.js'
+import { approveCandidate, keepStale, mirrorCandidate, pickHero, rejectCandidate } from './review.js'
+import { exportCharacter, importCharacter } from './files.js'
+import { characterCosts } from './costs.js'
+import { setSetting } from './settings.js'
+import { readAsset, saveAsset } from '../storage/assets.js'
 import sharp from 'sharp'
-import { renderPlaceholderPortrait } from '../providers/mock'
-import { parseObservation } from '../core/qa/perception'
-import { mirrorObservation, type QaReport } from '../core/qa/marks'
-import type { LlmRequest } from '../providers/types'
+import { renderPlaceholderPortrait } from '../providers/mock.js'
+import { parseObservation } from '../core/qa/perception.js'
+import { mirrorObservation, type QaReport } from '../core/qa/marks.js'
+import type { LlmRequest } from '../providers/types.js'
 import { eq } from 'drizzle-orm'
-import { jobs as jobsTable } from '../db/schema'
+import { jobs as jobsTable } from '../db/schema.js'
 
 // The whole of Phase 1 in demo mode (mock providers, no spend), including
 // the acceptance scenario: a REF-04 that comes back with the ear cuff on the
@@ -84,13 +84,22 @@ describe('character creation, stages 1 to 5 (demo mode)', () => {
     await updateCharacter(h.deps, h.ctx, characterId, { name: callie.name, age: callie.age, card: callie.card, eyes: callie.eyes, marks: callie.marks, body: callie.body, pronouns: callie.pronouns }, 'use Callie fixture')
   })
 
-  it('stage 3: runs 3 text-only hero prompts and one hero becomes REF-00', async () => {
-    const { preview, jobs } = await run({ type: 'hero', characterId, runsPerPrompt: 2 })
+  it('stage 3: runs 3 text-only hero prompts, 4 to 8 candidates each, and one hero becomes REF-00', async () => {
+    await expect(estimateAction(h.deps, h.ctx, { type: 'hero', characterId, runsPerPrompt: 3 })).rejects.toThrow()
+    const { preview, jobs } = await run({ type: 'hero', characterId, runsPerPrompt: 4 })
     expect(preview.prompts).toHaveLength(3)
-    expect(jobs).toHaveLength(6)
+    // How Callie's REF-00 was made: neutral, gray background, white tee, bare face.
+    for (const p of preview.prompts) {
+      expect(p.text).toMatch(/Chest-up portrait of .*Facing the camera, relaxed neutral expression/)
+      expect(p.text).toMatch(/Plain light gray background, soft even daylight, plain white crew-neck tee, hair in its usual style/)
+      expect(p.text).toContain('Bare face, no makeup, no retouching.')
+      expect(p.text).toContain('natural skin with visible pores and small believable imperfections')
+      expect(p.text).not.toMatch(/\b(acne|blemish|scar|rough skin)/i)
+    }
+    expect(jobs).toHaveLength(12)
     for (const j of jobs) expect((j.request as { refs?: unknown[] }).refs).toBeUndefined()
     const heroes = await candidatesFor(h.deps, h.ctx, characterId, { target: 'hero', statuses: ['in_review'] })
-    expect(heroes).toHaveLength(6)
+    expect(heroes).toHaveLength(12)
     const pick = await pickHero(h.deps, h.ctx, heroes[0]!.id)
     expect(pick.needsUpscale).toBe(false)
     const ch = await getCharacter(h.deps, h.ctx, characterId)
@@ -221,9 +230,9 @@ describe('character creation, stages 1 to 5 (demo mode)', () => {
     // SOUL IDENTITY block (demo mode still runs the mock).
     await setSetting(h.deps, h.ctx, 'routing_overrides', { hero: { model: 'higgsfield/soul-2' } })
     try {
-      const soulRun = await run({ type: 'hero', characterId: row.id, runsPerPrompt: 1 })
+      const soulRun = await run({ type: 'hero', characterId: row.id, runsPerPrompt: 4 })
       expect(soulRun.preview.prompts.every(p => p.text.includes('If hair is wet or slicked back, add "but still clearly blonde."'))).toBe(true)
-      expect(soulRun.jobs.map(j => (j.request as { identityId?: string }).identityId)).toEqual(Array(3).fill('0fdc33c0-7a1a-40a9-9b12-0dc35f44e29e'))
+      expect(soulRun.jobs.map(j => (j.request as { identityId?: string }).identityId)).toEqual(Array(12).fill('0fdc33c0-7a1a-40a9-9b12-0dc35f44e29e'))
     } finally {
       await setSetting(h.deps, h.ctx, 'routing_overrides', {})
     }

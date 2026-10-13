@@ -1,25 +1,25 @@
 import { eq } from 'drizzle-orm'
 import { z } from 'zod'
-import { refImages } from '../db/schema'
-import type { Ctx, Deps } from '../context'
-import { fill, hardWrap } from '../core/text'
-import { buildHeroPrompts, buildSheetPrompt } from '../core/prompts'
-import { blocking, lintPrompt, type RuleViolation } from '../core/rules'
-import { validateCharacter } from '../core/character'
-import { invalidationFor } from '../core/sheet'
-import { observationJsonSchema } from '../core/qa/perception'
-import { idealObservation } from '../core/qa/ideal'
-import { breakdownJsonSchema, cardUpdateJsonSchema, conceptsJsonSchema } from '../core/llmSchemas'
-import { AppError } from '../lib/errors'
-import { getAsset } from '../storage/assets'
-import { quoteJobs, runJobs, type JobSpec } from '../jobs/runner'
-import type { QuoteView } from '../costs/quotes'
-import type { GenRequest } from '../providers/types'
-import { forMode, liveRoute, resolveRoute } from './settings'
-import { identityForModel } from '../core/identity'
-import type { RealismWarning } from '../core/realism'
-import { buildModelTest, startModelTest } from './modelTests'
-import { approvedAssets, getCandidate, getCharacter, getRef, inspirationAssetIds, setCharacterFields, sheetState, toData } from './characters'
+import { refImages } from '../db/schema.js'
+import type { Ctx, Deps } from '../context.js'
+import { fill, hardWrap } from '../core/text.js'
+import { buildHeroPrompts, buildSheetPrompt } from '../core/prompts.js'
+import { blocking, lintPrompt, type RuleViolation } from '../core/rules.js'
+import { validateCharacter } from '../core/character.js'
+import { invalidationFor } from '../core/sheet.js'
+import { observationJsonSchema } from '../core/qa/perception.js'
+import { idealObservation } from '../core/qa/ideal.js'
+import { breakdownJsonSchema, cardUpdateJsonSchema, conceptsJsonSchema } from '../core/llmSchemas.js'
+import { AppError } from '../lib/errors.js'
+import { getAsset } from '../storage/assets.js'
+import { quoteJobs, runJobs, type JobSpec } from '../jobs/runner.js'
+import type { QuoteView } from '../costs/quotes.js'
+import type { GenRequest } from '../providers/types.js'
+import { forMode, liveRoute, resolveRoute } from './settings.js'
+import { identityForModel } from '../core/identity.js'
+import type { RealismWarning } from '../core/realism.js'
+import { buildModelSuite, buildModelTest, startModelSuite, startModelTest } from './modelTests.js'
+import { approvedAssets, getCandidate, getCharacter, getRef, inspirationAssetIds, setCharacterFields, sheetState, toData } from './characters.js'
 
 // Every paid step is an action. The same builder produces the job specs for
 // the estimate and for the run, so the run's fingerprint must match its
@@ -29,7 +29,8 @@ import { approvedAssets, getCandidate, getCharacter, getRef, inspirationAssetIds
 export const actionSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('breakdown'), characterId: z.string(), notes: z.string().max(2000).optional() }),
   z.object({ type: z.literal('concepts'), characterId: z.string(), notes: z.string().max(2000).optional() }),
-  z.object({ type: z.literal('hero'), characterId: z.string(), runsPerPrompt: z.number().int().min(1).max(8) }),
+  // 4 to 8 candidates per hero prompt, across the 3 prompts; one pick becomes REF-00.
+  z.object({ type: z.literal('hero'), characterId: z.string(), runsPerPrompt: z.number().int().min(4).max(8) }),
   z.object({ type: z.literal('upscale'), characterId: z.string() }),
   z.object({ type: z.literal('card_update'), characterId: z.string() }),
   z.object({
@@ -40,6 +41,8 @@ export const actionSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('qa'), characterId: z.string(), candidateId: z.string() }),
   // One small paid test that confirms a model (Settings, Models).
   z.object({ type: z.literal('model_test'), model: z.string() }),
+  // Every real model path once, in one quoted run under a cap (Settings).
+  z.object({ type: z.literal('model_suite') }),
 ])
 
 export type StudioAction = z.infer<typeof actionSchema>
@@ -123,6 +126,7 @@ function dedupe(list: RealismWarning[]): RuleViolation[] {
 
 export async function buildAction(deps: Deps, ctx: Ctx, action: StudioAction): Promise<BuiltAction> {
   if (action.type === 'model_test') return buildModelTest(deps, ctx, action.model)
+  if (action.type === 'model_suite') return buildModelSuite(deps, ctx)
   const row = await getCharacter(deps, ctx, action.characterId)
   const ch = toData(row)
   const tpl = deps.config.pipeline.templates
@@ -153,6 +157,9 @@ export async function buildAction(deps: Deps, ctx: Ctx, action: StudioAction): P
     }
 
     case 'hero': {
+      if (!Number.isInteger(action.runsPerPrompt) || action.runsPerPrompt < 4 || action.runsPerPrompt > 8) {
+        throw new AppError('bad_request', 'Run 4 to 8 candidates per hero prompt, across the 3 prompts, then pick one.')
+      }
       const issues = validateCharacter(ch).filter(i => i.severity === 'error')
       if (issues.length) throw new AppError('invalid_request', issues.map(i => i.message).join(' '))
       const route = await resolveRoute(deps, ctx, 'hero')
@@ -270,6 +277,7 @@ export async function runAction(deps: Deps, ctx: Ctx, action: StudioAction, quot
   const built = await buildAction(deps, ctx, action)
   const jobs = await runJobs(deps, ctx, { quoteId, confirmed, purpose: built.purpose, characterId: built.characterId, specs: built.specs })
   if (action.type === 'model_test') await startModelTest(deps, ctx, action.model, jobs[0]!.id)
+  else if (action.type === 'model_suite') await startModelSuite(deps, ctx, jobs)
   else await afterStart(deps, ctx, action, built)
   return { jobs, preview: built.preview }
 }

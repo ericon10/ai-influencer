@@ -2,31 +2,36 @@ import { Hono, type Context } from 'hono'
 import { z } from 'zod'
 import sharp from 'sharp'
 import { and, desc, eq, inArray } from 'drizzle-orm'
-import type { Ctx, Deps, Principal } from '../context'
-import { hasRole } from '../context'
-import { AppError } from '../lib/errors'
-import { newId } from '../lib/ids'
-import type { AuthProvider } from '../auth/provider'
-import { jobEvents, jobs } from '../db/schema'
-import { readAsset, saveAsset, getAsset } from '../storage/assets'
-import { verifyAssetSignature } from '../jobs/assetUrls'
-import { cancelJob, getJob, resolveJob, wakeFromWebhook } from '../jobs/runner'
-import { actionSchema, estimateAction, runAction } from '../pipeline/actions'
-import { createCharacter, getCharacter, linkInspiration, listCharacters, setCharacterFields, updateCharacter } from '../pipeline/characters'
-import { chooseConcept } from '../pipeline/concepts'
-import { approveCandidate, keepStale, pickHero, rejectCandidate, reopenCandidate, setFavorite, mirrorCandidate } from '../pipeline/review'
-import { isValidEndpoint, MODEL_OVERRIDES_KEY, readModelOverrides } from '../providers/modelOverrides'
-import { attachCheckImages, attachSheetImages, exportCharacter, importCharacter, type CheckImage } from '../pipeline/files'
-import { accountUsage } from '../pipeline/costs'
-import { providerMode, setSetting } from '../pipeline/settings'
-import { listCredentials, markVerified, revokeCredential, saveCredential } from '../providers/credentials'
-import { readAccountTokens } from '../providers/higgsfieldOAuth'
-import { disconnect, finishConnect, startConnect } from '../providers/mcpConnections'
-import { readBilling, saveBilling } from '../providers/billing'
-import type { AccountBalance } from '../providers/higgsfieldAccount'
-import { setBudget } from '../costs/budgets'
-import { formatUsd } from '../costs/money'
-import { characterSummary, characterView, settingsView } from './views'
+import type { Ctx, Deps, Principal } from '../context.js'
+import { hasRole } from '../context.js'
+import { AppError } from '../lib/errors.js'
+import { newId } from '../lib/ids.js'
+import type { AuthProvider } from '../auth/provider.js'
+import { jobEvents, jobs } from '../db/schema.js'
+import { readAsset, saveAsset, getAsset } from '../storage/assets.js'
+import { verifyAssetSignature } from '../jobs/assetUrls.js'
+import { cancelJob, getJob, resolveJob, wakeFromWebhook } from '../jobs/runner.js'
+import { wakeWorker } from '../jobs/wake.js'
+import { actionSchema, estimateAction, runAction } from '../pipeline/actions.js'
+import { createCharacter, getCharacter, linkInspiration, listCharacters, setCharacterFields, updateCharacter } from '../pipeline/characters.js'
+import { chooseConcept } from '../pipeline/concepts.js'
+import { approveCandidate, keepStale, pickHero, rejectCandidate, reopenCandidate, setFavorite, mirrorCandidate } from '../pipeline/review.js'
+import { isValidEndpoint, MODEL_OVERRIDES_KEY, readModelOverrides } from '../providers/modelOverrides.js'
+import { attachCheckImages, attachSheetImages, exportCharacter, importCharacter, type CheckImage } from '../pipeline/files.js'
+import { accountUsage } from '../pipeline/costs.js'
+import { providerMode, setSetting } from '../pipeline/settings.js'
+import { listCredentials, markVerified, revokeCredential, saveCredential } from '../providers/credentials.js'
+import { readAccountTokens } from '../providers/higgsfieldOAuth.js'
+import { disconnect, finishConnect, startConnect } from '../providers/mcpConnections.js'
+import { readBilling, saveBilling } from '../providers/billing.js'
+import { serverKeyFor } from '../providers/serverKeys.js'
+import type { AccountBalance } from '../providers/higgsfieldAccount.js'
+import { setBudget } from '../costs/budgets.js'
+import { formatUsd } from '../costs/money.js'
+import { characterSummary, characterView, settingsView } from './views.js'
+import { createUploadSlots, receiveUpload, sheetRefOf, takeUploads, MAX_UPLOAD_BYTES, type UploadedFile } from '../storage/uploads.js'
+import { corsRules } from '../storage/blobStore.js'
+import { startImportCheck } from '../pipeline/importCheck.js'
 
 // The Studio API (/api/v1). Every route except webhooks and signed public
 // asset links requires a signed-in principal; every query is scoped to that
@@ -50,21 +55,44 @@ function requireRole(ctx: Ctx, role: Parameters<typeof hasRole>[1]): void {
   if (!hasRole(ctx, role)) throw new AppError('forbidden', 'You do not have permission to do that.')
 }
 
-// Uploaded files named REF-00 to REF-11 become approved sheet images. A
-// mirrored copy (a negative QA fixture) becomes an image to check instead.
-async function sheetImagesFrom(value: unknown): Promise<{ images: Record<string, { data: Buffer; mime: string }>; checks: CheckImage[] }> {
+// Files named REF-00 to REF-11 (or "REF 00", "ref_3": names are
+// normalized) become approved sheet images. A mirrored copy (a negative QA
+// fixture) becomes an image to check instead. Files arrive either in a
+// multipart body (small, local) or as direct uploads named by id.
+function sheetImagesFrom(files: UploadedFile[]): { images: Record<string, { data: Buffer; mime: string }>; checks: CheckImage[] } {
   const images: Record<string, { data: Buffer; mime: string }> = {}
   const checks: CheckImage[] = []
+  for (const f of files) {
+    const refId = sheetRefOf(f.name.replace(/\.[a-z0-9]+$/i, ''))
+    if (!refId) continue
+    if (/MIRROR/i.test(f.name)) checks.push({ refId, name: f.name, data: f.data, mime: f.mime })
+    else images[refId] = { data: f.data, mime: f.mime }
+  }
+  return { images, checks }
+}
+
+async function multipartFiles(value: unknown): Promise<UploadedFile[]> {
+  const out: UploadedFile[] = []
   for (const f of ([] as unknown[]).concat(value ?? [])) {
     if (!(f instanceof File)) continue
     if (f.size > MAX_UPLOAD) throw new AppError('bad_request', `${f.name} is larger than 25 MB.`)
-    const ref = f.name.toUpperCase().match(/REF-(\d{2})/)
-    if (!ref) continue
-    const data = Buffer.from(await f.arrayBuffer())
-    if (/MIRROR/.test(f.name.toUpperCase())) checks.push({ refId: `REF-${ref[1]}`, name: f.name, data, mime: f.type })
-    else images[`REF-${ref[1]}`] = { data, mime: f.type }
+    out.push({ name: f.name, data: Buffer.from(await f.arrayBuffer()), mime: f.type })
   }
-  return { images, checks }
+  return out
+}
+
+const uploadRefs = z.array(z.object({ uploadId: z.string(), name: z.string().max(300), type: z.string().max(100).optional() })).max(40).default([])
+
+// A character file and its images, from a multipart body or a JSON body
+// naming direct uploads.
+async function fileBundle(deps: Deps, c: Context, ctx: Ctx): Promise<{ markdown: string | null; files: UploadedFile[] }> {
+  if ((c.req.header('content-type') ?? '').includes('application/json')) {
+    const body = parse(z.object({ markdown: z.string().max(500_000).optional(), uploads: uploadRefs }), await json(c))
+    return { markdown: body.markdown ?? null, files: await takeUploads(deps, ctx, body.uploads) }
+  }
+  const body = await c.req.parseBody({ all: true })
+  const md = ([] as unknown[]).concat(body.file ?? [])[0]
+  return { markdown: md instanceof File ? await md.text() : null, files: await multipartFiles(body.images) }
 }
 
 export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
@@ -94,7 +122,7 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
     if (!verifyAssetSignature(deps.env.STUDIO_SESSION_SECRET, id, Number(c.req.query('exp')), c.req.query('sig') ?? '', deps.clock.now().getTime())) {
       return c.json({ error: { code: 'forbidden', message: 'Link expired or invalid.' } }, 403)
     }
-    const { assets } = await import('../db/schema')
+    const { assets } = await import('../db/schema.js')
     const [row] = await deps.db.select().from(assets).where(eq(assets.id, id))
     if (!row) return c.json({ error: { code: 'not_found', message: 'Not found.' } }, 404)
     return new Response(new Uint8Array(await deps.store.get(row.storageKey)), { headers: { 'content-type': row.mime, 'cache-control': 'private, max-age=600' } })
@@ -191,10 +219,50 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
     return { data: Buffer.from(await f.arrayBuffer()), mime: f.type, name: f.name }
   }
 
+  // ── Direct uploads (browser to R2) ──
+  const corsChecked = new Set<string>()
+  const studioOrigins = (extra?: string) => [...new Set([deps.env.STUDIO_PUBLIC_URL, extra, 'http://localhost:5173', 'http://127.0.0.1:5173'].filter((o): o is string => !!o && /^https?:\/\/[^/]+$/.test(o.replace(/\/$/, ''))).map(o => o.replace(/\/$/, '')))]
+  app.post('/uploads', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    const body = parse(z.object({ files: z.array(z.object({ name: z.string().max(300), type: z.string().max(100), size: z.number().int().min(1).max(MAX_UPLOAD_BYTES) })).min(1).max(40) }), await json(c))
+    const result = await createUploadSlots(deps, ctx, body.files)
+    // Direct uploads need the bucket's CORS rules; set them once if the key may.
+    const origin = c.req.header('origin') ?? ''
+    if (result.direct && deps.store.ensureCors && !corsChecked.has(origin)) {
+      corsChecked.add(origin)
+      const r = await deps.store.ensureCors(studioOrigins(origin))
+      if (!r.ok) ctx.log.warn({ message: r.message }, 'storage CORS not set')
+    }
+    return c.json(result)
+  })
+
+  app.put('/uploads/:id', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    const data = Buffer.from(await c.req.arrayBuffer())
+    await receiveUpload(deps, ctx, c.req.param('id'), data, (c.req.header('content-type') ?? '').split(';')[0]!.trim())
+    return c.json({ ok: true })
+  })
+
+  app.get('/settings/storage', async c => {
+    const origins = studioOrigins(c.req.header('origin'))
+    return c.json({ driver: deps.store.driver, bucket: deps.store.driver === 's3' ? deps.env.S3_BUCKET : null, origins, corsRules: corsRules(origins) })
+  })
+
+  app.post('/settings/storage/check', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'admin')
+    if (!deps.store.ensureCors) return c.json({ ok: true, message: 'Local storage: uploads go through the Studio, no CORS needed.' })
+    return c.json(await deps.store.ensureCors(studioOrigins(c.req.header('origin'))))
+  })
+
   app.post('/characters/:id/inspirations', async c => {
     const ctx = c.get('ctx')
     requireRole(ctx, 'member')
-    const file = await uploadedFile(c, 'file')
+    const file = (c.req.header('content-type') ?? '').includes('application/json')
+      ? (await takeUploads(deps, ctx, parse(uploadRefs.unwrap().length(1), (await json(c) as { uploads?: unknown }).uploads)))[0]!
+      : await uploadedFile(c, 'file')
     if (!file.mime.startsWith('image/')) throw new AppError('bad_request', 'Inspiration must be an image.')
     const asset = await saveAsset(deps, ctx, { data: file.data, mime: file.mime, origin: 'upload', label: `inspiration: ${file.name}` })
     await linkInspiration(deps, ctx, c.req.param('id'), asset.id)
@@ -245,15 +313,14 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
     const ctx = c.get('ctx')
     requireRole(ctx, 'member')
     const id = c.req.param('id')
-    const body = await c.req.parseBody({ all: true })
-    const md = ([] as unknown[]).concat(body.file ?? [])[0]
-    const { images, checks } = await sheetImagesFrom(body.images)
-    if (!(md instanceof File) && !Object.keys(images).length && !checks.length) throw new AppError('bad_request', 'Attach the character file (.md) or sheet images named REF-00 to REF-11.')
+    const { markdown, files } = await fileBundle(deps, c, ctx)
+    const { images, checks } = sheetImagesFrom(files)
+    if (!markdown && !Object.keys(images).length && !checks.length) throw new AppError('bad_request', 'Attach the character file (.md) or sheet images named REF-00 to REF-11 (REF 00 works too).')
     let warnings: string[] = []
     let importedShots: string[]
     let checkShots: string[]
-    if (md instanceof File) {
-      const r = await importCharacter(deps, ctx, await md.text(), { characterId: id, images, checks })
+    if (markdown) {
+      const r = await importCharacter(deps, ctx, markdown, { characterId: id, images, checks })
       warnings = r.result.warnings
       importedShots = r.importedShots
       checkShots = r.checkShots
@@ -261,18 +328,21 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
       importedShots = await attachSheetImages(deps, ctx, id, images)
       checkShots = await attachCheckImages(deps, ctx, id, checks)
     }
-    return c.json({ warnings, importedShots, checkShots, view: await characterView(deps, ctx, id) })
+    // Imported sheet images get a free face match against REF-00 and a skin
+    // texture check on the worker; failures show on the Sheet tab.
+    const checkJobId = importedShots.length ? await startImportCheck(deps, ctx, id, importedShots) : null
+    return c.json({ warnings, importedShots, checkShots, checkJobId, view: await characterView(deps, ctx, id) })
   })
 
   app.post('/characters/import', async c => {
     const ctx = c.get('ctx')
     requireRole(ctx, 'member')
-    const body = await c.req.parseBody({ all: true })
-    const md = body.file
-    if (!(md instanceof File)) throw new AppError('bad_request', 'Attach the character file (.md).')
-    const { images, checks } = await sheetImagesFrom(body.images)
-    const result = await importCharacter(deps, ctx, await md.text(), { images, checks })
-    return c.json({ characterId: result.characterId, importedShots: result.importedShots, checkShots: result.checkShots, warnings: result.result.warnings }, 201)
+    const { markdown, files } = await fileBundle(deps, c, ctx)
+    if (!markdown) throw new AppError('bad_request', 'Attach the character file (.md).')
+    const { images, checks } = sheetImagesFrom(files)
+    const result = await importCharacter(deps, ctx, markdown, { images, checks })
+    const checkJobId = result.importedShots.length ? await startImportCheck(deps, ctx, result.characterId, result.importedShots) : null
+    return c.json({ characterId: result.characterId, importedShots: result.importedShots, checkShots: result.checkShots, checkJobId, warnings: result.result.warnings }, 201)
   })
 
   // ── Paid actions: estimate first, then run with the quote ──
@@ -298,6 +368,10 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
     if (characterId) conds.push(eq(jobs.characterId, characterId))
     if (c.req.query('active') === '1') conds.push(inArray(jobs.status, ['waiting', 'queued', 'submitting', 'running', 'ingesting', 'needs_attention']))
     const rows = await deps.db.select().from(jobs).where(and(...conds)).orderBy(desc(jobs.createdAt)).limit(Math.min(200, Number(c.req.query('limit') ?? 50)))
+    // Safety net for a lost wake (say, the worker was redeploying): the
+    // Studio polls this while jobs run, so an overdue job wakes the worker.
+    const overdue = deps.clock.now().getTime() - 20_000
+    if (rows.some(r => ['queued', 'submitting', 'running', 'ingesting'].includes(r.status) && r.nextPollAt && r.nextPollAt.getTime() < overdue)) await wakeWorker(deps)
     const ids = rows.map(r => r.id)
     const created = ids.length ? await deps.db.select().from(jobEvents).where(and(inArray(jobEvents.jobId, ids), eq(jobEvents.type, 'created'))) : []
     const labels = new Map(created.map(e => [e.jobId, (e.data as { label?: string }).label ?? '']))
@@ -361,7 +435,8 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
     const body = parse(z.object({ mode: z.enum(['demo', 'live']) }), await json(c))
     if (body.mode === 'live') {
       const creds = await listCredentials(deps.db, ctx.accountId)
-      if (!creds.length) throw new AppError('bad_request', 'Add at least one provider key before switching to live.')
+      const server = await serverKeyFor(deps.db, { ownerEmail: deps.env.STUDIO_OWNER_EMAIL || 'owner@studio.local', higgsfield: deps.env.HF_CREDENTIALS }, ctx.accountId, 'higgsfield')
+      if (!creds.length && !server) throw new AppError('bad_request', 'Add at least one provider key before switching to live.')
     }
     await setSetting(deps, ctx, 'provider_mode', body.mode)
     return c.json({ mode: body.mode })

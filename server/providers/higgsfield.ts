@@ -1,13 +1,25 @@
-import type { ModelEntry, StudioConfig } from '../config/load'
-import { estimateGen } from '../costs/pricebook'
-import { forceBeautifyOff } from '../core/realism'
-import { ProviderError, type GenRequest, type JobState, type JobStatus, type Output, type ProviderAdapter } from './types'
+import axios from 'axios'
+import {
+  APIError, AuthenticationError, BadInputError, NotEnoughCreditsError, ValidationError, createHiggsfieldClient,
+} from '@higgsfield/client/v2'
+import type { ModelEntry, StudioConfig } from '../config/load.js'
+import { estimateGen } from '../costs/pricebook.js'
+import { forceBeautifyOff } from '../core/realism.js'
+import { ProviderError, type GenRequest, type JobState, type JobStatus, type Output, type ProviderAdapter } from './types.js'
 
-// Higgsfield pay-per-use API (not the web subscription). Wire format from the
-// official SDK (MIT): base https://api.higgsfield.ai, header
-// "Authorization: Key KEY_ID:KEY_SECRET", POST /{endpoint}?hf_webhook=<url>
-// returns { status, request_id, status_url, cancel_url }, and
-// GET /requests/{id}/status returns the same shape with images[] or video.
+// Higgsfield pay-per-use API (not the web subscription), through the
+// official SDK (@higgsfield/client, v2 client). Submits use subscribe() with
+// withPolling false: POST /{endpoint}?hf_webhook=<url>, "Authorization: Key
+// KEY_ID:KEY_SECRET", answered with { status, request_id, status_url,
+// cancel_url }. The SDK's automatic retries are turned off for submits: a
+// retried POST after a timeout can start (and charge) the job twice, so an
+// unknown outcome goes to a person instead. Status, cancel and uploads use
+// the endpoints the SDK itself uses (GET /requests/{id}/status, the
+// cancel_url, POST /files/generate-upload-url).
+//
+// Status values (SDK): queued, in_progress, completed, failed, nsfw. Only
+// "completed" with at least one output counts as success; failed, nsfw
+// (moderated) and canceled results are refunded and never succeed.
 // 401 = bad key, 403 = not enough credits, 400/422 = bad input.
 //
 // Model endpoints and input shapes vary per model; they live in
@@ -19,11 +31,19 @@ import { ProviderError, type GenRequest, type JobState, type JobStatus, type Out
 // public_url }; the bytes are PUT to upload_url without our credentials and
 // public_url is passed as the image. No cloud storage of our own is needed.
 
+// The part of the SDK client the adapter uses (tests can pass their own).
+export interface HiggsfieldSubmitter {
+  subscribe(endpoint: string, options: { input: Record<string, unknown>; withPolling?: boolean; webhook?: { url: string; secret: string } }): Promise<unknown>
+}
+
 export interface HiggsfieldOptions {
   credentials: string // "KEY_ID:KEY_SECRET"
   config: StudioConfig
   baseUrl?: string
+  // Status, cancel and uploads.
   fetchImpl?: typeof fetch
+  // Submits. Defaults to the official SDK client.
+  sdk?: HiggsfieldSubmitter
   timeoutMs?: number
 }
 
@@ -38,8 +58,41 @@ interface HfResponse {
   detail?: unknown
 }
 
-const STATE: Record<HfResponse['status'], JobState> = {
-  queued: 'queued', in_progress: 'running', completed: 'succeeded', failed: 'failed', nsfw: 'nsfw', canceled: 'canceled',
+// Anything not listed keeps polling (and is flagged stuck if it never ends);
+// nothing but "completed" is ever a success.
+const STATE: Record<string, JobState> = {
+  queued: 'queued', in_progress: 'running', completed: 'succeeded',
+  failed: 'failed', error: 'failed',
+  nsfw: 'nsfw', moderated: 'nsfw', content_filtered: 'nsfw', rejected: 'nsfw',
+  canceled: 'canceled', cancelled: 'canceled',
+}
+
+// SDK and transport errors, classified so the runner never double-charges.
+export function classifySubmitError(e: unknown): ProviderError {
+  if (e instanceof ProviderError) return e
+  if (e instanceof AuthenticationError) return new ProviderError('Higgsfield rejected the API key. Check it in Settings.', { retryable: false, submitted: 'no', status: 401 })
+  if (e instanceof NotEnoughCreditsError) return new ProviderError('Not enough Higgsfield API credits. Top up in the Higgsfield Console.', { retryable: false, submitted: 'no', status: 403, code: 'credits' })
+  if (e instanceof ValidationError || e instanceof BadInputError) {
+    const d = (e as { details?: Array<{ loc?: string[]; msg?: string }> }).details
+    const detail = Array.isArray(d) && d.length ? d.map(x => `${(x.loc ?? []).slice(1).join('.') || 'input'}: ${x.msg ?? ''}`).join('; ') : e.message
+    return new ProviderError(`Higgsfield rejected the request: ${detail}`, { retryable: false, submitted: 'no', status: e.statusCode })
+  }
+  if (e instanceof APIError) {
+    const s = e.statusCode
+    const detail = typeof (e.responseData as { detail?: unknown } | undefined)?.detail === 'string' ? (e.responseData as { detail: string }).detail : e.message
+    if (s === 404) return new ProviderError('Higgsfield could not find that endpoint.', { retryable: false, submitted: 'no', status: s })
+    if (s === 429 || s === 502 || s === 503 || s === 504) return new ProviderError(`Higgsfield is busy (${s}). Will retry.`, { retryable: true, submitted: 'no', status: s })
+    return new ProviderError(`Higgsfield error ${s ?? ''}: ${detail}`.trim(), { retryable: false, submitted: 'unknown', status: s })
+  }
+  if (axios.isAxiosError(e)) {
+    // Never connected: safe to try again. Anything after the request left
+    // (a timeout, a dropped connection) may have started the job.
+    if (e.code === 'ECONNREFUSED' || e.code === 'ENOTFOUND' || e.code === 'EAI_AGAIN') {
+      return new ProviderError(`Could not reach Higgsfield: ${e.code}`, { retryable: true, submitted: 'no' })
+    }
+    return new ProviderError(e.code === 'ECONNABORTED' || e.code === 'ETIMEDOUT' ? 'Higgsfield did not answer in time.' : `Higgsfield connection failed: ${e.code ?? e.message}`, { retryable: false, submitted: 'unknown' })
+  }
+  return new ProviderError(`Higgsfield submit failed: ${(e as Error).message}`, { retryable: false, submitted: 'unknown' })
 }
 
 const imageUrl = (url?: string) => (url ? { type: 'image_url', image_url: url } : undefined)
@@ -137,7 +190,10 @@ export function createHiggsfieldAdapter(opts: HiggsfieldOptions): ProviderAdapte
   const base = (opts.baseUrl ?? 'https://api.higgsfield.ai').replace(/\/$/, '')
   const doFetch = opts.fetchImpl ?? fetch
   const timeoutMs = opts.timeoutMs ?? 60_000
-  const headers = { Authorization: `Key ${opts.credentials}`, 'Content-Type': 'application/json', Accept: 'application/json' }
+  const credentials = opts.credentials.trim()
+  const headers = { Authorization: `Key ${credentials}`, 'Content-Type': 'application/json', Accept: 'application/json' }
+  // Retries off for submits (see above); the runner decides what to retry.
+  const sdk: HiggsfieldSubmitter = opts.sdk ?? createHiggsfieldClient({ credentials, baseURL: base, timeout: timeoutMs, maxRetries: 0 })
 
   async function call<T = HfResponse>(method: 'GET' | 'POST', path: string, body?: unknown, phase: 'submit' | 'read' = 'read'): Promise<T> {
     const controller = new AbortController()
@@ -214,15 +270,27 @@ export function createHiggsfieldAdapter(opts: HiggsfieldOptions): ProviderAdapte
         throw new ProviderError('Video requests must send audio off.', { retryable: false, submitted: 'no' })
       }
       const endpoint = entry.endpoint!.startsWith('/') ? entry.endpoint! : `/${entry.endpoint}`
-      const path = webhookUrl ? `${endpoint}${endpoint.includes('?') ? '&' : '?'}hf_webhook=${encodeURIComponent(webhookUrl)}` : endpoint
-      const r = await call('POST', path, mapInput(entry, req), 'submit')
-      if (!r.request_id) throw new ProviderError('Higgsfield accepted the request but returned no request id.', { retryable: false, submitted: 'unknown' })
+      let r: HfResponse
+      try {
+        r = await sdk.subscribe(endpoint, { input: mapInput(entry, req), withPolling: false, ...(webhookUrl ? { webhook: { url: webhookUrl, secret: '' } } : {}) }) as HfResponse
+      } catch (e) {
+        throw classifySubmitError(e)
+      }
+      if (!r?.request_id) throw new ProviderError('Higgsfield accepted the request but returned no request id.', { retryable: false, submitted: 'unknown' })
       return { jobId: r.request_id, raw: r }
     },
     async status(jobId): Promise<JobStatus> {
       const r = await call('GET', `/requests/${encodeURIComponent(jobId)}/status`)
-      const state = STATE[r.status] ?? 'running'
-      return { state, outputs: state === 'succeeded' ? outputsOf(r) : undefined, error: r.error, raw: r }
+      const state = STATE[String(r.status).toLowerCase()] ?? 'running'
+      if (state === 'succeeded') {
+        // Completed without a single output is not a success.
+        const outputs = outputsOf(r)
+        return outputs.length ? { state, outputs, raw: r } : { state: 'failed', error: 'Higgsfield finished without returning any output.', raw: r }
+      }
+      const error = state === 'nsfw' ? 'Higgsfield moderation blocked this result (refunded).'
+        : state === 'failed' ? (r.error ?? 'Higgsfield reported a failure (refunded).')
+        : state === 'canceled' ? 'Canceled on Higgsfield.' : undefined
+      return { state, error, raw: r }
     },
     async result(jobId) {
       const r = await call('GET', `/requests/${encodeURIComponent(jobId)}/status`)

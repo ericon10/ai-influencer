@@ -9,7 +9,8 @@ export const logger = pino({
     paths: [
       '*.apiKey', '*.api_key', '*.secret', '*.keySecret', '*.passphrase', '*.password',
       '*.authorization', '*.Authorization', '*.cookie', 'headers.authorization', 'headers.cookie',
-      '*.ciphertext', '*.token',
+      '*.ciphertext', '*.token', '*.credentials', '*.HF_CREDENTIALS', 'env', '*.env',
+      '*.S3_SECRET_ACCESS_KEY', '*.STUDIO_MASTER_KEYS', '*.STUDIO_SESSION_SECRET', '*.DATABASE_URL', '*.DATABASE_URL_UNPOOLED',
     ],
     censor: '[redacted]',
   },

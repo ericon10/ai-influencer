@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { loadConfig } from '../config/load'
-import { dependentsOf, invalidationFor, nextUp, sheetProgress, validateGraph, type ShotState } from './sheet'
+import { loadConfig } from '../config/load.js'
+import { dependentsOf, invalidationFor, nextUp, sheetProgress, validateGraph, type ShotState } from './sheet.js'
 
 const shots = loadConfig().pipeline.sheet.shots
 const all = (status: ShotState['status']): ShotState[] => shots.map(s => ({ refId: s.id, status }))

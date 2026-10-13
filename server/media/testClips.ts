@@ -1,4 +1,4 @@
-import { ffmpeg } from './ffmpeg'
+import { ffmpeg } from './ffmpeg.js'
 
 // Synthetic clips for tests: real encoded video, no fixtures needed.
 export interface ClipSpec {

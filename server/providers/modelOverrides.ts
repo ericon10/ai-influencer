@@ -1,7 +1,7 @@
 import { and, eq } from 'drizzle-orm'
-import { accountSettings } from '../db/schema'
-import type { Db } from '../db/client'
-import type { ModelEntry, StudioConfig } from '../config/load'
+import { accountSettings } from '../db/schema.js'
+import type { Db } from '../db/client.js'
+import type { ModelEntry, StudioConfig } from '../config/load.js'
 
 // Per-account model confirmation. An owner or admin enters a model's REST
 // path from Higgsfield's official Model API Reference; the model counts as

@@ -26,6 +26,36 @@ qa:
 llm:
   image_max_edge: 1568
   image_max_tokens: 4784
+# The model test suite (Settings, Higgsfield models): one quoted run that
+# checks each real model path once on the pay-per-use API, with neutral
+# rendered test images (never a character). The whole run is refused when
+# its estimate is over cap_usd. A model without an endpoint is skipped.
+model_suite:
+  cap_usd: 10
+  tests:
+    - model: higgsfield/nano-banana-2.1
+      kind: image
+      refs: 2
+      aspect: "1:1"
+      resolution: 1k
+    - model: higgsfield/gpt-image-2.5-flare
+      kind: image
+      aspect: "1:1"
+    - model: higgsfield/seedance-2.5
+      kind: video
+      frames: start_end
+      aspect: "9:16"
+      resolution: 720p
+      duration_sec: 5
+    - model: higgsfield/kling-3.0-turbo
+      kind: video
+      frames: start
+      aspect: "9:16"
+      resolution: 720p
+      duration_sec: 5
+    - model: higgsfield/bytedance-upscale
+      kind: upscale
+      resolution: 2k
 # MCP-based providers on the owner's own plan (OAuth sign-in, plan credits).
 # One connection flow serves all of them (server/providers/mcpConnections.ts).
 mcp_connections:

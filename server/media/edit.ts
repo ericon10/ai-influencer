@@ -1,4 +1,4 @@
-import { ffmpeg, MediaError, probeFile } from './ffmpeg'
+import { ffmpeg, MediaError, probeFile } from './ffmpeg.js'
 
 // Shared encode settings so every clip the Studio produces can be joined
 // without surprises: H.264, yuv420p, BT.709, TV (limited) range, constant fps.

@@ -1,4 +1,4 @@
-import type { CharacterIdentity } from './character'
+import type { CharacterIdentity } from './character.js'
 
 // A character's saved identities (a trained Soul character, an element) and
 // what every request that uses one must carry.

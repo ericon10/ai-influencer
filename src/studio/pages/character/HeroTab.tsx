@@ -41,7 +41,7 @@ export function HeroTab({ v, onEditCard, goSheet }: { v: CharacterView; onEditCa
           {errors.length > 0 && <Callout tone="warn">{errors.map(e => e.message).join(' ')}</Callout>}
           <div className="st-row">
             <span className="st-label">Runs per prompt</span>
-            <div className="st-stepnum"><button onClick={() => setRuns(r => Math.max(1, r - 1))} aria-label="Fewer">-</button><span>{runs}</span><button onClick={() => setRuns(r => Math.min(8, r + 1))} aria-label="More">+</button></div>
+            <div className="st-stepnum"><button onClick={() => setRuns(r => Math.max(4, r - 1))} aria-label="Fewer" disabled={runs <= 4}>-</button><span>{runs}</span><button onClick={() => setRuns(r => Math.min(8, r + 1))} aria-label="More" disabled={runs >= 8}>+</button></div>
             <span className="st-hint">3 prompts x {runs} = {3 * runs} portraits</span>
           </div>
           <PriceButton action={errors.length ? null : { type: 'hero', characterId: v.id, runsPerPrompt: runs }} label={v.heroes.length ? 'Generate more heroes' : 'Generate heroes'} variant={picked ? 'secondary' : 'primary'} size={picked ? 'normal' : 'big'} disabledReason={errors.length ? 'Fix the card first.' : undefined} />

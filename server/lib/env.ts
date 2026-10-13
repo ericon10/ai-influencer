@@ -8,6 +8,9 @@ import { z } from 'zod'
 const schema = z.object({
   NODE_ENV: z.string().default('development'),
   DATABASE_URL: z.string().optional().default(''),
+  // Optional direct (unpooled) address for migrations; derived from a Neon
+  // pooled DATABASE_URL when unset.
+  DATABASE_URL_UNPOOLED: z.string().optional().default(''),
   PGLITE_DIR: z.string().default('.data/pg'),
   STORAGE_DRIVER: z.enum(['local', 's3']).default('local'),
   STORAGE_LOCAL_DIR: z.string().default('.data/blobs'),
@@ -24,22 +27,55 @@ const schema = z.object({
   STUDIO_API_PORT: z.coerce.number().default(8787),
   // Face models for identity QA (npm run models downloads them here).
   STUDIO_MODELS_DIR: z.string().default('.data/models'),
+  // The owner's Higgsfield API key (KEY_ID:KEY_SECRET), server side only. It
+  // serves the owner's own account; customers add their own key in Settings.
+  HF_CREDENTIALS: z.string().optional().default(''),
+  // The job worker's address (Railway), woken when jobs are queued.
+  STUDIO_WORKER_URL: z.string().optional().default(''),
+  // Worker loop: "poll" checks every second (local dev); "wake" sleeps when
+  // nothing is queued until the API wakes it, so the database can suspend.
+  STUDIO_WORKER_IDLE: z.enum(['poll', 'wake']).default('poll'),
 })
 
 export type Env = z.infer<typeof schema> & { isProduction: boolean }
+
+// A production deployment without its settings. The message names what is
+// missing and never shows a value.
+export class NotConfiguredError extends Error {
+  constructor(readonly missing: string[]) {
+    super(`This deployment is not set up yet. Add these environment variables, then redeploy: ${missing.join(', ')}.`)
+    this.name = 'NotConfiguredError'
+  }
+}
 
 let cached: Env | null = null
 
 export function loadEnv(overrides: Partial<Record<string, string>> = {}): Env {
   if (cached && Object.keys(overrides).length === 0) return cached
-  if (existsSync('.env') && typeof process.loadEnvFile === 'function') process.loadEnvFile('.env')
+  // .env.local first (never committed), then .env; real environment wins.
+  for (const file of ['.env.local', '.env']) {
+    if (existsSync(file) && typeof process.loadEnvFile === 'function') process.loadEnvFile(file)
+  }
   const parsed = schema.parse({ ...process.env, ...overrides })
-  const env: Env = { ...parsed, isProduction: parsed.NODE_ENV === 'production' }
+  // On Vercel, NODE_ENV is never set as a project variable (it would make the
+  // build skip devDependencies), so a Vercel deployment counts as production.
+  const env: Env = { ...parsed, isProduction: parsed.NODE_ENV === 'production' || process.env.VERCEL === '1' }
 
+  // Production must set its real settings. The message lists names only,
+  // never values: it is shown on a deployment that is not set up yet.
+  if (env.isProduction) {
+    const missing = [
+      !env.DATABASE_URL && 'DATABASE_URL',
+      !env.STUDIO_MASTER_KEYS && 'STUDIO_MASTER_KEYS',
+      !env.STUDIO_SESSION_SECRET && 'STUDIO_SESSION_SECRET',
+      env.STORAGE_DRIVER !== 's3' && 'STORAGE_DRIVER=s3',
+      ...(env.STORAGE_DRIVER === 's3' ? (['S3_ENDPOINT', 'S3_BUCKET', 'S3_ACCESS_KEY_ID', 'S3_SECRET_ACCESS_KEY'] as const).filter(k => !env[k]) : []),
+    ].filter((k): k is string => !!k)
+    if (missing.length) throw new NotConfiguredError(missing)
+  }
   // Local development: generate throwaway keys once so a fresh checkout runs
-  // with zero setup. Production must set real keys.
+  // with zero setup.
   if (!env.STUDIO_MASTER_KEYS || !env.STUDIO_SESSION_SECRET) {
-    if (env.isProduction) throw new Error('STUDIO_MASTER_KEYS and STUDIO_SESSION_SECRET must be set in production.')
     const devKeys = localDevKeys()
     env.STUDIO_MASTER_KEYS ||= devKeys.master
     env.STUDIO_SESSION_SECRET ||= devKeys.session

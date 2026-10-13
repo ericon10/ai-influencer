@@ -10,7 +10,7 @@ export const BARE_FACE_LINE = 'Bare face, no makeup, no retouching.'
 
 // Used when a character has no REALISM block of its own.
 export const DEFAULT_REALISM_BLOCK =
-  'REALISM: Candid phone photo, real skin texture with visible pores, small imperfections, natural unevenness, ordinary background clutter, no retouching, not a professional shoot.'
+  'REALISM: Candid phone photo, natural skin texture with visible pores and small believable imperfections, no retouching, not a professional shoot.'
 
 export const DEFAULT_AVOID_BLOCK =
   'AVOID: airbrushed or plastic skin, skin smoothing, beauty filters, studio lighting, perfect symmetry, text, watermarks.'
@@ -21,6 +21,11 @@ export const BANNED_REALISM_TERMS = [
   'flawless', 'perfect skin', 'smooth skin', 'airbrushed', 'retouched', 'porcelain',
   'beautify', 'glamour retouch', 'skin smoothing', 'beauty filter', 'enhance face',
 ] as const
+
+// The imperfection dose is a real person on a good day. Heavier flaw words
+// are never added on our side, and are removed from a prompt unless the
+// character's own card, marks or realism notes ask for them.
+const HEAVY_FLAWS = /\b(?:blemish(?:es|ed)?|acne|pimples?|zits?|scars?|scarr(?:ed|ing)|rough skin|pockmark\w*|breakouts?|enlarged pores|deep wrinkles|blotchy(?: skin)?|skin lesions?|rosacea|eczema|sun ?damage)\b/i
 
 // Makeup words that do not belong in a bare-faced hero or sheet shot.
 const MAKEUP_TERMS = /\b(?:glam(?:orous|our)?(?: makeup)?|soft glam|full glam|full makeup|heavy makeup|makeup look|wearing makeup|with makeup|red lip(?:stick)?s?|bold lips?|lipstick|lip gloss|winged (?:eye)?liner|eyeliner|mascara|eyeshadow|eye shadow|contour(?:ing|ed)?|bronzer|false lashes|lash extensions|smok(?:e|ey|y) eyes?)\b/i
@@ -112,6 +117,26 @@ function makeupHits(prompt: string): Hit[] {
   return out
 }
 
+function heavyFlawHits(prompt: string, allowed: string): Hit[] {
+  const avoid = avoidRanges(prompt)
+  const ok = allowed.toLowerCase()
+  const out: Hit[] = []
+  for (const m of prompt.matchAll(new RegExp(HEAVY_FLAWS.source, 'gi'))) {
+    const index = m.index ?? 0
+    if (avoid.some(([a, b]) => index >= a && index < b)) continue
+    if (negated(prompt, index)) continue
+    const word = m[0].toLowerCase()
+    // Asked for: the card or a mark names it (a "small scar on her chin").
+    if (ok.includes(word) || ok.includes(word.replace(/s$/, ''))) continue
+    out.push({ term: word, index, length: m[0].length })
+  }
+  return out
+}
+
+export function findHeavyFlaws(prompt: string, allowed = ''): string[] {
+  return [...new Set(heavyFlawHits(prompt, allowed).map(h => h.term))]
+}
+
 export function findMakeupTerms(prompt: string): string[] {
   return [...new Set(makeupHits(prompt).map(h => h.term))]
 }
@@ -138,7 +163,7 @@ export const BARE_FACE_STAGES = ['hero', 'sheet'] as const
 export const isBareFaceStage = (stage?: string) => !!stage && (BARE_FACE_STAGES as readonly string[]).includes(stage)
 
 export interface RealismWarning {
-  ruleId: 'realism-banned-words' | 'realism-makeup'
+  ruleId: 'realism-banned-words' | 'realism-makeup' | 'realism-flaw-dose'
   spec: string
   title: string
   severity: 'warning'
@@ -154,10 +179,19 @@ export interface FinalPrompt {
 // The last step of every image prompt the Studio builds: strip smoothing
 // words (and say why), keep hero and sheet shots bare-faced, and add the
 // REALISM and AVOID blocks. The REALISM block cannot be left out.
-export function finalizeImagePrompt(prompt: string, opts: { stage?: string; realism?: string | null; avoid?: string | null } = {}): FinalPrompt {
+export function finalizeImagePrompt(prompt: string, opts: { stage?: string; realism?: string | null; avoid?: string | null; allowedFlaws?: string } = {}): FinalPrompt {
   const warnings: RealismWarning[] = []
   const stripped = stripBannedTerms(prompt)
   let out = stripped.prompt
+  const heavy = stripHits(out, heavyFlawHits(out, opts.allowedFlaws ?? ''))
+  out = heavy.prompt
+  if (heavy.removed.length) {
+    warnings.push({
+      ruleId: 'realism-flaw-dose', spec: '0', title: 'Imperfections stay light', severity: 'warning',
+      message: `Removed ${heavy.removed.map(t => `"${t}"`).join(', ')}. The imperfection dose is a real person on a good day; extra flaw words read heavy. Add them to the card if the character really has them.`,
+      match: heavy.removed.join(', '),
+    })
+  }
   if (stripped.removed.length) {
     warnings.push({
       ruleId: 'realism-banned-words', spec: '0', title: 'Removed smoothing words', severity: 'warning',

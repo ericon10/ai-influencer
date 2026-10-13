@@ -1,12 +1,12 @@
-import { and, eq, gt, isNull } from 'drizzle-orm'
+import { and, count, eq, gt, isNull, lt } from 'drizzle-orm'
 import type { Context } from 'hono'
 import { getCookie, setCookie, deleteCookie } from 'hono/cookie'
-import { accounts, memberships, sessions, users } from '../db/schema'
-import type { Deps, Principal, Role } from '../context'
-import { newId, newToken } from '../lib/ids'
-import { sha256Hex, verifyPassword } from '../lib/passwords'
-import { AppError } from '../lib/errors'
-import { principalFor } from './accounts'
+import { accounts, loginAttempts, memberships, sessions, users } from '../db/schema.js'
+import type { Deps, Principal, Role } from '../context.js'
+import { newId, newToken } from '../lib/ids.js'
+import { sha256Hex, verifyPassword } from '../lib/passwords.js'
+import { AppError } from '../lib/errors.js'
+import { principalFor } from './accounts.js'
 
 // Authentication goes through this interface so real accounts and logins
 // (Clerk, WorkOS, Auth.js) can replace the v1 owner login without touching
@@ -22,6 +22,15 @@ export interface AuthProvider {
 
 const COOKIE = 'studio_session'
 const SESSION_DAYS = 30
+
+// Login throttle, kept in the database so it holds across serverless
+// instances: a few wrong passphrases per email, and a few more per address,
+// within the window, then sign-in pauses until the window passes.
+export const LOGIN_WINDOW_MS = 15 * 60_000
+export const MAX_FAILS_PER_EMAIL = 5
+export const MAX_FAILS_PER_IP = 20
+
+const clientIp = (c: Context) => (c.req.header('x-forwarded-for') ?? c.req.header('x-real-ip') ?? '').split(',')[0]!.trim().slice(0, 64)
 
 export function createPassphraseAuth(deps: Deps, opts: { devAutoLogin: boolean }): AuthProvider {
   async function fromCookie(c: Context): Promise<Principal | null> {
@@ -48,16 +57,28 @@ export function createPassphraseAuth(deps: Deps, opts: { devAutoLogin: boolean }
     },
     async login(c, input) {
       const email = input.email.trim().toLowerCase()
+      const ip = clientIp(c)
+      const since = new Date(deps.clock.now().getTime() - LOGIN_WINDOW_MS)
+      const fails = async (cond: ReturnType<typeof eq>) => (await deps.db.select({ n: count() }).from(loginAttempts)
+        .where(and(cond, eq(loginAttempts.ok, false), gt(loginAttempts.createdAt, since))))[0]!.n
+      if (await fails(eq(loginAttempts.email, email)) >= MAX_FAILS_PER_EMAIL || (ip && await fails(eq(loginAttempts.ip, ip)) >= MAX_FAILS_PER_IP)) {
+        throw new AppError('too_many_requests', 'Too many sign-in attempts. Wait 15 minutes, then try again.')
+      }
       const [u] = await deps.db.select().from(users).where(eq(users.email, email))
+      const [m] = u ? await deps.db.select().from(memberships).innerJoin(accounts, eq(accounts.id, memberships.accountId)).where(eq(memberships.userId, u.id)).limit(1) : []
+      const ok = !!u?.passwordHash && (await verifyPassword(input.passphrase, u.passwordHash))
+      await deps.db.insert(loginAttempts).values({ id: newId('lga'), accountId: m?.memberships.accountId ?? null, email, ip, ok })
       // Same message for unknown email and wrong passphrase.
-      if (!u?.passwordHash || !(await verifyPassword(input.passphrase, u.passwordHash))) throw new AppError('unauthorized', 'That email and passphrase do not match.')
-      const [m] = await deps.db.select().from(memberships).innerJoin(accounts, eq(accounts.id, memberships.accountId)).where(eq(memberships.userId, u.id)).limit(1)
+      if (!ok || !u) throw new AppError('unauthorized', 'That email and passphrase do not match.')
       if (!m) throw new AppError('forbidden', 'This user has no account.')
+      // A good sign-in clears the email's strikes; old rows are pruned.
+      await deps.db.delete(loginAttempts).where(and(eq(loginAttempts.email, email), eq(loginAttempts.ok, false)))
+      await deps.db.delete(loginAttempts).where(lt(loginAttempts.createdAt, new Date(deps.clock.now().getTime() - 86400_000)))
       const token = newToken(32)
       const expiresAt = new Date(deps.clock.now().getTime() + SESSION_DAYS * 86400_000)
       await deps.db.insert(sessions).values({
         id: newId('ses'), accountId: m.memberships.accountId, userId: u.id, tokenHash: sha256Hex(token), expiresAt,
-        userAgent: (c.req.header('user-agent') ?? '').slice(0, 300), ip: (c.req.header('x-forwarded-for') ?? '').split(',')[0]!.trim(),
+        userAgent: (c.req.header('user-agent') ?? '').slice(0, 300), ip,
       })
       setCookie(c, COOKIE, token, { httpOnly: true, sameSite: 'Lax', secure: deps.env.isProduction, path: '/', expires: expiresAt })
       return { accountId: m.memberships.accountId, userId: u.id, role: m.memberships.role as Role, email }

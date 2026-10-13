@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import { loadConfig } from '../config/load'
-import { buildHeroPrompts, buildSheetPrompt } from './prompts'
-import { blocking, lintPrompt } from './rules'
+import { loadConfig } from '../config/load.js'
+import { buildHeroPrompts, buildSheetPrompt } from './prompts.js'
+import { blocking, lintPrompt } from './rules.js'
 import {
   BARE_FACE_LINE, DEFAULT_REALISM_BLOCK, finalizeImagePrompt, findBannedTerms, forceBeautifyOff,
   hasRealismBlock, stripBannedTerms, suggestsFixingFlaw, treatsFlawAsDefect,
-} from './realism'
-import { mapInput } from '../providers/higgsfield'
-import { accountModel, accountParams } from '../providers/higgsfieldAccount'
-import type { ModelEntry } from '../config/load'
+} from './realism.js'
+import { mapInput } from '../providers/higgsfield.js'
+import { accountModel, accountParams } from '../providers/higgsfieldAccount.js'
+import type { ModelEntry } from '../config/load.js'
 
 // Rule zero, the Realism principle: real skin, visible flaws and a bare face
 // are the product, and nothing in the pipeline smooths them away.
@@ -157,5 +157,26 @@ describe('QA keeps the flaws', () => {
     expect(suggestsFixingFlaw('remove the freckles')).toBe(true)
     expect(suggestsFixingFlaw('smooth the skin texture')).toBe(true)
     expect(suggestsFixingFlaw('the left ear is melted')).toBe(false)
+  })
+})
+
+// The hero imperfection dose: a real person on a good day, never stacked.
+describe('imperfection dose', () => {
+  it('removes heavy flaw words the character does not have, and keeps ones the card asks for', async () => {
+    const { finalizeImagePrompt: fin } = await import('./realism.js')
+    const out = fin('Portrait, slight acne, rough skin and blemishes, wearing a gray tee.', { stage: 'hero' })
+    expect(out.prompt.split('\n')[0]).not.toMatch(/acne|rough skin|blemish/i)
+    expect(out.warnings.find(w => w.ruleId === 'realism-flaw-dose')!.message).toMatch(/real person on a good day/)
+    const asked = fin('Portrait, small scar on her chin, wearing a gray tee.', { stage: 'hero', allowedFlaws: 'small scar on her chin' })
+    expect(asked.prompt).toContain('small scar on her chin')
+    expect(asked.warnings).toEqual([])
+  })
+
+  it('the hero prompts carry one light imperfection line, not a stack', () => {
+    for (const p of buildHeroPrompts(templates, views, callie)) {
+      expect(p).toContain('natural skin with visible pores and small believable imperfections')
+      expect(p).not.toMatch(/\b(acne|blemish|scar|rough skin|freckles)\b/i)
+      expect(p).toMatch(/relaxed neutral expression/)
+    }
   })
 })

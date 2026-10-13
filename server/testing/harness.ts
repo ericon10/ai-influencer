@@ -1,16 +1,16 @@
 import { randomBytes } from 'node:crypto'
-import { openDb, type DbHandle } from '../db/client'
-import { createMemoryStore } from '../storage/blobStore'
-import { createKeyVault } from '../lib/vault'
-import { loadConfig } from '../config/load'
-import { logger } from '../lib/logger'
-import { loadEnv } from '../lib/env'
-import { createRegistry, type RegistryOptions } from '../providers/registry'
-import { createAccount } from '../auth/accounts'
-import { readAsset } from '../storage/assets'
-import type { Ctx, Deps } from '../context'
-import type { LlmProvider, ProviderAdapter } from '../providers/types'
-import { unavailableFaceMatcher, type FaceMatcher } from '../qa/faces'
+import { openDb, type DbHandle } from '../db/client.js'
+import { createMemoryStore } from '../storage/blobStore.js'
+import { createKeyVault } from '../lib/vault.js'
+import { loadConfig } from '../config/load.js'
+import { logger } from '../lib/logger.js'
+import { loadEnv } from '../lib/env.js'
+import { createRegistry, type RegistryOptions } from '../providers/registry.js'
+import { createAccount } from '../auth/accounts.js'
+import { readAsset } from '../storage/assets.js'
+import type { Ctx, Deps } from '../context.js'
+import type { LlmProvider, ProviderAdapter } from '../providers/types.js'
+import { unavailableFaceMatcher, type FaceMatcher } from '../qa/faces.js'
 
 // Real providers are unreachable from tests: any call fails loudly, except
 // the free key check, which answers locally.
@@ -79,7 +79,7 @@ export async function createHarness(opts: Partial<Pick<RegistryOptions, 'mockSce
 
 // Runs worker ticks until no job is due, advancing the clock between rounds.
 export async function drain(h: Harness, maxRounds = 30): Promise<void> {
-  const { tick } = await import('../jobs/runner')
+  const { tick } = await import('../jobs/runner.js')
   for (let i = 0; i < maxRounds; i++) {
     const n = await tick(h.deps, 20)
     if (n === 0) {

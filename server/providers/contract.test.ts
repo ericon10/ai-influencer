@@ -1,10 +1,11 @@
-import { describe, expect, it } from 'vitest'
-import { loadConfig, type StudioConfig } from '../config/load'
-import { createMockAdapter } from './mock'
-import { createHiggsfieldAdapter, mapInput } from './higgsfield'
-import { withModelOverrides } from './modelOverrides'
-import { ProviderError, type GenRequest, type ProviderAdapter } from './types'
-import { renderPlaceholderPortrait } from './mock'
+import { afterAll, describe, expect, it } from 'vitest'
+import { createServer, type Server } from 'node:http'
+import { loadConfig, type StudioConfig } from '../config/load.js'
+import { createMockAdapter } from './mock.js'
+import { createHiggsfieldAdapter, mapInput } from './higgsfield.js'
+import { withModelOverrides } from './modelOverrides.js'
+import { ProviderError, type GenRequest, type ProviderAdapter } from './types.js'
+import { renderPlaceholderPortrait } from './mock.js'
 
 // Every adapter must pass this contract. CI runs it against the mock and
 // against the Higgsfield adapter talking to a fake in-process API. Real
@@ -23,7 +24,7 @@ function verifiedConfig(): StudioConfig {
 
 interface FakeCall { method: string; url: string; headers: Record<string, string>; body?: unknown }
 
-function fakeHiggsfield(behavior: { submitStatus?: number; finalStatus?: 'completed' | 'failed' | 'nsfw' } = {}) {
+function fakeHiggsfield(behavior: { submitStatus?: number; finalStatus?: 'completed' | 'failed' | 'nsfw' | 'canceled'; submitDelayMs?: number; emptyCompleted?: boolean } = {}) {
   const calls: FakeCall[] = []
   const reqs = new Map<string, number>()
   const fetchImpl = (async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -50,10 +51,11 @@ function fakeHiggsfield(behavior: { submitStatus?: number; finalStatus?: 'comple
       if (n === 1) return json(200, { status: 'queued', request_id: id })
       if (n === 2) return json(200, { status: 'in_progress', request_id: id })
       const fin = behavior.finalStatus ?? 'completed'
-      return json(200, { status: fin, request_id: id, images: fin === 'completed' ? [{ url: 'https://cdn.higgsfield.ai/out/1.png' }] : undefined })
+      return json(200, { status: fin, request_id: id, images: fin === 'completed' && !behavior.emptyCompleted ? [{ url: 'https://cdn.higgsfield.ai/out/1.png' }] : undefined })
     }
     if (init?.method === 'POST' && url.includes('/cancel')) return json(200, { status: 'canceled', request_id: 'x' })
     if (init?.method === 'POST') {
+      if (behavior.submitDelayMs) await new Promise(r => setTimeout(r, behavior.submitDelayMs))
       if (behavior.submitStatus) return json(behavior.submitStatus, { detail: 'nope' })
       const id = `req-${reqs.size + 1}`
       reqs.set(id, 0)
@@ -62,6 +64,35 @@ function fakeHiggsfield(behavior: { submitStatus?: number; finalStatus?: 'comple
     return json(404, {})
   }) as typeof fetch
   return { fetchImpl, calls }
+}
+
+// The official SDK submits over HTTP (axios), so a local bridge serves the
+// fake API to it. Calls are recorded as if made to api.higgsfield.ai.
+const servers: Server[] = []
+afterAll(() => { for (const s of servers) s.close() })
+
+async function bridge(fetchImpl: typeof fetch): Promise<string> {
+  const server = createServer(async (req, res) => {
+    const chunks: Buffer[] = []
+    for await (const c of req) chunks.push(c as Buffer)
+    const body = chunks.length ? Buffer.concat(chunks).toString() : undefined
+    const headers: Record<string, string> = { Authorization: String(req.headers.authorization ?? ''), 'Content-Type': String(req.headers['content-type'] ?? '') }
+    try {
+      const r = await fetchImpl(`https://api.higgsfield.ai${req.url}`, { method: req.method, headers, body })
+      res.writeHead(r.status, { 'content-type': r.headers.get('content-type') ?? 'application/json' })
+      res.end(await r.text())
+    } catch { res.destroy() }
+  })
+  await new Promise<void>(r => server.listen(0, '127.0.0.1', () => r()))
+  servers.push(server)
+  const addr = server.address() as { port: number }
+  return `http://127.0.0.1:${addr.port}`
+}
+
+// An adapter whose SDK submits through the bridge and whose status, cancel
+// and upload calls go straight to the fake.
+async function hf(fake: ReturnType<typeof fakeHiggsfield>, c: StudioConfig = verifiedConfig(), credentials = 'kid_123:ksecret_456', timeoutMs?: number) {
+  return createHiggsfieldAdapter({ credentials, config: c, fetchImpl: fake.fetchImpl, baseUrl: await bridge(fake.fetchImpl), timeoutMs })
 }
 
 async function contract(name: string, make: () => ProviderAdapter, req: GenRequest) {
@@ -102,13 +133,15 @@ const portrait = await renderPlaceholderPortrait('contract')
 await contract('mock', () => createMockAdapter({ config, loadAsset: async () => portrait }),
   { kind: 'image', model: 'mock/image', prompt: 'portrait', aspect: '3:4', resolution: '2k', quality: 'high' })
 
-await contract('higgsfield (fake API)', () => createHiggsfieldAdapter({ credentials: 'kid_123:ksecret_456', config: verifiedConfig(), fetchImpl: fakeHiggsfield().fetchImpl }),
+const contractFake = fakeHiggsfield()
+const contractBase = await bridge(contractFake.fetchImpl)
+await contract('higgsfield (fake API, official SDK)', () => createHiggsfieldAdapter({ credentials: 'kid_123:ksecret_456', config: verifiedConfig(), fetchImpl: contractFake.fetchImpl, baseUrl: contractBase }),
   { kind: 'image', model: 'higgsfield/gpt-image-2.5', prompt: 'portrait', aspect: '3:4', resolution: '2k', quality: 'high' })
 
 describe('higgsfield adapter specifics', () => {
   it('sends the documented auth header, endpoint and webhook parameter', async () => {
     const fake = fakeHiggsfield()
-    const a = createHiggsfieldAdapter({ credentials: 'kid_123:ksecret_456', config: verifiedConfig(), fetchImpl: fake.fetchImpl })
+    const a = await hf(fake)
     await a.submit({ kind: 'image_edit', model: 'higgsfield/gpt-image-2.5', prompt: 'p', aspect: '3:4', resolution: '2k', quality: 'high', refs: [{ assetId: 'a1', url: 'https://r2.example.com/a1.png' }] },
       { idempotencyKey: 'k', webhookUrl: 'https://studio.example.com/api/v1/webhooks/higgsfield/job_1?t=abc' })
     const call = fake.calls[0]!
@@ -119,7 +152,7 @@ describe('higgsfield adapter specifics', () => {
   })
 
   it('refuses models whose endpoint is not verified yet', async () => {
-    const a = createHiggsfieldAdapter({ credentials: 'kid_123:ksecret_456', config, fetchImpl: fakeHiggsfield().fetchImpl })
+    const a = await hf(fakeHiggsfield(), config)
     await expect(a.submit({ kind: 'image', model: 'higgsfield/gpt-image-2.5', prompt: 'p' }, { idempotencyKey: 'k' }))
       .rejects.toMatchObject({ opts: { code: 'unverified_model', submitted: 'no' } })
   })
@@ -139,18 +172,18 @@ describe('higgsfield adapter specifics', () => {
       [500, { retryable: false, submitted: 'unknown' }],
     ]
     for (const [status, expected] of cases) {
-      const a = createHiggsfieldAdapter({ credentials: 'kid_123:ksecret_456', config: verifiedConfig(), fetchImpl: fakeHiggsfield({ submitStatus: status }).fetchImpl })
+      const a = await hf(fakeHiggsfield({ submitStatus: status }))
       await expect(a.submit({ kind: 'image', model: 'higgsfield/gpt-image-2.5', prompt: 'p' }, { idempotencyKey: 'k' })).rejects.toMatchObject({ opts: expected })
     }
   })
 
   it('maps nsfw and failed results, and verifies keys for free', async () => {
-    const a = createHiggsfieldAdapter({ credentials: 'kid_123:ksecret_456', config: verifiedConfig(), fetchImpl: fakeHiggsfield({ finalStatus: 'nsfw' }).fetchImpl })
+    const a = await hf(fakeHiggsfield({ finalStatus: 'nsfw' }))
     const { jobId } = await a.submit({ kind: 'image', model: 'higgsfield/gpt-image-2.5', prompt: 'p' }, { idempotencyKey: 'k' })
     await a.status(jobId); await a.status(jobId)
     expect((await a.status(jobId)).state).toBe('nsfw')
     expect((await a.verifyCredentials!()).ok).toBe(true)
-    const bad = createHiggsfieldAdapter({ credentials: 'wrong:creds', config: verifiedConfig(), fetchImpl: fakeHiggsfield().fetchImpl })
+    const bad = await hf(fakeHiggsfield(), verifiedConfig(), 'wrong:creds')
     expect((await bad.verifyCredentials!()).ok).toBe(false)
   })
 
@@ -158,14 +191,40 @@ describe('higgsfield adapter specifics', () => {
     const ref = 'higgsfield/nano-banana-2.1'
     const path = 'google/nano-banana-2.1/text-to-image'
     const fake = fakeHiggsfield()
-    const pending = createHiggsfieldAdapter({ credentials: 'kid_123:ksecret_456', config: withModelOverrides(config, { [ref]: { endpoint: path } }), fetchImpl: fake.fetchImpl })
+    const pending = await hf(fake, withModelOverrides(config, { [ref]: { endpoint: path } }))
     await expect(pending.submit({ kind: 'image', model: ref, prompt: 'p' }, { idempotencyKey: 'k1' })).rejects.toMatchObject({ opts: { code: 'unverified_model' } })
     await pending.submit({ kind: 'image', model: ref, prompt: 'p', resolution: '1k', modelTest: true }, { idempotencyKey: 'k2' })
     expect(fake.calls.at(-1)!.url).toBe(`https://api.higgsfield.ai/${path}`)
     // The test flag never reaches the provider.
     expect(fake.calls.at(-1)!.body).toEqual({ prompt: 'p', resolution: '1k' })
-    const confirmed = createHiggsfieldAdapter({ credentials: 'kid_123:ksecret_456', config: withModelOverrides(config, { [ref]: { endpoint: path, confirmedAt: '2026-10-12T12:00:00Z' } }), fetchImpl: fake.fetchImpl })
+    const confirmed = await hf(fake, withModelOverrides(config, { [ref]: { endpoint: path, confirmedAt: '2026-10-12T12:00:00Z' } }))
     await expect(confirmed.submit({ kind: 'image', model: ref, prompt: 'p' }, { idempotencyKey: 'k3' })).resolves.toMatchObject({ jobId: expect.any(String) })
+  })
+
+  it('never lets the SDK retry a submit that timed out: one POST, outcome unknown', async () => {
+    const fake = fakeHiggsfield({ submitDelayMs: 400 })
+    const a = await hf(fake, verifiedConfig(), 'kid_123:ksecret_456', 100)
+    await expect(a.submit({ kind: 'image', model: 'higgsfield/gpt-image-2.5', prompt: 'p' }, { idempotencyKey: 'k' }))
+      .rejects.toMatchObject({ opts: { submitted: 'unknown', retryable: false } })
+    await new Promise(r => setTimeout(r, 1500))
+    expect(fake.calls.filter(c => c.method === 'POST')).toHaveLength(1)
+  })
+
+  it('never counts failed, canceled, moderated or empty results as success', async () => {
+    for (const [behavior, state] of [
+      [{ finalStatus: 'failed' as const }, 'failed'],
+      [{ finalStatus: 'canceled' as const }, 'canceled'],
+      [{ finalStatus: 'nsfw' as const }, 'nsfw'],
+      [{ emptyCompleted: true }, 'failed'],
+    ] as const) {
+      const a = await hf(fakeHiggsfield(behavior))
+      const { jobId } = await a.submit({ kind: 'image', model: 'higgsfield/gpt-image-2.5', prompt: 'p' }, { idempotencyKey: 'k' })
+      await a.status(jobId); await a.status(jobId)
+      const st = await a.status(jobId)
+      expect(st.state).toBe(state)
+      expect(st.outputs ?? []).toEqual([])
+      expect(st.error).toBeTruthy()
+    }
   })
 
   it('refuses to send a reference image that was not uploaded', () => {
@@ -175,11 +234,11 @@ describe('higgsfield adapter specifics', () => {
 
   it('uploads reference images to Higgsfield storage without sending the key there', async () => {
     const fake = fakeHiggsfield()
-    const a = createHiggsfieldAdapter({ credentials: 'kid_123:ksecret_456', config: verifiedConfig(), fetchImpl: fake.fetchImpl })
+    const a = await hf(fake)
     const url = await a.uploadAsset!(portrait, 'image/png')
     expect(url).toBe('https://cdn.higgsfield.ai/uploads/slot-1.png')
     const [slot, put] = fake.calls
-    expect(slot).toMatchObject({ method: 'POST', url: 'https://api.higgsfield.ai/files/generate-upload-url', body: { content_type: 'image/png' } })
+    expect(slot).toMatchObject({ method: 'POST', url: expect.stringMatching(/\/files\/generate-upload-url$/), body: { content_type: 'image/png' } })
     expect(put).toMatchObject({ method: 'PUT', url: 'https://upload.higgsfield.test/slot-1?sig=x', body: { bytes: portrait.length } })
     expect(put!.headers['Content-Type']).toBe('image/png')
     expect(put!.headers.Authorization).toBeUndefined()
@@ -204,7 +263,7 @@ describe('higgsfield adapter specifics', () => {
 
 describe('mock renders', () => {
   it('label the camera angle a sheet prompt asks for', async () => {
-    const { mockAngle } = await import('./mock')
+    const { mockAngle } = await import('./mock.js')
     expect(mockAngle('Full side profile: head turned 90 degrees so only her RIGHT side faces the camera')).toMatchObject({ label: 'right profile', turn: 1 })
     expect(mockAngle('turned about 45 degrees so her LEFT cheek and LEFT ear face the camera')).toMatchObject({ label: 'left three-quarter', turn: -1 })
     expect(mockAngle('Full-body framing, standing. Seen from directly behind')).toMatchObject({ label: 'Full body, back', back: true })

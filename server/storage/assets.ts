@@ -1,11 +1,11 @@
 import { createHash } from 'node:crypto'
 import { and, eq } from 'drizzle-orm'
 import sharp from 'sharp'
-import { assets } from '../db/schema'
-import type { Ctx, Deps } from '../context'
-import { newId } from '../lib/ids'
-import { AppError, notFound } from '../lib/errors'
-import { probeMedia } from '../media/ffmpeg'
+import { assets } from '../db/schema.js'
+import type { Ctx, Deps } from '../context.js'
+import { newId } from '../lib/ids.js'
+import { AppError, notFound } from '../lib/errors.js'
+import { probeMedia } from '../media/ffmpeg.js'
 
 export type AssetRow = typeof assets.$inferSelect
 export type AssetOrigin = 'generated' | 'upload' | 'derived' | 'fixture'

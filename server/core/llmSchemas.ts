@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { markSchema, pronounsSchema } from './character'
+import { markSchema, pronounsSchema } from './character.js'
 
 // Structured outputs for the LLM steps. The JSON Schema goes to the model;
 // the Zod schema re-validates the answer before anything is stored.

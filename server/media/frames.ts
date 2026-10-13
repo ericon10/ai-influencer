@@ -1,7 +1,7 @@
 import { readdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import sharp from 'sharp'
-import { ffmpeg, ffmpegVerbose, MediaError, probeFile } from './ffmpeg'
+import { ffmpeg, ffmpegVerbose, MediaError, probeFile } from './ffmpeg.js'
 
 // Sharpness as variance of the Laplacian on a grayscale image. Higher is
 // sharper. Used to avoid handing a blurry or mid-motion frame to the next clip.

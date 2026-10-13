@@ -1,19 +1,20 @@
-import type { Db } from '../db/client'
-import type { KeyVault } from '../lib/vault'
-import type { StudioConfig } from '../config/load'
-import type { BlobStore } from '../storage/blobStore'
-import { AppError } from '../lib/errors'
-import { readSecret } from './credentials'
-import { createMockAdapter, type MockOptions } from './mock'
-import { createMockLlm, type LlmResponder } from './mockLlm'
-import { createAnthropicLlm } from './anthropic'
-import { createHiggsfieldAdapter } from './higgsfield'
-import { createHiggsfieldAccountAdapter, type AccountBalance } from './higgsfieldAccount'
-import { accountTokenSource, readAccountTokens } from './higgsfieldOAuth'
-import { createMcpClient, type McpClient } from './mcpClient'
-import { readBilling } from './billing'
-import { readModelOverrides, withModelOverrides } from './modelOverrides'
-import type { HiggsfieldBilling, LlmProvider, ProviderAdapter } from './types'
+import type { Db } from '../db/client.js'
+import type { KeyVault } from '../lib/vault.js'
+import type { StudioConfig } from '../config/load.js'
+import type { BlobStore } from '../storage/blobStore.js'
+import { AppError } from '../lib/errors.js'
+import { readSecret } from './credentials.js'
+import { createMockAdapter, type MockOptions } from './mock.js'
+import { createMockLlm, type LlmResponder } from './mockLlm.js'
+import { createAnthropicLlm } from './anthropic.js'
+import { createHiggsfieldAdapter } from './higgsfield.js'
+import { createHiggsfieldAccountAdapter, type AccountBalance } from './higgsfieldAccount.js'
+import { accountTokenSource, readAccountTokens } from './higgsfieldOAuth.js'
+import { createMcpClient, type McpClient } from './mcpClient.js'
+import { readBilling } from './billing.js'
+import { readModelOverrides, withModelOverrides } from './modelOverrides.js'
+import { serverKeyFor, type ServerKeys } from './serverKeys.js'
+import type { HiggsfieldBilling, LlmProvider, ProviderAdapter } from './types.js'
 
 // Resolves the adapter for a model ref, using the account's own encrypted
 // key. Mock adapters keep job state in memory, one instance per account.
@@ -49,6 +50,8 @@ export interface RegistryOptions {
   overrides?: { gen?: Record<string, ProviderAdapter>; llm?: Record<string, LlmProvider> }
   // Network for the Higgsfield account path (tests pass a fake server).
   fetchImpl?: typeof fetch
+  // Keys set on the server for the owner's own account (HF_CREDENTIALS).
+  serverKeys?: ServerKeys
 }
 
 export function createRegistry(o: RegistryOptions): ProviderRegistry & { mockFor(accountId: string): ReturnType<typeof createMockAdapter>; mockLlm: ReturnType<typeof createMockLlm> } {
@@ -111,7 +114,9 @@ export function createRegistry(o: RegistryOptions): ProviderRegistry & { mockFor
       }
       if (o.overrides?.gen?.[p]) return o.overrides.gen[p]!
       if (p === 'mock') return mockFor(accountId)
-      const secret = await readSecret(o.db, o.vault, accountId, p)
+      // The account's own key first; the owner's account can also use the
+      // server key (HF_CREDENTIALS).
+      const secret = (await readSecret(o.db, o.vault, accountId, p)) ?? (await serverKeyFor(o.db, o.serverKeys, accountId, p))
       if (!secret) throw new AppError('provider_not_configured', `Add your ${p} API key in Settings to run this live.`)
       // The account's own confirmed endpoints apply on top of the catalog.
       if (p === 'higgsfield') return createHiggsfieldAdapter({ credentials: secret, config: withModelOverrides(o.config, await readModelOverrides(o.db, accountId)) })

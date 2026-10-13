@@ -78,7 +78,7 @@ export function createFakeHiggsfield(): FakeHiggsfield {
         return new Response(null, { status: 200 })
       }
       if (url.startsWith(CDN) && method === 'GET') {
-        const { renderPlaceholderPortrait } = await import('../providers/mock')
+        const { renderPlaceholderPortrait } = await import('../providers/mock.js')
         return new Response(new Uint8Array(await renderPlaceholderPortrait('Fake Higgsfield')), { status: 200, headers: { 'content-type': 'image/png' } })
       }
       if (url !== MCP || method !== 'POST') return new Response('not found', { status: 404 })

@@ -1,7 +1,7 @@
 import { and, eq, gte, inArray, lt, sql, type SQL } from 'drizzle-orm'
-import { ledgerEntries } from '../db/schema'
-import type { Db } from '../db/client'
-import { newId } from '../lib/ids'
+import { ledgerEntries } from '../db/schema.js'
+import type { Db } from '../db/client.js'
+import { newId } from '../lib/ids.js'
 
 export type EntryType = 'hold' | 'release' | 'charge' | 'refund' | 'adjustment'
 export type LedgerInsert = Omit<typeof ledgerEntries.$inferInsert, 'id'>

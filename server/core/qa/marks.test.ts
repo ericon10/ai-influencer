@@ -1,10 +1,10 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { loadConfig } from '../../config/load'
-import { evaluateSheetShot, checkMirrorConsistency, mirrorFixFor, mirrorObservation } from './marks'
-import { parseObservation, type Observation } from './perception'
-import type { Mark } from '../marks'
+import { loadConfig } from '../../config/load.js'
+import { evaluateSheetShot, checkMirrorConsistency, mirrorFixFor, mirrorObservation } from './marks.js'
+import { parseObservation, type Observation } from './perception.js'
+import type { Mark } from '../marks.js'
 
 // Acceptance (SPEC 12.5, 14): QA must flag a mirrored mark, such as Callie's
 // ear cuff showing on her RIGHT ear in the right-profile shot REF-04. This
