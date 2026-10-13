@@ -70,6 +70,8 @@ export interface BuildOptions {
   background?: string | null
   // Default rule realism-flaw-dose; false keeps every flaw word as written.
   flawDose?: boolean
+  // A scene's makeup choice; it wins over the REALISM block's makeup line.
+  makeup?: string
 }
 
 export const DEFAULT_BACKGROUND = 'Plain light gray background, soft even daylight'
@@ -88,7 +90,7 @@ export function finishPrompt(prompt: string, stage: string, ch: RealismSource & 
   const body = block && !prompt.includes(block) ? `${prompt} ${block}` : prompt
   // Flaw words the character really has (card, marks, realism notes) stay.
   const allowedFlaws = [ch.card ?? '', ...(ch.marks ?? []).map(m => m.description), ...(ch.realism?.notes ?? [])].join(' ')
-  const done = finalizeImagePrompt(body, { stage, realism: ch.realism?.block, avoid: ch.realism?.avoid, allowedFlaws, flawDose: o.flawDose, plainBackground: o.background !== null })
+  const done = finalizeImagePrompt(body, { stage, realism: ch.realism?.block, avoid: ch.realism?.avoid, allowedFlaws, flawDose: o.flawDose, plainBackground: o.background !== null, makeup: o.makeup })
   o.warnings?.push(...done.warnings)
   return done.prompt
 }

@@ -155,7 +155,7 @@ describe('scenes (Stage 7, demo mode)', () => {
     const p = preview.prompts[0]!.text
     expect(p.startsWith("Using the attached reference images, keep this woman's face, hair, and features exactly the same.")).toBe(true)
     expect(p).toContain('instead of the white t-shirt, jeans and sneakers in the reference images')
-    expect(p).toContain('ordinary background clutter')
+    expect(p).toContain('Ordinary background, not a professional shoot.')
     const view = (await scenesView(h.deps, h.ctx, characterId)).scenes.find(s => s.id === sceneId)!
     expect(view.refs.map(r => r.refId)).toEqual(['REF-00', 'REF-01', 'REF-07', 'REF-10'])
     const made = (await stills(sceneId)).filter(c => c.op === 'generate')

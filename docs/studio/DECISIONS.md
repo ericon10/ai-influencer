@@ -761,3 +761,25 @@ changes what the Studio suggests and checks, never what the owner types.
 - Prompts (the models that take one) carry the character's REALISM
   block and say the result must be the character, never the performer.
 
+
+### G19. The new default REALISM block (owner, 2026-10-13)
+- Every character without its own block uses the owner's tested text
+  (Nano Banana 2.1 and GPT Image 2.5 Flare, clearly more realistic than the
+  old block): "Candid iPhone photo, neutral natural light. Real skin
+  texture: visible pores, soft peach fuzz catching the light on the cheeks
+  and jaw, a few stray brow hairs and baby hairs at the hairline, subtle
+  color variation with slight redness around the nose and cheeks, faint
+  natural shine. No makeup or light makeup only, no beauty retouching, no
+  beauty filter, no skin smoothing. Ordinary background, not a
+  professional shoot."
+- Hero and sheet stay bare-faced (fixed): there the block reads "No
+  makeup" (the light-makeup allowance is left out) and loses its
+  background sentence (the gray background). Clauses are edited one at a
+  time, so "no skin smoothing" is never dropped with a neighbor.
+- A scene's makeup choice (a default) wins over the block's makeup line:
+  soft glam leaves out "No makeup or light makeup only", bare leaves out
+  the allowance. Nothing else in the block changes.
+- Callie's new character file carries the same block (with "her cheeks")
+  and new model, video and safety-filter notes; it is the fixture now. In
+  production it reaches Callie when the owner imports it on her Character
+  file step.

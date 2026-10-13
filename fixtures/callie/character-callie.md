@@ -52,7 +52,7 @@ Bonus: BONUS-01 (seated, near-front, logo removed). Old body build; keep out of 
 ## Fixed blocks
 - REFERENCE: Using the attached reference images, keep this woman's face, hair, and features exactly the same.
 - SOUL IDENTITY (always include with the saved Soul character): Honey-blonde hair, light brown brows, fair skin with a light sun-kissed tan, soft oval face with a rounded chin, full lips. If hair is wet or slicked back, add "but still clearly blonde."
-- REALISM: Candid phone photo, natural skin texture with visible pores, small imperfections, ordinary background clutter, no retouching, not a professional shoot.
+- REALISM: Candid iPhone photo, neutral natural light. Real skin texture: visible pores, soft peach fuzz catching the light on her cheeks and jaw, a few stray brow hairs and baby hairs at the hairline, subtle color variation with slight redness around the nose and cheeks, faint natural shine. No makeup or light makeup only, no beauty retouching, no beauty filter, no skin smoothing. Ordinary background, not a professional shoot.
 - AVOID: studio lighting, perfect symmetry, plastic skin, airbrushed or smoothed skin, beauty filter, heavy makeup, text, watermarks.
 
 ## Models
@@ -60,6 +60,7 @@ Bonus: BONUS-01 (seated, near-front, logo removed). Old body build; keep out of 
 - Drift lock: after any Soul still, run a Nano Banana 2.1 face-only pass with the Soul image as base plus @REF-00 and the closest-angle ref; keep everything else identical (inpaint mask on face and hair if it re-composes).
 - Saved identity: Higgsfield Element "Callie-1" (id 1602db94-79e3-4e5a-bbe5-de3537cd0b83), made from REF-00. Instant, no training. Works with Nano Banana 2 / Pro, GPT Image 2, Seedream, Seedance 2.0, Kling 3.0 (Kling needs a start frame too). Reference it with @Callie-1 in Higgsfield.
 - Stills with refs and all edits: Nano Banana 2.1. Use @ references in Higgsfield so the model knows which image is which.
+- Model feel (Oct 13 test, new REALISM block): Nano Banana 2.1 gives the most candid, truly bare-faced everyday look; GPT Image 2.5 Flare gives polished close-up selfies (adds lip gloss and a pout unless told "bare natural lips, no gloss").
 - Stills, also strong: GPT Image 2.5 Flare. Produced her best beach shot (Koh Samui, real skin texture), though it once distorted her hair in an earlier scene. Worth running alongside Nano Banana and picking the best.
 - Video, final: Seedance 2.5 (mode omni_reference, start + end frame). Best faces by far.
 - Video, cheap motion tests only: Kling 3.0 Turbo. Faces melt when she is small in frame. Kling 3.0 Pro distorted her face when she talked animatedly.
@@ -90,6 +91,11 @@ Bonus: BONUS-01 (seated, near-front, logo removed). Old body build; keep out of 
 - Generated audio is off or pushed far down in post; any chatter must stay unintelligible.
 - Mix: terrace or room ambience, light clinks, a low house track like venue speakers. Normalize to social loudness.
 - Never crossfade between clips when the subject moved; it ghosts.
+- End frames: full edits in Nano Banana re-compose the whole scene; use inpaint with a mask on the head only.
+- Kling 3.0, seen once: an end frame with the body in the same position as the start froze a walking shot (feet sliding). Not yet tested on Seedance. Options if it happens: a tighter end frame (crop to chest-up, upscale, inpaint the head) or no end frame.
+- When she walks toward a tracking camera, say it outright: keep walking the whole clip, camera tracks backward, background slides past.
+- Slow motion in the prompt is unreliable; ramp the last 2 to 3 seconds in the editor.
+- Higgsfield's safety filter blocked "playful, slightly shy smile, lips gently closed." Use plain wording like "warm, friendly, closed-mouth smile."
 
 ## Disclosure
 Label all posted content as AI-generated per each platform's rules.

@@ -103,7 +103,8 @@ describe('rule switches: global and per character', () => {
     expect(preview.prompts[0]!.text).toContain('Bare face, no makeup, no retouching.')
     await setRuleSwitch(h.deps, h.ctx, { ruleId: 'sheet-background', characterId: b, on: false })
     const other = await estimateAction(h.deps, h.ctx, { type: 'hero', characterId: b, runsPerPrompt: 4 })
-    expect(other.preview.prompts[0]!.text).not.toMatch(/background/i)
+    // No background line of its own (the block's own background words may stay).
+    expect(other.preview.prompts[0]!.text).not.toMatch(/Plain (?:light gray|warm white) background/i)
     const view = await rulesView(h.deps, h.ctx, a)
     expect(view.rules.find(r => r.id === 'sheet-background')!.character).toMatchObject({ on: true, value: 'Plain warm white background, soft window light', valueSet: true })
     expect(view.rules.find(r => r.id === 'no-explicit')!.bucket).toBe('fixed')

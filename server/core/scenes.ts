@@ -213,7 +213,7 @@ function fillSceneBase(t: TemplatesConfig, f: SceneFields, p: Parts, o: { scaffo
 // `addendum` is the fix line a review reason adds (config/review.yaml).
 export function buildScenePrompt(t: TemplatesConfig, sc: ScenesConfig, views: ViewsConfig, f: SceneFields, ch: SceneCharacter, mode: ReferenceMode, o: BuildOptions & { addendum?: string; rules?: SceneRuleOptions } = {}): string {
   const prompt = fillSceneBase(t, f, sceneParts(t, sc, views, f, ch, mode, o), { scaffold: true })
-  return finishPrompt(normalizePrompt(o.addendum ? `${prompt} ${o.addendum}` : prompt), 'scene', ch, o)
+  return finishPrompt(normalizePrompt(o.addendum ? `${prompt} ${o.addendum}` : prompt), 'scene', ch, { ...o, makeup: f.makeup })
 }
 
 // The template's own text without the Studio's lines: what "Use the
@@ -267,7 +267,7 @@ export function assembleStillPrompt(t: TemplatesConfig, sc: ScenesConfig, views:
   // full outfit" holds whatever the writing says.
   const wearing = wearingLine(t, f, p, { jewelry: true, override: true })
   const text = [p.reference, cleanWritten(body), wearing, p.marks, p.colors, p.brand_line, o.addendum ?? ''].filter(Boolean).join('\n')
-  return finishPrompt(normalizePrompt(text), 'scene', ch, o)
+  return finishPrompt(normalizePrompt(text), 'scene', ch, { ...o, makeup: f.makeup })
 }
 
 // ── One-change edits (SPEC 5.3) ─────────────────────────────────────

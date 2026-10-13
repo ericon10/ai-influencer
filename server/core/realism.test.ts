@@ -3,7 +3,7 @@ import { loadConfig } from '../config/load.js'
 import { buildHeroPrompts, buildSheetPrompt } from './prompts.js'
 import { blocking, lintPrompt } from './rules.js'
 import {
-  BARE_FACE_LINE, DEFAULT_REALISM_BLOCK, finalizeImagePrompt, findBannedTerms, forceBeautifyOff,
+  BARE_FACE_LINE, DEFAULT_REALISM_BLOCK, DEFAULT_REFERENCE_REALISM, finalizeImagePrompt, realismForMakeup, findBannedTerms, forceBeautifyOff,
   hasRealismBlock, realismForReference, stripBannedTerms, suggestsFixingFlaw, treatsFlawAsDefect,
 } from './realism.js'
 import { mapInput } from '../providers/higgsfield.js'
@@ -56,14 +56,39 @@ describe('REALISM block', () => {
       expect(p).toContain(callie.realism.avoid)
       expect(hasRealismBlock(p)).toBe(true)
     }
+    // A character without its own block gets the Studio default, bare-faced
+    // and without its background sentence on hero and sheet shots.
     const plain = buildHeroPrompts(templates, views, { ...callie, realism: {} })[0]!
-    expect(plain).toContain(DEFAULT_REALISM_BLOCK)
+    expect(plain).toContain(DEFAULT_REFERENCE_REALISM)
+    expect(plain).not.toMatch(/light makeup|Ordinary background/)
+    expect(plain).toMatch(/no skin smoothing/)
+  })
+
+  it('the Studio default is the owner\'s tested block, used in full in scenes', () => {
+    expect(DEFAULT_REALISM_BLOCK).toBe('REALISM: Candid iPhone photo, neutral natural light. Real skin texture: visible pores, soft peach fuzz catching the light on the cheeks and jaw, a few stray brow hairs and baby hairs at the hairline, subtle color variation with slight redness around the nose and cheeks, faint natural shine. No makeup or light makeup only, no beauty retouching, no beauty filter, no skin smoothing. Ordinary background, not a professional shoot.')
+    const scene = finalizeImagePrompt('A woman at a farmers market, wearing a white linen shirt.', { stage: 'scene' })
+    expect(scene.prompt).toContain(DEFAULT_REALISM_BLOCK)
+    expect(scene.warnings).toEqual([])
+    expect(findBannedTerms(DEFAULT_REALISM_BLOCK)).toEqual([])
+  })
+
+  it('a scene\'s makeup choice wins over the makeup line; nothing else is dropped', () => {
+    const glam = realismForMakeup(DEFAULT_REALISM_BLOCK, 'soft_glam')
+    expect(glam).not.toMatch(/No makeup/)
+    expect(glam).toMatch(/No beauty retouching, no beauty filter, no skin smoothing\. Ordinary background/)
+    const bare = realismForMakeup(DEFAULT_REALISM_BLOCK, 'bare')
+    expect(bare).toMatch(/No makeup, no beauty retouching/)
+    expect(bare).not.toMatch(/light makeup/)
+    // Twice in a row gives the same answer (no regex state).
+    expect(realismForMakeup(DEFAULT_REALISM_BLOCK, 'bare')).toBe(bare)
+    expect(realismForMakeup(DEFAULT_REALISM_BLOCK, 'natural')).toBe(DEFAULT_REALISM_BLOCK)
+    expect(finalizeImagePrompt('Callie at a party.', { stage: 'scene', makeup: 'soft_glam' }).prompt).toContain(glam)
   })
 
   it('keeps the background clause in scenes, where the clutter belongs', () => {
     const scene = finalizeImagePrompt('Callie at a farmers market, wearing a white linen shirt.', { stage: 'scene', realism: callie.realism.block }).prompt
     expect(scene).toContain(callie.realism.block)
-    expect(realismForReference('REALISM: ordinary background clutter')).toBe(DEFAULT_REALISM_BLOCK)
+    expect(realismForReference('REALISM: ordinary background clutter')).toBe(DEFAULT_REFERENCE_REALISM)
   })
 
   it('is added once by the builder, never twice', () => {

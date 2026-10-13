@@ -9,8 +9,11 @@
 export const BARE_FACE_LINE = 'Bare face, no makeup, no retouching.'
 
 // Used when a character has no REALISM block of its own.
+// The Studio default for every character without its own block: the
+// owner's tested text (2026-10-13, Nano Banana 2.1 and GPT Image 2.5 Flare,
+// clearly more realistic than the earlier block).
 export const DEFAULT_REALISM_BLOCK =
-  'REALISM: Candid phone photo, natural skin texture with visible pores and small believable imperfections, no retouching, not a professional shoot.'
+  'REALISM: Candid iPhone photo, neutral natural light. Real skin texture: visible pores, soft peach fuzz catching the light on the cheeks and jaw, a few stray brow hairs and baby hairs at the hairline, subtle color variation with slight redness around the nose and cheeks, faint natural shine. No makeup or light makeup only, no beauty retouching, no beauty filter, no skin smoothing. Ordinary background, not a professional shoot.'
 
 export const DEFAULT_AVOID_BLOCK =
   'AVOID: airbrushed or plastic skin, skin smoothing, beauty filters, studio lighting, perfect symmetry, text, watermarks.'
@@ -167,12 +170,45 @@ export const isBareFaceStage = (stage?: string) => !!stage && (BARE_FACE_STAGES 
 // scenes, so a clause about the background ("ordinary background clutter")
 // is left out of hero and sheet prompts; scenes keep the block as written.
 const BACKGROUND_CLAUSE = /\b(?:background|backdrop|clutter|surroundings|bystanders|passers-?by)\b/i
+// "No makeup or light makeup only": the allowance after "no makeup". Hero and
+// sheet shots never wear makeup, so it goes there.
+const MAKEUP_ALLOWANCE = /\s+or\s+(?:light|minimal|natural|subtle|soft)\s+makeup(?:\s+only)?\b/i
+// A clause that limits makeup, left out when a scene asks for soft glam.
+const MAKEUP_LIMIT = /^(?:no makeup(?:\s+or\s+\w+\s+makeup(?:\s+only)?)?|(?:light|minimal|natural|subtle|soft)\s+makeup\s+only)$/i
+
+// A block edited clause by clause (sentences, then commas), so leaving one
+// clause out never takes its neighbors with it.
+function editClauses(block: string, keep: (clause: string) => boolean, map: (clause: string) => string = c => c): string {
+  const body = block.replace(/^REALISM:\s*/i, '').trim()
+  const sentences = body.split(/(?<=[.!?])\s+/)
+    .map(s => s.replace(/[.!?]+$/, '').split(/,\s*/).map(c => map(c).trim()).filter(c => c && keep(c)).join(', '))
+    .filter(Boolean)
+  return `REALISM: ${sentences.map(s => `${s.charAt(0).toUpperCase()}${s.slice(1)}.`).join(' ')}`
+}
+
+const forReference = (block: string) => editClauses(block, c => !BACKGROUND_CLAUSE.test(c), c => c.replace(MAKEUP_ALLOWANCE, ''))
+// The default block as hero and sheet prompts use it.
+export const DEFAULT_REFERENCE_REALISM = forReference(DEFAULT_REALISM_BLOCK)
 
 export function realismForReference(block: string): string {
-  const body = block.replace(/^REALISM:\s*/i, '')
-  const kept = body.split(/,\s*/).filter(c => !BACKGROUND_CLAUSE.test(c)).join(', ').replace(/[,\s]+$/, '')
-  const out = `REALISM: ${/[.!?]$/.test(kept) ? kept : `${kept}.`}`
-  return hasRealismBlock(out) ? out : DEFAULT_REALISM_BLOCK
+  const out = forReference(block)
+  return hasRealismBlock(out) ? out : DEFAULT_REFERENCE_REALISM
+}
+
+// Hero and sheet with the background switch off: bare-faced still, the
+// background clause kept.
+const bareFaceRealism = (block: string) => (MAKEUP_ALLOWANCE.test(block) ? editClauses(block, () => true, c => c.replace(MAKEUP_ALLOWANCE, '')) : block)
+
+// A scene's makeup choice (a default) wins over the block's makeup line:
+// soft glam leaves out "no makeup", bare leaves out the light-makeup
+// allowance. Every other clause stays, "no skin smoothing" included.
+export function realismForMakeup(block: string, makeup?: string): string {
+  if (makeup === 'soft_glam') {
+    const out = editClauses(block, c => !MAKEUP_LIMIT.test(c))
+    return hasRealismBlock(out) ? out : block
+  }
+  if (makeup === 'bare') return bareFaceRealism(block)
+  return block
 }
 
 export interface RealismWarning {
@@ -196,7 +232,7 @@ export interface FinalPrompt {
 // out heavier flaw words the character does not have. `plainBackground`
 // (default rule sheet-background) drops a REALISM background clause from
 // hero and sheet prompts, which use their own background.
-export function finalizeImagePrompt(prompt: string, opts: { stage?: string; realism?: string | null; avoid?: string | null; allowedFlaws?: string; flawDose?: boolean; plainBackground?: boolean } = {}): FinalPrompt {
+export function finalizeImagePrompt(prompt: string, opts: { stage?: string; realism?: string | null; avoid?: string | null; allowedFlaws?: string; flawDose?: boolean; plainBackground?: boolean; makeup?: string } = {}): FinalPrompt {
   const warnings: RealismWarning[] = []
   const stripped = stripBannedTerms(prompt)
   let out = stripped.prompt
@@ -229,7 +265,8 @@ export function finalizeImagePrompt(prompt: string, opts: { stage?: string; real
     if (!out.includes(BARE_FACE_LINE)) out = `${out} ${BARE_FACE_LINE}`
   }
   const block = realismBlock(opts.realism)
-  const realism = isBareFaceStage(opts.stage) && opts.plainBackground !== false ? realismForReference(block) : block
+  const realism = !isBareFaceStage(opts.stage) ? realismForMakeup(block, opts.makeup)
+    : opts.plainBackground !== false ? realismForReference(block) : bareFaceRealism(block)
   if (!hasRealismBlock(out)) out = `${out}\n${realism}`
   if (!/\bAVOID:/.test(out)) out = `${out}\n${avoidBlock(opts.avoid)}`
   return { prompt: out.trim(), warnings }

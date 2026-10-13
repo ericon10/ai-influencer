@@ -153,7 +153,8 @@ describe("Callie's character file", () => {
   })
 
   it('reads her REALISM and AVOID blocks, which go into every image prompt, and her Realism principle', () => {
-    expect(c.realism.block).toMatch(/^REALISM: Candid phone photo, natural skin texture with visible pores/)
+    expect(c.realism.block).toMatch(/^REALISM: Candid iPhone photo, neutral natural light\. Real skin texture: visible pores, soft peach fuzz catching the light on her cheeks and jaw/)
+    expect(c.realism.block).toMatch(/no skin smoothing\. Ordinary background, not a professional shoot\.$/)
     expect(c.realism.avoid).toBe('AVOID: studio lighting, perfect symmetry, plastic skin, airbrushed or smoothed skin, beauty filter, heavy makeup, text, watermarks.')
     expect(c.realism.notes?.[0]).toMatch(/^Callie looks real because she is not perfect/)
     expect(c.realism.notes).toContain('Hero and sheet: always bare-faced, no makeup, no retouching.')
