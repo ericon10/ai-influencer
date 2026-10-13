@@ -74,6 +74,22 @@ describe('scene QA', () => {
     expect(judge(flipped).report.findings.some(f => f.code === 'mark_wrong_side')).toBe(false)
   })
 
+  it('a plain item is not a logo, unreadable background text is a note, and sunglasses are not jewelry', () => {
+    const { report: r } = judge({ text_or_logos: ['Plain kraft paper shopping bag in her hand; no visible logo', 'Small sign under the awning; text is unreadable'], other_jewelry: [{ description: 'Sunglasses pushed up on her head (accessory, not jewelry)', image_side: 'image_left' }] })
+    expect(r.findings.filter(f => f.severity === 'fail')).toEqual([])
+    expect(r.findings.find(f => f.code === 'logo')?.severity).toBe('info')
+    expect(r.findings.some(f => f.code === 'extra_jewelry')).toBe(false)
+    expect(r.edits ?? []).toEqual([])
+  })
+
+  it('when the mark sides are in doubt, the summary leads with where the mole belongs', () => {
+    const mirrored: Observation = { ...base, skin_marks: [{ region: 'brow', image_side: 'image_left', description: 'small mole' }] }
+    const { report: r } = judge({ skin_marks: [{ region: 'brow', image_side: 'image_left', description: 'small mole' }], artifacts: ['a soft, simplified hand'] }, { mirrored })
+    expect(r.verdict).toBe('uncertain')
+    expect(r.summary).toMatch(/^Needs your eye: Check the side yourself: the mole belongs on her LEFT brow, the right side of the image/)
+    expect(r.summary).not.toMatch(/ear cuff/)
+  })
+
   it('a scene that allows brands is not told about logos', () => {
     expect(judge({ text_or_logos: ['logo on the cup'] }, { rules: { logos: false, jewelry: true, mirror: true } }).report.verdict).toBe('post')
   })

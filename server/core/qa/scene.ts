@@ -1,7 +1,7 @@
 import type { Side, ViewsConfig } from '../../config/pipeline.js'
 import { otherSide, subjectSide, type ImageSide, type Mark } from '../marks.js'
 import { describeFlaw, suggestsFixingFlaw, treatsFlawAsDefect } from '../realism.js'
-import { checkMirrorConsistency, detectView, finalize, mirrorObservation, type MirrorFix, type QaCode, type QaFinding, type QaReport } from './marks.js'
+import { checkMirrorConsistency, detectView, finalize, mirrorObservation, sideCheckMessage, type MirrorFix, type QaCode, type QaFinding, type QaReport } from './marks.js'
 import type { Observation } from './perception.js'
 
 // QA for scene stills (SPEC 6, Stage 7). The vision model reports what it
@@ -43,6 +43,10 @@ function jewelryKind(text: string): string | null {
   const t = text.toLowerCase()
   return JEWELRY_WORDS.find(w => new RegExp(`\\b${w}s?\\b`).test(t)) ?? null
 }
+
+const NOT_JEWELRY = /\b(sunglasses|glasses|eyewear|hat|cap|headband|scarf|bag|purse|accessor(?:y|ies)|not jewelry)\b/i
+const NO_LOGO = /\b(no (?:visible |readable )?(?:logos?|text|branding|lettering|brand names?)|unbranded)\b/i
+const UNREADABLE = /\b(unreadable|illegible|not legible|cannot be read|can't be read)\b/i
 
 const where = (side: ImageSide | 'center') => (side === 'center' ? 'in the middle of the image' : `on the ${side.replace('image_', '')} of the image`)
 
@@ -100,7 +104,9 @@ export function evaluateScene(input: SceneQaInput): SceneReport {
     }
     for (const j of obs.other_jewelry) {
       const kind = jewelryKind(j.description)
-      if (kind && asked.includes(kind)) continue
+      // Sunglasses, hats and bags are accessories, not jewelry.
+      if (!kind || NOT_JEWELRY.test(j.description)) continue
+      if (asked.includes(kind)) continue
       findings.push({ code: 'extra_jewelry', severity: 'info', message: `Jewelry the scene did not ask for: ${j.description}.` })
       edits.push({ code: 'extra_jewelry', change: `Remove the ${j.description.replace(/^(?:a|an|the)\s+/i, '')}, ${where(j.image_side)}`, face: false })
     }
@@ -111,6 +117,10 @@ export function evaluateScene(input: SceneQaInput): SceneReport {
   // brands or the rule is switched off.
   if (rules.logos) {
     for (const t of obs.text_or_logos) {
+      // A plain item the inspector listed anyway is not a logo.
+      if (NO_LOGO.test(t)) continue
+      // Unreadable background lettering is how real streets look: a note.
+      if (UNREADABLE.test(t)) { findings.push({ code: 'logo', severity: 'info', message: `Background text, unreadable: ${t}. Fine as is unless you want it plain.` }); continue }
       findings.push({ code: 'logo', severity: 'fail', message: `Logo or readable text: ${t}.` })
       edits.push({ code: 'logo', change: `Remove the ${t.replace(/^(?:a|an|the)\s+/i, '')}, leaving that surface plain and unbranded`, face: false })
     }
@@ -145,7 +155,9 @@ export function evaluateScene(input: SceneQaInput): SceneReport {
     const c = checkMirrorConsistency(obs, input.mirrored)
     if (!c.consistent) {
       contradicted = true
-      findings.push({ code: 'uncertain', severity: 'warn', message: `The inspector gave inconsistent answers on a mirrored copy (${c.differences.join(', ')}), so a person should check the sides.` })
+      // Signature jewelry is optional in scenes; the side check names the
+      // face marks (the mole), which never change.
+      findings.push({ code: 'uncertain', severity: 'warn', message: sideCheckMessage(marks, c.differences, poss, { jewelry: false }) })
     }
   }
 

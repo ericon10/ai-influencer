@@ -130,6 +130,17 @@ function colorFamilies(text: string): Set<string> {
   return out
 }
 
+// When the inspector contradicts itself on mark sides, say exactly where
+// each mark belongs, in image terms, so a person can check it in a second.
+export function sideCheckMessage(marks: Mark[], differences: string[], poss = 'their', o: { jewelry?: boolean } = {}): string {
+  const skin = differences.includes('skin mark sides')
+  const ears = differences.includes('ear jewelry sides') && o.jewelry !== false
+  const named = marks.filter(m => (m.kind === 'jewelry' ? ears : skin))
+  if (!named.length) return `The inspector gave inconsistent answers on a mirrored copy (${differences.join(', ')}), so a person should check the sides.`
+  const where = named.map(m => `the ${m.name} belongs on ${poss} ${m.side} ${m.region}, the ${m.side === 'LEFT' ? 'right' : 'left'} side of the image when facing the camera`)
+  return `Check the side yourself: ${where.join('; ')}. The automatic check gave different answers on a mirrored copy. If it is on the wrong side and nothing in the frame has text, Mirror fixes it for free.`
+}
+
 export interface EvaluateInput {
   shot: SheetShot
   views: ViewsConfig
@@ -267,7 +278,7 @@ export function evaluateSheetShot(input: EvaluateInput): QaReport {
     const c = checkMirrorConsistency(obs, input.mirrored)
     if (!c.consistent) {
       contradicted = true
-      findings.push({ code: 'uncertain', severity: 'warn', message: `The inspector gave inconsistent answers on a mirrored copy (${c.differences.join(', ')}), so a person should check the sides.` })
+      findings.push({ code: 'uncertain', severity: 'warn', message: sideCheckMessage(input.marks, c.differences, input.pronoun) })
     }
   }
 
@@ -293,7 +304,8 @@ export function finalize(findings: QaFinding[], detectedView: string | null, for
     post: 'Looks right. Ready to approve.',
     regenerate: `Regenerate: ${(fails.find(f => IDENTITY.includes(f.code)) ?? fails.find(f => regenerateCodes.includes(f.code)))?.message ?? ''}`,
     edit: `Fix with an edit: ${fails.map(f => f.message).join(' ')}`,
-    uncertain: `Needs your eye: ${(warns[0] ?? fails[0])?.message ?? ''}`,
+    // A side or angle doubt comes first: marks are the identity.
+    uncertain: `Needs your eye: ${(warns.find(f => f.code === 'uncertain') ?? warns.find(f => f.code.startsWith('mark')) ?? warns[0] ?? fails[0])?.message ?? ''}`,
   }[verdict].trim()
 
   const reasons = [...new Set(findings.filter(f => f.severity !== 'info').map(f => REASON[f.code]).filter((r): r is string => !!r))]
