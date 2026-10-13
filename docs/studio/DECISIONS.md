@@ -585,3 +585,43 @@ changes what the Studio suggests and checks, never what the owner types.
   the run uses ("Claude Sonnet 5.5", "Nano Banana 2.1"), as does the
   follow-up price line and the price details. Demo mode says "Demo mock,
   free".
+
+### G10. The prompt writer: Claude writes the final prompt (owner)
+- **Default on** (rule `scene-prompt-writer`; Settings, Claude models has
+  the same switch, and Settings, Rules a per-character one). Sonnet 5.5,
+  switchable to Opus like every Claude task (route `prompt_writer`).
+- Claude turns the scene fields into the final prompt as natural
+  sentences describing a real candid moment: 110 to 150 words for
+  stills, 40 to 80 for video (`scenes.yaml`, `settings.prompt_words`).
+  The video writer sees the start frame, "What happens" and the
+  directions.
+- The prompt sits above the Generate button, fully editable and saved as
+  you type, with Rewrite (priced, with the model name), Copy, and "Use the
+  template instead" (free). Generate needs a prompt in the box; a change
+  to the details after writing is pointed out, never forced.
+- **What code still adds** around the text, so it never depends on the
+  writing: the reference line for each model (refs, saved character or
+  card), the outfit swap line, the jewelry with its side, the mark sides,
+  the colors and brand-free lines, and the REALISM and AVOID blocks (rule
+  zero). A REALISM block typed into the box is replaced by the
+  character's own, and smoothing words are stripped. Video prompts get
+  the directions, the silent line when sound is off, and the REALISM
+  block too.
+- **Switched off**, the template builds the prompt as before. A run
+  with the writer on but nothing written yet (a regenerate from the
+  drawer) uses the template, with a note.
+- This replaces the SPEC 9 line "prompts are never written from scratch
+  by an LLM": the writer works from the fields, and the safety lines
+  stay in code.
+
+### G11. Video model picker (owner)
+- Kling 3.0 Pro (default), Kling 3.0 Standard, Seedance 2.0, Seedance 2.5
+  and Wan 3.0 Prime (`scenes.yaml`, `video.models`), each shown with the
+  price of one take at the chosen length and shape (free estimates; on
+  the account path a live Higgsfield price, saved for hours).
+- The last pick is remembered per account (`video_model` setting) and is
+  the next take's default.
+- Wan 3.0 Prime runs on the owner's account too (`wan3_0_prime` in the
+  connector's catalog, 2026-10-13). Kling's sound now follows the Sound
+  switch instead of always being off.
+

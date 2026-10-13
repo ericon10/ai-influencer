@@ -102,9 +102,11 @@ const routeSchema = z.object({
   resolution: z.string().optional(),
   aspect: z.string().optional(),
   effort: z.enum(['low', 'medium', 'high', 'xhigh', 'max']).optional(),
-  // For Claude tasks: the name and line shown in Settings, Claude models.
+  // For Claude tasks: the name and line shown in Settings, Claude models,
+  // and the default rule (rules.yaml) that switches the task on and off.
   label: z.string().optional(),
   hint: z.string().optional(),
+  rule: z.string().optional(),
 })
 
 const routingSchema = z.object({
@@ -236,6 +238,9 @@ function validateCrossRefs(cfg: StudioConfig): void {
       throw new ConfigError(`routing.yaml: task "${task}" points at unknown model "${route.model}"`)
     }
   }
+  for (const [task, route] of Object.entries(cfg.routing.tasks)) {
+    if (route.rule && !cfg.pipeline.rules.rules.some(r => r.id === route.rule && r.bucket === 'default')) throw new ConfigError(`routing.yaml: task "${task}" names "${route.rule}", which is not a default rule`)
+  }
   for (const ref of cfg.routing.claude_choices) {
     if (!llmRefs.has(ref)) throw new ConfigError(`routing.yaml: claude_choices has unknown model "${ref}"`)
   }
@@ -259,6 +264,14 @@ function validateCrossRefs(cfg: StudioConfig): void {
     if (!list.some(x => x.id === id)) throw new ConfigError(`scenes.yaml: default ${field} "${id}" is not a preset`)
   }
   try { new RegExp(cfg.pipeline.scenes.color_triggers, 'i') } catch { throw new ConfigError('scenes.yaml: color_triggers is not a valid pattern') }
+  const video = scn.video
+  for (const m of video.models) {
+    if (!cfg.models.models.some(x => x.ref === m.ref && x.kinds.includes('video'))) throw new ConfigError(`scenes.yaml: video model "${m.ref}" is not a known video model`)
+  }
+  if (!video.models.some(m => m.ref === video.model)) throw new ConfigError(`scenes.yaml: the default video model "${video.model}" is not in video.models`)
+  for (const [what, [min, max]] of Object.entries(sc.prompt_words)) {
+    if (min >= max) throw new ConfigError(`scenes.yaml: prompt_words.${what} needs a smaller first number`)
+  }
 }
 
 export function resetConfigCache(): void { cached = null }

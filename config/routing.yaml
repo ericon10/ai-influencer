@@ -13,6 +13,7 @@ tasks:
   scene_plan:    { model: anthropic/claude-sonnet-5-5, effort: medium, label: Scene planner, hint: Fills a scene's fields from your words (Plan it). }
   scene_ideas:   { model: anthropic/claude-sonnet-5-5, effort: low, label: Punch it up, hint: Three specific moments from a rough idea. }
   qa_perception: { model: anthropic/claude-sonnet-5-5, effort: medium, label: Check this, hint: The on-demand Claude check of a still or a take. }
+  prompt_writer: { model: anthropic/claude-sonnet-5-5, effort: medium, label: Prompt writer, hint: Turns the scene details into the final still or video prompt., rule: scene-prompt-writer }
 # Models a Claude task can be switched to in Settings.
 claude_choices: [anthropic/claude-sonnet-5-5, anthropic/claude-opus-5-5]
 mock:

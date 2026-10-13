@@ -15,7 +15,8 @@ import { cancelJob, getJob, resolveJob, wakeFromWebhook } from '../jobs/runner.j
 import { wakeWorker } from '../jobs/wake.js'
 import { actionSchema, estimateAction, runAction } from '../pipeline/actions.js'
 import { createCharacter, getCandidate, getCharacter, linkInspiration, listCharacters, setCharacterFields, updateCharacter } from '../pipeline/characters.js'
-import { approveSceneCandidate, archiveScene, copyScene, createScene, cropCandidate, updateScene } from '../pipeline/scenes.js'
+import { approveSceneCandidate, archiveScene, copyScene, createScene, cropCandidate, saveVideoModel, updateScene } from '../pipeline/scenes.js'
+import { videoPrices } from '../pipeline/sceneActions.js'
 import { rulesView, setRuleSwitch } from '../pipeline/rules.js'
 import { chooseConcept } from '../pipeline/concepts.js'
 import { approveCandidate, keepStale, pickHero, rejectCandidate, reopenCandidate, setFavorite, mirrorCandidate } from '../pipeline/review.js'
@@ -304,6 +305,9 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
     brief: z.string().max(2000).optional(),
     title: z.string().max(80).optional(),
     fields: z.record(z.string(), z.union([z.string().max(400), z.boolean(), z.array(z.string().max(20)).max(8)])).optional(),
+    prompts: z.object({ still: z.string().max(4000).optional(), video: z.string().max(4000).optional() }).optional(),
+    // "Use the template": the prompt box text came from the template.
+    fromTemplate: z.boolean().optional(),
   })
   app.post('/characters/:id/scenes', async c => {
     const ctx = c.get('ctx')
@@ -318,6 +322,21 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
     requireRole(ctx, 'member')
     const body = parse(z.object({ characterIds: z.array(z.string()).min(1).max(20) }), await json(c))
     return c.json({ copies: await copyScene(deps, ctx, c.req.param('id'), body.characterIds) }, 201)
+  })
+  // The price of one take on each video model (free estimates), and the
+  // model the owner picked last (the next take's default).
+  app.get('/characters/:id/video-prices', async c => {
+    const ctx = c.get('ctx')
+    await getCharacter(deps, ctx, c.req.param('id'))
+    const q = parse(z.object({ duration: z.coerce.number().int().min(2).max(15).default(5), aspect: z.string().max(8).default('9:16') }), { duration: c.req.query('duration'), aspect: c.req.query('aspect') })
+    return c.json({ prices: await videoPrices(deps, ctx, { durationSec: q.duration, aspect: q.aspect }) })
+  })
+  app.put('/settings/video-model', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    const body = parse(z.object({ model: z.string().max(80) }), await json(c))
+    await saveVideoModel(deps, ctx, body.model)
+    return c.json({ model: body.model })
   })
   app.patch('/scenes/:id', async c => {
     const ctx = c.get('ctx')

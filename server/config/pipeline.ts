@@ -135,6 +135,10 @@ const templatesSchema = z.object({
   scene_plan: z.object({ system: z.string(), prompt: z.string() }),
   scene_ideas: z.object({ system: z.string(), prompt: z.string() }),
   video: z.object({ base: z.string(), silent: z.string(), end_frame: z.string() }),
+  prompt_writer: z.object({
+    still_system: z.string(), still_prompt: z.string(), video_system: z.string(), video_prompt: z.string(),
+    end_frame: z.string(),
+  }),
 })
 
 const preset = z.object({ id: z.string(), label: z.string(), hint: z.string().optional() })
@@ -153,6 +157,7 @@ const scenesSchema = z.object({
     upscale_model: z.string(),
     // Pre-filled starting points, so only the moment itself is ever needed.
     defaults: z.object({ momentType: z.string(), camera: z.string(), light: z.string() }),
+    prompt_words: z.object({ still: z.tuple([z.number().int().positive(), z.number().int().positive()]), video: z.tuple([z.number().int().positive(), z.number().int().positive()]) }),
   }),
   moments: z.array(preset).min(1),
   cameras: z.array(preset.extend({ text: z.string(), foreground: z.string().optional() })).min(1),
@@ -169,7 +174,8 @@ const scenesSchema = z.object({
   }),
   video: z.object({
     model: z.string(),
-    resolution: z.string(),
+    // The models the owner picks from, each with its resolution if it has one.
+    models: z.array(z.object({ ref: z.string(), resolution: z.string().optional() })).min(1),
     durations: z.array(z.number().int().positive()).min(1),
     duration: z.number().int().positive(),
     aspect: z.string(),

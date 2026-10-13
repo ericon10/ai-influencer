@@ -7,20 +7,23 @@ import { identityForModel } from '../core/identity.js'
 import { pronounVars } from '../core/prompts.js'
 import type { RealismWarning } from '../core/realism.js'
 import {
-  aspectFor, buildEditPrompt, buildScenePrompt, comboConflict, comboEntryFor, mockSceneIdeas, oneChangeProblem, plannerRules,
-  sceneIdeasJsonSchema, scenePlanJsonSchema, scenePlanPrompt, type ReferenceMode, type SceneFields,
+  aspectFor, assembleStillPrompt, buildEditPrompt, buildScenePrompt, comboConflict, comboEntryFor, mockSceneIdeas, oneChangeProblem, plannerRules,
+  sceneIdeasJsonSchema, scenePlanJsonSchema, scenePlanPrompt, writerFacts, type ReferenceMode, type SceneFields,
 } from '../core/scenes.js'
+import { assembleVideoPrompt, mockWrittenPrompt, promptWriterJsonSchema, scenePrompts, type PromptTarget } from '../core/promptWriter.js'
+import { sha256Hex } from '../lib/passwords.js'
 import { ruleSwitches } from './rules.js'
 import { idealObservation } from '../core/qa/ideal.js'
 import { observationJsonSchema } from '../core/qa/perception.js'
 import { AppError } from '../lib/errors.js'
-import type { JobSpec } from '../jobs/runner.js'
+import { quoteItemsFor, type JobSpec } from '../jobs/runner.js'
+import { displayPrice } from '../costs/quotes.js'
 import type { GenRequest } from '../providers/types.js'
 import { listCredentials } from '../providers/credentials.js'
 import { ACCOUNT_PROVIDER } from '../providers/higgsfieldOAuth.js'
 import { forMode, providerMode, resolveRoute } from './settings.js'
 import { approvedAssets, getCandidate, toData, type CharacterRow } from './characters.js'
-import { comboEntries, comboProblem, getScene, sceneFields, sceneRefs, type SceneRef } from './scenes.js'
+import { comboEntries, comboProblem, getScene, sceneFields, sceneRefs, videoModel, type SceneRef } from './scenes.js'
 import { assertFace } from './videoAssets.js'
 import { getAsset } from '../storage/assets.js'
 import { assets } from '../db/schema.js'
@@ -212,6 +215,59 @@ export async function buildScenePlan(deps: Deps, ctx: Ctx, row: CharacterRow, sc
   }
 }
 
+// ── The prompt writer: Claude writes the final prompt (default rule) ──
+
+// What a still prompt was written from; a change to it is pointed out.
+export function stillBasis(deps: Deps, ch: Ch, f: SceneFields): string {
+  const { templates, scenes: sc, views } = deps.config.pipeline
+  return sha256Hex(writerFacts(templates, sc, views, f, ch))
+}
+
+export interface PromptWriteInput { sceneId: string; target: PromptTarget; motion?: string; directions?: string; startCandidateId?: string; endCandidateId?: string }
+
+export async function buildScenePromptWrite(deps: Deps, ctx: Ctx, row: CharacterRow, input: PromptWriteInput): Promise<SceneBuilt> {
+  const scene = await getScene(deps, ctx, input.sceneId)
+  if (scene.characterId !== row.id) throw new AppError('bad_request', 'That scene belongs to another character.')
+  const ch = toData(row)
+  const f = sceneFields(deps, scene)
+  const { templates: t, scenes: sc, views } = deps.config.pipeline
+  const route = await resolveRoute(deps, ctx, 'prompt_writer')
+  const pv = pronounVars(ch.pronouns)
+  const purpose = `scene_prompt:${scene.id}:${input.target}`
+  const label = sceneLabel(scene, f)
+  const llm = (system: string, prompt: string, extra: { imageAssetIds?: string[]; meta: Record<string, unknown> }): SceneBuilt => ({
+    purpose,
+    preview: { title: input.target === 'still' ? 'Write the prompt' : 'Write the video prompt', prompts: [{ label: 'Prompt writer', text: `${system}\n${prompt}`, wrapped: hardWrap(`${system}\n${prompt}`) }], warnings: [], invalidates: [] },
+    specs: [{
+      type: 'llm', stage: 'scene', purpose, label: `${input.target === 'still' ? 'Write the prompt' : 'Write the video prompt'}, ${label}`,
+      request: {
+        model: route.model, system, prompt, schema: promptWriterJsonSchema, schemaName: 'scene_prompt', maxTokens: 1200, effort: route.effort ?? 'medium',
+        ...(extra.imageAssetIds?.length ? { imageAssetIds: extra.imageAssetIds } : {}),
+        meta: { sceneId: scene.id, target: input.target, ...extra.meta },
+      },
+    }],
+  })
+  if (input.target === 'still') {
+    const range = sc.settings.prompt_words.still
+    const facts = writerFacts(t, sc, views, f, ch)
+    const system = fill(t.prompt_writer.still_system, { ...pv, name: ch.name, min: String(range[0]), max: String(range[1]) })
+    const prompt = fill(t.prompt_writer.still_prompt, { name: ch.name, facts })
+    return llm(system, prompt, { meta: { basis: sha256Hex(facts), mockPrompt: mockWrittenPrompt('still', { facts }, range) } })
+  }
+  // A video prompt: what happens, from the start frame (Claude sees it).
+  const motion = (input.motion ?? '').trim()
+  if (motion.length < 3) throw new AppError('invalid_request', 'Say what happens in the clip first.')
+  const start = input.startCandidateId ? await getCandidate(deps, ctx, input.startCandidateId) : null
+  if (start && (start.sceneId !== scene.id || !start.assetId || isVideoCandidate(start))) throw new AppError('bad_request', 'The start frame must be a still from this scene.')
+  const directions = (input.directions ?? sc.video.directions).trim()
+  const still = scenePrompts(scene.prompts).still?.text
+  const sceneText = still ?? [f.moment, f.setting, f.outfit].map(x => x.trim().replace(/[.\s]+$/, '')).filter(Boolean).join('. ')
+  const range = sc.settings.prompt_words.video
+  const system = fill(t.prompt_writer.video_system, { ...pv, name: ch.name, min: String(range[0]), max: String(range[1]), directions, end_frame: input.endCandidateId ? t.prompt_writer.end_frame : '' })
+  const prompt = fill(t.prompt_writer.video_prompt, { motion, scene: sceneText })
+  return llm(system, prompt, { imageAssetIds: start?.assetId ? [start.assetId] : [], meta: { motion, directions, mockPrompt: mockWrittenPrompt('video', { motion }, range) } })
+}
+
 // ── Generate: stills for one scene, on one or two models ────────────
 
 export async function buildSceneRun(deps: Deps, ctx: Ctx, row: CharacterRow, input: { sceneId: string; models: string[]; variations: number; reason?: string; withQa: boolean; allowRepeat?: boolean }): Promise<SceneBuilt> {
@@ -245,13 +301,21 @@ export async function buildSceneRun(deps: Deps, ctx: Ctx, row: CharacterRow, inp
   const prompts: SceneBuilt['preview']['prompts'] = []
   const realism: RealismWarning[] = []
   const sceneRules = { outfitOverride: sw.on('scene-outfit-override'), brandFree: sw.on('scene-brand-free'), colors: sw.on('scene-colors'), referenceLine: sw.on('scene-reference-slot') }
+  // Default rule scene-prompt-writer: the written prompt (Claude's, or the
+  // owner's edit) is the scene text; the Studio adds its own lines and the
+  // REALISM block per model. Without one, the template builds it.
+  const written = sw.on('scene-prompt-writer') ? scenePrompts(scene.prompts).still : undefined
+  if (sw.on('scene-prompt-writer') && !written) {
+    warnings.push({ ruleId: 'scene-prompt-writer', spec: '9', title: 'No written prompt yet', severity: 'warning', message: 'This run uses the template prompt. Write the prompt above Generate to use natural sentences instead.' })
+  }
   for (const model of models) {
     const entry = modelEntry(deps, model)
     const identity = identityForModel(ch.identities, model)
     // SPEC 5.2 rule 14: refs for an edit model, the saved character for a
     // trained one, the full card otherwise.
     const mode: ReferenceMode = entry.max_refs > 0 ? 'refs' : identity ? 'trained' : 'text'
-    const prompt = buildScenePrompt(templates, sc, views, f, ch, mode, { identityBlock: identity?.promptBlock, warnings: realism, addendum, rules: sceneRules, flawDose: sw.on('realism-flaw-dose') })
+    const o = { identityBlock: identity?.promptBlock, warnings: realism, addendum, rules: sceneRules, flawDose: sw.on('realism-flaw-dose') }
+    const prompt = written ? assembleStillPrompt(templates, sc, views, f, ch, mode, written.text, o) : buildScenePrompt(templates, sc, views, f, ch, mode, o)
     const kind: GenRequest['kind'] = mode === 'refs' ? 'image_edit' : 'image'
     const run = await runModel(deps, ctx, model, kind)
     const attached = mode === 'refs' ? refs.slice(0, Math.max(1, entry.max_refs)) : []
@@ -366,10 +430,11 @@ export async function buildSceneUpscale(deps: Deps, ctx: Ctx, row: CharacterRow,
 }
 
 // ── Video from a picked still (Stage 9, owner ruling 2026-10-13) ────────
-// Straight to the final model (Seedance 2.5, 720p), one job per take; a
-// quick motion test (Kling 3.0 Turbo, 5 s) is optional. Audio off, start
-// frame plus an optional end frame, one continuous take, the owner's
-// directions. Each take is checked locally when it arrives (free).
+// Straight to the picked model (Kling 3.0 Pro by default, DECISIONS G11),
+// one job per take; a quick motion test (Kling 3.0 Turbo, 5 s) is
+// optional. Audio off, start frame plus an optional end frame, one
+// continuous take, the owner's directions, the REALISM block. Each take is
+// checked locally when it arrives (free).
 
 const VIDEO_OPS = new Set(['video', 'video_upscale'])
 const isVideoCandidate = (c: { op: string }) => VIDEO_OPS.has(c.op)
@@ -377,6 +442,8 @@ const isVideoCandidate = (c: { op: string }) => VIDEO_OPS.has(c.op)
 export interface SceneVideoInput {
   candidateId: string
   endCandidateId?: string
+  // One of scenes.yaml video.models; the account's last pick, else the default.
+  model?: string
   motion: string
   directions: string
   durationSec: number
@@ -395,9 +462,12 @@ export async function buildSceneVideo(deps: Deps, ctx: Ctx, row: CharacterRow, i
   const { templates: t, scenes: sc, rules } = deps.config.pipeline
   const v = sc.video
   const sw = await ruleSwitches(deps, ctx, row.id)
-  const model = input.test ? v.test.model : v.model
+  const wanted = input.model ?? (input.test ? v.model : await videoModel(deps, ctx))
+  const picked = v.models.find(m => m.ref === wanted)
+  if (!picked) throw new AppError('bad_request', `${input.model} is not offered for video. Pick one of the listed models.`)
+  const model = input.test ? v.test.model : picked.ref
   const durationSec = input.test ? v.test.duration : input.durationSec
-  const resolution = input.test ? v.test.resolution : v.resolution
+  const resolution = input.test ? v.test.resolution : picked.resolution
   const warnings: RuleViolation[] = []
   const entry = modelEntry(deps, model)
   const endFrame = end && (entry.params as { end_image?: boolean } | undefined)?.end_image !== false ? end : null
@@ -406,7 +476,15 @@ export async function buildSceneVideo(deps: Deps, ctx: Ctx, row: CharacterRow, i
   const run = await runModel(deps, ctx, model, 'video')
   const motion = input.motion.trim().replace(/[.\s]+$/, '')
   if (motion.length < 3) throw new AppError('invalid_request', 'Say what happens in the clip.')
-  const prompt = normalizePrompt(fill(t.video.base, { motion, directions: input.directions.trim(), silent: input.audio ? '' : t.video.silent }))
+  // Default rule scene-prompt-writer: the written video prompt (Claude's or
+  // the owner's edit) replaces "what happens". The directions, the silent
+  // line and the REALISM block are added either way.
+  const ch = toData(row)
+  const written = sw.on('scene-prompt-writer') ? scenePrompts(scene.prompts).video : undefined
+  if (sw.on('scene-prompt-writer') && !written) {
+    warnings.push({ ruleId: 'scene-prompt-writer', spec: '9', title: 'No written video prompt yet', severity: 'warning', message: 'This take uses "what happens" as the prompt. Write the video prompt above Generate to use natural sentences instead.' })
+  }
+  const prompt = assembleVideoPrompt(t, written?.text ?? `${motion}.`, { directions: input.directions, audio: input.audio, realism: ch.realism?.block })
   const request: GenRequest = {
     kind: 'video', model: run.model, prompt, aspect: input.aspect, resolution, durationSec, audio: input.audio,
     startFrame: { assetId: start.assetId },
@@ -430,6 +508,26 @@ export async function buildSceneVideo(deps: Deps, ctx: Ctx, row: CharacterRow, i
     purpose: `scene_video:${scene.id}`, specs, followUp,
     preview: { title: input.test ? v.test.label : 'Video from the still', prompts: [{ label: 'Video prompt', text: prompt, wrapped: hardWrap(prompt) }], warnings, invalidates: [] },
   }
+}
+
+// The price of a take on each video model, for the picker (owner,
+// 2026-10-13: "each with its price"). Estimates are free; the account path
+// asks Higgsfield (saved for hours), the API path uses the price book.
+export async function videoPrices(deps: Deps, ctx: Ctx, input: { durationSec: number; aspect: string }): Promise<Array<{ model: string; label: string; display: string | null; verified: boolean; note: string | null }>> {
+  const v = deps.config.pipeline.scenes.video
+  const durationSec = Math.max(2, Math.min(15, Math.round(input.durationSec)))
+  return Promise.all(v.models.map(async m => {
+    const entry = modelEntry(deps, m.ref)
+    try {
+      const run = await runModel(deps, ctx, m.ref, 'video')
+      const request: GenRequest = { kind: 'video', model: run.model, prompt: 'price', aspect: input.aspect, resolution: m.resolution, durationSec, audio: false, ...(run.billing ? { billing: run.billing } : {}) }
+      const [item] = await quoteItemsFor(deps, ctx, [{ type: 'gen', stage: 'video', purpose: 'video_price', label: entry.label, request }])
+      const e = item!.estimate
+      return { model: m.ref, label: entry.label, display: displayPrice([{ amountMicros: e.totalMicros, credits: e.credits ?? null }]), verified: e.verified, note: e.note ?? null }
+    } catch (e) {
+      return { model: m.ref, label: entry.label, display: null, verified: false, note: (e as Error).message }
+    }
+  }))
 }
 
 // "Upscale this take": the exact take, never re-rolled. The upscaled clip

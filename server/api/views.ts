@@ -9,15 +9,18 @@ import { jobs } from '../db/schema.js'
 import { getAsset } from '../storage/assets.js'
 import { approvedAssets, candidatesFor, getCharacter, inspirationAssetIds, listConcepts, sheetState, toData, type CharacterRow } from '../pipeline/characters.js'
 import { characterCosts } from '../pipeline/costs.js'
-import { claudeModels, providerMode, resolveRoute } from '../pipeline/settings.js'
+import { claudeModels, liveRoute, providerMode, resolveRoute } from '../pipeline/settings.js'
 import { effectiveModel, readModelOverrides } from '../providers/modelOverrides.js'
 import { readBilling } from '../providers/billing.js'
 import { serverKeyFor } from '../providers/serverKeys.js'
 import { identityForModel } from '../core/identity.js'
-import { checkSceneFields, sceneFieldsSchema } from '../core/scenes.js'
-import { comboEntries, comboProblem, draftFields, effectiveFields, listScenes, sceneAspect, sceneCandidates, sceneRefs } from '../pipeline/scenes.js'
+import { checkSceneFields, sceneFieldsSchema, templateBody } from '../core/scenes.js'
+import { scenePrompts } from '../core/promptWriter.js'
+import { realismBlock } from '../core/realism.js'
+import { modelLabel } from '../costs/quotes.js'
+import { comboEntries, comboProblem, draftFields, effectiveFields, listScenes, sceneAspect, sceneCandidates, sceneRefs, videoModel } from '../pipeline/scenes.js'
 import { ruleSwitches } from '../pipeline/rules.js'
-import { comboPreview } from '../pipeline/sceneActions.js'
+import { comboPreview, stillBasis } from '../pipeline/sceneActions.js'
 
 // Response shapes for the UI. Plain data only; no secrets, no internals.
 
@@ -217,6 +220,15 @@ export async function scenesView(deps: Deps, ctx: Ctx, characterId: string) {
       refs: await sceneRefs(deps, ctx, characterId, { view: f.view ?? 'front', framing: f.framing ?? 'waist_up', expression: f.expression ?? 'neutral', refs: f.refs ?? [] }, sw.on('scene-refs-by-angle')),
       refsChosen: (f.refs ?? []).length > 0,
       candidates: cands.filter(c => c.sceneId === s.id).map(shape),
+      // The written prompts (prompt writer), with whether the details
+      // changed after the still prompt was written.
+      prompts: (() => {
+        const w = scenePrompts(s.prompts)
+        const stale = !!(w.still?.basis && complete && w.still.basis !== stillBasis(deps, ch, parsed.data))
+        return { still: w.still ? { ...w.still, stale } : null, video: w.video ? { ...w.video, stale: false } : null }
+      })(),
+      // What "Use the template" puts in the prompt box.
+      templateText: complete ? templateBody(deps.config.pipeline.templates, sc, views, parsed.data, ch) : null,
     })
   }
   const p = ch.pronouns
@@ -241,9 +253,17 @@ export async function scenesView(deps: Deps, ctx: Ctx, characterId: string) {
       stillModels, editModels, defaultModels: stillModels.slice(0, 1).map(m => m.ref),
       maxVariations: sc.settings.max_variations, maxModels: sc.settings.max_models,
       accountConnected: connected, mode: await providerMode(deps.db, ctx.accountId),
-      // Video defaults (Stage 9), all editable on the video card.
+      // The prompt writer (default rule scene-prompt-writer), its model as
+      // it runs live, its word ranges, and the REALISM block it always gets.
+      promptWriter: {
+        on: sw.on('scene-prompt-writer'), model: modelLabel(deps, (await liveRoute(deps, ctx, 'prompt_writer')).model),
+        words: sc.settings.prompt_words, realism: realismBlock(ch.realism?.block),
+      },
+      // Video defaults (Stage 9), all editable on the video card. The model
+      // is the account's last pick (Kling 3.0 Pro until one is made).
       video: {
-        model: modelInfo(sc.video.model), durations: sc.video.durations, duration: sc.video.duration, aspect: sc.video.aspect,
+        model: modelInfo(await videoModel(deps, ctx)),
+        models: sc.video.models.map(m => ({ ...modelInfo(m.ref), resolution: m.resolution ?? null })), durations: sc.video.durations, duration: sc.video.duration, aspect: sc.video.aspect,
         maxTakes: sc.video.max_takes, takes: sc.video.takes, directions: sc.video.directions,
         test: { model: modelInfo(sc.video.test.model), duration: sc.video.test.duration, label: sc.video.test.label, note: sc.video.test.note },
         upscale: modelInfo(sc.video.upscale.model),

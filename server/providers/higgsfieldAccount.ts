@@ -107,6 +107,7 @@ export function accountParams(entry: ReturnType<typeof accountModel>, req: GenRe
   Object.assign(params, m.fixed, entry.force_off ?? {})
   // Audio is off unless the request asks for it (default rule video-audio-off).
   if ('generate_audio' in params) params.generate_audio = req.audio === true
+  if ('sound' in params) params.sound = req.audio === true ? 'on' : 'off'
   // A masked edit changes only the white area of the mask (the end frame
   // helper inpaints the head of the start frame).
   if (req.mask || req.maskFor) {

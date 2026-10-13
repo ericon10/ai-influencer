@@ -12,6 +12,9 @@ import {
 } from '../core/scenes.js'
 import { getCandidate, getCharacter, toData, updateCharacter, approvedAssets, sheetState } from './characters.js'
 import { ruleSwitches } from './rules.js'
+import { getSetting, setSetting } from './settings.js'
+import { scenePrompts, type PromptTarget, type WrittenPrompt } from '../core/promptWriter.js'
+import { wordCount } from '../core/text.js'
 
 // Scenes (Stage 7) and still edits (Stage 8): the scene records, the free
 // steps (crop, mirror) and the human gate. Paid steps are actions.
@@ -115,15 +118,45 @@ function cleanFields(f: Partial<SceneFields>): Partial<SceneFields> {
   return out as Partial<SceneFields>
 }
 
-export async function updateScene(deps: Deps, ctx: Ctx, id: string, patch: { brief?: string; title?: string; fields?: Partial<SceneFields> }): Promise<SceneRow> {
+// `prompts` is the owner's own edit of a written prompt (or "" to clear it):
+// the text becomes theirs, and what it was written from is kept.
+export async function updateScene(deps: Deps, ctx: Ctx, id: string, patch: { brief?: string; title?: string; fields?: Partial<SceneFields>; prompts?: Partial<Record<PromptTarget, string>>; fromTemplate?: boolean }): Promise<SceneRow> {
   const row = await getScene(deps, ctx, id)
   const fields = patch.fields ? { ...draftFields(row), ...cleanFields(patch.fields) } : draftFields(row)
+  let prompts = scenePrompts(row.prompts)
+  for (const [target, text] of Object.entries(patch.prompts ?? {}) as Array<[PromptTarget, string]>) {
+    const before = prompts[target]
+    const source = patch.fromTemplate ? 'template' as const : before?.text === text ? before.source : 'owner' as const
+    prompts = { ...prompts, [target]: text.trim() ? { ...before, text: text.slice(0, MAX_PROMPT), source, at: deps.clock.now().toISOString(), words: wordCount(text) } : undefined }
+  }
   const [out] = await deps.db.update(scenes).set({
     brief: patch.brief !== undefined ? patch.brief.slice(0, 2000) : row.brief,
     title: patch.title !== undefined ? patch.title.slice(0, 80) : (patch.fields?.title ?? row.title),
-    fields, updatedAt: deps.clock.now(),
+    fields, prompts, updatedAt: deps.clock.now(),
   }).where(eq(scenes.id, row.id)).returning()
   return out!
+}
+
+const MAX_PROMPT = 4000
+
+// The video model for the next take: the account's last pick while it is
+// still offered, else the default (owner, 2026-10-13: Kling 3.0 Pro).
+const VIDEO_MODEL_KEY = 'video_model'
+export async function videoModel(deps: Deps, ctx: Ctx): Promise<string> {
+  const v = deps.config.pipeline.scenes.video
+  const saved = await getSetting<string | null>(deps.db, ctx.accountId, VIDEO_MODEL_KEY, null)
+  return saved && v.models.some(m => m.ref === saved) ? saved : v.model
+}
+export async function saveVideoModel(deps: Deps, ctx: Ctx, model: string): Promise<void> {
+  if (!deps.config.pipeline.scenes.video.models.some(m => m.ref === model)) throw new AppError('bad_request', `${model} is not offered for video.`)
+  if ((await getSetting<string | null>(deps.db, ctx.accountId, VIDEO_MODEL_KEY, null)) !== model) await setSetting(deps, ctx, VIDEO_MODEL_KEY, model)
+}
+
+// A prompt the writer (or "Use the template") put on the scene.
+export async function setScenePrompt(deps: Deps, ctx: Ctx, id: string, target: PromptTarget, prompt: Omit<WrittenPrompt, 'words' | 'at'>): Promise<void> {
+  const row = await getScene(deps, ctx, id)
+  const next = { ...scenePrompts(row.prompts), [target]: { ...prompt, text: prompt.text.slice(0, MAX_PROMPT), words: wordCount(prompt.text), at: deps.clock.now().toISOString() } }
+  await deps.db.update(scenes).set({ prompts: next, updatedAt: deps.clock.now() }).where(eq(scenes.id, row.id))
 }
 
 export async function archiveScene(deps: Deps, ctx: Ctx, id: string): Promise<void> {

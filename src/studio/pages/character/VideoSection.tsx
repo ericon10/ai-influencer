@@ -1,18 +1,21 @@
 import { useEffect, useState } from 'react'
-import { AlertTriangle, CheckCircle2, Download, Film, Loader2, RotateCcw, Wand2, XCircle } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
+import { AlertTriangle, Check, CheckCircle2, Download, Film, Info, Loader2, RotateCcw, Wand2, XCircle } from 'lucide-react'
 import { api, ApiError, assetUrl } from '../../api'
 import { useRefresh } from '../../hooks'
 import { PriceButton } from '../../PriceButton'
 import { Callout, Drawer, Field, Img, PromptViewer, errorMessage, useToast, type TodoItem } from '../../ui'
 import type { CharacterView, SceneStill, SceneView, ScenesData } from '../../types'
 import { OP_LABEL, STILL_STATUS, claudeChecked, wrap } from './StillDrawer'
+import { PromptBox } from './PromptBox'
 
 // Stage 9 (owner ruling 2026-10-13): a video from a picked still. Straight
-// to the final model (Seedance 2.5, 720p), then "Upscale this take" on a
-// take you keep, so the exact take is preserved. Start frame plus an
-// optional end frame, 9:16, audio off, the directions in the prompt, one
-// continuous take: all defaults, all editable. A quick motion test on the
-// cheap model is there for complex movement, off by default.
+// to the picked model (Kling 3.0 Pro unless another was picked last, each
+// shown with its price), then "Upscale this take" on a take you keep, so
+// the exact take is preserved. Start frame plus an optional end frame,
+// 9:16, audio off, the directions in the prompt, one continuous take: all
+// defaults, all editable. A quick motion test on the cheap model is there
+// for complex movement, off by default.
 
 const usable = (c: SceneStill) => c.media === 'image' && !!c.assetId && !['failed', 'rejected', 'superseded', 'qa_failed', 'qa_pending'].includes(c.status)
 
@@ -30,20 +33,39 @@ export function VideoSection({ v, data, scene, startId, setStartId }: { v: Chara
   const [takes, setTakes] = useState(o.takes)
   const [test, setTest] = useState(false)
   const [helper, setHelper] = useState(false)
+  // The model for this take: the account's last pick (Kling 3.0 Pro until
+  // one is made), each shown with the price of one take.
+  const [model, setModel] = useState(o.model.ref)
+  useEffect(() => setModel(o.model.ref), [o.model.ref])
+  const picked = o.models.find(m => m.ref === model) ?? { ...o.model, resolution: null }
+  const prices = useQuery({ queryKey: ['video-prices', v.id, duration, aspect, data.options.mode], queryFn: () => api.videoPrices(v.id, duration, aspect), staleTime: 10 * 60_000, retry: false })
+  function pick(ref: string) {
+    setModel(ref)
+    api.setVideoModel(ref).catch(() => undefined)
+  }
+  const pw = data.options.promptWriter
+  const [promptDirty, setPromptDirty] = useState(false)
+  const written = scene.prompts.video
+  const needsPrompt = pw.on && !(written?.text ?? '').trim()
   const [open, setOpen] = useState<string | null>(null)
   useEffect(() => { if (endId && (endId === start?.id || !stills.some(s => s.id === endId))) setEndId(null) }, [endId, start?.id, stills])
   const ends = stills.filter(c => c.id !== start?.id).sort((a, b) => Number(b.op === 'end_frame') - Number(a.op === 'end_frame'))
-  const todo: TodoItem[] = [
+  const writeTodo: TodoItem[] = [
     ...(!start ? [{ label: 'Pick a start frame', target: 'video-start' }] : []),
     ...(motion.trim().length < 3 ? [{ label: 'What happens', target: 'video-motion' }] : []),
   ]
+  const todo: TodoItem[] = [
+    ...writeTodo,
+    ...(needsPrompt ? [{ label: 'The video prompt (write it, or type your own)', target: 'video-prompt' }] : []),
+  ]
+  const motionChanged = !!written?.motion && written.motion.trim() !== motion.trim()
   const clip = clips.find(c => c.id === open) ?? null
 
   return (
     <section className="st-col" style={{ gap: 14 }}>
       <div className="st-section-head"><div className="st-h2">Videos</div><span className="st-muted">{clips.filter(c => c.assetId).length}</span></div>
       <div className="st-card" data-field="video-card">
-        <div className="st-card-head"><Film size={16} /><div className="grow"><div className="st-h3">Make a video</div><div className="st-hint">Straight to {o.model.label} at 720p. Keep a take you like, then upscale that exact take.</div></div></div>
+        <div className="st-card-head"><Film size={16} /><div className="grow"><div className="st-h3">Make a video</div><div className="st-hint">Straight to {picked.label}{picked.resolution ? ` at ${picked.resolution}` : ''}. Keep a take you like, then upscale that exact take.</div></div></div>
         <div className="st-card-body st-col" style={{ gap: 16 }}>
           {stills.length === 0 ? (
             <Callout tone="info">Generate a still above first. A video starts from a still of this scene.</Callout>
@@ -78,6 +100,23 @@ export function VideoSection({ v, data, scene, startId, setStartId }: { v: Chara
               <Field id="video-directions" label="Directions" hint="Added to the prompt. Edit freely.">
                 <textarea className="st-textarea" rows={2} style={{ minHeight: 0 }} maxLength={600} value={directions} onChange={e => setDirections(e.target.value)} />
               </Field>
+              {!test && (
+                <Field id="video-model" label="Video model" group hint={data.options.mode === 'demo' ? 'Demo mode runs a free mock for every model.' : 'Price of one take at this length and shape. Your pick is remembered for the next take.'}>
+                  <div className="st-videomodels" role="radiogroup" aria-label="Video model">
+                    {o.models.map(m => {
+                      const price = prices.data?.prices.find(p => p.model === m.ref)
+                      const on = m.ref === picked.ref
+                      return (
+                        <button key={m.ref} type="button" role="radio" aria-checked={on} className={`st-choice ${on ? 'on' : ''}`} onClick={() => pick(m.ref)} title={m.note || undefined}>
+                          <span className="st-row" style={{ gap: 8 }}><b>{m.label}</b><span className="st-spacer" />{on && <Check size={14} />}</span>
+                          <span className="st-model-price">{prices.isLoading ? <Loader2 size={12} className="st-spin" /> : price?.display ?? 'No price yet'}{price?.display && !price.verified ? <span className="st-muted" style={{ fontWeight: 400 }}> (not confirmed)</span> : null}</span>
+                          <span className="st-hint">{m.path === 'account' ? 'Your Higgsfield plan' : 'Higgsfield API'}{m.resolution ? ` · ${m.resolution}` : ''}</span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </Field>
+              )}
               <div className="st-form">
                 {!test && (
                   <Field label="Length" group>
@@ -107,12 +146,26 @@ export function VideoSection({ v, data, scene, startId, setStartId }: { v: Chara
                   <span className="st-hint">{o.test.model.label}, {o.test.duration} s, cheap. Only for checking complex motion before a real take; off for real takes.</span>
                 </span>
               </label>
+              {pw.on ? (
+                <PromptBox
+                  id="video-prompt" characterId={v.id} sceneId={scene.id} target="video"
+                  written={written} templateText={motion.trim().length >= 3 ? `${motion.trim().replace(/[.\s]+$/, '')}.` : null} words={pw.words.video} model={pw.model} realism={pw.realism}
+                  writeTodo={writeTodo}
+                  writeAction={writeTodo.length || !start ? null : { type: 'scene_prompt', characterId: v.id, sceneId: scene.id, target: 'video', motion: motion.trim(), directions: directions.trim(), startCandidateId: start.id, ...(endId ? { endCandidateId: endId } : {}) }}
+                  addedNote="Added when it runs: the directions, the silent line when sound is off, and the REALISM block (always)."
+                  changedNote={motionChanged ? 'You changed "What happens" after this was written. Rewrite to use it, or keep it as it is.' : null}
+                  onDirty={setPromptDirty}
+                />
+              ) : (
+                <span className="st-hint"><Info size={12} style={{ verticalAlign: -2 }} /> The prompt writer is off, so "What happens" and the directions are the prompt. Switch it on in Settings, Claude models.</span>
+              )}
               <PriceButton
                 size="big"
                 label={test ? 'Run the motion test' : takes > 1 ? `Generate ${takes} takes` : 'Generate a take'}
                 todo={todo}
-                action={todo.length || !start ? null : {
-                  type: 'scene_video', characterId: v.id, candidateId: start.id, ...(endId ? { endCandidateId: endId } : {}),
+                waiting={promptDirty ? 'Saving your changes...' : undefined}
+                action={todo.length || !start || promptDirty ? null : {
+                  type: 'scene_video', characterId: v.id, candidateId: start.id, ...(endId ? { endCandidateId: endId } : {}), ...(test ? {} : { model: picked.ref }),
                   motion: motion.trim(), directions: directions.trim(), durationSec: test ? o.test.duration : duration, aspect, audio, takes: test ? 1 : takes, test,
                 }}
               />

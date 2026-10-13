@@ -432,7 +432,10 @@ rule book is `config/rules.yaml`.
 34. **Strip any audio track** from generated clips that did not ask
     for audio, even when audio was "off."
 35. **Straight to the final model, then upscale the take you keep**
-    (owner, 2026-10-13). Takes run on Seedance 2.5 at 720p; "Upscale
+    (owner, 2026-10-13). Takes run on the picked model (Kling 3.0 Pro
+    by default; Kling 3.0 Standard, Seedance 2.0, Seedance 2.5 or Wan
+    3.0 Prime, each shown with its price, the last pick remembered);
+    "Upscale
     this take" sends the exact take to Higgsfield's video upscaler, so
     it is preserved instead of re-rolled. Both prices are shown first.
     A quick motion test (Kling 3.0 Turbo, 5 s, "faces not
@@ -660,8 +663,14 @@ round-trips with the `Character` record (export to
 
 **LLM token rules**
 
-- Prompts are filled by code from templates and the character
-  file, not written from scratch by an LLM each time.
+- The prompt writer (owner, 2026-10-13; a default, on unless
+  switched off): Claude Sonnet 5.5 turns the scene fields into the
+  final still prompt (110 to 150 words) or video prompt (40 to 80
+  words) as natural sentences about a real candid moment. The owner
+  edits it or presses Rewrite, priced with the model name. Code still
+  adds the reference line, the jewelry and mark sides and the REALISM
+  block, so they never depend on the writing. Switched off, code
+  fills the prompt from templates and the character file.
 - A small, cheap model handles routine prompt filling and
   first-pass QA triage. A larger model only for concepts and new
   scene ideas.

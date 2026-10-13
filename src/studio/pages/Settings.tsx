@@ -64,6 +64,14 @@ function ClaudeCard({ d }: { d: SettingsView }) {
   const invalidate = useInvalidate()
   const [busy, setBusy] = useState<string | null>(null)
   const short = (label: string) => label.replace(/^Claude /, '')
+  async function toggle(task: string, label: string, rule: { id: string; on: boolean }) {
+    setBusy(task)
+    try {
+      await api.setRule({ ruleId: rule.id, on: !rule.on })
+      invalidate()
+      toast({ tone: 'ok', text: `${label} is ${rule.on ? 'off: the template builds the prompt' : 'on'}.` })
+    } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) } finally { setBusy(null) }
+  }
   async function choose(task: string, label: string, model: string) {
     setBusy(task)
     try {
@@ -83,6 +91,12 @@ function ClaudeCard({ d }: { d: SettingsView }) {
               <div className="st-h3">{t.label}{t.changed && <span className="st-badge plain warn" style={{ marginLeft: 8 }}>Changed</span>}</div>
               <div className="st-hint">{t.hint}</div>
             </div>
+            {t.rule && (
+              <label className="st-row" style={{ gap: 8, cursor: 'pointer' }}>
+                <button type="button" role="switch" aria-checked={t.rule.on} aria-label={`${t.label} on or off`} className={`st-switch ${t.rule.on ? 'on' : ''}`} disabled={busy === t.task} onClick={() => toggle(t.task, t.label, t.rule!)}><span /></button>
+                <span className="st-hint" style={{ minWidth: 22 }}>{t.rule.on ? 'On' : 'Off'}</span>
+              </label>
+            )}
             <div className="st-seg" role="radiogroup" aria-label={`${t.label} model`}>
               {d.claude.choices.map(c => (
                 <button key={c.ref} role="radio" aria-checked={t.model === c.ref} className={t.model === c.ref ? 'on' : ''} disabled={busy === t.task} onClick={() => t.model !== c.ref && choose(t.task, t.label, c.ref)}>

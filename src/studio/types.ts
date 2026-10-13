@@ -60,6 +60,15 @@ export interface SceneView {
   refs: Array<{ refId: string; role: 'face' | 'angle' | 'body' | 'expression'; assetId: string }>
   refsChosen: boolean
   candidates: SceneStill[]
+  // The prompt writer's text (or the owner's edit) for stills and video.
+  prompts: { still: WrittenPrompt | null; video: WrittenPrompt | null }
+  // What "Use the template" puts in the prompt box.
+  templateText: string | null
+}
+
+export interface WrittenPrompt {
+  text: string; source: 'claude' | 'owner' | 'template'; at: string; model?: string; words: number; stale: boolean
+  motion?: string; directions?: string
 }
 
 export interface ScenePreset { id: string; label: string; hint?: string }
@@ -77,8 +86,9 @@ export interface ScenesData {
     editPresets: Array<ScenePreset & { text: string; face: boolean }>
     stillModels: SceneModel[]; editModels: SceneModel[]; defaultModels: string[]
     maxVariations: number; maxModels: number; accountConnected: boolean; mode: 'demo' | 'live'
+    promptWriter: { on: boolean; model: string; words: { still: [number, number]; video: [number, number] }; realism: string }
     video: {
-      model: SceneModel; durations: number[]; duration: number; aspect: string; maxTakes: number; takes: number; directions: string
+      model: SceneModel; models: Array<SceneModel & { resolution: string | null }>; durations: number[]; duration: number; aspect: string; maxTakes: number; takes: number; directions: string
       test: { model: SceneModel; duration: number; label: string; note: string }
       upscale: SceneModel
       endFrame: { model: SceneModel; presets: Array<{ id: string; label: string; text: string }> }
@@ -147,7 +157,8 @@ export type StudioAction =
   | { type: 'model_suite' }
   | { type: 'scene_plan'; characterId: string; sceneId: string }
   | { type: 'scene_ideas'; characterId: string; idea: string }
-  | { type: 'scene_video'; characterId: string; candidateId: string; endCandidateId?: string; motion: string; directions: string; durationSec: number; aspect: string; audio: boolean; takes: number; test: boolean }
+  | { type: 'scene_prompt'; characterId: string; sceneId: string; target: 'still' | 'video'; motion?: string; directions?: string; startCandidateId?: string; endCandidateId?: string }
+  | { type: 'scene_video'; characterId: string; candidateId: string; endCandidateId?: string; model?: string; motion: string; directions: string; durationSec: number; aspect: string; audio: boolean; takes: number; test: boolean }
   | { type: 'scene_video_upscale'; characterId: string; candidateId: string }
   | { type: 'scene_end_frame'; characterId: string; candidateId: string; change: string; withQa?: boolean }
   | { type: 'scene'; characterId: string; sceneId: string; models: string[]; variations: number; reason?: string; withQa?: boolean; allowRepeat?: boolean }
@@ -176,7 +187,7 @@ export interface SettingsView {
   // Claude tasks and the model each runs on (Settings, Claude models).
   claude: {
     choices: Array<{ ref: string; label: string }>
-    tasks: Array<{ task: string; label: string; hint: string; model: string; modelLabel: string; default: string; changed: boolean }>
+    tasks: Array<{ task: string; label: string; hint: string; model: string; modelLabel: string; default: string; changed: boolean; rule: { id: string; on: boolean } | null }>
   }
   models: Array<{
     ref: string; label: string; kinds: string[]; verified: boolean; notes: string; api: boolean; reference: string | null
@@ -205,3 +216,5 @@ export interface Usage {
   byModel: Array<{ model: string; runs: number; amount: string; micros: number }>
   recent: Array<{ id: string; at: string; type: string; amount: string; micros: number; stage: string; model: string; note: string; source: string }>
 }
+
+export interface VideoPrice { model: string; label: string; display: string | null; verified: boolean; note: string | null }

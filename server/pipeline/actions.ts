@@ -21,8 +21,8 @@ import { identityForModel } from '../core/identity.js'
 import type { RealismWarning } from '../core/realism.js'
 import { assertSuiteCap, buildModelSuite, buildModelTest, startModelSuite, startModelTest } from './modelTests.js'
 import { approvedAssets, getCandidate, getCharacter, getRef, inspirationAssetIds, setCharacterFields, sheetState, toData } from './characters.js'
-import { buildSceneEndFrame, buildSceneIdeas, buildScenePlan, buildSceneRecheck, buildSceneRun, buildSceneEdit, buildSceneUpscale, buildSceneVideo, buildVideoUpscale, type SceneBuilt } from './sceneActions.js'
-import { markSceneBusy } from './scenes.js'
+import { buildSceneEndFrame, buildSceneIdeas, buildScenePlan, buildScenePromptWrite, buildSceneRecheck, buildSceneRun, buildSceneEdit, buildSceneUpscale, buildSceneVideo, buildVideoUpscale, type SceneBuilt } from './sceneActions.js'
+import { markSceneBusy, saveVideoModel } from './scenes.js'
 import { ruleSwitches } from './rules.js'
 import { readBilling } from '../providers/billing.js'
 import { effectiveModel, readModelOverrides } from '../providers/modelOverrides.js'
@@ -54,6 +54,13 @@ export const actionSchema = z.discriminatedUnion('type', [
   // one or two models with QA (and the drift lock after a trained character).
   z.object({ type: z.literal('scene_plan'), characterId: z.string(), sceneId: z.string() }),
   z.object({ type: z.literal('scene_ideas'), characterId: z.string(), idea: z.string().trim().min(3).max(600) }),
+  // The prompt writer (default rule scene-prompt-writer): Claude writes the
+  // final still or video prompt from the scene details.
+  z.object({
+    type: z.literal('scene_prompt'), characterId: z.string(), sceneId: z.string(), target: z.enum(['still', 'video']),
+    motion: z.string().max(600).optional(), directions: z.string().max(600).optional(),
+    startCandidateId: z.string().optional(), endCandidateId: z.string().optional(),
+  }),
   z.object({
     type: z.literal('scene'), characterId: z.string(), sceneId: z.string(),
     models: z.array(z.string()).min(1).max(4), variations: z.number().int().min(1).max(8),
@@ -73,6 +80,7 @@ export const actionSchema = z.discriminatedUnion('type', [
   // helper inpaints only the head of the start frame.
   z.object({
     type: z.literal('scene_video'), characterId: z.string(), candidateId: z.string(), endCandidateId: z.string().optional(),
+    model: z.string().max(80).optional(),
     motion: z.string().max(600), directions: z.string().max(600).default(''), durationSec: z.number().int().min(2).max(15).default(5),
     aspect: z.string().max(8).default('9:16'), audio: z.boolean().default(false), takes: z.number().int().min(1).max(8).default(1), test: z.boolean().default(false),
   }),
@@ -182,6 +190,7 @@ export async function buildAction(deps: Deps, ctx: Ctx, action: StudioAction): P
   switch (action.type) {
     case 'scene_plan': return scene(await buildScenePlan(deps, ctx, row, action.sceneId))
     case 'scene_ideas': return scene(await buildSceneIdeas(deps, ctx, row, action.idea))
+    case 'scene_prompt': return scene(await buildScenePromptWrite(deps, ctx, row, action))
     case 'scene_video': return scene(await buildSceneVideo(deps, ctx, row, action))
     case 'scene_video_upscale': return scene(await buildVideoUpscale(deps, ctx, row, action.candidateId))
     case 'scene_end_frame': return scene(await buildSceneEndFrame(deps, ctx, row, { ...action, withQa: action.withQa ?? autoQa }))
@@ -391,6 +400,8 @@ async function afterStart(deps: Deps, ctx: Ctx, action: StudioAction, built: Bui
   if (action.type === 'scene' || action.type === 'scene_edit' || action.type === 'scene_upscale' || action.type === 'scene_video' || action.type === 'scene_video_upscale' || action.type === 'scene_end_frame') {
     await markSceneBusy(deps, ctx, built.purpose.split(':')[1]!)
   }
+  // The video model picked last is the next take's default.
+  if (action.type === 'scene_video' && !action.test && action.model) await saveVideoModel(deps, ctx, action.model)
   if (action.type === 'hero') {
     const row = await getCharacter(deps, ctx, action.characterId)
     if (row.stage < 3) await setCharacterFields(deps, ctx, row.id, { stage: 3 })

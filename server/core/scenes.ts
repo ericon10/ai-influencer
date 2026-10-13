@@ -5,10 +5,11 @@ import { cardPhrase, finishPrompt, markLines, pronounVars, type BuildOptions } f
 import { capitalize, fill, normalizePrompt } from './text.js'
 
 // Scenes (Stage 7) and one-change edits (Stage 8). A scene is a set of
-// fields: the owner's words or the planner fill them, and code builds the
-// prompt from the scene template (SPEC 9: prompts are never written from
-// scratch by an LLM). Rules from SPEC 5.2 and 5.3 live in config and in the
-// checks below.
+// fields: the owner's words or the planner fill them. The prompt writer
+// (DECISIONS G10) turns them into natural sentences, or the scene template
+// builds the prompt when it is switched off; either way code adds the
+// reference line, the mark sides and the REALISM block. Rules from SPEC 5.2
+// and 5.3 live in config and in the checks below.
 
 const text = (max: number) => z.string().trim().max(max)
 
@@ -137,8 +138,10 @@ type SceneCharacter = Pick<CharacterData, 'name' | 'card' | 'marks' | 'pronouns'
 // unless switched off; a scene that allows brands drops the brand-free line.
 export interface SceneRuleOptions { outfitOverride?: boolean; brandFree?: boolean; colors?: boolean; referenceLine?: boolean }
 
-// `addendum` is the fix line a review reason adds (config/review.yaml).
-export function buildScenePrompt(t: TemplatesConfig, sc: ScenesConfig, views: ViewsConfig, f: SceneFields, ch: SceneCharacter, mode: ReferenceMode, o: BuildOptions & { addendum?: string; rules?: SceneRuleOptions } = {}): string {
+// The pieces a scene prompt is made of, shared by the template and the
+// prompt writer. The reference line, the mark sides, the colors and the
+// brand-free line are the Studio's own lines; they never depend on writing.
+export function sceneParts(t: TemplatesConfig, sc: ScenesConfig, views: ViewsConfig, f: SceneFields, ch: SceneCharacter, mode: ReferenceMode, o: { rules?: SceneRuleOptions } = {}) {
   const rules = { outfitOverride: true, brandFree: true, colors: true, referenceLine: true, ...(o.rules ?? {}) }
   const pv = pronounVars(ch.pronouns)
   const view = views.views[f.view]
@@ -151,12 +154,6 @@ export function buildScenePrompt(t: TemplatesConfig, sc: ScenesConfig, views: Vi
   const reference = mode === 'refs' ? (rules.referenceLine ? fill(t.scene.reference.refs, pv) : '')
     : mode === 'trained' ? fill(t.scene.reference.trained, { name: ch.name })
     : fill(t.scene.reference.text, { card: cardPhrase(ch.card, ch.pronouns.noun) })
-  // Nothing is worn unless the scene says so: outfit, footwear and jewelry
-  // (signature pieces such as an ear cuff included) are each optional.
-  const items = [sentence(f.outfit), f.footwear ? (f.outfit ? `with ${sentence(f.footwear)}` : sentence(f.footwear)) : '', sentence(f.jewelry)].filter(Boolean)
-  const override = mode === 'refs' && rules.outfitOverride && f.outfit ? fill(t.scene.outfit_override, { sheet_outfit: t.scene.sheet_outfit }) : ''
-  const wearing = !items.length ? ''
-    : fill(f.outfit ? t.scene.wearing : t.scene.wearing_only, { ...pv, items: items.join(', '), outfit_override: override })
   const makeup = f.makeup === 'bare' ? t.scene.makeup.bare
     : f.makeup === 'soft_glam' ? fill(t.scene.makeup.soft_glam, { glam: ch.makeup.glam?.trim() || 'soft glam' })
     : fill(t.scene.makeup.natural, { natural: ch.makeup.default?.trim() || 'natural' })
@@ -166,25 +163,111 @@ export function buildScenePrompt(t: TemplatesConfig, sc: ScenesConfig, views: Vi
     ? fill(t.scene.colors, { ...pv, hair_color: hairColor }) : ''
   // Marks that are part of the face (a mole) stay; worn pieces are optional.
   const faceMarks = ch.marks.filter(m => m.kind !== 'jewelry')
-  const prompt = fill(t.scene.base, {
-    ...pv,
-    reference,
-    moment: sentence(f.moment),
-    setting: sentence(f.setting),
-    wearing,
-    makeup,
-    hair: sentence(f.hair) || 'as usual',
-    pose: capitalize(sentence(f.pose) || 'Natural, relaxed pose'),
+  return {
+    pv, reference, makeup,
+    momentType: sc.moments.find(m => m.id === f.momentType)?.label ?? '',
     expression: fill(expression.text, pv),
-    marks: markLines(t, view, faceMarks, ch.pronouns),
     camera: fill(camera.text, { ...pv, foreground: sentence(f.foreground) || camera.foreground || 'a blurred shoulder' }),
     framing: fill(framing.text, pv),
     height: height.text,
     light: light.text,
+    marks: markLines(t, view, faceMarks, ch.pronouns),
     colors,
     brand_line: rules.brandFree && !f.brands ? fill(t.scene.brand_free, pv) : '',
+    // The scene's outfit replaces the sheet outfit in the reference images.
+    override: mode === 'refs' && rules.outfitOverride && !!f.outfit,
+  }
+}
+
+type Parts = ReturnType<typeof sceneParts>
+
+// "She is wearing ..." from the outfit, footwear and jewelry fields (each
+// optional). The prompt writer path adds jewelry on its own line.
+function wearingLine(t: TemplatesConfig, f: SceneFields, p: Parts, o: { jewelry: boolean; override: boolean }): string {
+  const items = [sentence(f.outfit), f.footwear ? (f.outfit ? `with ${sentence(f.footwear)}` : sentence(f.footwear)) : '', o.jewelry ? sentence(f.jewelry) : ''].filter(Boolean)
+  const override = o.override && p.override ? fill(t.scene.outfit_override, { sheet_outfit: t.scene.sheet_outfit }) : ''
+  return !items.length ? '' : fill(f.outfit ? t.scene.wearing : t.scene.wearing_only, { ...p.pv, items: items.join(', '), outfit_override: override })
+}
+
+function fillSceneBase(t: TemplatesConfig, f: SceneFields, p: Parts, o: { scaffold: boolean }): string {
+  return fill(t.scene.base, {
+    ...p.pv,
+    reference: o.scaffold ? p.reference : '',
+    moment: sentence(f.moment),
+    setting: sentence(f.setting),
+    wearing: wearingLine(t, f, p, { jewelry: o.scaffold, override: o.scaffold }),
+    makeup: p.makeup,
+    hair: sentence(f.hair) || 'as usual',
+    pose: capitalize(sentence(f.pose) || 'Natural, relaxed pose'),
+    expression: p.expression,
+    marks: o.scaffold ? p.marks : '',
+    camera: p.camera,
+    framing: p.framing,
+    height: p.height,
+    light: p.light,
+    colors: o.scaffold ? p.colors : '',
+    brand_line: o.scaffold ? p.brand_line : '',
   })
+}
+
+// `addendum` is the fix line a review reason adds (config/review.yaml).
+export function buildScenePrompt(t: TemplatesConfig, sc: ScenesConfig, views: ViewsConfig, f: SceneFields, ch: SceneCharacter, mode: ReferenceMode, o: BuildOptions & { addendum?: string; rules?: SceneRuleOptions } = {}): string {
+  const prompt = fillSceneBase(t, f, sceneParts(t, sc, views, f, ch, mode, o), { scaffold: true })
   return finishPrompt(normalizePrompt(o.addendum ? `${prompt} ${o.addendum}` : prompt), 'scene', ch, o)
+}
+
+// The template's own text without the Studio's lines: what "Use the
+// template" puts in the prompt box while the prompt writer is on.
+export function templateBody(t: TemplatesConfig, sc: ScenesConfig, views: ViewsConfig, f: SceneFields, ch: SceneCharacter): string {
+  return normalizePrompt(fillSceneBase(t, f, sceneParts(t, sc, views, f, ch, 'refs'), { scaffold: false }))
+}
+
+// The details the prompt writer gets, one per line. The Studio's own lines
+// (reference, the exact outfit sentence with jewelry, mark sides, colors,
+// brand-free) are added after the writing; jewelry is left out here so its
+// side is never reworded.
+export function writerFacts(t: TemplatesConfig, sc: ScenesConfig, views: ViewsConfig, f: SceneFields, ch: SceneCharacter): string {
+  const p = sceneParts(t, sc, views, f, ch, 'refs')
+  const line = (label: string, value: string) => (value.trim() ? `- ${label}: ${sentence(value)}.` : '')
+  return [
+    line('The moment', f.moment),
+    line('Kind of moment', p.momentType),
+    line('Setting', f.setting),
+    line('Place', f.location),
+    line('Outfit', f.outfit),
+    line('Footwear', f.footwear),
+    line('Makeup', p.makeup),
+    line('Hair styling', f.hair),
+    line('Pose and gaze', f.pose),
+    line('Expression', p.expression),
+    line('Who takes the photo and from where', p.camera),
+    line('Framing and camera height', `${p.framing}, ${p.height}`),
+    line('Light', p.light),
+    line('In the foreground', f.foreground),
+    `- Brands: ${f.brands ? 'brands and logos may show' : 'everything is plain and unbranded'}.`,
+  ].filter(Boolean).join('\n')
+}
+
+// Text the writer or the owner wrote, made safe to wrap: a REALISM or AVOID
+// block in it is dropped (the Studio adds the character's own), and so are
+// quotes around the whole and extra space.
+export function cleanWritten(text: string): string {
+  return text.split('\n').filter(l => !/^\s*(?:REALISM|AVOID):/i.test(l)).join(' ')
+    .replace(/\s+/g, ' ').trim().replace(/^["\u201c]+|["\u201d]+$/g, '').trim()
+}
+
+// The final still prompt from written text: the reference line for this
+// model, the text, then the Studio's lines (the outfit sentence, the mark
+// sides, colors, brand-free), then REALISM and AVOID (rule zero, added by
+// finishPrompt and impossible to leave out).
+export function assembleStillPrompt(t: TemplatesConfig, sc: ScenesConfig, views: ViewsConfig, f: SceneFields, ch: SceneCharacter, mode: ReferenceMode, body: string, o: BuildOptions & { addendum?: string; rules?: SceneRuleOptions } = {}): string {
+  const p = sceneParts(t, sc, views, f, ch, mode, o)
+  // The template's exact outfit sentence (outfit, footwear, jewelry with its
+  // side, and the sheet outfit replaced): Callie's rule "always write the
+  // full outfit" holds whatever the writing says.
+  const wearing = wearingLine(t, f, p, { jewelry: true, override: true })
+  const text = [p.reference, cleanWritten(body), wearing, p.marks, p.colors, p.brand_line, o.addendum ?? ''].filter(Boolean).join('\n')
+  return finishPrompt(normalizePrompt(text), 'scene', ch, o)
 }
 
 // ── One-change edits (SPEC 5.3) ─────────────────────────────────────

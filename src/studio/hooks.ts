@@ -55,7 +55,7 @@ export function useCharacter(id: string) {
 export function useScenes(characterId: string) {
   const qc = useQueryClient()
   const active = useActiveJobs()
-  const busy = (active.data?.jobs ?? []).some(j => j.characterId === characterId && /^(scene|scene_plan|scene_qa|scene_edit|scene_upscale|scene_end_frame|scene_video|scene_video_upscale|drift_lock):/.test(j.purpose))
+  const busy = (active.data?.jobs ?? []).some(j => j.characterId === characterId && /^(scene|scene_plan|scene_qa|scene_edit|scene_upscale|scene_end_frame|scene_video|scene_video_upscale|scene_prompt|drift_lock):/.test(j.purpose))
   const wasBusy = useRef(false)
   useEffect(() => {
     // A finished job's own checks (a video take's frame QA) run just after

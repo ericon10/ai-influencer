@@ -14,7 +14,9 @@ import { clipFrames } from './videoAssets.js'
 import { readAsset, saveAsset } from '../storage/assets.js'
 import { compareTexture } from '../qa/texture.js'
 import { scoreSceneIdentity } from './identity.js'
-import { draftFields, getScene, refreshSceneStatus, sceneFields, updateScene } from './scenes.js'
+import { draftFields, getScene, refreshSceneStatus, sceneFields, setScenePrompt, updateScene } from './scenes.js'
+import { cleanWriterOutput, type PromptTarget } from '../core/promptWriter.js'
+import { modelLabel } from '../costs/quotes.js'
 import { textureCheck, textureSummary } from './texture.js'
 import { ruleSwitches } from './rules.js'
 
@@ -63,6 +65,22 @@ async function onScenePlan(deps: Deps, ctx: Ctx, job: JobRow, out: JobOutcome): 
   const parsed = sceneFieldsSchema.safeParse(merged)
   if (parsed.success) for (const issue of checkSceneFields(deps.config.pipeline.scenes, deps.config.pipeline.views, parsed.data)) delete merged[issue.field]
   await updateScene(deps, ctx, scene.id, { fields: merged as Partial<SceneFields>, title: scene.title || (typeof raw.title === 'string' ? raw.title : undefined) })
+}
+
+// The prompt writer's answer goes into the scene's prompt box, cleaned (no
+// REALISM block of its own, no smoothing words), with what it was written
+// from so a later change to the details can be pointed out.
+async function onScenePrompt(deps: Deps, ctx: Ctx, job: JobRow, out: JobOutcome): Promise<void> {
+  if (out.status !== 'completed') return
+  const meta = ((job.request as { meta?: Record<string, unknown> }).meta ?? {}) as { target?: PromptTarget; basis?: string; motion?: string; directions?: string }
+  const raw = (out.data ?? {}) as { prompt?: unknown }
+  if (typeof raw.prompt !== 'string' || !raw.prompt.trim() || !meta.target) return
+  const { text } = cleanWriterOutput(raw.prompt)
+  await setScenePrompt(deps, ctx, sceneIdOf(job), meta.target, {
+    text, source: 'claude', model: modelLabel(deps, `${job.provider}/${job.model}`),
+    ...(meta.basis ? { basis: meta.basis } : {}),
+    ...(meta.target === 'video' ? { motion: meta.motion ?? '', directions: meta.directions ?? '' } : {}),
+  })
 }
 
 // The free local checks on a still when no Claude check runs (owner,
@@ -310,6 +328,7 @@ export function registerSceneHooks(): void {
   if (registered) return
   registered = true
   registerJobHook('scene_plan', onScenePlan)
+  registerJobHook('scene_prompt', onScenePrompt)
   registerJobHook('scene', onScene)
   registerJobHook('drift_lock', onDriftLock)
   registerJobHook('scene_edit', onSceneEdit)

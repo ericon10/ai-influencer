@@ -9,6 +9,7 @@ import { Field, Img, Modal, SectionProgress, errorMessage, scrollToField, useToa
 import type { CharacterView, SceneFields, SceneStill, SceneView, ScenesData } from '../../types'
 import { StillDrawer, STILL_STATUS, OP_LABEL, claudeChecked } from './StillDrawer'
 import { VideoSection } from './VideoSection'
+import { PromptBox } from './PromptBox'
 
 // One scene: the owner's words, the planned fields (all editable, saved as
 // you type), the refs it will attach, and the stills it made.
@@ -337,9 +338,15 @@ function GenerateCard({ v, data, scene, todo, saving, setRefs }: { v: CharacterV
   function toggle(ref: string) {
     setModels(ms => (ms.includes(ref) ? ms.filter(x => x !== ref) : [...ms, ref].slice(-o.maxModels)))
   }
+  // The prompt writer (default on): the prompt box must hold a prompt,
+  // written by Claude, typed, or the template's, before Generate runs.
+  const pw = o.promptWriter
+  const [promptDirty, setPromptDirty] = useState(false)
+  const needsPrompt = pw.on && !(scene.prompts.still?.text ?? '').trim()
   const left: TodoItem[] = [
     ...todo,
     ...(!models.length ? [{ label: 'Pick a model', target: 'scene-models' }] : []),
+    ...(needsPrompt ? [{ label: 'The prompt (write it, or type your own)', target: 'scene-prompt' }] : []),
   ]
   const trained = chosen.find(m => m.trained)
   const picked = scene.refs.map(r => r.refId)
@@ -398,12 +405,25 @@ function GenerateCard({ v, data, scene, todo, saving, setRefs }: { v: CharacterV
           <span className="st-label">Stills per model</span>
           <div className="st-stepnum"><button onClick={() => setVariations(n => Math.max(1, n - 1))} aria-label="Fewer">-</button><span>{variations}</span><button onClick={() => setVariations(n => Math.min(o.maxVariations, n + 1))} aria-label="More">+</button></div>
         </div>
+        {pw.on ? (
+          <PromptBox
+            id="scene-prompt" characterId={v.id} sceneId={scene.id} target="still"
+            written={scene.prompts.still} templateText={scene.templateText} words={pw.words.still} model={pw.model} realism={pw.realism}
+            writeTodo={todo}
+            writeAction={todo.length || saving ? null : { type: 'scene_prompt', characterId: v.id, sceneId: scene.id, target: 'still' }}
+            addedNote="Added for each model when it runs: the reference line, the jewelry and mark sides, and the REALISM block (always)."
+            changedNote={scene.prompts.still?.stale ? 'You changed the details after this was written. Rewrite to include them, or keep it as it is.' : null}
+            onDirty={setPromptDirty}
+          />
+        ) : (
+          <span className="st-hint"><Info size={12} style={{ verticalAlign: -2 }} /> The prompt writer is off, so the template builds the prompt (see Details). Switch it on in Settings, Claude models.</span>
+        )}
         <PriceButton
           size="big"
           label={chosen.length > 1 ? `Generate ${variations * chosen.length} stills` : `Generate ${variations} still${variations > 1 ? 's' : ''}`}
           todo={left}
-          waiting={saving ? 'Saving your changes...' : undefined}
-          action={left.length || saving ? null : { type: 'scene', characterId: v.id, sceneId: scene.id, models, variations, withQa: o.autoQa, allowRepeat: true }}
+          waiting={saving || promptDirty ? 'Saving your changes...' : undefined}
+          action={left.length || saving || promptDirty ? null : { type: 'scene', characterId: v.id, sceneId: scene.id, models, variations, withQa: o.autoQa, allowRepeat: true }}
         />
         {scene.combo && <span className="st-hint">Logged on your first pick as: {[scene.combo.moment, scene.combo.camera, scene.combo.light, scene.combo.location].filter(Boolean).join(' / ')}</span>}
       </div>

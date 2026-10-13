@@ -148,8 +148,19 @@ describe('Higgsfield account path (plan credits)', () => {
   })
 
   it('refuses a model with no account path, with a way forward', async () => {
-    await expect(quoteJobs(h.deps, h.ctx, { purpose: 'test', characterId: null, specs: [{ type: 'gen', stage: 'scene', purpose: 'test', label: 'Clip', request: { kind: 'video', model: 'higgsfield/wan-3.0', prompt: 'p', audio: false } }] }))
-      .rejects.toThrow(/Switch Higgsfield billing to the API/)
+    // Every listed model has an account path today; one without it is refused.
+    const cfg = h.deps.config
+    const noPath = { ...cfg, models: { ...cfg.models, models: cfg.models.models.map(m => (m.ref === 'higgsfield/wan-3.0' ? { ...m, mcp_id: undefined, mcp: undefined } : m)) } }
+    expect(() => accountModel(noPath, 'higgsfield/wan-3.0')).toThrow(/Switch Higgsfield billing to the API/)
+  })
+
+  it('runs Wan 3.0 Prime on the account with audio off, and Kling sound follows the request', () => {
+    const cfg = h.deps.config
+    const wan = accountParams(accountModel(cfg, 'higgsfield/wan-3.0'), { kind: 'video', model: 'higgsfield/wan-3.0', prompt: 'p', aspect: '9:16', resolution: '720p', durationSec: 5, audio: false }, false)
+    expect(wan).toMatchObject({ model: 'wan3_0_prime', aspect_ratio: '9:16', resolution: '720p', duration: 5, generate_audio: false })
+    const kling = (audio: boolean) => accountParams(accountModel(cfg, 'higgsfield/kling-3.0-pro'), { kind: 'video', model: 'higgsfield/kling-3.0-pro', prompt: 'p', aspect: '9:16', durationSec: 5, audio }, false)
+    expect(kling(false)).toMatchObject({ model: 'kling3_0', mode: 'pro', sound: 'off' })
+    expect(kling(true)).toMatchObject({ sound: 'on' })
   })
 
   it('keeps model tests on the API, since they confirm API endpoints', async () => {

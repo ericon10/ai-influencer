@@ -7,6 +7,7 @@ import { estimateAction, runAction, type StudioAction } from './actions.js'
 import { importCharacter } from './files.js'
 import { createScene, sceneCandidates } from './scenes.js'
 import { scenesView } from '../api/views.js'
+import { videoPrices } from './sceneActions.js'
 import { renderPlaceholderPortrait } from '../providers/mock.js'
 import { getJob } from '../jobs/runner.js'
 import { getAsset } from '../storage/assets.js'
@@ -58,16 +59,19 @@ describe('video from a picked still (Stage 9, demo mode)', () => {
     directions: 'No talking, no winking, steady eye contact. One continuous take, no cuts.', durationSec: 5, aspect: '9:16', audio: false, takes: 1, test: false, ...over,
   })
 
-  it('goes straight to the final model: 720p, 9:16, audio off, the directions, and the upscale price shown too', async () => {
-    const { preview, jobs } = await run(take())
+  it('goes straight to the picked model (Kling 3.0 Pro by default): 9:16, audio off, the directions, REALISM, and the upscale price shown too', async () => {
+    const { preview, jobs, quote } = await run(take())
     const text = preview.prompts[0]!.text
     expect(text).toContain('Callie laughs and turns toward the camera.')
     expect(text).toContain('No talking, no winking, steady eye contact.')
     expect(text).toContain('Silent, no audio, no dialogue.')
+    expect(text).toMatch(/\nREALISM: .{20,}/)
+    expect(quote.items[0]!.label).toBe('Video take')
     expect(preview.followUp?.label).toMatch(/Upscale this take/)
     expect(preview.followUp?.display).toBeTruthy()
     const job = await getJob(h.deps, h.ctx, jobs[0]!.id)
-    expect(job.request as GenRequest).toMatchObject({ kind: 'video', aspect: '9:16', resolution: '720p', durationSec: 5, audio: false })
+    expect(job.request as GenRequest).toMatchObject({ kind: 'video', aspect: '9:16', durationSec: 5, audio: false })
+    expect((job.request as GenRequest).resolution).toBeUndefined()
     const clip = (await sceneCandidates(h.deps, h.ctx, [sceneId])).find(c => c.op === 'video')!
     expect(clip.status).toBe('in_review')
     expect((await getAsset(h.deps, h.ctx, clip.assetId!)).kind).toBe('video')
@@ -112,5 +116,20 @@ describe('video from a picked still (Stage 9, demo mode)', () => {
     // Start and end frame together in one take.
     const both = await estimateAction(h.deps, h.ctx, take({ endCandidateId: end.id }))
     expect(both.quote.status).toBe('open')
+  })
+  it('picks any of the five video models, each priced; the last pick is the next default', async () => {
+    const before = (await scenesView(h.deps, h.ctx, characterId)).options.video
+    expect(before.models.map(m => m.label)).toEqual(['Kling 3.0 Pro', 'Kling 3.0 Standard', 'Seedance 2.0', 'Seedance 2.5', 'Wan 3.0 Prime'])
+    expect(before.model.ref).toBe('higgsfield/kling-3.0-pro')
+    const prices = await videoPrices(h.deps, h.ctx, { durationSec: 5, aspect: '9:16' })
+    expect(prices.map(p => p.label)).toEqual(before.models.map(m => m.label))
+    for (const p of prices) expect(p.display).toBeTruthy()
+    const { jobs } = await run(take({ model: 'higgsfield/seedance-2.5' }))
+    expect((await getJob(h.deps, h.ctx, jobs[0]!.id)).request).toMatchObject({ resolution: '720p' })
+    expect((await scenesView(h.deps, h.ctx, characterId)).options.video.model.ref).toBe('higgsfield/seedance-2.5')
+    // With no model named, the next take uses the last pick.
+    const next = await estimateAction(h.deps, h.ctx, take())
+    expect(next.quote.status).toBe('open')
+    await expect(estimateAction(h.deps, h.ctx, take({ model: 'higgsfield/soul-2' }))).rejects.toThrow(/not offered for video/)
   })
 })

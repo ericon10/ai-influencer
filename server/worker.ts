@@ -24,7 +24,8 @@ const port = Number(process.env.PORT || 0)
 const server = port
   ? createServer((req, res) => {
       if (req.method === 'GET' && req.url === '/health') {
-        res.writeHead(200, { 'content-type': 'application/json' }).end('{"ok":true}')
+        // The commit it runs (Railway sets it), so a deploy can be confirmed.
+        res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ ok: true, commit: process.env.RAILWAY_GIT_COMMIT_SHA?.slice(0, 7) ?? null }))
         return
       }
       if (req.method === 'POST' && req.url === '/wake') {

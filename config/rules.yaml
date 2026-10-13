@@ -340,6 +340,14 @@ rules:
     title: Drift lock after a still from a saved character
     check: { type: behavior }
     message: A face-only pass locks the face to REF-00 after every still from a trained character such as Soul.
+  - id: scene-prompt-writer
+    bucket: default
+    area: scene
+    spec: "9"
+    # Owner, 2026-10-13: Claude writes the final prompt as natural sentences.
+    title: Claude writes the final prompt
+    check: { type: behavior }
+    message: Claude (the Prompt writer in Settings, Claude models) turns the scene details into the final still or video prompt, as natural sentences about a real candid moment. You can edit it or rewrite it before you generate. The Studio still adds the reference line, the mark sides and the REALISM block. Switched off, the template builds the prompt.
   - id: scene-auto-qa
     bucket: default
     area: qa

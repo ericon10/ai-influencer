@@ -5,6 +5,7 @@ import type { Ctx, Deps } from '../context.js'
 import type { Route } from '../config/load.js'
 import { audit } from '../lib/audit.js'
 import { AppError } from '../lib/errors.js'
+import { ruleSwitches } from './rules.js'
 
 // Per-account settings and overrides of config defaults.
 
@@ -69,12 +70,18 @@ const isClaudeTask = (deps: Deps, task: string) => deps.config.models.llm_models
 export async function claudeModels(deps: Deps, ctx: Ctx) {
   const label = (ref: string) => deps.config.models.llm_models.find(m => m.ref === ref)?.label ?? ref
   const tasks = Object.keys(deps.config.routing.tasks).filter(t => isClaudeTask(deps, t))
+  // A task with a rule can be switched off for the account (Settings, Rules
+  // has the same switch, and a per-character one).
+  const sw = await ruleSwitches(deps, ctx, null)
   return {
     choices: deps.config.routing.claude_choices.map(ref => ({ ref, label: label(ref) })),
     tasks: await Promise.all(tasks.map(async task => {
       const base = deps.config.routing.tasks[task]!
       const model = (await liveRoute(deps, ctx, task)).model
-      return { task, label: base.label ?? task.replace(/_/g, ' '), hint: base.hint ?? '', model, modelLabel: label(model), default: base.model, changed: model !== base.model }
+      return {
+        task, label: base.label ?? task.replace(/_/g, ' '), hint: base.hint ?? '', model, modelLabel: label(model), default: base.model, changed: model !== base.model,
+        rule: base.rule ? { id: base.rule, on: sw.on(base.rule) } : null,
+      }
     })),
   }
 }

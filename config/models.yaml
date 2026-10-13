@@ -201,7 +201,14 @@ models:
     endpoint: alibaba/wan-3.0-prime/image-to-video
     input_map: wan_i2v
     verified: false
+    # From the connector's catalog (models_explore, 2026-10-13): duration 2
+    # to 30 s, 480p/720p/1080p, start and end frames, native audio on unless
+    # switched off.
+    mcp_id: wan3_0_prime
+    mcp: { params: [aspect_ratio, duration, resolution], fixed: { generate_audio: false }, roles: { start: start_image, end: end_image } }
+    aliases: [Wan 3.0 Prime, wan3_0_prime]
     audio: off_switch
+    params: { start_image: true, end_image: true, resolution: [480p, 720p, 1080p] }
   - ref: higgsfield/mirelo-sfx
     label: Mirelo text to audio (sound effects)
     kinds: [audio]

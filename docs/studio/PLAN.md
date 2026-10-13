@@ -328,6 +328,10 @@ Decisions: `DECISIONS.md` G7.
 - [x] End frame helper: head-only masked inpaint (Nano Banana 2.1)
 - [x] Local clip QA: face on sampled frames, skin texture; smoothed
       upscales never replace the take
+- [x] Video model picker with prices (Kling 3.0 Pro default; last pick
+      remembered), DECISIONS G11
+- [x] Prompt writer for stills and video, editable above Generate,
+      DECISIONS G10
 - [ ] First live take, then confirm the upscaler's real price
 - [ ] Chaining (continue from the last frame), sound bed, rough cut
 

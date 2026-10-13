@@ -1,4 +1,4 @@
-import type { ActionPreview, CharacterSummary, CharacterView, HiggsfieldAccount, JobView, Me, QuoteView, RulesView, SceneFields, ScenesData, SettingsView, StudioAction, Usage } from './types'
+import type { ActionPreview, CharacterSummary, CharacterView, HiggsfieldAccount, JobView, Me, QuoteView, RulesView, SceneFields, ScenesData, SettingsView, StudioAction, Usage, VideoPrice } from './types'
 import { sheetRefOf, typeOf, uploadFiles } from './files'
 
 // Thin client for /api/v1. Every write sends the CSRF header the server
@@ -73,7 +73,9 @@ export const api = {
   scenes: (characterId: string) => request<ScenesData>('GET', `/characters/${characterId}/scenes`),
   copyScene: (id: string, characterIds: string[]) => request<{ copies: Array<{ characterId: string; sceneId: string; name: string }> }>('POST', `/scenes/${id}/copy`, { characterIds }),
   createScene: (characterId: string, body: { brief?: string; title?: string; fields?: Partial<SceneFields> }) => request<{ id: string }>('POST', `/characters/${characterId}/scenes`, body),
-  updateScene: (sceneId: string, body: { brief?: string; title?: string; fields?: Partial<SceneFields> }) => request<{ id: string }>('PATCH', `/scenes/${sceneId}`, body),
+  updateScene: (sceneId: string, body: { brief?: string; title?: string; fields?: Partial<SceneFields>; prompts?: { still?: string; video?: string }; fromTemplate?: boolean }) => request<{ id: string }>('PATCH', `/scenes/${sceneId}`, body),
+  videoPrices: (characterId: string, duration: number, aspect: string) => request<{ prices: VideoPrice[] }>('GET', `/characters/${characterId}/video-prices?duration=${duration}&aspect=${encodeURIComponent(aspect)}`),
+  setVideoModel: (model: string) => request<{ model: string }>('PUT', '/settings/video-model', { model }),
   archiveScene: (sceneId: string) => request<{ ok: true }>('DELETE', `/scenes/${sceneId}`),
   crop: (candidateId: string, rect: { x: number; y: number; w: number; h: number }) => request<{ candidateId: string; width: number; height: number }>('POST', `/candidates/${candidateId}/crop`, rect),
 

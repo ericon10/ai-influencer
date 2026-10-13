@@ -128,6 +128,67 @@ video:
   # The end frame helper: only the masked head and face change.
   end_frame: "Edit only the masked area, {poss} head and face: {change}. Keep {poss} identity, hair, skin texture, the mole and everything outside the mask exactly the same."
 
+# The prompt writer (owner, 2026-10-13, default rule scene-prompt-writer):
+# Claude turns the scene details into the final prompt as natural sentences.
+# The Studio then adds what must not depend on the writing: the reference
+# line, the scene template's exact outfit sentence (jewelry and the sheet
+# outfit swap included), the mark sides, the colors and brand-free lines,
+# and the REALISM and AVOID blocks. Word ranges live in scenes.yaml
+# (settings.prompt_words).
+prompt_writer:
+  still_system: |
+    You write the final prompt for an image model: one candid photo of
+    {name}, an original, fictional adult character, in everyday life.
+    Write it as natural sentences that describe a real moment as it
+    happens, the way you would describe a photo a friend just took: the
+    action in progress, the place, what {subj} wears, the light, who is
+    holding the camera and from where, and one or two small real-life
+    details that make it feel unposed.
+    Rules:
+    - {min} to {max} words. One paragraph, present tense. No lists,
+      headings, labels or quotation marks.
+    - Use every detail given. Add only small, believable details that do
+      not contradict them.
+    - Never describe {name}'s face, eyes, eye color, hair color, skin or
+      skin marks, and leave jewelry out: the reference images carry the
+      identity, and the Studio adds the reference line, the exact outfit
+      sentence with the jewelry, the mark sides and the REALISM block
+      after your text. Mention the clothes only as far as the moment
+      needs them. Hair styling (a claw clip, a low ponytail) is fine.
+    - Never use words like flawless, perfect skin, smooth skin,
+      airbrushed, retouched or porcelain. Real skin is the look.
+    - {name} is an adult. Never nudity or sexual content.
+    - No brand names, logos or readable text unless a detail names them.
+  still_prompt: |
+    The details for this photo of {name}:
+    {facts}
+
+    Write the prompt.
+  video_system: |
+    You write the prompt for an image-to-video model that animates a
+    still photo of {name}, an original, fictional adult character. The
+    attached still is the first frame{end_frame}. Describe what happens
+    in the clip as natural sentences: one continuous action, how {subj}
+    moves, and at most one slow camera move.
+    Rules:
+    - {min} to {max} words. One paragraph, present tense. No lists,
+      headings, labels or quotation marks.
+    - The start frame already shows the place, the outfit and {name}'s
+      face; mention them only as far as the motion needs.
+    - Calm, natural motion keeps the face steady: small movements, no
+      fast turns, no talking, singing or shouting.
+    - These directions are added after your text, so never contradict
+      them: {directions}
+    - Never describe {name}'s face, eyes, hair color or skin, and never
+      use words like flawless, smooth skin or airbrushed.
+    - {name} is an adult. Never nudity or sexual content.
+  video_prompt: |
+    What happens: {motion}
+    The scene in the still: {scene}
+
+    Write the prompt.
+  end_frame: ", and the clip ends on a second still the model is also given"
+
 # "Punch it up": the owner's rough idea becomes three specific moments to
 # pick from. The pick fills the scene box and stays editable.
 scene_ideas:

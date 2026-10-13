@@ -244,6 +244,9 @@ export const scenes = pgTable('scenes', {
   // The owner's own words, kept as written.
   brief: text('brief').notNull().default(''),
   fields: jsonb('fields').notNull().default({}),
+  // The written prompts (prompt writer or the owner's own edit), by target:
+  // { still?: WrittenPrompt, video?: WrittenPrompt }.
+  prompts: jsonb('prompts').notNull().default({}),
   status: text('status').notNull().default('draft'), // draft | generating | in_review | approved
   comboLoggedAt: timestamp('combo_logged_at', { withTimezone: true }),
   createdBy: text('created_by'),

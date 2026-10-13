@@ -26,6 +26,9 @@ settings:
   # planner changes them. With these, only the moment itself is required,
   # and the owner's own words count as the moment until it is planned.
   defaults: { momentType: caught_mid_action, camera: friend_phone, light: natural }
+  # The prompt writer's length, in words, for the text it writes (the
+  # Studio's added lines and the REALISM block come on top).
+  prompt_words: { still: [110, 150], video: [40, 80] }
 
 # Moment types (the first column of the combo log).
 moments:
@@ -138,9 +141,15 @@ edits:
 # Video from a picked still (Stage 9, owner ruling 2026-10-13). Every value
 # is a default the owner can change on the video card.
 video:
-  # Straight to the final model; no separate draft step.
-  model: higgsfield/seedance-2.5
-  resolution: 720p
+  # Owner, 2026-10-13: pick the model per take. Kling 3.0 Pro unless the
+  # owner picked another (the last pick is remembered per account).
+  model: higgsfield/kling-3.0-pro
+  models:
+    - { ref: higgsfield/kling-3.0-pro }
+    - { ref: higgsfield/kling-3.0-standard }
+    - { ref: higgsfield/seedance-2.0, resolution: 720p }
+    - { ref: higgsfield/seedance-2.5, resolution: 720p }
+    - { ref: higgsfield/wan-3.0, resolution: 720p }
   durations: [5, 10]
   duration: 5
   aspect: "9:16"
