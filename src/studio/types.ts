@@ -30,8 +30,18 @@ export interface SceneFields {
   title: string; momentType: string; moment: string; setting: string; location: string
   outfit: string; footwear: string; jewelry: string; makeup: 'bare' | 'natural' | 'soft_glam'
   hair: string; pose: string; view: string; expression: string; camera: string; foreground: string
-  framing: string; light: string; destination: string
+  height: string; framing: string; light: string; destination: string
+  brands: boolean; refs: string[]
 }
+
+// The rule book (Settings, Rules): fixed rules are always on; defaults are
+// on unless switched off, for all characters or one, and only ever warn.
+export interface RuleRow {
+  id: string; title: string; bucket: 'fixed' | 'default'; area: string; spec: string; message: string; defaultValue: string | null
+  global: { on: boolean; value: string | null; set: boolean }
+  character: { on: boolean; value: string | null; set: boolean; valueSet: boolean } | null
+}
+export interface RulesView { areas: Record<string, string>; rules: RuleRow[] }
 
 export interface SceneEdit { code: string; change: string; face: boolean }
 
@@ -47,6 +57,7 @@ export interface SceneView {
   combo: { moment: string; camera: string; light: string; location: string } | null
   comboProblem: string | null
   refs: Array<{ refId: string; role: 'face' | 'angle' | 'body' | 'expression'; assetId: string }>
+  refsChosen: boolean
   candidates: SceneStill[]
 }
 
@@ -55,10 +66,12 @@ export interface SceneModel { ref: string; label: string; path: 'api' | 'account
 
 export interface ScenesData {
   scenes: SceneView[]
+  sheetRefs: Array<{ refId: string; label: string; assetId: string }>
   combos: Array<{ date: string; moment: string; camera: string; light: string; location: string }>
   reasons: Array<{ id: string; label: string }>
   options: {
-    moments: ScenePreset[]; cameras: ScenePreset[]; lights: ScenePreset[]; framings: ScenePreset[]; expressions: ScenePreset[]
+    moments: ScenePreset[]; cameras: ScenePreset[]; lights: ScenePreset[]; framings: ScenePreset[]; expressions: ScenePreset[]; heights: ScenePreset[]
+    autoQa: boolean; maxRefs: number; signatureJewelry: string[]
     makeup: ScenePreset[]; destinations: Array<ScenePreset & { aspect: string }>; views: ScenePreset[]
     editPresets: Array<ScenePreset & { text: string; face: boolean }>
     stillModels: SceneModel[]; editModels: SceneModel[]; defaultModels: string[]
@@ -123,7 +136,7 @@ export type StudioAction =
   | { type: 'model_test'; model: string }
   | { type: 'model_suite' }
   | { type: 'scene_plan'; characterId: string; sceneId: string }
-  | { type: 'scene'; characterId: string; sceneId: string; models: string[]; variations: number; reason?: string; withQa?: boolean }
+  | { type: 'scene'; characterId: string; sceneId: string; models: string[]; variations: number; reason?: string; withQa?: boolean; allowRepeat?: boolean }
   | { type: 'scene_edit'; characterId: string; candidateId: string; change: string; face?: boolean; model?: string; withQa?: boolean }
   | { type: 'scene_upscale'; characterId: string; candidateId: string }
   | { type: 'scene_qa'; characterId: string; candidateId: string }

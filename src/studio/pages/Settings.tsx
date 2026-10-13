@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
-import { CheckCircle2, CreditCard, KeyRound, Link2, Loader2, RefreshCw, ShieldCheck, Trash2, UserRound } from 'lucide-react'
+import { CheckCircle2, CreditCard, KeyRound, Link2, ListChecks, Loader2, RefreshCw, ShieldCheck, Trash2, UserRound } from 'lucide-react'
 import { api } from '../api'
 import { keys, useHiggsfieldAccount, useSettings } from '../hooks'
 import { Callout, PromptViewer, errorMessage, useToast } from '../ui'
@@ -13,7 +13,9 @@ export default function Settings() {
   const d = s.data
   return (
     <div className="st-page">
-      <div className="st-pagehead"><div className="grow"><div className="st-kicker">Settings</div><h1 className="st-h1">Studio settings</h1></div></div>
+      <div className="st-pagehead"><div className="grow"><div className="st-kicker">Settings</div><h1 className="st-h1">Studio settings</h1></div>
+        <Link className="st-btn secondary" to="/studio/settings/rules"><ListChecks size={16} />Rules</Link>
+      </div>
       {!d ? <div className="st-skel" style={{ height: 240, borderRadius: 18 }} /> : (
         <div className="st-col" style={{ gap: 20 }}>
           <ModeCard d={d} />

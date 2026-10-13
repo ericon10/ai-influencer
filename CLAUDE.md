@@ -36,6 +36,39 @@ lint, the job runner, the adapters and QA), not only in this file:
 7. **New users are told, in one line:** "Real skin and no makeup is
    what makes characters believable. Don't fix the flaws."
 
+## Rule one: DEFAULTS, NOT LOCKS (owner, 2026-10-13)
+
+The Studio gives 100% creative flexibility with every character. The
+sheet keeps the person from drifting (the face matters most); after
+that a character can wear anything, go anywhere and do anything in
+real life. Lessons from earlier runs are starting suggestions, never
+restrictions. Every rule is in exactly one of two buckets
+(`config/rules.yaml`, `bucket:`):
+
+- **FIXED, and only these:** the Realism principle (rule zero: real
+  skin, the REALISM block, banned words, beautify off, the texture
+  check, the natural baseline); bare face on hero and sheet;
+  characters are 21 or older; no nudity or explicit content; a new
+  person, never a copy of the inspiration face; the price shown before
+  any paid run; budget caps; keys server-side only. Fixed rules can
+  stop a run and cannot be switched off.
+- **DEFAULT, everything else:** pre-filled, fully editable, a warning
+  at most, never blocks a run. Outfit, footwear, jewelry (the ear
+  cuff included), makeup and hair; any camera angle, height, distance
+  or framing; aspect by destination; combo log repeats (warning with
+  "Use anyway"); logos (off by default, a per-scene "Brands and
+  logos" switch for brand deals); the persona "never" list
+  (suggestions only); the gray sheet background (editable); QA
+  findings (advice with one-click fixes; face drift is a strong
+  warning and the owner still decides); video recipe rules (single
+  take, calm action, no winking line, audio off).
+
+Settings > Rules lists every rule with its bucket and an on/off switch
+for each default, for all characters or one (the character setting
+wins). The lint forces a default to "warning" even if the yaml says
+"error", and `server/pipeline/rulebook.test.ts` proves no default can
+block a run. A new rule is a default unless the owner says otherwise.
+
 This file gives a new Claude Code session enough context to be useful
 immediately. Read this first before making changes.
 
@@ -52,24 +85,28 @@ checklist: `docs/studio/PLAN.md`). The Studio is server-backed
 (Postgres + object storage + job runner). The legacy pages described
 below keep working unchanged on localStorage and the Higgsfield MCP path.
 
-## Character Studio standing rules (required)
+## Character Studio working rules (required)
 
-From SPEC.md section 12 and the owner's guardrails. These are
-requirements, not suggestions. Rule zero (Realism, above) comes first.
+From SPEC.md section 12 and the owner's guardrails. Rule zero (Realism)
+and rule one (defaults, not locks) come first. These are how we build
+the Studio; they are not creative limits on a character.
 
 - **No em-dashes anywhere**: UI copy, prompts, docs, commit messages,
   code comments. `npm run check` fails on them in Studio paths.
 - **Prompts shown in the UI are hard-wrapped**, never one long line,
   and each has a one-click copy.
-- **Audio off for every video generation request**, always. Strip any
-  audio track from generated clips before assembly anyway.
-- **Cost estimate before every generation.** Never call a paid endpoint
-  (image, video, audio, LLM, upscale, training) without a quote shown to
-  the owner first. The server enforces this: a run needs a fresh quote id.
+- **Audio is per request.** Video requests are silent by default
+  (`audio` false) and the runner strips the track unless the request
+  asked for audio. Voice and sound come later (ElevenLabs).
+- **Cost estimate before every generation (fixed).** Never call a paid
+  endpoint (image, video, audio, LLM, upscale, training) without a quote
+  shown to the owner first. The server enforces this: a run needs a
+  fresh quote id.
 - **Tests use the mock adapter only.** No test, script or dev session
   calls a real provider without an approved quote.
-- **SPEC.md section 5 rules are requirements.** They live as data in
-  `config/` and are enforced by the prompt lint and QA.
+- **SPEC.md section 5 rules are defaults.** They live as data in
+  `config/rules.yaml`; the prompt lint and QA warn on them and the
+  owner can switch each one off. Only the fixed rules block.
 - **Secrets stay in `.env`** (deployment secrets) or the encrypted
   per-account vault (provider keys). Never in code, never in the browser.
 - **Multi-tenant from day one**: every record carries `account_id` (and
@@ -77,9 +114,9 @@ requirements, not suggestions. Rule zero (Realism, above) comes first.
 - **Rules, prompt templates and model routing are data**, not code.
   Callie is a test fixture (`fixtures/callie/`), not app logic.
 - **Higgsfield endpoints only from the official Model API Reference**,
-  never from third-party catalog copies; a model is confirmed only after
-  one small paid test (Settings, Higgsfield models). USD prices from
-  open.higgsfield.ai/pricing.
+  never from third-party catalog copies. A model not yet confirmed by
+  one small paid test (Settings, Higgsfield models) shows a warning on
+  its quote. USD prices from open.higgsfield.ai/pricing.
 - **Never crossfade a seam.** Cut, grade, or mark the seam failed. Prefer
   one take with start and end frames (SPEC 4.3).
 - Do not modify the OpenCut fork from this repo. The Studio hands
@@ -92,8 +129,10 @@ requirements, not suggestions. Rule zero (Realism, above) comes first.
 | `config/*.yaml` | Rules engine, prompt templates, sheet graph, views, routing, price book, budgets |
 | `server/core/` | Pure, unit-tested logic (prompts, rules, sheet DAG, QA side logic, character file) |
 | `server/core/realism.ts` | Rule zero: bare-face line, REALISM and AVOID blocks, banned words, beautify filter |
+| `server/core/safety.ts` | Fixed: no nudity or explicit content (lint and runner) |
+| `config/rules.yaml`, `server/pipeline/rules.ts` | Rule one: the rule book (fixed or default), switches per account and per character, Settings > Rules |
 | `config/scenes.yaml`, `server/core/scenes.ts` | Stage 7 and 8 presets, scene and edit prompts, ref picker by angle, combo log |
-| `server/core/qa/scene.ts` | Scene QA: what an edit can fix, the free mirror, regenerate on face drift |
+| `server/core/qa/scene.ts` | Scene QA as advice: one-click fixes, the free mirror, face drift as a strong warning |
 | `server/pipeline/scenes.ts`, `sceneActions.ts`, `sceneHooks.ts` | Scene records, picks and crops; paid scene steps; what finished scene jobs do |
 | `server/qa/texture.ts` | Texture check after upscales and edits (skin smoothed) |
 | `server/providers/` | `ProviderAdapter` (SPEC 7.1), mock, Higgsfield API, Higgsfield account (MCP, plan credits), shared MCP connection flow (Dzine AI coming soon), Anthropic, contract tests |

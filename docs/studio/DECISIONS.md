@@ -396,7 +396,7 @@ closest angle close up, a full-body ref when more than the head shows, and
 the matching expression ref, at most 4. Models without image inputs use the
 saved character (Soul, with the drift lock pass after it) or the full card.
 
-### F4. Scene QA fixes what an edit can fix
+### F4. Scene QA fixes what an edit can fix (face drift: see G3)
 In scenes a logo, extra jewelry or the cuff on the wrong ear is an edit (or
 the free mirror when no text is in frame), not a regenerate; face drift and
 plastic or smoothed skin always regenerate. Jewelry the scene asked for is
@@ -406,7 +406,7 @@ faces in the frame. Logos and text are read by the vision model; OCR is not
 added (SPEC 6 lists OCR with the vision model; the vision model alone is
 judged enough for now).
 
-### F5. The combo log lives in the character file
+### F5. The combo log lives in the character file (repeats warn: see G3)
 The "Combo log (last 10)" section of the character file is the log. A run
 whose moment and camera pair is in the last 10 entries is refused with the
 date and place of the earlier one; the first pick of a scene appends its
@@ -419,3 +419,69 @@ A closer shot of a scene is a crop of the wide still at the scene's aspect
 owner's account (never Nano Banana, which re-composes). An upscale or edit
 whose skin detail falls below the texture threshold waits as failed QA and
 never replaces its source.
+
+## G. Defaults, not locks, 2026-10-13
+
+### G1. Two buckets: fixed and default (owner)
+The owner needs full creative freedom with every character: the sheet
+keeps the person from drifting (face first), and after that a character
+wears anything and does anything in real life. Every rule in the Studio
+is in `config/rules.yaml` with a `bucket`:
+
+- **Fixed**, the only rules that can stop a run, and they cannot be
+  switched off: the Realism principle (REALISM block, banned words,
+  beautify off, the texture check, the natural baseline), bare face on
+  hero and sheet, characters 21 or older, no nudity or explicit
+  content, the price shown before any paid run, budget caps, keys
+  server-side only.
+- **Default**, everything else: pre-filled, editable, at most a warning.
+  The lint forces a default to "warning" whatever the yaml says, and
+  `server/pipeline/rulebook.test.ts` trips every lintable default and
+  shows none of them blocks.
+
+One addition to the owner's fixed list, kept fixed on purpose:
+**distinct-person** (a hero that matches the face in an inspiration
+image cannot become REF-00). It is the same safety line as "no explicit
+content": the Studio makes new people, never a copy of a real one.
+
+### G2. Switches per account and per character
+Settings > Rules lists every rule with its bucket. Each default has an
+on/off switch for all characters and, separately, for one character; a
+character setting wins over "All characters" and "Set here" clears it.
+Rules with a value (the sheet background) take an edited value the same
+way. Switches live in account settings (`rule_switches`); turning one off
+changes what the Studio suggests and checks, never what the owner types.
+
+### G3. What changed from earlier rulings
+- **Jewelry is styling, not a mark.** Callie's updated file keeps only
+  the mole as a fixed mark. The ear cuff is a signature piece the
+  planner may suggest and the owner adds per scene; when worn it goes on
+  the left ear. Scenes never add it for you, and QA never flags it
+  missing or added (it notes the side only when the scene asked for it).
+  Supersedes the "constant mark added for you" line in Phase 2.
+- **Any camera angle.** Eye level, slightly high, over the shoulder, a
+  friend shooting from rocks or a ledge and a long lens across a venue
+  are offered; low and high are allowed. The planner's default is to
+  avoid low angles up at her body and tight crops on the body.
+- **Combo log repeats warn** with "Use anyway" (supersedes F5's refusal).
+- **Outfit and footwear are optional** scene fields. Nothing from the
+  sheet or the style notes is put in for you.
+- **Logos:** brand-free by default; a per-scene "Brands and logos" switch
+  turns off the plain-and-unbranded line and the logo check for brand
+  deals and products.
+- **The persona "never" list** is sent to the planner as suggestions.
+- **The gray background** is the default for hero and sheet and is an
+  editable value in Rules (F1 stands as the default).
+- **QA is advice** with one-click fixes (supersedes F4's "always
+  regenerate" for face drift). Face drift asks the owner to confirm
+  before a pick ("Pick anyway"); plastic or smoothed skin stays fixed
+  and is never picked. The free mirror is offered for any still.
+- **Refs:** picked by angle by default; the owner can choose up to 4
+  sheet shots per scene.
+- **Audio is per request**: silent by default, stripped unless the
+  request asked for audio. Voice and sound come later (ElevenLabs).
+- **Untested models warn** on their quote instead of being refused; a
+  model with no official endpoint is still refused (it cannot run).
+- **Hero runs** are 1 to 8 per prompt (fewer than 4 warns), and the sheet
+  can be regenerated out of order (missing inputs fall back with a
+  warning).

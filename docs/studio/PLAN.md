@@ -235,16 +235,16 @@ Guardrails that apply to every item:
 
 ## Phase 2: Scenes and edits (Stages 7 and 8, started 2026-10-13)
 
-Decisions: `DECISIONS.md` F1 to F6.
+Decisions: `DECISIONS.md` F1 to F6, then G1 to G3 (defaults, not locks).
 
 ### 2.1 Scenes as data
-- [x] `config/scenes.yaml`: moment types, cameras (who shoots, eye level),
-      framings, light, expressions, makeup, destinations (aspect), edit
+- [x] `config/scenes.yaml`: moment types, cameras (who shoots), camera
+      heights, framings, light, expressions, makeup, destinations (aspect), edit
       presets, models offered for stills, edits and upscales
 - [x] Scene template, edit template and planner prompt in `templates.yaml`
-- [x] Rules as data: reference slot (5.2.14), footwear named (5.2.16),
-      plain and unbranded (5.2.17), eye-level angles and no tight crops on
-      the body (5.2.20), aspect by destination (5.2.22); the sheet's
+- [x] Rules as data (defaults): reference slot (5.2.14), footwear named
+      (5.2.16), plain and unbranded (5.2.17), no low angles up at the body
+      or tight body crops (5.2.20), aspect by destination (5.2.22); the sheet's
       chest-up legwear rule applies to hero and sheet only
 
 ### 2.2 Stage 7: scene stills
@@ -255,10 +255,11 @@ Decisions: `DECISIONS.md` F1 to F6.
       always (edit models), the saved character with no attachments (Soul),
       or the full card (text only)
 - [x] Outfit written out in full and replacing the sheet outfit; footwear
-      always named; the constant mark (ear cuff) added for you; colors stated
-      when water, wind or harsh sun change how hair looks
+      named; colors stated when water, wind or harsh sun change how hair
+      looks (all defaults; jewelry is never added for you, see G3)
 - [x] Combo log: a repeated moment and camera pair from the last 10 entries
-      is refused; the first pick writes the entry to the character file
+      warns with "Use anyway"; the first pick writes the entry to the
+      character file
 - [x] One or two models side by side, 1 to 4 stills each, one quote
 - [x] Drift lock after a still from a trained character (DECISIONS D3)
 - [x] Scene QA: face match against the face and closest-angle refs (small
@@ -287,7 +288,28 @@ Decisions: `DECISIONS.md` F1 to F6.
       reasons, fix one thing, mirror, crop closer, upscale, prompt with copy
 - [x] Verified in the browser against the mock (desktop and phone)
 
+### 2.4b Defaults, not locks (DECISIONS G1 to G3)
+- [x] Rule book: every rule fixed or default in `config/rules.yaml`
+- [x] Defaults only ever warn (lint forces it); fixed rules alone block
+- [x] No nudity or explicit content as a fixed check (lint and runner)
+- [x] Switches per account and per character; editable sheet background
+- [x] Settings > Rules page
+- [x] Scene form: optional outfit and footwear, signature pieces as
+      chips, camera height, Brands and logos switch, refs chooser,
+      "Use anyway" on a combo repeat
+- [x] QA as advice: face drift confirm, mirror for any still
+- [x] Audio per request; untested models warn
+- [x] Tests: no default can block a run (`rulebook.test.ts`)
+- [ ] Re-import Callie's updated file in production (only the mole fixed)
+
 ### 2.5 Live
 - [ ] First live scene for Callie (Nano Banana 2.1 on the account, GPT Image
       2.5 Flare on the API), after the owner sees the quote
 - [ ] Soul 2.0 model test, then a Soul scene with its drift lock
+
+## Roadmap after Phase 4 (owner, 2026-10-13; not started)
+
+SPEC 13.1, R1 to R7: Clone Video (first after Phase 3), Inspo board
+and "Recreate this", Scene library, Multi-character runs, LoRA
+training, Vault, Posting calendar. Endpoints and rough costs are in
+the SPEC. Phase 2 and Phase 3 come first.

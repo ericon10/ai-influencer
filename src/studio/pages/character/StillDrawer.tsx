@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { AlertTriangle, Check, CheckCircle2, Crop, FlipHorizontal2, Loader2, RotateCcw, XCircle } from 'lucide-react'
-import { api } from '../../api'
+import { api, ApiError } from '../../api'
 import { useRefresh } from '../../hooks'
 import { PriceButton } from '../../PriceButton'
 import { Callout, Drawer, Img, PromptViewer, errorMessage, useToast } from '../../ui'
@@ -46,23 +46,31 @@ export function StillDrawer({ v, data, scene, still, onClose, onOpen }: { v: Cha
   const [fixes, setFixes] = useState<Array<{ reason: string; action: string; label: string; available: boolean }> | null>(null)
   const [cropping, setCropping] = useState(false)
   const [busy, setBusy] = useState(false)
-  useEffect(() => { setRejecting(false); setReasons([]); setFixes(null); setCompare(false) }, [still?.id])
+  const [confirmDrift, setConfirmDrift] = useState(false)
+  useEffect(() => { setRejecting(false); setReasons([]); setFixes(null); setCompare(false); setConfirmDrift(false) }, [still?.id])
   if (!still) return null
 
   const r = still.qaReport
   const ref00 = v.sheet.shots[0]!.approved?.assetId
   const parent = still.parentId ? scene.candidates.find(c => c.id === still.parentId) : undefined
   const drift = !!r?.findings.some(f => f.severity === 'fail' && f.code === 'face_drift')
-  const canPick = !!still.assetId && ['in_review', 'qa_failed', 'rejected', 'superseded'].includes(still.status) && !drift && !r?.findings.some(f => f.severity === 'fail' && (f.code === 'skin_plastic' || f.code === 'skin_smoothed'))
+  // Plastic or smoothed skin is the fixed Realism rule; face drift is a
+  // strong warning you confirm (Settings, Rules).
+  const plastic = !!r?.findings.some(f => f.severity === 'fail' && (f.code === 'skin_plastic' || f.code === 'skin_smoothed'))
+  const canPick = !!still.assetId && ['in_review', 'qa_failed', 'rejected', 'superseded'].includes(still.status) && !plastic
   const s = STILL_STATUS[still.status] ?? { label: still.status, tone: '' }
 
-  async function pick() {
+  async function pick(acknowledge = false) {
     setBusy(true)
     try {
-      const out = await api.approve(still!.id)
+      const out = await api.approve(still!.id, acknowledge)
+      setConfirmDrift(false)
       refresh(v.id)
       toast({ tone: 'ok', text: out.comboLogged ? 'Picked. Added to the combo log.' : 'Picked.' })
-    } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) } finally { setBusy(false) }
+    } catch (e) {
+      if (e instanceof ApiError && e.code === 'confirm_required') setConfirmDrift(true)
+      else toast({ tone: 'bad', text: errorMessage(e) })
+    } finally { setBusy(false) }
   }
   async function reject() {
     setBusy(true)
@@ -112,12 +120,21 @@ export function StillDrawer({ v, data, scene, still, onClose, onOpen }: { v: Cha
         {still.assetId && !fixes && !rejecting && (
           <div className="st-row" style={{ gap: 8, flexWrap: 'wrap' }}>
             {still.status === 'approved' ? <span className="st-badge ok"><CheckCircle2 size={13} /> Picked</span> : (
-              <button className="st-btn ok" disabled={!canPick || busy} onClick={pick} title={drift ? 'Face drift: regenerate instead.' : undefined}><CheckCircle2 size={16} />Pick this still</button>
+              <button className="st-btn ok" disabled={!canPick || busy} onClick={() => pick()} title={plastic ? 'Real skin is a fixed rule: regenerate this one.' : undefined}><CheckCircle2 size={16} />Pick this still</button>
             )}
             {['in_review', 'qa_failed', 'approved'].includes(still.status) && <button className="st-btn bad" disabled={busy} onClick={() => setRejecting(true)}><XCircle size={16} />Reject</button>}
             {['rejected', 'superseded'].includes(still.status) && <button className="st-btn ghost" onClick={reopen}><RotateCcw size={14} />Back to review</button>}
-            {r?.mirrorFix?.available && <button className="st-btn secondary" disabled={busy} onClick={mirror} title={r.mirrorFix.message}><FlipHorizontal2 size={16} />Mirror it (free)</button>}
+            <button className={`st-btn ${r?.mirrorFix?.available ? 'secondary' : 'ghost'}`} disabled={busy} onClick={mirror} title={r?.mirrorFix?.available ? r.mirrorFix.message : 'Flip the still horizontally. Free; any text in the frame is mirrored too.'}><FlipHorizontal2 size={16} />Mirror (free)</button>
           </div>
+        )}
+        {confirmDrift && (
+          <Callout tone="bad" icon={<AlertTriangle size={16} />}>
+            <b>The face does not match REF-00.</b> QA usually suggests a regenerate here. Pick it anyway?
+            <div className="st-row" style={{ gap: 8, marginTop: 8 }}>
+              <button className="st-btn sm bad" disabled={busy} onClick={() => pick(true)}>Pick anyway</button>
+              <button className="st-btn sm ghost" onClick={() => setConfirmDrift(false)}>Cancel</button>
+            </div>
+          </Callout>
         )}
 
         {rejecting && (
@@ -179,13 +196,13 @@ function FixOne({ v, data, still, drift }: { v: CharacterView; data: ScenesData;
   const [model, setModel] = useState(data.options.editModels.find(m => !(data.options.mode === 'live' && m.path === 'account' && !data.options.accountConnected))?.ref ?? data.options.editModels[0]?.ref)
   useEffect(() => { setChange(suggestions[0]?.change ?? ''); setFace(suggestions[0]?.face ?? false) }, [still.id]) // eslint-disable-line react-hooks/exhaustive-deps
   const placeholder = /\{thing\}/.test(change)
-  const disabledReason = drift ? 'Face drift is never fixed with an edit. Regenerate the scene.'
-    : change.trim().length < 6 ? 'Say what to change, where, and on which side.'
+  const disabledReason = change.trim().length < 3 ? 'Say what to change, where, and on which side.'
     : placeholder ? 'Replace {thing} with what to remove and where.' : undefined
   return (
     <div className="st-card pad st-col" style={{ gap: 10, boxShadow: 'none' }}>
       <div className="st-h3">Fix one thing</div>
-      <span className="st-hint">Edit, don't regenerate, when the face is right and only a detail is wrong. One change per pass; the rest of the still stays the same.</span>
+      <span className="st-hint">Edit, don't regenerate, when the face is right and only a detail is wrong. One change per pass usually works best; the rest of the still stays the same.</span>
+      {drift && <span className="st-hint" style={{ color: 'var(--st-warn)' }}>QA found face drift. An edit rarely fixes a face; a regenerate usually does. Your call.</span>}
       <div className="st-row" style={{ gap: 6, flexWrap: 'wrap' }}>
         {suggestions.map((s, i) => <button key={`qa${i}`} className="st-chip on" onClick={() => { setChange(s.change); setFace(s.face) }}>QA: {s.change.length > 48 ? `${s.change.slice(0, 48)}...` : s.change}</button>)}
         {data.options.editPresets.map(p => <button key={p.id} className="st-chip" onClick={() => { setChange(p.text); setFace(p.face) }}>{p.label}</button>)}

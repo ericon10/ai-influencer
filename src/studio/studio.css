@@ -531,6 +531,10 @@ button.st-chip:hover { color: var(--st-text); border-color: var(--st-text-3); }
 .st-choice:disabled { opacity: 0.55; cursor: not-allowed; }
 .st-refpick { display: grid; gap: 4px; justify-items: center; font-size: 10.5px; color: var(--st-text-3); }
 .st-refpick .st-img { width: 44px; height: 58px; border-radius: 8px; }
+.st-refgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); gap: 8px; }
+.st-refchoice { display: grid; gap: 4px; padding: 4px; border-radius: 10px; border: 1px solid var(--st-line); background: var(--st-surface-2); cursor: pointer; font: inherit; font-size: 10.5px; color: var(--st-text-3); }
+.st-refchoice .st-img { aspect-ratio: 3 / 4; border-radius: 7px; }
+.st-refchoice.on { border-color: rgba(255, 106, 61, 0.7); box-shadow: 0 0 0 2px var(--st-accent-soft); color: var(--st-text); }
 .st-combo { display: grid; grid-template-columns: 92px 1.2fr 1.4fr 1fr 1fr; gap: 10px; font-size: 13px; align-items: baseline; }
 .st-drawer.wide { width: min(760px, 100vw); }
 .st-crop { width: min(760px, calc(100vw - 32px)); }
@@ -548,6 +552,17 @@ button.st-chip:hover { color: var(--st-text); border-color: var(--st-text-3); }
   .st-combo > span:first-child { width: 100%; font-size: 11.5px; }
   .st-scene-title { font-size: 24px; }
 }
+
+/* Rules (Settings, Rules) */
+.st-rule { display: flex; align-items: flex-start; gap: 16px; padding: 12px 0; border-bottom: 1px solid var(--st-line); }
+.st-rule:last-child { border-bottom: 0; }
+.st-rule .st-badge { flex: none; margin-top: 2px; }
+.st-switch { flex: none; position: relative; width: 44px; height: 26px; border-radius: 13px; border: 1px solid var(--st-line-2); background: var(--st-surface-3); cursor: pointer; padding: 0; transition: background 0.15s ease, border-color 0.15s ease; }
+.st-switch span { position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; border-radius: 50%; background: var(--st-text-3); transition: transform 0.15s ease, background 0.15s ease; }
+.st-switch.on { background: var(--st-accent); border-color: transparent; }
+.st-switch.on span { transform: translateX(18px); background: #fff; }
+.st-switch:disabled { opacity: 0.6; cursor: wait; }
+.st-switch:focus-visible { outline: none; box-shadow: var(--st-ring); }
 
 .st-only-phone { display: none; }
 @media (max-width: 860px) { .st-only-phone { display: inline-flex; } }

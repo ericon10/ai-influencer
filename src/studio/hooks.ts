@@ -10,6 +10,7 @@ export const keys = {
   characters: ['characters'] as const,
   character: (id: string) => ['character', id] as const,
   scenes: (id: string) => ['scenes', id] as const,
+  rules: (characterId: string | null) => ['rules', characterId ?? 'all'] as const,
   jobs: (scope: string) => ['jobs', scope] as const,
   usage: ['usage'] as const,
   settings: ['settings'] as const,
@@ -61,6 +62,10 @@ export function useScenes(characterId: string) {
     wasBusy.current = busy
   }, [busy, characterId, qc])
   return useQuery({ queryKey: keys.scenes(characterId), queryFn: () => api.scenes(characterId), refetchInterval: busy ? 1500 : false })
+}
+
+export function useRules(characterId: string | null) {
+  return useQuery({ queryKey: keys.rules(characterId), queryFn: () => api.rules(characterId) })
 }
 
 export function useCharacterJobs(id: string) {

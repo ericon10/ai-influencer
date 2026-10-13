@@ -36,6 +36,28 @@ lint, the job runner, the adapters and QA), not only in this file:
 7. **New users are told, in one line:** "Real skin and no makeup is
    what makes characters believable. Don't fix the flaws."
 
+## Rule one: DEFAULTS, NOT LOCKS (owner, 2026-10-13)
+
+The lessons in this document are starting suggestions, never
+restrictions. The sheet keeps the person from drifting, face first;
+after that the character can wear anything and do anything in real
+life. Every rule is in one of two buckets:
+
+- **FIXED (only these):** the Realism principle (rule zero), bare face
+  on hero and sheet, characters 21 or older, no nudity or explicit
+  content, a new person rather than a copy of the inspiration face,
+  the price shown before any paid run, budget caps, keys server-side
+  only. Fixed rules can stop a run.
+- **DEFAULT (everything else), including section 5 apart from its
+  Realism items (5.1.3 and 5.2.19):**
+  pre-filled, fully editable, a warning at most, never a block. Each
+  default can be switched off in Settings > Rules for all characters
+  or for one.
+
+Outside rule zero, where this document says "always", "never" or
+"locked" about a creative choice, read it as the default the Studio
+starts from.
+
 ---
 
 One place to create consistent AI characters and turn them into
@@ -270,8 +292,12 @@ only receives finished, continuous shots.
 
 ## 5. Rules engine
 
-These are the rules the prompt builder and QA enforce. Each one
-is a lesson from the Callie run.
+These are the defaults the prompt builder and QA start from (rule
+one). Each one is a lesson from the Callie run. Only the rules that
+belong to rule zero (Realism, bare-faced hero and sheet) and the
+fixed list in rule one can stop a run; every other rule here is a
+warning at most and can be switched off in Settings > Rules. The
+rule book is `config/rules.yaml`.
 
 ### 5.1 Character creation
 
@@ -305,10 +331,11 @@ is a lesson from the Callie run.
 10. **Body is locked in REF-06/07/08.** Changing the build only
     requires redoing the full-body shots, not the face shots.
 11. **Marks are side-specific.** Store each mark with its side
-    (`ear cuff: LEFT ear`, `mole: above LEFT brow`). For the
-    opposite profile, the prompt must say the marks are hidden
-    ("her right ear has no jewelry; the cuff is only on her left
-    ear"). Models love to mirror marks.
+    (`mole: above LEFT brow`). For the opposite profile, the prompt
+    says the mark is hidden. Models love to mirror marks. Jewelry
+    is styling, not a mark: a signature piece such as Callie's ear
+    cuff is suggested, never forced, and keeps its side when worn
+    (`ear cuff: LEFT ear`).
 12. **Marks should be subtle.** A subtle mole reads as real skin.
     QA confirms presence, not prominence.
 13. **Hair styling is allowed to vary.** Hair color, length and
@@ -327,10 +354,12 @@ is a lesson from the Callie run.
 15. **Override the sheet outfit explicitly**: full new outfit +
     "wearing this outfit instead of the one in the reference
     images."
-16. **Always name footwear.** Otherwise the sheet sneakers leak
-    into scenes.
+16. **Name footwear (default).** Otherwise the sheet sneakers leak
+    into scenes. Leaving it empty is allowed.
 17. **Brand-free by default.** Prompts say "plain unbranded" for
-    shoes, glasses, cups. QA scans for logos and printed text.
+    shoes, glasses, cups, and QA points out logos and printed text.
+    A per-scene "Brands and logos" switch turns this off for brand
+    deals and products.
 18. **Camera matches the story.** Friend on a phone = "candid
     phone photo." Event photographer across the room = "candid
     event photo, long lens, about 25 feet away, compressed
@@ -340,13 +369,15 @@ is a lesson from the Callie run.
 19. **Imperfection is a feature.** Smile lines, skin creasing,
     shine, flyaways, uneven tan, soft focus stay. QA only rejects
     things a real camera would never capture.
-20. **Body framing stays everyday.** Eye-level angles, waist-up or
-    full body, the moment leads. No low angles looking up, no
-    tight crops on body parts.
-21. **Combo log.** Do not repeat a moment type + camera combo from
-    the character's last 10 entries.
+20. **Body framing stays everyday (default).** The planner avoids
+    low angles looking up at her body and tight crops on body parts;
+    eye level, slightly high, over the shoulder, a friend shooting
+    from rocks or a ledge, or a long lens from across a venue all
+    fit. Any angle, including low or high, is allowed when chosen.
+21. **Combo log.** A moment type + camera combo from the
+    character's last 10 entries shows a warning with "Use anyway".
 22. **Aspect by destination:** 9:16 Reels/TikTok/Shorts/Stories,
-    4:5 feed, 1:1 only on request.
+    4:5 feed, 1:1 on request; other shapes are allowed.
 
 ### 5.3 Still edits
 
@@ -354,14 +385,17 @@ is a lesson from the Callie run.
     detail is wrong (logo on a glass, extra earring). Far cheaper.
 24. **One change per edit pass for small details.** Combined edits
     often skip the small one.
-25. **Face drift is never an edit.** Any face drift means
-    regenerate with better-matched refs.
+25. **Face drift is a strong warning.** QA says to regenerate with
+    better-matched refs; the owner can still pick or edit the still
+    after confirming. Plastic or smoothed skin is fixed (rule zero)
+    and is never picked.
 
 ### 5.4 Video
 
 26. **Image-to-video only.** Never text-to-video for a character.
-27. **Audio OFF, always.** Generated audio invents gibberish
-    speech. Sound is added in post.
+27. **Audio off by default.** Generated audio invents gibberish
+    speech, so requests are silent and sound is added in post. A
+    clip can ask for audio when it is wanted.
 28. **No audible dialogue in candid scenes.** People can talk
     visually; viewers hear only the room. Prompts include "silent,
     no audio, no dialogue."
@@ -392,8 +426,8 @@ is a lesson from the Callie run.
     - Run one continuous audio track across the cut. Never
       crossfade the picture: color-match the incoming clip, or
       fail the seam (SPEC 4.3).
-34. **Strip any audio track** from generated clips before
-    assembly, even when audio was "off."
+34. **Strip any audio track** from generated clips that did not ask
+    for audio, even when audio was "off."
 35. **Cheap draft first, premium last.** Test motion on Wan or
     Kling Turbo at 480p/720p; re-run only the winner on a premium
     model (Seedance 2.5, Kling 3.0).
@@ -436,8 +470,15 @@ is a lesson from the Callie run.
 ## 6. QA service
 
 Automated checks run on every result before a human sees it.
-Anything that fails is rejected or routed to an edit, so the human
-queue only holds plausible winners.
+Under rule one, QA findings are advice with one-click fixes (an
+edit, the free mirror, a crop), never a block. Face drift is a
+strong warning: the owner confirms before picking a drifted still.
+Only the fixed checks stop a still: plastic, waxy or smoothed skin
+(rule zero) and a hero that copies the inspiration face
+(distinctness). In the table, "Fails when" means "flags when"
+for every other row. Logos are flagged only when the scene is
+brand-free, and jewelry the scene did not ask for is a note, not a
+failure.
 
 | Check | Method | Fails when |
 | --- | --- | --- |
@@ -788,6 +829,141 @@ run.
 - Batch mode: "7 scenes for the week" end to end, stopping only
   at human gates.
 
+### 13.1 Roadmap after Phase 4 (owner, 2026-10-13)
+
+Recorded, not built. Phase 2 and Phase 3 come first; Clone Video is
+the first thing after Phase 3 ships. Rule one holds in every item:
+every choice is a pre-filled default the owner can change, and only
+the fixed rules stop a run (Realism and the texture check, 21 or
+older, no explicit content, a new person rather than a copy, the
+price first, budget caps, keys server-side).
+
+Endpoints below are from Higgsfield's official Model API Reference
+(docs.higgsfield.ai, read 2026-10-13) or are tools on the owner's
+Higgsfield account (the MCP path, plan credits). Each new model gets
+its one small paid test before it counts as confirmed. **Costs are
+rough:** the Higgsfield pricing page was not reachable from the
+build sandbox, so they come from the nearest price book entries and
+are confirmed by the paid test. Every run is quoted before it starts.
+
+**R1. Clone Video (Phase 3 add-on, highest priority)**
+- Upload or paste a clip (3 to 30 s); pick one or more characters;
+  rebuild it with the same motion and camera. "Keep original sound"
+  is a per-clip switch (off by default, like every video). When on,
+  the Studio puts the source audio back onto the result with ffmpeg
+  (free and the same for every model) rather than trusting a model
+  to keep it.
+- One source across several characters: one quote with a line per
+  character and video, and the total.
+- Endpoints, picked per run (all behind the adapters):
+  - API `kling-video/v3/motion-control/std` and `/pro`: one character
+    image (REF-00 or an approved still) plus the source video;
+    `keep_original_sound` sent as `no` (audio comes back by remux);
+    `character_orientation` image or video.
+  - API `higgsfield/genjutsu/motion-transfer/v1.0`: source video plus
+    1 to 8 image refs, so several sheet shots can hold the face.
+  - API `bytedance/seedance-2.5/video-edit`: prompt, source video and
+    image refs; `generate_audio: false`.
+  - API `kling-video/o3/video-edit` (3 to 15.5 s, up to 4 images).
+  - Account tool `motion_control` (Kling 3.0, 720p or 1080p).
+- QA on the output: face match against REF-00 on sampled frames,
+  the texture check on face crops (smoothed or plastic skin fails),
+  and distinctness against the performer in the source clip (the
+  result must be the character, never the original person).
+- Rough cost: Kling 3.0 motion control is not in the price book
+  yet; Kling 3.0 image to video is $0.063/s (Standard) and $0.084/s
+  (Pro), so plan on about $0.65 to $0.85 per 10 s clip per
+  character. Seedance 2.5 video edit from $0.206/s, about $2.10 per
+  10 s. QA about $0.05 per clip. Five characters on one 10 s source
+  on Kling Pro: about $4.50.
+
+**R2. Inspo board and "Recreate this"**
+- Paste a link or upload a photo or clip. No scrapers: a link is
+  used only when it is a direct image or video file, or a YouTube
+  link through Higgsfield's own analysis; for an Instagram or TikTok
+  post the owner uploads the file.
+- Claude reads pose, outfit, setting, camera, framing and light and
+  pre-fills a scene plan for the chosen character (the existing
+  planner fields, all editable). Outfit and setting are copied as
+  suggestions; the face and body always come from the character.
+  A clip can go straight to Clone Video.
+- Endpoints: Anthropic Messages with images (the vision model in
+  `routing.yaml`); the existing `scene_plan` call; account tool
+  `video_analysis_create` (an uploaded clip or a YouTube link,
+  scene by scene, 3 to 5 minutes) as an option for longer clips.
+- Rough cost: about $0.04 per photo and $0.10 per clip (8 sampled
+  frames) at the price book's rates for the vision model, plus the
+  plan (about $0.02).
+
+**R3. Scene library**
+- Save any approved scene, or just its recipe (fields, refs rule,
+  models), as a template with a thumbnail. Multi-select templates
+  and batch generate; each scene still goes through the scene
+  flow, QA and the human pick.
+- Endpoints: none new; the scene still models already in use.
+- Rough cost: saving is free. A batch is the sum of its scenes: for
+  example 5 templates x 2 stills on Nano Banana 2.1 is about $1.50
+  plus about $0.05 of QA per still (price book placeholders).
+
+**R4. Multi-character runs**
+- Run one scene, template or clone across several characters at
+  once. Each character's own sheet refs, card, marks and rule
+  switches apply; one quote with a line per character and the
+  total; budget caps checked against the whole batch.
+- Endpoints: the same as the single run.
+- Rough cost: the single-run price times the number of characters.
+
+**R5. LoRA training (saved identities)**
+- Pick approved images in the vault and train. The Studio suggests
+  a 22 to 30 image set: the 12 sheet shots plus varied approved
+  scenes (different light, framing, outfits and angles), chosen by
+  face match to REF-00 and spread, never by beauty. The owner can
+  add or remove any image.
+- Endpoints: API `POST /v1/custom-references` (Soul ID; name,
+  `model_version` v1, v2 or cinema, 1 to 100 images), polled at
+  `GET /v1/custom-references/{id}`; the result's id is passed as
+  `custom_reference_id` to Soul 2 or Soul Cinema, followed by the
+  face-only drift lock (DECISIONS D3). Other trainers can be added
+  behind the same adapter later. Training never blocks the
+  pipeline (5.6.40): reference-image models keep working meanwhile.
+- Rough cost: Soul ID training is not priced in the docs we could
+  reach; it is quoted from the paid test and capped by the budget.
+  Generating with the saved character is a Soul 2 still (about
+  $0.10 placeholder) plus the drift lock edit.
+
+**R6. Vault**
+- One library for every image and clip: filters for generated,
+  uploaded, edited and inspo, plus character, scene, model, status
+  and date; collections the owner names. Feeds R2, R3 and R5.
+- Endpoints: none (Postgres and object storage).
+- Rough cost: free to use; storage on R2 is about $0.015 per GB per
+  month with no download fees.
+
+**R7. Posting calendar**
+- Schedule finished content per character for Instagram and
+  TikTok. Before posting: trending sound suggestions and a virality
+  score, both optional.
+- TikTok, through the owner's Higgsfield account: `tiktok_connect`
+  and `tiktok_accounts` to link, `tiktok_music_trending` for sounds
+  from TikTok's Commercial Music Library (cleared for commercial
+  use, SPEC 5.5.38), `tiktok_prepare_publish` and
+  `tiktok_publish_status` to post. Higgsfield's publish form must be
+  submitted by the owner, so at the scheduled time the Studio
+  prepares the post (or saves it to TikTok drafts) and notifies the
+  owner to press publish. Fully automatic posting would need
+  TikTok's own Content Posting API and an approved TikTok app.
+- Instagram: Higgsfield has no Instagram tool. Posting goes through
+  Meta's Instagram API content publishing for a professional
+  account, which needs a Meta app and its review.
+- Virality: account tool `virality_predictor` on the finished clip.
+- AI disclosure: TikTok and Instagram require AI-generated content
+  to be labeled, so the label is on by default on every post.
+  Proposed as fixed (a platform rule, like 21 and older); owner to
+  confirm.
+- Rough cost: posting and the sound list are free; the virality
+  score is charged in Higgsfield credits (price from its first
+  quote).
+
 ---
 
 ## 14. Open questions
@@ -815,8 +991,9 @@ Character System project (`character-callie.md`).
   warm hazel-brown eyes, soft oval face, full light-brown brows,
   full lips, fit athletic build with defined waist and curvy
   hips.
-- Marks: subtle mole above her LEFT brow; gold double-band ear
-  cuff on her LEFT ear.
+- Mark: subtle mole above her LEFT brow (the only fixed mark).
+  Signature piece, optional: gold double-band ear cuff, on her LEFT
+  ear when worn.
 - Makeup: natural by default; soft glam for nights out and
   events.
 - Sheet: GPT Image 2.5. Scenes: Nano Banana with refs. Soul 2.0

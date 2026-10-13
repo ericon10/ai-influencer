@@ -236,8 +236,9 @@ function ShotDrawer({ v, shot, onClose }: { v: CharacterView; shot: Shot | null;
         {shot.id !== 'REF-00' && (
           <div className="st-card" style={{ padding: 14, boxShadow: 'none' }}>
             <div className="st-h3" style={{ marginBottom: 8 }}>Regenerate this shot</div>
-            {blocked.length > 0 ? <span className="st-hint">Approve {blocked.join(' and ')} first.</span> : (
+            {(
               <div className="st-col" style={{ gap: 10 }}>
+                {blocked.length > 0 && <span className="st-hint">{blocked.join(' and ')} {blocked.length > 1 ? 'are' : 'is'} not approved yet, so this shot uses the approved shots it depends on.</span>}
                 <select className="st-select" value={reason} onChange={e => setReason(e.target.value)}>
                   <option value="">No specific problem</option>
                   {v.reasons.filter(r => r.id !== 'talking').map(r => <option key={r.id} value={r.id}>{r.label}</option>)}

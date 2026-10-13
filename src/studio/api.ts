@@ -1,4 +1,4 @@
-import type { ActionPreview, CharacterSummary, CharacterView, HiggsfieldAccount, JobView, Me, QuoteView, SceneFields, ScenesData, SettingsView, StudioAction, Usage } from './types'
+import type { ActionPreview, CharacterSummary, CharacterView, HiggsfieldAccount, JobView, Me, QuoteView, RulesView, SceneFields, ScenesData, SettingsView, StudioAction, Usage } from './types'
 import { sheetRefOf, typeOf, uploadFiles } from './files'
 
 // Thin client for /api/v1. Every write sends the CSRF header the server
@@ -45,7 +45,9 @@ export const api = {
   },
   chooseConcept: (conceptId: string) => request<{ ok: true }>('POST', `/concepts/${conceptId}/choose`, {}),
 
-  approve: (candidateId: string) => request<{ invalidated: string[]; sheetComplete: boolean; comboLogged?: boolean }>('POST', `/candidates/${candidateId}/approve`, {}),
+  approve: (candidateId: string, acknowledge = false) => request<{ invalidated: string[]; sheetComplete: boolean; comboLogged?: boolean }>('POST', `/candidates/${candidateId}/approve`, acknowledge ? { acknowledge } : {}),
+  rules: (characterId?: string | null) => request<RulesView>('GET', `/settings/rules${characterId ? `?characterId=${encodeURIComponent(characterId)}` : ''}`),
+  setRule: (body: { ruleId: string; characterId?: string | null; on?: boolean | null; value?: string | null }) => request<RulesView>('PUT', '/settings/rules', body),
   reject: (candidateId: string, reasons: string[], note: string) => request<{ fixes: Array<{ reason: string; action: string; label: string; available: boolean }> }>('POST', `/candidates/${candidateId}/reject`, { reasons, note }),
   reopen: (candidateId: string) => request<{ ok: true }>('POST', `/candidates/${candidateId}/reopen`, {}),
   pickHero: (candidateId: string) => request<{ needsUpscale: boolean; height: number | null }>('POST', `/candidates/${candidateId}/pick-hero`, {}),
