@@ -1,6 +1,7 @@
 import type { Rule, RulesConfig } from '../config/pipeline'
 import type { GenRequest } from '../providers/types'
 import type { Mark } from './marks'
+import { BARE_FACE_LINE, findBannedTerms, findMakeupTerms, hasRealismBlock, isBareFaceStage } from './realism'
 
 // The rules engine (SPEC 5). Rules are data (config/rules.yaml); this file
 // only knows how to evaluate each check type against a prompt and request.
@@ -87,6 +88,27 @@ export function lintPrompt(rules: RulesConfig, prompt: string, ctx: RuleContext)
     if (!applies(rule, ctx)) continue
     const hit = check(rule, prompt, ctx)
     if (hit) out.push({ ruleId: rule.id, spec: rule.spec, title: rule.title, severity: rule.severity, message: rule.message, match: hit })
+  }
+  return [...out, ...realismViolations(prompt, ctx)]
+}
+
+// Rule zero, the Realism principle. Checked in code for every prompt, after
+// the configured rules, so no config edit can switch it off.
+export function realismViolations(prompt: string, ctx: Pick<RuleContext, 'kind' | 'stage'>): RuleViolation[] {
+  const out: RuleViolation[] = []
+  const image = ctx.kind === 'image' || ctx.kind === 'image_edit'
+  const v = (ruleId: string, title: string, message: string, match?: string): RuleViolation => ({ ruleId, spec: '0', title, severity: 'error', message, match })
+  if (image && !hasRealismBlock(prompt)) {
+    out.push(v('realism-block', 'Every image prompt carries the REALISM block', 'Every image prompt must include the REALISM block (real skin texture, visible pores, no retouching). It cannot be turned off.', 'no REALISM block'))
+  }
+  const banned = [...new Set(findBannedTerms(prompt).map(h => h.term))]
+  if (banned.length) {
+    out.push(v('realism-banned-words', 'No smoothing or beautifying words', 'Words like these make models smooth skin away. Real skin and visible flaws are what make the character believable.', banned.join(', ')))
+  }
+  if (image && isBareFaceStage(ctx.stage)) {
+    if (!prompt.includes(BARE_FACE_LINE)) out.push(v('realism-bare-face', 'Hero and sheet are bare-faced', `Hero and sheet prompts must include "${BARE_FACE_LINE}"`, 'no bare-face line'))
+    const makeup = findMakeupTerms(prompt)
+    if (makeup.length) out.push(v('realism-makeup', 'No makeup on hero and sheet', 'Hero and sheet shots never wear makeup. Makeup belongs in scenes.', makeup.join(', ')))
   }
   return out
 }

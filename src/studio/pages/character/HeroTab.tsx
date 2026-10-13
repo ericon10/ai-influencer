@@ -6,10 +6,16 @@ import { PriceButton } from '../../PriceButton'
 import { Callout, Img, MarkChip, errorMessage, useToast } from '../../ui'
 import { LastRun } from '../../LastRun'
 import type { CharacterView } from '../../types'
+import { REALISM_LINE } from '../../copy'
 
 // Stage 3: three hero prompts, several text-only runs each; one hero across
 // all prompts becomes REF-00 (SPEC 5.1 rules 1 and 2).
 export function HeroTab({ v, onEditCard, goSheet }: { v: CharacterView; onEditCard: () => void; goSheet: () => void }) {
+  // An upscale that smoothed the skin never replaces REF-00; say so.
+  const lastUpscale = v.sheet.shots[0]?.candidates.filter(c => c.status === 'qa_failed' && c.qaReport?.texture?.smoothed).at(-1)
+  const smoothedUpscale = lastUpscale && !v.sheet.shots[0]?.candidates.some(c => c.status === 'approved' && c.createdAt > lastUpscale.createdAt)
+    ? `The last upscale smoothed the skin, so REF-00 kept its original. ${lastUpscale.qaReport!.texture!.message.replace(/ Rerun it;.*$/, '')} Run the upscale again.`
+    : null
   const toast = useToast()
   const refresh = useRefresh()
   const [runs, setRuns] = useState(4)
@@ -28,8 +34,9 @@ export function HeroTab({ v, onEditCard, goSheet }: { v: CharacterView; onEditCa
   return (
     <div className="st-col" style={{ gap: 24 }}>
       <section className="st-card">
-        <div className="st-card-head"><div className="grow"><div className="st-h2">3. Hero portrait</div><div className="st-hint">Text only: the inspiration image is never attached. Natural, everyday makeup.</div></div><button className="st-btn sm ghost" onClick={onEditCard}>Edit card</button></div>
+        <div className="st-card-head"><div className="grow"><div className="st-h2">3. Hero portrait</div><div className="st-hint">Text only: the inspiration image is never attached. Bare face, no makeup, no retouching.</div></div><button className="st-btn sm ghost" onClick={onEditCard}>Edit card</button></div>
         <div className="st-card-body st-col" style={{ gap: 14 }}>
+          <p className="st-realism left">{REALISM_LINE}</p>
           {v.data.marks.length > 0 && <div className="st-marks">{v.data.marks.map(m => <MarkChip key={m.name + m.side} mark={m} />)}</div>}
           {errors.length > 0 && <Callout tone="warn">{errors.map(e => e.message).join(' ')}</Callout>}
           <div className="st-row">
@@ -46,6 +53,7 @@ export function HeroTab({ v, onEditCard, goSheet }: { v: CharacterView; onEditCa
         <section className="st-card">
           <div className="st-card-body st-col" style={{ gap: 12 }}>
             <div className="st-row"><Callout tone="ok" icon={<Check size={16} />}>REF-00 is set{v.ref00?.height ? ` (${v.ref00.width} x ${v.ref00.height})` : ''}.</Callout><span className="st-spacer" /><button className="st-btn primary" onClick={goSheet}>Build the sheet<ArrowRight size={15} /></button></div>
+            {smoothedUpscale && <Callout tone="bad">{smoothedUpscale}</Callout>}
             {v.ref00?.needsUpscale && <><Callout tone="warn">REF-00 is under 1,500 px tall. Upscale it 2x (never more) so small marks survive.</Callout><PriceButton action={{ type: 'upscale', characterId: v.id }} label="Upscale REF-00 2x" /></>}
             <div className="st-divider" style={{ margin: '4px 0' }} />
             <div className="st-h3">The image wins over the card</div>

@@ -1,6 +1,7 @@
 import type { SheetShot, TemplatesConfig, ViewDef, ViewsConfig } from '../config/pipeline'
 import type { CharacterData, Pronouns } from './character'
 import { imageSideOf, markExpectation, otherSide, regionVisible, type Mark } from './marks'
+import { finalizeImagePrompt, type RealismWarning } from './realism'
 import { capitalize, fill, normalizePrompt } from './text'
 
 // Prompts are filled by code from templates and the character record
@@ -57,15 +58,37 @@ function cardPhrase(card: string, noun: string): string {
   return /^\d/.test(c) ? `a ${noun}, ${c}` : c
 }
 
-export function buildHeroPrompts(t: TemplatesConfig, views: ViewsConfig, ch: Pick<CharacterData, 'card' | 'marks' | 'pronouns'>): string[] {
-  const front = views.views.front!
-  const marks = markLines(t, front, ch.marks, ch.pronouns)
-  return t.hero.variants.map(variant => normalizePrompt(fill(t.hero.base, {
-    ...pronounVars(ch.pronouns), card: cardPhrase(ch.card, ch.pronouns.noun), variant, marks,
-  })))
+// Options every image prompt builder takes. The finished prompt always ends
+// with the bare-face line (hero and sheet), the REALISM block and the AVOID
+// block; smoothing words are stripped and reported in `warnings`.
+export interface BuildOptions {
+  // A saved identity's prompt block (for example SOUL IDENTITY).
+  identityBlock?: string
+  warnings?: RealismWarning[]
 }
 
-export function buildSheetPrompt(t: TemplatesConfig, views: ViewsConfig, shot: SheetShot, ch: Pick<CharacterData, 'marks' | 'pronouns' | 'body'>, addendum = ''): string {
+type RealismSource = { realism?: CharacterData['realism'] }
+
+function finish(prompt: string, stage: 'hero' | 'sheet', ch: RealismSource, o: BuildOptions): string {
+  const block = o.identityBlock?.trim()
+  const body = block && !prompt.includes(block) ? `${prompt} ${block}` : prompt
+  const done = finalizeImagePrompt(body, { stage, realism: ch.realism?.block, avoid: ch.realism?.avoid })
+  o.warnings?.push(...done.warnings)
+  return done.prompt
+}
+
+// Hero shots are bare-faced: the bare-face line is added by code, whatever
+// the template or the card says (Realism principle).
+export function buildHeroPrompts(t: TemplatesConfig, views: ViewsConfig, ch: Pick<CharacterData, 'card' | 'marks' | 'pronouns'> & RealismSource, o: BuildOptions = {}): string[] {
+  const front = views.views.front!
+  const marks = markLines(t, front, ch.marks, ch.pronouns)
+  return t.hero.variants.map(variant => finish(normalizePrompt(fill(t.hero.base, {
+    ...pronounVars(ch.pronouns), card: cardPhrase(ch.card, ch.pronouns.noun), variant, marks,
+  })), 'hero', ch, o))
+}
+
+// Sheet shots (REF-01 to REF-11) are bare-faced too.
+export function buildSheetPrompt(t: TemplatesConfig, views: ViewsConfig, shot: SheetShot, ch: Pick<CharacterData, 'marks' | 'pronouns' | 'body'> & RealismSource, addendum = '', o: BuildOptions = {}): string {
   const view = views.views[shot.view]
   if (!view) throw new Error(`Unknown view "${shot.view}" for ${shot.id}.`)
   const pv = pronounVars(ch.pronouns)
@@ -80,5 +103,5 @@ export function buildSheetPrompt(t: TemplatesConfig, views: ViewsConfig, shot: S
     body: body ? `${body} ` : '',
     outfit: t.outfit[shot.framing]!,
   })
-  return normalizePrompt(addendum ? `${prompt} ${addendum}` : prompt)
+  return finish(normalizePrompt(addendum ? `${prompt} ${addendum}` : prompt), 'sheet', ch, o)
 }

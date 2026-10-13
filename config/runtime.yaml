@@ -18,18 +18,36 @@ media:
   # Seams are cut, never crossfaded (SPEC 4.3).
   seam: { max_diff: 0.18, motion_max_diff: 0.35, motion_ratio: 1.5, motion_threshold: 0.10, color_match: true }
   last_frame: { step_back_sec: 0.5, blur_ratio: 0.6 }
+# Realism principle: after an upscale or edit, the face keeps at least this
+# share of its fine skin detail (Laplacian variance at the same scale), or it
+# is flagged "skin smoothed" with a rerun suggested.
+qa:
+  texture_min_ratio: 0.6
 llm:
   image_max_edge: 1568
   image_max_tokens: 4784
-# The owner's Higgsfield account: generation through the MCP connector, paid
-# with plan credits. OAuth with PKCE and dynamic client registration, the same
-# flow the classic app uses. The pay-per-use REST API is separate.
-higgsfield_account:
-  mcp_url: https://mcp.higgsfield.ai/mcp
-  oauth:
-    register: https://mcp.higgsfield.ai/oauth2/register
-    authorize: https://mcp.higgsfield.ai/oauth2/authorize
-    token: https://mcp.higgsfield.ai/oauth2/token
-    scope: openid email offline_access
-  timeout_sec: 60
-  poll_after_sec: 5
+# MCP-based providers on the owner's own plan (OAuth sign-in, plan credits).
+# One connection flow serves all of them (server/providers/mcpConnections.ts).
+mcp_connections:
+  # Generation through the Higgsfield MCP connector. OAuth with PKCE and
+  # dynamic client registration, the same flow the classic app uses. The
+  # pay-per-use REST API is separate (Settings, Higgsfield billing).
+  higgsfield:
+    label: Higgsfield
+    site: https://higgsfield.ai
+    status: live
+    mcp_url: https://mcp.higgsfield.ai/mcp
+    oauth:
+      register: https://mcp.higgsfield.ai/oauth2/register
+      authorize: https://mcp.higgsfield.ai/oauth2/authorize
+      token: https://mcp.higgsfield.ai/oauth2/token
+      scope: openid email offline_access
+    timeout_sec: 60
+    poll_after_sec: 5
+  # Coming soon: a slot only. No endpoints are set, so nothing is ever called
+  # until Dzine's MCP server and OAuth details are confirmed and added here.
+  dzine:
+    label: Dzine AI
+    site: https://www.dzine.ai
+    status: coming_soon
+    note: Connects over MCP with your Dzine plan credits, the same way as your Higgsfield account. Manual Dzine work stays as it is until then.

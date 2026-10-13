@@ -4,6 +4,7 @@ import { FileUp, Plus, Upload } from 'lucide-react'
 import { api } from '../api'
 import { useCharacters, useRefresh } from '../hooks'
 import { Img, Modal, STAGES, errorMessage, useToast } from '../ui'
+import { REALISM_LINE } from '../copy'
 
 export default function Characters() {
   const list = useCharacters()
@@ -36,6 +37,7 @@ export default function Characters() {
         <div className="st-empty">
           <h2 className="st-h1">Cast your first <em>character</em></h2>
           <p className="st-sub" style={{ margin: 0 }}>Start from an inspiration image, or import a character you already built.</p>
+          <p className="st-realism">{REALISM_LINE}</p>
           <div className="st-row" style={{ justifyContent: 'center' }}>
             <button className="st-btn" onClick={() => setImporting(true)}><FileUp size={16} />Import</button>
             <button className="st-btn primary big" onClick={create}><Plus size={18} />New character</button>

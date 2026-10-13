@@ -530,3 +530,7 @@ button.st-chip:hover { color: var(--st-text); border-color: var(--st-text-3); }
 .st-choice:focus-visible { outline: 2px solid var(--st-accent); outline-offset: 2px; }
 .st-choice-status { font-size: 12.5px; color: var(--st-text-2); }
 @media (max-width: 720px) { .st-choices { grid-template-columns: minmax(0, 1fr); } }
+/* Rule zero, the Realism principle, in one line for new users. */
+.st-realism { margin: 0; font-size: 13.5px; color: var(--st-text-2); font-style: italic; text-align: center; }
+.st-realism.left { text-align: left; }
+.st-connection.soon { opacity: 0.85; }

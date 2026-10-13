@@ -21,6 +21,6 @@ export function idealObservation(shot: Pick<SheetShot, 'view' | 'framing'>, view
       .map(m => ({ image_side: toImage(m.side), location: `near the ${m.region}`, description: m.description })),
     other_jewelry: [],
     eye_color: view.facing === 'camera' ? eyes || 'unknown' : 'not visible',
-    text_or_logos: [], artifacts: [], notes: 'Demo inspector (mock).',
+    text_or_logos: [], artifacts: [], skin: { texture: 'real', flaws: ['visible pores'] }, notes: 'Demo inspector (mock).',
   }
 }

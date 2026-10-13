@@ -16,7 +16,8 @@ import { quoteJobs, runJobs, type JobSpec } from '../jobs/runner'
 import type { QuoteView } from '../costs/quotes'
 import type { GenRequest } from '../providers/types'
 import { forMode, liveRoute, resolveRoute } from './settings'
-import { identityForModel, withIdentityBlock } from '../core/identity'
+import { identityForModel } from '../core/identity'
+import type { RealismWarning } from '../core/realism'
 import { buildModelTest, startModelTest } from './modelTests'
 import { approvedAssets, getCandidate, getCharacter, getRef, inspirationAssetIds, setCharacterFields, sheetState, toData } from './characters'
 
@@ -113,6 +114,13 @@ function mirrorFor(o: ReturnType<typeof idealObservation>) {
   return { ...o, nose: flip(o.nose), ears: o.ears.map(e => ({ ...e, image_side: flip(e.image_side) })), skin_marks: o.skin_marks.map(m => ({ ...m, image_side: flip(m.image_side) })) }
 }
 
+// The same realism warning once per action, not once per prompt.
+function dedupe(list: RealismWarning[]): RuleViolation[] {
+  const seen = new Map<string, RuleViolation>()
+  for (const w of list) if (!seen.has(`${w.ruleId}|${w.match}`)) seen.set(`${w.ruleId}|${w.match}`, w)
+  return [...seen.values()]
+}
+
 export async function buildAction(deps: Deps, ctx: Ctx, action: StudioAction): Promise<BuiltAction> {
   if (action.type === 'model_test') return buildModelTest(deps, ctx, action.model)
   const row = await getCharacter(deps, ctx, action.characterId)
@@ -151,8 +159,10 @@ export async function buildAction(deps: Deps, ctx: Ctx, action: StudioAction): P
       // A saved identity for the real model (for example a Soul character)
       // rides along with its prompt block, even while demo mode runs the mock.
       const identity = identityForModel(ch.identities, (await liveRoute(deps, ctx, 'hero')).model)
-      const prompts = buildHeroPrompts(tpl, views, ch).map(p => withIdentityBlock(p, identity))
-      const warnings: RuleViolation[] = []
+      // Bare-faced, with the REALISM and AVOID blocks (Realism principle).
+      const realism: RealismWarning[] = []
+      const prompts = buildHeroPrompts(tpl, views, ch, { identityBlock: identity?.promptBlock, warnings: realism })
+      const warnings: RuleViolation[] = dedupe(realism)
       const specs: JobSpec[] = []
       prompts.forEach((prompt, i) => {
         for (let r = 0; r < action.runsPerPrompt; r++) {
@@ -213,7 +223,8 @@ export async function buildAction(deps: Deps, ctx: Ctx, action: StudioAction): P
       const reasonAction = action.reason ? deps.config.pipeline.review.reasons.find(r => r.id === action.reason)?.action : undefined
       const addendum = reasonAction ? deps.config.pipeline.review.actions[reasonAction]?.prompt_addendum ?? '' : ''
       const identity = identityForModel(ch.identities, lockedModel)
-      const prompt = withIdentityBlock(buildSheetPrompt(tpl, views, shot, ch, addendum), identity)
+      const realism: RealismWarning[] = []
+      const prompt = buildSheetPrompt(tpl, views, shot, ch, addendum, { identityBlock: identity?.promptBlock, warnings: realism })
       const specs: JobSpec[] = []
       let warnings: RuleViolation[] = []
       for (let v = 0; v < action.variations; v++) {
@@ -226,6 +237,7 @@ export async function buildAction(deps: Deps, ctx: Ctx, action: StudioAction): P
           stage: 'sheet', framing: shot.framing, kind: 'image_edit', request: { ...request, model: lockedModel }, marks: ch.marks,
           sheetLock: { model: lockedModel }, aspectByFraming: sheet.settings.aspect, identityBlock: identity?.promptBlock,
         }), shot.label)
+        warnings = [...dedupe(realism), ...warnings]
         const genIndex = specs.length
         specs.push({ type: 'gen', stage: 'sheet', purpose: `sheet:${shot.id}`, label: `${shot.label}${action.variations > 1 ? `, variation ${v + 1}` : ''}`, request })
         if (action.withQa) specs.push(...await qaSpecs(deps, ctx, row.id, shot.id, { parentIndex: genIndex }))

@@ -70,7 +70,13 @@ export interface CharacterData {
   notes: string
   identities: CharacterIdentity[]
   sections: FileSection[]
+  // Realism principle: the REALISM block goes into every image prompt and
+  // the AVOID block after it. Empty means the Studio defaults. Notes are the
+  // character file's Realism section, kept for people to read.
+  realism: CharacterRealism
 }
+
+export interface CharacterRealism { block?: string; avoid?: string; notes?: string[] }
 
 export const MIN_AGE = 18
 export const DEFAULT_MIN_AGE = 21

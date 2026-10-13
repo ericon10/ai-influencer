@@ -10,10 +10,16 @@ import { probeMedia } from '../media/ffmpeg'
 import { saveAsset } from '../storage/assets'
 import { renderPlaceholderPortrait } from '../providers/mock'
 import type { GenRequest, ProviderAdapter } from '../providers/types'
+import { finalizeImagePrompt } from '../core/realism'
 
+// Image prompts go through the realism step like every built prompt.
 const img = (prompt: string, extra: Partial<GenRequest> = {}): JobSpec => ({
   type: 'gen', stage: 'hero', purpose: 'test:hero', label: 'Test image',
-  request: { kind: 'image', model: 'mock/image', prompt, aspect: '3:4', resolution: '2k', quality: 'high', ...extra },
+  request: { kind: 'image', model: 'mock/image', prompt: finalizeImagePrompt(prompt, { stage: 'hero' }).prompt, aspect: '3:4', resolution: '2k', quality: 'high', ...extra },
+})
+const raw = (prompt: string, stage = 'scene'): JobSpec => ({
+  type: 'gen', stage, purpose: 'test:raw', label: 'Raw prompt',
+  request: { kind: 'image', model: 'mock/image', prompt, aspect: '3:4', resolution: '2k', quality: 'high' },
 })
 
 async function quoteAndRun(h: Harness, specs: JobSpec[], opts: { confirmed?: boolean; characterId?: string | null } = {}) {
@@ -21,6 +27,32 @@ async function quoteAndRun(h: Harness, specs: JobSpec[], opts: { confirmed?: boo
   const rows = await runJobs(h.deps, h.ctx, { quoteId: q.id, confirmed: opts.confirmed, purpose: 'test', characterId: opts.characterId ?? null, specs })
   return { q, rows }
 }
+
+// Rule zero: the runner refuses what the prompt builder would never send.
+describe('realism guard', () => {
+  let h: Harness
+  beforeEach(async () => { h = await createHarness() })
+  afterEach(async () => { await h.close() })
+
+  it('refuses an image prompt without the REALISM block, before any quote', async () => {
+    await expect(quoteJobs(h.deps, h.ctx, { purpose: 'test', characterId: null, specs: [raw('A woman at a market, wearing a linen shirt.')] }))
+      .rejects.toMatchObject({ code: 'prompt_rejected', message: expect.stringMatching(/REALISM block/) })
+    const ok = raw(finalizeImagePrompt('A woman at a market, wearing a linen shirt.').prompt)
+    await expect(quoteJobs(h.deps, h.ctx, { purpose: 'test', characterId: null, specs: [ok] })).resolves.toMatchObject({ status: 'open' })
+  })
+
+  it('refuses smoothing words even with the REALISM block', async () => {
+    const p = `A woman with flawless porcelain skin, wearing a linen shirt.\n${finalizeImagePrompt('x').prompt.split('\n').slice(1).join('\n')}`
+    await expect(quoteJobs(h.deps, h.ctx, { purpose: 'test', characterId: null, specs: [raw(p)] }))
+      .rejects.toMatchObject({ code: 'prompt_rejected', message: expect.stringMatching(/flawless, porcelain/) })
+  })
+
+  it('refuses a hero or sheet prompt without the bare-face line', async () => {
+    const p = finalizeImagePrompt('Chest-up portrait, wearing a white tee.').prompt
+    await expect(quoteJobs(h.deps, h.ctx, { purpose: 'test', characterId: null, specs: [raw(p, 'sheet')] }))
+      .rejects.toMatchObject({ code: 'prompt_rejected', message: expect.stringMatching(/Bare face, no makeup, no retouching/) })
+  })
+})
 
 describe('job runner', () => {
   let h: Harness

@@ -6,6 +6,7 @@ import { PriceButton } from '../../PriceButton'
 import { Callout, Img, MarkChip, errorMessage, useToast } from '../../ui'
 import { LastRun } from '../../LastRun'
 import type { CharacterView } from '../../types'
+import { REALISM_LINE } from '../../copy'
 
 // Stages 1 and 2: inspiration intake, the Keep / Change breakdown, and three
 // concepts to choose from.
@@ -32,6 +33,7 @@ export function StartTab({ v, onEditCard, goHero }: { v: CharacterView; onEditCa
       <section className="st-card">
         <div className="st-card-head"><div className="grow"><div className="st-h2">1. Inspiration</div><div className="st-hint">The look to borrow: styling, palette, vibe. The face will be a new person.</div></div></div>
         <div className="st-card-body st-col" style={{ gap: 14 }}>
+          {v.inspirations.length === 0 && <p className="st-realism left">{REALISM_LINE}</p>}
           <div className="st-grid heroes">
             {v.inspirations.map(id => <Img key={id} assetId={id} width={360} style={{ aspectRatio: '3/4' }} />)}
             <label className={`st-drop ${over ? 'over' : ''}`} style={{ aspectRatio: '3/4', padding: 12 }} onDragOver={e => { e.preventDefault(); setOver(true) }} onDragLeave={() => setOver(false)} onDrop={e => { e.preventDefault(); setOver(false); upload(e.dataTransfer.files) }}>

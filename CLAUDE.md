@@ -1,5 +1,41 @@
 # Project context for Claude Code
 
+## Rule zero: REALISM PRINCIPLE (above everything else)
+
+Characters look real because they are not perfect. Flaws,
+imperfections, real skin texture, and a no-makeup baseline are the
+product. Never let the system smooth them away.
+
+This is enforced in code (`server/core/realism.ts`, the prompt
+lint, the job runner, the adapters and QA), not only in this file:
+
+1. **Hero and sheet (REF-00 to REF-11) are always bare-faced.** The
+   prompt builders add "Bare face, no makeup, no retouching." to
+   every hero and sheet prompt and strip makeup words. Editing a
+   template cannot remove it.
+2. **The REALISM block is in every image prompt.** The builder adds
+   the character's own block (or the Studio default); the lint and
+   the job runner refuse any image prompt without it. There is no
+   setting to turn it off.
+3. **Banned words:** flawless, perfect skin, smooth skin, airbrushed,
+   retouched, porcelain, beautify, glamour retouch, skin smoothing,
+   beauty filter, enhance face. The builder strips them and tells the
+   user why; the runner refuses a prompt that still has one. Negated
+   uses ("no airbrushing") and the AVOID block are fine.
+4. **No beautify, face-enhance, skin-smoothing or prompt-enhance step
+   anywhere.** Adapters force any such provider option off.
+5. **Upscales and edits keep texture.** A Laplacian-variance check on
+   the face crop, against the input at the same scale, flags "skin
+   smoothed" and suggests a rerun. A smoothed upscale never replaces
+   REF-00.
+6. **QA keeps the flaws.** Pores, freckles, slight redness, uneven
+   tone, shine, flyaways, smile lines, asymmetry and the subtle mole
+   are required, never defects, and QA never suggests fixing them.
+   Plastic, waxy, airbrushed or porcelain skin fails QA even when the
+   face embedding matches.
+7. **New users are told, in one line:** "Real skin and no makeup is
+   what makes characters believable. Don't fix the flaws."
+
 This file gives a new Claude Code session enough context to be useful
 immediately. Read this first before making changes.
 
@@ -19,7 +55,7 @@ below keep working unchanged on localStorage and the Higgsfield MCP path.
 ## Character Studio standing rules (required)
 
 From SPEC.md section 12 and the owner's guardrails. These are
-requirements, not suggestions.
+requirements, not suggestions. Rule zero (Realism, above) comes first.
 
 - **No em-dashes anywhere**: UI copy, prompts, docs, commit messages,
   code comments. `npm run check` fails on them in Studio paths.
@@ -55,7 +91,9 @@ requirements, not suggestions.
 |---|---|
 | `config/*.yaml` | Rules engine, prompt templates, sheet graph, views, routing, price book, budgets |
 | `server/core/` | Pure, unit-tested logic (prompts, rules, sheet DAG, QA side logic, character file) |
-| `server/providers/` | `ProviderAdapter` (SPEC 7.1), mock, Higgsfield API, Higgsfield account (MCP, plan credits), Anthropic, contract tests |
+| `server/core/realism.ts` | Rule zero: bare-face line, REALISM and AVOID blocks, banned words, beautify filter |
+| `server/qa/texture.ts` | Texture check after upscales and edits (skin smoothed) |
+| `server/providers/` | `ProviderAdapter` (SPEC 7.1), mock, Higgsfield API, Higgsfield account (MCP, plan credits), shared MCP connection flow (Dzine AI coming soon), Anthropic, contract tests |
 | `server/jobs/runner.ts` | Quotes required for every run, holds, submit, webhook/poll, ingest, ledger |
 | `server/media/` | ffmpeg tools including the seam-scored join (SPEC 4.3) |
 | `server/qa/faces.ts` | Face matcher for identity and distinctness QA (YuNet + SFace on onnxruntime-web) |

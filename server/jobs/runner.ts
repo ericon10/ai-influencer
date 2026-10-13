@@ -17,6 +17,7 @@ import { probeFile } from '../media/ffmpeg'
 import { stripAudio } from '../media/edit'
 import { ProviderError, type GenRequest, type LlmImage, type LlmRequest, type Output, type ProviderAdapter } from '../providers/types'
 import { withBilling } from '../providers/billing'
+import { realismBlockers } from '../core/realism'
 import { publicAssetUrl } from './assetUrls'
 import { safeDownload } from './download'
 import { hookFor, type JobOutcome, type JobRow } from './hooks'
@@ -59,7 +60,20 @@ async function llmEstimateRequest(deps: Deps, ctx: Ctx, req: LlmJobRequest): Pro
   return { ...rest, images }
 }
 
+// Rule zero, the Realism principle: no generation is quoted or run without
+// the REALISM block in an image prompt, with a smoothing word in any prompt,
+// or without the bare-face line on a hero or sheet shot. The prompt builders
+// never produce these; this refuses any path that skipped them.
+function guardRealism(specs: JobSpec[]): void {
+  for (const s of specs) {
+    if (s.type !== 'gen') continue
+    const problems = realismBlockers(s.request.prompt, { kind: s.request.kind, stage: s.stage })
+    if (problems.length) throw new AppError('prompt_rejected', `${s.label}: ${problems.join(' ')}`)
+  }
+}
+
 export async function quoteItemsFor(deps: Deps, ctx: Ctx, specs: JobSpec[]): Promise<QuoteItem[]> {
+  guardRealism(specs)
   const items: QuoteItem[] = []
   for (const s of specs) {
     const [provider, model] = s.request.model.split('/') as [string, string]

@@ -60,7 +60,8 @@ describe('hero prompts', () => {
     expect(prompts).toHaveLength(3)
     for (const p of prompts) {
       expect(p).toMatch(/^Chest-up portrait of a woman, 24, long honey-blonde/)
-      expect(p).toContain('no makeup beyond everyday')
+      expect(p).toContain('Bare face, no makeup, no retouching.')
+      expect(p).toMatch(/\nREALISM: /)
       expect(p).toContain('gold double-band ear cuff on her LEFT ear')
       expect(blocking(lintPrompt(rules, p, { stage: 'hero', framing: 'chest_up', kind: 'image', marks: ch.marks, request: { kind: 'image', model: 'mock/image' } }))).toEqual([])
     }
@@ -108,7 +109,7 @@ describe('text helpers', () => {
     const long = buildSheetPrompt(templates, views, shot('REF-04'), ch)
     const wrapped = hardWrap(long, 72)
     for (const line of wrapped.split('\n')) expect(line.length).toBeLessThanOrEqual(72)
-    expect(wrapped.replace(/\n/g, ' ')).toBe(long)
+    expect(wrapped.replace(/\n/g, ' ')).toBe(long.replace(/\n/g, ' '))
   })
 })
 

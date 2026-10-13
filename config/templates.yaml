@@ -1,5 +1,10 @@
 # Prompt templates (SPEC 10). {braces} are filled by the engine from the
 # character record; LLMs never write these prompts from scratch.
+#
+# Realism principle (rule zero): hero and sheet shots are bare-faced. Code
+# adds "Bare face, no makeup, no retouching." and the REALISM and AVOID
+# blocks to every hero and sheet prompt, so editing these templates cannot
+# remove them (server/core/realism.ts).
 # Pronoun placeholders: {subj} she, {obj} her, {poss} her, {noun} woman.
 version: 1
 
@@ -9,8 +14,8 @@ hero:
     Chest-up portrait of {card}. {variant} Plain light gray background, soft
     even daylight, simple white crew-neck t-shirt, hair in its usual style.
     {marks}
-    Photorealistic, natural skin texture with visible pores, no retouching,
-    no makeup beyond everyday.
+    Photorealistic, real skin texture with visible pores and small natural
+    imperfections.
   variants:
     - "Facing the camera, relaxed neutral expression."
     - "Facing the camera, a small relaxed closed-mouth smile."
@@ -22,9 +27,9 @@ sheet:
     tone, and distinguishing marks exactly the same. {framing}. {view}.
     {marks}
     {expression}{body} Plain light gray background, soft even daylight,
-    {outfit}. Photorealistic, natural skin texture with visible pores, same
-    natural makeup as the reference, no retouching. Same person as the
-    reference, not a lookalike.
+    {outfit}. Photorealistic, real skin texture with visible pores, the same
+    freckles, redness and small imperfections as the reference. Same person
+    as the reference, not a lookalike.
 
 framing:
   chest_up: "Chest-up framing, from mid-chest to just above the top of the head"
@@ -78,7 +83,9 @@ breakdown:
     study inspiration images and separate the look (styling, hair styling,
     wardrobe, palette, setting, camera feel, energy) from identity (the face).
     The character you help design must be a new, fictional adult, never a copy
-    of anyone in the images. You never identify or name real people.
+    of anyone in the images. You never identify or name real people. Real
+    skin and visible flaws are what make a character believable; never
+    suggest smoothing, perfecting or retouching skin.
   prompt: |
     Study the attached inspiration image(s) and return a Keep and Change
     breakdown.
@@ -97,9 +104,11 @@ concepts:
     photorealistic candid content. Features are precise and specific so an
     image model can reproduce them consistently. Bodies are described only in
     neutral brand terms (for example "fit, athletic build, defined waist,
-    naturally curvy hips"), never cup sizes or measurements. The makeup
-    baseline is natural and everyday. Distinguishing marks are subtle and
-    side-specific, with sides from the character's own point of view.
+    naturally curvy hips"), never cup sizes or measurements. The baseline is
+    a bare face with no makeup and real skin: visible texture, small
+    imperfections, natural unevenness. Never describe skin in smoothing or
+    beautifying terms. Distinguishing marks are subtle and side-specific,
+    with sides from the character's own point of view.
   prompt: |
     Propose exactly 3 clearly different character concepts based on this
     breakdown.
@@ -138,6 +147,11 @@ qa_perception:
     "image_left" means the left half of the picture as you look at it. You
     never translate positions into the subject's own left or right. If
     something is unclear, say so and lower your confidence.
+    Real skin is the goal. Pores, freckles, slight redness, uneven tone,
+    shine, flyaway hairs, smile lines, asymmetry and small moles are expected
+    and required. Never report them as defects or artifacts, and never
+    suggest removing, fixing or smoothing them. Skin that looks plastic,
+    waxy, airbrushed or porcelain is the defect.
   prompt: |
     Inspect the attached image of a person and report:
     1. Head pose: frontal, three_quarter, profile, back, or unclear; and which
@@ -153,5 +167,8 @@ qa_perception:
     6. Eye color as seen.
     7. Any readable text, logos or brand marks.
     8. Anything a real camera would never capture (warped features, wrong
-       finger count, melted objects).
+       finger count, melted objects). Natural skin flaws are not on this list.
+    9. Skin texture: "real" (visible pores and fine texture, natural
+       unevenness), "slightly_smooth", or "plastic" (plastic, waxy,
+       airbrushed or porcelain), and the natural flaws you can see.
     Look closely for: {hints}

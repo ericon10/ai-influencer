@@ -42,7 +42,8 @@ still the plan for hosting the Studio's own files in the cloud.
 ### A3. Dzine (Deferred)
 No adapter until Dzine publishes API endpoints and pricing (SPEC 7.2).
 The provider layer is pluggable, so adding it later is one adapter file
-plus price book rows.
+plus price book rows. Update 2026-10-13: a Dzine AI slot now sits on the
+shared MCP connection flow, marked coming soon (E4).
 
 ### A4. Budget limits (Default)
 | Scope | Default cap | Warn at |
@@ -306,3 +307,40 @@ Higgsfield billing (new accounts start on the API).
   the server; tokens are sealed in the account's key vault like any key and
   renew themselves. Model tests always use the API, because they confirm
   API endpoints. Wan 3.0 Prime has no account path yet.
+
+### E3. Rule zero: the Realism principle
+Characters look real because they are not perfect. Flaws, real skin
+texture and a no-makeup baseline are the product, and nothing in the
+system smooths them away. It is rule zero at the top of CLAUDE.md and
+SPEC.md and is enforced in code, so no template, setting or character
+file can switch it off:
+
+- `server/core/realism.ts` holds the bare-face line, the default REALISM
+  and AVOID blocks, the banned words and the beautify option filter.
+- The hero and sheet builders add "Bare face, no makeup, no retouching."
+  and strip makeup words; every image prompt gets the character's REALISM
+  block (or the default) and AVOID block.
+- The lint adds code checks after the configured rules, and the job runner
+  refuses to quote or run an image prompt without the REALISM block, any
+  prompt with a smoothing word, or a hero or sheet prompt without the
+  bare-face line.
+- Both Higgsfield adapters force any beautify, face-enhance,
+  skin-smoothing or prompt-enhance option off.
+- After every upscale and edit, a Laplacian-variance check on the face
+  crop (both images at the same scale) flags "skin smoothed" below 60% of
+  the input's fine detail (`config/runtime.yaml`, qa.texture_min_ratio).
+  A smoothed upscale never replaces REF-00.
+- QA treats pores, freckles, redness, uneven tone, shine, flyaways, smile
+  lines, asymmetry and moles as required, drops any "artifact" that names
+  one, never echoes a suggestion to fix one, and fails plastic, waxy,
+  airbrushed or porcelain skin even when the face embedding matches.
+
+### E4. One connection flow for MCP providers; Dzine AI coming soon
+The Higgsfield account sign-in became a shared MCP connection flow
+(`server/providers/mcpConnections.ts`): OAuth with PKCE and dynamic client
+registration, tokens in the vault, routes `/oauth/:provider/start` and
+`/oauth/:provider/callback`. Providers are data (`config/runtime.yaml`,
+mcp_connections). Dzine AI (www.dzine.ai) is listed there as coming soon
+with no endpoints, so it shows in Settings, Connected accounts, and never
+makes a call. Adding it later is its MCP URL, OAuth endpoints and an
+adapter, on the same flow.

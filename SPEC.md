@@ -1,5 +1,43 @@
 # Character Studio: Software Scope v0.1
 
+## Rule zero: REALISM PRINCIPLE (above everything else)
+
+Characters look real because they are not perfect. Flaws,
+imperfections, real skin texture, and a no-makeup baseline are the
+product. Never let the system smooth them away.
+
+This is enforced in code (`server/core/realism.ts`, the prompt
+lint, the job runner, the adapters and QA), not only in this file:
+
+1. **Hero and sheet (REF-00 to REF-11) are always bare-faced.** The
+   prompt builders add "Bare face, no makeup, no retouching." to
+   every hero and sheet prompt and strip makeup words. Editing a
+   template cannot remove it.
+2. **The REALISM block is in every image prompt.** The builder adds
+   the character's own block (or the Studio default); the lint and
+   the job runner refuse any image prompt without it. There is no
+   setting to turn it off.
+3. **Banned words:** flawless, perfect skin, smooth skin, airbrushed,
+   retouched, porcelain, beautify, glamour retouch, skin smoothing,
+   beauty filter, enhance face. The builder strips them and tells the
+   user why; the runner refuses a prompt that still has one. Negated
+   uses ("no airbrushing") and the AVOID block are fine.
+4. **No beautify, face-enhance, skin-smoothing or prompt-enhance step
+   anywhere.** Adapters force any such provider option off.
+5. **Upscales and edits keep texture.** A Laplacian-variance check on
+   the face crop, against the input at the same scale, flags "skin
+   smoothed" and suggests a rerun. A smoothed upscale never replaces
+   REF-00.
+6. **QA keeps the flaws.** Pores, freckles, slight redness, uneven
+   tone, shine, flyaways, smile lines, asymmetry and the subtle mole
+   are required, never defects, and QA never suggests fixing them.
+   Plastic, waxy, airbrushed or porcelain skin fails QA even when the
+   face embedding matches.
+7. **New users are told, in one line:** "Real skin and no makeup is
+   what makes characters believable. Don't fix the flaws."
+
+---
+
 One place to create consistent AI characters and turn them into
 finished UGC images and video, driven by provider APIs instead of
 a dozen logins and interfaces.
@@ -243,10 +281,10 @@ is a lesson from the Callie run.
 2. **Pick one hero across all three hero prompts**, not one per
    prompt. Prefer a result where both distinguishing marks are
    visible, since every later shot copies what REF-00 shows.
-3. **Natural baseline.** Hero and sheet use natural, everyday
-   makeup. Glam is added per scene through the wardrobe line,
-   never baked into the sheet. Adding makeup is easy for models;
-   removing it changes the face.
+3. **Bare-faced baseline (rule zero).** Hero and sheet are always
+   bare-faced: no makeup, no retouching. Makeup is added per scene
+   through the wardrobe line, never baked into the sheet. Adding
+   makeup is easy for models; removing it changes the face.
 4. **The image wins over the card.** When the approved hero
    differs from the card (ear cuff landed on the left ear, fuller
    lips), update the card to match the image.
@@ -465,6 +503,7 @@ type GenRequest = {
 | WaveSpeed (secondary) | Bearer API key, `POST /api/v3/{model}` then poll or webhook | Models Higgsfield lacks; price-shopping drafts | Prepaid credits that do not expire, price shown before submit. Not automatically cheaper (Seedance 2.0 720p $0.24/s) |
 | fal / Atlas Cloud (secondary) | API key | Cheapest Wan drafts (Atlas lists Wan Flash/Turbo around $0.02/s), Kling, Seedance | Optional second source for video |
 | Dzine (manual only for now) | Subscription plans; no published API pricing found | Manual work if its subscription value beats per-second pricing | Do not build an adapter until API endpoints and pricing are confirmed |
+| Dzine AI over MCP (coming soon) | OAuth sign-in to the owner's Dzine account, plan credits | Same as the manual entry, without leaving the Studio | A slot on the shared MCP connection flow (Settings, Connected accounts), next to the Higgsfield account. Listed as coming soon; no call is made until Dzine's MCP server and OAuth details are confirmed |
 | ElevenLabs | API / MCP | Sound effects only if a library track will not do | Skip music generation |
 
 **Price-shop per job.** Prices for the same model differ by
@@ -571,8 +610,11 @@ Wrapped for readability. `{braces}` are filled by the engine.
 Chest-up portrait of {card}. Facing the camera, relaxed
 neutral expression, plain light gray background, soft even
 daylight, simple white crew-neck t-shirt, hair in its usual
-style. Photorealistic, natural skin texture with visible
-pores, no retouching, no makeup beyond everyday.
+style. Photorealistic, real skin texture with visible pores
+and small natural imperfections. Bare face, no makeup, no
+retouching.
+{REALISM block}
+{AVOID block}
 ```
 
 **Sheet shot**
@@ -582,9 +624,12 @@ hair, skin tone, and distinguishing marks exactly the same.
 {framing}. {view and side-specific mark visibility}.
 {expression}. {body line, full body only}. Plain light gray
 background, soft even daylight, {outfit for framing}.
-Photorealistic, natural skin texture with visible pores, same
-natural makeup as the reference, no retouching. Same person as
-the reference, not a lookalike.
+Photorealistic, real skin texture with visible pores, the same
+freckles, redness and small imperfections as the reference. Same
+person as the reference, not a lookalike. Bare face, no makeup,
+no retouching.
+{REALISM block}
+{AVOID block}
 ```
 
 **Scene (edit model with refs)**
@@ -594,9 +639,10 @@ hair, and features exactly the same. {moment}. {setting}.
 {outfit}, {footwear}, {jewelry incl. marks}, wearing this
 outfit instead of the one in the reference images. {makeup
 level}, {hair styling}. {pose and gaze}. {camera: who shoots,
-distance, framing, angle}. {light}. {realism block}. Avoid:
-studio lighting, perfect symmetry, plastic skin, text,
-watermarks, logos.
+distance, framing, angle}. {light}.
+{REALISM block}
+{AVOID block: studio lighting, perfect symmetry, plastic skin,
+text, watermarks, logos}
 ```
 
 **Video clip**

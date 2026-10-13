@@ -19,6 +19,7 @@ export default function Settings() {
           <ModeCard d={d} />
           <KeysCard d={d} />
           <BillingCard d={d} />
+          <ConnectionsCard d={d} />
           <BudgetsCard d={d} />
           <ModelsCard d={d} />
         </div>
@@ -108,52 +109,26 @@ function KeyRow({ p, cred }: { p: SettingsView['providers'][number]; cred?: Sett
 function BillingCard({ d }: { d: SettingsView }) {
   const toast = useToast()
   const invalidate = useInvalidate()
-  const qc = useQueryClient()
-  const [params, setParams] = useSearchParams()
   const b = d.billing
   const account = useHiggsfieldAccount(b.accountConnected)
-  const [busy, setBusy] = useState<'connect' | 'disconnect' | 'save' | null>(null)
+  const [busy, setBusy] = useState(false)
   const [creditUsd, setCreditUsd] = useState(String(b.creditUsd || ''))
   useEffect(() => setCreditUsd(String(b.creditUsd || '')), [b.creditUsd])
   const apiKey = d.credentials.find(c => c.provider === 'higgsfield')
   const apiOnly = d.models.filter(m => m.ref.startsWith('higgsfield/') && !b.accountModels.includes(m.ref)).map(m => m.label)
 
-  // Back from the Higgsfield sign-in page.
-  useEffect(() => {
-    const result = params.get('higgsfield')
-    if (!result) return
-    if (result === 'connected') toast({ tone: 'ok', text: 'Higgsfield account connected. Choose it below to run on plan credits.' })
-    else toast({ tone: 'bad', text: params.get('message') ?? 'Higgsfield sign-in failed.' })
-    params.delete('higgsfield'); params.delete('message')
-    setParams(params, { replace: true })
-    invalidate()
-    qc.invalidateQueries({ queryKey: keys.higgsfieldAccount })
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
-
   async function choose(next: 'api' | 'account') {
     if (next === b.default) return
-    setBusy('save')
+    setBusy(true)
     try {
       await api.setBilling({ default: next })
       invalidate()
       toast({ tone: 'ok', text: next === 'account' ? 'Higgsfield runs now use your plan credits. New estimates show credits.' : 'Higgsfield runs now use the API balance.' })
-    } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) } finally { setBusy(null) }
-  }
-  async function connect() {
-    setBusy('connect')
-    try { window.location.assign((await api.connectHiggsfieldAccount()).url) } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }); setBusy(null) }
-  }
-  async function disconnect() {
-    if (!confirm('Disconnect your Higgsfield account? Runs go back to the API balance.')) return
-    setBusy('disconnect')
-    try { await api.disconnectHiggsfieldAccount(); invalidate(); qc.removeQueries({ queryKey: keys.higgsfieldAccount }) } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) } finally { setBusy(null) }
+    } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) } finally { setBusy(false) }
   }
   async function saveCreditValue() {
-    setBusy('save')
-    try { await api.setBilling({ creditUsd: Number(creditUsd) || 0 }); invalidate(); toast({ tone: 'ok', text: 'Credit value saved.' }) } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) } finally { setBusy(null) }
-  }
-  async function refreshBalance() {
-    try { qc.setQueryData(keys.higgsfieldAccount, await api.higgsfieldAccount(true)) } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) }
+    setBusy(true)
+    try { await api.setBilling({ creditUsd: Number(creditUsd) || 0 }); invalidate(); toast({ tone: 'ok', text: 'Credit value saved.' }) } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) } finally { setBusy(false) }
   }
 
   const a = account.data
@@ -163,46 +138,108 @@ function BillingCard({ d }: { d: SettingsView }) {
       <div className="st-card-head"><div className="grow"><div className="st-h2">Higgsfield billing</div><div className="st-hint">Which Higgsfield balance pays for images and video on this account. Every run still shows its price first.</div></div></div>
       <div className="st-card-body st-col" style={{ gap: 16 }}>
         <div className="st-choices" role="radiogroup" aria-label="Higgsfield billing">
-          <button className={`st-choice ${b.default === 'api' ? 'on' : ''}`} role="radio" aria-checked={b.default === 'api'} disabled={busy === 'save'} onClick={() => choose('api')}>
+          <button className={`st-choice ${b.default === 'api' ? 'on' : ''}`} role="radio" aria-checked={b.default === 'api'} disabled={busy} onClick={() => choose('api')}>
             <div className="st-row" style={{ flexWrap: 'nowrap' }}><KeyRound size={16} /><span className="st-h3" style={{ flex: 1 }}>Higgsfield API</span>{b.default === 'api' && <span className="st-badge accent plain">Default</span>}</div>
             <span className="st-hint">Pay-per-use dollars from the Higgsfield Console. For customers and production.</span>
             <span className="st-choice-status">{apiKey ? 'API key added' : 'Needs an API key (Provider keys, above)'}</span>
           </button>
-          <button className={`st-choice ${b.default === 'account' ? 'on' : ''}`} role="radio" aria-checked={b.default === 'account'} disabled={!b.accountConnected || busy === 'save'} onClick={() => choose('account')} title={b.accountConnected ? undefined : 'Connect your Higgsfield account first'}>
+          <button className={`st-choice ${b.default === 'account' ? 'on' : ''}`} role="radio" aria-checked={b.default === 'account'} disabled={!b.accountConnected || busy} onClick={() => choose('account')} title={b.accountConnected ? undefined : 'Connect your Higgsfield account first (Connected accounts, below)'}>
             <div className="st-row" style={{ flexWrap: 'nowrap' }}><UserRound size={16} /><span className="st-h3" style={{ flex: 1 }}>My Higgsfield account</span>{b.default === 'account' && <span className="st-badge accent plain">Default</span>}</div>
             <span className="st-hint">Spends your plan credits. For your own work.</span>
-            <span className="st-choice-status">{!b.accountConnected ? 'Not connected' : balance ?? (account.isLoading ? 'Checking credits...' : 'Connected')}</span>
+            <span className="st-choice-status">{!b.accountConnected ? 'Connect it under Connected accounts, below' : balance ?? (account.isLoading ? 'Checking credits...' : 'Connected')}</span>
           </button>
         </div>
-
-        <div className="st-card" style={{ padding: 14, boxShadow: 'none' }}>
-          <div className="st-row">
-            <Link2 size={16} />
-            <div className="grow" style={{ flex: 1 }}>
-              <div className="st-h3">Higgsfield account</div>
-              <div className="st-hint">{b.accountConnected ? (a?.error ? a.error : 'Signed in through Higgsfield. The sign-in is stored encrypted for this account; your password never reaches the Studio.') : 'Sign in on higgsfield.ai to run on your plan credits. Your password never reaches the Studio.'}</div>
-            </div>
-            {b.accountConnected && <span className={`st-badge ${a?.error || b.accountStatus === 'failed' ? 'bad' : 'ok'}`}>{a?.error || b.accountStatus === 'failed' ? 'Reconnect' : 'Connected'}</span>}
-            {b.accountConnected && <button className="st-btn sm icon ghost" onClick={refreshBalance} aria-label="Refresh credits"><RefreshCw size={14} /></button>}
-            {(!b.accountConnected || a?.error || b.accountStatus === 'failed') && (
-              <button className="st-btn primary sm" onClick={connect} disabled={busy === 'connect'}>{busy === 'connect' ? <Loader2 size={14} className="st-spin" /> : <Link2 size={14} />}{b.accountConnected ? 'Reconnect' : 'Connect'}</button>
-            )}
-            {b.accountConnected && <button className="st-btn sm icon ghost" onClick={disconnect} disabled={busy === 'disconnect'} aria-label="Disconnect Higgsfield account"><Trash2 size={14} /></button>}
-          </div>
-        </div>
-
         {b.accountConnected && (
           <label className="st-field">
             <span className="st-label">What one credit is worth to you</span>
             <div className="st-row" style={{ gap: 6, flexWrap: 'nowrap', maxWidth: 320 }}>
               <span className="st-muted">$</span>
               <input className="st-input" inputMode="decimal" placeholder="0.00" value={creditUsd} onChange={e => setCreditUsd(e.target.value.replace(/[^\d.]/g, ''))} />
-              <button className="st-btn sm" onClick={saveCreditValue} disabled={busy === 'save' || Number(creditUsd || 0) === b.creditUsd}><CreditCard size={14} />Save</button>
+              <button className="st-btn sm" onClick={saveCreditValue} disabled={busy || Number(creditUsd || 0) === b.creditUsd}><CreditCard size={14} />Save</button>
             </div>
             <span className="st-hint">Optional. Credit runs count toward budget caps at this value. Leave it empty to track credits only.</span>
           </label>
         )}
         <span className="st-hint">{apiOnly.length ? `${apiOnly.join(', ')} ${apiOnly.length === 1 ? 'runs' : 'run'} on the API only. ` : ''}Model tests always use the API, since they confirm API endpoints.</span>
+      </div>
+    </div>
+  )
+}
+
+// Accounts on the owner's own plan, over MCP. One connection flow for every
+// provider: Higgsfield today, Dzine AI coming soon.
+function ConnectionsCard({ d }: { d: SettingsView }) {
+  const toast = useToast()
+  const invalidate = useInvalidate()
+  const qc = useQueryClient()
+  const [params, setParams] = useSearchParams()
+
+  // Back from a provider's sign-in page.
+  useEffect(() => {
+    const ok = params.get('connected'), bad = params.get('connection_error')
+    if (!ok && !bad) return
+    const label = d.connections.find(c => c.id === (ok ?? bad))?.label ?? 'Account'
+    if (ok) toast({ tone: 'ok', text: ok === 'higgsfield' ? 'Higgsfield account connected. Choose it under Higgsfield billing to run on plan credits.' : `${label} connected.` })
+    else toast({ tone: 'bad', text: params.get('message') ?? `${label} sign-in failed.` })
+    for (const k of ['connected', 'connection_error', 'message']) params.delete(k)
+    setParams(params, { replace: true })
+    invalidate()
+    qc.invalidateQueries({ queryKey: keys.higgsfieldAccount })
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  return (
+    <div className="st-card">
+      <div className="st-card-head"><div className="grow"><div className="st-h2">Connected accounts</div><div className="st-hint">Your own plans, over MCP. Each sign-in happens on the provider's site and is stored encrypted for this account; your password never reaches the Studio.</div></div></div>
+      <div className="st-card-body st-col" style={{ gap: 14 }}>
+        {d.connections.map(c => <ConnectionRow key={c.id} c={c} />)}
+      </div>
+    </div>
+  )
+}
+
+function ConnectionRow({ c }: { c: SettingsView['connections'][number] }) {
+  const toast = useToast()
+  const invalidate = useInvalidate()
+  const qc = useQueryClient()
+  const [busy, setBusy] = useState<'connect' | 'disconnect' | null>(null)
+  const isHiggsfield = c.id === 'higgsfield'
+  const account = useHiggsfieldAccount(isHiggsfield && c.connected)
+  const a = isHiggsfield ? account.data : undefined
+  const soon = c.status === 'coming_soon'
+  const failed = !!a?.error || c.verifyStatus === 'failed'
+
+  async function connect() {
+    setBusy('connect')
+    try { window.location.assign((await api.connect(c.id)).url) } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }); setBusy(null) }
+  }
+  async function disconnect() {
+    if (!confirm(`Disconnect your ${c.label} account?${isHiggsfield ? ' Higgsfield runs go back to the API balance.' : ''}`)) return
+    setBusy('disconnect')
+    try { await api.disconnect(c.id); invalidate(); qc.removeQueries({ queryKey: keys.higgsfieldAccount }) } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) } finally { setBusy(null) }
+  }
+  async function refreshBalance() {
+    try { qc.setQueryData(keys.higgsfieldAccount, await api.higgsfieldAccount(true)) } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) }
+  }
+
+  const detail = soon
+    ? c.note
+    : c.connected
+      ? (a?.error ?? (a?.credits != null ? `${a.plan ? `${a.plan} plan, ` : ''}${a.credits.toLocaleString('en-US')} credits` : 'Signed in.'))
+      : `Sign in on ${c.site.replace(/^https:\/\/(www\.)?/, '')} to use your plan credits.`
+  return (
+    <div className={`st-card st-connection ${soon ? 'soon' : ''}`} style={{ padding: 14, boxShadow: 'none' }}>
+      <div className="st-row">
+        <Link2 size={16} />
+        <div className="grow" style={{ flex: 1, minWidth: 0 }}>
+          <div className="st-row" style={{ gap: 8 }}><span className="st-h3">{c.label}</span>{soon && <span className="st-badge plain">Coming soon</span>}</div>
+          <div className="st-hint">{detail}</div>
+        </div>
+        {c.connected && <span className={`st-badge ${failed ? 'bad' : 'ok'}`}>{failed ? 'Reconnect' : 'Connected'}</span>}
+        {isHiggsfield && c.connected && <button className="st-btn sm icon ghost" onClick={refreshBalance} aria-label="Refresh credits"><RefreshCw size={14} /></button>}
+        {soon
+          ? <button className="st-btn sm" disabled title="Coming soon: nothing is connected or called yet."><Link2 size={14} />Connect</button>
+          : (!c.connected || failed) && <button className="st-btn primary sm" onClick={connect} disabled={busy === 'connect'}>{busy === 'connect' ? <Loader2 size={14} className="st-spin" /> : <Link2 size={14} />}{c.connected ? 'Reconnect' : 'Connect'}</button>}
+        {c.connected && <button className="st-btn sm icon ghost" onClick={disconnect} disabled={busy === 'disconnect'} aria-label={`Disconnect ${c.label}`}><Trash2 size={14} /></button>}
       </div>
     </div>
   )

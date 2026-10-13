@@ -161,3 +161,50 @@ describe('free mirror fix', () => {
     expect(fixFor('REF-04', perception('REF-04'))).toBeNull()
   })
 })
+
+// Rule zero, the Realism principle: natural flaws are required, never
+// defects; plastic skin fails even when the face matches.
+describe('QA and real skin', () => {
+  const correct = () => perception('REF-00')
+  const match = [{ code: 'identity_match' as const, severity: 'info' as const, message: 'Same person as REF-00 (0.71).' }]
+
+  it('never reports pores, freckles, redness, shine, flyaways, smile lines, asymmetry or the mole as defects', () => {
+    const obs = { ...correct(), artifacts: ['visible pores on the nose', 'freckles across the cheeks', 'slight redness', 'shine on the forehead', 'flyaway hairs', 'smile lines', 'slight facial asymmetry', 'remove the small mole above the brow'] }
+    const report = evaluateSheetShot({ shot: shot('REF-00'), views: config.pipeline.views, marks: callie.marks, eyeColor: callie.eyes, observation: obs })
+    expect(report.findings.filter(f => f.code === 'artifact')).toEqual([])
+    expect(report.verdict).toBe('post')
+    expect(report.findings.find(f => f.code === 'flaws_kept')?.severity).toBe('info')
+    // No finding ever suggests fixing a flaw.
+    for (const f of report.findings) expect(f.message).not.toMatch(/\b(remove|smooth|fix|even out)\b.*\b(pores?|freckles?|mole|redness|lines)\b/i)
+  })
+
+  it('still reports things a real camera never captures', () => {
+    const obs = { ...correct(), artifacts: ['melted left ear', 'six fingers on the right hand'] }
+    const report = evaluateSheetShot({ shot: shot('REF-00'), views: config.pipeline.views, marks: callie.marks, eyeColor: callie.eyes, observation: obs })
+    expect(report.findings.filter(f => f.code === 'artifact')).toHaveLength(2)
+  })
+
+  it('rejects plastic, waxy, airbrushed or porcelain skin even when the face embedding matches', () => {
+    const obs = { ...correct(), skin: { texture: 'plastic' as const, flaws: [] } }
+    const report = evaluateSheetShot({ shot: shot('REF-00'), views: config.pipeline.views, marks: callie.marks, eyeColor: callie.eyes, observation: obs, extraFindings: match })
+    expect(report.verdict).toBe('regenerate')
+    expect(report.reasons).toContain('skin_smoothed')
+    // It stands even when the inspector contradicted itself on the mirror.
+    const contradicted = evaluateSheetShot({ shot: shot('REF-00'), views: config.pipeline.views, marks: callie.marks, eyeColor: callie.eyes, observation: obs, mirrored: obs, extraFindings: match })
+    expect(contradicted.verdict).toBe('regenerate')
+  })
+
+  it('asks a person to check slightly smoothed skin, and passes real skin', () => {
+    const smooth = evaluateSheetShot({ shot: shot('REF-00'), views: config.pipeline.views, marks: callie.marks, eyeColor: callie.eyes, observation: { ...correct(), skin: { texture: 'slightly_smooth', flaws: [] } } })
+    expect(smooth.verdict).toBe('uncertain')
+    const real = evaluateSheetShot({ shot: shot('REF-00'), views: config.pipeline.views, marks: callie.marks, eyeColor: callie.eyes, observation: { ...correct(), skin: { texture: 'real', flaws: ['visible pores', 'light freckles'] } } })
+    expect(real.verdict).toBe('post')
+  })
+
+  it('tells the vision model that flaws are required and plastic skin is the defect', () => {
+    const t = config.pipeline.templates.qa_perception
+    expect(t.system).toMatch(/Pores, freckles, slight redness, uneven tone,\s+shine, flyaway hairs, smile lines, asymmetry and small moles are expected\s+and required/)
+    expect(t.system).toMatch(/never\s+suggest removing, fixing or smoothing them/)
+    expect(t.prompt).toMatch(/Skin texture/)
+  })
+})

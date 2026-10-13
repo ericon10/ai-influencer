@@ -41,6 +41,10 @@ const modelsSchema = z.object({
     params: z.record(z.string(), z.unknown()).default({}),
     use_for: z.array(z.string()).default([]),
     avoid_for: z.array(z.string()).default([]),
+    // Realism principle: provider options known to beautify, face-enhance or
+    // smooth skin by default, sent explicitly off on every request. Adapters
+    // also force off any such option they send, listed here or not.
+    force_off: z.record(z.string(), z.union([z.boolean(), z.string(), z.number()])).optional(),
   })),
   llm_models: z.array(z.object({
     ref: z.string(),
@@ -116,13 +120,22 @@ const runtimeSchema = z.object({
     last_frame: z.object({ step_back_sec: z.number().positive(), blur_ratio: z.number().positive() }),
   }),
   llm: z.object({ image_max_edge: z.number().int().positive(), image_max_tokens: z.number().int().positive() }),
-  // The owner's Higgsfield account (MCP connector, plan credits).
-  higgsfield_account: z.object({
-    mcp_url: z.string().url(),
-    oauth: z.object({ register: z.string().url(), authorize: z.string().url(), token: z.string().url(), scope: z.string() }),
-    timeout_sec: z.number().positive(),
-    poll_after_sec: z.number().positive(),
-  }),
+  // Realism principle: after an upscale or edit, the face must keep at least
+  // this share of its fine skin detail, or it is flagged as smoothed.
+  qa: z.object({ texture_min_ratio: z.number().positive().max(1) }).default({ texture_min_ratio: 0.6 }),
+  // MCP-based providers that bill the owner's own plan (OAuth sign-in, plan
+  // credits). One connection flow serves all of them; coming_soon ones are
+  // listed and never called.
+  mcp_connections: z.record(z.string(), z.object({
+    label: z.string(),
+    site: z.string().url(),
+    status: z.enum(['live', 'coming_soon']),
+    note: z.string().optional(),
+    mcp_url: z.string().url().optional(),
+    oauth: z.object({ register: z.string().url(), authorize: z.string().url(), token: z.string().url(), scope: z.string() }).optional(),
+    timeout_sec: z.number().positive().default(60),
+    poll_after_sec: z.number().positive().default(5),
+  }).refine(c => c.status !== 'live' || (!!c.mcp_url && !!c.oauth), { message: 'A live connection needs mcp_url and oauth.' })),
 })
 
 export type ModelsConfig = z.infer<typeof modelsSchema>

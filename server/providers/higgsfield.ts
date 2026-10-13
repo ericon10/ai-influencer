@@ -1,5 +1,6 @@
 import type { ModelEntry, StudioConfig } from '../config/load'
 import { estimateGen } from '../costs/pricebook'
+import { forceBeautifyOff } from '../core/realism'
 import { ProviderError, type GenRequest, type JobState, type JobStatus, type Output, type ProviderAdapter } from './types'
 
 // Higgsfield pay-per-use API (not the web subscription). Wire format from the
@@ -48,8 +49,14 @@ function needUrl(ref: { url?: string } | undefined, what: string): string {
   return ref.url
 }
 
-// Request shapes per model family. Only these fields are sent.
+// Request shapes per model family. Only these fields are sent, and any
+// beautify, face-enhance, skin-smoothing or prompt-enhance option is always
+// off (Realism principle), whatever the family mapping or config says.
 export function mapInput(entry: ModelEntry, req: GenRequest): Record<string, unknown> {
+  return forceBeautifyOff({ ...mapFamily(entry, req), ...(entry.force_off ?? {}) })
+}
+
+function mapFamily(entry: ModelEntry, req: GenRequest): Record<string, unknown> {
   const clean = (o: Record<string, unknown>) => Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined && !(Array.isArray(v) && !v.length)))
   switch (entry.input_map) {
     case 'generic_image':

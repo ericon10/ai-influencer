@@ -1,6 +1,7 @@
 import type { ModelEntry, StudioConfig } from '../config/load'
 import { findPrice, splitRef } from '../costs/pricebook'
 import { usdToMicros } from '../costs/money'
+import { forceBeautifyOff } from '../core/realism'
 import type { McpClient } from './mcpClient'
 import { ProviderError, type CostEstimate, type GenRequest, type JobState, type JobStatus, type Output, type ProviderAdapter } from './types'
 
@@ -78,8 +79,9 @@ export function accountParams(entry: ReturnType<typeof accountModel>, req: GenRe
   if (entry.input_map === 'seedance_i2v') candidate.mode = req.startFrame || req.endFrame ? 'omni_reference' : 't2v'
   const params: Json = { model: entry.mcp_id, prompt: req.prompt }
   for (const k of m.params) if (candidate[k] !== undefined && candidate[k] !== null) params[k] = candidate[k]
-  Object.assign(params, m.fixed)
-  if (!withMedia) return params
+  Object.assign(params, m.fixed, entry.force_off ?? {})
+  // Beautify, face-enhance and skin-smoothing options are always off.
+  if (!withMedia) return forceBeautifyOff(params)
 
   const medias: Array<{ value: string; role: string }> = []
   const role = (r: string | undefined, what: string) => {
@@ -91,7 +93,7 @@ export function accountParams(entry: ReturnType<typeof accountModel>, req: GenRe
   if (req.endFrame) medias.push({ value: need(req.endFrame, 'The end frame'), role: role(m.roles.end, 'an end frame') })
   if (req.sourceVideo) throw new ProviderError(`${entry.label} does not take a source video on the account path.`, { retryable: false, submitted: 'no' })
   if (medias.length) params.medias = medias
-  return params
+  return forceBeautifyOff(params)
 }
 
 function tools(req: GenRequest): { batch: string; cost: string } {
@@ -236,7 +238,7 @@ export function createHiggsfieldAccountAdapter(o: HiggsfieldAccountOptions): Pro
         const src = req.refs?.[0]
         if (!src?.width || !src.height) throw new ProviderError('An upscale needs the source image size.', { retryable: false, submitted: 'no' })
         const value = await o.client.callTool('upscale_image', {
-          params: { image_id: need(src, 'The image to upscale'), width: src.width, height: src.height, provider: entry.mcp_id, ...entry.mcp.fixed },
+          params: forceBeautifyOff({ image_id: need(src, 'The image to upscale'), width: src.width, height: src.height, provider: entry.mcp_id, ...entry.mcp.fixed, ...(entry.force_off ?? {}) }),
         }, 'submit')
         const r = submitted(value)
         if (r.jobId) return { jobId: r.jobId, raw: value }

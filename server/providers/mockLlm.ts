@@ -42,7 +42,7 @@ const DEFAULTS: Record<string, LlmResponder> = {
   qa_perception: req => req.meta?.mockObservation ?? {
     pose: 'frontal', nose: 'toward_camera', confidence: 0.9,
     framing: 'chest_up', standing: true, ears: [], skin_marks: [], other_jewelry: [],
-    eye_color: 'unknown', text_or_logos: [], artifacts: [], notes: 'Mock observation.',
+    eye_color: 'unknown', text_or_logos: [], artifacts: [], skin: { texture: 'real', flaws: ['visible pores'] }, notes: 'Mock observation.',
   },
 }
 

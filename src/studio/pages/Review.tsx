@@ -221,8 +221,22 @@ function Verdict({ cand, onMirror }: { cand: Candidate | undefined; onMirror?: (
         <div className="st-verdict-title">{title}</div>
         {notes.length ? <ul>{notes.slice(0, 4).map((f, i) => <li key={i}>{f.message}</li>)}</ul> : <ul><li>Marks on the right sides, framing as asked, no extra jewelry or logos.</li></ul>}
         {r.identity && <FaceMatch score={r.identity} />}
+        {r.texture && <SkinDetail t={r.texture} />}
         {onMirror && <button className="st-btn sm secondary" style={{ marginTop: 8 }} onClick={onMirror} title={r.mirrorFix?.message}><FlipHorizontal2 size={13} />Mirror it (free)</button>}
       </div>
+    </div>
+  )
+}
+
+// Fine skin detail kept after an upscale or edit (Realism principle). The
+// tick is the point below which the skin counts as smoothed.
+function SkinDetail({ t }: { t: NonNullable<QaReport['texture']> }) {
+  const pct = (x: number) => `${Math.round(Math.min(1, Math.max(0, x)) * 100)}%`
+  return (
+    <div className="st-facematch" title={t.message}>
+      <span>Skin detail kept</span>
+      <span className="st-facematch-bar"><span className={t.smoothed ? 'bad' : 'ok'} style={{ width: pct(t.ratio) }} /><i style={{ left: '60%' }} /></span>
+      <b className={t.smoothed ? 'bad' : 'ok'}>{pct(t.ratio)}</b>
     </div>
   )
 }

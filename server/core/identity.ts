@@ -9,10 +9,13 @@ export function identityForModel(identities: CharacterIdentity[], model: string)
   return identities.find(i => i.status === 'ready' && i.kind === 'trained' && i.model === model)
 }
 
-// Adds the identity's prompt block (for example SOUL IDENTITY) once, at the
-// end, so the character does not drift.
+// Adds the identity's prompt block (for example SOUL IDENTITY) once, so the
+// character does not drift: at the end of the description, before the
+// REALISM and AVOID blocks when the prompt already has them.
 export function withIdentityBlock(prompt: string, identity: CharacterIdentity | undefined): string {
   const block = identity?.promptBlock?.trim()
   if (!block || prompt.includes(block)) return prompt
-  return `${prompt.trimEnd()} ${block}`
+  const at = prompt.search(/\n(?:REALISM|AVOID):/)
+  if (at === -1) return `${prompt.trimEnd()} ${block}`
+  return `${prompt.slice(0, at).trimEnd()} ${block}${prompt.slice(at)}`
 }

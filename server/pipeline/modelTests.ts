@@ -4,6 +4,7 @@ import type { GenRequest } from '../providers/types'
 import { AppError } from '../lib/errors'
 import { hardWrap } from '../core/text'
 import { lintPrompt, blocking, type RuleViolation } from '../core/rules'
+import { finalizeImagePrompt } from '../core/realism'
 import { renderPlaceholderPortrait } from '../providers/mock'
 import { saveAsset } from '../storage/assets'
 import type { JobSpec } from '../jobs/runner'
@@ -55,7 +56,8 @@ export async function buildModelTest(deps: Deps, ctx: Ctx, modelRef: string): Pr
   } else if (kind === 'audio') {
     request = { kind: 'audio', model: entry.ref, prompt: PROMPTS.audio, durationSec: 3, modelTest: true }
   } else {
-    request = { kind: 'image', model: entry.ref, prompt: PROMPTS.image, aspect: '1:1', resolution, modelTest: true }
+    // Every image prompt carries the REALISM block, tests included.
+    request = { kind: 'image', model: entry.ref, prompt: finalizeImagePrompt(PROMPTS.image).prompt, aspect: '1:1', resolution, modelTest: true }
   }
   const violations = lintPrompt(deps.config.pipeline.rules, request.prompt, { kind: request.kind, request })
   const errors = blocking(violations)

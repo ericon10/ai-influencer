@@ -21,6 +21,8 @@ export interface QaReport {
   verdict: 'post' | 'edit' | 'regenerate' | 'uncertain'; summary: string; findings: QaFinding[]; reasons: string[]; detectedView: string | null
   identity?: IdentityScore | null
   mirrorFix?: { available: boolean; message: string } | null
+  // Fine skin detail after an upscale or edit, as a share of its input's.
+  texture?: { ratio: number; smoothed: boolean; region: string; message: string } | null
 }
 
 export interface Candidate {
@@ -97,6 +99,7 @@ export interface SettingsView {
   prices: Array<{ model: string; unit: string; price: string; verified: boolean; source: string; when: string; credits: number | null }>
   priceVersion: string
   billing: { default: 'api' | 'account'; creditUsd: number; accountConnected: boolean; accountStatus: string | null; accountModels: string[] }
+  connections: Array<{ id: string; label: string; site: string; status: 'live' | 'coming_soon'; note: string; connected: boolean; verifyStatus: string | null; connectedAt: string | null }>
 }
 
 export interface HiggsfieldAccount {

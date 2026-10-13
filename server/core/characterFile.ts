@@ -43,6 +43,7 @@ const frontSchema = z.object({
   avoid_models: z.array(z.string()).default([]),
   preferred_models: z.record(z.string(), z.string()).default({}),
   identities: z.array(identitySchema).default([]),
+  realism: z.object({ block: z.string().optional(), avoid: z.string().optional(), notes: z.array(z.string()).optional() }).default({}),
   disclosure: z.string().default('Label all posts as AI-generated'),
   notes: z.string().default(''),
   sheet: z.array(z.object({ id: z.string(), label: z.string(), status: z.string(), checksum: z.string().nullable() })).optional(),
@@ -117,7 +118,9 @@ export function exportCharacterFile(ch: CharacterData, sheet: SheetEntry[] = [])
     studio: 'character-studio', format: FORMAT,
     name: ch.name, age: ch.age, eyes: ch.eyes, card: ch.card, body: ch.body,
     marks: ch.marks, pronouns: ch.pronouns, makeup: ch.makeup, style: ch.style, persona: ch.persona,
-    avoid_models: ch.avoidModels, preferred_models: ch.preferredModels, identities: ch.identities.map(canonicalIdentity), disclosure: ch.disclosure, notes: ch.notes,
+    avoid_models: ch.avoidModels, preferred_models: ch.preferredModels, identities: ch.identities.map(canonicalIdentity),
+    ...(ch.realism && Object.keys(ch.realism).length ? { realism: ch.realism } : {}),
+    disclosure: ch.disclosure, notes: ch.notes,
     ...(sheet.length ? { sheet } : {}),
   }
   const p = ch.pronouns.poss
@@ -173,6 +176,7 @@ export function importCharacterFile(md: string, opts: ImportOptions = {}): Impor
       notes: notes != null ? (notes === '(none)' ? '' : unwrap(notes)) : front.notes,
       identities: front.identities,
       sections: kept,
+      realism: front.realism,
     },
     sheet: front.sheet ?? [],
     warnings: [],
@@ -403,6 +407,31 @@ export function importFreeform(md: string, opts: ImportOptions = {}): ImportResu
     })
     if (target) target.promptBlock = b.value
   }
+  // Realism (rule zero): the REALISM and AVOID blocks go into every image
+  // prompt. A Realism section's own blocks win over the fixed blocks; its
+  // other lines are kept as notes. The section itself stays as written.
+  const realism: CharacterData['realism'] = {}
+  for (const b of bullets(find(sections, /^fixed blocks?$/, /^prompt blocks?$/)?.body ?? '')) {
+    if (b.key && /^realism\b/i.test(b.key)) realism.block = `REALISM: ${b.value}`
+    else if (b.key && /^avoid\b/i.test(b.key)) realism.avoid = `AVOID: ${b.value}`
+  }
+  const realismSec = find(sections, /^realism\b/)
+  if (realismSec) {
+    const lines = bullets(realismSec.body)
+    const notes: string[] = []
+    for (const b of lines) {
+      if (b.key && /^(?:realism\b|realism block|block)/i.test(b.key)) realism.block = `REALISM: ${b.value}`
+      else if (b.key && /^avoid\b/i.test(b.key)) realism.avoid = `AVOID: ${b.value}`
+      else notes.push(b.key ? `${b.key}: ${b.value}` : b.value)
+    }
+    if (!lines.length && realismSec.body.trim()) notes.push(unwrap(realismSec.body))
+    if (notes.length) realism.notes = notes
+  }
+  if (realism.block || realism.avoid) {
+    warnings.push(`Realism: ${[realism.block ? 'REALISM block' : '', realism.avoid ? 'AVOID block' : ''].filter(Boolean).join(' and ')} read; ${realism.block && realism.avoid ? 'they go' : 'it goes'} into every image prompt.`)
+  }
+  if (!realism.block) warnings.push('No REALISM block in the file; every image prompt uses the Studio\'s default one.')
+
   for (const i of identities) {
     const what = i.kind === 'element' ? 'Element' : `${models.find(m => m.ref === i.model)?.label ?? 'trained'} character`
     const extras = [i.promptBlock ? 'with its prompt block' : '', i.followUp ? `with a ${i.followUp.name.toLowerCase()} pass` : ''].filter(Boolean).join(' and ')
@@ -420,7 +449,7 @@ export function importFreeform(md: string, opts: ImportOptions = {}): ImportResu
       pronouns: detectPronouns(md),
       makeup, style, persona, avoidModels, preferredModels, disclosure,
       notes: notesSec ? unwrap(notesSec.body) : '',
-      identities, sections: kept,
+      identities, sections: kept, realism,
     },
     sheet: [],
     warnings,

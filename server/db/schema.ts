@@ -112,6 +112,8 @@ export const characters = pgTable('characters', {
   // Sections of the character file the Studio does not model (scene rules,
   // recipes, combo log), kept word for word so the file round-trips.
   fileSections: jsonb('file_sections').notNull().default([]),
+  // The character's REALISM and AVOID prompt blocks (Realism principle).
+  realism: jsonb('realism').notNull().default({}),
   revision: integer('revision').notNull().default(1),
   createdBy: text('created_by'),
   createdAt: createdAt(),

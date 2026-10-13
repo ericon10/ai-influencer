@@ -20,6 +20,9 @@ export interface MockOptions {
   scenario?: (req: GenRequest) => MockScenario
   // Status calls before a job reports done.
   pollsUntilDone?: number
+  // Tests: change what a request produces (for example blur an upscale to
+  // check that smoothed skin is caught).
+  transform?: (req: GenRequest, data: Buffer) => Promise<Buffer>
 }
 
 interface MockJob {
@@ -140,6 +143,7 @@ export function createMockAdapter(opts: MockOptions): ProviderAdapter & { jobs: 
     } else {
       data = await renderPlaceholderPortrait(req.prompt, aspect)
     }
+    if (opts.transform) data = await opts.transform(req, data)
     const url = `mock://${id}/0`
     files.set(url, data)
     return [{ url, kind, mime: kind === 'video' ? 'video/mp4' : 'image/png' }]

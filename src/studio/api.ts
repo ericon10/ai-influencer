@@ -81,6 +81,7 @@ export const api = {
   saveBudgets: (b: Partial<SettingsView['budgets']>) => request<SettingsView>('PUT', '/settings/budgets', b),
   setBilling: (b: { default?: 'api' | 'account'; creditUsd?: number }) => request<SettingsView>('PUT', '/settings/billing', b),
   higgsfieldAccount: (fresh = false) => request<HiggsfieldAccount>('GET', `/settings/higgsfield-account${fresh ? '?fresh=1' : ''}`),
-  connectHiggsfieldAccount: () => request<{ url: string }>('POST', '/oauth/higgsfield/start', {}),
-  disconnectHiggsfieldAccount: () => request<SettingsView>('DELETE', '/settings/higgsfield-account'),
+  // The shared MCP connection flow (Higgsfield account, Dzine AI soon).
+  connect: (provider: string) => request<{ url: string }>('POST', `/oauth/${provider}/start`, {}),
+  disconnect: (provider: string) => request<SettingsView>('DELETE', `/settings/connections/${provider}`),
 }

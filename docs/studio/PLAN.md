@@ -189,6 +189,23 @@ Guardrails that apply to every item:
 - [ ] Owner connects the account once from Settings (needs a deployed or
   local Studio that can reach mcp.higgsfield.ai)
 
+## Rule zero: Realism principle (owner, 2026-10-13)
+- [x] First rule in CLAUDE.md and SPEC.md
+- [x] Bare-face line hard-coded into every hero and sheet prompt
+- [x] REALISM block mandatory in every image prompt (builder, lint, runner)
+- [x] Banned-words lint: stripped with a warning, refused at run time
+- [x] Adapters force beautify, face-enhance and skin-smoothing options off
+- [x] Texture check after every upscale and edit ("skin smoothed")
+- [x] QA keeps natural flaws and fails plastic skin even on a face match
+- [x] One-line message on onboarding and the hero screen
+- [ ] Re-import Callie's file with its new Realism section and AVOID block
+  (the importer reads both; waiting on the file)
+
+## MCP connections
+- [x] Shared connection flow for MCP providers on the owner's plan
+- [x] Dzine AI slot, marked coming soon (no calls)
+- [ ] Dzine AI live once its MCP server and OAuth details are confirmed
+
 ## Housekeeping (not blocking)
 - [x] Remove the creator's affiliate code, feedback form, guide doc and
       demo personas and images (approved 2026-10-12)

@@ -1,6 +1,7 @@
 import type { SheetShot, Side, ViewsConfig } from '../../config/pipeline'
 import { markExpectation, otherSide, subjectSide, type ImageSide, type Mark } from '../marks'
 import type { Observation } from './perception'
+import { describeFlaw, suggestsFixingFlaw, treatsFlawAsDefect } from '../realism'
 
 // Deterministic QA for sheet shots. The vision model only reports what it
 // sees, in image positions. This module turns that into the character's own
@@ -10,6 +11,9 @@ import type { Observation } from './perception'
 export type QaCode =
   | 'mark_wrong_side' | 'mark_missing' | 'extra_jewelry' | 'wrong_view' | 'wrong_framing'
   | 'eye_color' | 'logo' | 'artifact' | 'uncertain' | 'face_drift' | 'too_similar' | 'identity_skipped' | 'identity_match'
+  // Realism principle: smoothed or plastic skin is a defect; natural flaws
+  // are kept and never reported as one.
+  | 'skin_smoothed' | 'skin_plastic' | 'skin_real' | 'flaws_kept'
 
 export interface QaFinding {
   code: QaCode
@@ -37,6 +41,8 @@ export interface QaReport {
   reasons: string[]
   detectedView: string | null
   identity?: IdentityScore | null
+  // Fine skin detail after an upscale or edit, against its input.
+  texture?: { ratio: number; smoothed: boolean; region: string; message: string } | null
   // When the sides are swapped: whether flipping the image horizontally
   // fixes it (free, no new generation, the face cannot drift), and the
   // report the flipped image would get.
@@ -57,12 +63,14 @@ const MIRROR_VIEW: Record<string, string> = {
 const REASON: Partial<Record<QaCode, string>> = {
   mark_wrong_side: 'mark_wrong_side', mark_missing: 'mark_missing', wrong_view: 'wrong_view', wrong_framing: 'wrong_framing',
   extra_jewelry: 'extra_jewelry', logo: 'logo', face_drift: 'face_drift', eye_color: 'face_drift', too_similar: 'other', artifact: 'other',
+  skin_smoothed: 'skin_smoothed', skin_plastic: 'skin_smoothed',
 }
 
-const REGENERATE: QaCode[] = ['mark_wrong_side', 'mark_missing', 'wrong_view', 'wrong_framing', 'face_drift', 'too_similar']
+const REGENERATE: QaCode[] = ['mark_wrong_side', 'mark_missing', 'wrong_view', 'wrong_framing', 'face_drift', 'too_similar', 'skin_smoothed', 'skin_plastic']
 // Measured by face embeddings, not the vision model, so they stand even when
-// the vision model contradicted itself.
-const IDENTITY: QaCode[] = ['face_drift', 'too_similar']
+// the vision model contradicted itself. Smoothed or plastic skin stands too,
+// even when the face matches (Realism principle).
+const IDENTITY: QaCode[] = ['face_drift', 'too_similar', 'skin_smoothed', 'skin_plastic']
 
 const REGION_WORDS: Record<string, RegExp> = {
   brow: /brow/i, eye: /eye(?!brow)|lid|lash/i, cheek: /cheek/i, lip: /lip|mouth/i, jaw: /jaw/i, nose: /nose|nostril/i,
@@ -232,7 +240,26 @@ export function evaluateSheetShot(input: EvaluateInput): QaReport {
 
   // 7. Logos, printed text, impossible details.
   for (const t of obs.text_or_logos) findings.push({ code: 'logo', severity: 'fail', message: `Logo or readable text: ${t}.` })
-  for (const a of obs.artifacts) findings.push({ code: 'artifact', severity: 'warn', message: `Looks unreal: ${a}.` })
+  // Natural flaws (pores, freckles, redness, shine, flyaways, smile lines,
+  // asymmetry, the mole) are required, never defects: an inspector that
+  // lists one as an artifact, or suggests fixing one, is ignored on it.
+  const kept: string[] = []
+  for (const a of obs.artifacts) {
+    if (treatsFlawAsDefect(a) || suggestsFixingFlaw(a)) kept.push(describeFlaw(a))
+    else findings.push({ code: 'artifact', severity: 'warn', message: `Looks unreal: ${a}.` })
+  }
+  const flaws = [...(obs.skin?.flaws ?? []).map(describeFlaw), ...kept].filter(Boolean)
+  if (flaws.length) findings.push({ code: 'flaws_kept', severity: 'info', message: `Natural flaws kept, as they should be: ${[...new Set(flaws)].join(', ')}.` })
+
+  // 7b. Skin texture: plastic, waxy, airbrushed or porcelain skin fails even
+  // when the face embedding matches.
+  if (obs.skin?.texture === 'plastic') {
+    findings.push({ code: 'skin_plastic', severity: 'fail', message: 'The skin looks plastic or airbrushed. Real skin texture with visible pores is required.' })
+  } else if (obs.skin?.texture === 'slightly_smooth') {
+    findings.push({ code: 'skin_smoothed', severity: 'warn', message: 'The skin looks slightly smoothed. Check for visible pores and texture before approving.' })
+  } else if (obs.skin?.texture === 'real') {
+    findings.push({ code: 'skin_real', severity: 'info', message: 'Real skin texture.' })
+  }
 
   // 8. Did the inspector contradict itself on the mirrored copy?
   let contradicted = false

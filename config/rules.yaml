@@ -9,12 +9,16 @@ rules:
     when: { stage: hero }
     check: { type: no_attachments }
     message: The hero run must not attach any image. The inspiration supplies the look; the card supplies the face.
+  # Rule zero, the Realism principle, is enforced in code on top of these
+  # (server/core/realism.ts): the REALISM block in every image prompt,
+  # smoothing words refused, bare-faced hero and sheet. Config cannot turn
+  # those checks off.
   - id: natural-baseline
-    spec: "5.1.3"
-    title: Natural makeup on hero and sheet
+    spec: "0"
+    title: Hero and sheet are bare-faced
     when: { stage: [hero, sheet] }
-    check: { type: forbid_pattern, flags: i, pattern: "\\b(glam|glamorous|smok(?:e|ey|y) eyes?|contour(?:ing|ed)?|false lashes|lash extensions|bold lips?|red lip(?:stick)?|heavy makeup|full makeup|winged (?:liner|eyeliner))\\b" }
-    message: Hero and sheet use natural, everyday makeup. Glam is added per scene, never baked into the sheet.
+    check: { type: forbid_pattern, flags: i, exclude_after: "AVOID:", pattern: "\\b(glam|glamorous|smok(?:e|ey|y) eyes?|contour(?:ing|ed)?|false lashes|lash extensions|bold lips?|red lip(?:stick)?|heavy makeup|full makeup|winged (?:liner|eyeliner))\\b" }
+    message: Hero and sheet shots are bare-faced, no makeup and no retouching. Makeup is added per scene, never baked into the sheet.
   - id: sheet-settings
     spec: "5.1.5"
     title: Sheet quality high or above, 2k

@@ -34,6 +34,7 @@ export function toData(row: CharacterRow): CharacterData {
     // Stored as a list; an early build stored a single object.
     identities: (Array.isArray(row.identityModel) ? row.identityModel : row.identityModel ? [row.identityModel] : []) as CharacterIdentity[],
     sections: (row.fileSections ?? []) as FileSection[],
+    realism: (row.realism ?? {}) as CharacterData['realism'],
   }
 }
 
@@ -53,6 +54,7 @@ function fromData(d: Partial<CharacterData>): Partial<typeof characters.$inferIn
   if (d.notes !== undefined) out.notes = d.notes
   if (d.identities !== undefined) out.identityModel = d.identities
   if (d.sections !== undefined) out.fileSections = d.sections
+  if (d.realism !== undefined) out.realism = d.realism
   return out
 }
 

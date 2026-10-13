@@ -12,6 +12,9 @@ import { getCharacter, getRef, setCharacterFields, toData } from './characters'
 import { refreshRefStatus } from './review'
 import { scoreDistinctness, scoreIdentity } from './identity'
 import { onModelTest } from './modelTests'
+import { readAsset } from '../storage/assets'
+import { compareTexture, type TextureResult } from '../qa/texture'
+import type { GenRequest } from '../providers/types'
 
 // What each finished job does to the character. Registered once at boot.
 
@@ -23,6 +26,21 @@ async function createCandidate(deps: Deps, ctx: Ctx, job: JobRow, fields: Partia
   })
   return id
 }
+
+// Realism principle: an upscale or edit must keep the face's fine skin
+// detail. Free and local; a failure to measure never blocks the result.
+async function textureCheck(deps: Deps, ctx: Ctx, inputAssetId: string | undefined, outputAssetId: string, sameFraming: boolean): Promise<TextureResult | null> {
+  if (!inputAssetId) return null
+  try {
+    const [a, b] = await Promise.all([readAsset(deps, ctx, inputAssetId), readAsset(deps, ctx, outputAssetId)])
+    return await compareTexture(a.data, b.data, { faces: deps.faces, minRatio: deps.config.runtime.qa.texture_min_ratio, sameFraming })
+  } catch (e) {
+    ctx.log.warn({ err: e }, 'texture check could not run')
+    return null
+  }
+}
+
+const textureSummary = (t: TextureResult) => ({ ratio: t.ratio, smoothed: t.smoothed, region: t.region, message: t.message })
 
 async function onBreakdown(deps: Deps, ctx: Ctx, job: JobRow, out: JobOutcome): Promise<void> {
   if (out.status !== 'completed') return
@@ -69,7 +87,16 @@ async function onHero(deps: Deps, ctx: Ctx, job: JobRow, out: JobOutcome): Promi
 async function onUpscale(deps: Deps, ctx: Ctx, job: JobRow, out: JobOutcome): Promise<void> {
   if (out.status !== 'completed' || !out.assets?.[0]) return
   const ref = await getRef(deps, ctx, job.characterId!, 'REF-00')
-  const id = await createCandidate(deps, ctx, job, { refId: 'REF-00', assetId: out.assets[0].id, status: 'approved', reviewedAt: deps.clock.now() })
+  const texture = await textureCheck(deps, ctx, (job.request as GenRequest).refs?.[0]?.assetId, out.assets[0].id, true)
+  if (texture?.smoothed) {
+    // A smoothed upscale never replaces the hero: REF-00 keeps its image and
+    // the upscale waits with the reason and a rerun.
+    const report = { ...finalize([{ code: 'skin_smoothed', severity: 'fail', message: `${texture.message} Run the upscale again.` }], null), texture: textureSummary(texture) }
+    await createCandidate(deps, ctx, job, { refId: 'REF-00', assetId: out.assets[0].id, status: 'qa_failed', qaReport: report, qaVerdict: report.verdict })
+    return
+  }
+  const report = texture ? { ...finalize([{ code: 'skin_real', severity: 'info', message: texture.message }], null), texture: textureSummary(texture) } : null
+  const id = await createCandidate(deps, ctx, job, { refId: 'REF-00', assetId: out.assets[0].id, status: 'approved', reviewedAt: deps.clock.now(), qaReport: report, qaVerdict: report?.verdict ?? null })
   if (ref.approvedCandidateId) await deps.db.update(candidates).set({ status: 'superseded' }).where(eq(candidates.id, ref.approvedCandidateId))
   await deps.db.update(refImages).set({ approvedCandidateId: id, status: 'approved', updatedAt: deps.clock.now() }).where(eq(refImages.id, ref.id))
 }
@@ -79,9 +106,19 @@ async function onSheet(deps: Deps, ctx: Ctx, job: JobRow, out: JobOutcome): Prom
   const children = await childJobs(deps, job.id)
   if (out.status === 'completed' && out.assets?.[0]) {
     const asset = out.assets[0]
-    const candId = await createCandidate(deps, ctx, job, { refId, assetId: asset.id, status: children.length ? 'qa_pending' : 'in_review' })
-    // QA was quoted with the shot; start it now that the image exists.
-    await activateChildren(deps, job.id, child => ({ imageAssetIds: [asset.id], estimateImages: undefined, meta: { ...((child.request as { meta?: object }).meta ?? {}), candidateId: candId } }))
+    // A sheet shot is an edit of its first reference: its skin detail must hold.
+    const texture = await textureCheck(deps, ctx, (job.request as GenRequest).refs?.[0]?.assetId, asset.id, false)
+    const t = texture ? textureSummary(texture) : null
+    if (children.length) {
+      const candId = await createCandidate(deps, ctx, job, { refId, assetId: asset.id, status: 'qa_pending' })
+      // QA was quoted with the shot; start it now that the image exists.
+      await activateChildren(deps, job.id, child => ({ imageAssetIds: [asset.id], estimateImages: undefined, meta: { ...((child.request as { meta?: object }).meta ?? {}), candidateId: candId, texture: t } }))
+    } else if (t?.smoothed) {
+      const report = { ...finalize([{ code: 'skin_smoothed', severity: 'fail', message: t.message }], null), texture: t }
+      await createCandidate(deps, ctx, job, { refId, assetId: asset.id, status: 'qa_failed', qaReport: report, qaVerdict: report.verdict })
+    } else {
+      await createCandidate(deps, ctx, job, { refId, assetId: asset.id, status: 'in_review' })
+    }
   } else {
     await createCandidate(deps, ctx, job, { refId, status: 'failed', rejectNote: out.error ?? '' })
     await cancelChildren(deps, job.id, 'The shot it was checking did not finish.')
@@ -98,7 +135,7 @@ async function qaSiblings(deps: Deps, job: JobRow): Promise<JobRow[]> {
 }
 
 async function onQa(deps: Deps, ctx: Ctx, job: JobRow, _out: JobOutcome): Promise<void> {
-  const meta = (job.request as { meta?: { candidateId?: string; refId?: string } }).meta ?? {}
+  const meta = (job.request as { meta?: { candidateId?: string; refId?: string; texture?: QaReport['texture'] } }).meta ?? {}
   if (!meta.candidateId || !meta.refId) return
   const siblings = await qaSiblings(deps, job)
   if (siblings.some(s => ['waiting', 'queued', 'submitting', 'running', 'ingesting'].includes(s.status))) return
@@ -109,12 +146,15 @@ async function onQa(deps: Deps, ctx: Ctx, job: JobRow, _out: JobOutcome): Promis
   const shot = deps.config.pipeline.sheet.shots.find(s => s.id === meta.refId)!
 
   // Face identity first: it is measured, not read by the vision model.
-  const [cand] = await deps.db.select({ assetId: candidates.assetId, provider: jobs.provider }).from(candidates)
+  const [cand] = await deps.db.select({ assetId: candidates.assetId, provider: jobs.provider, qaReport: candidates.qaReport }).from(candidates)
     .leftJoin(jobs, eq(jobs.id, candidates.jobId))
     .where(and(eq(candidates.accountId, job.accountId), eq(candidates.id, meta.candidateId)))
   const id = cand?.assetId
     ? await scoreIdentity(deps, ctx, { characterId: job.characterId!, shot, assetId: cand.assetId, demo: cand.provider === 'mock' })
     : { findings: [], identity: null }
+  // The texture check ran when the shot arrived; a re-check keeps it.
+  const texture = meta.texture ?? (cand?.qaReport as QaReport | null)?.texture ?? null
+  if (texture?.smoothed) id.findings.push({ code: 'skin_smoothed', severity: 'fail', message: texture.message })
 
   let report: QaReport
   if (!orig || orig.status !== 'completed') {
@@ -131,6 +171,7 @@ async function onQa(deps: Deps, ctx: Ctx, job: JobRow, _out: JobOutcome): Promis
     }
   }
   report.identity = id.identity
+  report.texture = texture
 
   // Failed results never reach the human queue (SPEC 6); they wait with
   // their reasons and a one-click, quoted fix.

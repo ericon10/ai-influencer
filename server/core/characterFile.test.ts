@@ -12,6 +12,7 @@ const callie: CharacterData = {
   avoidModels: ['higgsfield/gpt-image-2.5-flare'], preferredModels: { sheet: 'higgsfield/gpt-image-2.5' },
   disclosure: 'Label all posts as AI-generated', notes: 'Soul 2.0 character queued, not required.',
   identities: [], sections: [],
+  realism: { block: 'REALISM: Candid phone photo, natural skin texture with visible pores, no retouching.', avoid: 'AVOID: plastic skin, text, watermarks.' },
 }
 const sheet = [{ id: 'REF-00', label: 'Front, close-up', status: 'approved', checksum: 'abc123' }]
 
@@ -149,6 +150,12 @@ describe("Callie's character file", () => {
     for (const kept of c.sections) expect(kept.body).toBe(original.find(s => s.title === kept.title)!.body)
   })
 
+  it('reads her REALISM and AVOID blocks, which go into every image prompt', () => {
+    expect(c.realism.block).toMatch(/^REALISM: Candid phone photo, natural skin texture with visible pores/)
+    expect(c.realism.avoid).toMatch(/^AVOID: studio lighting, perfect symmetry, plastic skin/)
+    expect(r.warnings.some(w => /REALISM block and AVOID block read/.test(w))).toBe(true)
+  })
+
   it('exports and re-imports without losing anything', () => {
     const sheet = [{ id: 'REF-00', label: 'Front, close-up', status: 'approved', checksum: null }]
     const out = exportCharacterFile(c, sheet)
@@ -158,5 +165,35 @@ describe("Callie's character file", () => {
     const back = importCharacterFile(out, { models })
     expect(back.character).toEqual(c)
     expect(exportCharacterFile(back.character, back.sheet)).toBe(out)
+  })
+})
+
+// Rule zero: a file's Realism section feeds the REALISM and AVOID blocks.
+describe('a Realism section', () => {
+  const md = [
+    '# Character: Test', '', '## Card', 'Test, 30 years old. Short dark hair.', '',
+    '## Fixed blocks', '- REALISM: an older block that the Realism section replaces.', '',
+    '## Realism', '- Freckles, pores and the slight redness on her nose always stay.',
+    '- REALISM block: Candid phone photo, real skin texture with visible pores and freckles, no retouching.',
+    '- AVOID: airbrushed skin, beauty filters, smooth skin, porcelain skin.', '',
+  ].join('\n')
+  const r = importCharacterFile(md)
+
+  it('reads the block and AVOID line from it, and keeps the rest as notes', () => {
+    expect(r.character.realism).toEqual({
+      block: 'REALISM: Candid phone photo, real skin texture with visible pores and freckles, no retouching.',
+      avoid: 'AVOID: airbrushed skin, beauty filters, smooth skin, porcelain skin.',
+      notes: ['Freckles, pores and the slight redness on her nose always stay.'],
+    })
+  })
+
+  it('keeps the section as written so the file round-trips', () => {
+    expect(r.character.sections.map(x => x.title)).toContain('Realism')
+  })
+
+  it('says when a file has no REALISM block, and the default is used', () => {
+    const plain = importCharacterFile('# Character: Plain\n\n## Card\nPlain, 30.\n')
+    expect(plain.character.realism).toEqual({})
+    expect(plain.warnings.some(w => /No REALISM block/.test(w))).toBe(true)
   })
 })

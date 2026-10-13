@@ -14,6 +14,7 @@ import { ACCOUNT_PROVIDER, disconnectAccount, finishAccountConnect, readAccountT
 import { createMcpClient } from './mcpClient'
 import { storeSecret } from './credentials'
 import { estimateGen } from '../costs/pricebook'
+import { finalizeImagePrompt } from '../core/realism'
 import { ProviderError, type GenRequest, type ProviderAdapter } from './types'
 
 // The second Higgsfield path: the owner's own account (MCP connector, plan
@@ -22,9 +23,10 @@ import { ProviderError, type GenRequest, type ProviderAdapter } from './types'
 let h: Harness
 let fake: FakeHiggsfield
 
+const STILL_PROMPT = finalizeImagePrompt('Callie at a farmers market, wearing a white linen shirt, light jeans, white sandals.').prompt
 const still = (over: Partial<GenRequest> = {}): JobSpec => ({
   type: 'gen', stage: 'scene', purpose: 'test_still', label: 'Scene still',
-  request: { kind: 'image', model: 'higgsfield/nano-banana-2.1', prompt: 'Callie at a farmers market, white linen shirt, light jeans, white sandals.', aspect: '3:4', resolution: '2k', ...over },
+  request: { kind: 'image', model: 'higgsfield/nano-banana-2.1', prompt: STILL_PROMPT, aspect: '3:4', resolution: '2k', ...over },
 })
 
 async function connect(): Promise<void> {

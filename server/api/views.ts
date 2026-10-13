@@ -88,9 +88,15 @@ export async function settingsView(deps: Deps, ctx: Ctx) {
   const tasks = Object.keys(deps.config.routing.tasks)
   const credentials = await listCredentials(deps.db, ctx.accountId)
   const account = credentials.find(c => c.provider === 'higgsfield_account')
+  const connectionIds = Object.keys(deps.config.runtime.mcp_connections)
   return {
     mode: await providerMode(deps.db, ctx.accountId),
-    credentials: credentials.filter(c => c.provider !== 'higgsfield_account'),
+    credentials: credentials.filter(c => !connectionIds.some(id => c.provider === `${id}_account`)),
+    // Accounts on the owner's own plan, over MCP (one connection flow).
+    connections: Object.entries(deps.config.runtime.mcp_connections).map(([id, c]) => {
+      const cred = credentials.find(x => x.provider === `${id}_account`)
+      return { id, label: c.label, site: c.site, status: c.status, note: c.note ?? '', connected: !!cred, verifyStatus: cred?.verifyStatus ?? null, connectedAt: cred?.createdAt ?? null }
+    }),
     // Which Higgsfield balance pays: the REST API (USD) or the owner's own
     // account (plan credits). Models with no account path always use the API.
     billing: {

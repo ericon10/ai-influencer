@@ -20,7 +20,8 @@ import { attachCheckImages, attachSheetImages, exportCharacter, importCharacter,
 import { accountUsage } from '../pipeline/costs'
 import { providerMode, setSetting } from '../pipeline/settings'
 import { listCredentials, markVerified, revokeCredential, saveCredential } from '../providers/credentials'
-import { disconnectAccount, finishAccountConnect, readAccountTokens, startAccountConnect } from '../providers/higgsfieldOAuth'
+import { readAccountTokens } from '../providers/higgsfieldOAuth'
+import { disconnect, finishConnect, startConnect } from '../providers/mcpConnections'
 import { readBilling, saveBilling } from '../providers/billing'
 import type { AccountBalance } from '../providers/higgsfieldAccount'
 import { setBudget } from '../costs/budgets'
@@ -99,13 +100,14 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
     return new Response(new Uint8Array(await deps.store.get(row.storageKey)), { headers: { 'content-type': row.mime, 'cache-control': 'private, max-age=600' } })
   })
 
-  // The redirect back from the Higgsfield account sign-in. A browser
-  // navigation, so no API session: the one-time state binds it to the admin
-  // who started it. Always lands on Settings with a message.
-  app.get('/oauth/higgsfield/callback', async c => {
+  // The redirect back from an account sign-in (shared MCP connection flow).
+  // A browser navigation, so no API session: the one-time state binds it to
+  // the admin who started it. Always lands on Settings with a message.
+  app.get('/oauth/:provider/callback', async c => {
+    const provider = c.req.param('provider')
     const q = c.req.query()
-    const r = await finishAccountConnect(deps, { code: q.code, state: q.state, error: q.error, error_description: q.error_description })
-    const params = new URLSearchParams(r.ok ? { higgsfield: 'connected' } : { higgsfield: 'error', message: r.message })
+    const r = await finishConnect(deps, provider, { code: q.code, state: q.state, error: q.error, error_description: q.error_description })
+    const params = new URLSearchParams(r.ok ? { connected: provider } : { connection_error: provider, message: r.message })
     return c.redirect(`${r.returnTo ?? ''}/studio/settings?${params}`, 302)
   })
 
@@ -390,10 +392,19 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
   })
 
   // ── Higgsfield billing: the REST API or the owner's own account ──
-  app.post('/oauth/higgsfield/start', async c => {
+  // Starts a sign-in for any MCP connection (a coming-soon one refuses).
+  app.post('/oauth/:provider/start', async c => {
     const ctx = c.get('ctx')
     const origin = c.req.header('origin') || new URL(c.req.url).origin
-    return c.json(await startAccountConnect(deps, ctx, { origin }))
+    return c.json(await startConnect(deps, ctx, c.req.param('provider'), { origin }))
+  })
+
+  app.delete('/settings/connections/:provider', async c => {
+    const ctx = c.get('ctx')
+    const provider = c.req.param('provider')
+    await disconnect(deps, ctx, provider)
+    if (provider === 'higgsfield') balances.delete(ctx.accountId)
+    return c.json(await settingsView(deps, ctx))
   })
 
   // Plan and credits come from Higgsfield (a free call), cached briefly so
@@ -416,12 +427,6 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
     }
   })
 
-  app.delete('/settings/higgsfield-account', async c => {
-    const ctx = c.get('ctx')
-    await disconnectAccount(deps, ctx)
-    balances.delete(ctx.accountId)
-    return c.json(await settingsView(deps, ctx))
-  })
 
   app.put('/settings/billing', async c => {
     const ctx = c.get('ctx')

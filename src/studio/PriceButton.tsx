@@ -38,6 +38,9 @@ export function PriceButton({ action, label, variant = 'primary', size = 'normal
   })
 
   const quote = est.data?.quote
+  // Realism warnings (smoothing or makeup words removed) are shown right
+  // under the button, not only in the details.
+  const realism = (est.data?.preview.warnings ?? []).filter(w => (w as { ruleId?: string }).ruleId?.startsWith('realism'))
   const blocked = quote?.status === 'blocked'
   const estimateError = est.error ? errorMessage(est.error) : null
   const disabled = !!disabledReason || !action || est.isLoading || !!estimateError || blocked || running
@@ -86,6 +89,7 @@ export function PriceButton({ action, label, variant = 'primary', size = 'normal
       {disabledReason && <span className="st-hint">{disabledReason}</span>}
       {estimateError && <span className="st-hint" style={{ color: 'var(--st-bad)' }}>{estimateError}</span>}
       {blocked && <span className="st-hint" style={{ color: 'var(--st-bad)' }}>This run would go over a budget cap. Adjust caps in Settings.</span>}
+      {realism.map((w, i) => <span key={i} className="st-hint" style={{ color: 'var(--st-warn)' }}><AlertTriangle size={12} style={{ verticalAlign: -2 }} /> {w.message}</span>)}
       {quote && !quote.verified && !blocked && <span className="st-hint"><Info size={12} style={{ verticalAlign: -2 }} /> Uses a price that is not confirmed with the provider yet.</span>}
       {(est.data?.preview.invalidates.length ?? 0) > 0 && (
         <span className="st-hint" style={{ color: 'var(--st-warn)' }}><AlertTriangle size={12} style={{ verticalAlign: -2 }} /> Will mark {est.data!.preview.invalidates.join(' and ')} for re-check.</span>

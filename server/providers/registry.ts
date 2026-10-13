@@ -42,6 +42,7 @@ export interface RegistryOptions {
   loadAsset: (accountId: string, assetId: string) => Promise<Buffer>
   mockScenario?: MockOptions['scenario']
   mockPollsUntilDone?: number
+  mockTransform?: MockOptions['transform']
   mockLlmResponders?: Record<string, LlmResponder>
   // Tests can inject any adapter by provider id ("higgsfield_account" for
   // the account path).
@@ -62,6 +63,7 @@ export function createRegistry(o: RegistryOptions): ProviderRegistry & { mockFor
         loadAsset: id => o.loadAsset(accountId, id),
         scenario: o.mockScenario,
         pollsUntilDone: o.mockPollsUntilDone,
+        transform: o.mockTransform,
       })
       mocks.set(accountId, m)
     }
@@ -78,16 +80,16 @@ export function createRegistry(o: RegistryOptions): ProviderRegistry & { mockFor
     if (!stored) throw new AppError('provider_not_configured', 'Connect your Higgsfield account in Settings to run on plan credits, or switch Higgsfield billing to the API.')
     let s = sessions.get(accountId)
     if (!s || s.credentialId !== stored.id) {
-      const cfg = o.config.runtime.higgsfield_account
+      const cfg = o.config.runtime.mcp_connections.higgsfield!
       const tokens = accountTokenSource(o, accountId, stored, { fetchImpl: o.fetchImpl })
       s = {
         credentialId: stored.id,
-        client: createMcpClient({ url: cfg.mcp_url, getToken: tokens.getToken, refreshToken: tokens.refresh, timeoutMs: cfg.timeout_sec * 1000, clientName: 'Character Studio', fetchImpl: o.fetchImpl }),
+        client: createMcpClient({ url: cfg.mcp_url!, getToken: tokens.getToken, refreshToken: tokens.refresh, timeoutMs: cfg.timeout_sec * 1000, clientName: 'Character Studio', fetchImpl: o.fetchImpl }),
       }
       sessions.set(accountId, s)
     }
     const { creditUsd } = await readBilling(o.db, accountId)
-    const adapter = createHiggsfieldAccountAdapter({ config: o.config, client: s.client, creditUsd, fetchImpl: o.fetchImpl, timeoutMs: o.config.runtime.higgsfield_account.timeout_sec * 1000 })
+    const adapter = createHiggsfieldAccountAdapter({ config: o.config, client: s.client, creditUsd, fetchImpl: o.fetchImpl, timeoutMs: o.config.runtime.mcp_connections.higgsfield!.timeout_sec * 1000 })
     // A test network serves the results too; real downloads go through the
     // runner's guarded download (host allowlist, no private addresses).
     const net = o.fetchImpl

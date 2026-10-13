@@ -18,6 +18,11 @@ export const observationSchema = z.object({
   eye_color: z.string(),
   text_or_logos: z.array(z.string()),
   artifacts: z.array(z.string()),
+  // Realism principle: real skin is required; plastic skin is the defect.
+  skin: z.object({
+    texture: z.enum(['real', 'slightly_smooth', 'plastic', 'unclear']),
+    flaws: z.array(z.string()),
+  }).default({ texture: 'unclear', flaws: [] }),
   notes: z.string(),
 })
 
@@ -32,7 +37,7 @@ export function parseObservation(raw: unknown): Observation {
 export const observationJsonSchema: Record<string, unknown> = {
   type: 'object',
   additionalProperties: false,
-  required: ['pose', 'nose', 'confidence', 'framing', 'standing', 'ears', 'skin_marks', 'other_jewelry', 'eye_color', 'text_or_logos', 'artifacts', 'notes'],
+  required: ['pose', 'nose', 'confidence', 'framing', 'standing', 'ears', 'skin_marks', 'other_jewelry', 'eye_color', 'text_or_logos', 'artifacts', 'skin', 'notes'],
   properties: {
     pose: { type: 'string', enum: ['frontal', 'three_quarter', 'profile', 'back', 'unclear'] },
     nose: { type: 'string', enum: ['image_left', 'image_right', 'toward_camera', 'away', 'unclear'] },
@@ -63,6 +68,13 @@ export const observationJsonSchema: Record<string, unknown> = {
     eye_color: { type: 'string' },
     text_or_logos: { type: 'array', items: { type: 'string' } },
     artifacts: { type: 'array', items: { type: 'string' } },
+    skin: {
+      type: 'object', additionalProperties: false, required: ['texture', 'flaws'],
+      properties: {
+        texture: { type: 'string', enum: ['real', 'slightly_smooth', 'plastic', 'unclear'] },
+        flaws: { type: 'array', items: { type: 'string' } },
+      },
+    },
     notes: { type: 'string' },
   },
 }
