@@ -1,16 +1,18 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link, NavLink, useLocation } from 'react-router-dom'
-import { Activity, AlertTriangle, CheckCircle2, Circle, FolderOpen, LayoutGrid, Loader2, Moon, Plus, Settings2, Sparkle, Sun, Users, XCircle } from 'lucide-react'
+import { Activity, FolderOpen, LayoutGrid, Loader2, Moon, Plus, Settings2, Sparkle, Sun, Users } from 'lucide-react'
 import { useTheme } from '../context/theme'
 import { api } from './api'
-import { useActiveJobs, useMe, useRefresh, useUsage, useWorker } from './hooks'
-import { Drawer, JobBadge, Meter, errorMessage, useToast } from './ui'
+import { isActiveJob, useActiveJobs, useLiveJobs, useMe, useRefresh, useUsage, useWorker } from './hooks'
+import { RunRow } from './runs'
+import { Drawer, Meter, errorMessage, useToast } from './ui'
 import type { JobView } from './types'
 import { NEW_POST, useNewPost } from './pages/post/parts'
 
 export function Shell({ children }: { children: ReactNode }) {
   const me = useMe()
   const jobs = useActiveJobs()
+  const live = useLiveJobs()
   const usage = useUsage()
   const { isDark, toggle } = useTheme()
   const [activity, setActivity] = useState(false)
@@ -58,47 +60,38 @@ export function Shell({ children }: { children: ReactNode }) {
       </aside>
       <main className="st-main">{children}</main>
       <Drawer open={activity} onClose={() => setActivity(false)} title="Activity">
-        <ActivityList jobs={active} />
-        {active.length === 0 && <p className="st-muted">Nothing is running. Finished work shows in its post and in the Library.</p>}
+        <ActivityList jobs={live.data?.jobs ?? []} />
+        {(live.data?.jobs.length ?? 0) === 0 && <p className="st-muted">Nothing is running, and nothing finished in the last 15 minutes. Finished work shows in its post and in the Library.</p>}
       </Drawer>
     </div>
   )
 }
 
-function JobIcon({ status }: { status: string }) {
-  if (['queued', 'submitting', 'running', 'ingesting'].includes(status)) return <span className="st-job-icon run"><Loader2 size={15} className="st-spin" /></span>
-  if (status === 'completed') return <span className="st-job-icon ok"><CheckCircle2 size={15} /></span>
-  if (status === 'failed') return <span className="st-job-icon bad"><XCircle size={15} /></span>
-  if (status === 'needs_attention') return <span className="st-job-icon warn"><AlertTriangle size={15} /></span>
-  return <span className="st-job-icon"><Circle size={15} /></span>
-}
-
+// Activity: the same live rows as in each step, running work first, then
+// what finished in the last 15 minutes.
 export function ActivityList({ jobs }: { jobs: JobView[] }) {
   const toast = useToast()
   const refresh = useRefresh()
   async function act(fn: () => Promise<unknown>) {
     try { await fn(); refresh() } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) }
   }
+  const order = [...jobs].sort((a, b) => Number(isActiveJob(b)) - Number(isActiveJob(a)))
   return (
-    <div>
-      {jobs.map(j => (
-        <div className="st-job" key={j.id}>
-          <JobIcon status={j.status} />
-          <div style={{ minWidth: 0 }}>
-            <div className="st-job-title">{j.label}</div>
-            <div className="st-job-sub">{j.model} · {j.actual ?? `est. ${j.estimate}`} · {new Date(j.createdAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</div>
-            {j.error && <div className="st-job-sub" style={{ color: j.status === 'needs_attention' ? 'var(--st-warn)' : 'var(--st-bad)' }}>{j.error}</div>}
-            {j.status === 'needs_attention' && (
-              <div className="st-row" style={{ marginTop: 8 }}>
-                <button className="st-btn sm" onClick={() => act(() => api.resolveJob(j.id, { action: 'not_charged' }))}>Not charged, release</button>
-                <button className="st-btn sm ghost" onClick={() => { const id = prompt('Provider job id from the provider console:'); if (id) act(() => api.resolveJob(j.id, { action: 'attach', providerJobId: id })) }}>Attach provider job</button>
-              </div>
-            )}
+    <div className="st-col" style={{ gap: 8 }}>
+      {order.map(j => (
+        <div className="st-activity" key={j.id}>
+          <div className="st-row" style={{ gap: 6 }}>
+            <span className="st-job-title grow">{j.label}</span>
+            <span className="st-hint">{j.modelName} · {j.actual ?? `est. ${j.estimate}`} · {new Date(j.createdAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</span>
           </div>
-          <div className="st-col" style={{ alignItems: 'flex-end', gap: 6 }}>
-            <JobBadge status={j.status} />
-            {['waiting', 'queued'].includes(j.status) && <button className="st-btn sm ghost" onClick={() => act(() => api.cancelJob(j.id))}>Cancel</button>}
-          </div>
+          <RunRow j={j} showLabel={false} />
+          {j.status === 'needs_attention' && (
+            <div className="st-row" style={{ marginTop: 4 }}>
+              <button className="st-btn sm" onClick={() => act(() => api.resolveJob(j.id, { action: 'not_charged' }))}>Not charged, release</button>
+              <button className="st-btn sm ghost" onClick={() => { const id = prompt('Provider job id from the provider console:'); if (id) act(() => api.resolveJob(j.id, { action: 'attach', providerJobId: id })) }}>Attach provider job</button>
+            </div>
+          )}
+          {['waiting', 'queued'].includes(j.status) && <button className="st-btn sm ghost" style={{ alignSelf: 'flex-start' }} onClick={() => act(() => api.cancelJob(j.id))}>Cancel</button>}
         </div>
       ))}
     </div>

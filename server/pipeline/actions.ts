@@ -1,6 +1,6 @@
 import { and, eq } from 'drizzle-orm'
 import { z } from 'zod'
-import { quotes, refImages } from '../db/schema.js'
+import { jobEvents, quotes, refImages } from '../db/schema.js'
 import type { Ctx, Deps } from '../context.js'
 import { fill, hardWrap } from '../core/text.js'
 import { buildHeroPrompts, buildSheetPrompt } from '../core/prompts.js'
@@ -12,7 +12,7 @@ import { idealObservation } from '../core/qa/ideal.js'
 import { breakdownJsonSchema, cardUpdateJsonSchema, conceptsJsonSchema } from '../core/llmSchemas.js'
 import { AppError } from '../lib/errors.js'
 import { getAsset } from '../storage/assets.js'
-import { quoteItemsFor, quoteJobs, runJobs, type JobSpec } from '../jobs/runner.js'
+import { getJob, quoteItemsFor, quoteJobs, runJobs, type JobSpec } from '../jobs/runner.js'
 import { displayPrice, modelLabel } from '../costs/quotes.js'
 import type { QuoteView } from '../costs/quotes.js'
 import type { GenRequest } from '../providers/types.js'
@@ -49,6 +49,8 @@ export const actionSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('qa'), characterId: z.string(), candidateId: z.string() }),
   // One small paid test that confirms a model (Settings, Models).
   z.object({ type: z.literal('model_test'), model: z.string() }),
+  // Retry a failed run on its own, with a new price (feedback everywhere).
+  z.object({ type: z.literal('retry'), jobId: z.string() }),
   // Every real model path once, in one quoted run under a cap (Settings).
   z.object({ type: z.literal('model_suite') }),
   // Scenes (Stage 7): plan the fields from the owner's words, then stills on
@@ -183,6 +185,7 @@ function dedupe(list: RealismWarning[]): RuleViolation[] {
 export async function buildAction(deps: Deps, ctx: Ctx, action: StudioAction): Promise<BuiltAction> {
   if (action.type === 'model_test') return buildModelTest(deps, ctx, action.model)
   if (action.type === 'model_suite') return buildModelSuite(deps, ctx)
+  if (action.type === 'retry') return buildRetry(deps, ctx, action.jobId)
   const row = await getCharacter(deps, ctx, action.characterId)
   const ch = toData(row)
   const tpl = deps.config.pipeline.templates
@@ -353,6 +356,23 @@ export async function buildAction(deps: Deps, ctx: Ctx, action: StudioAction): P
   }
 }
 
+// The same request as a failed run, quoted again. Only a run that failed or
+// was canceled on its own (not one waiting on another step, not a model
+// test, not free worker steps) can be retried this way.
+async function buildRetry(deps: Deps, ctx: Ctx, jobId: string): Promise<BuiltAction> {
+  const job = await getJob(deps, ctx, jobId)
+  const req = job.request as Record<string, unknown>
+  if (!['failed', 'canceled'].includes(job.status)) throw new AppError('bad_request', 'Only a failed run can be retried.')
+  if (job.provider === 'local' || req.parentJobId || job.purpose.startsWith('model_test')) throw new AppError('bad_request', 'Run this again from the step it belongs to.')
+  const [created] = await deps.db.select().from(jobEvents).where(and(eq(jobEvents.jobId, job.id), eq(jobEvents.type, 'created')))
+  const label = (created?.data as { label?: string } | undefined)?.label || job.purpose
+  const { parentJobId: _p, quotedCredits: _q, promptFrom: _f, ...request } = req
+  const spec = (job.kind === 'llm'
+    ? { type: 'llm', stage: job.stage, purpose: job.purpose, label, request }
+    : { type: 'gen', stage: job.stage, purpose: job.purpose, label, request }) as unknown as JobSpec
+  return { purpose: job.purpose, characterId: job.characterId, specs: [spec], preview: { title: `Retry: ${label}`, prompts: [], warnings: [], invalidates: [] } }
+}
+
 export async function estimateAction(deps: Deps, ctx: Ctx, action: StudioAction): Promise<{ quote: QuoteView; preview: ActionPreview }> {
   const built = await buildAction(deps, ctx, action)
   const quote = await quoteJobs(deps, ctx, { purpose: built.purpose, characterId: built.characterId, specs: built.specs })
@@ -406,7 +426,8 @@ export async function runAction(deps: Deps, ctx: Ctx, action: StudioAction, quot
 
 async function afterStart(deps: Deps, ctx: Ctx, action: StudioAction, built: BuiltAction): Promise<void> {
   const now = deps.clock.now()
-  if (action.type === 'scene' || action.type === 'scene_edit' || action.type === 'scene_upscale' || action.type === 'scene_video' || action.type === 'scene_video_upscale' || action.type === 'scene_end_frame') {
+  if (action.type === 'scene' || action.type === 'scene_edit' || action.type === 'scene_upscale' || action.type === 'scene_video' || action.type === 'scene_video_upscale' || action.type === 'scene_end_frame'
+    || (action.type === 'retry' && /^(scene|scene_edit|scene_upscale|scene_video|scene_video_upscale|scene_end_frame|drift_lock):/.test(built.purpose))) {
     await markSceneBusy(deps, ctx, built.purpose.split(':')[1]!)
   }
   // The video model picked last is the next take's default.

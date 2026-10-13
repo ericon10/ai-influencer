@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { CircleAlert, Check, Copy, User, X } from 'lucide-react'
+import { CircleAlert, Check, Copy, Loader2, User, X } from 'lucide-react'
 import { assetUrl } from './api'
 import type { ShotStatus } from './types'
 
@@ -252,3 +252,24 @@ export function Todo({ items }: { items: TodoItem[] }) {
     </div>
   )
 }
+
+// A button that starts work (feedback everywhere): it switches to a working
+// state the moment it is pressed and cannot be pressed twice.
+export function AsyncButton({ onClick, children, busyLabel = 'Submitting...', className = 'st-btn', disabled = false, title, icon }: {
+  onClick: () => Promise<unknown> | void; children: ReactNode; busyLabel?: string; className?: string; disabled?: boolean; title?: string; icon?: ReactNode
+}) {
+  const [busy, setBusy] = useState(false)
+  async function go() {
+    if (busy) return
+    setBusy(true)
+    try { await onClick() } finally { setBusy(false) }
+  }
+  return (
+    <button type="button" className={className} disabled={disabled || busy} onClick={() => void go()} title={title} aria-busy={busy}>
+      {busy ? <Loader2 size={14} className="st-spin" /> : icon}{busy ? busyLabel : children}
+    </button>
+  )
+}
+
+// Made in the last half minute: shown with a short highlight when it arrives.
+export const isFresh = (createdAt: string) => Date.now() - Date.parse(createdAt) < 30_000

@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom'
 import { api } from '../../api'
 import { useCharacters, useRefresh } from '../../hooks'
 import { PriceButton } from '../../PriceButton'
-import { Field, Img, Modal, SectionProgress, errorMessage, scrollToField, useToast, type TodoItem } from '../../ui'
+import { Field, Img, Modal, SectionProgress, errorMessage, isFresh, scrollToField, useToast, type TodoItem } from '../../ui'
 import type { CharacterView, SceneFields, SceneStill, SceneView, ScenesData } from '../../types'
 import { StillDrawer, STILL_STATUS, OP_LABEL, claudeChecked } from './StillDrawer'
 import { PromptBox } from './PromptBox'
@@ -221,7 +221,7 @@ function StillTile({ c, aspect, onOpen, action, picked }: { c: SceneStill; aspec
   const s = STILL_STATUS[c.status] ?? { label: c.status, tone: '' }
   const usable = !!c.assetId && !['failed', 'qa_pending', 'qa_failed', 'rejected'].includes(c.status)
   return (
-    <div className={`st-tile st-scene-tile ${picked >= 0 ? 'picked' : ''}`}>
+    <div className={`st-tile st-scene-tile ${picked >= 0 ? 'picked' : ''} ${isFresh(c.createdAt) ? 'st-new' : ''}`}>
       <button type="button" className="st-tile-open" onClick={onOpen} aria-label={`Open ${OP_LABEL[c.op]}`}>
         <Img assetId={c.assetId} width={420} style={{ aspectRatio: aspect.replace(':', ' / ') }} />
         <span className={`st-badge ${s.tone}`}>{picked >= 0 ? `Used${picked > 0 ? ` ${picked + 1}` : ''}` : s.label}</span>
@@ -435,6 +435,7 @@ function GenerateCard({ v, data, scene, todo, saving, setRefs, onStarted }: { v:
           waiting={saving || promptDirty ? 'Saving your changes...' : undefined}
           action={left.length || saving || promptDirty ? null : { type: 'scene', characterId: v.id, sceneId: scene.id, models, variations, withQa: o.autoQa, allowRepeat: true, ...(needsPrompt ? { write: true } : {}) }}
           onStarted={() => onStarted?.()}
+          watch={j => new RegExp(`^(scene|drift_lock|scene_qa|scene_edit|scene_upscale|scene_end_frame):${scene.id}(:|$)`).test(j.purpose) && !/^scene_qa:.*:video/.test(j.purpose)}
         />
         {needsPrompt && <span className="st-hint">Claude writes the prompt from your idea and the details, then the stills run on it. One price for both; the prompt shows here after, editable for the next run.</span>}
         {scene.combo && <span className="st-hint">Logged on your first pick as: {[scene.combo.moment, scene.combo.camera, scene.combo.light, scene.combo.location].filter(Boolean).join(' / ')}</span>}

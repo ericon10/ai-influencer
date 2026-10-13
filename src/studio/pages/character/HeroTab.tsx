@@ -43,7 +43,7 @@ export function HeroTab({ v, onEditCard, goSheet }: { v: CharacterView; onEditCa
             <div className="st-stepnum"><button onClick={() => setRuns(r => Math.max(1, r - 1))} aria-label="Fewer" disabled={runs <= 1}>-</button><span>{runs}</span><button onClick={() => setRuns(r => Math.min(8, r + 1))} aria-label="More" disabled={runs >= 8}>+</button></div>
             <span className="st-hint">3 prompts x {runs} = {3 * runs} portraits{runs < 4 ? '. 4 or more per prompt usually makes a better pick.' : ''}</span>
           </div>
-          <PriceButton action={errors.length ? null : { type: 'hero', characterId: v.id, runsPerPrompt: runs }} label={v.heroes.length ? 'Generate more heroes' : 'Generate heroes'} variant={picked ? 'secondary' : 'primary'} size={picked ? 'normal' : 'big'} todo={errors.map(e => ({ label: e.message.replace(/\.$/, ''), onGo: () => { onEditCard(); window.setTimeout(() => scrollToField(`card-${e.field}`), 250) } }))} />
+          <PriceButton watch={j => j.characterId === v.id && /^hero(:|$)/.test(j.purpose)} action={errors.length ? null : { type: 'hero', characterId: v.id, runsPerPrompt: runs }} label={v.heroes.length ? 'Generate more heroes' : 'Generate heroes'} variant={picked ? 'secondary' : 'primary'} size={picked ? 'normal' : 'big'} todo={errors.map(e => ({ label: e.message.replace(/\.$/, ''), onGo: () => { onEditCard(); window.setTimeout(() => scrollToField(`card-${e.field}`), 250) } }))} />
           <span className="st-hint">Pick one hero across all three prompts. Prefer one where both marks are visible; every later shot copies what REF-00 shows.</span>
         </div>
       </section>
@@ -53,7 +53,7 @@ export function HeroTab({ v, onEditCard, goSheet }: { v: CharacterView; onEditCa
           <div className="st-card-body st-col" style={{ gap: 12 }}>
             <div className="st-row"><Callout tone="ok" icon={<Check size={16} />}>REF-00 is set{v.ref00?.height ? ` (${v.ref00.width} x ${v.ref00.height})` : ''}.</Callout><span className="st-spacer" /><button className="st-btn primary" onClick={goSheet}>Build the sheet<ArrowRight size={15} /></button></div>
             {smoothedUpscale && <Callout tone="bad">{smoothedUpscale}</Callout>}
-            {v.ref00?.needsUpscale && <><Callout tone="warn">REF-00 is under 1,500 px tall. Upscale it 2x (never more) so small marks survive.</Callout><PriceButton action={{ type: 'upscale', characterId: v.id }} label="Upscale REF-00 2x" /></>}
+            {v.ref00?.needsUpscale && <><Callout tone="warn">REF-00 is under 1,500 px tall. Upscale it 2x (never more) so small marks survive.</Callout><PriceButton watch={j => j.characterId === v.id && j.purpose === 'upscale'} action={{ type: 'upscale', characterId: v.id }} label="Upscale REF-00 2x" /></>}
             <div className="st-divider" style={{ margin: '4px 0' }} />
             <div className="st-h3">The image wins over the card</div>
             <span className="st-hint">If the hero differs from the card (lip fullness, which ear the cuff landed on), update the card to match the image.</span>

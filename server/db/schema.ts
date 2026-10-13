@@ -352,6 +352,10 @@ export const jobs = pgTable('jobs', {
   resultMeta: jsonb('result_meta'),
   submittedAt: timestamp('submitted_at', { withTimezone: true }),
   completedAt: timestamp('completed_at', { withTimezone: true }),
+  // What the run is doing now, for the live status (owner, 2026-10-13):
+  // sent | provider_queued | generating | checking | done, and since when.
+  phase: text('phase'),
+  phaseAt: timestamp('phase_at', { withTimezone: true }),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 }, t => [

@@ -137,22 +137,41 @@ function tools(req: GenRequest): { batch: string; cost: string } {
   return { batch: 'generate_image_batch', cost: 'generate_image' }
 }
 
+// A preset Higgsfield recommends instead of running the request (seen live
+// 2026-10-13: a "submission_failed" job with preset_recommendation, or an
+// older text notice naming declined_preset_id). Nothing was created.
+function recommendedPreset(value: unknown, text: string): { id: string; name?: string } | undefined {
+  if (isObj(value)) {
+    const items = [value.jobs, value.results, value.requests].find(Array.isArray) as unknown[] | undefined
+    for (const it of [...(items ?? []), value]) {
+      const rec = isObj(it) && isObj(it.preset_recommendation) ? it.preset_recommendation : undefined
+      const id = rec ? str(rec.preset_id) ?? str(rec.id) : undefined
+      if (id) return { id, name: str(rec!.name) }
+    }
+  }
+  const id = text.match(/declined_preset_id[^a-f0-9]*([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i)?.[1]
+  return id ? { id } : undefined
+}
+
 // The job id from a submit answer, or the reason there is none.
-function submitted(value: unknown): { jobId?: string; problem?: string; presetId?: string } {
+function submitted(value: unknown): { jobId?: string; problem?: string; presetId?: string; presetName?: string } {
   const text = typeof value === 'string' ? value : JSON.stringify(value ?? '')
   if (BLOCKED.test(text)) return { problem: 'Higgsfield blocked this request: it detected a protected likeness in the reference images.' }
-  const preset = text.match(/declined_preset_id[^a-f0-9]*([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i)?.[1]
+  const rec = recommendedPreset(value, text)
+  const preset = rec?.id
   if (isObj(value)) {
     const items = [value.jobs, value.results, value.requests].find(Array.isArray) as unknown[] | undefined
     const first = items?.find(isObj) as Json | undefined
     const id = str(first?.job_id) ?? str(first?.id) ?? str(value.job_id) ?? str(value.id)
     if (id && id !== preset) return { jobId: id }
+    // A recommended preset comes with an error; it is not a failure yet.
+    if (rec) return { presetId: rec.id, presetName: rec.name }
     const err = str(first?.error) ?? str(first?.message) ?? str(value.error) ?? (Array.isArray(value.errors) && isObj(value.errors[0]) ? str(value.errors[0].error) ?? str(value.errors[0].message) : undefined)
     if (err) return { problem: `Higgsfield did not start the job: ${err}` }
     if (value.unlim_choice !== undefined) return { problem: 'Higgsfield asked which balance to use instead of starting the job. Nothing was charged.' }
     if (value.recovery_tool !== undefined) return { problem: `Higgsfield needs a step first (${str(value.recovery_tool) ?? 'see its message'}). Nothing was started.` }
   }
-  if (preset) return { presetId: preset }
+  if (rec) return { presetId: rec.id, presetName: rec.name }
   return {}
 }
 
@@ -316,15 +335,21 @@ export function createHiggsfieldAccountAdapter(o: HiggsfieldAccountOptions): Pro
         if (r.problem) throw new ProviderError(r.problem, { retryable: false, submitted: 'no' })
         throw new ProviderError('Higgsfield answered the upscale without a job id.', { retryable: false, submitted: 'unknown' })
       }
+      // use_unlim is always sent, and always false: the plan's credits pay.
       const params = { ...accountParams(entry, req), use_unlim: false }
       const tool = tools(req).batch
       let value = await o.client.callTool(tool, { requests: [{ index: 0, params }] }, 'submit')
       let r = submitted(value)
-      // A preset suggestion instead of a job: nothing was created, so decline
-      // that preset and submit once more.
+      // A recommended preset instead of a job: nothing was created. The
+      // Studio never uses a preset (the prompt and refs are the owner's), so
+      // it declines that preset and submits the same request once more.
       if (!r.jobId && !r.problem && r.presetId) {
+        const declined = r.presetName ?? 'a preset'
         value = await o.client.callTool(tool, { requests: [{ index: 0, params: { ...params, declined_preset_id: r.presetId } }] }, 'submit')
         r = submitted(value)
+        if (!r.jobId && !r.problem && r.presetId) {
+          throw new ProviderError(`Higgsfield recommended its preset ${r.presetName ? `"${r.presetName}"` : ''} again after the Studio declined ${declined}, so nothing ran and nothing was charged. The Studio never uses presets. Try again, or change the prompt slightly.`.replace(/\s+/g, ' '), { retryable: false, submitted: 'no' })
+        }
       }
       if (r.jobId) return { jobId: r.jobId, raw: value }
       if (r.problem) throw new ProviderError(r.problem, { retryable: false, submitted: 'no' })

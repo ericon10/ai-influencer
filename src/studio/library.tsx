@@ -2,7 +2,8 @@ import { useRef, useState, type ReactNode } from 'react'
 import { AlertTriangle, Check, Loader2, Upload } from 'lucide-react'
 import { api, assetUrl } from './api'
 import { useLibrary, useRefresh, useWorkerGate } from './hooks'
-import { Callout, Drawer, Img, errorMessage, useToast } from './ui'
+import { Callout, Drawer, Img, errorMessage, isFresh, useToast } from './ui'
+import { RunStatus } from './runs'
 import type { LibraryClip, LibraryStill } from './types'
 
 // The Library's grids (UX-PLAN.md): stills and clips across characters. The
@@ -23,7 +24,7 @@ export function StillGrid({ stills, picked = [], onPick, action, showCharacter =
           </>
         )
         return (
-          <div key={s.id} className={`st-tile st-scene-tile ${n >= 0 ? 'picked' : ''}`}>
+          <div key={s.id} className={`st-tile st-scene-tile ${n >= 0 ? 'picked' : ''} ${isFresh(s.createdAt) ? 'st-new' : ''}`}>
             {onPick ? <button type="button" className="st-tile-open" onClick={() => onPick(s)} aria-pressed={n >= 0}>{body}</button> : <div className="st-tile-open">{body}</div>}
             <div className="st-col" style={{ gap: 2, padding: '0 4px 2px' }}>
               <span className="st-tile-label">{s.sceneTitle || 'Still'}</span>
@@ -53,7 +54,7 @@ export function ClipGrid({ clips, picked = [], onPick, action, showCharacter = f
           </>
         )
         return (
-          <div key={c.id} className={`st-tile st-scene-tile ${n >= 0 ? 'picked' : ''}`}>
+          <div key={c.id} className={`st-tile st-scene-tile ${n >= 0 ? 'picked' : ''} ${isFresh(c.createdAt) ? 'st-new' : ''}`}>
             {onPick && ready ? <button type="button" className="st-tile-open" onClick={() => onPick(c)} aria-pressed={n >= 0}>{body}</button> : <div className="st-tile-open">{body}</div>}
             <div className="st-col" style={{ gap: 2, padding: '0 4px 2px' }}>
               <span className="st-tile-label">{c.title}</span>
@@ -76,12 +77,13 @@ export function ClipUpload({ characterId, contentId, label = 'Upload a video', o
   const worker = useWorkerGate()
   const input = useRef<HTMLInputElement | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
+  const [added, setAdded] = useState<string[]>([])
   async function upload(files: File[]) {
     const videos = files.filter(f => f.type.startsWith('video/') || /\.(mp4|mov|webm|m4v)$/i.test(f.name))
     if (!videos.length) { toast({ tone: 'bad', text: 'Pick a video file (MP4, MOV or WebM).' }); return }
     for (const [i, f] of videos.entries()) {
       setBusy(`Uploading ${f.name}${videos.length > 1 ? ` (${i + 1} of ${videos.length})` : ''}...`)
-      try { const { id } = await api.addClip(characterId, f, contentId); onUploaded?.(id) } catch (e) { toast({ tone: 'bad', text: `${f.name}: ${errorMessage(e)}` }) }
+      try { const { id } = await api.addClip(characterId, f, contentId); setAdded(a => [...a, id]); onUploaded?.(id) } catch (e) { toast({ tone: 'bad', text: `${f.name}: ${errorMessage(e)}` }) }
     }
     setBusy(null)
     refresh(characterId)
@@ -93,6 +95,7 @@ export function ClipUpload({ characterId, contentId, label = 'Upload a video', o
         {busy ? <Loader2 size={15} className="st-spin" /> : <Upload size={15} />}{label}
       </button>
       {busy && <span className="st-hint">{busy}</span>}
+      <RunStatus match={j => added.some(id => j.purpose === `clip_ingest:${id}`)} />
     </span>
   )
 }

@@ -6,6 +6,7 @@ import '@fontsource/tiktok-sans/600.css'
 import { api, assetUrl, downloadUrl } from '../../api'
 import { keys, useCharacters, useWorkerGate } from '../../hooks'
 import { Callout, Todo, errorMessage, useToast, type TodoItem } from '../../ui'
+import { RunStatus } from '../../runs'
 import type { BrollTiming, ContentData, ContentItem, ContentKind, PostStep } from '../../types'
 
 // Shared parts of a post (UX-PLAN.md): saving as you type, the TikTok
@@ -229,12 +230,13 @@ export function BrollUpload({ data }: { data: ContentData }) {
   const input = useRef<HTMLInputElement | null>(null)
   const [product, setProduct] = useState('')
   const [busy, setBusy] = useState<string | null>(null)
+  const [added, setAdded] = useState<string[]>([])
   async function upload(files: File[]) {
     const videos = files.filter(f => f.type.startsWith('video/') || /\.(mp4|mov|webm|m4v)$/i.test(f.name))
     if (!videos.length) { toast({ tone: 'bad', text: 'Pick video files (MP4, MOV or WebM).' }); return }
     for (const [i, f] of videos.entries()) {
       setBusy(`Uploading ${f.name} (${i + 1} of ${videos.length})...`)
-      try { await api.addBroll(f, product) } catch (e) { toast({ tone: 'bad', text: `${f.name}: ${errorMessage(e)}` }) }
+      try { const b = await api.addBroll(f, product); setAdded(a => [...a, b.id]) } catch (e) { toast({ tone: 'bad', text: `${f.name}: ${errorMessage(e)}` }) }
     }
     setBusy(null)
     await qc.invalidateQueries({ queryKey: keys.content })
@@ -247,6 +249,7 @@ export function BrollUpload({ data }: { data: ContentData }) {
       <button type="button" className="st-btn sm" disabled={!!busy || !worker.ready} onClick={() => input.current?.click()}>{busy ? <Loader2 size={14} className="st-spin" /> : <Upload size={14} />}Upload B-roll</button>
       {busy && <span className="st-hint">{busy}</span>}
       {!worker.ready && <span className="st-hint st-warntext">{worker.reason}</span>}
+      <RunStatus match={j => added.some(id => j.purpose === `broll_ingest:${id}`)} />
     </div>
   )
 }
@@ -275,12 +278,13 @@ export function ExportPanel({ item, todo, saving, flush, label, onStart, childre
       <div className="st-row" style={{ gap: 10, flexWrap: 'wrap' }}>
         <button className="st-btn primary big" disabled={todo.length > 0 || saving || starting || rendering || !worker.ready} onClick={go}>
           {starting || rendering ? <Loader2 size={16} className="st-spin" /> : item.status === 'ready' || item.status === 'failed' ? <RotateCcw size={16} /> : <Download size={16} />}
-          {rendering ? (o.total ? `Rendering ${Math.min((o.done ?? 0) + (o.failed ?? 0) + 1, o.total)} of ${o.total}...` : 'Rendering...') : item.status === 'ready' || item.status === 'failed' ? `${label} again` : label}
-          <span className="st-price">Free</span>
+          {starting ? 'Submitting...' : rendering ? (o.total ? `Rendering ${Math.min((o.done ?? 0) + (o.failed ?? 0) + 1, o.total)} of ${o.total}...` : 'Rendering...') : item.status === 'ready' || item.status === 'failed' ? `${label} again` : label}
+          {!starting && !rendering && <span className="st-price">Free</span>}
         </button>
         {saving && <span className="st-hint st-row" style={{ gap: 6 }}><Loader2 size={13} className="st-spin" />Saving...</span>}
       </div>
       {!worker.ready && <span className="st-hint st-warntext" role="status">{worker.reason}</span>}
+      <RunStatus match={j => j.purpose === `content_render:${item.id}`} pending={starting} />
       <span className="st-hint">Renders on the Studio's worker: no provider, no cost. 9:16, no sound. {AI_LABEL}</span>
       {item.status === 'failed' && item.error && <Callout tone="bad">{item.error}</Callout>}
       {children}

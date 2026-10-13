@@ -46,7 +46,7 @@ export function StartTab({ v, onEditCard, goHero }: { v: CharacterView; onEditCa
           </Field>
           <Field id="start-notes" label="Notes for the breakdown and concepts (optional)"><textarea className="st-textarea" style={{ minHeight: 64 }} value={notes} onChange={e => setNotes(e.target.value)} placeholder="e.g. Keep the beachy, sun-kissed feel. Late 20s. Not a model look, a real person." /></Field>
           <LastRun characterId={v.id} purpose="breakdown" />
-          <PriceButton action={v.inspirations.length ? { type: 'breakdown', characterId: v.id, notes: notes || undefined } : null} label={v.breakdown ? 'Break it down again' : 'Break it down'} variant={v.breakdown ? 'secondary' : 'primary'} todo={v.inspirations.length ? [] : [{ label: 'Add at least one inspiration image', target: 'start-inspiration' }]} />
+          <PriceButton watch={j => j.characterId === v.id && j.purpose === 'breakdown'} action={v.inspirations.length ? { type: 'breakdown', characterId: v.id, notes: notes || undefined } : null} label={v.breakdown ? 'Break it down again' : 'Break it down'} variant={v.breakdown ? 'secondary' : 'primary'} todo={v.inspirations.length ? [] : [{ label: 'Add at least one inspiration image', target: 'start-inspiration' }]} />
         </div>
       </section>
 
@@ -70,7 +70,7 @@ export function StartTab({ v, onEditCard, goHero }: { v: CharacterView; onEditCa
         </div>
         <div className="st-card-body st-col" style={{ gap: 16 }}>
           <LastRun characterId={v.id} purpose="concepts" />
-          <PriceButton action={v.breakdown || notes ? { type: 'concepts', characterId: v.id, notes: notes || undefined } : null} label={v.concepts.length ? 'Propose 3 new concepts' : 'Propose 3 concepts'} variant={v.concepts.length ? 'secondary' : 'primary'} todo={v.breakdown || notes ? [] : [{ label: 'Run the breakdown above, or write notes', target: 'start-notes' }]} />
+          <PriceButton watch={j => j.characterId === v.id && j.purpose === 'concepts'} action={v.breakdown || notes ? { type: 'concepts', characterId: v.id, notes: notes || undefined } : null} label={v.concepts.length ? 'Propose 3 new concepts' : 'Propose 3 concepts'} variant={v.concepts.length ? 'secondary' : 'primary'} todo={v.breakdown || notes ? [] : [{ label: 'Run the breakdown above, or write notes', target: 'start-notes' }]} />
           {v.concepts.length > 0 && (
             <div className="st-grid cards">
               {v.concepts.map(c => <ConceptCard key={c.id} characterId={v.id} c={c} chosen={chosen?.id === c.id} onChosen={goHero} />)}

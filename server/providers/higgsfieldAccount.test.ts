@@ -226,6 +226,37 @@ describe('account adapter edge cases', () => {
     expect(sent[1].generate_audio).toBe(false)
   })
 
+  it('a recommended preset (the live answer shape) is declined and the same request runs; use_unlim is false', async () => {
+    fake.presetRecommend = 'once'
+    try {
+      const kling: GenRequest = { ...video, model: 'higgsfield/kling-3.0-pro', durationSec: 5 }
+      const { jobId } = await adapter().submit(kling, { idempotencyKey: 'k' })
+      expect(jobId).toMatch(/^[0-9a-f-]{36}$/)
+      const sent = fake.tool('generate_video_batch').slice(-2).map(c => c.args.requests[0].params)
+      expect(sent[0].declined_preset_id).toBeUndefined()
+      expect(sent[1].declined_preset_id).toBe('24bae836-2c4a-48e0-89b6-49fcc0b21612')
+      // The same request, only the decline added; never the preset itself.
+      expect({ ...sent[1], declined_preset_id: undefined }).toEqual({ ...sent[0], declined_preset_id: undefined })
+      for (const p of sent) { expect(p.use_unlim).toBe(false); expect(p).not.toHaveProperty('preset_id') }
+    } finally {
+      fake.presetRecommend = null
+    }
+  })
+
+  it('a second recommendation after the decline fails plainly, with nothing started', async () => {
+    fake.presetRecommend = 'always'
+    try {
+      const before = fake.tool('generate_image_batch').length
+      const err = await adapter().submit({ kind: 'image', model: 'higgsfield/nano-banana-2.1', prompt: 'p', aspect: '9:16' }, { idempotencyKey: 'k' }).catch(e => e)
+      expect(err).toBeInstanceOf(ProviderError)
+      expect((err as ProviderError).opts.submitted).toBe('no')
+      expect((err as Error).message).toMatch(/recommended its preset "IN THE DARK" again .* nothing was charged/)
+      expect(fake.tool('generate_image_batch').length - before).toBe(2)
+    } finally {
+      fake.presetRecommend = null
+    }
+  })
+
   it('reads answers sent as an event stream', async () => {
     fake.sse = true
     try {

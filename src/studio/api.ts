@@ -106,10 +106,12 @@ export const api = {
   estimate: (action: StudioAction, signal?: AbortSignal) => request<{ quote: QuoteView; preview: ActionPreview }>('POST', '/actions/estimate', { action }, signal),
   run: (action: StudioAction, quoteId: string, confirmed: boolean) => request<{ jobIds: string[] }>('POST', '/actions/run', { action, quoteId, confirmed }),
 
-  jobs: (opts: { characterId?: string; active?: boolean } = {}) => {
+  jobs: (opts: { characterId?: string; active?: boolean; live?: boolean; limit?: number } = {}) => {
     const q = new URLSearchParams()
+    if (opts.limit) q.set('limit', String(opts.limit))
     if (opts.characterId) q.set('characterId', opts.characterId)
     if (opts.active) q.set('active', '1')
+    if (opts.live) q.set('live', '1')
     return request<{ jobs: JobView[] }>('GET', `/jobs?${q}`)
   },
   job: (id: string) => request<{ job: { id: string; status: string; error: { message?: string } | null }; result: unknown }>('GET', `/jobs/${id}`),

@@ -21,6 +21,9 @@ export interface FakeHiggsfield {
   validTokens: Set<string>
   // Knobs
   presetNoticeOnce: boolean
+  // The answer seen live on 2026-10-13: a failed submission carrying a
+  // preset_recommendation. 'always' recommends again after a decline.
+  presetRecommend: 'once' | 'always' | null
   sse: boolean
   hangOn: string | null
   refuseRefresh: boolean
@@ -44,7 +47,7 @@ export function createFakeHiggsfield(): FakeHiggsfield {
   const f: FakeHiggsfield = {
     calls: [], tokenRequests: [], registrations: [], uploads: new Map(), jobs: new Map(),
     validTokens: new Set(['at-1']),
-    presetNoticeOnce: false, sse: false, hangOn: null, refuseRefresh: false, sessions: 0,
+    presetNoticeOnce: false, presetRecommend: null, sse: false, hangOn: null, refuseRefresh: false, sessions: 0,
     tool: name => f.calls.filter(c => c.tool === name),
     fetch: async (input, init) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url
@@ -123,6 +126,13 @@ export function createFakeHiggsfield(): FakeHiggsfield {
         }
         case 'generate_image_batch': case 'generate_video_batch': case 'generate_audio_batch': {
           const p = (args.requests as Json[])[0]!.params as Json
+          if (f.presetRecommend && (f.presetRecommend === 'always' || !p.declined_preset_id)) {
+            const preset_id = p.declined_preset_id ? 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee' : '24bae836-2c4a-48e0-89b6-49fcc0b21612'
+            return answer({
+              jobs: [{ index: 0, status: 'submission_failed', error: 'Preset "IN THE DARK" was recommended instead of submitting a job.', preset_recommendation: { preset_id, name: 'IN THE DARK', preview_url: 'https://cdn.higgsfield.ai/job_set_chain_preset/x.mp4' } }],
+              submitted_count: 0, failed_count: 1,
+            })
+          }
           if (f.presetNoticeOnce && !p.declined_preset_id) {
             f.presetNoticeOnce = false
             return answer('A matching preset was found. To generate without it, call again with declined_preset_id: 11111111-2222-4333-8444-555555555555')

@@ -1,7 +1,7 @@
 import { Hono, type Context } from 'hono'
 import { z } from 'zod'
 import sharp from 'sharp'
-import { and, desc, eq, inArray } from 'drizzle-orm'
+import { and, desc, eq, gt, inArray, or } from 'drizzle-orm'
 import type { Ctx, Deps, Principal } from '../context.js'
 import { hasRole } from '../context.js'
 import { AppError } from '../lib/errors.js'
@@ -19,6 +19,7 @@ import { approveSceneCandidate, archiveScene, copyScene, createScene, cropCandid
 import { videoPrices } from '../pipeline/sceneActions.js'
 import { expectedVersion, readWorkerStatus } from '../jobs/workerStatus.js'
 import { addClip, libraryView } from '../pipeline/clips.js'
+import { jobViews } from '../jobs/jobView.js'
 import { POST_STEPS, addBroll, archiveBroll, archiveContent, contentView, createContent, duplicateContent, postScene, startRender, updateBroll, updateContent } from '../pipeline/content.js'
 import { rulesView, setRuleSwitch } from '../pipeline/rules.js'
 import { chooseConcept } from '../pipeline/concepts.js'
@@ -459,7 +460,11 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
     const conds = [eq(jobs.accountId, ctx.accountId)]
     const characterId = c.req.query('characterId')
     if (characterId) conds.push(eq(jobs.characterId, characterId))
-    if (c.req.query('active') === '1') conds.push(inArray(jobs.status, ['waiting', 'queued', 'submitting', 'running', 'ingesting', 'needs_attention']))
+    const ACTIVE = ['waiting', 'queued', 'submitting', 'running', 'ingesting', 'needs_attention']
+    if (c.req.query('active') === '1') conds.push(inArray(jobs.status, ACTIVE))
+    // Live: what is running, and what finished in the last 15 minutes (the
+    // live status in each step and in Activity).
+    if (c.req.query('live') === '1') conds.push(or(inArray(jobs.status, ACTIVE), gt(jobs.completedAt, new Date(deps.clock.now().getTime() - 15 * 60_000)))!)
     const rows = await deps.db.select().from(jobs).where(and(...conds)).orderBy(desc(jobs.createdAt)).limit(Math.min(200, Number(c.req.query('limit') ?? 50)))
     // Safety net for a lost wake (say, the worker was redeploying): the
     // Studio polls this while jobs run, so an overdue job wakes the worker.
@@ -468,14 +473,7 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
     const ids = rows.map(r => r.id)
     const created = ids.length ? await deps.db.select().from(jobEvents).where(and(inArray(jobEvents.jobId, ids), eq(jobEvents.type, 'created'))) : []
     const labels = new Map(created.map(e => [e.jobId, (e.data as { label?: string }).label ?? '']))
-    return c.json({
-      jobs: rows.map(j => ({
-        id: j.id, label: labels.get(j.id) ?? j.purpose, purpose: j.purpose, stage: j.stage, status: j.status, kind: j.kind,
-        model: `${j.provider}/${j.model}`, characterId: j.characterId,
-        estimate: formatUsd(j.estimateMicros), actual: j.actualMicros != null ? formatUsd(j.actualMicros) : null,
-        error: (j.error as { message?: string } | null)?.message ?? null, createdAt: j.createdAt.toISOString(), completedAt: j.completedAt?.toISOString() ?? null,
-      })),
-    })
+    return c.json({ jobs: await jobViews(deps, ctx.accountId, rows, labels) })
   })
 
   app.get('/jobs/:id', async c => {

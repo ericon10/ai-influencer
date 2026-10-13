@@ -301,7 +301,7 @@ async function submitGen(deps: Deps, job: JobRow): Promise<void> {
     const resolved = await resolveRefs(deps, ctx, adapter, masked)
     const { jobId } = await adapter.submit(resolved, { idempotencyKey: job.idempotencyKey, webhookUrl })
     const now = deps.clock.now()
-    await update(deps, job, { status: 'running', providerJobId: jobId, submittedAt: now, nextPollAt: new Date(now.getTime() + backoffMs(deps, 1)), lockedUntil: null })
+    await update(deps, job, { status: 'running', providerJobId: jobId, submittedAt: now, phase: 'sent', phaseAt: now, nextPollAt: new Date(now.getTime() + backoffMs(deps, 1)), lockedUntil: null })
     await event(deps.db, job, 'submitted', { providerJobId: jobId, webhook: !!webhookUrl })
   } catch (e) {
     await handleProviderError(deps, job, e, attempts, 'submit')
@@ -336,7 +336,10 @@ async function pollGen(deps: Deps, job: JobRow): Promise<void> {
   const pollCount = job.pollCount + 1
   if (st.state === 'queued' || st.state === 'running') {
     const delay = st.pollAfterSec != null && st.pollAfterSec > 0 ? st.pollAfterSec * 1000 : backoffMs(deps, pollCount)
-    await update(deps, job, { pollCount, lastPolledAt: now, nextPollAt: new Date(now.getTime() + delay), lockedUntil: null })
+    // The provider's own state, for the live status: still in its queue, or
+    // generating (and since when).
+    const phase = st.state === 'queued' ? 'provider_queued' : 'generating'
+    await update(deps, job, { pollCount, lastPolledAt: now, nextPollAt: new Date(now.getTime() + delay), lockedUntil: null, ...(job.phase !== phase ? { phase, phaseAt: now } : {}) })
     const stuckAfter = (deps.config.runtime.jobs.stuck_after_sec[job.kind] ?? 900) * 1000
     if (job.submittedAt && now.getTime() - job.submittedAt.getTime() > stuckAfter) {
       const already = await deps.db.select({ id: jobEvents.id }).from(jobEvents).where(and(eq(jobEvents.jobId, job.id), eq(jobEvents.type, 'stuck')))
@@ -430,7 +433,10 @@ async function ingestGen(deps: Deps, job: JobRow): Promise<void> {
     const actual = actualGen(deps.config, req, measured)
     await settle(deps, job, 'completed', actual.totalMicros, `${actual.lines.map(l => l.label).join(', ')}`)
   }
+  // The free checks (face match, skin texture) run in the hook.
+  await update(deps, job, { phase: 'checking', phaseAt: deps.clock.now() })
   await runHook(deps, ctx, job, { status: 'completed', assets })
+  await update(deps, job, { phase: 'done', phaseAt: deps.clock.now() })
 }
 
 async function loadLlmImages(deps: Deps, ctx: Ctx, req: LlmJobRequest): Promise<LlmImage[]> {

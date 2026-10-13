@@ -705,3 +705,25 @@ changes what the Studio suggests and checks, never what the owner types.
   clips. Old addresses redirect.
 - Importing a character file: jewelry listed with the marks becomes a
   style idea, with a note; marks are skin features.
+
+### G16. Presets declined on the account path (owner)
+- Higgsfield's account tools can answer a generate_* request with a
+  recommended preset instead of a job (seen live on a Kling 3.0 Pro take:
+  "Preset IN THE DARK was recommended instead of submitting a job", 0
+  submitted). The adapter declines it: it resubmits the same request once
+  with params.declined_preset_id set to that preset. The Studio never uses
+  a recommended preset. A second recommendation fails plainly, with
+  nothing charged.
+- use_unlim: false is sent on every generate_* call on the account path.
+
+### G17. Feedback everywhere (owner)
+- Every button that starts work switches to "Submitting..." at once and
+  cannot be pressed twice. Its runs show live under it from the runner's
+  real state (Queued at the provider, Generating with the elapsed and the
+  usual time, Downloading, Checking, Done). The usual time is the
+  account's own median for the model, else a typical time per kind
+  (runtime.yaml typical_sec).
+- Done results get a short highlight, and a toast with Show when the step
+  is out of view. A failure says what happened in plain words, whether
+  anything was charged, offers a priced Retry, and keeps the provider's
+  message under Details. Activity shows the same rows.

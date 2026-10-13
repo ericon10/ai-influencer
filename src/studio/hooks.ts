@@ -24,12 +24,23 @@ export function useMe() {
   return useQuery({ queryKey: keys.me, queryFn: api.me, retry: false, staleTime: 30_000 })
 }
 
-export function useActiveJobs() {
+const ACTIVE = ['waiting', 'queued', 'submitting', 'running', 'ingesting', 'needs_attention']
+export const isActiveJob = (j: { status: string }) => ACTIVE.includes(j.status)
+
+// Everything running, and what finished in the last 15 minutes: the live
+// status in each step and in Activity. Polls fast while anything runs.
+export function useLiveJobs() {
   return useQuery({
-    queryKey: keys.jobs('active'),
-    queryFn: () => api.jobs({ active: true }),
-    refetchInterval: q => ((q.state.data?.jobs.length ?? 0) > 0 ? 1500 : 8000),
+    queryKey: keys.jobs('live'),
+    queryFn: () => api.jobs({ live: true, limit: 100 }),
+    refetchInterval: q => (q.state.data?.jobs.some(j => isActiveJob(j) && j.status !== 'needs_attention') ? 1500 : 8000),
   })
+}
+
+export function useActiveJobs() {
+  const live = useLiveJobs()
+  const jobs = live.data?.jobs.filter(isActiveJob)
+  return { ...live, data: live.data ? { jobs: jobs! } : undefined }
 }
 
 export function useCharacters() {

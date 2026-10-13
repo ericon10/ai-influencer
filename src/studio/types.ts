@@ -155,6 +155,7 @@ export type StudioAction =
   | { type: 'qa'; characterId: string; candidateId: string }
   | { type: 'model_test'; model: string }
   | { type: 'model_suite' }
+  | { type: 'retry'; jobId: string }
   | { type: 'scene_plan'; characterId: string; sceneId: string }
   | { type: 'scene_ideas'; characterId: string; idea: string }
   | { type: 'scene_prompt'; characterId: string; sceneId: string; target: 'still' | 'video'; motion?: string; directions?: string; startCandidateId?: string; endCandidateId?: string }
@@ -168,7 +169,15 @@ export type StudioAction =
   | { type: 'content_slides'; characterId: string; contentId: string }
   | { type: 'content_captions'; characterId: string; contentId: string }
 
-export interface JobView { id: string; label: string; purpose: string; stage: string; status: string; kind: string; model: string; characterId: string | null; estimate: string; actual: string | null; error: string | null; createdAt: string; completedAt: string | null }
+// A run's live status (server/jobs/jobView.ts).
+export type JobPhase = 'waiting' | 'queued' | 'submitting' | 'working' | 'sent' | 'provider_queued' | 'generating' | 'downloading' | 'checking' | 'done' | 'failed' | 'canceled' | 'needs_attention'
+export interface JobView {
+  id: string; label: string; purpose: string; stage: string; status: string; kind: string; model: string; modelName: string; characterId: string | null
+  estimate: string; actual: string | null
+  phase: JobPhase; phaseLabel: string; since: string; typicalSec: number | null
+  error: string | null; detail: string | null; charged: 'no' | 'yes' | 'maybe' | null; retry: boolean
+  createdAt: string; completedAt: string | null
+}
 
 export interface Me { email: string; role: string; accountId: string; mode: 'demo' | 'live'; auth: string }
 

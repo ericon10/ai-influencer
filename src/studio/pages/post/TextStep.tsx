@@ -63,6 +63,7 @@ function Slides({ ctx }: { ctx: PostCtx }) {
         todo={writeTodo}
         waiting={draft.saving ? 'Saving...' : undefined}
         action={writeTodo.length || draft.saving || !item.characterId ? null : { type: 'content_slides', characterId: item.characterId, contentId: item.id }}
+        watch={j => j.purpose === `content_slides:${item.id}`}
         onStarted={() => void ctx.advance('text')}
       />
       <span className="st-hint">Claude writes a hook and {data.options.slideshow.slides[0]} to {data.options.slideshow.slides[1]} slides about "{topic || 'your idea'}", plus a caption and hashtags. Edit anything after.</span>
@@ -114,6 +115,7 @@ function Captions({ ctx }: { ctx: PostCtx }) {
             label={`Write ${spec.count} captions`} variant={captions.length ? 'secondary' : 'primary'}
             todo={writeTodo} waiting={draft.saving ? 'Saving...' : undefined}
             action={writeTodo.length || draft.saving || !item.characterId ? null : { type: 'content_captions', characterId: item.characterId, contentId: item.id }}
+            watch={j => j.purpose === `content_captions:${item.id}`}
             onStarted={() => void ctx.advance('text')}
           />
         </div>

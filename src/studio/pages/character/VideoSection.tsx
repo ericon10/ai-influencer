@@ -4,7 +4,7 @@ import { AlertTriangle, Check, CheckCircle2, Download, Film, Info, Loader2, Rota
 import { api, ApiError, assetUrl } from '../../api'
 import { useRefresh } from '../../hooks'
 import { PriceButton } from '../../PriceButton'
-import { Callout, Drawer, Field, Img, PromptViewer, errorMessage, useToast, type TodoItem } from '../../ui'
+import { AsyncButton, Callout, Drawer, Field, Img, PromptViewer, errorMessage, isFresh, useToast, type TodoItem } from '../../ui'
 import type { CharacterView, SceneStill, SceneView, ScenesData } from '../../types'
 import { OP_LABEL, STILL_STATUS, claudeChecked, wrap } from './StillDrawer'
 import { PromptBox } from './PromptBox'
@@ -174,11 +174,13 @@ export function VideoSection({ v, data, scene, startId, setStartId, onUseTake, u
                   addedNote="Added when it runs: the directions, the silent line when sound is off, and the REALISM block (always)."
                   changedNote={motionChanged ? 'You changed "What happens" after this was written. Rewrite to use it, or keep it as it is.' : null}
                   onDirty={setPromptDirty}
+                  watch={j => j.purpose === `scene_prompt:${scene.id}:video`}
                 />
               ) : (
                 <span className="st-hint"><Info size={12} style={{ verticalAlign: -2 }} /> The prompt writer is off, so "What happens" and the directions are the prompt. Switch it on in Settings, Claude models.</span>
               )}
               <PriceButton
+                watch={j => new RegExp(`^(scene_video|scene_video_upscale):${scene.id}(:|$)`).test(j.purpose)}
                 size="big"
                 label={test ? 'Run the motion test' : takes > 1 ? `Generate ${takes} takes` : 'Generate a take'}
                 todo={todo}
@@ -196,7 +198,7 @@ export function VideoSection({ v, data, scene, startId, setStartId, onUseTake, u
         <>
           <div className="st-section-head" style={{ margin: '6px 0 0' }}><div className="st-h3">Takes</div><span className="st-muted">{clips.filter(c => c.assetId).length}</span></div>
           <div className="st-grid scenes">
-            {clips.map(c => <ClipTile key={c.id} c={c} aspect={scene.aspect} onOpen={() => setOpen(c.id)} used={c.id === usedId} onUse={onUseTake ? () => void useTake(c.id) : undefined} />)}
+            {clips.map(c => <ClipTile key={c.id} c={c} aspect={scene.aspect} onOpen={() => setOpen(c.id)} used={c.id === usedId} onUse={onUseTake ? () => useTake(c.id) : undefined} />)}
           </div>
         </>
       )}
@@ -230,12 +232,12 @@ function EndFrameHelper({ v, data, start }: { v: CharacterView; data: ScenesData
   )
 }
 
-function ClipTile({ c, aspect, onOpen, onUse, used }: { c: SceneStill; aspect: string; onOpen: () => void; onUse?: () => void; used: boolean }) {
+function ClipTile({ c, aspect, onOpen, onUse, used }: { c: SceneStill; aspect: string; onOpen: () => void; onUse?: () => Promise<void>; used: boolean }) {
   const s = STILL_STATUS[c.status] ?? { label: c.status, tone: '' }
   const test = JSON.stringify(c.qaReport ?? '').includes('faces not representative')
   const usable = !!c.assetId && ['in_review', 'approved', 'rejected', 'superseded'].includes(c.status)
   return (
-    <div className={`st-tile st-scene-tile ${used ? 'picked' : ''}`}>
+    <div className={`st-tile st-scene-tile ${used ? 'picked' : ''} ${isFresh(c.createdAt) ? 'st-new' : ''}`}>
       <button type="button" className="st-tile-open" onClick={onOpen} aria-label={`Open ${test ? 'motion test' : OP_LABEL[c.op]}`}>
         {c.assetId
           ? <video className="st-clip" src={assetUrl(c.assetId)} muted loop playsInline preload="metadata" style={{ aspectRatio: aspect.replace(':', ' / ') }} onMouseEnter={e => void e.currentTarget.play().catch(() => {})} onMouseLeave={e => e.currentTarget.pause()} />
@@ -247,7 +249,7 @@ function ClipTile({ c, aspect, onOpen, onUse, used }: { c: SceneStill; aspect: s
         <span className="st-spacer" />
         {c.qaVerdict && <span className={`st-badge plain ${c.qaVerdict === 'post' ? 'ok' : c.qaVerdict === 'regenerate' ? 'bad' : 'warn'}`}>{c.qaVerdict === 'post' ? (claudeChecked(c.qaReport) ? 'QA ok' : 'Free checks ok') : c.qaVerdict === 'regenerate' ? 'Face?' : 'Look'}</span>}
       </div>
-      {onUse && usable && !used && !test && <div className="st-tile-action"><button type="button" className="st-btn sm ok" onClick={onUse}><CheckCircle2 size={14} />Use this take</button></div>}
+      {onUse && usable && !used && !test && <div className="st-tile-action"><AsyncButton className="st-btn sm ok" onClick={onUse} icon={<CheckCircle2 size={14} />}>Use this take</AsyncButton></div>}
     </div>
   )
 }

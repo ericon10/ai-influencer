@@ -791,3 +791,25 @@ button.st-chip:hover { color: var(--st-text); border-color: var(--st-text-3); }
   .st-worker.ready { display: none; }
   .st-worker.restarting, .st-worker.down { position: fixed; top: 0; left: 0; right: 0; z-index: 90; margin: 0; border-radius: 0; background: var(--st-surface); }
 }
+
+/* ── Feedback everywhere: live run status (UX-PLAN.md shared patterns) ── */
+.st-runs { display: flex; flex-direction: column; gap: 6px; width: 100%; max-width: 640px; }
+.st-run { display: flex; align-items: flex-start; gap: 8px; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--st-line); background: var(--st-surface-2); font-size: 12.5px; line-height: 1.45; color: var(--st-text-2); }
+.st-run > svg { flex: none; margin-top: 1px; color: var(--st-accent); }
+.st-run.ok { border-color: rgba(63, 209, 143, 0.35); background: var(--st-ok-soft); }
+.st-run.ok > svg { color: var(--st-ok); }
+.st-run.bad { border-color: rgba(255, 93, 93, 0.4); background: var(--st-bad-soft); color: var(--st-text); }
+.st-run.bad > svg { color: var(--st-bad); }
+.st-run.warn { border-color: rgba(243, 194, 79, 0.45); background: var(--st-warn-soft); color: var(--st-text); }
+.st-run.warn > svg { color: var(--st-warn); }
+.st-run-text { flex: 1; min-width: 0; }
+.st-run-text b { color: var(--st-text); font-weight: 600; }
+.st-run .st-col { gap: 4px; }
+.st-run-details { margin-top: 4px; }
+.st-run-details summary { cursor: pointer; color: var(--st-text-3); font-size: 12px; }
+.st-run-details pre { margin: 6px 0 0; padding: 8px; max-height: 160px; overflow: auto; white-space: pre-wrap; word-break: break-word; font-family: var(--st-mono); font-size: 11px; border-radius: 8px; background: var(--st-bg-2); border: 1px solid var(--st-line); color: var(--st-text-2); }
+.st-activity { display: flex; flex-direction: column; gap: 6px; padding: 10px 0; border-bottom: 1px solid var(--st-line); }
+.st-activity:last-child { border-bottom: 0; }
+/* A result that just arrived: a short highlight. */
+@keyframes st-arrive { 0% { box-shadow: 0 0 0 0 rgba(255, 106, 61, 0.0); } 20% { box-shadow: 0 0 0 4px rgba(255, 106, 61, 0.55); } 100% { box-shadow: 0 0 0 0 rgba(255, 106, 61, 0); } }
+.st-new { animation: st-arrive 2.2s ease-out 1; }

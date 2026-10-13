@@ -3,8 +3,9 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { AlertTriangle, Info, Loader2, Receipt, RotateCcw, Sparkles } from 'lucide-react'
 import { api, ApiError } from './api'
 import { useRefresh, useWorkerGate } from './hooks'
-import type { StudioAction } from './types'
+import type { JobView, StudioAction } from './types'
 import { Callout, Modal, PromptViewer, Todo, errorMessage, useToast, type TodoItem } from './ui'
+import { RunStatus } from './runs'
 
 // Every Generate button shows its price before it can be pressed (SPEC 11:
 // "Money is always visible"). Estimates are free; the run must present the
@@ -28,6 +29,13 @@ interface Props {
   waiting?: string
   onStarted?: (jobIds: string[]) => void
   icon?: boolean
+  // Runs that belong to this button even when started elsewhere or before
+  // a reload; their live status shows under it (feedback everywhere).
+  watch?: (j: JobView) => boolean
+  // No live status here (another place shows it).
+  noStatus?: boolean
+  // A small button inside a status line (Retry): no details or notes.
+  compact?: boolean
 }
 
 async function estimateWithin(action: StudioAction, outer?: AbortSignal) {
@@ -48,12 +56,13 @@ async function estimateWithin(action: StudioAction, outer?: AbortSignal) {
   }
 }
 
-export function PriceButton({ action, label, variant = 'primary', size = 'normal', todo = [], disabledReason, waiting, onStarted, icon = true }: Props) {
+export function PriceButton({ action, label, variant = 'primary', size = 'normal', todo = [], disabledReason, waiting, onStarted, icon = true, watch, noStatus = false, compact = false }: Props) {
   const qc = useQueryClient()
   const refresh = useRefresh()
   const toast = useToast()
   const [confirming, setConfirming] = useState(false)
   const [running, setRunning] = useState(false)
+  const [started, setStarted] = useState<string[]>([])
   const [details, setDetails] = useState(false)
   const key = ['estimate', JSON.stringify(action)]
   const blockers: TodoItem[] = [...todo, ...(disabledReason ? [{ label: disabledReason }] : [])]
@@ -79,7 +88,8 @@ export function PriceButton({ action, label, variant = 'primary', size = 'normal
   const disabled = held || !action || est.isLoading || !!estimateError || blocked || running
 
   async function go() {
-    if (!action || !quote) return
+    // One click starts one run: a second click while sending does nothing.
+    if (!action || !quote || running) return
     if (quote.needsConfirm && !confirming) { setConfirming(true); return }
     setRunning(true)
     try {
@@ -87,7 +97,10 @@ export function PriceButton({ action, label, variant = 'primary', size = 'normal
       let q = quote
       if (new Date(q.expiresAt).getTime() - Date.now() < 30_000) q = (await qc.fetchQuery({ queryKey: key, queryFn: () => api.estimate(action) })).quote
       const { jobIds } = await api.run(action, q.id, confirming || !q.needsConfirm)
-      toast({ tone: 'ok', text: `Started ${jobIds.length === 1 ? '1 job' : `${jobIds.length} jobs`} for ${q.display}.` })
+      // The live status shows right under the button; a toast only when it
+      // is not shown here.
+      if (noStatus) toast({ tone: 'ok', text: `Started ${jobIds.length === 1 ? '1 job' : `${jobIds.length} jobs`} for ${q.display}.` })
+      setStarted(ids => [...ids, ...jobIds])
       setConfirming(false)
       onStarted?.(jobIds)
     } catch (e) {
@@ -118,12 +131,12 @@ export function PriceButton({ action, label, variant = 'primary', size = 'normal
       <div className="st-row" style={{ gap: 6 }}>
         <button className={cls} disabled={disabled} onClick={go} title={blockers.map(b => b.label).join(', ') || estimateError || undefined}>
           {running ? <Loader2 size={16} className="st-spin" /> : icon && <Sparkles size={16} />}
-          {confirming ? `Confirm ${quote?.display}` : label}
-          {!confirming && price}
+          {running ? 'Submitting...' : confirming ? `Confirm ${quote?.display}` : label}
+          {!confirming && !running && price}
         </button>
         {confirming && <button className="st-btn ghost sm" onClick={() => setConfirming(false)}>Cancel</button>}
         {quote && !held && <span className="st-model-tag" title="The model this runs on (Claude models can be switched in Settings)">{quote.models.join(' + ')}</span>}
-        {quote && !confirming && (
+        {quote && !confirming && !compact && (
           <button className="st-btn ghost sm" onClick={() => setDetails(true)} aria-label="Price details"><Receipt size={14} />Details</button>
         )}
       </div>
@@ -134,13 +147,14 @@ export function PriceButton({ action, label, variant = 'primary', size = 'normal
           <button className="st-btn sm secondary" onClick={() => est.refetch()} disabled={est.isFetching}>{est.isFetching ? <Loader2 size={13} className="st-spin" /> : <RotateCcw size={13} />}Retry</button>
         </div>
       )}
-      {quote?.notes?.map((n, i) => <span key={i} className="st-hint" style={{ color: 'var(--st-warn)' }}><Info size={12} style={{ verticalAlign: -2 }} /> {n}</span>)}
+      {!compact && quote?.notes?.map((n, i) => <span key={i} className="st-hint" style={{ color: 'var(--st-warn)' }}><Info size={12} style={{ verticalAlign: -2 }} /> {n}</span>)}
       {est.data?.preview.followUp && !held && (
         <span className="st-hint"><Receipt size={12} style={{ verticalAlign: -2 }} /> Then: {est.data.preview.followUp.label}: <b>{est.data.preview.followUp.display}</b> on {est.data.preview.followUp.models.join(' + ')}{est.data.preview.followUp.verified ? '' : ' (not confirmed yet)'}</span>
       )}
       {blocked && <span className="st-hint" style={{ color: 'var(--st-bad)' }}>This run would go over a budget cap. Adjust caps in Settings.</span>}
+      {!noStatus && !compact && <RunStatus ids={started} match={watch} pending={running} />}
       {realism.map((w, i) => <span key={i} className="st-hint" style={{ color: 'var(--st-warn)' }}><AlertTriangle size={12} style={{ verticalAlign: -2 }} /> {w.message}</span>)}
-      {quote && !quote.verified && !blocked && <span className="st-hint"><Info size={12} style={{ verticalAlign: -2 }} /> Uses a price that is not confirmed with the provider yet.</span>}
+      {quote && !quote.verified && !blocked && !compact && <span className="st-hint"><Info size={12} style={{ verticalAlign: -2 }} /> Uses a price that is not confirmed with the provider yet.</span>}
       {(est.data?.preview.invalidates.length ?? 0) > 0 && (
         <span className="st-hint" style={{ color: 'var(--st-warn)' }}><AlertTriangle size={12} style={{ verticalAlign: -2 }} /> Will mark {est.data!.preview.invalidates.join(' and ')} for re-check.</span>
       )}

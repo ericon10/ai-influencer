@@ -185,6 +185,7 @@ function NextUp({ v, shot, action }: { v: CharacterView; shot: Shot; action: 'ge
               size="big"
               label={failed ? 'Regenerate with the fix' : `Generate ${shot.id}`}
               action={{ type: 'sheet', characterId: v.id, refId: shot.id, variations, reason: failed ? fixReason : undefined, refsMode: ref00Only ? 'ref00_only' : 'graph' }}
+              watch={j => j.characterId === v.id && (j.purpose === `sheet:${shot.id}` || j.purpose === `qa:${shot.id}`)}
             />
             <span className="st-hint">You review each shot. Free checks (face match, skin texture) run on every shot; press Check this for a Claude check of the mark sides and framing.</span>
           </>

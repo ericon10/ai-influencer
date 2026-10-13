@@ -166,12 +166,26 @@ top; Activity, the month's spend and Demo/Live sit at the bottom.
    ready · version", yellow "Worker restarting", red "Worker down". While
    it isn't green, every button that starts work is held, with the reason
    above it. Nothing gets stuck at "Preparing...".
-5. **Progress.**
-   - The stepper shows each step as Done, Current or Waiting, and a done
-     step collapses to a one-line summary with a thumbnail and Change.
-   - Running work shows inside its step, using the runner's real status
-     ("Rendering 3 of 20", "Writing the prompt..."). No fake bars.
-   - Activity (sidebar footer) lists everything running across posts.
+5. **Feedback everywhere** (owner, 2026-10-13). Every button that starts
+   work follows the same pattern:
+   - **Instant:** the moment it is pressed it switches to a working state
+     (spinner, "Submitting...") and cannot be pressed twice.
+   - **Live status, in the step:** from the runner's real state, never a
+     fake bar: Submitting, Queued at the provider (for example "Queued at
+     Kling 3.0 Pro"), Generating with the elapsed time and the usual time
+     for that model (the account's own median, else a typical time),
+     Downloading, Checking, Done. Many runs of one kind (a batch, several
+     stills) read as one line ("3 of 20 done").
+   - **Done:** the result appears with a short highlight; when the step is
+     scrolled out of view, a small toast with Show brings it back.
+   - **Failed:** plain words for what happened, whether anything was
+     charged (a failed run releases its hold), a Retry (priced, like any
+     run), and the provider's own message under Details. No silent
+     failures, and no result appearing minutes later without a signal.
+   - **Activity** in the sidebar shows the same rows: running work first,
+     then what finished in the last 15 minutes.
+   - The stepper still shows each step as Done, Current or Waiting, and a
+     done step folds to a one-line summary with Change.
 6. **Errors.** Plain words: what happened, what to do, and a Retry. The
    provider's own message is passed through. Never "Something went wrong".
    Failed runs note that the provider refunds them.

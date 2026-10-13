@@ -6,7 +6,7 @@ import { api, ApiError } from '../../api'
 import { keys, useRefresh } from '../../hooks'
 import { PriceButton } from '../../PriceButton'
 import { LibraryDrawer } from '../../library'
-import { Callout, Img, errorMessage, useToast } from '../../ui'
+import { AsyncButton, Callout, Img, errorMessage, useToast } from '../../ui'
 import type { SceneStill, SlideshowSpec } from '../../types'
 import { SceneStills } from '../character/SceneStills'
 import type { PostCtx } from './ctx'
@@ -162,5 +162,5 @@ function UseStill({ ctx, c, used }: { ctx: PostCtx; c: SceneStill; used: boolean
       />
     )
   }
-  return <button type="button" className="st-btn sm primary" onClick={() => void use()}><CheckCircle2 size={14} />Use this still</button>
+  return <AsyncButton className="st-btn sm primary" onClick={() => use()} icon={<CheckCircle2 size={14} />}>Use this still</AsyncButton>
 }

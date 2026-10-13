@@ -6,6 +6,7 @@ import { api, assetUrl, downloadUrl } from '../api'
 import { keys, useCharacters, useContent, useLibrary, useScenes, useWorkerGate } from '../hooks'
 import { Callout, Img, errorMessage, useToast } from '../ui'
 import { ClipGrid, ClipUpload, StillGrid } from '../library'
+import { RunStatus } from '../runs'
 import type { BrollClip, ContentData, ScenesData } from '../types'
 import { KIND_LABEL, fileSlug, postName, useNewPost } from './post/parts'
 
@@ -150,6 +151,7 @@ function BrollTab({ data }: { data: ContentData }) {
   const [product, setProduct] = useState('')
   const [filter, setFilter] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
+  const [added, setAdded] = useState<string[]>([])
   const input = useRef<HTMLInputElement | null>(null)
   const worker = useWorkerGate()
   async function upload(files: File[]) {
@@ -157,11 +159,10 @@ function BrollTab({ data }: { data: ContentData }) {
     if (!videos.length) { toast({ tone: 'bad', text: 'Pick video files (MP4, MOV or WebM).' }); return }
     for (const [i, f] of videos.entries()) {
       setBusy(`Uploading ${f.name} (${i + 1} of ${videos.length})...`)
-      try { await api.addBroll(f, product) } catch (e) { toast({ tone: 'bad', text: `${f.name}: ${errorMessage(e)}` }) }
+      try { const b = await api.addBroll(f, product); setAdded(a => [...a, b.id]) } catch (e) { toast({ tone: 'bad', text: `${f.name}: ${errorMessage(e)}` }) }
     }
     setBusy(null)
     await qc.invalidateQueries({ queryKey: keys.content })
-    toast({ tone: 'ok', text: 'Uploaded. Each clip is being prepared; it is ready in a moment.' })
   }
   const shown = data.broll.filter(b => !filter || b.product === filter)
   return (
@@ -177,6 +178,7 @@ function BrollTab({ data }: { data: ContentData }) {
           {busy && <span className="st-hint">{busy}</span>}
           {!worker.ready && <span className="st-hint st-warntext" role="status">{worker.reason} Uploads are prepared by the worker.</span>}
         </div>
+        <RunStatus match={j => added.some(id => j.purpose === `broll_ingest:${id}`)} />
       </div></section>
       {data.products.length > 0 && (
         <div className="st-row" style={{ gap: 6, flexWrap: 'wrap' }}>

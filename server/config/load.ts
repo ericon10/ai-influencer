@@ -126,6 +126,8 @@ const runtimeSchema = z.object({
     submit_max_attempts: z.number().int().min(1),
     quote_ttl_sec: z.number().positive(),
     stuck_after_sec: z.record(z.string(), z.number().positive()),
+    // Shown as "usually about N min" until there is history for a model.
+    typical_sec: z.record(z.string(), z.number().positive()).default({}),
   }),
   downloads: z.object({
     max_bytes: z.number().positive(),

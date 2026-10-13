@@ -8,6 +8,9 @@ jobs:
   submit_max_attempts: 3
   quote_ttl_sec: 900
   stuck_after_sec: { image: 600, image_edit: 600, upscale: 600, video: 1800, video_extend: 1800, audio: 900, train_identity: 1800, llm: 300 }
+  # The typical time a run takes, until this account has its own history for
+  # the model (then the median of its recent runs is shown instead).
+  typical_sec: { image: 45, image_edit: 45, upscale: 60, video: 180, video_extend: 180, audio: 60, train_identity: 1200, llm: 20, local: 30 }
 downloads:
   max_bytes: 524288000
   timeout_sec: 120

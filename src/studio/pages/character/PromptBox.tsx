@@ -5,7 +5,7 @@ import { api } from '../../api'
 import { useRefresh } from '../../hooks'
 import { PriceButton } from '../../PriceButton'
 import { ReqBadge, errorMessage, useToast, type TodoItem } from '../../ui'
-import type { StudioAction, WrittenPrompt } from '../../types'
+import type { JobView, StudioAction, WrittenPrompt } from '../../types'
 
 // The finished prompt, above the Generate button (owner, 2026-10-13): Claude
 // writes it from the details (the prompt writer, Sonnet 5.5 unless switched
@@ -16,7 +16,7 @@ import type { StudioAction, WrittenPrompt } from '../../types'
 
 const SOURCE: Record<WrittenPrompt['source'], string> = { claude: 'Written by', owner: 'Edited by you', template: 'From the template' }
 
-export function PromptBox({ id, characterId, sceneId, target, written, writeAction, writeTodo = [], templateText, words, model, realism, addedNote, changedNote, onDirty }: {
+export function PromptBox({ id, characterId, sceneId, target, written, writeAction, writeTodo = [], templateText, words, model, realism, addedNote, changedNote, onDirty, watch }: {
   id: string
   characterId: string
   sceneId: string
@@ -33,6 +33,8 @@ export function PromptBox({ id, characterId, sceneId, target, written, writeActi
   // Why the text may be out of date (the details changed after writing).
   changedNote?: string | null
   onDirty?: (dirty: boolean) => void
+  // Writer runs started elsewhere ("Use this still") show here too.
+  watch?: (j: JobView) => boolean
 }) {
   const toast = useToast()
   const refresh = useRefresh()
@@ -124,6 +126,7 @@ export function PromptBox({ id, characterId, sceneId, target, written, writeActi
           size="sm"
           icon={!has}
           onStarted={() => { if (timer.current) { clearTimeout(timer.current); timer.current = null } dirty.current = false; onDirty?.(false); setWriting(serverAt) }}
+          watch={watch}
         />
         {templateText && !has && <button type="button" className="st-btn ghost sm" onClick={useTemplate}><FileText size={14} />Use the template instead (free)</button>}
         {has && <button type="button" className="st-btn ghost sm" onClick={copy}>{copied ? <Check size={14} /> : <Copy size={14} />}{copied ? 'Copied' : 'Copy'}</button>}
