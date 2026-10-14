@@ -135,7 +135,7 @@ const templatesSchema = z.object({
   scene_plan: z.object({ system: z.string(), prompt: z.string() }),
   scene_ideas: z.object({ system: z.string(), prompt: z.string() }),
   video: z.object({ base: z.string(), silent: z.string(), end_frame: z.string(), continue: z.string() }),
-  clone: z.object({ swap: z.string(), image: z.string() }),
+  clone: z.object({ swap: z.string(), image: z.string(), replace: z.string(), scene_still: z.string(), outfit_source: z.string(), outfit_hers: z.string(), target_main: z.string(), target_at: z.string() }),
   content_slides: z.object({ system: z.string(), prompt: z.string() }),
   content_captions: z.object({ system: z.string(), prompt: z.string() }),
   prompt_writer: z.object({
@@ -244,8 +244,14 @@ const contentSchema = z.object({
   slideshow: z.object({ slides: z.tuple([z.number().int().positive(), z.number().int().positive()]), hashtags: z.tuple([z.number().int().min(0), z.number().int().positive()]), max_stills: z.number().int().positive(), image: z.object({ quality: z.number().int().min(50).max(100) }) }),
   batch: z.object({ max: z.number().int().positive(), default_count: z.number().int().positive(), zip_part_mb: z.number().positive().default(150) }),
   clone: z.object({
+    mode: z.enum(['replace', 'motion']).default('replace'),
     model: z.string(),
     account_model: z.string(),
+    motion_model: z.string(),
+    motion_account_model: z.string(),
+    outfit: z.enum(['source', 'hers']).default('source'),
+    face_refs: z.array(z.string()).min(1).default(['REF-00', 'REF-01', 'REF-02']),
+    scene_still: z.object({ model: z.string(), api_model: z.string() }),
     models: z.array(z.object({ ref: z.string(), resolution: z.string().optional() })).min(1),
     min_seconds: z.number().positive(),
     max_seconds: z.number().positive(),

@@ -129,13 +129,14 @@ export function accountParams(entry: ReturnType<typeof accountModel>, req: GenRe
   if (req.mask) medias.push({ value: need(req.mask, 'The mask'), role: role(m.roles.mask, 'a mask') })
   if (req.startFrame) medias.push({ value: need(req.startFrame, 'The start frame'), role: role(m.roles.start, 'a start frame') })
   if (req.endFrame) medias.push({ value: need(req.endFrame, 'The end frame'), role: role(m.roles.end, 'an end frame') })
-  if (req.sourceVideo) throw new ProviderError(`${entry.label} does not take a source video on the account path.`, { retryable: false, submitted: 'no' })
+  // Clone Video's source clip (Genjutsu replace: exactly one, G28).
+  if (req.sourceVideo) medias.push({ value: need(req.sourceVideo, 'The source clip'), role: role(m.roles.video, 'a source video') })
   if (medias.length) params.medias = medias
   return forceBeautifyOff(params)
 }
 
 function tools(req: GenRequest): { batch: string; cost: string } {
-  if (req.kind === 'video' || req.kind === 'video_extend') return { batch: 'generate_video_batch', cost: 'generate_video' }
+  if (req.kind === 'video' || req.kind === 'video_extend' || req.kind === 'video_clone') return { batch: 'generate_video_batch', cost: 'generate_video' }
   if (req.kind === 'audio') return { batch: 'generate_audio_batch', cost: 'generate_audio' }
   return { batch: 'generate_image_batch', cost: 'generate_image' }
 }
@@ -260,9 +261,11 @@ export function createHiggsfieldAccountAdapter(o: HiggsfieldAccountOptions): Pro
     async estimate(req) {
       const entry = accountModel(o.config, req.model)
       let reason = ''
-      // A model with its own tool (motion_control) has no price preflight:
-      // the price book answers, marked not confirmed until a run shows it.
-      if (req.kind !== 'upscale' && !entry.mcp.tool) {
+      // A model with its own tool (motion_control) has no price preflight,
+      // and a clone cannot be priced before its clip is uploaded (Genjutsu
+      // replace answers 422 without one): the price book answers, marked
+      // not confirmed until a run shows it.
+      if (req.kind !== 'upscale' && req.kind !== 'video_clone' && !entry.mcp.tool) {
         // A recent live price for the same request shape answers at once.
         const sig = priceSignature(req)
         const saved = await o.livePrices?.get(sig).catch(() => null) ?? null
@@ -340,10 +343,13 @@ export function createHiggsfieldAccountAdapter(o: HiggsfieldAccountOptions): Pro
         if (r.problem) throw new ProviderError(r.problem, { retryable: false, submitted: 'no' })
         throw new ProviderError('Higgsfield answered the upscale without a job id.', { retryable: false, submitted: 'unknown' })
       }
-      // Clone Video on the account path: Kling 3.0 Motion Control's own tool.
-      // The character image and the source clip are media ids; the place
-      // comes from the clip ("video") or the image. It takes no prompt.
-      if (req.kind === 'video_clone') {
+      // Clone Video on the account path with Kling 3.0 Motion Control's own
+      // tool. The character image (a scene still, G28) and the source clip
+      // are media ids; the place comes from the clip ("video") or the image.
+      // It takes no prompt. Genjutsu replace goes through generate_video
+      // below with the clip in its video role.
+      if (req.kind === 'video_clone' && !entry.clone) throw new ProviderError(`${entry.label} does not clone a video on the account path.`, { retryable: false, submitted: 'no' })
+      if (req.kind === 'video_clone' && entry.mcp.tool) {
         if (entry.mcp.tool !== 'motion_control') throw new ProviderError(`${entry.label} does not clone a video on the account path.`, { retryable: false, submitted: 'no' })
         const value = await o.client.callTool('motion_control', {
           params: forceBeautifyOff({

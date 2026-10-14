@@ -25,7 +25,7 @@ import { skinFor } from '../core/scenes.js'
 import { buildSceneEndFrame, buildSceneIdeas, buildScenePlan, buildScenePromptWrite, buildSceneRecheck, buildSceneRun, buildSceneEdit, buildSceneUpscale, buildSceneVideo, buildVideoUpscale, type SceneBuilt } from './sceneActions.js'
 import { markSceneBusy, saveVideoModel } from './scenes.js'
 import { buildContentCaptions, buildContentSlides } from './content.js'
-import { buildClone, saveCloneModel } from './clone.js'
+import { buildClone, buildCloneStill, saveCloneModel } from './clone.js'
 import { ruleSwitches } from './rules.js'
 import { readBilling } from '../providers/billing.js'
 import { effectiveModel, readModelOverrides } from '../providers/modelOverrides.js'
@@ -104,9 +104,13 @@ export const actionSchema = z.discriminatedUnion('type', [
   // more characters, one quote with a line each.
   z.object({
     type: z.literal('clone'), contentId: z.string(), characterIds: z.array(z.string().max(60)).min(1).max(10),
-    model: z.string().max(80).optional(), background: z.enum(['video', 'image']).optional(),
+    model: z.string().max(80).optional(), mode: z.enum(['replace', 'motion']).optional(), background: z.enum(['video', 'image']).optional(),
+    outfit: z.enum(['source', 'hers']).optional(),
     looks: z.record(z.string().max(60), z.string().max(60)).default({}), keepSound: z.boolean().default(false),
   }),
+  // "Copy the moves into a new scene": the clip's first frame with the
+  // character in place of the picked person, shown before the motion run.
+  z.object({ type: z.literal('clone_still'), contentId: z.string(), characterId: z.string().max(60), outfit: z.enum(['source', 'hers']).optional(), look: z.string().max(60).optional() }),
 ])
 
 export type StudioAction = z.infer<typeof actionSchema>
@@ -199,6 +203,7 @@ export async function buildAction(deps: Deps, ctx: Ctx, action: StudioAction): P
   if (action.type === 'model_suite') return buildModelSuite(deps, ctx)
   if (action.type === 'retry') return buildRetry(deps, ctx, action.jobId)
   if (action.type === 'clone') return buildClone(deps, ctx, action)
+  if (action.type === 'clone_still') return buildCloneStill(deps, ctx, action)
   const row = await getCharacter(deps, ctx, action.characterId)
   const ch = toData(row)
   const tpl = deps.config.pipeline.templates

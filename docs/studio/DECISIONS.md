@@ -1142,3 +1142,58 @@ new pages or sidebar items; one new Library tab (Sounds).
   on our side. Nothing was charged." with Retry, and the ffmpeg message
   stays under Details. The Studio's own plain messages ("Add shot B ...")
   are shown as they are.
+
+### G28. Clone: replace the person and keep the scene (owner bug report, 2026-10-14)
+
+- **What went wrong:** a rave TikTok cloned with Genjutsu motion transfer
+  came back in a gray studio, in a white tee and jeans, and a dancer in the
+  background became a second Callie. The run sent seven sheet images (REF-00
+  plus every face shot) as the character images. A motion model copies the
+  moves onto the image it gets, so it took the sheet's gray background and
+  plain clothes as the scene, and with several people moving it put her
+  face on more than one of them.
+- **Lesson:** never feed a motion model a bare sheet image, and never send
+  more of the sheet than the face needs. Sheet images are for identity; the
+  scene must come from the clip or from a still made for that scene.
+- **Two modes, "Replace the person (keep the scene)" the default:**
+  - Replace swaps only the picked person and keeps the clip's place,
+    light, crowd and outfit. It runs Genjutsu replace
+    (`hf_mult_replace_object`) on the owner's Higgsfield plan, with the
+    clip as the one video (`video_references`) and REF-00 plus the first
+    approved three-quarter view as images (`image_references`). On the API
+    it runs Seedance 2.5 video edit (Kling O3 video edit is also offered).
+    Not motion control.
+  - "Copy the moves into a new scene" (motion control) first makes a scene
+    still: the clip's first frame edited (Nano Banana 2.1 on the plan, GPT
+    Image 2.5 on the API) to put the character in place of the picked
+    person, keeping everything else. The still is shown with its free
+    checks; the first good one is kept, "Use this still" picks another.
+    The motion run gets only that still. Without one it is refused, with
+    the way forward.
+- **Only the main subject changes:** the worker finds the faces on the
+  first frame at ingest (largest first). The largest is replaced unless the
+  owner taps another on the frame; with more than one person and no tap the
+  quote says so. Models take no boxes, so the pick goes into the prompt in
+  words ("the person on the left side of the frame, further back"), and
+  every prompt says everyone else stays exactly as they are. A new tap drops
+  kept scene stills, since they show the old pick. Clips prepared before
+  this get their first frame when the panel opens (free, on the worker).
+- **Outfit:** the clip's outfit by default; "your character's outfit from
+  this post's still" adds that still as the last image. With no still the
+  clip's outfit stays, with a note (a default, never a block).
+- **Preview before the paid run:** "What runs" shows the first frame with
+  the person ringed and the two face images (Replace), or the scene still
+  (Copy the moves), above the price.
+- **Price:** Genjutsu replace cannot be priced before its clip is uploaded
+  (Higgsfield answers 422 without one, checked 2026-10-14 with a free price
+  call), so its quote comes from the price book (3 credits a second at
+  720p, a placeholder marked not confirmed) until the first run shows the
+  charge. The last pick is remembered per mode, so the old motion pick no
+  longer becomes the default.
+- **Tests:** the rave case (two dancers: only the main one changes, REF-00
+  and REF-01 only, the clip as the video, the scene and outfit kept; a tap
+  on the dancer in the back; a motion model refused under Replace; the
+  motion run refused without a scene still, then given only the still),
+  the outfit choice, and the account adapter's media roles.
+- **Re-run of the rave clip:** a paid run, so it waits for the owner's
+  click in Replace mode (counts toward the 150-credit cap).

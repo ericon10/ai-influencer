@@ -172,7 +172,8 @@ export type StudioAction =
   | { type: 'scene_qa'; characterId: string; candidateId: string }
   | { type: 'content_slides'; characterId: string; contentId: string }
   | { type: 'content_captions'; characterId: string; contentId: string }
-  | { type: 'clone'; contentId: string; characterIds: string[]; model?: string; background?: 'video' | 'image'; looks: Record<string, string>; keepSound: boolean }
+  | { type: 'clone'; contentId: string; characterIds: string[]; model?: string; mode?: CloneMode; background?: 'video' | 'image'; outfit?: 'source' | 'hers'; looks: Record<string, string>; keepSound: boolean }
+  | { type: 'clone_still'; contentId: string; characterId: string; outfit?: 'source' | 'hers'; look?: string }
 
 // A run's live status (server/jobs/jobView.ts).
 export type JobPhase = 'waiting' | 'queued' | 'submitting' | 'working' | 'sent' | 'provider_queued' | 'generating' | 'downloading' | 'checking' | 'done' | 'failed' | 'canceled' | 'needs_attention'
@@ -271,15 +272,22 @@ export interface BatchSpec extends BrollTiming { clipIds: string[]; brollIds: st
 
 // Clone Video (SPEC 13.1 R1): the post's saved TikTok or Reel, the models
 // with their prices, and the results.
+export type CloneMode = 'replace' | 'motion'
+export interface PersonBox { x: number; y: number; w: number; h: number }
 export interface CloneSource {
   status: 'preparing' | 'ready' | 'failed'; name: string; uploadId: string | null; assetId: string | null
   durationSec: number | null; hasAudio: boolean; trimmed: boolean; error: string | null
+  firstFrameId?: string | null; people?: PersonBox[]; target?: { x: number; y: number } | null; stills?: Record<string, string>
+}
+export interface CloneStill {
+  id: string; characterId: string; characterName: string; assetId: string | null; status: string; kept: boolean; error: string | null
+  findings: Array<{ code: string; severity: string; message: string }>; createdAt: string
 }
 export interface CloneModel {
-  ref: string; label: string; resolution: string | null; background: Array<'video' | 'image'>; minSec: number; maxSec: number
+  ref: string; label: string; mode: CloneMode; resolution: string | null; background: Array<'video' | 'image'>; minSec: number; maxSec: number
   path: 'account' | 'api'; note: string; display: string | null; verified: boolean; problem: string | null
 }
-export interface CloneOptions { model: string; models: CloneModel[]; seconds: number; maxCharacters: number; keepSound: boolean; minSeconds: number; maxSeconds: number; maxUploadMb: number }
+export interface CloneOptions { mode: CloneMode; outfit: 'source' | 'hers'; defaults: Record<CloneMode, string>; target: string; model: string; models: CloneModel[]; seconds: number; maxCharacters: number; keepSound: boolean; minSeconds: number; maxSeconds: number; maxUploadMb: number }
 export interface CloneResult {
   id: string; characterId: string; characterName: string; assetId: string | null; status: string; label: string
   durationSec: number | null; error: string | null; findings: Array<{ code: string; severity: string; message: string }>; createdAt: string

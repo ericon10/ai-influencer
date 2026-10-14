@@ -1143,3 +1143,15 @@ button.st-chip:hover { color: var(--st-text); border-color: var(--st-text-3); }
   .ed-title .st-hint { max-width: 50vw; }
 }
 .st-license { margin: 0; padding: 12px 14px; max-height: 260px; overflow: auto; white-space: pre-wrap; font-family: var(--st-mono); font-size: 11.5px; line-height: 1.5; color: var(--st-text-2); border-radius: var(--st-r); border: 1px solid var(--st-line); background: var(--st-bg-2); }
+
+/* Clone: tap the person to replace on the first frame (G28). */
+.st-framepick { position: relative; display: block; width: 180px; padding: 0; border: 1px solid var(--st-line); border-radius: 12px; overflow: hidden; background: var(--st-bg-2); cursor: crosshair; }
+.st-framepick img { display: block; width: 100%; height: auto; }
+.st-framepick.sm { width: 90px; cursor: default; }
+.st-framepick:disabled { opacity: 0.7; cursor: progress; }
+.st-framepick-ring { position: absolute; border: 2px solid rgba(255, 255, 255, 0.75); border-radius: 50%; box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35); pointer-events: none; }
+.st-framepick-ring.on { border-color: var(--st-accent); border-width: 3px; box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.45), 0 0 12px var(--st-accent); }
+.st-framepick-dot { position: absolute; width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%; background: var(--st-accent); box-shadow: 0 0 0 2px #fff; pointer-events: none; }
+.st-clonepreview-ref { width: 64px; height: 64px; object-fit: cover; border-radius: 10px; border: 1px solid var(--st-line); }
+.st-clonepreview-still { width: 90px; aspect-ratio: 9 / 16; object-fit: cover; border-radius: 10px; border: 1px solid var(--st-line); }
+@media (max-width: 640px) { .st-framepick { width: 150px; } }

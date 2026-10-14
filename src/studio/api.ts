@@ -1,4 +1,4 @@
-import type { ActionPreview, CharacterSummary, CharacterView, HiggsfieldAccount, JobView, Me, QuoteView, RulesView, SceneFields, ScenesData, SettingsView, StudioAction, Usage, VideoPrice, BrollClip, ContentData, ContentKind, LibraryData, PostStep, WorkerStatus, CloneOptions, CloneResult, CutView, SoundItem } from './types'
+import type { ActionPreview, CharacterSummary, CharacterView, HiggsfieldAccount, JobView, Me, QuoteView, RulesView, SceneFields, ScenesData, SettingsView, StudioAction, Usage, VideoPrice, BrollClip, ContentData, ContentKind, LibraryData, PostStep, WorkerStatus, CloneOptions, CloneResult, CloneSource, CloneStill, CutView, SoundItem } from './types'
 import { sheetRefOf, typeOf, uploadFiles } from './files'
 
 // Thin client for /api/v1. Every write sends the CSRF header the server
@@ -109,6 +109,9 @@ export const api = {
   keepClone: (id: string, acknowledge = false) => request<{ ok: true }>('POST', `/clones/${id}/keep`, { acknowledge }),
   postFromClone: (contentId: string, cloneId: string, acknowledge = false) => request<{ id: string }>('POST', `/content/${contentId}/clones/${cloneId}/post`, { acknowledge }),
   setCloneModel: (model: string) => request<{ model: string }>('PUT', '/settings/clone-model', { model }),
+  setCloneTarget: (contentId: string, at: { x: number; y: number } | null) => request<{ clone: CloneSource }>('PUT', `/content/${contentId}/clone-target`, { at }),
+  cloneStills: (contentId: string) => request<{ stills: CloneStill[] }>('GET', `/content/${contentId}/clone-stills`),
+  useCloneStill: (contentId: string, id: string) => request<{ ok: true }>('POST', `/content/${contentId}/clone-stills/${id}/use`),
   archiveContent: (id: string) => request<{ ok: true }>('DELETE', `/content/${id}`),
   renderContent: (id: string) => request<{ id: string; status: string }>('POST', `/content/${id}/render`, {}),
   retryFailed: (id: string) => request<{ id: string; status: string }>('POST', `/content/${id}/render/retry-failed`, {}),

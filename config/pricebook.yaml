@@ -41,6 +41,7 @@ entries:
   # $0.084/s (Pro), so motion control is expected near those.
   - { provider: higgsfield, model: kling-3.0-motion-control, unit: second, price: 0.12, verified: false, credits: 2, when: { resolution: 720p }, source: "Placeholder credits per second at 720p, set high until the first run shows the charge (motion_control has no price preflight)." }
   - { provider: higgsfield, model: kling-3.0-motion-control, unit: second, price: 0.16, verified: false, credits: 3, source: "Placeholder credits per second at 1080p." }
+  - { provider: higgsfield, model: genjutsu-replace, unit: second, price: 0.15, verified: false, credits: 3, source: "Placeholder credits per second, set high until the first run shows the charge (the live price needs the uploaded clip)." }
   - { provider: higgsfield, model: kling-3.0-motion-control-pro, unit: second, price: 0.11, verified: false, source: "Placeholder near Kling 3.0 Pro image to video ($0.084/s)." }
   - { provider: higgsfield, model: kling-3.0-motion-control-standard, unit: second, price: 0.08, verified: false, source: "Placeholder near Kling 3.0 Standard image to video ($0.063/s)." }
   - { provider: higgsfield, model: genjutsu-motion-transfer, unit: second, price: 0.15, verified: false, source: "Placeholder." }

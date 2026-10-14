@@ -392,6 +392,34 @@ describe('account adapter edge cases', () => {
     expect((await a.estimate({ ...req, resolution: '1080p' })).credits).toBe(36)
   })
 
+  it('Clone Video "Replace the person" runs Genjutsu replace through generate_video: her face images and exactly one clip (G28)', async () => {
+    const a = adapter()
+    const req: GenRequest = {
+      kind: 'video_clone', model: 'higgsfield/genjutsu-replace', prompt: 'Replace only the main person.', resolution: '720p', durationSec: 10, cloneBackground: 'video', audio: false,
+      refs: [{ assetId: 'r0', url: '1b2f7a10-3c4d-4e5f-8a9b-0c1d2e3f4a5b' }, { assetId: 'r1', url: '3b2f7a10-3c4d-4e5f-8a9b-0c1d2e3f4a5b' }], sourceVideo: { assetId: 's', url: '2b2f7a10-3c4d-4e5f-8a9b-0c1d2e3f4a5b' },
+    }
+    expect(accountParams(accountModel(h.deps.config, req.model), req)).toEqual({
+      model: 'hf_mult_replace_object', prompt: 'Replace only the main person.', resolution: '720p',
+      medias: [
+        { value: '1b2f7a10-3c4d-4e5f-8a9b-0c1d2e3f4a5b', role: 'image_references' },
+        { value: '3b2f7a10-3c4d-4e5f-8a9b-0c1d2e3f4a5b', role: 'image_references' },
+        { value: '2b2f7a10-3c4d-4e5f-8a9b-0c1d2e3f4a5b', role: 'video_references' },
+      ],
+    })
+    // Higgsfield cannot price it before the clip is uploaded: the price
+    // book answers (3 credits per second, not confirmed), with no call.
+    const est = await a.estimate(req)
+    expect(est.credits).toBe(30)
+    expect(est.verified).toBe(false)
+    expect(fake.calls).toHaveLength(0)
+    const { jobId } = await a.submit(req, { idempotencyKey: 'k-replace' })
+    expect(jobId).toBeTruthy()
+    expect(fake.tool('motion_control')).toHaveLength(0)
+    const sent = fake.tool('generate_video_batch').at(-1)!.args.requests[0].params
+    expect(sent).toMatchObject({ model: 'hf_mult_replace_object', use_unlim: false })
+    expect(sent.medias.filter((m: { role: string }) => m.role === 'video_references')).toHaveLength(1)
+  })
+
   it('refuses a clone on a model the account path cannot clone with', async () => {
     const req: GenRequest = { kind: 'video_clone', model: 'higgsfield/kling-3.0-pro', prompt: 'x', durationSec: 5, refs: [{ assetId: 'r', url: 'u' }], sourceVideo: { assetId: 's', url: 'v' } }
     await expect(adapter().submit(req, { idempotencyKey: 'k-x' })).rejects.toThrow(/does not clone a video/)

@@ -125,6 +125,14 @@ const cloneSource = z.object({
   hasAudio: z.boolean().default(false),
   trimmed: z.boolean().default(false),
   error: z.string().max(500).nullable().default(null),
+  // The clip's first frame and the people on it (face boxes, 0 to 1, the
+  // largest first), for "tap the person to replace" and the preview (G28).
+  firstFrameId: id.nullable().default(null),
+  people: z.array(z.object({ x: z.number(), y: z.number(), w: z.number(), h: z.number() })).max(12).default([]),
+  // Where the owner tapped (0 to 1); unset means the largest person.
+  target: z.object({ x: z.number().min(0).max(1), y: z.number().min(0).max(1) }).nullable().default(null),
+  // "Copy the moves": the scene still kept per character (candidate ids).
+  stills: z.record(id, id).default({}),
 })
 export type CloneSource = z.infer<typeof cloneSource>
 // The sound bed (Phase 3; SPEC 5.5): ambience ("none", "room" for the

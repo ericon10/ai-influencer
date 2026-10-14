@@ -230,6 +230,31 @@ models:
   # puts it back itself when "Keep original sound" is on (free, the same for
   # every model). `clone.background` says where the result's place comes
   # from: the source clip ("video") or the character image ("image").
+  # Two modes (owner, 2026-10-14, G28). "Replace the person" swaps only the
+  # main subject and keeps the clip's place, light, crowd and outfit; it
+  # gets REF-00 and one three-quarter view. "Copy the moves into a new
+  # scene" (motion) gets one scene still of the character already in the
+  # clip's place, never a bare sheet image.
+  - ref: higgsfield/genjutsu-replace
+    label: Genjutsu replace
+    kinds: [video_clone]
+    max_refs: 3
+    api: false
+    endpoint: null
+    input_map: genjutsu_replace
+    verified: false
+    # generate_video with model hf_mult_replace_object: images in
+    # image_references, exactly one clip in video_references, resolution
+    # 480p, 720p or 1080p (models_explore and the backend's own validation
+    # message, read 2026-10-14). The price needs the uploaded clip, so the
+    # quote comes from the price book until the first run shows the charge.
+    mcp_id: hf_mult_replace_object
+    mcp: { params: [resolution], roles: { refs: image_references, video: video_references } }
+    clone: { mode: replace, background: [video], image_refs: 3, min_sec: 3, max_sec: 30, prompt: optional }
+    aliases: [Genjutsu replace, hf_mult_replace_object]
+    params: { resolution: [480p, 720p, 1080p] }
+    use_for: [video_clone]
+    notes: Your Higgsfield plan. Swaps only the person you pick and keeps the clip's place, light, crowd and outfit.
   - ref: higgsfield/kling-3.0-motion-control
     label: Kling 3.0 Motion Control
     kinds: [video_clone]
@@ -243,7 +268,7 @@ models:
     # (where the background comes from). Read from the connector 2026-10-13.
     mcp_id: kling3_0_motion_control
     mcp: { tool: motion_control, params: [resolution] }
-    clone: { background: [video, image], image_refs: 1, min_sec: 3, max_sec: 30, prompt: none }
+    clone: { mode: motion, background: [video, image], image_refs: 1, min_sec: 3, max_sec: 30, prompt: none }
     aliases: [Kling 3.0 Motion Control, motion_control]
     params: { resolution: [720p, 1080p] }
     use_for: [video_clone]
@@ -256,7 +281,7 @@ models:
     endpoint: kling-video/v3/motion-control/pro
     input_map: kling_motion_control
     verified: false
-    clone: { background: [image], image_refs: 1, min_sec: 3, max_sec: 30, prompt: optional }
+    clone: { mode: motion, background: [image], image_refs: 1, min_sec: 3, max_sec: 30, prompt: optional }
     aliases: [Kling 3.0 Motion Control Pro]
     notes: The character image sets the look and the place; the clip gives the motion and the camera. keep_original_sound is sent "no".
   - ref: higgsfield/kling-3.0-motion-control-standard
@@ -267,7 +292,7 @@ models:
     endpoint: kling-video/v3/motion-control/std
     input_map: kling_motion_control
     verified: false
-    clone: { background: [image], image_refs: 1, min_sec: 3, max_sec: 30, prompt: optional }
+    clone: { mode: motion, background: [image], image_refs: 1, min_sec: 3, max_sec: 30, prompt: optional }
     aliases: [Kling 3.0 Motion Control Standard]
   - ref: higgsfield/genjutsu-motion-transfer
     label: Genjutsu motion transfer
@@ -277,10 +302,10 @@ models:
     endpoint: higgsfield/genjutsu/motion-transfer/v1.0
     input_map: genjutsu_motion
     verified: false
-    clone: { background: [image], image_refs: 8, min_sec: 4, max_sec: 30, prompt: optional }
+    clone: { mode: motion, background: [image], image_refs: 1, min_sec: 4, max_sec: 30, prompt: optional }
     aliases: [Genjutsu, Genjutsu motion transfer]
     params: { resolution: [480p, 720p, 1080p] }
-    notes: Up to 8 character images, so several sheet shots can hold the face. The source must be at least 4 s; longer than 30 s is trimmed.
+    notes: Copies the moves onto one image. The Studio only ever sends it a scene still of the character in the clip's place (never a bare sheet image, which gave a gray studio, G28). The source must be at least 4 s; longer than 30 s is trimmed.
   - ref: higgsfield/seedance-2.5-video-edit
     label: Seedance 2.5 video edit
     kinds: [video_clone]
@@ -289,7 +314,7 @@ models:
     endpoint: bytedance/seedance-2.5/video-edit
     input_map: seedance_video_edit
     verified: false
-    clone: { background: [video], image_refs: 4, min_sec: 4, max_sec: 30, prompt: required }
+    clone: { mode: replace, background: [video], image_refs: 3, min_sec: 4, max_sec: 30, prompt: required }
     aliases: [Seedance 2.5 video edit]
     params: { resolution: [480p, 720p, 1080p] }
     audio: off_switch
@@ -302,7 +327,7 @@ models:
     endpoint: kling-video/o3/video-edit
     input_map: kling_o3_edit
     verified: false
-    clone: { background: [video], image_refs: 4, min_sec: 3, max_sec: 15.5, prompt: required }
+    clone: { mode: replace, background: [video], image_refs: 3, min_sec: 3, max_sec: 15.5, prompt: required }
     aliases: [Kling O3 video edit]
     notes: Keeps the clip's place and swaps the person by prompt. Sources from 3 to 15.5 s.
 

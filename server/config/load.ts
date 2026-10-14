@@ -45,11 +45,14 @@ const modelsSchema = z.object({
       // instead of the generate_* tools.
       tool: z.string().optional(),
     }).optional(),
-    // Clone Video (SPEC 13.1 R1): where the result's place comes from (the
-    // source clip, the character image, or either), how many character
+    // Clone Video (SPEC 13.1 R1): what the model does with the clip
+    // ("replace" swaps one person and keeps the scene; "motion" copies the
+    // moves onto a character image), where the result's place comes from
+    // (the source clip, the character image, or either), how many character
     // images it takes, the source length it accepts, and whether it takes
     // a prompt.
     clone: z.object({
+      mode: z.enum(['replace', 'motion']),
       background: z.array(z.enum(['video', 'image'])).min(1),
       image_refs: z.number().int().min(1),
       min_sec: z.number().positive(),

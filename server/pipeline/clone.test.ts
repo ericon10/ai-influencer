@@ -125,17 +125,24 @@ describe('Clone Video: the run', () => {
     expect(o.models.find(m => m.ref === 'higgsfield/kling-3.0-motion-control')!.path).toBe('account')
     expect(o.models.find(m => m.ref === 'higgsfield/seedance-2.5-video-edit')!.background).toEqual(['video'])
     expect(o.keepSound).toBe(false)
+    // Two modes: "Replace the person" is the default (G28).
+    expect(o.mode).toBe('replace')
+    expect(o.defaults.motion).toBe('higgsfield/kling-3.0-motion-control-pro')
+    expect(o.models.find(m => m.ref === 'higgsfield/genjutsu-replace')).toMatchObject({ mode: 'replace', path: 'account' })
+    expect(o.models.find(m => m.ref === 'higgsfield/genjutsu-motion-transfer')!.mode).toBe('motion')
   })
 
   it('one quote with a line per character; both clones are checked and kept in Library > Clips', async () => {
-    const action: StudioAction = { type: 'clone', contentId: postId, characterIds: [callie, second], model: 'higgsfield/genjutsu-motion-transfer', looks: {}, keepSound: false }
+    const action: StudioAction = { type: 'clone', contentId: postId, characterIds: [callie, second], model: 'higgsfield/kling-o3-video-edit', looks: {}, keepSound: false }
     const { quote, preview, jobs } = await run(action)
     expect(quote.items).toHaveLength(2)
-    expect(preview.title).toBe('Clone "dance trend" for Callie, Mara')
+    expect(preview.title).toBe('Replace the person in "dance trend" for Callie, Mara')
     // The REALISM block rides along on a model that takes a prompt, and the
-    // source's sound is never asked of the provider.
+    // source's sound is never asked of the provider. Only one person
+    // changes; the clip's outfit stays by default.
     expect(preview.prompts[0]!.text).toMatch(/REALISM/)
-    expect(preview.prompts[0]!.text).toMatch(/never the face of the person in the source video/)
+    expect(preview.prompts[0]!.text).toMatch(/Every other person in the video stays exactly as they are/)
+    expect(preview.prompts[0]!.text).toMatch(/Keep the clothes, shoes and accessories that person wears in the source/)
     expect(new Set(jobs.map(j => j.characterId))).toEqual(new Set([callie, second]))
     const clones = await postClones(h.deps, h.ctx, postId)
     expect(clones).toHaveLength(2)
@@ -145,12 +152,13 @@ describe('Clone Video: the run', () => {
     expect((await probeAsset(clones[0]!.assetId!)).hasAudio).toBe(false)
     const lib = await libraryView(h.deps, h.ctx, { characterId: callie })
     expect(lib.clips.find(c => c.id === clones.find(x => x.characterId === callie)!.id)).toMatchObject({ op: 'clone', title: 'Clone: dance trend', status: 'approved' })
-    // The picked model is the next clone's default.
-    expect(await cloneModel(h.deps, h.ctx)).toBe('higgsfield/genjutsu-motion-transfer')
+    // The picked model is the next clone's default for its mode.
+    expect(await cloneModel(h.deps, h.ctx, 'replace')).toBe('higgsfield/kling-o3-video-edit')
+    expect(await cloneModel(h.deps, h.ctx, 'motion')).toBe('higgsfield/kling-3.0-motion-control-pro')
   }, 120_000)
 
   it('"Keep original sound" puts the source sound back, and the post MP4 keeps it, B-roll and all', async () => {
-    await run({ type: 'clone', contentId: postId, characterIds: [callie], model: 'higgsfield/kling-3.0-motion-control-pro', looks: {}, keepSound: true })
+    await run({ type: 'clone', contentId: postId, characterIds: [callie], model: 'higgsfield/seedance-2.5-video-edit', looks: {}, keepSound: true })
     const clone = (await postClones(h.deps, h.ctx, postId)).find(c => c.characterId === callie && c.findings.some(f => /original sound/.test(f.message)))!
     expect(clone).toBeTruthy()
     expect((await probeAsset(clone.assetId!)).hasAudio).toBe(true)
@@ -174,18 +182,19 @@ describe('Clone Video: the run', () => {
     expect(p.durationSec!).toBeLessThan((clip.durationSec ?? 0) + 2.5)
   }, 120_000)
 
-  it('the place from the character image warns when only REF-00 is there, and a still can be the look', async () => {
+  it('"Use one of hers" dresses her in a still\'s outfit; with no still the clip\'s outfit stays, with a note', async () => {
     const sceneId = (await createScene(h.deps, h.ctx, callie, { brief: 'Callie on a rooftop at sunset' })).id
     const { updateScene } = await import('./scenes.js')
     await updateScene(h.deps, h.ctx, sceneId, { prompts: { still: 'Callie on a rooftop at sunset, laughing, caught by a friend.' } })
     await run({ type: 'scene', characterId: callie, sceneId, models: ['higgsfield/nano-banana-2.1'], variations: 1, withQa: false })
     const still = (await sceneCandidates(h.deps, h.ctx, [sceneId])).find(c => c.op === 'generate' && c.assetId)!
-    const plain = await estimateAction(h.deps, h.ctx, { type: 'clone', contentId: postId, characterIds: [callie], model: 'higgsfield/kling-3.0-motion-control-pro', looks: {}, keepSound: false })
-    expect(plain.preview.warnings.map(w => w.ruleId)).toContain('clone-place')
-    const withStill = await estimateAction(h.deps, h.ctx, { type: 'clone', contentId: postId, characterIds: [callie], model: 'higgsfield/kling-3.0-motion-control-pro', looks: { [callie]: still.id }, keepSound: false })
-    expect(withStill.preview.warnings.map(w => w.ruleId)).not.toContain('clone-place')
-    // A still of another character cannot be the look.
-    await expect(estimateAction(h.deps, h.ctx, { type: 'clone', contentId: postId, characterIds: [second], looks: { [second]: still.id }, keepSound: false })).rejects.toThrow(/Pick a still of Mara/)
+    const plain = await estimateAction(h.deps, h.ctx, { type: 'clone', contentId: postId, characterIds: [callie], outfit: 'hers', looks: {}, keepSound: false })
+    expect(plain.preview.warnings.map(w => w.ruleId)).toContain('clone-outfit')
+    const hers = await estimateAction(h.deps, h.ctx, { type: 'clone', contentId: postId, characterIds: [callie], outfit: 'hers', looks: { [callie]: still.id }, keepSound: false })
+    expect(hers.preview.warnings.map(w => w.ruleId)).not.toContain('clone-outfit')
+    expect(hers.preview.prompts[0]!.text).toMatch(/Dress her in the outfit from the outfit reference image/)
+    // A still of another character cannot be the outfit.
+    await expect(estimateAction(h.deps, h.ctx, { type: 'clone', contentId: postId, characterIds: [second], outfit: 'hers', looks: { [second]: still.id }, keepSound: false })).rejects.toThrow(/Pick a still of Mara/)
   }, 120_000)
 
   it('a clip outside what a model takes is refused before any price (Kling O3 takes up to 15.5 s)', async () => {

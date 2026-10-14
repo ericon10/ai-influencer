@@ -118,7 +118,7 @@ export function useContent() {
   const qc = useQueryClient()
   const active = useActiveJobs()
   // Claude writing slides or captions, a render, or a B-roll upload.
-  const busy = (active.data?.jobs ?? []).some(j => /^(content_slides|content_captions|content_render|broll_ingest|clip_ingest|clone_source|chain_frame|chain_join):/.test(j.purpose))
+  const busy = (active.data?.jobs ?? []).some(j => /^(content_slides|content_captions|content_render|broll_ingest|clip_ingest|clone_source|clone_frame|chain_frame|chain_join):/.test(j.purpose))
   const wasBusy = useRef(false)
   useEffect(() => {
     if (wasBusy.current && !busy) qc.invalidateQueries({ queryKey: keys.content })
@@ -187,6 +187,19 @@ export function useClones(contentId: string) {
     wasBusy.current = busy
   }, [busy, qc, contentId])
   return useQuery({ queryKey: ['clones', contentId], queryFn: () => api.clones(contentId), refetchInterval: busy ? 3000 : false })
+}
+
+// A post's scene stills for "Copy the moves": looks again when one ends.
+export function useCloneStills(contentId: string) {
+  const qc = useQueryClient()
+  const active = useActiveJobs()
+  const busy = (active.data?.jobs ?? []).some(j => j.purpose.startsWith(`clone_still:${contentId}:`))
+  const wasBusy = useRef(false)
+  useEffect(() => {
+    if (wasBusy.current && !busy) { qc.invalidateQueries({ queryKey: ['clone-stills', contentId] }); qc.invalidateQueries({ queryKey: keys.content }) }
+    wasBusy.current = busy
+  }, [busy, qc, contentId])
+  return useQuery({ queryKey: ['clone-stills', contentId], queryFn: () => api.cloneStills(contentId), refetchInterval: busy ? 3000 : false })
 }
 
 export function useRules(characterId: string | null) {

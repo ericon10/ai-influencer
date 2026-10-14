@@ -138,7 +138,15 @@ video:
 clone:
   swap: "Replace the person in the source video with the person in the reference images: {poss} face, hair, skin and body exactly as in the references. Keep the motion, timing, gestures, camera movement, framing and place of the source video exactly the same. The result must be the reference person, never the person from the source video."
   image: "The person in the reference image performs the exact motion of the source video: the same timing, gestures, body movement and camera movement. Keep {poss} face, hair, skin, body and the place of the reference image exactly the same, never the face of the person in the source video."
-
+  # "Replace the person (keep the scene)" (G28): only one person changes.
+  replace: "Replace only {target} in the source video with the person in the reference images: {poss} face, hair, skin and body exactly as in the references. Every other person in the video stays exactly as they are, with their own faces. Keep the place, the lighting, the crowd, the motion, the timing, the gestures, the camera movement and the framing of the source video exactly the same. {outfit} The replaced person must be the reference person, never the person from the source video."
+  # The scene still for "Copy the moves" (G28): the clip's first frame (the
+  # first image) with only that person replaced.
+  scene_still: "In the first image, replace only {target} with the person in the other reference images: {poss} face, hair, skin and body exactly as in those references. Keep every other person, the place, the lighting, the pose, the framing and the camera of the first image exactly the same. {outfit} The replaced person must be the reference person, never the person from the first image"
+  outfit_source: "Keep the clothes, shoes and accessories that person wears in the source exactly the same."
+  outfit_hers: "Dress {obj} in the outfit from the outfit reference image (the last reference image), not the clothes in the source."
+  target_main: "the main person (the largest person, closest to the camera)"
+  target_at: "the person {where} of the frame{depth}"
 # The prompt writer (owner, 2026-10-13, default rule scene-prompt-writer):
 # Claude turns the scene details into the final prompt as natural sentences.
 # The Studio then adds what must not depend on the writing: the reference
