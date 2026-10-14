@@ -1742,7 +1742,9 @@ person" in the clone panel.
   Every Flare prompt carries "Bare natural lips, no gloss."
   (`models.yaml prompt_lines`, inserted before REALISM by
   `withModelLines`). Recreate's stills and face pass stay on Nano Banana
-  2.1 for now.
+  2.1 for now: on the plan whenever it is connected, whatever the billing
+  default (production's is the API); GPT Image 2.5 on the API only when
+  there is no plan.
 - **Real Flare prices (plan transactions):** Standard 2k 1 credit,
   High 2k 2.75 credits a still. API dollars are not confirmed yet; every
   API run now reads its exact price back from Higgsfield

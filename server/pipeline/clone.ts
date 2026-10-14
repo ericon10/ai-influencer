@@ -759,7 +759,10 @@ async function stillRun(deps: Deps, ctx: Ctx, characterId: string) {
   const ch = toData(row)
   const approved = await approvedAssets(deps, ctx, row.id)
   if (!approved.get('REF-00')) throw new AppError('bad_request', `${row.name} has no face yet. Set up ${ch.pronouns.poss} face (REF-00) first.`)
-  const account = await onAccount(deps, ctx)
+  // Recreate's stills and face pass stay on Nano Banana 2.1 (owner,
+  // 2026-10-14), a plan-only model: on the plan whenever it is connected,
+  // whatever the billing default; the API model only when there is no plan.
+  const account = (await listCredentials(deps.db, ctx.accountId)).some(c => c.provider === ACCOUNT_PROVIDER)
   const model = account ? cfg.scene_still.model : cfg.scene_still.api_model
   const run = await runModel(deps, ctx, model, 'image_edit')
   const entry = deps.config.models.models.find(m => m.ref === model)!

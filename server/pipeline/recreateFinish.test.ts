@@ -9,12 +9,14 @@ import { registerPipelineHooks } from './hooks.js'
 import { estimateAction, runAction, type StudioAction } from './actions.js'
 import { importCharacter } from './files.js'
 import { createContent, getContent, type MemeSpec } from './content.js'
-import { addCloneSource, checkCloneCap, cloneOptions, cloneStills, gateFor, postClones, setCloneChoices } from './clone.js'
+import { addCloneSource, buildCloneStill, checkCloneCap, cloneOptions, cloneStills, gateFor, postClones, setCloneChoices } from './clone.js'
 import { addRecreateRow, recreateBatch, recreateFor, setRecreateRows, startRecreate, useCloneTake } from './recreate.js'
 import { createScene } from './scenes.js'
 import { candidates, jobs } from '../db/schema.js'
 import { renderPlaceholderPortrait } from '../providers/mock.js'
-import { saveCredential } from '../providers/credentials.js'
+import { revokeCredential, saveCredential, storeSecret } from '../providers/credentials.js'
+import { ACCOUNT_PROVIDER } from '../providers/higgsfieldOAuth.js'
+import { saveBilling } from '../providers/billing.js'
 import { mapInput, createHiggsfieldAdapter } from '../providers/higgsfield.js'
 import { classifyText } from '../qa/ocr.js'
 import { setSetting } from './settings.js'
@@ -125,6 +127,17 @@ describe('step 2, the stills and the gates', () => {
     expect(text).toContain('She wears the outfit of the first image: dark green sleeveless dress.')
     expect(text).toContain("She must not have that person's dark brown hair, brown eyes, a nose ring, winged liner.")
   }, 120_000)
+
+  it('the stills stay on Nano Banana 2.1 on the plan whenever it is connected, even with the API as the billing default', async () => {
+    await saveBilling(h.deps, h.ctx, { default: 'api', creditUsd: 0 })
+    expect((await buildCloneStill(h.deps, h.ctx, { contentId: postId, characterId: callie })).specs[0]!.request.modelRef).toBe('higgsfield/gpt-image-2.5')
+    await storeSecret(h.deps, h.ctx, ACCOUNT_PROVIDER, JSON.stringify({ accessToken: 'at-1', refreshToken: 'rt-1', expiresAt: Date.now() + 3600_000, clientId: 'client-1' }), 'Higgsfield account', '')
+    try {
+      expect((await buildCloneStill(h.deps, h.ctx, { contentId: postId, characterId: callie })).specs[0]!.request.modelRef).toBe('higgsfield/nano-banana-2.1')
+    } finally {
+      await revokeCredential(h.deps, h.ctx, ACCOUNT_PROVIDER)
+    }
+  })
 
   it('the gates: a face match under 0.363 or a likeness of 0.36 or more holds the video, with why', () => {
     const g = h.deps.config.pipeline.content.clone.recreate.gate
