@@ -1,13 +1,13 @@
 import { useMemo, useRef, useState, type ReactNode } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
-import { Archive, Clapperboard, Download, Film, History, Images, LayoutGrid, Loader2, Plus, Upload } from 'lucide-react'
+import { Archive, AudioLines, Clapperboard, Download, Film, History, Images, LayoutGrid, Loader2, Music, Plus, Upload, Wind } from 'lucide-react'
 import { api, assetUrl, downloadUrl } from '../api'
-import { keys, useCharacters, useContent, useLibrary, useScenes, useWorkerGate } from '../hooks'
+import { keys, useCharacters, useContent, useLibrary, useScenes, useSounds, useWorkerGate } from '../hooks'
 import { Callout, Img, errorMessage, useToast } from '../ui'
 import { ClipGrid, ClipUpload, StillGrid } from '../library'
 import { RunStatus } from '../runs'
-import type { BrollClip, ContentData, ScenesData } from '../types'
+import type { BrollClip, ContentData, ScenesData, SoundItem } from '../types'
 import { KIND_LABEL, fileSlug, postName, useNewPost } from './post/parts'
 import { HowTo } from '../guide/Guide'
 
@@ -15,11 +15,12 @@ import { HowTo } from '../guide/Guide'
 // Stills and clips start a new post in one click; B-roll is uploaded and
 // tagged here; exported posts can be downloaded again.
 
-type Tab = 'stills' | 'clips' | 'broll' | 'posts'
+type Tab = 'stills' | 'clips' | 'broll' | 'sounds' | 'posts'
 const TABS: Array<[Tab, string, ReactNode]> = [
   ['stills', 'Stills', <Images size={14} key="s" />],
   ['clips', 'Clips', <Film size={14} key="c" />],
   ['broll', 'B-roll', <Clapperboard size={14} key="b" />],
+  ['sounds', 'Sounds', <AudioLines size={14} key="a" />],
   ['posts', 'Posts', <LayoutGrid size={14} key="p" />],
 ]
 
@@ -91,6 +92,8 @@ export default function Library() {
 
       {tab === 'broll' && (!content.data ? <Skel /> : <BrollTab data={content.data} />)}
 
+      {tab === 'sounds' && <SoundsTab />}
+
       {tab === 'posts' && (
         !content.data ? <Skel /> : <ExportedPosts data={content.data} characterId={characterId} />
       )}
@@ -99,6 +102,75 @@ export default function Library() {
 }
 
 const Skel = () => <div className="st-skel" style={{ height: 240, borderRadius: 18 }} />
+
+// Library > Sounds (Phase 3 sound bed): ambience recordings and music
+// tracks for the Finish step's Sound row. Room tone is built in. No AI music.
+function SoundsTab() {
+  const toast = useToast()
+  const qc = useQueryClient()
+  const sounds = useSounds()
+  const worker = useWorkerGate()
+  const [busy, setBusy] = useState<string | null>(null)
+  const [added, setAdded] = useState<string[]>([])
+  const input = useRef<HTMLInputElement | null>(null)
+  const kind = useRef<'ambience' | 'music'>('ambience')
+  async function upload(files: File[]) {
+    for (const [i, f] of files.entries()) {
+      setBusy(`Uploading ${f.name} (${i + 1} of ${files.length})...`)
+      try { const row = await api.addSound(f, kind.current); setAdded(a => [...a, row.id]) } catch (e) { toast({ tone: 'bad', text: `${f.name}: ${errorMessage(e)}` }) }
+    }
+    setBusy(null)
+    await qc.invalidateQueries({ queryKey: ['sounds'] })
+  }
+  const pick = (k: 'ambience' | 'music') => { kind.current = k; input.current?.click() }
+  const list = sounds.data?.sounds ?? []
+  return (
+    <div className="st-col" style={{ gap: 18 }}>
+      <section className="st-card"><div className="st-card-body st-col" style={{ gap: 12 }}>
+        <div className="st-h3">Add sounds</div>
+        <span className="st-hint">Ambience: a real recording of a place (a cafe, a street, a room). Music: a track you have the rights to. Each is converted and measured so the mix can level it. Room tone is built in. No AI music.</span>
+        <input ref={input} type="file" accept="audio/*,video/*" multiple hidden onChange={e => { const f = Array.from(e.target.files ?? []); e.target.value = ''; void upload(f) }} />
+        <div className="st-row" style={{ gap: 10, flexWrap: 'wrap' }}>
+          <button className="st-btn" disabled={!!busy || !worker.ready} onClick={() => pick('ambience')}><Wind size={15} />Upload ambience</button>
+          <button className="st-btn" disabled={!!busy || !worker.ready} onClick={() => pick('music')}><Music size={15} />Upload music</button>
+          {busy && <span className="st-hint"><Loader2 size={12} className="st-spin" style={{ verticalAlign: -2 }} /> {busy}</span>}
+          {!worker.ready && <span className="st-hint st-warntext" role="status">{worker.reason} Uploads are prepared by the worker.</span>}
+        </div>
+        <RunStatus match={j => added.some(id => j.purpose === `sound_ingest:${id}`)} />
+      </div></section>
+      {!sounds.data ? <Skel /> : !list.length ? <Callout tone="info">No sounds yet. Room tone is built in; upload a recording or a track to add more.</Callout> : (
+        <div className="st-soundlist">{list.map(x => <SoundCard key={x.id} s={x} />)}</div>
+      )}
+    </div>
+  )
+}
+
+function SoundCard({ s }: { s: SoundItem }) {
+  const toast = useToast()
+  const qc = useQueryClient()
+  const [title, setTitle] = useState(s.title)
+  const [tag, setTag] = useState(s.tag)
+  async function save(patch: { title?: string; tag?: string; kind?: 'ambience' | 'music' }) {
+    try { await api.updateSound(s.id, patch); await qc.invalidateQueries({ queryKey: ['sounds'] }) } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) }
+  }
+  async function archive() {
+    try { await api.archiveSound(s.id); await qc.invalidateQueries({ queryKey: ['sounds'] }) } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) }
+  }
+  return (
+    <div className="st-sounditem">
+      {s.kind === 'music' ? <Music size={16} /> : <Wind size={16} />}
+      <input className="st-input" style={{ maxWidth: 240 }} value={title} onChange={e => setTitle(e.target.value)} onBlur={() => title !== s.title && void save({ title })} aria-label="Title" />
+      <input className="st-input" style={{ maxWidth: 160 }} value={tag} onChange={e => setTag(e.target.value)} onBlur={() => tag !== s.tag && void save({ tag })} placeholder="Tag, e.g. cafe" aria-label="Tag" />
+      <div className="st-seg sm" role="radiogroup" aria-label="Kind">
+        {(['ambience', 'music'] as const).map(k => <button key={k} type="button" role="radio" aria-checked={s.kind === k} className={s.kind === k ? 'on' : ''} onClick={() => s.kind !== k && void save({ kind: k })}>{k === 'music' ? 'Music' : 'Ambience'}</button>)}
+      </div>
+      <span className="st-hint">{s.status === 'processing' ? 'Being prepared...' : s.status === 'failed' ? s.error : [s.durationSec ? `${s.durationSec} s` : '', s.loudness != null ? `${s.loudness} LUFS` : ''].filter(Boolean).join(' · ')}</span>
+      <span className="st-spacer" />
+      {s.assetId && <audio className="st-audio" src={assetUrl(s.assetId)} controls preload="none" />}
+      <button className="st-btn sm ghost icon" onClick={() => void archive()} aria-label={`Remove ${s.title}`} title="Remove from the library"><Archive size={14} /></button>
+    </div>
+  )
+}
 
 function ExportedPosts({ data, characterId }: { data: ContentData; characterId: string | null }) {
   const done = data.items.filter(i => (i.status === 'ready' || i.outputs.zipAssetId || i.outputs.videoAssetId) && (!characterId || i.characterId === characterId))

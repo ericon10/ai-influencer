@@ -1,4 +1,4 @@
-import type { ActionPreview, CharacterSummary, CharacterView, HiggsfieldAccount, JobView, Me, QuoteView, RulesView, SceneFields, ScenesData, SettingsView, StudioAction, Usage, VideoPrice, BrollClip, ContentData, ContentKind, LibraryData, PostStep, WorkerStatus, CloneOptions, CloneResult } from './types'
+import type { ActionPreview, CharacterSummary, CharacterView, HiggsfieldAccount, JobView, Me, QuoteView, RulesView, SceneFields, ScenesData, SettingsView, StudioAction, Usage, VideoPrice, BrollClip, ContentData, ContentKind, LibraryData, PostStep, WorkerStatus, CloneOptions, CloneResult, CutView, SoundItem } from './types'
 import { sheetRefOf, typeOf, uploadFiles } from './files'
 
 // Thin client for /api/v1. Every write sends the CSRF header the server
@@ -111,6 +111,19 @@ export const api = {
   setCloneModel: (model: string) => request<{ model: string }>('PUT', '/settings/clone-model', { model }),
   archiveContent: (id: string) => request<{ ok: true }>('DELETE', `/content/${id}`),
   renderContent: (id: string) => request<{ id: string; status: string }>('POST', `/content/${id}/render`, {}),
+  // Phase 3: the rough cut and sound bed, "Continue this shot", the sound library.
+  cut: (id: string) => request<CutView>('GET', `/content/${id}/cut`),
+  continueShot: (id: string) => request<{ id: string }>('POST', `/content/${id}/continue`, {}),
+  chainUse: (id: string, takeId: string) => request<{ id: string }>('POST', `/content/${id}/continue/use`, { takeId }),
+  twoShots: (id: string) => request<{ id: string }>('POST', `/content/${id}/continue/two-shots`, {}),
+  cancelContinue: (id: string) => request<{ id: string }>('DELETE', `/content/${id}/continue`),
+  sounds: () => request<{ sounds: SoundItem[] }>('GET', '/sounds'),
+  addSound: async (file: File, kind: 'ambience' | 'music', onProgress?: (done: number, total: number) => void) => {
+    const [up] = await uploadFiles([file], onProgress)
+    return request<SoundItem>('POST', '/sounds', { uploadId: up!.uploadId, name: file.name, kind })
+  },
+  updateSound: (id: string, patch: { title?: string; tag?: string; kind?: 'ambience' | 'music' }) => request<SoundItem>('PATCH', `/sounds/${id}`, patch),
+  archiveSound: (id: string) => request<{ ok: true }>('DELETE', `/sounds/${id}`),
   archiveScene: (sceneId: string) => request<{ ok: true }>('DELETE', `/scenes/${sceneId}`),
   crop: (candidateId: string, rect: { x: number; y: number; w: number; h: number }) => request<{ candidateId: string; width: number; height: number }>('POST', `/candidates/${candidateId}/crop`, rect),
 

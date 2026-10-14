@@ -8,6 +8,7 @@ import type { BatchSpec, BrollTiming, LibraryClip, MemeSpec } from '../../types'
 import { VideoSection } from '../character/VideoSection'
 import { BrollPicker } from './parts'
 import { ClonePanel } from './ClonePanel'
+import { ContinueButton, ContinuePanel } from './ContinueShot'
 import type { PostCtx } from './ctx'
 
 // The Video step. A video post gets its clip four ways, all right here:
@@ -49,7 +50,9 @@ function PostClip({ ctx }: { ctx: PostCtx }) {
   const [library, setLibrary] = useState(false)
   const name = v?.data.name ?? 'this character'
   const use = (id: string) => { setChanging(false); void ctx.advance('text', { clipId: id }) }
-  const showWays = !clip || changing
+  // "Continue this shot" (Phase 3): the clip is being continued.
+  const cont = spec.continueFrom ?? null
+  const showWays = (!clip || changing) && !cont
 
   return (
     <div className="st-col" style={{ gap: 16 }}>
@@ -60,10 +63,16 @@ function PostClip({ ctx }: { ctx: PostCtx }) {
             <span className="st-label">The clip</span>
             <b>{clip.title}</b>
             <span className="st-hint">{clip.status === 'approved' ? `${clip.durationSec ? `${clip.durationSec} s, ` : ''}kept in Library > Clips.` : clip.status === 'failed' ? clip.error : 'Being prepared; it is ready in a moment.'}</span>
-            {!changing && <button type="button" className="st-btn sm ghost" style={{ alignSelf: 'flex-start' }} onClick={() => setChanging(true)}>Use a different clip</button>}
+            {!changing && !cont && (
+              <div className="st-row" style={{ gap: 8, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                <button type="button" className="st-btn sm ghost" onClick={() => setChanging(true)}>Use a different clip</button>
+              </div>
+            )}
+            {!changing && !cont && clip.status === 'approved' && <ContinueButton ctx={ctx} clip={clip} />}
           </div>
         </div>
       )}
+      {cont && <ContinuePanel ctx={ctx} clip={clip} cont={cont} />}
       {showWays && (
         <>
           <div className="st-ways">

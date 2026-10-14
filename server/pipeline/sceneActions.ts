@@ -282,7 +282,13 @@ export async function buildScenePromptWrite(deps: Deps, ctx: Ctx, row: Character
   // default) and AUDIO (sound off unless turned on) itself.
   const range = sc.settings.prompt_words.video
   const system = fill(t.prompt_writer.video_system, { ...pv, name: ch.name, min: String(range[0]), max: String(range[1]), directions, end_frame: input.endCandidateId ? t.prompt_writer.end_frame : '', directors_pass: pass })
-  const facts = videoWriterFacts(t, sc, views, f, ch)
+  let facts = videoWriterFacts(t, sc, views, f, ch)
+  // Chaining: a start frame taken from a kept clip continues that shot.
+  if (start?.op === 'last_frame' && start.parentId) {
+    const previous = await getCandidate(deps, ctx, start.parentId).catch(() => null)
+    const text = ((previous?.meta as { lastPrompt?: string } | null)?.lastPrompt || previous?.prompt || 'not known').replace(/\s+/g, ' ').slice(0, 1500)
+    facts = `${facts}\n${fill(t.prompt_writer.continue_facts, { previous: text }).trim()}`
+  }
   const prompt = fill(t.prompt_writer.video_prompt, { motion, facts })
   const format = fill(t.prompt_writer.video_format, { duration: String(input.durationSec ?? sc.video.duration), aspect: input.aspect ?? sc.video.aspect })
   const audio = input.audio ? t.prompt_writer.video_audio_on : t.prompt_writer.video_audio_off
@@ -540,9 +546,12 @@ export async function buildSceneVideo(deps: Deps, ctx: Ctx, row: CharacterRow, i
   const motion = input.motion.trim().replace(/[.\s]+$/, '')
   if (motion.length < 3) throw new AppError('invalid_request', 'Say what happens in the video.')
   const ch = toData(row)
-  const prompt = assembleVideoPrompt(t, `${motion}.`, { directions: input.directions, audio: input.audio, realism: ch.realism?.block, skin: skinFor(sc, sceneFields(deps, scene).framing) })
+  // A take that starts from a kept clip's last frame continues that shot
+  // (Phase 3 chaining): same place, light, wardrobe and camera.
+  const directions = start.op === 'last_frame' ? `${t.video.continue} ${input.directions}`.trim() : input.directions
+  const prompt = assembleVideoPrompt(t, `${motion}.`, { directions, audio: input.audio, realism: ch.realism?.block, skin: skinFor(sc, sceneFields(deps, scene).framing) })
   const request: GenRequest = {
-    kind: 'video', model: run.model, prompt, aspect: input.aspect, resolution, durationSec, audio: input.audio,
+    kind: 'video', model: run.model, modelRef: model, prompt, aspect: input.aspect, resolution, durationSec, audio: input.audio,
     startFrame: { assetId: start.assetId },
     ...(endFrame?.assetId ? { endFrame: { assetId: endFrame.assetId } } : {}),
     ...(run.billing ? { billing: run.billing } : {}),

@@ -57,6 +57,10 @@ export interface GenRequest {
   // prompt is rebuilt from the written text for this scene model when the
   // writer finishes. Never sent to a provider.
   promptFrom?: { sceneModel: string; reason?: string }
+  // The Studio's model pick for this run (demo mode runs a mock in its
+  // place), so a chained take can use the same model. Never sent to a
+  // provider.
+  modelRef?: string
   // Higgsfield only. Stamped when the run is quoted, from the account's
   // default, so switching the default needs a new quote.
   billing?: HiggsfieldBilling

@@ -231,7 +231,8 @@ async function onSceneVideo(deps: Deps, ctx: Ctx, job: JobRow, out: JobOutcome):
   const asset = out.assets?.find(a => a.kind === 'video') ?? out.assets?.[0]
   const req = job.request as GenRequest
   if (out.status === 'completed' && asset) {
-    const id = await newCandidate(deps, job, { assetId: asset.id, parentId, op: 'video', status: 'qa_pending' })
+    // The model the take ran on, so "Continue this shot" can use it again.
+    const id = await newCandidate(deps, job, { assetId: asset.id, parentId, op: 'video', status: 'qa_pending', meta: req.modelRef ? { model: req.modelRef } : {} })
     const findings: QaReport['findings'] = []
     if (job.purpose.split(':')[3] === 'test') {
       findings.push({ code: 'uncertain', severity: 'info', message: `${deps.config.pipeline.scenes.video.test.label}: faces not representative. Judge the motion only.` })

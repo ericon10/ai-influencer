@@ -30,7 +30,7 @@ export function sniffMime(data: Buffer): string | null {
   if (data.length >= 8 && data.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return 'image/png'
   if (data.length >= 3 && data[0] === 0xff && data[1] === 0xd8 && data[2] === 0xff) return 'image/jpeg'
   if (data.length >= 12 && data.subarray(0, 4).toString() === 'RIFF' && data.subarray(8, 12).toString() === 'WEBP') return 'image/webp'
-  if (data.length >= 12 && data.subarray(4, 8).toString() === 'ftyp') return 'video/mp4'
+  if (data.length >= 12 && data.subarray(4, 8).toString() === 'ftyp') return /^M4[AB] $/.test(data.subarray(8, 12).toString()) ? 'audio/mp4' : 'video/mp4'
   if (data.length >= 4 && data.subarray(0, 4).equals(Buffer.from([0x50, 0x4b, 0x03, 0x04]))) return 'application/zip'
   if (data.length >= 12 && data.subarray(0, 4).toString() === 'RIFF' && data.subarray(8, 12).toString() === 'WAVE') return 'audio/wav'
   if (data.length >= 3 && (data.subarray(0, 3).toString() === 'ID3' || (data[0] === 0xff && (data[1]! & 0xe0) === 0xe0))) return 'audio/mpeg'
@@ -49,7 +49,10 @@ export interface SaveAssetInput {
 // Stores bytes under a tenant-prefixed key and records checksum, size,
 // dimensions and duration so later stages never re-download or re-probe.
 export async function saveAsset(deps: Deps, ctx: Ctx, input: SaveAssetInput): Promise<AssetRow> {
-  const mime = sniffMime(input.data) ?? input.mime
+  // An MP4 container holding only sound (an .m4a) keeps the audio type it
+  // was saved with.
+  const sniffed = sniffMime(input.data)
+  const mime = sniffed === 'video/mp4' && input.mime?.startsWith('audio/') ? input.mime : sniffed ?? input.mime
   if (!mime) throw new Error('Could not determine the file type.')
   const kind = kindOf(mime)
   const id = newId('ast')

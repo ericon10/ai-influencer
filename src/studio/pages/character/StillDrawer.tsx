@@ -23,7 +23,7 @@ export const STILL_STATUS: Record<string, { label: string; tone: string }> = {
 
 export const OP_LABEL: Record<SceneStill['op'], string> = {
   generate: 'Still', edit: 'Edit', crop: 'Crop', upscale: 'Upscale 2x', mirror: 'Mirrored', drift_lock: 'Drift lock',
-  end_frame: 'End frame', video: 'Take', video_upscale: 'Upscaled take', upload: 'Uploaded clip', clone: 'Clone',
+  end_frame: 'End frame', video: 'Take', video_upscale: 'Upscaled take', upload: 'Uploaded clip', clone: 'Clone', chain: 'Chained clip', last_frame: 'Last frame',
 }
 
 export function wrap(text: string, width = 72): string {

@@ -19,6 +19,9 @@ import { approveSceneCandidate, archiveScene, copyScene, createScene, cropCandid
 import { videoPrices } from '../pipeline/sceneActions.js'
 import { expectedVersion, readWorkerStatus } from '../jobs/workerStatus.js'
 import { addClip, libraryView } from '../pipeline/clips.js'
+import { cancelContinue, continueShot, keepTwoShots, useChainTake } from '../pipeline/chain.js'
+import { postCutView } from '../pipeline/cutView.js'
+import { addSound, archiveSound, listSounds, soundView, updateSound } from '../pipeline/sounds.js'
 import { addCloneSource, cloneOptions, keepClone, postClones, postFromClone, saveCloneModel } from '../pipeline/clone.js'
 import { jobViews } from '../jobs/jobView.js'
 import { POST_STEPS, addBroll, archiveBroll, archiveContent, contentView, createContent, duplicateContent, postScene, startRender, updateBroll, updateContent } from '../pipeline/content.js'
@@ -639,6 +642,53 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
     const ctx = c.get('ctx')
     requireRole(ctx, 'member')
     await archiveContent(deps, ctx, c.req.param('id'))
+    return c.json({ ok: true })
+  })
+  // Phase 3: the rough cut and sound bed the Finish step shows, and
+  // "Continue this shot" (chaining) in the Video step. All free.
+  app.get('/content/:id/cut', async c => c.json(await postCutView(deps, c.get('ctx'), c.req.param('id'))))
+  app.post('/content/:id/continue', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    const row = await continueShot(deps, ctx, c.req.param('id'))
+    return c.json({ id: row.id }, 202)
+  })
+  app.post('/content/:id/continue/use', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    const body = parse(z.object({ takeId: z.string().max(60) }), await json(c))
+    const row = await useChainTake(deps, ctx, c.req.param('id'), body.takeId)
+    return c.json({ id: row.id }, 202)
+  })
+  app.post('/content/:id/continue/two-shots', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    const row = await keepTwoShots(deps, ctx, c.req.param('id'))
+    return c.json({ id: row.id })
+  })
+  app.delete('/content/:id/continue', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    const row = await cancelContinue(deps, ctx, c.req.param('id'))
+    return c.json({ id: row.id })
+  })
+  app.get('/sounds', async c => c.json({ sounds: (await listSounds(deps, c.get('ctx'))).map(soundView) }))
+  app.post('/sounds', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    const body = parse(z.object({ uploadId: z.string().max(40), name: z.string().max(300), kind: z.enum(['ambience', 'music']), title: z.string().max(120).optional(), tag: z.string().max(60).optional() }), await json(c))
+    return c.json(soundView(await addSound(deps, ctx, body)), 201)
+  })
+  app.patch('/sounds/:id', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    const body = parse(z.object({ title: z.string().max(120).optional(), tag: z.string().max(60).optional(), kind: z.enum(['ambience', 'music']).optional() }), await json(c))
+    return c.json(soundView(await updateSound(deps, ctx, c.req.param('id'), body)))
+  })
+  app.delete('/sounds/:id', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    await archiveSound(deps, ctx, c.req.param('id'))
     return c.json({ ok: true })
   })
   // Rendering is local and free (ffmpeg and sharp on the worker).

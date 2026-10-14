@@ -47,7 +47,7 @@ export interface RulesView { areas: Record<string, string>; rules: RuleRow[] }
 export interface SceneEdit { code: string; change: string; face: boolean }
 
 export interface SceneStill extends Candidate {
-  op: 'generate' | 'edit' | 'crop' | 'upscale' | 'mirror' | 'drift_lock' | 'end_frame' | 'video' | 'video_upscale' | 'upload' | 'clone'
+  op: 'generate' | 'edit' | 'crop' | 'upscale' | 'mirror' | 'drift_lock' | 'end_frame' | 'video' | 'video_upscale' | 'upload' | 'clone' | 'chain' | 'last_frame'
   media: 'image' | 'video'
   parentId: string | null; sceneId: string
   qaReport: (QaReport & { edits?: SceneEdit[] }) | null
@@ -239,10 +239,27 @@ export interface VideoPrice { model: string; label: string; display: string | nu
 export type ContentKind = 'meme' | 'slideshow' | 'batch'
 export interface BrollClip { id: string; title: string; product: string; status: 'processing' | 'ready' | 'failed'; error: string | null; assetId: string | null; durationSec: number | null; createdAt: string }
 export interface BrollTiming { order: 'clip_first' | 'broll_first'; brollStart: number; brollSeconds: number }
-export interface MemeSpec extends BrollTiming { clipId: string | null; stillId: string | null; brollId: string | null; caption: string; clone: CloneSource | null }
+export interface MemeSpec extends BrollTiming {
+  clipId: string | null; stillId: string | null; brollId: string | null; caption: string; clone: CloneSource | null
+  sound?: Partial<SoundSpec>; cut?: Cut | null; continueFrom?: ContinueFrom | null
+}
+// Phase 3: the sound bed, the rough cut and "Continue this shot".
+export type SoundLevel = 'quiet' | 'normal' | 'loud'
+export interface SoundSpec { ambience: string; ambienceLevel: SoundLevel; music: string | null; musicLevel: SoundLevel; duck: boolean; clipSound: boolean }
+export interface CutShot { id: string; kind: 'clip' | 'broll'; ref: string; in: number; out: number | null }
+export interface CutCaption { id: string; text: string | null; start: number; end: number | null }
+export interface Cut { auto: boolean; shots: CutShot[]; captions: CutCaption[] }
+export interface ContinueFrom { clipId: string; frameId: string | null; status: 'preparing' | 'ready' | 'joining' | 'failed'; model: string | null; takeId: string | null; error: string | null }
+export interface SoundItem { id: string; kind: 'ambience' | 'music'; title: string; tag: string; status: 'processing' | 'ready' | 'failed'; error: string | null; assetId: string | null; durationSec: number | null; loudness: number | null; createdAt: string }
+export interface CutShotView extends CutShot { title: string; assetId: string | null; posterId: string | null; sourceSec: number | null; start: number | null; durationSec: number | null; hasSound: boolean; ready: boolean; takes: number }
+export interface CutView {
+  auto: boolean; shots: CutShotView[]; captions: Array<CutCaption & { shown: string; linked: boolean }>; totalSec: number; complete: boolean
+  limits: { maxSeconds: number; maxShots: number; maxCaptions: number }
+  sound: { spec: SoundSpec; sounds: SoundItem[]; hasClipSound: boolean; targetLufs: number; levels: Record<SoundLevel, number>; maxUploadMb: number }
+}
 export interface SlideshowSpec { stillIds: string[]; topic: string; hook: string; slides: string[]; caption: string; hashtags: string[] }
 // A batch rotates its clips and B-roll across the captions.
-export interface BatchSpec extends BrollTiming { clipIds: string[]; brollIds: string[]; topic: string; count: number; captions: string[]; clone: CloneSource | null }
+export interface BatchSpec extends BrollTiming { clipIds: string[]; brollIds: string[]; topic: string; count: number; captions: string[]; clone: CloneSource | null; sound?: Partial<SoundSpec> }
 
 // Clone Video (SPEC 13.1 R1): the post's saved TikTok or Reel, the models
 // with their prices, and the results.
@@ -263,6 +280,7 @@ export type PostStep = 'idea' | 'stills' | 'video' | 'text' | 'finish'
 export interface ContentOutputs {
   videoAssetId?: string; imageAssetIds?: string[]; videos?: Array<{ caption: string; assetId: string; clipId?: string; brollId?: string | null } | null>; zipAssetId?: string
   done?: number; failed?: number; total?: number; dropped?: string[]; renderedAt?: string
+  durationSec?: number; sound?: { layers: Array<'clip' | 'ambience' | 'music'>; targetLufs: number | null; ducked: boolean }
 }
 export interface ContentItem {
   id: string; kind: ContentKind; characterId: string | null; title: string; spec: Record<string, unknown>
@@ -278,6 +296,9 @@ export interface ContentData {
     slideshow: { slides: [number, number]; maxStills: number }
     batch: { max: number; default_count: number }
     maxUploadMb: number
+    cut?: { max_seconds: number; max_shots: number; max_captions: number }
+    sound?: { defaultAmbience: 'none' | 'room'; targetLufs: number; maxUploadMb: number }
+    chain?: { maxParts: number }
   }
 }
 

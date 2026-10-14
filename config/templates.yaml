@@ -125,6 +125,9 @@ edit:
 video:
   base: "{motion}. {directions} {silent}"
   silent: "Silent, no audio, no dialogue."
+  # Chaining (Phase 3, "Continue this shot"): added to a take that starts
+  # from the last frame of a kept clip.
+  continue: "Continues the previous shot from this exact frame: the same place, the same light from the same direction, the same wardrobe and hair, the same camera position."
   # The end frame helper: only the masked head and face change.
   end_frame: "Edit only the masked area, {poss} head and face: {change}. Keep {poss} identity, hair, skin texture, the mole and everything outside the mask exactly the same."
 
@@ -233,6 +236,10 @@ prompt_writer:
   video_format: "FORMAT: {duration} s, {aspect}, live-action personal phone video, one continuous take, no cuts."
   video_audio_off: "AUDIO: Sound off: silent, no dialogue, no music."
   video_audio_on: "AUDIO: Phone-microphone sound: natural location ambience and small sounds with their visible causes, no added music."
+  # Chaining: the writer is told the take continues the last one.
+  continue_facts: |
+    - This take continues the previous one from its last frame (the start frame): keep the same place, the same light and its direction, the same wardrobe and hair, and the same camera position. The new beat follows straight on, with no cut.
+    - The previous take's prompt, for continuity only: {previous}
   # The director's pass (owner, 2026-10-13; default rule
   # scene-directors-pass): decide what makes the shot memorable, keep it
   # phone-real, and return the choices as a short "Director's notes" line

@@ -10,7 +10,7 @@ import { ffmpeg, MediaError, probeFile } from './ffmpeg.js'
 export interface Canvas { width: number; height: number; fps: number }
 
 // Social export: H.264, BT.709, TV range, constant frame rate, fast start.
-function socialArgs(fps: number, sound = false): string[] {
+export function socialArgs(fps: number, sound = false): string[] {
   return [
     '-c:v', 'libx264', '-preset', 'medium', '-crf', '20', '-pix_fmt', 'yuv420p',
     '-color_range', 'tv', '-colorspace', 'bt709', '-color_primaries', 'bt709', '-color_trc', 'bt709',
@@ -22,7 +22,7 @@ function socialArgs(fps: number, sound = false): string[] {
 // One input made 9:16: a portrait clip fills the frame (center crop); a
 // landscape one (a laptop screen recording) is fitted over a blurred copy of
 // itself, so nothing on the screen is cut off.
-function fitFilter(input: string, label: string, c: Canvas, landscape: boolean, extra = ''): string {
+export function fitFilter(input: string, label: string, c: Canvas, landscape: boolean, extra = ''): string {
   const tail = `setsar=1,fps=${c.fps},format=yuv420p${extra}`
   if (!landscape) return `[${input}]scale=${c.width}:${c.height}:force_original_aspect_ratio=increase:flags=lanczos,crop=${c.width}:${c.height},${tail}[${label}]`
   return [

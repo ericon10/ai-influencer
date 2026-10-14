@@ -13,7 +13,11 @@ import { enqueueLocalJob, type JobSpec } from '../jobs/runner.js'
 import { captionPng, slideImage } from '../core/overlay.js'
 import { fill, hardWrap } from '../core/text.js'
 import { pronounVars } from '../core/prompts.js'
-import { renderMeme, transcodeBroll } from '../media/meme.js'
+import { transcodeBroll } from '../media/meme.js'
+import { renderTimeline, type TimelineCaption, type TimelineShot } from '../media/timeline.js'
+import { applySoundBed, type SoundBedResult } from '../media/sound.js'
+import { cutProblems, cutSchema, effectiveCut, type Cut } from '../core/cut.js'
+import { soundFile } from './sounds.js'
 import { withTempDir } from '../media/ffmpeg.js'
 import { getAsset, readAsset, saveAsset } from '../storage/assets.js'
 import { uploadKey } from '../storage/uploads.js'
@@ -117,6 +121,31 @@ const cloneSource = z.object({
   error: z.string().max(500).nullable().default(null),
 })
 export type CloneSource = z.infer<typeof cloneSource>
+// The sound bed (Phase 3; SPEC 5.5): ambience ("none", "room" for the
+// built-in Room tone, or an uploaded recording's id; unset means the
+// configured default), an optional uploaded music track, levels, ducking,
+// and whether the clips' own sound stays.
+const level = z.enum(['quiet', 'normal', 'loud']).default('normal')
+export const soundSpec = z.object({
+  ambience: z.string().max(60).optional(),
+  ambienceLevel: level,
+  music: id.nullable().default(null),
+  musicLevel: level,
+  duck: z.boolean().default(true),
+  clipSound: z.boolean().default(true),
+}).prefault({})
+export type SoundSpec = z.infer<typeof soundSpec>
+// "Continue this shot" (Phase 3 chaining): the clip being continued, the
+// last frame that starts the next take, and how far along it is.
+const continueFrom = z.object({
+  clipId: id,
+  frameId: id.nullable().default(null),
+  status: z.enum(['preparing', 'ready', 'joining', 'failed']),
+  model: z.string().max(80).nullable().default(null),
+  takeId: id.nullable().default(null),
+  error: z.string().max(600).nullable().default(null),
+})
+export type ContinueFrom = z.infer<typeof continueFrom>
 const memeSpec = z.object({
   clipId: id.nullable().default(null),
   // The still the clip was made from, when it was made in this post.
@@ -127,6 +156,10 @@ const memeSpec = z.object({
   brollSeconds: z.number().min(0.5).max(60).default(6),
   caption: z.string().max(400).default(''),
   clone: cloneSource.nullable().default(null),
+  sound: soundSpec,
+  // The rough cut once the owner edits it (null: the automatic cut).
+  cut: cutSchema.nullable().default(null),
+  continueFrom: continueFrom.nullable().default(null),
 })
 const slideshowSpec = z.object({
   stillIds: z.array(id).max(20).default([]),
@@ -149,6 +182,7 @@ const batchObject = z.object({
   count: z.number().int().min(1).max(50).default(20),
   captions: z.array(z.string().max(400)).max(50).default([]),
   clone: cloneSource.nullable().default(null),
+  sound: soundSpec,
 })
 const batchSpec = z.preprocess(raw => {
   if (!raw || typeof raw !== 'object') return raw
@@ -187,6 +221,8 @@ export interface ContentOutputs {
   total?: number
   dropped?: string[]
   renderedAt?: string
+  durationSec?: number
+  sound?: Pick<SoundBedResult, 'layers' | 'targetLufs' | 'ducked'>
 }
 
 function parseSpec(kind: string, raw: unknown) {
@@ -320,12 +356,12 @@ async function candidateAsset(deps: Deps, ctx: Ctx, candidateId: string, charact
 
 // What a render needs, checked before it is queued, so a mistake shows at
 // once instead of on the worker.
-function renderProblems(row: ContentRow): string[] {
+function renderProblems(deps: Deps, row: ContentRow): string[] {
   const out: string[] = []
   if (row.kind === 'meme') {
     const s = memeSpec.parse(row.spec)
-    if (!s.clipId) out.push('Pick a clip')
-    if (!s.caption.trim()) out.push('Write the caption')
+    const cfg = deps.config.pipeline.content
+    out.push(...cutProblems(effectiveCut(s, cfg.meme.max_broll_seconds), s.caption, { maxShots: cfg.cut.max_shots, maxCaptions: cfg.cut.max_captions }))
   } else if (row.kind === 'batch') {
     const s = batchSpec.parse(row.spec)
     if (!s.clipIds.length) out.push('Pick a clip')
@@ -340,7 +376,7 @@ function renderProblems(row: ContentRow): string[] {
 
 export async function startRender(deps: Deps, ctx: Ctx, itemId: string): Promise<ContentRow> {
   const row = await getContent(deps, ctx, itemId)
-  const problems = renderProblems(row)
+  const problems = renderProblems(deps, row)
   if (problems.length) throw new AppError('bad_request', `${problems.join('; ')}.`)
   if (row.status === 'rendering') throw new AppError('bad_request', 'This is already rendering.')
   // A batch is one short job per video (the worker takes other work in
@@ -364,26 +400,56 @@ async function setOutputs(deps: Deps, itemId: string, outputs: ContentOutputs, s
   await deps.db.update(contentItems).set({ outputs, ...(status ? { status } : {}), updatedAt: deps.clock.now() }).where(eq(contentItems.id, itemId))
 }
 
-async function renderVideo(deps: Deps, ctx: Ctx, job: JobRow, s: Pick<MemeSpec, 'clipId' | 'brollId' | 'order' | 'brollStart' | 'brollSeconds'>, characterId: string, caption: string, label: string) {
-  if (!s.clipId) throw new AppError('bad_request', 'Pick a clip.')
+// One video from a cut (Phase 3 rough cut): the shots joined with hard
+// cuts, the captions by time, then the sound bed, normalized to social
+// loudness. Free: ffmpeg and sharp on the worker.
+async function renderCut(deps: Deps, ctx: Ctx, job: JobRow, cut: Cut, input: { characterId: string; caption: string; sound: SoundSpec; label: string }) {
   const cfg = deps.config.pipeline.content
-  const clipAsset = await candidateAsset(deps, ctx, s.clipId!, characterId, 'video')
-  const broll = s.brollId ? await getBroll(deps, ctx, s.brollId) : null
-  if (broll && (broll.status !== 'ready' || !broll.assetId)) throw new AppError('bad_request', `The B-roll clip "${broll.title}" is not ready yet.`)
   return withTempDir(async dir => {
-    const clip = join(dir, 'clip.mp4'), b = join(dir, 'broll.mp4'), cap = join(dir, 'caption.png'), out = join(dir, 'out.mp4')
-    await writeFile(clip, (await readAsset(deps, ctx, clipAsset)).data)
-    if (broll?.assetId) await writeFile(b, (await readAsset(deps, ctx, broll.assetId)).data)
-    const overlay = await captionPng(caption, cfg)
-    await writeFile(cap, overlay.png)
+    const shots: TimelineShot[] = []
+    for (const [i, sh] of cut.shots.entries()) {
+      const path = join(dir, `shot${i}.mp4`)
+      if (sh.kind === 'clip') {
+        const asset = await candidateAsset(deps, ctx, sh.ref, input.characterId, 'video')
+        await writeFile(path, (await readAsset(deps, ctx, asset)).data)
+        shots.push({ path, in: sh.in, out: sh.out, maxSeconds: cfg.meme.max_clip_seconds })
+      } else {
+        const b = await getBroll(deps, ctx, sh.ref)
+        if (b.status !== 'ready' || !b.assetId) throw new AppError('bad_request', `The B-roll clip "${b.title}" is not ready yet.`)
+        await writeFile(path, (await readAsset(deps, ctx, b.assetId)).data)
+        shots.push({ path, in: sh.in, out: sh.out, maxSeconds: cfg.meme.max_broll_seconds })
+      }
+    }
+    const captions: TimelineCaption[] = []
+    const dropped: string[] = []
+    for (const [j, c] of cut.captions.entries()) {
+      const text = (c.text ?? input.caption).trim()
+      if (!text) continue
+      const overlay = await captionPng(text, cfg)
+      const png = join(dir, `caption${j}.png`)
+      await writeFile(png, overlay.png)
+      captions.push({ png, start: c.start, end: c.end })
+      dropped.push(...overlay.layout.dropped)
+    }
+    const picture = join(dir, 'picture.mp4'), out = join(dir, 'out.mp4')
     // A clip only has sound when the owner kept it (a clone with "Keep
-    // original sound"); every other clip is stored silent.
-    await renderMeme({
-      clip, caption: cap, out, canvas: cfg.canvas, order: s.order, maxClipSeconds: cfg.meme.max_clip_seconds, keepSound: true,
-      broll: broll?.assetId ? { path: b, startSec: s.brollStart, seconds: Math.min(s.brollSeconds, cfg.meme.max_broll_seconds) } : null,
-    })
-    const asset = await saveAsset(deps, ctx, { data: await readFile(out), mime: 'video/mp4', origin: 'derived', label, sourceJobId: job.id })
-    return { assetId: asset.id, dropped: overlay.layout.dropped }
+    // original sound", an upload's own sound); every take is stored silent.
+    const t = await renderTimeline({ shots, captions, canvas: cfg.canvas, out: picture, keepSound: input.sound.clipSound, maxSeconds: cfg.cut.max_seconds })
+    const bed = await layBed(deps, ctx, picture, out, dir, input.sound)
+    const asset = await saveAsset(deps, ctx, { data: await readFile(out), mime: 'video/mp4', origin: 'derived', label: input.label, sourceJobId: job.id })
+    return { assetId: asset.id, dropped, durationSec: t.durationSec, sound: { layers: bed.layers, targetLufs: bed.targetLufs, ducked: bed.ducked } }
+  })
+}
+
+// The sound bed under a finished picture (SPEC 5.5).
+async function layBed(deps: Deps, ctx: Ctx, picture: string, out: string, dir: string, s: SoundSpec): Promise<SoundBedResult> {
+  const cfg = deps.config.pipeline.content.sound
+  const ambienceId = s.ambience ?? cfg.default_ambience
+  const ambience = ambienceId === 'none' ? null : ambienceId === 'room' ? { builtin: 'room' as const } : { path: await soundFile(deps, ctx, ambienceId, dir, 'ambience.m4a') }
+  const music = s.music ? { path: await soundFile(deps, ctx, s.music, dir, 'music.m4a') } : null
+  return applySoundBed({
+    video: picture, out, workDir: dir, clipSound: s.clipSound, ambience, ambienceDb: cfg.levels[s.ambienceLevel], music, musicDb: cfg.levels[s.musicLevel], duck: s.duck,
+    levels: { target: cfg.target_lufs, truePeak: cfg.true_peak, ambienceAlone: cfg.ambience_only_lufs, ambience: cfg.ambience_lufs, music: cfg.music_lufs, duck: { threshold: cfg.duck.threshold, ratio: cfg.duck.ratio, attackMs: cfg.duck.attack_ms, releaseMs: cfg.duck.release_ms } },
   })
 }
 
@@ -394,8 +460,9 @@ async function runContentRender(deps: Deps, ctx: Ctx, job: JobRow): Promise<unkn
   try {
     if (row.kind === 'meme') {
       const s = memeSpec.parse(row.spec)
-      const v = await renderVideo(deps, ctx, job, s, row.characterId!, s.caption, `Meme video: ${s.caption.slice(0, 60)}`)
-      const outputs: ContentOutputs = { videoAssetId: v.assetId, dropped: v.dropped, renderedAt: deps.clock.now().toISOString() }
+      const cut = effectiveCut(s, deps.config.pipeline.content.meme.max_broll_seconds)
+      const v = await renderCut(deps, ctx, job, cut, { characterId: row.characterId!, caption: s.caption, sound: s.sound, label: `Video post: ${s.caption.slice(0, 60)}` })
+      const outputs: ContentOutputs = { videoAssetId: v.assetId, dropped: v.dropped, durationSec: v.durationSec, sound: v.sound, renderedAt: deps.clock.now().toISOString() }
       await setOutputs(deps, itemId, outputs, 'ready')
       return outputs
     }
@@ -439,7 +506,8 @@ async function renderBatchVideo(deps: Deps, ctx: Ctx, job: JobRow, row: ContentR
   if (caption) {
     try {
       const src = batchSources(s, index)
-      const v = await renderVideo(deps, ctx, job, { ...s, ...src }, row.characterId!, caption, `Batch ${name} ${index + 1}: ${caption.slice(0, 50)}`)
+      const cut = effectiveCut({ ...s, ...src }, deps.config.pipeline.content.meme.max_broll_seconds)
+      const v = await renderCut(deps, ctx, job, cut, { characterId: row.characterId!, caption, sound: s.sound, label: `Batch ${name} ${index + 1}: ${caption.slice(0, 50)}` })
       result = { caption, assetId: v.assetId, clipId: src.clipId!, brollId: src.brollId }
     } catch (e) {
       error = `Video ${index + 1} failed: ${(e as Error).message.slice(0, 300)}`
@@ -599,6 +667,9 @@ export async function contentView(deps: Deps, ctx: Ctx) {
       caption: { size: cfg.caption.size, safe: cfg.caption.safe, position: cfg.caption.position, maxChars: cfg.caption.max_chars, box: cfg.caption.box },
       canvas: cfg.canvas, meme: cfg.meme, slideshow: { slides: cfg.slideshow.slides, maxStills: cfg.slideshow.max_stills }, batch: cfg.batch,
       maxUploadMb: cfg.broll.max_upload_mb,
+      cut: cfg.cut,
+      sound: { defaultAmbience: cfg.sound.default_ambience, targetLufs: cfg.sound.target_lufs, maxUploadMb: cfg.sound.max_upload_mb },
+      chain: { maxParts: cfg.chain.max_parts },
     },
   }
 }

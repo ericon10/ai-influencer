@@ -118,7 +118,7 @@ export function useContent() {
   const qc = useQueryClient()
   const active = useActiveJobs()
   // Claude writing slides or captions, a render, or a B-roll upload.
-  const busy = (active.data?.jobs ?? []).some(j => /^(content_slides|content_captions|content_render|broll_ingest|clip_ingest|clone_source):/.test(j.purpose))
+  const busy = (active.data?.jobs ?? []).some(j => /^(content_slides|content_captions|content_render|broll_ingest|clip_ingest|clone_source|chain_frame|chain_join):/.test(j.purpose))
   const wasBusy = useRef(false)
   useEffect(() => {
     if (wasBusy.current && !busy) qc.invalidateQueries({ queryKey: keys.content })
@@ -136,7 +136,7 @@ export function useContent() {
 export function useLibrary(characterId: string | null = null) {
   const qc = useQueryClient()
   const active = useActiveJobs()
-  const busy = (active.data?.jobs ?? []).some(j => /^(clip_ingest|scene|scene_edit|scene_upscale|scene_video|scene_video_upscale|drift_lock|clone):/.test(j.purpose))
+  const busy = (active.data?.jobs ?? []).some(j => /^(clip_ingest|scene|scene_edit|scene_upscale|scene_video|scene_video_upscale|drift_lock|clone|chain_join):/.test(j.purpose))
   const wasBusy = useRef(false)
   useEffect(() => {
     if (wasBusy.current && !busy) qc.invalidateQueries({ queryKey: ['library'] })
@@ -147,6 +147,33 @@ export function useLibrary(characterId: string | null = null) {
     queryFn: () => api.library(characterId),
     refetchInterval: q => (busy || q.state.data?.clips.some(c => c.status === 'generating') ? 2000 : false),
   })
+}
+
+// A video post's rough cut and sound bed (Phase 3), looked at again when
+// the post changes, when a render or a sound upload ends, or while a sound
+// is being prepared.
+export function useCut(contentId: string, version: string, enabled = true) {
+  const qc = useQueryClient()
+  const active = useActiveJobs()
+  const busy = (active.data?.jobs ?? []).some(j => /^(sound_ingest|chain_join|clip_ingest|broll_ingest):/.test(j.purpose) || j.purpose === `content_render:${contentId}`)
+  const wasBusy = useRef(false)
+  useEffect(() => {
+    if (wasBusy.current && !busy) qc.invalidateQueries({ queryKey: ['cut', contentId] })
+    wasBusy.current = busy
+  }, [busy, qc, contentId])
+  return useQuery({
+    queryKey: ['cut', contentId, version],
+    queryFn: () => api.cut(contentId),
+    enabled,
+    placeholderData: prev => prev,
+    refetchInterval: q => (busy || q.state.data?.sound.sounds.some(x => x.status === 'processing') ? 2500 : false),
+  })
+}
+
+export function useSounds() {
+  const active = useActiveJobs()
+  const busy = (active.data?.jobs ?? []).some(j => j.purpose.startsWith('sound_ingest:'))
+  return useQuery({ queryKey: ['sounds'], queryFn: api.sounds, refetchInterval: q => (busy || q.state.data?.sounds.some(x => x.status === 'processing') ? 2500 : false) })
 }
 
 // A post's clones (Clone Video): looks again when one of its clone runs ends.

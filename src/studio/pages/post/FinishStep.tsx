@@ -4,6 +4,8 @@ import { Img, type TodoItem } from '../../ui'
 import type { BatchSpec, MemeSpec, SlideshowSpec } from '../../types'
 import { DownloadLink, ExportPanel, fileSlug, postName, useDuplicate } from './parts'
 import type { PostCtx } from './ctx'
+import { RoughCut, SoundRow, autoCut } from './RoughCut'
+import { useSounds } from '../../hooks'
 
 // The Finish step: export (free, on the worker), download, and make another
 // like this. Fine-tune opens the editor over the post in Phase 4.
@@ -13,13 +15,18 @@ export function FinishStep({ ctx }: { ctx: PostCtx }) {
   const duplicate = useDuplicate()
   const name = fileSlug(postName({ ...item, title: draft.fields.title, idea: draft.fields.idea }))
   const o = item.outputs
+  const sounds = useSounds().data?.sounds ?? []
   let todo: TodoItem[] = []
   let label = 'Export MP4'
   if (item.kind === 'meme') {
     const s = draft.spec as unknown as MemeSpec
-    todo = [...(!s.clipId ? [{ label: 'Pick a clip', target: 'step-video' }] : []), ...(!s.caption?.trim() ? [{ label: 'Write the caption', target: 'post-caption' }] : [])]
-    const clip = lib?.clips.find(c => c.id === s.clipId)
-    if (clip && clip.status !== 'approved') todo.push({ label: 'Wait for the clip to be prepared' })
+    // The rough cut decides what is in the video (Phase 3).
+    const cut = s.cut && !s.cut.auto && s.cut.shots.length ? s.cut : autoCut(s, ctx.data.options.meme.max_broll_seconds)
+    const captioned = cut.captions.some(c => (c.text ?? s.caption ?? '').trim())
+    todo = [...(!cut.shots.length ? [{ label: 'Pick a clip', target: 'step-video' }] : []), ...(!captioned ? [{ label: 'Write the caption', target: 'post-caption' }] : [])]
+    const waiting = cut.shots.filter(x => x.kind === 'clip').map(x => lib?.clips.find(c => c.id === x.ref)).some(c => c && c.status !== 'approved')
+    if (waiting) todo.push({ label: 'Wait for the clip to be prepared' })
+    if (s.continueFrom?.status === 'joining') todo.push({ label: 'Wait for the takes to be joined', target: 'continue-shot' })
   } else if (item.kind === 'slideshow') {
     const s = draft.spec as unknown as SlideshowSpec
     todo = [...(!s.stillIds.length ? [{ label: 'Pick stills', target: 'step-stills' }] : []), ...(![s.hook, ...s.slides].some(t => t.trim()) ? [{ label: 'Write the slides (or type them)', target: 'slides-text' }] : [])]
@@ -30,8 +37,13 @@ export function FinishStep({ ctx }: { ctx: PostCtx }) {
     todo = [...(!s.clipIds?.length ? [{ label: 'Pick a clip', target: 'batch-clips' }] : []), ...(!n ? [{ label: 'Add captions', target: 'batch-captions' }] : [])]
     label = n ? `Make ${n} videos` : 'Make the videos'
   }
+  // A sound picked while it is still being prepared.
+  const sp = (draft.spec as { sound?: { ambience?: string; music?: string | null } }).sound
+  if (item.kind !== 'slideshow' && sounds.some(x => x.status === 'processing' && (x.id === sp?.ambience || x.id === sp?.music))) todo.push({ label: 'Wait for the sound to be prepared', target: 'post-sound' })
   return (
     <div className="st-col" style={{ gap: 16 }}>
+      {item.kind === 'meme' && <RoughCut ctx={ctx} />}
+      {item.kind !== 'slideshow' && <SoundRow ctx={ctx} />}
       <ExportPanel item={item} todo={todo} saving={draft.saving} flush={draft.flush} label={label} onStart={() => void ctx.advance('finish')}>
         {item.kind === 'meme' && item.status === 'ready' && o.videoAssetId && (
           <div className="st-row" style={{ gap: 14, alignItems: 'flex-start', flexWrap: 'wrap' }}>

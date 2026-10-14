@@ -845,3 +845,63 @@ used.
   remembered in that browser only; if the browser blocks storage, the
   banner just shows again.
 
+### G22. Phase 3 finish: chaining, sound bed, rough cut (evening build, 2026-10-14)
+
+The owner asked for the rest of Phase 3 while away, with sensible calls
+logged here. Everything fits the post workspace (UX-PLAN.md section 8): no
+new pages or sidebar items; one new Library tab (Sounds).
+
+- **Chaining is "Continue this shot"** under the Video step's clip. The
+  clip's last frame is extracted at full resolution and stepped back about
+  half a second when blurry (SPEC 5.4 rule 33, existing `extractLastFrame`),
+  then saved as a still of the post's scene (op `last_frame`). The next
+  take starts there, on the model the clip was made with (takes now record
+  it in `candidates.meta.model`; `GenRequest.modelRef` carries the pick and
+  is never sent to a provider), with a continuity line in its prompt ("same
+  place, same light from the same direction, same wardrobe and hair, same
+  camera position"; `templates.yaml` video.continue) and in the prompt
+  writer's facts (with the previous take's prompt). Use this take joins the
+  two on the worker (free): both normalized to the first clip's size and
+  frame rate, the handoff frame dropped, the seam scored by the existing
+  `joinClips` (cut, camera motion, or color match; never a crossfade).
+  The result is one clip (op `chain`, its parts and seam scores in
+  `candidates.meta`), kept in Library > Clips and picked for the post.
+  Defaults, all in `content.yaml` chain: 4 takes, 40 s, step back 0.5 s,
+  seam limit 0.18.
+- **A failed seam is never exported** (SPEC 4.3). The owner can make
+  another take, or "Keep them as two shots": the rough cut gets both clips
+  with a real cut between them. A cut between two shots is an edit, not a
+  seam, so this keeps the never-crossfade rule. Call made tonight.
+- **Sound bed** (SPEC 5.5): ambience (built-in Room tone, None, or an
+  uploaded recording) plus an optional uploaded music track, levels
+  Quiet/Normal/Loud, music ducked under the clip's own sound (sidechain
+  compressor), then a two-pass loudness normalization: -14 LUFS integrated
+  and -1 dBTP when there is music or clip sound (TikTok, Reels and Shorts
+  all play around -14), and -28 LUFS when there is only ambience, so a
+  room never gets pushed up to soundtrack level. Every layer is leveled
+  from its measured loudness. No AI music anywhere, and nothing offers it.
+- **Room tone is the default ambience for every post** (config
+  `sound.default_ambience`, switchable to none). A silent phone video
+  sounds dead; Room tone is quiet brown noise kept under 450 Hz, made by
+  code, deterministic. It is synthetic, so real recordings are better: the
+  owner can upload them in Library > Sounds. Call made tonight; it changes
+  exports that used to be silent (they now carry a faint room). Set
+  ambience to None for the old behaviour.
+- **Uploaded sounds** live in a new `sounds` table (migration 0010):
+  AAC 48 kHz stereo, at most 10 minutes, measured on arrival. An .m4a keeps
+  its audio type when stored (it used to sniff as video/mp4).
+- **Rough cut** in the Finish step: the post's shots (clips and B-roll,
+  each trimmed) and captions (each timed) as one timeline, with a Sound
+  lane. Built automatically from the steps (the clip, its B-roll before or
+  after, the caption over the whole video) until the owner edits it; then
+  the owner's cut is kept (`spec.cut`, `auto: false`) and Rebuild returns
+  to the automatic one. A caption with no text of its own shows the
+  Caption step's text, so editing the caption still works on an edited
+  cut. Export renders exactly the cut (`server/media/timeline.ts`: hard
+  cuts, captions by time, then the sound bed). Limits: 90 s, 12 shots, 8
+  captions. Batches render through the same path (one automatic cut per
+  caption, with the batch's sound bed).
+- Click counts: the video-post flow stays at 8; each extra chained shot
+  is 3 more (Continue, Generate a take, Use this take), measured in the
+  browser in demo mode.
+

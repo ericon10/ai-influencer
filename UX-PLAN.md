@@ -69,7 +69,7 @@ flow, not what the rules are.
  │  Reference sheet      │   │  3 Video       video from a still | clone TikTok/Reel│   │ Publish      │
  │  Character file       │   │                | upload a clip | pick from Library   │   │  (TikTok     │
  └───────────────────────┘   │  4 Text        caption | hook and slides | captions  │   │  prepare and │
-                             │  5 Finish      preview > Export or Fine-tune          │   │  notify, R7) │
+                             │  5 Finish      rough cut, sound > Export or Fine-tune │   │  notify, R7) │
                              │                         (OpenCut over the page,     │   └──────────────┘
                              │                          Phase 4; Done comes back)   │
                              └──────────────────────────────────────────────────────┘
@@ -114,7 +114,7 @@ top; Activity, the month's spend and Demo/Live sit at the bottom.
 | **Characters** | `/studio/characters` | All characters; make or import one | "Your characters" |
 | **Character setup** | `/studio/characters/:id` | Inspiration > Face > Reference sheet > Character file, as a stepper | "Set up Callie": a finished reference sheet and character file |
 | Sheet review | `/studio/characters/:id/review/:ref` | Full-screen review of sheet results (setup only) | An approved sheet shot |
-| **Library** | `/studio/library` | Browse everything made: tabs Stills, Clips, B-roll, Posts; filter by character and product; download; "Use in a new post"; upload B-roll and clips | My library |
+| **Library** | `/studio/library` | Browse everything made: tabs Stills, Clips, B-roll, Sounds, Posts; filter by character and product; download; "Use in a new post"; upload B-roll, clips and sounds | My library |
 | **Settings** | `/studio/settings` | Tabs: General (mode, keys, Higgsfield billing), Models (Claude, Higgsfield), Rules, Budgets and usage, Notices | A Studio set up the way I want |
 | **Guide** | `/studio/guide` | The visual manual (owner, 2026-10-13): Quick start, the big picture, every page and step with an annotated screenshot, and a glossary. In the sidebar under Settings | "How do I use this?" answered with pictures |
 
@@ -337,5 +337,23 @@ threshold (one Confirm click, the price-first rule).
 3. Done: Clone Video in the Video step (upload, characters, model picker
    with prices, original sound optional, result in Library > Clips;
    DECISIONS G18).
-4. The rest of Phase 3 (chaining, sound bed, rough cut), each fitted into
-   a step of this plan first.
+4. The rest of Phase 3 (chaining, sound bed, rough cut), fitted into the
+   steps as section 8 describes (2026-10-14).
+
+---
+
+## 8. Phase 3 finish: chaining, sound bed, rough cut (2026-10-14)
+
+No new pages and no sidebar items. Everything sits in the post workspace,
+with one new Library tab.
+
+| Piece | Where it lives | What I do | Extra clicks |
+|---|---|---|---|
+| **Continue this shot** (chaining) | Video step, under "The clip" | Press Continue this shot (free). Its last frame (full size, stepped back if blurry) becomes the start frame of the next take, the same model is picked, and the prompt carries "same place, same light, same wardrobe". Generate a take, then Use this take: the takes are joined into one longer clip (seams scored, never crossfaded) | **3** per extra shot (Continue, Generate, Use) |
+| A seam that fails | Video step, a callout under the clip | Regenerate the take, or "Keep them as two shots" (a real cut between two shots in the rough cut) | 1 |
+| **Sound** (sound bed) | Finish step, the Sound row | Ambience: None, Room tone (built in) or a recording I uploaded. Music: None or a track I uploaded, ducked under the clip's own sound. Mixed and normalized to social loudness (-14 LUFS, -1 dBTP). No AI music | **0** (Room tone by default); 2 to add music |
+| Upload a sound | Finish step (inline) and **Library > Sounds** (new tab: ambience and music, tagged) | Choose a file; it is converted and measured | 1 |
+| **Rough cut** | Finish step, above Export | The post's clips, B-roll and captions laid out as one timeline, built automatically from the steps above. Click a block to trim it, move it or remove it; add a clip, B-roll or a caption; Rebuild returns to the automatic cut. Export renders exactly this timeline, and Fine-tune (Phase 4) opens the same layers | **0** (automatic) |
+
+The video-post flow stays at **8** clicks; a two-shot chained video post is
+**11** (8 plus Continue, Generate, Use).

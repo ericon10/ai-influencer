@@ -72,3 +72,45 @@ clone:
   # Off by default, like every video (owner ruling G1).
   keep_sound: false
 
+
+# Chaining (Phase 3; SPEC 4.3 and 5.4 rule 33): "Continue this shot" in the
+# Video step. The kept clip's last frame (full size; stepped back about half
+# a second when it is blurry) starts the next take on the same model, and
+# the takes are joined into one longer clip. Seams are scored and never
+# crossfaded: cut, grade, or fail the seam.
+chain:
+  max_parts: 4
+  max_seconds: 40
+  step_back_sec: 0.5
+  # Largest difference (1 - SSIM) that still cuts cleanly at a seam.
+  max_seam_diff: 0.18
+
+# The sound bed (Phase 3; SPEC 5.5): ambience (Room tone is built in, or a
+# recording the owner uploaded) and an optional music track the owner
+# uploaded, ducked under the clip's own sound. Mixed locally with ffmpeg and
+# normalized to social loudness. No AI music, ever by default.
+sound:
+  # Integrated loudness of the finished post when it has music or the
+  # clip's own sound (TikTok, Reels and Shorts all play around -14 LUFS).
+  target_lufs: -14
+  true_peak: -1
+  # A post with ambience only stays quiet: a room, not a soundtrack.
+  ambience_only_lufs: -28
+  # Levels each layer is set to before the mix (then the mix is normalized).
+  ambience_lufs: -30
+  music_lufs: -20
+  # The owner's level choices, in dB on top of those.
+  levels: { quiet: -6, normal: 0, loud: 4 }
+  # Ducking: the music dips while the clip's own sound plays.
+  duck: { threshold: 0.03, ratio: 8, attack_ms: 20, release_ms: 400 }
+  # New posts start with Room tone and no music.
+  default_ambience: room
+  max_upload_mb: 50
+  max_seconds: 600
+
+# The rough cut (Phase 3): the post's clips, B-roll and captions on one
+# timeline in the Finish step, built automatically from the steps above.
+cut:
+  max_seconds: 90
+  max_shots: 12
+  max_captions: 8

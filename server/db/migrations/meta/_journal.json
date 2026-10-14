@@ -71,6 +71,13 @@
       "when": 1791927635214,
       "tag": "0009_job_phase",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1791937785731,
+      "tag": "0010_chain_sound",
+      "breakpoints": true
     }
   ]
 }

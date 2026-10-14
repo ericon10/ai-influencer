@@ -21,12 +21,16 @@ const usable = (c: SceneStill) => c.media === 'image' && !!c.assetId && !['faile
 
 // In a post, `onUseTake` picks a take for the post; picking it keeps it
 // (owner, 2026-10-13), so there is no separate Keep click.
-export function VideoSection({ v, data, scene, startId, setStartId, onUseTake, usedId = null }: { v: CharacterView; data: ScenesData; scene: SceneView; startId: string | null; setStartId: (id: string | null) => void; onUseTake?: (id: string) => void; usedId?: string | null }) {
+// Chaining ("Continue this shot"): `preferModel` starts on the model of the
+// clip being continued, and `takesFrom` shows only the takes that start
+// from its last frame.
+export function VideoSection({ v, data, scene, startId, setStartId, onUseTake, usedId = null, preferModel = null, takesFrom = null }: { v: CharacterView; data: ScenesData; scene: SceneView; startId: string | null; setStartId: (id: string | null) => void; onUseTake?: (id: string) => void | Promise<void>; usedId?: string | null; preferModel?: string | null; takesFrom?: string | null }) {
   const toast = useToast()
   const refresh = useRefresh()
   const o = data.options.video
   const stills = scene.candidates.filter(usable).sort((a, b) => Number(b.status === 'approved') - Number(a.status === 'approved'))
-  const clips = scene.candidates.filter(c => c.media === 'video' && (c.assetId || c.status === 'failed'))
+  const fromFrame = (c: SceneStill) => c.parentId === takesFrom || (c.op === 'video_upscale' && scene.candidates.some(p => p.id === c.parentId && p.parentId === takesFrom))
+  const clips = scene.candidates.filter(c => c.media === 'video' && c.op !== 'chain' && (c.assetId || c.status === 'failed') && (!takesFrom || fromFrame(c)))
   const start = stills.find(c => c.id === startId) ?? stills.find(c => c.status === 'approved') ?? null
   const [endId, setEndId] = useState<string | null>(null)
   const [directions, setDirections] = useState(o.directions)
@@ -38,8 +42,9 @@ export function VideoSection({ v, data, scene, startId, setStartId, onUseTake, u
   const [helper, setHelper] = useState(false)
   // The model for this take: the account's last pick (Kling 3.0 Pro until
   // one is made), each shown with the price of one take.
-  const [model, setModel] = useState(o.model.ref)
-  useEffect(() => setModel(o.model.ref), [o.model.ref])
+  const preferred = preferModel && o.models.some(m => m.ref === preferModel) ? preferModel : null
+  const [model, setModel] = useState(preferred ?? o.model.ref)
+  useEffect(() => setModel(preferred ?? o.model.ref), [o.model.ref, preferred])
   const picked = o.models.find(m => m.ref === model) ?? { ...o.model, resolution: null }
   const prices = useQuery({ queryKey: ['video-prices', v.id, duration, aspect, data.options.mode], queryFn: () => api.videoPrices(v.id, duration, aspect), staleTime: 10 * 60_000, retry: false })
   function pick(ref: string) {
@@ -72,7 +77,7 @@ export function VideoSection({ v, data, scene, startId, setStartId, onUseTake, u
     try {
       if (c.status !== 'approved') await api.approve(c.id, acknowledge)
       refresh(v.id)
-      onUseTake(c.id)
+      await onUseTake(c.id)
       setOpen(null)
     } catch (e) {
       if (e instanceof ApiError && e.code === 'confirm_required') toast({ tone: 'bad', text: 'The face in this take does not match REF-00.', action: { label: 'Use it anyway', run: () => void useTake(id, true) } })
@@ -92,10 +97,10 @@ export function VideoSection({ v, data, scene, startId, setStartId, onUseTake, u
             <>
               <Field id="video-start" label="Start frame" required done={!!start} group>
                 <div className="st-refgrid">
-                  {stills.map(c => (
+                  {(takesFrom ? stills.filter(c => c.id === takesFrom) : stills).map(c => (
                     <button key={c.id} type="button" className={`st-refchoice ${start?.id === c.id ? 'on' : ''}`} onClick={() => setStartId(c.id)} title={OP_LABEL[c.op]}>
                       <Img assetId={c.assetId} width={160} style={{ aspectRatio: scene.aspect.replace(':', ' / ') }} />
-                      <span>{c.status === 'approved' ? 'Picked' : OP_LABEL[c.op]}</span>
+                      <span>{c.op === 'last_frame' ? 'Last frame' : c.status === 'approved' ? 'Picked' : OP_LABEL[c.op]}</span>
                     </button>
                   ))}
                 </div>

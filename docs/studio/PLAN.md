@@ -373,7 +373,8 @@ OpenCut as a page in the Studio, project from R2, Done saves back.
 - [ ] OpenCut's license notice in the app
 - [ ] Written permission from the ai-influencer author (owner)
 - [ ] First live take, then confirm the upscaler's real price
-- [ ] Chaining (continue from the last frame), sound bed, rough cut
+- [x] Chaining (continue from the last frame), sound bed, rough cut
+      (Phase 3 finish, G22; UX-PLAN.md section 8)
 
 ## Roadmap after Phase 4 (owner, 2026-10-13; not started)
 

@@ -134,14 +134,14 @@ const templatesSchema = z.object({
   edit: z.object({ base: z.string(), face_ref: z.string() }),
   scene_plan: z.object({ system: z.string(), prompt: z.string() }),
   scene_ideas: z.object({ system: z.string(), prompt: z.string() }),
-  video: z.object({ base: z.string(), silent: z.string(), end_frame: z.string() }),
+  video: z.object({ base: z.string(), silent: z.string(), end_frame: z.string(), continue: z.string() }),
   clone: z.object({ swap: z.string(), image: z.string() }),
   content_slides: z.object({ system: z.string(), prompt: z.string() }),
   content_captions: z.object({ system: z.string(), prompt: z.string() }),
   prompt_writer: z.object({
     still_system: z.string(), still_prompt: z.string(), video_system: z.string(), video_prompt: z.string(),
     end_frame: z.string(),
-    video_format: z.string(), video_audio_off: z.string(), video_audio_on: z.string(),
+    video_format: z.string(), video_audio_off: z.string(), video_audio_on: z.string(), continue_facts: z.string(),
     directors_still: z.string(), directors_video: z.string(), notes_given: z.string(),
   }),
 })
@@ -247,6 +247,16 @@ const contentSchema = z.object({
     max_characters: z.number().int().positive(),
     keep_sound: z.boolean(),
   }),
+  chain: z.object({ max_parts: z.number().int().min(2), max_seconds: z.number().positive(), step_back_sec: z.number().min(0), max_seam_diff: z.number().positive() }),
+  sound: z.object({
+    target_lufs: z.number(), true_peak: z.number(), ambience_only_lufs: z.number(), ambience_lufs: z.number(), music_lufs: z.number(),
+    levels: z.object({ quiet: z.number(), normal: z.number(), loud: z.number() }),
+    duck: z.object({ threshold: z.number().positive(), ratio: z.number().min(1), attack_ms: z.number().positive(), release_ms: z.number().positive() }),
+    default_ambience: z.enum(['none', 'room']),
+    max_upload_mb: z.number().positive(),
+    max_seconds: z.number().positive(),
+  }),
+  cut: z.object({ max_seconds: z.number().positive(), max_shots: z.number().int().positive(), max_captions: z.number().int().positive() }),
 })
 
 export const pipelineSchemas = {

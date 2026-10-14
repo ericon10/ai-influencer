@@ -217,8 +217,10 @@ export const GUIDE: GuideSection[] = [
       'Pick a video model. Each shows the price of one take; your pick is remembered.',
       'Set the length, shape, sound and number of takes, then press Generate a take.',
       'Press Use this take on the one you like. Upscale this take adds detail to the exact same take later.',
+      'Want it longer? Press Continue this shot under the clip (free). Its last frame starts the next take on the same model; Generate a take, then Use this take, and the two join into one longer clip.',
     ],
     tips: [
+      'Continue this shot keeps the same place, light, wardrobe and camera. The seam is scored and cut, never blended; if it fails you can regenerate the take or keep them as two shots.',
       'If a take looks off, open "If a take looks off" under the prompt: what to change for a restless camera, morphing hands, a staged look and more.',
       'Start and end frames give two beats in one continuous take. The end frame helper changes only the head of the start frame.',
       'B-roll (optional) is a screen recording or phone video cut in hard before or after the clip.',
@@ -270,16 +272,18 @@ export const GUIDE: GuideSection[] = [
   },
   {
     id: 'post-finish', group: 'Make a post', title: 'Step 5: Finish', color: 'green',
-    tagline: 'Export, download, post. Free.',
+    tagline: 'Rough cut, sound, export, download, post. Free.',
     where: 'Any post > Finish',
-    intro: 'Export MP4 renders the post on the Studio\'s own worker: 9:16, the caption burned in, B-roll cut in. It costs nothing. Download it and post it. A slideshow exports JPEG slides; a batch exports every video and a zip.',
+    intro: 'The rough cut lays the post out as one timeline (video, text, sound), built automatically from the steps above. The Sound row adds Room tone or your own ambience and music, mixed and normalized to -14 LUFS. Export MP4 renders exactly that on the Studio\'s own worker, for free. A slideshow exports JPEG slides; a batch exports every video and a zip.',
     steps: [
+      'Check the rough cut. Click a block to trim it, move it or remove it; add a clip, B-roll or a timed caption. Rebuild goes back to the automatic cut.',
+      'Pick the sound: Room tone (the default), a recording you uploaded, or None; add a music track you uploaded if you like. Music dips under the clip\'s own sound.',
       'Press Export MP4 (it shows what is still missing if anything is).',
       'Download MP4.',
       'Turn on TikTok\'s AI-generated content label when you post.',
       'Make another like this for the next one in a series.',
     ],
-    tips: ['Change anything above and press Export MP4 again for a new version.'],
+    tips: ['Change anything above and press Export MP4 again for a new version.', 'There is no AI music. Upload tracks you have the rights to (Library > Sounds holds them all).', 'Cuts between shots are hard cuts, never a crossfade.'],
     cost: 'Free.',
     shots: [{ id: 'post-finish', caption: 'Finish' }],
   },
@@ -340,6 +344,10 @@ export const GUIDE: GuideSection[] = [
 ]
 
 export const GLOSSARY: Array<[string, string]> = [
+  ['Rough cut', 'The post as one timeline in the Finish step: its shots, captions and sound. Export renders exactly this.'],
+  ['Continue this shot', 'Make the next take from the last frame of a clip, then join them into one longer clip.'],
+  ['Room tone', 'The quiet sound of a room, made by code. The default ambience; a silent video sounds dead.'],
+  ['LUFS', 'How loud a video sounds overall. Posts are normalized to -14, like TikTok, Reels and Shorts play them.'],
   ['REF-00', 'The hero face. Every later image copies it.'],
   ['Reference sheet', 'REF-00 to REF-11: the same person from every angle, with expressions and full body.'],
   ['Still', 'A photo of a moment, made in a post\'s Stills step.'],

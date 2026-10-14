@@ -107,7 +107,7 @@ export async function libraryView(deps: Deps, ctx: Ctx, opts: { characterId?: st
     clips.push({
       ...base(c), assetId: c.assetId ?? '', posterId: poster(c.parentId),
       durationSec: asset?.durationMs ? Math.round(asset.durationMs / 100) / 10 : null,
-      title: c.op === 'upload' || c.op === 'clone' ? c.label || 'Uploaded clip' : c.sceneId ? sceneTitle.get(c.sceneId) ?? 'Take' : 'Clip',
+      title: c.op === 'upload' || c.op === 'clone' ? c.label || 'Uploaded clip' : c.op === 'chain' ? `${c.sceneId ? sceneTitle.get(c.sceneId) ?? 'Clip' : 'Clip'} (${c.label || 'chained'})` : c.sceneId ? sceneTitle.get(c.sceneId) ?? 'Take' : 'Clip',
       error: c.status === 'failed' ? c.rejectNote || 'This clip failed.' : null,
     })
   }

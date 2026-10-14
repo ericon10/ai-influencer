@@ -228,6 +228,9 @@ export const candidates = pgTable('candidates', {
   rejectReasons: jsonb('reject_reasons').notNull().default([]),
   rejectNote: text('reject_note').notNull().default(''),
   favorite: boolean('favorite').notNull().default(false),
+  // Extra facts some ops keep: a last frame's source clip and handoff time,
+  // a chained clip's parts and seam scores (Phase 3 chaining).
+  meta: jsonb('meta').notNull().default({}),
   reviewedBy: text('reviewed_by'),
   reviewedAt: timestamp('reviewed_at', { withTimezone: true }),
   createdBy: text('created_by'),
@@ -294,6 +297,26 @@ export const brollClips = pgTable('broll_clips', {
   updatedAt: updatedAt(),
   archivedAt: timestamp('archived_at', { withTimezone: true }),
 }, t => [index('broll_account_idx').on(t.accountId, t.createdAt)])
+
+// The sound library (Phase 3 sound bed): ambience recordings and music
+// tracks the owner uploaded. Converted to AAC and measured (integrated
+// loudness, LUFS) so the mix can level them. No AI music.
+export const sounds = pgTable('sounds', {
+  id: text('id').primaryKey(),
+  accountId: text('account_id').notNull().references(() => accounts.id),
+  kind: text('kind').notNull(), // ambience | music
+  assetId: text('asset_id'),
+  title: text('title').notNull().default(''),
+  tag: text('tag').notNull().default(''),
+  durationMs: integer('duration_ms'),
+  loudness: doublePrecision('loudness'),
+  status: text('status').notNull().default('processing'), // processing | ready | failed
+  error: text('error'),
+  createdBy: text('created_by'),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+  archivedAt: timestamp('archived_at', { withTimezone: true }),
+}, t => [index('sounds_account_idx').on(t.accountId, t.kind, t.createdAt)])
 
 // A post (UX-PLAN.md): a video post, a slideshow or a batch. What it is made
 // of (spec), and what rendering it produced (outputs). Drafts are saved as

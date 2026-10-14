@@ -95,7 +95,7 @@ describe('content builder (demo mode)', () => {
     brollId = row.id
   })
 
-  it('meme video: the kept clip, a hard cut to B-roll, the caption on top; 9:16, no sound', async () => {
+  it('meme video: the kept clip, a hard cut to B-roll, the caption on top; 9:16, Room tone under it', async () => {
     const item = await createContent(h.deps, h.ctx, { kind: 'meme', characterId, spec: { clipId } })
     await expect(startRender(h.deps, h.ctx, item.id)).rejects.toThrow(/Write the caption/)
     await updateContent(h.deps, h.ctx, item.id, { spec: { brollId, brollSeconds: 2, caption: 'me when the AI finally fixes my code 💀' } })
@@ -105,9 +105,19 @@ describe('content builder (demo mode)', () => {
     expect(done.status).toBe('ready')
     const out = done.outputs as ContentOutputs
     const p = await probeAsset(out.videoAssetId!)
-    expect(p).toMatchObject({ width: 1080, height: 1920, fps: 30, hasAudio: false })
-    expect(p.durationSec).toBeGreaterThan(2.5)
+    // The default sound bed: Room tone only, kept quiet (Phase 3).
+    expect(p).toMatchObject({ width: 1080, height: 1920, fps: 30, hasAudio: true })
+    expect(out.sound).toEqual({ layers: ['ambience'], targetLufs: -28, ducked: false })
+    expect(p.durationSec).toBeCloseTo(7, 0)
+    expect(out.durationSec).toBeCloseTo(7, 0)
     expect(out.dropped).toEqual([])
+    // Sound off: a silent post, as before.
+    await updateContent(h.deps, h.ctx, item.id, { spec: { sound: { ambience: 'none' } } })
+    await startRender(h.deps, h.ctx, item.id)
+    await drain(h, 20)
+    const silent = (await getContent(h.deps, h.ctx, item.id)).outputs as ContentOutputs
+    expect((await probeAsset(silent.videoAssetId!)).hasAudio).toBe(false)
+    expect(silent.sound?.layers).toEqual([])
   })
 
   it('slideshow: Claude writes the hook, the slides, the caption and hashtags (priced), then the images export in order', async () => {
