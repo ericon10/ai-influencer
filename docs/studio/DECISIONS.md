@@ -1380,3 +1380,63 @@ new pages or sidebar items; one new Library tab (Sounds).
   beats), Payoff spot, Impact shake, undo and redo, Save as a style, name,
   Save, Done, then the copy opened with the stack and the saved style
   placed in one click: 7 clicks, no page errors.
+
+### G32. Editor phase D: the worker renders the same timeline (overnight run, 2026-10-14)
+
+- **Headless editor export on the worker: no.** It would need a Chromium
+  with WebCodecs in the Railway image (hundreds of MB), open-source
+  Chromium has no H.264 encoder, and a 50-video batch would hold a
+  browser per job. Instead, one renderer for the camera presets: the
+  worker runs the editor's own camera math (`server/core/camera.ts`, a
+  line-for-line copy of the fork's `cameraAt`, `ease`, `shakeOffset`)
+  frame by frame (`server/media/camera.ts`: scale, shift and rotate over
+  black, blur, colour, brightness, the motion streak, RGB split,
+  vignette, dark, flash, in the canvas's order). Time, text and layout
+  presets use the worker's code edits of the same name (G24, G26), one
+  per video.
+- **The preset library is data:** `config/presets.yaml`, copied from the
+  pinned fork commit by `npm run presets:sync`; a test fails when the pin
+  moves without a sync, and the config check fails when an edit style
+  names a preset that is not there.
+- **What the worker renders** (`server/pipeline/workerTimeline.ts`):
+  1. A timeline saved by the editor: its shots as trimmed (black where it
+     has a gap), its captions (text, box or outline, nearest safe place),
+     its camera blocks, its music switch, and its time or text preset as
+     the code edit. What only the editor draws (OpenReel's own effects
+     and transitions, a second video track, the person cutout, karaoke,
+     text animations, text behind her) is listed under the export with
+     "Open the editor and press Done for them". Nothing blocks.
+  2. A stack carried by Make another like this: placed at this post's own
+     payoff, cuts and beats (beats found in the post's music).
+  3. A batch's style (Finish step, Style: a saved style): placed on every
+     video at that video's own places.
+  4. Otherwise the cut and its Format exactly as before (the worker's
+     code edit, which zooms toward her face). A first try rendered a
+     camera Format with the editor's preset instead; it changed how old
+     posts look (a centre zoom, a transition at the payoff instead of its
+     cut) and the existing edit tests caught it, so it was dropped.
+- **Migration:** no data is rewritten. Posts made before keep their cut
+  and Format; the worker renders them as before (row 4) and the
+  editor lays them out on first open (phase B), placing the Format's
+  preset; from then on the saved timeline renders. A post edited in the
+  editor no longer needs Done to export: Export MP4 renders its saved
+  timeline (phase A's "export it there with Done" block is gone).
+- **Parity** (`scripts/editor-parity.mjs`, local Studio and Playwright's
+  Chromium): one post, Snap zoom (Strong) at the payoff, exported by the
+  editor (Done) and rendered by the worker (Export MP4); frames compared
+  over the bottom two thirds (no caption: the editor draws text with the
+  browser's fonts, the worker with the bundled TikTok Sans).
+  - Before the zoom: 35.5 and 35.7 dB. Inside it (4.05 to 5.0 s): 32.5 to
+    33.0 dB. The picture matches; what is left is the two decoders (VP9 in
+    this test browser, H.264 on the worker) and the two scalers.
+  - In the test suite (`server/media/camera.test.ts`,
+    `server/pipeline/workerTimeline.test.ts`): a zoomed frame against
+    ffmpeg's own scale and crop of the same frame (above 24 dB), unmoved
+    frames against a plain render (above 24 dB), zoomed frames against a
+    plain render (7 dB, so a missing zoom fails loudly), for a saved
+    timeline, a carried stack and a 2-video batch with a style.
+- **Captions start the same in both:** the manifest sends the post's
+  caption look (the white box by default) and place (the upper third),
+  and the editor's first layout uses them.
+- **Library:** the editor's Done already lands the MP4 in Library >
+  Posts (the post's video), as the worker's export does.

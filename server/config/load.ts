@@ -242,6 +242,7 @@ export function loadConfig(dir = resolve(process.cwd(), 'config')): StudioConfig
       scenes: readConfigFile(dir, 'scenes.yaml', pipelineSchemas.scenes),
       content: readConfigFile(dir, 'content.yaml', pipelineSchemas.content),
       edits: readConfigFile(dir, 'edits.yaml', pipelineSchemas.edits),
+      presets: readConfigFile(dir, 'presets.yaml', pipelineSchemas.presets),
     },
   }
   validateCrossRefs(cfg)
@@ -252,6 +253,11 @@ export function loadConfig(dir = resolve(process.cwd(), 'config')): StudioConfig
 // Checks that references between files line up (routes point at real models,
 // every priced model exists, the sheet graph is well formed).
 function validateCrossRefs(cfg: StudioConfig): void {
+  // Every edit style names an editor preset that exists.
+  const presetIds = new Set(cfg.pipeline.presets.presets.map(p => p.id))
+  for (const st of cfg.pipeline.edits.styles) {
+    if (st.preset && !presetIds.has(st.preset)) throw new ConfigError(`edits.yaml: style "${st.id}" names unknown editor preset "${st.preset}" (config/presets.yaml)`)
+  }
   const imageRefs = new Set(cfg.models.models.map(m => m.ref))
   const llmRefs = new Set(cfg.models.llm_models.map(m => m.ref))
   for (const [task, route] of Object.entries(cfg.routing.tasks)) {

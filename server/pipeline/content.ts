@@ -22,6 +22,9 @@ import { soundFile } from './sounds.js'
 import { EDIT_IDS } from '../config/pipeline.js'
 import { applyEdit, DEFAULT_FACE, detectBeats, mapTime, overlayBehind, type EditStyle } from '../media/edits.js'
 import { personMaskVideo, segmentAvailable } from '../media/segment.js'
+import { applyCameraBlocks } from '../media/camera.js'
+import { stackPlan, workerTimeline } from './workerTimeline.js'
+import type { CameraBlock } from '../core/camera.js'
 import { normalizeForRender, NORMALIZE_VERSION } from '../media/normalize.js'
 import { makeScratch } from '../media/sound.js'
 import { extractFrameAt } from '../media/frames.js'
@@ -227,6 +230,10 @@ const batchObject = z.object({
   // A batch takes the one-shot edits (each video has one clip).
   edit: editSpec,
   captionStyle,
+  // A saved style from the editor (editor phase D): its presets placed on
+  // every video at that video's own payoff, cuts and beats.
+  stack: stackSchema.nullable().default(null),
+  styleName: z.string().max(60).nullable().default(null),
 })
 const batchSpec = z.preprocess(raw => {
   if (!raw || typeof raw !== 'object') return raw
@@ -274,6 +281,10 @@ export interface ContentOutputs {
   editNote?: string | null
   // Exported from the OpenReel editor (G29) rather than rendered here.
   fromEditor?: boolean
+  // Rendered here from the post's timeline (editor phase D, G32), and what
+  // only the editor's own export draws.
+  fromTimeline?: boolean
+  editorOnly?: string[]
 }
 
 function parseSpec(kind: string, raw: unknown) {
@@ -418,7 +429,8 @@ function renderProblems(deps: Deps, row: ContentRow): string[] {
     const cfg = deps.config.pipeline.content
     const cut = effectiveCut(s, cfg.meme.max_broll_seconds)
     out.push(...cutProblems(cut, s.caption, { maxShots: cfg.cut.max_shots, maxCaptions: cfg.cut.max_captions }))
-    const style = deps.config.pipeline.edits.styles.find(x => x.id === s.edit.style)
+    // A timeline saved by the editor decides its own shots (editor phase D).
+    const style = s.editor?.projectAssetId ? undefined : deps.config.pipeline.edits.styles.find(x => x.id === s.edit.style)
     if (style?.shots === 2 && cut.shots.filter(x => x.kind === 'clip').length < 2) out.push(`Add shot B for the ${style.label.toLowerCase()} (Video step)`)
     if (style?.needs.includes('background') && !cut.shots.some(x => x.kind === 'broll')) out.push(`Pick B-roll or a screenshot for the ${style.label.toLowerCase()} background (Video step)`)
   } else if (row.kind === 'batch') {
@@ -465,8 +477,28 @@ export async function setOutputs(deps: Deps, itemId: string, outputs: ContentOut
 // One video from a cut (Phase 3 rough cut): the shots joined with hard
 // cuts, the captions by time, then the sound bed, normalized to social
 // loudness. Free: ffmpeg and sharp on the worker.
-async function renderCut(deps: Deps, ctx: Ctx, job: JobRow, fullCut: Cut, input: { characterId: string; caption: string; sound: SoundSpec; label: string; edit?: EditSpec; captionStyle?: 'box' | 'outline' | null }) {
+// The timeline's own picture (editor phase D, G32): camera blocks for the
+// camera pass, the one code edit and the caption look a plan sets, and
+// for a saved editor timeline its shots as files and its captions.
+export interface RenderPlan {
+  blocks: CameraBlock[]
+  edit: { style: string; strength: EditSpec['strength']; at: number } | null
+  captionStyle: 'box' | 'outline' | null
+  prepared?: { shots: TimelineShot[]; captions: Array<{ text: string; start: number; end: number | null; position?: CaptionPosition }> }
+}
+type CaptionPosition = 'top' | 'upper_third' | 'middle' | 'bottom'
+
+async function renderCut(deps: Deps, ctx: Ctx, job: JobRow, fullCut: Cut, input: { characterId: string; caption: string; sound: SoundSpec; label: string; edit?: EditSpec; captionStyle?: 'box' | 'outline' | null; plan?: RenderPlan }) {
   const base = deps.config.pipeline.content
+  const plan = input.plan
+  // A plan's edit and caption look win; without a plan the post's Format
+  // and caption look stand (the cut as before).
+  if (plan) {
+    input = { ...input, captionStyle: plan.captionStyle ?? input.captionStyle, edit: plan.edit
+      ? { ...(input.edit ?? editSpec.parse({})), style: plan.edit.style as EditSpec['style'], strength: plan.edit.strength, payoff: plan.edit.at }
+      : { ...(input.edit ?? editSpec.parse({})), style: 'none' } }
+  }
+  const blocks = plan?.blocks ?? []
   // The post's caption look (box or outline) over the account's default.
   const cfg = { ...base, caption: { ...base.caption, style: input.captionStyle ?? base.caption.style } }
   const style = input.edit?.style ?? 'none'
@@ -487,7 +519,8 @@ async function renderCut(deps: Deps, ctx: Ctx, job: JobRow, fullCut: Cut, input:
     // Every shot is made plain first (one size, square pixels, constant
     // frame rate, yuv420p, 48 kHz stereo or no sound): the render only ever
     // sees plain files. A clip's plain copy is kept for the next render.
-    for (const [i, sh] of cut.shots.entries()) {
+    if (plan?.prepared) shots.push(...plan.prepared.shots)
+    else for (const [i, sh] of cut.shots.entries()) {
       if (sh.kind === 'clip') {
         const path = await plainClip(deps, ctx, sh.ref, input.characterId, dir, `shot${i}`, input.sound.clipSound)
         shots.push({ path, in: sh.in, out: sh.out, maxSeconds: cfg.meme.max_clip_seconds })
@@ -502,10 +535,11 @@ async function renderCut(deps: Deps, ctx: Ctx, job: JobRow, fullCut: Cut, input:
     }
     const captions: TimelineCaption[] = []
     const dropped: string[] = []
-    for (const [j, c] of cut.captions.entries()) {
+    const captionList = plan?.prepared ? plan.prepared.captions : cut.captions.map(c => ({ text: c.text ?? input.caption, start: c.start, end: c.end, position: undefined as CaptionPosition | undefined }))
+    for (const [j, c] of captionList.entries()) {
       const text = (c.text ?? input.caption).trim()
       if (!text) continue
-      const overlay = await captionPng(text, cfg)
+      const overlay = await captionPng(text, c.position ? { ...cfg, caption: { ...cfg.caption, position: c.position } } : cfg)
       const png = join(dir, `caption${j}.png`)
       await writeFile(png, overlay.png)
       captions.push({ png, start: c.start, end: c.end })
@@ -518,14 +552,24 @@ async function renderCut(deps: Deps, ctx: Ctx, job: JobRow, fullCut: Cut, input:
     let accents: Array<{ path: string; at: number; db?: number }> = []
     let durationSec: number
     let editNote: string | null = null
-    if (style === 'none') {
+    if (style === 'none' && !blocks.length) {
       durationSec = (await renderTimeline({ shots, captions, canvas: cfg.canvas, out: picture, keepSound: input.sound.clipSound, maxSeconds: cfg.cut.max_seconds })).durationSec
+    } else if (style === 'none') {
+      // Presets from the editor: the clean picture, the camera pass (the
+      // editor's own math), then the captions over it, still and readable.
+      const clean = join(dir, 'clean.mp4'), moved = join(dir, 'moved.mp4')
+      const t = await renderTimeline({ shots, captions: [], canvas: cfg.canvas, out: clean, keepSound: input.sound.clipSound, maxSeconds: cfg.cut.max_seconds })
+      await applyCameraBlocks(clean, moved, blocks, cfg.canvas)
+      await renderTimeline({ shots: [{ path: moved, in: 0, out: null }], captions, canvas: cfg.canvas, out: picture, keepSound: input.sound.clipSound })
+      durationSec = t.durationSec
     } else {
       // Amazing Edits (Phase 5): the clean picture, then the edit, then the
       // captions (moved with the edit's time), then the sound bed.
       const clean = join(dir, 'clean.mp4'), edited = join(dir, 'edited.mp4')
       const t = await renderTimeline({ shots, captions: [], canvas: cfg.canvas, out: clean, keepSound: input.sound.clipSound, maxSeconds: cfg.cut.max_seconds })
-      const r = await runEdit(deps, ctx, { style, edit: input.edit!, cut, plan: t.shots, picture: clean, out: edited, dir, totalSec: t.durationSec, sound: input.sound, background })
+      const r = await runEdit(deps, ctx, { style, edit: input.edit!, cut, plan: t.shots, picture: clean, out: blocks.length ? join(dir, 'edited-only.mp4') : edited, dir, totalSec: t.durationSec, sound: input.sound, background })
+      // The editor's camera presets after the code edit, before the captions.
+      if (blocks.length) await applyCameraBlocks(join(dir, 'edited-only.mp4'), edited, blocks, cfg.canvas)
       editNote = r.note
       const moved = await editCaptions(deps, cut, captions, { style, edit: input.edit!, caption: input.caption, timeMap: r.timeMap, payoff: r.payoff, durationSec: r.durationSec, dir, cfg })
       finalPicture = join(dir, 'captioned.mp4')
@@ -758,8 +802,14 @@ async function runContentRender(deps: Deps, ctx: Ctx, job: JobRow): Promise<unkn
     if (row.kind === 'meme') {
       const s = memeSpec.parse(row.spec)
       const cut = effectiveCut(s, deps.config.pipeline.content.meme.max_broll_seconds)
-      const v = await renderCut(deps, ctx, job, cut, { characterId: row.characterId!, caption: s.caption, sound: s.sound, edit: s.edit, captionStyle: s.captionStyle, label: `Video post: ${s.caption.slice(0, 60)}` })
-      const outputs: ContentOutputs = { videoAssetId: v.assetId, dropped: v.dropped, durationSec: v.durationSec, sound: v.sound, editNote: v.editNote, renderedAt: deps.clock.now().toISOString() }
+      // The post's timeline (editor phase D): the saved one, a carried
+      // stack, or the Format's preset, else the cut as before.
+      const { v, notes, timeline } = await withTempDir(async dir => {
+        const tl = await workerTimeline(deps, ctx, { characterId: row.characterId!, cut, sound: s.sound, edit: s.edit, editor: s.editor ? { projectAssetId: s.editor.projectAssetId, stack: s.editor.stack } : null, dir })
+        const v = await renderCut(deps, ctx, job, tl.cut, { characterId: row.characterId!, caption: s.caption, sound: tl.sound, edit: s.edit, captionStyle: s.captionStyle, label: `Video post: ${s.caption.slice(0, 60)}`, plan: tl.plan })
+        return { v, notes: tl.notes, timeline: !!tl.plan }
+      })
+      const outputs: ContentOutputs = { videoAssetId: v.assetId, dropped: v.dropped, durationSec: v.durationSec, sound: v.sound, editNote: v.editNote, renderedAt: deps.clock.now().toISOString(), ...(timeline ? { fromTimeline: true } : {}), ...(notes.length ? { editorOnly: notes } : {}) }
       await setOutputs(deps, itemId, outputs, 'ready')
       return outputs
     }
@@ -811,7 +861,14 @@ async function renderBatchVideo(deps: Deps, ctx: Ctx, job: JobRow, row: ContentR
     try {
       const src = batchSources(s, index)
       const cut = effectiveCut({ ...s, ...src }, deps.config.pipeline.content.meme.max_broll_seconds)
-      const v = await renderCut(deps, ctx, job, cut, { characterId: row.characterId!, caption, sound: s.sound, edit: s.edit, captionStyle: s.captionStyle, label: `Batch ${name} ${index + 1}: ${caption.slice(0, 50)}` })
+      // The batch's style (a saved style from the editor), placed at this
+      // video's own payoff, cuts and beats; else its Format as before.
+      const v = await withTempDir(async dir => {
+        const tl = s.stack?.length
+          ? { cut, sound: s.sound, ...(await stackPlan(deps, ctx, { characterId: row.characterId!, cut, stack: s.stack, edit: s.edit, sound: s.sound, dir })) }
+          : await workerTimeline(deps, ctx, { characterId: row.characterId!, cut, sound: s.sound, edit: s.edit, editor: null, dir })
+        return renderCut(deps, ctx, job, tl.cut, { characterId: row.characterId!, caption, sound: tl.sound, edit: s.edit, captionStyle: s.captionStyle, label: `Batch ${name} ${index + 1}: ${caption.slice(0, 50)}`, plan: tl.plan })
+      })
       result = { caption, assetId: v.assetId, clipId: src.clipId!, brollId: src.brollId }
     } catch (e) {
       error = `Video ${index + 1} failed: ${(e as Error).message.slice(0, 300)}`

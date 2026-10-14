@@ -23,7 +23,8 @@
     "check": "npm run typecheck && npm run lint:text && npm run test",
     "db:generate": "drizzle-kit generate",
     "build:app": "vite build",
-    "build:editor": "node scripts/build-editor.mjs"
+    "build:editor": "node scripts/build-editor.mjs",
+    "presets:sync": "tsx scripts/sync-presets.mts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.133.0",

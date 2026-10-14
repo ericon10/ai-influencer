@@ -70,3 +70,8 @@ rule.
   the playhead).
 - More suggested spots: a reaction peak (face motion) and the loudest beat.
 - Seamless loop as a preset (trim to the frame closest to the first).
+- The editor's caption box like the worker's: rounded corners, padding
+  and the bundled TikTok Sans, so captions match to the pixel.
+- More than one time, text or layout preset per video on the worker
+  (today the first one renders, the rest are listed).
+- Run scripts/editor-parity.mjs in CI with a Chromium that has H.264.

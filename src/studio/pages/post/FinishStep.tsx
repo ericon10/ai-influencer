@@ -6,7 +6,8 @@ import { DownloadLink, ExportPanel, fileSlug, postName, renderFailure, useDuplic
 import type { PostCtx } from './ctx'
 import { SoundRow, autoCut } from './SoundRow'
 import { editOf } from './EditStyles'
-import { EditorCard, editorUrl, scrollKey } from './EditorCard'
+import { EditorCard } from './EditorCard'
+import { BatchStyle } from './BatchStyle'
 import { keys, useSounds } from '../../hooks'
 import { useQueryClient } from '@tanstack/react-query'
 
@@ -35,10 +36,10 @@ export function FinishStep({ ctx }: { ctx: PostCtx }) {
     const waiting = cut.shots.filter(x => x.kind === 'clip').map(x => lib?.clips.find(c => c.id === x.ref)).some(c => c && c.status !== 'approved')
     if (waiting) todo.push({ label: 'Wait for the clip to be prepared' })
     if (s.continueFrom?.status === 'joining') todo.push({ label: 'Wait for the takes to be joined', target: 'continue-shot' })
-    // An edited timeline is exported by the editor (Done) until the worker
-    // renders timelines itself.
-    if (s.editor?.projectAssetId) todo.push({ label: 'This post was edited in the editor: export it there with Done', onGo: () => { void draft.flush().then(() => { try { sessionStorage.setItem(scrollKey(item.id), String(window.scrollY)) } catch { /* private window */ } window.location.assign(editorUrl(item.id)) }) } })
-    const style = ctx.data.options.edits?.styles.find(x => x.id === editOf(s).style)
+    // A post edited in the editor exports its saved timeline on the worker
+    // (editor phase D); the Format's shot B and background apply only
+    // before that.
+    const style = s.editor?.projectAssetId ? undefined : ctx.data.options.edits?.styles.find(x => x.id === editOf(s).style)
     if (style?.shots === 2 && cut.shots.filter(x => x.kind === 'clip').length < 2) todo.push({ label: `Add shot B for the ${style.label.toLowerCase()}`, onGo: inStep('video', 'shot-b') })
     if (style?.needs?.includes('background') && !cut.shots.some(x => x.kind === 'broll')) todo.push({ label: `Pick B-roll or a screenshot for the ${style.label.toLowerCase()} background`, onGo: inStep('video', 'post-broll') })
   } else if (item.kind === 'slideshow') {
@@ -58,6 +59,7 @@ export function FinishStep({ ctx }: { ctx: PostCtx }) {
     <div className="st-col" style={{ gap: 16 }}>
       {item.kind === 'meme' && <EditorCard ctx={ctx} />}
       {item.kind !== 'slideshow' && <SoundRow ctx={ctx} />}
+      {item.kind === 'batch' && <BatchStyle ctx={ctx} />}
       <ExportPanel item={item} todo={todo} saving={draft.saving} flush={draft.flush} label={label} onStart={() => void ctx.advance('finish')}>
         {item.kind === 'meme' && item.status === 'ready' && o.videoAssetId && (
           <div className="st-row" style={{ gap: 14, alignItems: 'flex-start', flexWrap: 'wrap' }}>
@@ -65,6 +67,8 @@ export function FinishStep({ ctx }: { ctx: PostCtx }) {
             <div className="st-col" style={{ gap: 6 }}>
               <DownloadLink assetId={o.videoAssetId} name={`${name}.mp4`}>Download MP4</DownloadLink>
               {o.fromEditor && <span className="st-hint">Exported from the editor.</span>}
+              {o.fromTimeline && <span className="st-hint">Rendered from your timeline on the worker.</span>}
+              {!!o.editorOnly?.length && <span className="st-hint st-warntext">Only the editor's export has: {o.editorOnly.join('; ')}. Open the editor and press Done for them.</span>}
               {o.editNote && <span className="st-hint">Edit: {o.editNote}</span>}
             </div>
           </div>

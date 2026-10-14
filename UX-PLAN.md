@@ -465,6 +465,27 @@ timeline). "Open the editor" says it works best on a computer.
 **Batch.** Up to 50 videos render on the worker from the same timeline
 JSON, with each video's clip and caption swapped in.
 
+**Rendering on the worker (phase D).** One renderer for camera presets:
+the worker runs the editor's own camera math frame by frame (parity
+tested against the editor's export). Time, text and layout presets use
+the worker's code edits (G24, G26) of the same name. What renders where:
+
+| Post | Export MP4 (worker, free) | Done in the editor |
+|---|---|---|
+| Never opened in the editor | Its cut and its Format, as before (the worker's code edit) | Lays it out, places the Format's preset |
+| Edited in the editor | Its saved timeline: shots as trimmed, presets, captions (look and place), music on or off | The export, as before |
+| Made with "Make another like this" | Its own cut with the carried presets at its own payoff, cuts and beats | Places the stack on first open |
+| Batch | Each video: its clip and caption, with the batch's style placed at that video's payoff, cuts and beats | Not used |
+
+Effects only the editor can draw (OpenReel's own effects and
+transitions, text animations, layouts made by hand) are listed under the
+worker's export, with "Open the editor and press Done" as the way to get
+them. Nothing blocks an export.
+
+**A batch's style.** Finish step of a batch, "Style": None or one of the
+saved styles (from the editor's Styles card), 1 click. Each video gets it
+at its own places.
+
 | Piece | Where | Clicks |
 |---|---|---|
 | Open the editor | Finish step | 1 |

@@ -1,4 +1,4 @@
-import type { ActionPreview, CharacterSummary, CharacterView, HiggsfieldAccount, JobView, Me, QuoteView, RulesView, SceneFields, ScenesData, SettingsView, StudioAction, Usage, VideoPrice, BrollClip, ContentData, ContentKind, LibraryData, PostStep, WorkerStatus, CloneOptions, CloneResult, CloneSource, CloneStill, CutView, SoundItem } from './types'
+import type { ActionPreview, CharacterSummary, CharacterView, HiggsfieldAccount, JobView, Me, QuoteView, RulesView, SceneFields, ScenesData, SettingsView, StudioAction, Usage, VideoPrice, BrollClip, ContentData, ContentKind, LibraryData, PostStep, WorkerStatus, CloneOptions, CloneResult, CloneSource, CloneStill, CutView, SoundItem, EditorStyle } from './types'
 import { sheetRefOf, typeOf, uploadFiles } from './files'
 
 // Thin client for /api/v1. Every write sends the CSRF header the server
@@ -89,6 +89,7 @@ export const api = {
   archiveBroll: (id: string) => request<{ ok: true }>('DELETE', `/broll/${id}`),
   createContent: (body: { kind: ContentKind; characterId: string; title?: string; spec?: Record<string, unknown>; idea?: string; accountTag?: string; sceneId?: string | null; step?: PostStep }) => request<{ id: string }>('POST', '/content', body),
   updateContent: (id: string, patch: { title?: string; spec?: Record<string, unknown>; idea?: string; accountTag?: string; sceneId?: string | null; step?: PostStep; characterId?: string }) => request<{ id: string }>('PATCH', `/content/${id}`, patch),
+  editorStyles: () => request<{ styles: EditorStyle[] }>('GET', '/editor/styles'),
   duplicateContent: (id: string) => request<{ id: string }>('POST', `/content/${id}/duplicate`, {}),
   postScene: (id: string) => request<{ id: string; sceneId: string }>('POST', `/content/${id}/scene`, {}),
   library: (characterId?: string | null) => request<LibraryData>('GET', `/library${characterId ? `?characterId=${encodeURIComponent(characterId)}` : ''}`),

@@ -302,6 +302,31 @@ const editsSchema = z.object({
   })).min(1),
 })
 
+// The editor's preset library (config/presets.yaml, copied from the
+// OpenReel fork by npm run presets:sync): what the worker needs to render a
+// preset the editor placed (editor phase D).
+const cameraKeySchema = z.object({
+  t: z.number().min(0).max(1),
+  scale: z.number().optional(), x: z.number().optional(), y: z.number().optional(), rotation: z.number().optional(),
+  blur: z.number().optional(), motionBlur: z.number().optional(), rgb: z.number().optional(), flash: z.number().optional(),
+  dark: z.number().optional(), shake: z.number().optional(), saturation: z.number().optional(), brightness: z.number().optional(),
+  vignette: z.number().optional(),
+  ease: z.enum(['linear', 'in', 'out', 'inOut', 'inExpo', 'outExpo', 'outBack', 'hold']).optional(),
+})
+const presetsSchema = z.object({
+  source: z.object({ repo: z.string(), commit: z.string().regex(/^[0-9a-f]{40}$/) }),
+  presets: z.array(z.object({
+    id: z.string().regex(/^[a-z_]{2,40}$/),
+    label: z.string(),
+    kind: z.enum(['camera', 'time', 'text', 'caption', 'layout']),
+    category: z.string(),
+    anchor: z.enum(['playhead', 'cut']),
+    // Text, caption and layout presets have no block (0).
+    duration: z.number().nonnegative(),
+    keys: z.array(cameraKeySchema).optional(),
+  })).min(1),
+})
+
 export const pipelineSchemas = {
   sheet: sheetSchema,
   views: viewsSchema,
@@ -311,6 +336,7 @@ export const pipelineSchemas = {
   scenes: scenesSchema,
   content: contentSchema,
   edits: editsSchema,
+  presets: presetsSchema,
 }
 
 export type SheetConfig = z.infer<typeof sheetSchema>
@@ -325,6 +351,8 @@ export type ScenesConfig = z.infer<typeof scenesSchema>
 export type ContentConfig = z.infer<typeof contentSchema>
 export type EditsConfig = z.infer<typeof editsSchema>
 export type EditId = (typeof EDIT_IDS)[number]
+export type PresetsConfig = z.infer<typeof presetsSchema>
+export type PresetConfig = PresetsConfig['presets'][number]
 
 export interface PipelineConfig {
   sheet: SheetConfig
@@ -335,4 +363,5 @@ export interface PipelineConfig {
   scenes: ScenesConfig
   content: ContentConfig
   edits: EditsConfig
+  presets: PresetsConfig
 }

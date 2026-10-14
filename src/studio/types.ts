@@ -270,7 +270,7 @@ export interface CutView {
 }
 export interface SlideshowSpec { stillIds: string[]; topic: string; hook: string; slides: string[]; caption: string; hashtags: string[] }
 // A batch rotates its clips and B-roll across the captions.
-export interface BatchSpec extends BrollTiming { clipIds: string[]; brollIds: string[]; topic: string; count: number; captions: string[]; clone: CloneSource | null; sound?: Partial<SoundSpec>; edit?: Partial<EditSpec>; captionStyle?: CaptionStyle | null }
+export interface BatchSpec extends BrollTiming { clipIds: string[]; brollIds: string[]; topic: string; count: number; captions: string[]; clone: CloneSource | null; sound?: Partial<SoundSpec>; edit?: Partial<EditSpec>; captionStyle?: CaptionStyle | null; stack?: StyleItem[] | null; styleName?: string | null }
 
 // Clone Video (SPEC 13.1 R1): the post's saved TikTok or Reel, the models
 // with their prices, and the results.
@@ -300,7 +300,7 @@ export interface ContentOutputs {
   done?: number; failed?: number; total?: number; dropped?: string[]; renderedAt?: string
   durationSec?: number; sound?: { layers: Array<'clip' | 'ambience' | 'music'>; targetLufs: number | null; ducked: boolean }
   errors?: Record<string, string>; zipParts?: Array<{ assetId: string; from: number; to: number }>; editNote?: string | null
-  fromEditor?: boolean
+  fromEditor?: boolean; fromTimeline?: boolean; editorOnly?: string[]
 }
 export interface ContentItem {
   id: string; kind: ContentKind; characterId: string | null; title: string; spec: Record<string, unknown>
@@ -334,3 +334,9 @@ export interface WorkerStatus {
 export interface LibraryStill { id: string; assetId: string; characterId: string; characterName: string; sceneId: string | null; sceneTitle: string; status: string; op: string; createdAt: string }
 export interface LibraryClip extends LibraryStill { posterId: string | null; durationSec: number | null; title: string; error: string | null }
 export interface LibraryData { stills: LibraryStill[]; clips: LibraryClip[] }
+
+// Saved styles from the editor (editor phase C, G31): presets with places
+// relative to the video.
+export interface StyleAnchor { on: 'payoff' | 'cut' | 'beat' | 'start' | 'end'; index: number; offset: number; ratio: number }
+export interface StyleItem { preset: string; strength: 'subtle' | 'normal' | 'strong'; at: StyleAnchor; duration: number | null; keys: Array<Record<string, number | string>> | null }
+export interface EditorStyle { id: string; name: string; items: StyleItem[]; createdAt: string }
