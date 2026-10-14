@@ -160,7 +160,8 @@ export interface ProviderAdapter {
 export class ProviderError extends Error {
   constructor(
     message: string,
-    readonly opts: { retryable: boolean; submitted: 'no' | 'unknown'; status?: number; code?: string } = { retryable: false, submitted: 'no' },
+    // `detail`: the provider's own answer, when it sent one (a tool error's body).
+    readonly opts: { retryable: boolean; submitted: 'no' | 'unknown'; status?: number; code?: string; detail?: unknown } = { retryable: false, submitted: 'no' },
   ) {
     super(message)
     this.name = 'ProviderError'

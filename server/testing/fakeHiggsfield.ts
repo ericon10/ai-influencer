@@ -24,6 +24,8 @@ export interface FakeHiggsfield {
   // The answer seen live on 2026-10-13: a failed submission carrying a
   // preset_recommendation. 'always' recommends again after a decline.
   presetRecommend: 'once' | 'always' | null
+  // Live Higgsfield flags a preset recommendation as a tool error (isError).
+  presetAsError: boolean
   sse: boolean
   hangOn: string | null
   refuseRefresh: boolean
@@ -47,7 +49,7 @@ export function createFakeHiggsfield(): FakeHiggsfield {
   const f: FakeHiggsfield = {
     calls: [], tokenRequests: [], registrations: [], uploads: new Map(), jobs: new Map(),
     validTokens: new Set(['at-1']),
-    presetNoticeOnce: false, presetRecommend: null, sse: false, hangOn: null, refuseRefresh: false, sessions: 0,
+    presetNoticeOnce: false, presetRecommend: null, presetAsError: true, sse: false, hangOn: null, refuseRefresh: false, sessions: 0,
     tool: name => f.calls.filter(c => c.tool === name),
     fetch: async (input, init) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url
@@ -131,7 +133,7 @@ export function createFakeHiggsfield(): FakeHiggsfield {
             return answer({
               jobs: [{ index: 0, status: 'submission_failed', error: 'Preset "IN THE DARK" was recommended instead of submitting a job.', preset_recommendation: { preset_id, name: 'IN THE DARK', preview_url: 'https://cdn.higgsfield.ai/job_set_chain_preset/x.mp4' } }],
               submitted_count: 0, failed_count: 1,
-            })
+            }, f.presetAsError)
           }
           if (f.presetNoticeOnce && !p.declined_preset_id) {
             f.presetNoticeOnce = false

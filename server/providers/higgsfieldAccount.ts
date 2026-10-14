@@ -361,18 +361,34 @@ export function createHiggsfieldAccountAdapter(o: HiggsfieldAccountOptions): Pro
       // use_unlim is always sent, and always false: the plan's credits pay.
       const params = { ...accountParams(entry, req), use_unlim: false }
       const tool = tools(req).batch
-      let value = await o.client.callTool(tool, { requests: [{ index: 0, params }] }, 'submit')
+      // Higgsfield marks a recommended preset as a tool error (seen live
+      // 2026-10-14: "submission_failed" with preset_recommendation, isError
+      // set). Nothing was created, so it is an answer to read, not a
+      // failure yet; any other tool error still fails the run.
+      const submitCall = async (p: Record<string, unknown>) => {
+        try {
+          return await o.client.callTool(tool, { requests: [{ index: 0, params: p }] }, 'submit')
+        } catch (e) {
+          const body = e instanceof ProviderError && e.opts.code === 'tool_error' ? e.opts.detail : undefined
+          if (body !== undefined && recommendedPreset(body, typeof body === 'string' ? body : JSON.stringify(body))) return body
+          throw e
+        }
+      }
+      let value = await submitCall(params)
       let r = submitted(value)
       // A recommended preset instead of a job: nothing was created. The
       // Studio never uses a preset (the prompt and refs are the owner's), so
-      // it declines that preset and submits the same request once more.
-      if (!r.jobId && !r.problem && r.presetId) {
-        const declined = r.presetName ?? 'a preset'
-        value = await o.client.callTool(tool, { requests: [{ index: 0, params: { ...params, declined_preset_id: r.presetId } }] }, 'submit')
+      // it declines that exact preset (declined_preset_id, per Higgsfield's
+      // tool schema) and submits the same request again, up to twice more
+      // when it recommends a different one each time.
+      const declined: string[] = []
+      for (let attempt = 0; attempt < 2 && !r.jobId && !r.problem && r.presetId; attempt++) {
+        declined.push(r.presetName ? `"${r.presetName}"` : 'a preset')
+        value = await submitCall({ ...params, declined_preset_id: r.presetId })
         r = submitted(value)
-        if (!r.jobId && !r.problem && r.presetId) {
-          throw new ProviderError(`Higgsfield recommended its preset ${r.presetName ? `"${r.presetName}"` : ''} again after the Studio declined ${declined}, so nothing ran and nothing was charged. The Studio never uses presets. Try again, or change the prompt slightly.`.replace(/\s+/g, ' '), { retryable: false, submitted: 'no' })
-        }
+      }
+      if (!r.jobId && !r.problem && r.presetId) {
+        throw new ProviderError(`Higgsfield kept recommending its presets (${[...declined, r.presetName ? `"${r.presetName}"` : 'a preset'].join(', then ')}) instead of running the take, even after the Studio declined them, so nothing ran and nothing was charged. The Studio never uses presets. Try again, or change the prompt slightly.`, { retryable: false, submitted: 'no' })
       }
       if (r.jobId) return { jobId: r.jobId, raw: value }
       if (r.problem) throw new ProviderError(r.problem, { retryable: false, submitted: 'no' })

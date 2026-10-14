@@ -956,3 +956,19 @@ new pages or sidebar items; one new Library tab (Sounds).
   waited behind others is skipped if another worker took it; a render
   never runs twice at once. Tested with 25 rotated videos.
 
+### G16a. Presets declined, also when Higgsfield flags them as errors (owner report, 2026-10-14)
+
+- Live Kling 3.0 Pro takes still failed with "Preset IN THE DARK was
+  recommended instead of submitting a job". Higgsfield now sends that
+  answer as a tool error (isError), so the MCP client threw before the
+  decline in G16 could run. The client now keeps the error's body, and the
+  account adapter reads a preset recommendation out of it like a normal
+  answer: nothing was created, so it declines that exact preset
+  (`declined_preset_id`, which Higgsfield's tool schema says suppresses
+  that preset for the retry) and submits the same request again.
+- When Higgsfield recommends a different preset each time, the adapter
+  declines up to two more (three submits in all), then fails plainly with
+  nothing run and nothing charged. Any other tool error fails as before.
+- The test double now answers a recommendation as a tool error, like the
+  live service; the normal-answer shape is still covered.
+

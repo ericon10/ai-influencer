@@ -197,7 +197,7 @@ export function createMcpClient(o: McpClientOptions): McpClient {
       const value = unwrapToolResult(reply.result)
       if (reply.result?.isError) {
         const message = typeof value === 'string' ? value : JSON.stringify(value).slice(0, 400)
-        throw new ProviderError(`Higgsfield ${name} failed: ${message}`, { retryable: false, submitted: 'no', code: 'tool_error' })
+        throw new ProviderError(`Higgsfield ${name} failed: ${message}`, { retryable: false, submitted: 'no', code: 'tool_error', detail: value })
       }
       return value
     },
