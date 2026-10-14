@@ -404,3 +404,8 @@ workspace, drawers and inline steps; no new page or sidebar item.
 | Piece | Where it lives | Clicks |
 |---|---|---|
 | Batch progress | Posts home, on a batch's card: "12 of 50 done", a thin bar while it renders | 0 |
+| Edit pack 2 | The same four places as pack 1, nothing new: Idea step Format, Video step shot slots, Finish step Edit style, Fine-tune Edit lane. Ten more edits with a moving thumbnail and one line each | 1 (optional) |
+| Split screen, zoom-rotate spin | Two-shot edits: shot B sits under shot A in the Video step, as for the crash zoom. Split screen adds Stacked or Side by side under Subtle, Normal, Strong | 2 to 3 for shot B |
+| Green-screen reaction | Her clip over the post's B-roll (a screen recording, or a screenshot image uploaded as B-roll). The Finish step lists "Pick B-roll for the background" until there is one, linked to the B-roll field | 1 to 2 |
+| Text behind subject, green screen, dolly zoom | Need her outline (a person mask). The worker makes it at export, free; nothing to click | 0 |
+| Karaoke captions, word pop | Caption edits: the caption itself changes, the picture does not | 0 |

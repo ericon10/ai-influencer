@@ -7,7 +7,7 @@ import { LibraryDrawer } from '../../library'
 import { Drawer, errorMessage, useToast } from '../../ui'
 import type { Cut, CutCaption, CutShot, EditSpec, EditStrength, EditStyleView, MemeSpec, SoundLevel, SoundSpec } from '../../types'
 import { autoCut, place, shotInfo, type Placed } from './RoughCut'
-import { firstFrame, postName } from './parts'
+import { captionCss, firstFrame, postName } from './parts'
 import { editOf, editStyles, editZones, type EditZones } from './EditStyles'
 import type { PostCtx } from './ctx'
 
@@ -317,8 +317,7 @@ function Preview({ ctx, placed, captions, caption, time, setTime, playing, setPl
   }, [playing]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const k = w / o.canvas.width
-  const c = o.caption
-  const half = Math.min(o.canvas.width / 2 - c.safe.left, o.canvas.width / 2 - c.safe.right)
+  const css = captionCss(o, k, (ctx.draft.spec as unknown as MemeSpec).captionStyle)
   const shown = captions.filter(x => time >= x.start && time < (x.end ?? total)).map(x => (x.text ?? caption).trim()).filter(Boolean)
   return (
     <div className="ed-preview">
@@ -330,8 +329,8 @@ function Preview({ ctx, placed, captions, caption, time, setTime, playing, setPl
         {!placed.length && <div className="ed-empty">Add a clip to start</div>}
         {badge && <span className="ed-edit-badge"><Sparkles size={11} />{badge}</span>}
         {shown.map((text, i) => (
-          <div key={i} className={`st-captionbox ${c.position}`} style={{ top: c.position === 'top' ? c.safe.top * k : undefined, bottom: c.position === 'bottom' ? c.safe.bottom * k : undefined, width: 2 * half * k, fontSize: c.size * k }}>
-            <span style={{ padding: `${c.box.pad_y * k}px ${c.box.pad_x * k}px`, borderRadius: c.box.radius * k, background: c.box.fill, color: c.box.text }}>{text}</span>
+          <div key={i} className={css.cls} style={css.box}>
+            <span style={css.span}>{text}</span>
           </div>
         ))}
       </div>

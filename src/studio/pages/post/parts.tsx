@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Download, Loader2, RotateCcw, Upload } from 'lucide-react'
@@ -7,7 +7,7 @@ import { api, assetUrl, downloadUrl } from '../../api'
 import { keys, useCharacters, useWorkerGate } from '../../hooks'
 import { Callout, Todo, errorMessage, useToast, type TodoItem } from '../../ui'
 import { RunStatus } from '../../runs'
-import type { BrollTiming, ContentData, ContentItem, ContentKind, PostStep } from '../../types'
+import type { BrollTiming, CaptionStyle, ContentData, ContentItem, ContentKind, PostStep } from '../../types'
 
 // Shared parts of a post (UX-PLAN.md): saving as you type, the TikTok
 // caption preview, B-roll, and the free export on the worker.
@@ -145,25 +145,50 @@ export function useDuplicate() {
 
 // ── The caption preview: TikTok's white box over the frame ───────────
 
-export function CaptionPreview({ text, data, video, image, width = 240 }: { text: string; data: ContentData; video?: string | null; image?: string | null; width?: number }) {
-  const o = data.options
-  const k = width / o.canvas.width
+// Where the caption sits and how it looks, scaled by k (preview px per
+// frame px). Matches server/core/overlay.ts: the box or the outline style,
+// top, upper third, middle or bottom.
+export function captionCss(o: ContentData['options'], k: number, look?: CaptionStyle | null): { cls: string; box: CSSProperties; span: CSSProperties } {
   const c = o.caption
   const half = Math.min(o.canvas.width / 2 - c.safe.left, o.canvas.width / 2 - c.safe.right)
-  const style = {
-    top: c.position === 'top' ? c.safe.top * k : undefined,
+  const style = look ?? (c.style === 'outline' ? 'outline' : 'box')
+  const upper = c.position === 'upper_third'
+  const box: CSSProperties = {
+    top: c.position === 'top' ? c.safe.top * k : upper ? Math.max(c.safe.top, o.canvas.height * 0.26) * k : undefined,
     bottom: c.position === 'bottom' ? c.safe.bottom * k : undefined,
     width: 2 * half * k,
     fontSize: c.size * k,
   }
+  const span: CSSProperties = style === 'outline'
+    ? { color: c.outline?.text ?? '#fff', WebkitTextStroke: `${Math.max(1, c.size * (c.outline?.width ?? 0.11) * k)}px ${c.outline?.stroke ?? '#000'}`, paintOrder: 'stroke fill', padding: `${c.box.pad_y * k}px 0` }
+    : { padding: `${c.box.pad_y * k}px ${c.box.pad_x * k}px`, borderRadius: c.box.radius * k, background: c.box.fill, color: c.box.text }
+  return { cls: `st-captionbox ${upper ? 'upper' : c.position}`, box, span }
+}
+
+export function CaptionPreview({ text, data, video, image, width = 240, look }: { text: string; data: ContentData; video?: string | null; image?: string | null; width?: number; look?: CaptionStyle | null }) {
+  const o = data.options
+  const k = width / o.canvas.width
+  const css = captionCss(o, k, look)
   return (
     <div className="st-captionframe" style={{ width, height: (width * o.canvas.height) / o.canvas.width }}>
       {video ? <video src={assetUrl(video)} autoPlay muted loop playsInline /> : image ? <img src={assetUrl(image, 480)} alt="" /> : null}
       {text.trim() && (
-        <div className={`st-captionbox ${c.position}`} style={style}>
-          <span style={{ padding: `${c.box.pad_y * k}px ${c.box.pad_x * k}px`, borderRadius: c.box.radius * k, background: c.box.fill, color: c.box.text }}>{text.trim()}</span>
+        <div className={css.cls} style={css.box}>
+          <span style={css.span}>{text.trim()}</span>
         </div>
       )}
+    </div>
+  )
+}
+
+// Box or Outline for one post's captions (the account default first).
+export function CaptionStylePick({ value, onChange, data }: { value: CaptionStyle | null | undefined; onChange: (v: CaptionStyle) => void; data: ContentData }) {
+  const current = value ?? (data.options.caption.style === 'outline' ? 'outline' : 'box')
+  return (
+    <div className="st-seg sm" role="radiogroup" aria-label="Caption style">
+      {([['box', 'White box'], ['outline', 'Outline']] as const).map(([id, label]) => (
+        <button key={id} type="button" role="radio" aria-checked={current === id} className={current === id ? 'on' : ''} onClick={() => onChange(id)}>{label}</button>
+      ))}
     </div>
   )
 }
@@ -233,8 +258,9 @@ export function BrollUpload({ data }: { data: ContentData }) {
   const [busy, setBusy] = useState<string | null>(null)
   const [added, setAdded] = useState<string[]>([])
   async function upload(files: File[]) {
-    const videos = files.filter(f => f.type.startsWith('video/') || /\.(mp4|mov|webm|m4v)$/i.test(f.name))
-    if (!videos.length) { toast({ tone: 'bad', text: 'Pick video files (MP4, MOV or WebM).' }); return }
+    // A screenshot (an image) becomes a still B-roll clip (the green screen's background).
+    const videos = files.filter(f => f.type.startsWith('video/') || f.type.startsWith('image/') || /\.(mp4|mov|webm|m4v|png|jpe?g|webp)$/i.test(f.name))
+    if (!videos.length) { toast({ tone: 'bad', text: 'Pick video files (MP4, MOV or WebM) or a screenshot (PNG or JPEG).' }); return }
     for (const [i, f] of videos.entries()) {
       setBusy(`Uploading ${f.name} (${i + 1} of ${videos.length})...`)
       try { const b = await api.addBroll(f, product); setAdded(a => [...a, b.id]) } catch (e) { toast({ tone: 'bad', text: `${f.name}: ${errorMessage(e)}` }) }
@@ -246,8 +272,8 @@ export function BrollUpload({ data }: { data: ContentData }) {
     <div className="st-row" style={{ gap: 8, flexWrap: 'wrap' }}>
       <input className="st-input" style={{ maxWidth: 200 }} list="post-broll-products" value={product} onChange={e => setProduct(e.target.value)} placeholder="Product, e.g. Notion" aria-label="Product for new B-roll" />
       <datalist id="post-broll-products">{data.products.map(p => <option key={p} value={p} />)}</datalist>
-      <input ref={input} type="file" accept="video/*" multiple hidden onChange={e => { const f = Array.from(e.target.files ?? []); e.target.value = ''; void upload(f) }} />
-      <button type="button" className="st-btn sm" disabled={!!busy || !worker.ready} onClick={() => input.current?.click()}>{busy ? <Loader2 size={14} className="st-spin" /> : <Upload size={14} />}Upload B-roll</button>
+      <input ref={input} type="file" accept="video/*,image/png,image/jpeg,image/webp" multiple hidden onChange={e => { const f = Array.from(e.target.files ?? []); e.target.value = ''; void upload(f) }} />
+      <button type="button" className="st-btn sm" disabled={!!busy || !worker.ready} onClick={() => input.current?.click()} title="A screen recording, a phone video, or a screenshot">{busy ? <Loader2 size={14} className="st-spin" /> : <Upload size={14} />}Upload B-roll</button>
       {busy && <span className="st-hint">{busy}</span>}
       {!worker.ready && <span className="st-hint st-warntext">{worker.reason}</span>}
       <RunStatus match={j => added.some(id => j.purpose === `broll_ingest:${id}`)} />

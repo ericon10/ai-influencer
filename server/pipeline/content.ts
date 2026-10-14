@@ -10,7 +10,7 @@ import { AppError, notFound } from '../lib/errors.js'
 import { newId } from '../lib/ids.js'
 import { registerJobHook, registerLocalJob, type JobOutcome, type JobRow } from '../jobs/hooks.js'
 import { enqueueLocalJob, type JobSpec } from '../jobs/runner.js'
-import { captionPng, slideImage } from '../core/overlay.js'
+import { captionPng, captionWords, slideImage, type CaptionLook } from '../core/overlay.js'
 import { fill, hardWrap } from '../core/text.js'
 import { pronounVars } from '../core/prompts.js'
 import { transcodeBroll } from '../media/meme.js'
@@ -19,7 +19,9 @@ import { applySoundBed, type SoundBedResult } from '../media/sound.js'
 import { cutProblems, cutSchema, effectiveCut, type Cut } from '../core/cut.js'
 import { soundFile } from './sounds.js'
 import { EDIT_IDS } from '../config/pipeline.js'
-import { applyEdit, DEFAULT_FACE, detectBeats, mapTime, type EditStyle } from '../media/edits.js'
+import { applyEdit, DEFAULT_FACE, detectBeats, mapTime, overlayBehind, type EditStyle } from '../media/edits.js'
+import { personMaskVideo, segmentAvailable } from '../media/segment.js'
+import { makeScratch } from '../media/sound.js'
 import { extractFrameAt } from '../media/frames.js'
 import { withTempDir } from '../media/ffmpeg.js'
 import { getAsset, readAsset, saveAsset } from '../storage/assets.js'
@@ -158,8 +160,13 @@ export const editSpec = z.object({
   strength: z.enum(['subtle', 'normal', 'strong']).default('normal'),
   payoff: z.number().min(0).max(600).nullable().default(null),
   text: z.string().max(120).default(''),
+  // A layout choice (split screen: stacked or side by side).
+  variant: z.string().max(20).default(''),
 }).prefault({})
 export type EditSpec = z.infer<typeof editSpec>
+// The caption look for one post (null: the account's default from
+// content.yaml): TikTok's white box or the Outline style.
+const captionStyle = z.enum(['box', 'outline']).nullable().default(null)
 const memeSpec = z.object({
   clipId: id.nullable().default(null),
   // The still the clip was made from, when it was made in this post.
@@ -179,6 +186,7 @@ const memeSpec = z.object({
   // and the still it is being made from.
   clipB: id.nullable().default(null),
   stillB: id.nullable().default(null),
+  captionStyle,
 })
 const slideshowSpec = z.object({
   stillIds: z.array(id).max(20).default([]),
@@ -204,6 +212,7 @@ const batchObject = z.object({
   sound: soundSpec,
   // A batch takes the one-shot edits (each video has one clip).
   edit: editSpec,
+  captionStyle,
 })
 const batchSpec = z.preprocess(raw => {
   if (!raw || typeof raw !== 'object') return raw
@@ -391,10 +400,13 @@ function renderProblems(deps: Deps, row: ContentRow): string[] {
     out.push(...cutProblems(cut, s.caption, { maxShots: cfg.cut.max_shots, maxCaptions: cfg.cut.max_captions }))
     const style = deps.config.pipeline.edits.styles.find(x => x.id === s.edit.style)
     if (style?.shots === 2 && cut.shots.filter(x => x.kind === 'clip').length < 2) out.push(`Add shot B for the ${style.label.toLowerCase()} (Video step)`)
+    if (style?.needs.includes('background') && !cut.shots.some(x => x.kind === 'broll')) out.push(`Pick B-roll or a screenshot for the ${style.label.toLowerCase()} background (Video step)`)
   } else if (row.kind === 'batch') {
     const s = batchSpec.parse(row.spec)
     if (!s.clipIds.length) out.push('Pick a clip')
-    if (deps.config.pipeline.edits.styles.find(x => x.id === s.edit.style)?.shots === 2) out.push('A batch takes one-shot edits only; pick another edit style')
+    const bs = deps.config.pipeline.edits.styles.find(x => x.id === s.edit.style)
+    if (bs?.shots === 2) out.push('A batch takes one-shot edits only; pick another edit style')
+    if (bs?.needs.includes('background')) out.push(`A batch cannot use the ${bs.label.toLowerCase()} yet; pick another edit style`)
     if (!s.captions.some(c => c.trim())) out.push('Add captions (paste them or write them with Claude)')
   } else {
     const s = slideshowSpec.parse(row.spec)
@@ -433,10 +445,25 @@ async function setOutputs(deps: Deps, itemId: string, outputs: ContentOutputs, s
 // One video from a cut (Phase 3 rough cut): the shots joined with hard
 // cuts, the captions by time, then the sound bed, normalized to social
 // loudness. Free: ffmpeg and sharp on the worker.
-async function renderCut(deps: Deps, ctx: Ctx, job: JobRow, cut: Cut, input: { characterId: string; caption: string; sound: SoundSpec; label: string; edit?: EditSpec }) {
-  const cfg = deps.config.pipeline.content
+async function renderCut(deps: Deps, ctx: Ctx, job: JobRow, fullCut: Cut, input: { characterId: string; caption: string; sound: SoundSpec; label: string; edit?: EditSpec; captionStyle?: 'box' | 'outline' | null }) {
+  const base = deps.config.pipeline.content
+  // The post's caption look (box or outline) over the account's default.
+  const cfg = { ...base, caption: { ...base.caption, style: input.captionStyle ?? base.caption.style } }
+  const style = input.edit?.style ?? 'none'
+  const def = deps.config.pipeline.edits.styles.find(x => x.id === style)
+  // The green screen puts the B-roll behind her instead of cutting to it.
+  const behind = def?.needs.includes('background') ? fullCut.shots.find(x => x.kind === 'broll') ?? null : null
+  const cut: Cut = behind ? { ...fullCut, shots: fullCut.shots.filter(x => x !== behind) } : fullCut
   return withTempDir(async dir => {
     const shots: TimelineShot[] = []
+    let background: string | undefined
+    if (behind) {
+      const b = await getBroll(deps, ctx, behind.ref)
+      if (b.status !== 'ready' || !b.assetId) throw new AppError('bad_request', `The B-roll clip "${b.title}" is not ready yet.`)
+      const a = await readAsset(deps, ctx, b.assetId)
+      background = join(dir, `background.${a.row.mime.startsWith('image/') ? 'png' : 'mp4'}`)
+      await writeFile(background, a.data)
+    }
     for (const [i, sh] of cut.shots.entries()) {
       const path = join(dir, `shot${i}.mp4`)
       if (sh.kind === 'clip') {
@@ -464,8 +491,8 @@ async function renderCut(deps: Deps, ctx: Ctx, job: JobRow, cut: Cut, input: { c
     const picture = join(dir, 'picture.mp4'), out = join(dir, 'out.mp4')
     // A clip only has sound when the owner kept it (a clone with "Keep
     // original sound", an upload's own sound); every take is stored silent.
-    const style = input.edit?.style ?? 'none'
     let finalPicture = picture
+    let accents: Array<{ path: string; at: number; db?: number }> = []
     let durationSec: number
     let editNote: string | null = null
     if (style === 'none') {
@@ -475,13 +502,24 @@ async function renderCut(deps: Deps, ctx: Ctx, job: JobRow, cut: Cut, input: { c
       // captions (moved with the edit's time), then the sound bed.
       const clean = join(dir, 'clean.mp4'), edited = join(dir, 'edited.mp4')
       const t = await renderTimeline({ shots, captions: [], canvas: cfg.canvas, out: clean, keepSound: input.sound.clipSound, maxSeconds: cfg.cut.max_seconds })
-      const r = await runEdit(deps, ctx, { style, edit: input.edit!, cut, plan: t.shots, picture: clean, out: edited, dir, totalSec: t.durationSec, sound: input.sound })
+      const r = await runEdit(deps, ctx, { style, edit: input.edit!, cut, plan: t.shots, picture: clean, out: edited, dir, totalSec: t.durationSec, sound: input.sound, background })
       editNote = r.note
-      const moved = await editCaptions(deps, cut, captions, { style, edit: input.edit!, caption: input.caption, timeMap: r.timeMap, payoff: r.payoff, durationSec: r.durationSec, dir })
+      const moved = await editCaptions(deps, cut, captions, { style, edit: input.edit!, caption: input.caption, timeMap: r.timeMap, payoff: r.payoff, durationSec: r.durationSec, dir, cfg })
       finalPicture = join(dir, 'captioned.mp4')
-      durationSec = (await renderTimeline({ shots: [{ path: edited, in: 0, out: null }], captions: moved, canvas: cfg.canvas, out: finalPicture, keepSound: input.sound.clipSound })).durationSec
+      if (style === 'text_behind' && r.mask) {
+        // The words go between the room and her.
+        await overlayBehind({ video: edited, mask: r.mask, out: finalPicture, canvas: cfg.canvas, captions: moved })
+        durationSec = r.durationSec
+      } else {
+        durationSec = (await renderTimeline({ shots: [{ path: edited, in: 0, out: null }], captions: moved, canvas: cfg.canvas, out: finalPicture, keepSound: input.sound.clipSound })).durationSec
+      }
+      for (const [i, a] of (r.accents ?? []).entries()) {
+        const path = join(dir, `accent${i}.wav`)
+        await makeScratch(path)
+        accents.push({ path, at: a.at, db: -2 })
+      }
     }
-    const bed = await layBed(deps, ctx, finalPicture, out, dir, input.sound)
+    const bed = await layBed(deps, ctx, finalPicture, out, dir, input.sound, accents)
     const asset = await saveAsset(deps, ctx, { data: await readFile(out), mime: 'video/mp4', origin: 'derived', label: input.label, sourceJobId: job.id })
     return { assetId: asset.id, dropped, durationSec, editNote, sound: { layers: bed.layers, targetLufs: bed.targetLufs, ducked: bed.ducked } }
   })
@@ -490,7 +528,7 @@ async function renderCut(deps: Deps, ctx: Ctx, job: JobRow, cut: Cut, input: { c
 // One edit on the clean picture (Phase 5). Two-shot edits work on the cut
 // where shot B (the second clip) starts; a zoom finds her face first (the
 // face models on the worker), else the middle of the upper frame.
-async function runEdit(deps: Deps, ctx: Ctx, a: { style: EditStyle; edit: EditSpec; cut: Cut; plan: Array<{ start: number }>; picture: string; out: string; dir: string; totalSec: number; sound: SoundSpec }) {
+async function runEdit(deps: Deps, ctx: Ctx, a: { style: EditStyle; edit: EditSpec; cut: Cut; plan: Array<{ start: number }>; picture: string; out: string; dir: string; totalSec: number; sound: SoundSpec; background?: string }) {
   const cfg = deps.config.pipeline
   const def = cfg.edits.styles.find(x => x.id === a.style)
   if (!def) throw new AppError('bad_request', `Unknown edit style "${a.style}".`)
@@ -503,14 +541,24 @@ async function runEdit(deps: Deps, ctx: Ctx, a: { style: EditStyle; edit: EditSp
   if (def.shots === 2 && !cuts.length) throw new AppError('bad_request', `${def.label} needs shot B: add it in the Video step.`)
   const payoff = Math.max(0.2, Math.min(a.totalSec - 0.2, a.edit.payoff ?? a.totalSec - cfg.edits.payoff_from_end))
   let face = DEFAULT_FACE
-  if (['crash_zoom', 'zoom_reveal', 'punch_in'].includes(a.style)) {
-    const at = a.style === 'crash_zoom' ? Math.max(0, cuts[0]! - (params.seconds ?? 0.6)) : a.style === 'zoom_reveal' ? 0.05 : 0.5
+  if (['crash_zoom', 'zoom_reveal', 'punch_in', 'snap_zoom', 'dolly_zoom', 'record_scratch'].includes(a.style)) {
+    const at = a.style === 'crash_zoom' ? Math.max(0, cuts[0]! - (params.seconds ?? 0.6)) : a.style === 'zoom_reveal' ? 0.05 : a.style === 'punch_in' ? 0.5 : payoff
     face = await faceCenter(deps, a.picture, Math.min(at, a.totalSec - 0.05), a.dir) ?? DEFAULT_FACE
   }
   let beats: number[] | undefined
-  if (a.style === 'punch_in' && a.sound.music) beats = await detectBeats(await soundFile(deps, ctx, a.sound.music, a.dir, 'beat-music.m4a'), a.totalSec).catch(() => undefined)
-  const r = await applyEdit({ style: a.style, video: a.picture, out: a.out, workDir: a.dir, canvas: cfg.content.canvas, params, cuts, payoff, face, beats })
-  return { ...r, payoff }
+  if ((a.style === 'punch_in' || a.style === 'velocity') && a.sound.music) beats = await detectBeats(await soundFile(deps, ctx, a.sound.music, a.dir, 'beat-music.m4a'), a.totalSec).catch(() => undefined)
+  // Her outline, for the edits that put something behind her (free, on
+  // the worker; the person model ships with the face models).
+  let mask: string | undefined
+  let maskNote = ''
+  if (def.needs.includes('mask')) {
+    if (!segmentAvailable(deps.env.STUDIO_MODELS_DIR)) throw new AppError('bad_request', `${def.label} needs the person model on the worker (npm run models).`)
+    mask = join(a.dir, 'mask.mp4')
+    const m = await personMaskVideo(a.picture, mask, { modelsDir: deps.env.STUDIO_MODELS_DIR, fps: cfg.content.canvas.fps })
+    if (m.coverage < 0.02) maskNote = ' No person was found in the clip, so nothing sits in front.'
+  }
+  const r = await applyEdit({ style: a.style, video: a.picture, out: a.out, workDir: a.dir, canvas: cfg.content.canvas, params, cuts, payoff, face, beats, mask, background: a.background, variant: a.edit.variant || def.variants?.[0]?.id })
+  return { ...r, note: r.note || maskNote ? `${r.note ?? ''}${maskNote}`.trim() : null, payoff, mask }
 }
 
 // Where her face is in a frame, as a share of the frame; null when the face
@@ -529,24 +577,27 @@ async function faceCenter(deps: Deps, video: string, at: number, dir: string): P
 }
 
 // The captions after an edit: moved with its time; word by word for Word
-// pop; a pop in the middle during a freeze.
-async function editCaptions(deps: Deps, cut: Cut, captions: TimelineCaption[], a: { style: EditStyle; edit: EditSpec; caption: string; timeMap: Array<[number, number]>; payoff: number; durationSec: number; dir: string }): Promise<TimelineCaption[]> {
-  const cfg = deps.config.pipeline.content
+// pop; each word lit in turn for Karaoke; big and plain for Text behind
+// subject (laid behind her later); a pop during a freeze (the freeze pop
+// and the record scratch), with the other captions stepping aside.
+type ContentCfg = Deps['config']['pipeline']['content']
+async function editCaptions(deps: Deps, cut: Cut, captions: TimelineCaption[], a: { style: EditStyle; edit: EditSpec; caption: string; timeMap: Array<[number, number]>; payoff: number; durationSec: number; dir: string; cfg?: ContentCfg }): Promise<TimelineCaption[]> {
+  const cfg = a.cfg ?? deps.config.pipeline.content
   const def = deps.config.pipeline.edits.styles.find(x => x.id === a.style)!
   const params = def.params[a.edit.strength] ?? def.params.normal
   const moved = captions.map(c => ({ ...c, start: mapTime(a.timeMap, c.start), end: c.end == null ? null : Math.min(a.durationSec, mapTime(a.timeMap, c.end)) }))
   const fps = cfg.canvas.fps
-  const png = async (text: string, name: string, over: Partial<typeof cfg.caption> = {}) => {
+  const png = async (text: string, name: string, over: Partial<typeof cfg.caption> = {}, look: CaptionLook = {}) => {
     const file = join(a.dir, name)
-    await writeFile(file, (await captionPng(text, { canvas: cfg.canvas, caption: { ...cfg.caption, ...over } })).png)
+    await writeFile(file, (await captionPng(text, { canvas: cfg.canvas, caption: { ...cfg.caption, ...over } }, look)).png)
     return file
   }
+  const texts = cut.captions.map(c => (c.text ?? a.caption).trim())
   if (a.style === 'word_pop') {
     // Each caption appears one word at a time; each new word pops for two
     // frames. Long captions step a few words at a time.
     const out: TimelineCaption[] = []
-    for (const [ci, c] of cut.captions.entries()) {
-      const text = (c.text ?? a.caption).trim()
+    for (const [ci, text] of texts.entries()) {
       const at = moved[ci]
       if (!text || !at) continue
       const words = text.split(/\s+/)
@@ -565,34 +616,88 @@ async function editCaptions(deps: Deps, cut: Cut, captions: TimelineCaption[], a
     }
     return out
   }
-  if (a.style === 'freeze_pop') {
-    // The pop text (or the main caption) springs in the middle of the
-    // frozen frame: small, overshoot, settle, then holds.
-    const text = (a.edit.text || cut.captions.map(c => (c.text ?? a.caption).trim()).find(Boolean) || '').trim()
+  if (a.style === 'karaoke') {
+    // The whole caption shows; each word lights up in turn, timed by its
+    // length (or by the voice line's own word times when there are some).
+    const out: TimelineCaption[] = []
+    for (const [ci, text] of texts.entries()) {
+      const at = moved[ci]
+      if (!text || !at) continue
+      const words = captionWords(text, { canvas: cfg.canvas, caption: cfg.caption })
+      const end = at.end ?? a.durationSec
+      const timed = (cut.captions[ci] as { words?: Array<{ start: number; end: number }> }).words
+      const times = timed?.length === words.length
+        ? timed.map(w => mapTime(a.timeMap, w.start))
+        : wordStarts(words, at.start, end)
+      for (const [k, t0] of times.entries()) {
+        const t1 = k < times.length - 1 ? times[k + 1]! : end
+        if (t1 - t0 < 0.02) continue
+        out.push({ png: await png(text, `k${ci}_${k}.png`, {}, { highlight: k, pill: (params.pill ?? 1) >= 1, pop: params.pop ?? 1 }), start: t0, end: k < times.length - 1 ? t1 : at.end })
+      }
+    }
+    return out
+  }
+  if (a.style === 'text_behind') {
+    // Big, plain words in the upper third; they go behind her later.
+    const out: TimelineCaption[] = []
+    for (const [ci, text] of texts.entries()) {
+      const at = moved[ci]
+      if (!text || !at) continue
+      out.push({ png: await png(text.toUpperCase(), `tb${ci}.png`, { style: 'plain', size: cfg.caption.size * (params.size ?? 2.2), position: 'upper_third', max_width: cfg.canvas.width - 2 * cfg.caption.safe.left, max_lines: 4 }), start: at.start, end: at.end })
+    }
+    return out
+  }
+  if (a.style === 'freeze_pop' || a.style === 'record_scratch') {
+    // The pop text springs in during the frozen frame: small, overshoot,
+    // settle, then holds. The other captions step aside meanwhile.
+    const text = (a.edit.text || (a.style === 'record_scratch' ? def.text ?? '' : texts.find(Boolean) ?? '')).trim()
     if (!text) return moved
     const start = a.payoff
     // The freeze is the jump in the edit's time map at the payoff.
     const held = Math.max(0.3, mapTime(a.timeMap, a.payoff + 0.0001) - a.payoff)
     const end = Math.min(a.durationSec, start + held)
-    const scales = [0.6, 0.85, 1.12, 1.04, 1]
-    const out = [...moved]
+    const scales = a.style === 'record_scratch' ? [0.92, 1.03, 1] : [0.6, 0.85, 1.12, 1.04, 1]
+    const big = a.style === 'record_scratch' ? 1 : 1.25
+    const out = aside(moved, start, end)
     for (const [i, k] of scales.entries()) {
       const t0 = start + i / fps, t1 = i < scales.length - 1 ? start + (i + 1) / fps : end
-      out.push({ png: await png(text, `pop${i}.png`, { size: cfg.caption.size * 1.25 * k, position: 'middle' }), start: t0, end: t1 })
+      out.push({ png: await png(text, `pop${i}.png`, { size: cfg.caption.size * big * k, position: 'upper_third' }), start: t0, end: t1 })
     }
     return out
   }
   return moved
 }
 
+// Captions with a window cut out of them (they step aside for a pop).
+function aside(list: TimelineCaption[], from: number, to: number): TimelineCaption[] {
+  const out: TimelineCaption[] = []
+  for (const c of list) {
+    const end = c.end ?? Number.POSITIVE_INFINITY
+    if (c.start < from) out.push({ ...c, end: Math.min(end, from) === Number.POSITIVE_INFINITY ? null : Math.min(end, from) })
+    if (end > to) out.push({ ...c, start: Math.max(c.start, to) })
+  }
+  return out
+}
+
+// When each word starts, spread over the caption's time by word length.
+export function wordStarts(words: string[], start: number, end: number): number[] {
+  const weight = words.map(w => w.replace(/[^\p{L}\p{N}]/gu, '').length + 1)
+  const total = weight.reduce((x, y) => x + y, 0) || 1
+  const span = Math.max(0.1, end - start)
+  const out: number[] = []
+  let t = start
+  for (const w of weight) { out.push(Math.round(t * 1000) / 1000); t += (span * w) / total }
+  return out
+}
+
 // The sound bed under a finished picture (SPEC 5.5).
-async function layBed(deps: Deps, ctx: Ctx, picture: string, out: string, dir: string, s: SoundSpec): Promise<SoundBedResult> {
+async function layBed(deps: Deps, ctx: Ctx, picture: string, out: string, dir: string, s: SoundSpec, accents: Array<{ path: string; at: number; db?: number }> = []): Promise<SoundBedResult> {
   const cfg = deps.config.pipeline.content.sound
   const ambienceId = s.ambience ?? cfg.default_ambience
   const ambience = ambienceId === 'none' ? null : ambienceId === 'room' ? { builtin: 'room' as const } : { path: await soundFile(deps, ctx, ambienceId, dir, 'ambience.m4a') }
   const music = s.music ? { path: await soundFile(deps, ctx, s.music, dir, 'music.m4a') } : null
   return applySoundBed({
-    video: picture, out, workDir: dir, clipSound: s.clipSound, ambience, ambienceDb: cfg.levels[s.ambienceLevel], music, musicDb: cfg.levels[s.musicLevel], duck: s.duck,
+    video: picture, out, workDir: dir, clipSound: s.clipSound, ambience, ambienceDb: cfg.levels[s.ambienceLevel], music, musicDb: cfg.levels[s.musicLevel], duck: s.duck, accents,
     levels: { target: cfg.target_lufs, truePeak: cfg.true_peak, ambienceAlone: cfg.ambience_only_lufs, ambience: cfg.ambience_lufs, music: cfg.music_lufs, duck: { threshold: cfg.duck.threshold, ratio: cfg.duck.ratio, attackMs: cfg.duck.attack_ms, releaseMs: cfg.duck.release_ms } },
   })
 }
@@ -605,7 +710,7 @@ async function runContentRender(deps: Deps, ctx: Ctx, job: JobRow): Promise<unkn
     if (row.kind === 'meme') {
       const s = memeSpec.parse(row.spec)
       const cut = effectiveCut(s, deps.config.pipeline.content.meme.max_broll_seconds)
-      const v = await renderCut(deps, ctx, job, cut, { characterId: row.characterId!, caption: s.caption, sound: s.sound, edit: s.edit, label: `Video post: ${s.caption.slice(0, 60)}` })
+      const v = await renderCut(deps, ctx, job, cut, { characterId: row.characterId!, caption: s.caption, sound: s.sound, edit: s.edit, captionStyle: s.captionStyle, label: `Video post: ${s.caption.slice(0, 60)}` })
       const outputs: ContentOutputs = { videoAssetId: v.assetId, dropped: v.dropped, durationSec: v.durationSec, sound: v.sound, editNote: v.editNote, renderedAt: deps.clock.now().toISOString() }
       await setOutputs(deps, itemId, outputs, 'ready')
       return outputs
@@ -658,7 +763,7 @@ async function renderBatchVideo(deps: Deps, ctx: Ctx, job: JobRow, row: ContentR
     try {
       const src = batchSources(s, index)
       const cut = effectiveCut({ ...s, ...src }, deps.config.pipeline.content.meme.max_broll_seconds)
-      const v = await renderCut(deps, ctx, job, cut, { characterId: row.characterId!, caption, sound: s.sound, edit: s.edit, label: `Batch ${name} ${index + 1}: ${caption.slice(0, 50)}` })
+      const v = await renderCut(deps, ctx, job, cut, { characterId: row.characterId!, caption, sound: s.sound, edit: s.edit, captionStyle: s.captionStyle, label: `Batch ${name} ${index + 1}: ${caption.slice(0, 50)}` })
       result = { caption, assetId: v.assetId, clipId: src.clipId!, brollId: src.brollId }
     } catch (e) {
       error = `Video ${index + 1} failed: ${(e as Error).message.slice(0, 300)}`
@@ -863,13 +968,13 @@ export async function contentView(deps: Deps, ctx: Ctx) {
     // Account tags in use, most recent first (the Idea step suggests them).
     accountTags: [...new Set(items.map(i => i.accountTag).filter(Boolean))],
     options: {
-      caption: { size: cfg.caption.size, safe: cfg.caption.safe, position: cfg.caption.position, maxChars: cfg.caption.max_chars, box: cfg.caption.box },
+      caption: { size: cfg.caption.size, safe: cfg.caption.safe, position: cfg.caption.position, maxChars: cfg.caption.max_chars, box: cfg.caption.box, style: cfg.caption.style, outline: cfg.caption.outline, karaoke: cfg.caption.karaoke },
       canvas: cfg.canvas, meme: cfg.meme, slideshow: { slides: cfg.slideshow.slides, maxStills: cfg.slideshow.max_stills }, batch: cfg.batch,
       maxUploadMb: cfg.broll.max_upload_mb,
       cut: cfg.cut,
       sound: { defaultAmbience: cfg.sound.default_ambience, targetLufs: cfg.sound.target_lufs, maxUploadMb: cfg.sound.max_upload_mb },
       chain: { maxParts: cfg.chain.max_parts },
-      edits: { styles: deps.config.pipeline.edits.styles.map(e => ({ id: e.id, label: e.label, line: e.line, shots: e.shots, anchor: e.anchor, slots: e.slots ?? null, params: e.params })), payoffFromEnd: deps.config.pipeline.edits.payoff_from_end },
+      edits: { styles: deps.config.pipeline.edits.styles.map(e => ({ id: e.id, label: e.label, line: e.line, shots: e.shots, anchor: e.anchor, slots: e.slots ?? null, params: e.params, stage: e.stage, needs: e.needs, variants: e.variants ?? null, text: e.text ?? null })), payoffFromEnd: deps.config.pipeline.edits.payoff_from_end },
     },
   }
 }

@@ -9,7 +9,8 @@ import { join, resolve } from 'node:path'
 import sharp from 'sharp'
 import { loadConfig } from '../server/config/load.js'
 import { captionPng } from '../server/core/overlay.js'
-import { applyEdit, mapTime, type EditStyle } from '../server/media/edits.js'
+import { applyEdit, mapTime, overlayBehind, type EditStyle } from '../server/media/edits.js'
+import { personMaskVideo } from '../server/media/segment.js'
 import { ffmpeg } from '../server/media/ffmpeg.js'
 import { renderTimeline, type TimelineCaption } from '../server/media/timeline.js'
 
@@ -58,10 +59,21 @@ async function drawShot(dir: string, name: string, look: Look): Promise<string> 
   return out
 }
 
-async function captionFile(dir: string, text: string, name: string, over: Partial<typeof caption> = {}): Promise<string> {
+async function captionFile(dir: string, text: string, name: string, over: Partial<typeof caption> = {}, look: Parameters<typeof captionPng>[2] = {}): Promise<string> {
   const file = join(dir, name)
-  await writeFile(file, (await captionPng(text, { canvas, caption: { ...caption, ...over } as typeof caption })).png)
+  await writeFile(file, (await captionPng(text, { canvas, caption: { ...caption, ...over } as typeof caption }, look)).png)
   return file
+}
+
+// A drawn "post" for the green screen's background: a card with an avatar,
+// lines of text and a picture block.
+async function postImage(out: string) {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}"><rect width="${W}" height="${H}" fill="#eef1f5"/>
+  <rect x="20" y="40" width="${W - 40}" height="${H * 0.55}" rx="18" fill="#ffffff"/>
+  <circle cx="56" cy="80" r="18" fill="#7aa2e3"/><rect x="84" y="68" width="120" height="10" rx="5" fill="#c7cdd6"/><rect x="84" y="86" width="80" height="8" rx="4" fill="#dde1e7"/>
+  <rect x="38" y="118" width="${W - 76}" height="12" rx="6" fill="#d0d5dc"/><rect x="38" y="140" width="${W - 120}" height="12" rx="6" fill="#d0d5dc"/>
+  <rect x="38" y="168" width="${W - 76}" height="${H * 0.55 - 150}" rx="12" fill="#f3b562"/></svg>`
+  await sharp(Buffer.from(svg)).png().toFile(out)
 }
 
 async function toWebp(video: string, out: string) {
@@ -88,15 +100,40 @@ async function main() {
   const two = await join2(a, b, 'two')
   const hand = await join2(ha, hb, 'hand')
   const face = { x: 0.5, y: 300 / H }
-  const styles = cfg.pipeline.edits.styles
+  const styles = cfg.pipeline.edits.styles.filter(s => !process.env.ONLY || process.env.ONLY.split(',').includes(s.id))
+  const masks = new Map<string, string>()
+  const maskOf = async (src: string) => {
+    if (!masks.has(src)) { const m = `${src}.mask.mp4`; await personMaskVideo(src, m, { modelsDir: process.env.STUDIO_MODELS_DIR || '.data/models', fps: FPS }); masks.set(src, m) }
+    return masks.get(src)!
+  }
+  const post = join(dir, 'post.png')
+  await postImage(post)
   for (const s of styles) {
     const params = s.params.normal
-    const src = s.id === 'hand_lens' ? hand : s.shots === 2 || s.id === 'flash_shake' ? two : one
+    const atCut = s.shots === 2 || s.id === 'flash_shake' || s.id === 'glitch'
+    const src = s.id === 'hand_lens' ? hand : atCut ? two : one
     const edited = join(dir, `${s.id}.mp4`)
-    const payoff = 0.9
-    const r = await applyEdit({ style: s.id as EditStyle, video: src, out: edited, workDir: dir, canvas, params: { ...params, ...(s.id === 'punch_in' ? { every: 0.5 } : {}) }, cuts: s.shots === 2 || s.id === 'flash_shake' ? [SEC] : [], payoff, face })
+    const payoff = s.id === 'dolly_zoom' ? 0.3 : s.id === 'snap_zoom' ? 0.6 : 0.9
+    const mask = s.needs.includes('mask') ? await maskOf(src) : undefined
+    const r = await applyEdit({ style: s.id as EditStyle, video: src, out: edited, workDir: dir, canvas, params: { ...params, ...(s.id === 'punch_in' ? { every: 0.5 } : {}) }, cuts: atCut ? [SEC] : [], payoff, face, mask, background: s.id === 'green_screen' ? post : undefined })
     let final = edited
-    // The two caption edits show their captions.
+    // The caption edits show their captions.
+    if (s.id === 'karaoke' || s.id === 'record_scratch') {
+      const caps: TimelineCaption[] = []
+      if (s.id === 'karaoke') {
+        const words = 'wait for the end'.split(' ')
+        for (let i = 0; i < words.length; i++) caps.push({ png: await captionFile(dir, words.join(' '), `kk${i}.png`, {}, { highlight: i, pill: true }), start: 0.1 + i * 0.45, end: i < words.length - 1 ? 0.1 + (i + 1) * 0.45 : null })
+      } else {
+        const held = mapTime(r.timeMap, payoff + 0.0001) - payoff
+        caps.push({ png: await captionFile(dir, "Yep, that's me.", 'rs.png', { position: 'upper_third' }), start: payoff, end: payoff + held })
+      }
+      final = join(dir, `${s.id}-cap.mp4`)
+      await renderTimeline({ shots: [{ path: edited, in: 0, out: null }], captions: caps, canvas, out: final, keepSound: false })
+    }
+    if (s.id === 'text_behind') {
+      final = join(dir, `${s.id}-cap.mp4`)
+      await overlayBehind({ video: edited, mask: mask!, out: final, canvas, captions: [{ png: await captionFile(dir, 'WAIT', 'tb.png', { style: 'plain', size: caption.size * 3, position: 'middle' }), start: 0, end: null }] })
+    }
     if (s.id === 'word_pop' || s.id === 'freeze_pop') {
       const caps: TimelineCaption[] = []
       if (s.id === 'word_pop') {
@@ -105,7 +142,7 @@ async function main() {
         for (let i = 1; i <= words.length; i++) caps.push({ png: await captionFile(dir, words.slice(0, i).join(' '), `wp${i}.png`), start: (i - 1) * per + 0.1, end: i < words.length ? i * per + 0.1 : null })
       } else {
         const held = mapTime(r.timeMap, payoff + 0.0001) - payoff
-        caps.push({ png: await captionFile(dir, 'NO WAY', 'pop.png', { size: caption.size * 1.25, position: 'middle' }), start: payoff, end: payoff + held })
+        caps.push({ png: await captionFile(dir, 'NO WAY', 'pop.png', { size: caption.size * 1.25, position: 'upper_third' }), start: payoff, end: payoff + held })
       }
       final = join(dir, `${s.id}-cap.mp4`)
       await renderTimeline({ shots: [{ path: edited, in: 0, out: null }], captions: caps, canvas, out: final, keepSound: false })

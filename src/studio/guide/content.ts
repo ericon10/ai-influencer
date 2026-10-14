@@ -260,7 +260,7 @@ export const GUIDE: GuideSection[] = [
     where: 'Any post > Caption (Slides for a slideshow, Captions for a batch)',
     intro: 'A video post has one caption in TikTok\'s white box. A slideshow has a hook on slide 1, slides, a post caption and hashtags; Claude can write them. A batch has one caption per line, one video each; Claude can write as many as you ask for.',
     steps: [
-      'Video post: type the caption and watch the preview.',
+      'Video post: type the caption and watch the preview. Pick White box or Outline (white text with a black stroke, TikTok Classic). It sits in the upper third, off her mouth and hands.',
       'Slideshow: press Write the slides (or type them), add or remove slides, then the caption and hashtags.',
       'Batch: set How many, press Write, and edit the list. The clips rotate across the captions.',
     ],
@@ -280,7 +280,7 @@ export const GUIDE: GuideSection[] = [
     steps: [
       'Check the rough cut. Click a block to trim it, move it or remove it; add a clip, B-roll or a timed caption. Rebuild goes back to the automatic cut.',
       'Pick the sound: Room tone (the default), a recording you uploaded, or None; add a music track you uploaded if you like. Music dips under the clip\'s own sound.',
-      'Edit style (optional, default None): ten edits made by code, each with a moving preview: crash zoom cut, speed ramp, punch-in on the beat, freeze and caption pop, flash and shake, seamless loop, word-by-word pop, whip pan, hand over the lens, zoom-out reveal. Pick Subtle, Normal or Strong.',
+      'Edit style (optional, default None): twenty edits made by code, each with a moving preview. Pack 1: crash zoom cut, speed ramp, punch-in on the beat, freeze and caption pop, flash and shake, seamless loop, word-by-word pop, whip pan, hand over the lens, zoom-out reveal. Pack 2: velocity edit, text behind subject, karaoke captions, split screen, green-screen reaction, glitch hit, zoom-rotate spin, dolly zoom, record-scratch freeze, snap zoom. Pick Subtle, Normal or Strong.',
       'Press Export MP4 (it shows what is still missing if anything is), or Fine-tune for a full-screen editor: split, trim and move shots, retime captions, then Done saves and exports.',
       'Download MP4.',
       'Turn on TikTok\'s AI-generated content label when you post.',
@@ -351,7 +351,8 @@ export const GLOSSARY: Array<[string, string]> = [
   ['Fine-tune', 'The full-screen editor over a post: the rough cut as layers you can split, trim and move. Done saves and exports.'],
   ['Continue this shot', 'Make the next take from the last frame of a clip, then join them into one longer clip.'],
   ['Edit style', 'An edit made by code on the worker, free, never by a video model: a crash zoom, a speed ramp, a freeze and pop and more. Default None.'],
-  ['Shot B', 'The second shot of a two-shot edit (crash zoom cut, whip pan, hand over the lens), right after the clip.'],
+  ['Shot B', 'The second shot of a two-shot edit (crash zoom cut, whip pan, hand over the lens, zoom-rotate spin), right after the clip; for split screen it plays beside or below it.'],
+  ['Person mask', 'Her outline in every frame, made free on the worker, for text behind her, the green screen and the dolly zoom.'],
   ['Payoff', 'Where a speed ramp, freeze or flash lands. Automatic (2 s before the end) until you drag it in Fine-tune.'],
   ['Room tone', 'The quiet sound of a room, made by code. The default ambience; a silent video sounds dead.'],
   ['LUFS', 'How loud a video sounds overall. Posts are normalized to -14, like TikTok, Reels and Shorts play them.'],

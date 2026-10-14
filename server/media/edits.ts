@@ -16,6 +16,8 @@ import type { Canvas } from './meme.js'
 // can follow.
 
 export type EditStyle = 'crash_zoom' | 'speed_ramp' | 'punch_in' | 'freeze_pop' | 'flash_shake' | 'seamless_loop' | 'word_pop' | 'whip_pan' | 'hand_lens' | 'zoom_reveal'
+  // Edit pack 2 (overnight run, 2026-10-14).
+  | 'velocity' | 'text_behind' | 'karaoke' | 'split_screen' | 'green_screen' | 'glitch' | 'spin' | 'dolly_zoom' | 'record_scratch' | 'snap_zoom'
 
 export interface EditInput {
   style: EditStyle
@@ -32,6 +34,13 @@ export interface EditInput {
   face?: { x: number; y: number }
   // Beat times from the music, for the punch-ins.
   beats?: number[]
+  // Her outline, frame for frame with the picture (white where she is),
+  // for the edits that put something behind her.
+  mask?: string
+  // What goes behind her on the green screen (a video or a still image).
+  background?: string
+  // A layout choice (split screen: "stacked" or "side").
+  variant?: string
 }
 
 export interface EditResult {
@@ -39,6 +48,8 @@ export interface EditResult {
   // Points [time in the picture, time in the result] to move captions by.
   timeMap: Array<[number, number]>
   note: string | null
+  // Sound accents the edit asks for (made by code), at a time in the result.
+  accents?: Array<{ kind: 'scratch'; at: number }>
 }
 
 export const DEFAULT_FACE = { x: 0.5, y: 0.38 }
@@ -72,6 +83,9 @@ interface Seg {
   freeze?: number
   // A white flash over the start of the segment, this long.
   flash?: number
+  // Filters that also use her outline (the mask, trimmed the same way):
+  // inputs are the segment's picture and mask labels, output the label.
+  withMask?: (v: string, m: string, out: string, k: number) => string[]
 }
 
 async function renderSegments(e: EditInput, segs: Seg[], hasAudio: boolean): Promise<void> {
@@ -79,8 +93,19 @@ async function renderSegments(e: EditInput, segs: Seg[], hasAudio: boolean): Pro
   const n = segs.length
   const f: string[] = [`[0:v]split=${n}${segs.map((_, k) => `[i${k}]`).join('')}`]
   if (hasAudio) f.push(`[0:a]asplit=${n}${segs.map((_, k) => `[j${k}]`).join('')}`)
+  const masked = segs.map((s, k) => (s.withMask ? k : -1)).filter(k => k >= 0)
+  if (masked.length && !e.mask) throw new MediaError('This edit needs her outline (the person mask).')
+  if (masked.length) f.push(`[1:v]format=gray,split=${masked.length}${masked.map(k => `[mi${k}]`).join('')}`)
   for (const [k, s] of segs.entries()) {
     const range = s.startFrame != null ? `trim=start_frame=${s.startFrame}:end_frame=${s.endFrame}` : `trim=start=${r3(s.start!)}:end=${r3(s.end!)}`
+    if (s.withMask) {
+      f.push(`[i${k}]${range},setpts=PTS-STARTPTS,setsar=1,format=yuv420p[sv${k}]`)
+      f.push(`[mi${k}]${range},setpts=PTS-STARTPTS,scale=${W}:${H},format=gray[sm${k}]`)
+      f.push(...s.withMask(`[sv${k}]`, `[sm${k}]`, `[w${k}]`, k))
+      f.push(`[w${k}]setsar=1,format=yuv420p[v${k}]`)
+      if (hasAudio) f.push(`[j${k}]atrim=start=${r3(s.start!)}:end=${r3(s.end!)},asetpts=PTS-STARTPTS,aformat=sample_rates=48000:channel_layouts=stereo[a${k}]`)
+      continue
+    }
     if (s.freeze) {
       const frames = Math.max(1, Math.round(s.freeze * fps))
       f.push(`[i${k}]trim=start=${r3(s.start!)}:duration=${r3(1.5 / fps)},setpts=PTS-STARTPTS,select='eq(n,0)',loop=loop=${frames - 1}:size=1:start=0,setpts=N/(${fps}*TB),fps=${fps}${s.vf ? `,${s.vf}` : ''}[v${k}]`)
@@ -99,7 +124,33 @@ async function renderSegments(e: EditInput, segs: Seg[], hasAudio: boolean): Pro
     }
   }
   f.push(`${segs.map((_, k) => (hasAudio ? `[v${k}][a${k}]` : `[v${k}]`)).join('')}concat=n=${n}:v=1:a=${hasAudio ? 1 : 0}[v]${hasAudio ? '[a]' : ''}`)
-  await ffmpeg(['-i', e.video, '-filter_complex', f.join(';'), '-map', '[v]', ...(hasAudio ? ['-map', '[a]'] : []), ...workArgs(fps, hasAudio), e.out], 900_000)
+  await ffmpeg(['-i', e.video, ...(masked.length ? ['-i', e.mask!] : []), '-filter_complex', f.join(';'), '-map', '[v]', ...(hasAudio ? ['-map', '[a]'] : []), ...workArgs(fps, hasAudio), e.out], 900_000)
+}
+
+// A steady zoom on her face (z fixed), for the snap zoom's steps.
+const holdZoom = (e: EditInput, z: number) => zoomTo(e, String(z))
+
+// Pseudo-random but repeatable numbers (the glitch looks the same each export).
+const jitter = (k: number, salt: number) => {
+  const x = Math.sin(k * 12.9898 + salt * 78.233) * 43758.5453
+  return x - Math.floor(x)
+}
+
+// Slow and fast stretches of a picture as segments, with the time map.
+function speedSegments(D: number, pieces: Array<{ start: number; end: number; speed: number }>, fps: number) {
+  const segs: Seg[] = []
+  const map: Array<[number, number]> = [[0, 0]]
+  let out = 0
+  for (const p of pieces) {
+    if (p.end - p.start < 1 / fps) continue
+    const sp = p.speed
+    const vf = sp === 1 ? undefined : sp < 1 ? `setpts=PTS/${sp.toFixed(4)},minterpolate=fps=${fps}:mi_mode=blend` : `setpts=PTS/${sp.toFixed(4)}`
+    segs.push({ start: p.start, end: p.end, ...(vf ? { vf } : {}), ...(sp === 1 ? {} : { af: atempoChain(sp) }) })
+    out += (p.end - p.start) / sp
+    map.push([p.end, out])
+  }
+  if (map.at(-1)![0] < D) map.push([D, out + (D - map.at(-1)![0])])
+  return { segs, map, duration: out }
 }
 
 // A zoom toward her face, frame by frame: z is an expression of the
@@ -261,10 +312,193 @@ export async function applyEdit(e: EditInput): Promise<EditResult> {
       return { durationSec: D, timeMap: id(), note: `No dark frame near the cut (the lens was not covered), so a ${r3(d)} s dip to black on each side.` }
     }
     case 'word_pop':
-      // The picture is unchanged; the captions pop word by word.
+    case 'karaoke':
+    case 'text_behind':
+      // The picture is unchanged here; the captions carry these edits
+      // (text behind subject is laid in with overlayBehind).
       await ffmpeg(['-i', e.video, '-c', 'copy', e.out])
       return { durationSec: D, timeMap: id(), note: null }
+    case 'velocity': {
+      // Fast, then slow right on the beat, then fast again: the speed
+      // ramps used in velocity edits, on the music's beat (or a steady grid).
+      const fast = p.fast ?? 2, slow = p.slow ?? 0.4, win = p.window ?? 0.5, every = p.every ?? 1
+      const ramp = Math.min(0.08, win / 4)
+      let beats = (e.beats ?? []).filter(b => b > 0.4 && b < D - 0.3)
+      if (beats.length >= 2 && (beats[beats.length - 1]! - beats[0]!) / (beats.length - 1) < 0.45) beats = beats.filter((_, i) => i % 2 === 0)
+      if (!beats.length) beats = Array.from({ length: Math.max(1, Math.floor((D - 0.6) / every)) }, (_, i) => r3(0.6 + i * every)).filter(b => b < D - 0.3)
+      const pieces: Array<{ start: number; end: number; speed: number }> = []
+      let t = 0
+      for (const b of beats) {
+        const a = Math.max(t, b - win * 0.35), z = Math.min(D, b + win * 0.65)
+        if (z - a < 0.15) continue
+        if (a - ramp > t) pieces.push({ start: t, end: a - ramp, speed: fast })
+        if (a - ramp >= t) pieces.push({ start: Math.max(t, a - ramp), end: a, speed: (fast + slow) / 2 })
+        pieces.push({ start: a, end: z, speed: slow })
+        t = z
+        if (t + ramp < D) { pieces.push({ start: t, end: t + ramp, speed: (fast + slow) / 2 }); t += ramp }
+      }
+      if (t < D - 0.02) pieces.push({ start: t, end: D, speed: fast })
+      const s2 = speedSegments(D, pieces, fps)
+      await renderSegments(e, s2.segs, audio)
+      return { durationSec: s2.duration, timeMap: s2.map, note: `${beats.length} slow-motion hits at ${slow}x, ${fast}x between${e.beats?.length ? ', on the music\'s beat' : ''}.` }
+    }
+    case 'snap_zoom': {
+      // Two instant punch-ins on her reaction, then back to the full frame.
+      const a = clampTime(e.payoff, D)
+      const g = p.gap ?? 0.25, hold = p.hold ?? 1, z1 = p.zoom1 ?? 1.3, z2 = p.zoom2 ?? 1.65
+      const b = Math.min(D, a + g), c = Math.min(D, b + hold)
+      const segs: Seg[] = [{ start: 0, end: a }, { start: a, end: b, vf: holdZoom(e, z1) }]
+      if (c > b + 0.02) segs.push({ start: b, end: c, vf: holdZoom(e, z2) })
+      if (c < D - 0.02) segs.push({ start: c, end: D })
+      await renderSegments(e, segs, audio)
+      return { durationSec: D, timeMap: id(), note: `Snaps to ${z1}x at ${r3(a)} s, then ${z2}x for ${r3(c - b)} s.` }
+    }
+    case 'glitch': {
+      // A burst of RGB split, sideways jumps and noise on the hit (the first
+      // cut, or the payoff). Each 2-frame slice has its own offsets; every
+      // frame is still one picture, never two blended.
+      const at = firstCut ?? clampTime(e.payoff, D)
+      const S = Math.min(p.seconds ?? 0.35, D - 0.1)
+      const amp = Math.round((p.shift ?? 16) * (e.canvas.width / 1080))
+      const slice = 2 / fps
+      const from = Math.max(0, at - S / 2), to = Math.min(D, from + S)
+      const segs: Seg[] = []
+      if (from > 0.01) segs.push({ start: 0, end: from })
+      const { width: W, height: H } = e.canvas
+      const big = (x: number) => Math.round(x * 1.06 / 2) * 2
+      for (let k = 0, t0 = from; t0 < to - 1e-3; k++, t0 += slice) {
+        const t1 = Math.min(to, t0 + slice)
+        const sx = Math.round((jitter(k, 1) - 0.5) * 2 * amp), dx = Math.round((jitter(k, 2) - 0.5) * 2 * amp * 1.5)
+        const vf = `rgbashift=rh=${sx}:bh=${-sx}:gv=${Math.round(sx / 3)},scale=${big(W)}:${big(H)},crop=${W}:${H}:${Math.round((big(W) - W) / 2 + dx)}:${Math.round((big(H) - H) / 2)},noise=alls=${Math.round(14 + jitter(k, 3) * 20)}:allf=t`
+        segs.push({ start: t0, end: t1, vf })
+      }
+      if (to < D - 0.01) segs.push({ start: to, end: D })
+      await renderSegments(e, segs, audio)
+      return { durationSec: D, timeMap: id(), note: `Glitch for ${r3(to - from)} s at ${r3(at)} s${firstCut != null ? ' (the cut)' : ''}.` }
+    }
+    case 'spin': {
+      // Shot A spins away while it zooms in; shot B spins in from the other
+      // side and settles. The zoom always covers the corners, so no black
+      // shows; a hard cut joins them inside the motion blur.
+      const c = needCut('The zoom-rotate spin')
+      const S = Math.max(3 / fps, Math.min(p.seconds ?? 0.3, c - 0.1, D - c - 0.1))
+      const ang = ((p.angle ?? 90) * Math.PI) / 180
+      const Z = p.zoom ?? 1.4
+      const { width: W, height: H } = e.canvas
+      const k = (H / W).toFixed(4)
+      const pre = 2.2
+      const big = (x: number) => Math.round(x * pre / 2) * 2
+      const side = (dir: 'out' | 'in') => {
+        const u = `min(1,max(0,t/${r3(S)}))`
+        const th = dir === 'out' ? `${ang.toFixed(4)}*pow(${u},2)` : `-${ang.toFixed(4)}*pow(1-${u},2)`
+        const ui = `min(1,max(0,it/${r3(S)}))`
+        const thi = dir === 'out' ? `${ang.toFixed(4)}*pow(${ui},2)` : `-${ang.toFixed(4)}*pow(1-${ui},2)`
+        const zz = dir === 'out' ? `1+${(Z - 1).toFixed(3)}*pow(${ui},2)` : `1+${(Z - 1).toFixed(3)}*pow(1-${ui},2)`
+        const cover = `abs(cos(${thi}))+${k}*abs(sin(${thi}))`
+        return `scale=${big(W)}:${big(H)},rotate=a='${th}':ow=iw:oh=ih:c=black,zoompan=z='max(${zz},${cover})':x='iw/2-iw/zoom/2':y='ih/2-ih/zoom/2':d=1:s=${W}x${H}:fps=${fps},tmix=frames=3`
+      }
+      await renderSegments(e, [{ start: 0, end: c - S }, { start: c - S, end: c, vf: side('out') }, { start: c, end: c + S, vf: side('in') }, { start: c + S, end: D }], audio)
+      return { durationSec: D, timeMap: id(), note: `Spin of ${p.angle ?? 90} degrees over ${r3(S)} s on each side of the cut at ${r3(c)} s.` }
+    }
+    case 'record_scratch': {
+      // The record-scratch freeze: the frame stops, the color drains and a
+      // slow push-in starts; a scratch sound plays (made by code) and the
+      // caption says "you're probably wondering how I got here".
+      const F = p.seconds ?? 2
+      const a = clampTime(e.payoff, D)
+      const frames = Math.max(1, Math.round(F * fps))
+      const push = `zoompan=z='1+${((p.zoom ?? 1.08) - 1).toFixed(3)}*on/${frames}':x='iw/2-iw/zoom/2':y='ih*${(e.face ?? DEFAULT_FACE).y.toFixed(3)}-ih/zoom*${(e.face ?? DEFAULT_FACE).y.toFixed(3)}':d=1:s=${e.canvas.width}x${e.canvas.height}:fps=${fps}`
+      await renderSegments(e, [{ start: 0, end: a }, { start: a, freeze: F, vf: `hue=s=${(p.color ?? 0.25).toFixed(2)},eq=contrast=1.06,${push},vignette=PI/5` }, { start: a, end: D }], audio)
+      const held = frames / fps
+      return { durationSec: D + held, timeMap: [[0, 0], [a, a], [a, a + held], [D, D + held]], note: `Frozen at ${r3(a)} s for ${r3(held)} s with a record scratch.`, accents: [{ kind: 'scratch', at: a }] }
+    }
+    case 'dolly_zoom': {
+      // The vertigo shot: she stays the same size while the room behind her
+      // pushes in. Her outline lifts her off the picture; the room behind
+      // her is filled with a blur of itself first, so the bigger room never
+      // shows a second copy of her.
+      const a = clampTime(e.payoff, D)
+      const S = Math.min(p.seconds ?? 1.5, D - a)
+      const Z = p.zoom ?? 1.4
+      const { width: W, height: H } = e.canvas
+      const fy = (e.face ?? DEFAULT_FACE).y.toFixed(3)
+      const dolly = (v: string, m: string, out: string, k: number) => [
+        `${v}split=3[d0${k}][d1${k}][d2${k}]`,
+        `${m}split=2[m0${k}][m1${k}]`,
+        `[d1${k}]boxblur=${Math.round(W / 40)}:2[bl${k}]`,
+        `[m0${k}]lut=y='if(gt(val,16),255,0)',gblur=sigma=${Math.round(W / 60)},lut=y='if(gt(val,8),255,0)',format=gray[md${k}]`,
+        `[bl${k}][md${k}]alphamerge[blp${k}]`,
+        `[d0${k}][blp${k}]overlay=format=auto[cl${k}]`,
+        `[cl${k}]zoompan=z='1+${(Z - 1).toFixed(3)}*(0.5-0.5*cos(PI*min(1,it/${r3(S)})))':x='iw/2-iw/zoom/2':y='ih*${fy}-ih/zoom*${fy}':d=1:s=${W}x${H}:fps=${fps}[bg${k}]`,
+        `[d2${k}][m1${k}]alphamerge[pp${k}]`,
+        `[bg${k}][pp${k}]overlay=format=auto${out}`,
+      ]
+      const segs: Seg[] = [{ start: 0, end: a }, { start: a, end: a + S, withMask: dolly }]
+      if (a + S < D - 0.02) segs.push({ start: a + S, end: D })
+      await renderSegments(e, segs.filter(x => x.end! - x.start! > 0.01), audio)
+      return { durationSec: D, timeMap: id(), note: `Dolly zoom from ${r3(a)} s for ${r3(S)} s: the room pushes to ${Z}x behind her.` }
+    }
+    case 'split_screen': {
+      // Two clips at once: shot A and shot B stacked (or side by side), the
+      // shorter one holding its last frame. Their own sounds are mixed.
+      const c = needCut('Split screen')
+      const { width: W, height: H } = e.canvas
+      const gap = Math.round((p.gap ?? 8) * (W / 1080) / 2) * 2
+      const side = e.variant === 'side'
+      const cw = side ? Math.round((W - gap) / 4) * 2 : W, ch = side ? H : Math.round((H - gap) / 4) * 2
+      const la = c, lb = D - c, out = Math.max(la, lb)
+      const cover = `scale=${cw}:${ch}:force_original_aspect_ratio=increase,crop=${cw}:${ch},setsar=1`
+      const f = [
+        `[0:v]split=2[x][y]`,
+        `[x]trim=start=0:end=${r3(c)},setpts=PTS-STARTPTS,${cover},tpad=stop_mode=clone:stop_duration=${r3(out - la + 0.05)}[a]`,
+        `[y]trim=start=${r3(c)}:end=${r3(D)},setpts=PTS-STARTPTS,${cover},tpad=stop_mode=clone:stop_duration=${r3(out - lb + 0.05)}[b]`,
+        `color=c=white:s=${W}x${H}:r=${fps}:d=${r3(out)}[bg]`,
+        `[bg][a]overlay=0:0:shortest=1[ab]`,
+        `[ab][b]overlay=${side ? `${cw + gap}:0` : `0:${ch + gap}`}:shortest=1,trim=duration=${r3(out)},format=yuv420p[v]`,
+      ]
+      if (audio) f.push(`[0:a]asplit=2[p][q]`, `[p]atrim=0:${r3(c)},asetpts=PTS-STARTPTS[pa]`, `[q]atrim=${r3(c)}:${r3(D)},asetpts=PTS-STARTPTS[qa]`, `[pa][qa]amix=inputs=2:normalize=0:duration=longest,atrim=0:${r3(out)}[a]`)
+      await ffmpeg(['-i', e.video, '-filter_complex', f.join(';'), '-map', '[v]', ...(audio ? ['-map', '[a]'] : []), ...workArgs(fps, audio), e.out], 900_000)
+      return { durationSec: out, timeMap: [[0, 0], [c, Math.min(c, out)], [D, out]], note: `Shot A and shot B ${side ? 'side by side' : 'stacked'} for ${r3(out)} s.` }
+    }
+    case 'green_screen': {
+      // Her clip over a background (a screen recording, a screenshot, a
+      // post): her outline lifts her off her own room, smaller, at the
+      // bottom, the way TikTok's green screen effect looks.
+      if (!e.background) throw new MediaError('The green screen needs a background: pick B-roll or a screenshot.')
+      if (!e.mask) throw new MediaError('The green screen needs her outline (the person mask).')
+      const { width: W, height: H } = e.canvas
+      const sc = p.scale ?? 0.72
+      const pw = Math.round(W * sc / 2) * 2, ph = Math.round(H * sc / 2) * 2
+      const still = /\.(png|jpe?g|webp)$/i.test(e.background)
+      const f = [
+        `[2:v]scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},setsar=1,fps=${fps},trim=duration=${r3(D)},setpts=PTS-STARTPTS[bg]`,
+        `[1:v]format=gray,scale=${W}:${H}[m]`,
+        `[0:v]setsar=1,format=yuv420p[pv]`,
+        `[pv][m]alphamerge,scale=${pw}:${ph}[me]`,
+        `[bg][me]overlay=x=${(W - pw) / 2}:y=${H - ph}:format=auto:shortest=1,format=yuv420p[v]`,
+      ]
+      await ffmpeg(['-i', e.video, '-i', e.mask, ...(still ? ['-loop', '1', '-t', String(r3(D + 0.1)), '-i', e.background] : ['-stream_loop', '-1', '-i', e.background]), '-filter_complex', f.join(';'), '-map', '[v]', ...(audio ? ['-map', '0:a'] : []), ...workArgs(fps, audio), '-t', String(r3(D)), e.out], 900_000)
+      return { durationSec: D, timeMap: id(), note: `She sits over the background at ${Math.round(sc * 100)}% size.` }
+    }
   }
+}
+
+// Text behind subject: the captions go between the picture and her. Her
+// outline (the mask) is laid back on top, so the words sit behind her and
+// in front of the room.
+export async function overlayBehind(o: { video: string; mask: string; out: string; canvas: Canvas; captions: Array<{ png: string; start: number; end: number | null }> }): Promise<void> {
+  const { width: W, height: H, fps } = o.canvas
+  const pr = await probeFile(o.video)
+  const D = pr.durationSec ?? 0
+  const f = [`[0:v]setsar=1,format=yuv420p,split=2[base][pv]`, `[1:v]format=gray,scale=${W}:${H}[m]`, `[pv][m]alphamerge[her]`]
+  let last = '[base]'
+  o.captions.forEach((c, i) => {
+    const end = c.end ?? D
+    f.push(`${last}[${i + 2}:v]overlay=0:0:enable='between(t,${r3(c.start)},${r3(end)})'[t${i}]`)
+    last = `[t${i}]`
+  })
+  f.push(`${last}[her]overlay=0:0:format=auto,format=yuv420p[v]`)
+  await ffmpeg(['-i', o.video, '-i', o.mask, ...o.captions.flatMap(c => ['-loop', '1', '-t', String(r3(D + 0.1)), '-i', c.png]), '-filter_complex', f.join(';'), '-map', '[v]', ...(pr.hasAudio ? ['-map', '0:a'] : []), ...workArgs(fps, pr.hasAudio), '-t', String(r3(D)), o.out], 900_000)
 }
 
 // A time in the picture, moved the way the edit moved time.

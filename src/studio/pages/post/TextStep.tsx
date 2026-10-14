@@ -2,8 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { Copy, Plus, X } from 'lucide-react'
 import { PriceButton } from '../../PriceButton'
 import { Field, useToast, type TodoItem } from '../../ui'
-import type { BatchSpec, MemeSpec, SlideshowSpec } from '../../types'
-import { CaptionPreview } from './parts'
+import type { BatchSpec, CaptionStyle, MemeSpec, SlideshowSpec } from '../../types'
+import { CaptionPreview, CaptionStylePick } from './parts'
 import type { PostCtx } from './ctx'
 
 // The Text step: the caption of a video post, the hook and slides of a
@@ -32,10 +32,15 @@ function Caption({ ctx }: { ctx: PostCtx }) {
   const clip = lib?.clips.find(c => c.id === spec.clipId && c.status === 'approved')
   return (
     <div className="st-content-grid">
-      <Field id="post-caption" label="Caption" required done={!!spec.caption?.trim()} hint={`In TikTok's white box, kept clear of TikTok's buttons. Up to ${data.options.caption.maxChars} characters; emoji work.`}>
-        <textarea className="st-textarea" rows={3} maxLength={data.options.caption.maxChars} value={spec.caption ?? ''} onChange={e => draft.setSpec({ caption: e.target.value })} placeholder="e.g. me when the code finally works and I have no idea why 💀" />
-      </Field>
-      <div className="st-content-side"><CaptionPreview text={spec.caption ?? ''} data={data} video={clip?.assetId} /><span className="st-hint">Preview. The export uses the same font, box and safe zones.</span></div>
+      <div className="st-col" style={{ gap: 14 }}>
+        <Field id="post-caption" label="Caption" required done={!!spec.caption?.trim()} hint={`In the upper third, kept clear of her mouth and hands and of TikTok's buttons. Up to ${data.options.caption.maxChars} characters; emoji work.`}>
+          <textarea className="st-textarea" rows={3} maxLength={data.options.caption.maxChars} value={spec.caption ?? ''} onChange={e => draft.setSpec({ caption: e.target.value })} placeholder="e.g. me when the code finally works and I have no idea why 💀" />
+        </Field>
+        <Field id="post-caption-style" label="Caption style" hint="TikTok's white box, or white text with a black outline (TikTok Classic).">
+          <CaptionStylePick value={spec.captionStyle} data={data} onChange={v => draft.setSpec({ captionStyle: v } as never)} />
+        </Field>
+      </div>
+      <div className="st-content-side"><CaptionPreview text={spec.caption ?? ''} data={data} video={clip?.assetId} look={spec.captionStyle} /><span className="st-hint">Preview. The export uses the same font, style and safe zones.</span></div>
     </div>
   )
 }
@@ -127,8 +132,11 @@ function Captions({ ctx }: { ctx: PostCtx }) {
             onChange={e => { setText(e.target.value); draft.setSpec({ captions: e.target.value.split('\n').map(c => c.trim()).filter(Boolean).slice(0, 50) }) }}
             placeholder={'e.g. me pretending I read the syllabus\nPOV: the group chat at 2am before the exam'} />
         </Field>
+        <Field id="batch-caption-style" label="Caption style" hint="TikTok's white box, or white text with a black outline (TikTok Classic).">
+          <CaptionStylePick value={(draft.spec as { captionStyle?: CaptionStyle | null }).captionStyle} data={data} onChange={v => draft.setSpec({ captionStyle: v } as never)} />
+        </Field>
       </div>
-      <div className="st-content-side"><CaptionPreview text={captions[0] ?? ''} data={data} video={first?.assetId} /><span className="st-hint">The first caption, as a preview.</span></div>
+      <div className="st-content-side"><CaptionPreview text={captions[0] ?? ''} data={data} video={first?.assetId} look={(draft.spec as { captionStyle?: CaptionStyle | null }).captionStyle} /><span className="st-hint">The first caption, as a preview.</span></div>
     </div>
   )
 }

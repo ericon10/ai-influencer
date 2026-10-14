@@ -51,3 +51,13 @@ rule.
   blurriest frame).
 - Make the close-up for the whip pan and hand over the lens too (today it
   is offered for the crash zoom).
+
+## Overnight run
+
+- A cleaner room behind her for the dolly zoom: fill her area with a
+  normalized blur of the room only (no halo on high-contrast hair).
+- Text behind subject: drag the words up or down in Fine-tune, and pick
+  their color.
+- Split screen: a "reaction" layout (her small in a corner over shot A).
+- The green screen in batches (one background per video).
+- A person mask cache per clip, so a re-export skips making it again.

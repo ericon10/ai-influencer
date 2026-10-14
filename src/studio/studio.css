@@ -704,6 +704,7 @@ button.st-chip:hover { color: var(--st-text); border-color: var(--st-text-3); }
   font-family: 'TikTok Sans', system-ui, sans-serif; font-weight: 600; line-height: 1.3;
 }
 .st-captionbox.middle { top: 50%; transform: translate(-50%, -50%); }
+.st-captionbox.upper { transform: translate(-50%, -50%); }
 .st-captionbox span {
   box-decoration-break: clone; -webkit-box-decoration-break: clone; white-space: pre-wrap;
 }

@@ -242,13 +242,15 @@ export interface BrollTiming { order: 'clip_first' | 'broll_first'; brollStart: 
 export interface MemeSpec extends BrollTiming {
   clipId: string | null; stillId: string | null; brollId: string | null; caption: string; clone: CloneSource | null
   sound?: Partial<SoundSpec>; cut?: Cut | null; continueFrom?: ContinueFrom | null
-  edit?: Partial<EditSpec>; clipB?: string | null; stillB?: string | null
+  edit?: Partial<EditSpec>; clipB?: string | null; stillB?: string | null; captionStyle?: CaptionStyle | null
 }
 // Phase 5: Amazing Edits (config/edits.yaml).
 export type EditStyleId = 'crash_zoom' | 'speed_ramp' | 'punch_in' | 'freeze_pop' | 'flash_shake' | 'seamless_loop' | 'word_pop' | 'whip_pan' | 'hand_lens' | 'zoom_reveal'
+  | 'velocity' | 'text_behind' | 'karaoke' | 'split_screen' | 'green_screen' | 'glitch' | 'spin' | 'dolly_zoom' | 'record_scratch' | 'snap_zoom'
 export type EditStrength = 'subtle' | 'normal' | 'strong'
-export interface EditSpec { style: 'none' | EditStyleId; strength: EditStrength; payoff: number | null; text: string }
-export interface EditStyleView { id: EditStyleId; label: string; line: string; shots: 1 | 2; anchor: string; slots: { a: string; b: string } | null; params: Record<EditStrength, Record<string, number>> }
+export interface EditSpec { style: 'none' | EditStyleId; strength: EditStrength; payoff: number | null; text: string; variant?: string }
+export type CaptionStyle = 'box' | 'outline'
+export interface EditStyleView { id: EditStyleId; label: string; line: string; shots: 1 | 2; anchor: string; slots: { a: string; b: string } | null; params: Record<EditStrength, Record<string, number>>; stage?: string; needs?: Array<'mask' | 'background'>; variants?: Array<{ id: string; label: string }> | null; text?: string | null }
 // Phase 3: the sound bed, the rough cut and "Continue this shot".
 export type SoundLevel = 'quiet' | 'normal' | 'loud'
 export interface SoundSpec { ambience: string; ambienceLevel: SoundLevel; music: string | null; musicLevel: SoundLevel; duck: boolean; clipSound: boolean }
@@ -265,7 +267,7 @@ export interface CutView {
 }
 export interface SlideshowSpec { stillIds: string[]; topic: string; hook: string; slides: string[]; caption: string; hashtags: string[] }
 // A batch rotates its clips and B-roll across the captions.
-export interface BatchSpec extends BrollTiming { clipIds: string[]; brollIds: string[]; topic: string; count: number; captions: string[]; clone: CloneSource | null; sound?: Partial<SoundSpec>; edit?: Partial<EditSpec> }
+export interface BatchSpec extends BrollTiming { clipIds: string[]; brollIds: string[]; topic: string; count: number; captions: string[]; clone: CloneSource | null; sound?: Partial<SoundSpec>; edit?: Partial<EditSpec>; captionStyle?: CaptionStyle | null }
 
 // Clone Video (SPEC 13.1 R1): the post's saved TikTok or Reel, the models
 // with their prices, and the results.
@@ -297,7 +299,7 @@ export interface ContentItem {
 export interface ContentData {
   broll: BrollClip[]; products: string[]; items: ContentItem[]; accountTags: string[]
   options: {
-    caption: { size: number; safe: { top: number; bottom: number; left: number; right: number }; position: 'top' | 'middle' | 'bottom'; maxChars: number; box: { fill: string; text: string; radius: number; pad_x: number; pad_y: number } }
+    caption: { size: number; safe: { top: number; bottom: number; left: number; right: number }; position: 'top' | 'upper_third' | 'middle' | 'bottom'; maxChars: number; box: { fill: string; text: string; radius: number; pad_x: number; pad_y: number }; style?: CaptionStyle | 'plain'; outline?: { text: string; stroke: string; width: number }; karaoke?: { fill: string; text: string; color: string } }
     canvas: { width: number; height: number; fps: number }
     meme: { max_clip_seconds: number; broll_seconds: number; max_broll_seconds: number; order: 'clip_first' | 'broll_first' }
     slideshow: { slides: [number, number]; maxStills: number }

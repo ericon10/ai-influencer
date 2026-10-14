@@ -90,11 +90,30 @@ function wrapGreedy(fonts: Font[], text: string, size: number, maxWidth: number)
 
 const esc = (s: string) => s.replace(/[<>&"]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' })[c]!)
 
-export interface CaptionLayout { lines: string[]; size: number; box: { x: number; y: number; w: number; h: number }; dropped: string[] }
+export interface CaptionLayout { lines: string[]; size: number; box: { x: number; y: number; w: number; h: number }; dropped: string[]; words: number }
+
+export interface CaptionLook {
+  // Light up one word (karaoke), by its index in the caption.
+  highlight?: number
+  // Karaoke: a pill behind the word (true) or the word's color only.
+  pill?: boolean
+  // The lit word drawn this much bigger (a pop).
+  pop?: number
+}
+
+// Where the caption block starts, for a block this tall.
+function blockTop(position: ContentConfig['caption']['position'], area: { top: number; bottom: number }, blockH: number, frameH: number): number {
+  if (position === 'top') return area.top
+  if (position === 'bottom') return area.bottom - blockH
+  if (position === 'middle') return Math.round((area.top + area.bottom - blockH) / 2)
+  // Upper third: centered a quarter of the way down, kept in the safe area.
+  return Math.max(area.top, Math.min(area.bottom - blockH, Math.round(frameH * 0.26 - blockH / 2)))
+}
 
 // The caption as SVG over the whole frame: a rounded box per line (TikTok's
-// "background" text style), then the text outlines.
-export function captionSvg(text: string, content: Pick<ContentConfig, 'canvas' | 'caption'>): { svg: string; layout: CaptionLayout } {
+// "background" text style), then the text outlines. The outline style draws
+// a black stroke under white text instead of the box; plain draws neither.
+export function captionSvg(text: string, content: Pick<ContentConfig, 'canvas' | 'caption'>, look: CaptionLook = {}): { svg: string; layout: CaptionLayout } {
   const { canvas: c, caption: cap } = content
   const fonts = captionFonts(cap)
   const clean = text.trim().slice(0, cap.max_chars)
@@ -116,37 +135,69 @@ export function captionSvg(text: string, content: Pick<ContentConfig, 'canvas' |
   const lineRuns = lines.map(l => runs(fonts, l, dropped))
   const lineH = Math.round(size * cap.line_height)
   const blockH = lines.length * lineH + 2 * cap.box.pad_y
-  const top = cap.position === 'top' ? area.top
-    : cap.position === 'bottom' ? area.bottom - blockH
-    : Math.round((area.top + area.bottom - blockH) / 2)
+  const top = blockTop(cap.position, area, blockH, c.height)
   const main = fonts[0]!
   const scale = size / main.unitsPerEm
   const textH = (main.ascender - main.descender) * scale
+  const style = cap.style ?? 'box'
   const parts: string[] = []
   const glyphs: string[] = []
+  const lit: string[] = []
+  const litBack: string[] = []
   let maxW = 0
+  let wordIndex = 0
+  const none = new Set<string>()
   lineRuns.forEach((rs, i) => {
     const w = width(rs, size)
     maxW = Math.max(maxW, w)
     const boxW = w + 2 * cap.box.pad_x
     const y = top + i * lineH
     // Boxes overlap their neighbors by the padding, so the lines read as one shape.
-    parts.push(`<rect x="${(centerX - boxW / 2).toFixed(1)}" y="${y}" width="${boxW.toFixed(1)}" height="${lineH + 2 * cap.box.pad_y}" rx="${cap.box.radius}" ry="${cap.box.radius}" fill="${esc(cap.box.fill)}"/>`)
-    let x = centerX - w / 2
+    if (style === 'box') parts.push(`<rect x="${(centerX - boxW / 2).toFixed(1)}" y="${y}" width="${boxW.toFixed(1)}" height="${lineH + 2 * cap.box.pad_y}" rx="${cap.box.radius}" ry="${cap.box.radius}" fill="${esc(cap.box.fill)}"/>`)
     const baseline = y + cap.box.pad_y + (lineH - textH) / 2 + main.ascender * scale
-    for (const r of rs) {
-      glyphs.push(r.font.getPath(r.text, x, baseline, size).toPathData(2))
-      x += r.font.getAdvanceWidth(r.text, size)
-    }
+    // Word by word, so one word can be lit (karaoke).
+    let x = centerX - w / 2
+    const words = lines[i]!.split(' ')
+    words.forEach((word, wi) => {
+      const wr = runs(fonts, word, none)
+      const ww = width(wr, size)
+      const k = wordIndex++
+      {
+        const isLit = look.highlight === k
+        const pop = isLit ? (look.pop ?? 1) : 1
+        const s2 = size * pop
+        const wx = x - (ww * pop - ww) / 2
+        const by = baseline + (s2 - size) * 0.35
+        let gx = wx
+        const paths = wr.map(r => { const d = r.font.getPath(r.text, gx, by, s2).toPathData(2); gx += r.font.getAdvanceWidth(r.text, s2); return d })
+        if (isLit && look.pill !== false) {
+          const px = size * 0.14
+          litBack.push(`<rect x="${(wx - px).toFixed(1)}" y="${(y + cap.box.pad_y * 0.5).toFixed(1)}" width="${(ww * pop + 2 * px).toFixed(1)}" height="${(lineH + cap.box.pad_y).toFixed(1)}" rx="${(size * 0.22).toFixed(1)}" fill="${esc(cap.karaoke.fill)}"/>`)
+          lit.push(...paths)
+        } else if (isLit) lit.push(...paths)
+        else glyphs.push(...paths)
+      }
+      x += ww + (wi < words.length - 1 ? width(runs(fonts, ' ', none), size) : 0)
+    })
   })
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${c.width}" height="${c.height}" viewBox="0 0 ${c.width} ${c.height}">${parts.join('')}<path d="${glyphs.join(' ')}" fill="${esc(cap.box.text)}"/></svg>`
+  const fill = style === 'box' ? cap.box.text : cap.outline.text
+  const stroke = style === 'outline'
+    ? `<path d="${[...glyphs, ...lit].join(' ')}" fill="none" stroke="${esc(cap.outline.stroke)}" stroke-width="${(size * cap.outline.width).toFixed(1)}" stroke-linejoin="round"/>`
+    : style === 'plain' ? `<path d="${[...glyphs, ...lit].join(' ')}" fill="#000" fill-opacity="0.28" transform="translate(${(size * 0.03).toFixed(1)} ${(size * 0.05).toFixed(1)})"/>` : ''
+  const litFill = look.pill !== false ? cap.karaoke.text : cap.karaoke.color
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${c.width}" height="${c.height}" viewBox="0 0 ${c.width} ${c.height}">${parts.join('')}${stroke}${litBack.join('')}<path d="${glyphs.join(' ')}" fill="${esc(fill)}"/>${lit.length ? `<path d="${lit.join(' ')}" fill="${esc(litFill)}"/>` : ''}</svg>`
   const boxW = maxW + 2 * cap.box.pad_x
-  return { svg, layout: { lines, size, box: { x: Math.round(centerX - boxW / 2), y: top, w: Math.round(boxW), h: blockH }, dropped: [...dropped] } }
+  return { svg, layout: { lines, size, box: { x: Math.round(centerX - boxW / 2), y: top, w: Math.round(boxW), h: blockH }, dropped: [...dropped], words: wordIndex } }
+}
+
+// The caption's words in reading order, as the layout splits them.
+export function captionWords(text: string, content: Pick<ContentConfig, 'canvas' | 'caption'>): string[] {
+  return captionSvg(text, content).layout.lines.flatMap(l => l.split(' '))
 }
 
 // The caption overlay as a transparent PNG the size of the frame.
-export async function captionPng(text: string, content: Pick<ContentConfig, 'canvas' | 'caption'>): Promise<{ png: Buffer; layout: CaptionLayout }> {
-  const { svg, layout } = captionSvg(text, content)
+export async function captionPng(text: string, content: Pick<ContentConfig, 'canvas' | 'caption'>, look: CaptionLook = {}): Promise<{ png: Buffer; layout: CaptionLayout }> {
+  const { svg, layout } = captionSvg(text, content, look)
   return { png: await sharp(Buffer.from(svg)).png().toBuffer(), layout }
 }
 

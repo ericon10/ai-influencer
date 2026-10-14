@@ -1,4 +1,5 @@
-# Amazing Edits (Phase 5; UX-PLAN.md section 10): edits rendered free by
+# Amazing Edits (Phase 5 and edit pack 2; UX-PLAN.md sections 10 and 11):
+# edits rendered free by
 # code (ffmpeg on the worker), never by a video model. Data, not code: the
 # names, the one-line descriptions, how many shots each needs, the shot
 # directions a two-shot edit adds to its takes, and the numbers behind
@@ -18,6 +19,7 @@ closeup: { share: 0.42 }
 
 styles:
   - id: crash_zoom
+    stage: transition
     label: Crash zoom cut
     line: The end of shot A rushes into her face, then a hard cut to a close-up.
     shots: 2
@@ -31,6 +33,7 @@ styles:
       strong: { seconds: 0.8, zoom: 3.4 }
 
   - id: speed_ramp
+    stage: time
     label: Speed ramp to slow motion
     line: The payoff slows to a smooth slow motion, then snaps back.
     shots: 1
@@ -43,6 +46,7 @@ styles:
       strong: { seconds: 1.2, speed: 0.3, smooth: 0 }
 
   - id: punch_in
+    stage: camera
     label: Punch-in on the beat
     line: Quick zoom punches land on the beat of your music (every second without music).
     shots: 1
@@ -53,6 +57,7 @@ styles:
       strong: { zoom: 1.22, every: 0.5 }
 
   - id: freeze_pop
+    stage: time
     label: Freeze frame and caption pop
     line: The payoff freezes for a beat while a caption pops in the middle.
     shots: 1
@@ -63,6 +68,7 @@ styles:
       strong: { seconds: 1.5 }
 
   - id: flash_shake
+    stage: hit
     label: Flash and impact shake
     line: A white flash and a short camera shake hit on the first cut, or where you place it.
     shots: 1
@@ -73,6 +79,7 @@ styles:
       strong: { flash: 0.18, shake: 30, seconds: 0.5 }
 
   - id: seamless_loop
+    stage: loop
     label: Seamless loop
     line: Ends on the frame closest to the first, so the video loops without a visible jump.
     shots: 1
@@ -83,6 +90,7 @@ styles:
       strong: { min_share: 0.45 }
 
   - id: word_pop
+    stage: text
     label: Word-by-word text pop
     line: The caption appears one word at a time, each word popping in.
     shots: 1
@@ -93,6 +101,7 @@ styles:
       strong: { per_word: 0.22, pop: 1.14 }
 
   - id: whip_pan
+    stage: transition
     label: Whip pan transition
     line: Shot A whips away and shot B whips in, joined by a hard cut inside the blur.
     shots: 2
@@ -106,6 +115,7 @@ styles:
       strong: { seconds: 0.2, shift: 0.42, blur: 60 }
 
   - id: hand_lens
+    stage: transition
     label: Hand over the lens
     line: Her hand covers the lens, and the new shot starts as it pulls away (an outfit change).
     shots: 2
@@ -119,6 +129,7 @@ styles:
       strong: { search: 1.2, dip: 0.25 }
 
   - id: zoom_reveal
+    stage: camera
     label: Zoom-out reveal
     line: Starts tight on her face and pulls back fast to reveal the whole scene.
     shots: 1
@@ -127,3 +138,127 @@ styles:
       subtle: { seconds: 1, zoom: 1.8 }
       normal: { seconds: 1.2, zoom: 2.4 }
       strong: { seconds: 1.4, zoom: 3 }
+
+  # Edit pack 2 (overnight run, 2026-10-14).
+  - id: velocity
+    stage: time
+    label: Velocity edit
+    line: Fast, then slow motion right on the beat, then fast again, all through the clip.
+    shots: 1
+    anchor: beats
+    params:
+      subtle: { fast: 1.6, slow: 0.55, window: 0.4, every: 1.2 }
+      normal: { fast: 2, slow: 0.4, window: 0.5, every: 1 }
+      strong: { fast: 2.5, slow: 0.3, window: 0.6, every: 0.8 }
+
+  - id: text_behind
+    stage: text
+    label: Text behind subject
+    line: The caption sits behind her and in front of the room, big and bold.
+    shots: 1
+    anchor: words
+    needs: [mask]
+    params:
+      subtle: { size: 1.7 }
+      normal: { size: 2.2 }
+      strong: { size: 2.8 }
+
+  - id: karaoke
+    stage: text
+    label: Karaoke captions
+    line: The whole caption shows and each word lights up in time, like karaoke.
+    shots: 1
+    anchor: words
+    params:
+      subtle: { pill: 0, pop: 1 }
+      normal: { pill: 1, pop: 1 }
+      strong: { pill: 1, pop: 1.12 }
+
+  - id: split_screen
+    stage: layout
+    label: Split screen or duet
+    line: Shot A and shot B play at once, stacked or side by side (before and after, or her reacting).
+    shots: 2
+    anchor: cut
+    slots:
+      a: "One steady shot that works in half the frame."
+      b: "Her reaction, framed close, the same light, for half the frame."
+    variants:
+      - { id: stacked, label: Stacked }
+      - { id: side, label: Side by side }
+    params:
+      subtle: { gap: 0 }
+      normal: { gap: 8 }
+      strong: { gap: 18 }
+
+  - id: green_screen
+    stage: layout
+    label: Green-screen reaction
+    line: Her clip over a screenshot, a post or your B-roll, cut out and placed at the bottom.
+    shots: 1
+    anchor: start
+    needs: [mask, background]
+    params:
+      subtle: { scale: 0.6 }
+      normal: { scale: 0.72 }
+      strong: { scale: 0.85 }
+
+  - id: glitch
+    stage: hit
+    label: Glitch hit
+    line: An RGB split, sideways jumps and noise for a split second on the cut or the payoff.
+    shots: 1
+    anchor: cut_or_payoff
+    params:
+      subtle: { seconds: 0.25, shift: 8 }
+      normal: { seconds: 0.35, shift: 16 }
+      strong: { seconds: 0.5, shift: 28 }
+
+  - id: spin
+    stage: transition
+    label: Zoom-rotate spin
+    line: Shot A spins away as it zooms in, and shot B spins in and settles.
+    shots: 2
+    anchor: cut
+    slots:
+      a: "The shot ends with the phone turning quickly in a spin, motion blurred."
+      b: "The shot starts mid-spin, motion blurred, then settles level."
+    params:
+      subtle: { seconds: 0.25, angle: 60, zoom: 1.25 }
+      normal: { seconds: 0.3, angle: 90, zoom: 1.4 }
+      strong: { seconds: 0.35, angle: 140, zoom: 1.6 }
+
+  - id: dolly_zoom
+    stage: camera
+    label: Dolly zoom (vertigo)
+    line: On the reveal she stays the same size while the room behind her pushes in.
+    shots: 1
+    anchor: payoff
+    needs: [mask]
+    params:
+      subtle: { seconds: 1.2, zoom: 1.25 }
+      normal: { seconds: 1.5, zoom: 1.4 }
+      strong: { seconds: 2, zoom: 1.6 }
+
+  - id: record_scratch
+    stage: time
+    label: Record-scratch freeze
+    line: A record scratch, the frame freezes and drains of color, and the caption says how she got here.
+    shots: 1
+    anchor: payoff
+    text: "Yep, that's me. You're probably wondering how I got here."
+    params:
+      subtle: { seconds: 1.6, color: 0.45, zoom: 1.04 }
+      normal: { seconds: 2.2, color: 0.25, zoom: 1.08 }
+      strong: { seconds: 2.8, color: 0, zoom: 1.12 }
+
+  - id: snap_zoom
+    stage: camera
+    label: Snap zoom
+    line: Two instant punch-ins on her reaction, then back out.
+    shots: 1
+    anchor: payoff
+    params:
+      subtle: { gap: 0.3, hold: 0.8, zoom1: 1.2, zoom2: 1.45 }
+      normal: { gap: 0.25, hold: 1, zoom1: 1.3, zoom2: 1.65 }
+      strong: { gap: 0.2, hold: 1.3, zoom1: 1.4, zoom2: 1.9 }

@@ -56,6 +56,8 @@ function PostClip({ ctx }: { ctx: PostCtx }) {
   const cont = spec.continueFrom ?? null
   // A two-shot edit (Phase 5) plans shot A (this clip) and shot B.
   const twoShot = data.options.edits?.styles.find(s => s.id === editOf(spec).style && s.shots === 2) ?? null
+  // The green screen uses the B-roll as her background.
+  const bgStyle = data.options.edits?.styles.find(s => s.id === editOf(spec).style && s.needs?.includes('background')) ?? null
   const showWays = (!clip || changing) && !cont
 
   return (
@@ -100,7 +102,7 @@ function PostClip({ ctx }: { ctx: PostCtx }) {
         </>
       )}
       {twoShot && <ShotB ctx={ctx} style={twoShot} />}
-      <Field id="post-broll" label="B-roll (optional)" group hint="A screen recording or phone video, cut in hard before or after the clip.">
+      <Field id="post-broll" label={bgStyle ? `Background for the ${bgStyle.label.toLowerCase()}` : 'B-roll (optional)'} required={!!bgStyle} done={!!spec.brollId} group hint={bgStyle ? 'A screen recording, a post, or a screenshot (upload an image): it sits behind her, she is cut out over it.' : 'A screen recording or phone video, cut in hard before or after the clip.'}>
         <BrollPicker data={data} ids={spec.brollId ? [spec.brollId] : []} multi={false} onChange={ids => draft.setSpec({ brollId: ids[0] ?? null })} timing={spec} setTiming={(p: Partial<BrollTiming>) => draft.setSpec(p)} />
       </Field>
       {item.characterId && (

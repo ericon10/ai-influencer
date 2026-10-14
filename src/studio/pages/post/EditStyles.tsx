@@ -7,14 +7,15 @@ export { editZones, type EditZones } from './editZones'
 // worker, free, never by a video model. The Idea step's Format and the
 // Finish step's Edit style set the same field; Fine-tune changes it too.
 
-export const EDIT_DEFAULT: EditSpec = { style: 'none', strength: 'normal', payoff: null, text: '' }
+export const EDIT_DEFAULT: EditSpec = { style: 'none', strength: 'normal', payoff: null, text: '', variant: '' }
 export const editOf = (spec: unknown): EditSpec => ({ ...EDIT_DEFAULT, ...((spec as { edit?: Partial<EditSpec> } | null)?.edit ?? {}) })
 export const thumbUrl = (id: string) => `/studio-edits/${id}.webp`
 
 export function editStyles(ctx: PostCtx): EditStyleView[] {
   const all = ctx.data.options.edits?.styles ?? []
-  // A batch video has one clip, so only the one-shot edits fit.
-  return ctx.item.kind === 'batch' ? all.filter(s => s.shots === 1) : all
+  // A batch video has one clip, so only the one-shot edits fit (and no
+  // background edit yet).
+  return ctx.item.kind === 'batch' ? all.filter(s => s.shots === 1 && !s.needs?.includes('background')) : all
 }
 
 export function EditStylePicker({ ctx, mode }: { ctx: PostCtx; mode: 'format' | 'finish' }) {
@@ -61,11 +62,21 @@ export function EditStylePicker({ ctx, mode }: { ctx: PostCtx; mode: 'format' | 
               <span className="st-hint">{edit.payoff == null ? `Auto: ${ctx.data.options.edits?.payoffFromEnd ?? 2} s before the end${chosen.anchor === 'cut_or_payoff' ? ' (or the cut, with two shots)' : ''}.` : ''}</span>
             </label>
           )}
+          {chosen.variants?.length ? (
+            <div className="st-seg sm" role="radiogroup" aria-label="Layout">
+              {chosen.variants.map(v => { const on = (edit.variant || chosen.variants![0]!.id) === v.id; return <button key={v.id} type="button" role="radio" aria-checked={on} className={on ? 'on' : ''} onClick={() => set({ variant: v.id })}>{v.label}</button> })}
+            </div>
+          ) : null}
           {chosen.id === 'freeze_pop' && (
             <input className="st-input" style={{ maxWidth: 260 }} maxLength={120} value={edit.text} onChange={e => set({ text: e.target.value })} placeholder="Pop text, e.g. NO WAY (else the caption)" aria-label="Pop text" />
           )}
+          {chosen.id === 'record_scratch' && (
+            <input className="st-input" style={{ maxWidth: 360 }} maxLength={120} value={edit.text} onChange={e => set({ text: e.target.value })} placeholder={chosen.text ?? 'The line during the freeze'} aria-label="The line during the freeze" />
+          )}
         </div>
       )}
+      {chosen?.needs?.includes('background') && <span className="st-hint">The background is the post's B-roll: a screen recording, or a screenshot uploaded as B-roll (Video step).</span>}
+      {chosen?.needs?.includes('mask') && <span className="st-hint">Her outline is made on the worker at export, free.</span>}
       {mode === 'finish' && <span className="st-hint">Made by code on the worker, free. Cuts stay hard cuts; nothing is ever crossfaded.</span>}
     </div>
   )

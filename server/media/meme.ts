@@ -1,3 +1,4 @@
+import sharp from 'sharp'
 import { ffmpeg, MediaError, probeFile } from './ffmpeg.js'
 
 // Meme videos (owner, 2026-10-13): a kept clip, an optional B-roll clip cut
@@ -89,7 +90,18 @@ export async function renderMeme(m: MemeInput): Promise<{ durationSec: number }>
 
 // A B-roll upload made lean: at most 1920 px on the long side, 30 fps,
 // H.264, no sound, cut at the length limit.
-export async function transcodeBroll(input: string, out: string, o: { maxSeconds: number; fps: number }): Promise<void> {
+export async function transcodeBroll(input: string, out: string, o: { maxSeconds: number; fps: number; stillSeconds?: number }): Promise<{ still: boolean }> {
+  // A screenshot or a saved post (an image) becomes a still B-roll clip,
+  // for the green screen's background or a cut-in.
+  const img = await sharp(input).metadata().catch(() => null)
+  if (img?.width && img.height && (img.pages ?? 1) === 1 && img.format !== 'gif') {
+    await ffmpeg([
+      '-loop', '1', '-t', String(o.stillSeconds ?? 8), '-i', input,
+      '-vf', `scale=w='min(iw,1920)':h='min(ih,1920)':force_original_aspect_ratio=decrease:force_divisible_by=2:flags=lanczos,fps=${o.fps},format=yuv420p`,
+      '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20', '-pix_fmt', 'yuv420p', '-tune', 'stillimage', '-movflags', '+faststart', '-an', out,
+    ], 600_000)
+    return { still: true }
+  }
   const p = await probeFile(input)
   if (!p.hasVideo) throw new MediaError('That file has no video.')
   await ffmpeg([
@@ -98,6 +110,7 @@ export async function transcodeBroll(input: string, out: string, o: { maxSeconds
     '-vf', `scale=w='min(iw,1920)':h='min(ih,1920)':force_original_aspect_ratio=decrease:force_divisible_by=2:flags=lanczos,fps=${o.fps},format=yuv420p`,
     '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '22', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', '-an', out,
   ], 600_000)
+  return { still: false }
 }
 
 // A clone's source clip (Clone Video): made lean like B-roll, but its sound

@@ -20,8 +20,15 @@ caption:
   max_lines: 7
   max_chars: 220
   safe: { top: 250, bottom: 480, left: 60, right: 160 }
-  # Where the caption sits inside the safe area: top, middle or bottom.
-  position: top
+  # Where the caption sits inside the safe area: top, upper_third, middle
+  # or bottom. Upper third by default (owner, 2026-10-14) so it stays off
+  # her mouth and hands.
+  position: upper_third
+  # box (TikTok's white box) or outline (white text, black stroke, TikTok
+  # Classic). Each post can switch; the plain style is for text behind her.
+  style: box
+  outline: { text: "#ffffff", stroke: "#000000", width: 0.11 }
+  karaoke: { fill: "#ffd60a", text: "#000000", color: "#ffd60a" }
 
 meme:
   # The clip plays in full; B-roll is cut in hard (never a crossfade).

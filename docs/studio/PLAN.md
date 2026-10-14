@@ -398,6 +398,15 @@ Decisions: `DECISIONS.md` G24. UX: `UX-PLAN.md` section 10.
       (paid; owner approval)
 - [ ] First close-up upscale on a live take (paid; owner approval)
 
+## Overnight run (2026-10-14)
+
+Decisions: `DECISIONS.md` G25 onward. UX: `UX-PLAN.md` section 11.
+
+- [x] OpenCut decided: our own Fine-tune, OpenCut's format kept (G25)
+- [x] Batch progress on Posts home (G25)
+- [ ] Approved paid tests 1 to 6 (not run tonight; G25)
+- [x] Edit pack 2: ten more edits, the person mask, caption styles (G26)
+
 ## Roadmap after Phase 4 (owner, 2026-10-13; not started)
 
 SPEC 13.1, R1 to R7: Clone Video (first after Phase 3), Inspo board

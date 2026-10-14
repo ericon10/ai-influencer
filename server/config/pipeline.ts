@@ -231,7 +231,13 @@ const contentSchema = z.object({
     max_lines: z.number().int().positive(),
     max_chars: z.number().int().positive(),
     safe: z.object({ top: z.number().min(0), bottom: z.number().min(0), left: z.number().min(0), right: z.number().min(0) }),
-    position: z.enum(['top', 'middle', 'bottom']),
+    position: z.enum(['top', 'upper_third', 'middle', 'bottom']),
+    // "box": TikTok's white box. "outline": white text with a black stroke
+    // (TikTok Classic). "plain": big text, no box (text behind subject).
+    style: z.enum(['box', 'outline', 'plain']).default('box'),
+    outline: z.object({ text: z.string(), stroke: z.string(), width: z.number().min(0) }).default({ text: '#ffffff', stroke: '#000000', width: 0.11 }),
+    // Karaoke: the word being said, lit up.
+    karaoke: z.object({ fill: z.string(), text: z.string(), color: z.string() }).default({ fill: '#ffd60a', text: '#000000', color: '#ffd60a' }),
   }),
   meme: z.object({ max_clip_seconds: z.number().positive(), broll_seconds: z.number().positive(), max_broll_seconds: z.number().positive(), order: z.enum(['clip_first', 'broll_first']) }),
   broll: z.object({ max_upload_mb: z.number().positive(), max_seconds: z.number().positive(), products: z.array(z.string()).default([]) }),
@@ -261,7 +267,10 @@ const contentSchema = z.object({
 
 // Amazing Edits (Phase 5; config/edits.yaml): code-rendered edits.
 const strength = z.record(z.string(), z.number())
-export const EDIT_IDS = ['crash_zoom', 'speed_ramp', 'punch_in', 'freeze_pop', 'flash_shake', 'seamless_loop', 'word_pop', 'whip_pan', 'hand_lens', 'zoom_reveal'] as const
+export const EDIT_IDS = ['crash_zoom', 'speed_ramp', 'punch_in', 'freeze_pop', 'flash_shake', 'seamless_loop', 'word_pop', 'whip_pan', 'hand_lens', 'zoom_reveal',
+  'velocity', 'text_behind', 'karaoke', 'split_screen', 'green_screen', 'glitch', 'spin', 'dolly_zoom', 'record_scratch', 'snap_zoom'] as const
+// Where an edit sits when edits are stacked (applied in this order).
+export const EDIT_STAGES = ['layout', 'transition', 'camera', 'hit', 'time', 'loop', 'text'] as const
 const editsSchema = z.object({
   version: z.number(),
   payoff_from_end: z.number().positive(),
@@ -274,6 +283,14 @@ const editsSchema = z.object({
     anchor: z.enum(['cut', 'payoff', 'beats', 'cut_or_payoff', 'end', 'words', 'start']),
     slots: z.object({ a: z.string(), b: z.string() }).optional(),
     params: z.object({ subtle: strength, normal: strength, strong: strength }),
+    stage: z.enum(EDIT_STAGES),
+    // What the edit needs besides the clip: her outline (made on the
+    // worker) or a background (the post's B-roll).
+    needs: z.array(z.enum(['mask', 'background'])).default([]),
+    // A layout choice, the first is the default.
+    variants: z.array(z.object({ id: z.string(), label: z.string() })).optional(),
+    // Default text (the record scratch's line).
+    text: z.string().optional(),
   })).min(1),
 })
 

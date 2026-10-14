@@ -14,7 +14,8 @@ const twoShots = [{ kind: 'clip', start: 0 }, { kind: 'clip', start: 2 }]
 describe('the Edit lane', () => {
   it('shows a zone for every edit in the yaml', () => {
     for (const s of styles) {
-      const z = editZones(s, edit({ style: s.id }), s.shots === 2 ? twoShots : oneShot, 4, 2, false)
+      const shots = s.shots === 2 ? twoShots : s.needs?.includes('background') ? [...oneShot, { kind: 'broll', start: 3 }] : oneShot
+      const z = editZones(s, edit({ style: s.id }), shots, 4, 2, false)
       expect(z.problem, s.id).toBeNull()
       expect(z.zones.length, s.id).toBeGreaterThan(0)
       for (const x of z.zones) expect(x.end, s.id).toBeGreaterThan(x.start)
@@ -40,6 +41,15 @@ describe('the Edit lane', () => {
   it('flash and shake hits the first cut, unless the owner placed it', () => {
     expect(editZones(style('flash_shake'), edit({ style: 'flash_shake' }), twoShots, 4, 2, false).marker).toBe(2)
     expect(editZones(style('flash_shake'), edit({ style: 'flash_shake', payoff: 0.8 }), twoShots, 4, 2, false).marker).toBe(0.8)
+  })
+
+  it('the green screen asks for its background', () => {
+    expect(editZones(style('green_screen'), edit({ style: 'green_screen' }), oneShot, 4, 2, false).problem).toMatch(/B-roll or a screenshot/)
+  })
+
+  it('the snap zoom and dolly zoom land at the payoff, and it moves', () => {
+    expect(editZones(style('snap_zoom'), edit({ style: 'snap_zoom', payoff: 1 }), oneShot, 5, 2, false)).toMatchObject({ marker: 1, movable: true, zones: [{ start: 1, end: 2.25 }] })
+    expect(editZones(style('dolly_zoom'), edit({ style: 'dolly_zoom' }), oneShot, 5, 2, false)).toMatchObject({ marker: 3, movable: true })
   })
 
   it('punch-ins follow the music when there is some, else a steady grid', () => {

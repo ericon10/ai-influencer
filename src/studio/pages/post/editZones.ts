@@ -33,6 +33,26 @@ export function editZones(style: EditStyleView | null, edit: EditSpec, shots: Ar
       return { ...none, zones }
     }
     case 'word_pop': return { ...none, zones: [{ start: 0, end: total, label: 'Captions pop word by word' }] }
+    // Edit pack 2.
+    case 'karaoke': return { ...none, zones: [{ start: 0, end: total, label: 'Each word lights up in time' }] }
+    case 'text_behind': return { ...none, zones: [{ start: 0, end: total, label: 'Captions behind her' }] }
+    case 'split_screen': return { ...none, zones: [{ start: 0, end: total, label: 'Shot A and shot B at once' }] }
+    case 'green_screen': {
+      if (!shots.some(s => s.kind === 'broll')) return { ...none, problem: 'The green screen needs B-roll or a screenshot behind her.' }
+      return { ...none, zones: [{ start: 0, end: total, label: 'She sits over the B-roll' }] }
+    }
+    case 'velocity': {
+      if (hasMusic) return { ...none, zones: [{ start: 0, end: total, label: 'Slow on the beat of your music' }] }
+      const every = p.every ?? 1, win = p.window ?? 0.5
+      const zones: EditZones['zones'] = []
+      for (let b = 0.6; b < total - 0.3; b += every) zones.push({ start: Math.max(0, b - win * 0.35), end: Math.min(total, b + win * 0.65), label: `Slow ${p.slow ?? 0.4}x` })
+      return { ...none, zones }
+    }
+    case 'glitch': { const at = edit.payoff == null && firstCut != null ? firstCut : payoff; const S = p.seconds ?? 0.35; return { ...none, zones: [{ start: Math.max(0, at - S / 2), end: Math.min(total, at + S / 2), label: 'Glitch' }], marker: at, movable: true } }
+    case 'spin': { const S = p.seconds ?? 0.3; return { ...none, zones: [{ start: shotB! - S, end: shotB! + S, label: 'Spin' }], marker: shotB! } }
+    case 'dolly_zoom': return { ...none, zones: [{ start: payoff, end: Math.min(total, payoff + (p.seconds ?? 1.5)), label: `Room pushes to ${p.zoom ?? 1.4}x` }], marker: payoff, movable: true }
+    case 'record_scratch': return { ...none, zones: [{ start: payoff, end: Math.min(total, payoff + 0.15), label: `Scratch and freeze ${r(p.seconds ?? 2.2)} s` }], marker: payoff, movable: true }
+    case 'snap_zoom': return { ...none, zones: [{ start: payoff, end: Math.min(total, payoff + (p.gap ?? 0.25) + (p.hold ?? 1)), label: `${p.zoom1 ?? 1.3}x, then ${p.zoom2 ?? 1.65}x` }], marker: payoff, movable: true }
   }
   return none
 }

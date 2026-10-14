@@ -106,14 +106,14 @@ describe('edits in a post', () => {
     expect(late).toBeGreaterThan(early * 1.5)
   }, 180_000)
 
-  it('freeze and pop: the frame holds and the pop text shows in the middle', async () => {
+  it('freeze and pop: the frame holds and the pop text shows in the upper third', async () => {
     const row = await render({ clipId: clipA, caption: 'top caption', edit: { style: 'freeze_pop', payoff: 1, text: 'NO WAY' } })
     const out = row.outputs as ContentOutputs
     expect(out.durationSec).toBeCloseTo(3.1, 0)
     const video = await fileOf(out.videoAssetId!, 'freeze.mp4')
     const f = join(dir, 'fz.png')
     await ffmpeg(['-ss', '1.6', '-i', video, '-frames:v', '1', f])
-    const { data } = await sharp(f).extract({ left: 140, top: 860, width: 800, height: 200 }).greyscale().raw().toBuffer({ resolveWithObject: true })
+    const { data } = await sharp(f).extract({ left: 140, top: 350, width: 800, height: 300 }).greyscale().raw().toBuffer({ resolveWithObject: true })
     expect(data.reduce((n, v) => n + (v > 235 ? 1 : 0), 0)).toBeGreaterThan(5000)
   }, 180_000)
 
@@ -128,7 +128,7 @@ describe('edits in a post', () => {
     const v = await contentView(h.deps, h.ctx)
     const crash = v.options.edits.styles.find(s => s.id === 'crash_zoom')
     expect(crash).toMatchObject({ shots: 2, anchor: 'cut', params: { normal: { seconds: 0.6, zoom: 3 } } })
-    expect(v.options.edits.styles).toHaveLength(10)
+    expect(v.options.edits.styles).toHaveLength(20)
   })
 
   it('a batch takes one-shot edits, and refuses two-shot ones', async () => {

@@ -1065,3 +1065,46 @@ new pages or sidebar items; one new Library tab (Sounds).
 - **Batch progress on Posts home:** a batch's card reads "12 of 50 done"
   (failures counted apart) with a thin bar while it renders; the card
   refreshes every 2 seconds while anything renders.
+
+### G26. Edit pack 2: ten more edits, her outline, caption styles (overnight run, 2026-10-14)
+
+- **Ten more edits, same four places** (Idea Format, Video step shot slots,
+  Finish Edit style, Fine-tune Edit lane), each with Subtle, Normal and
+  Strong, a moving thumbnail and one line, all made by code on the worker:
+  velocity edit (fast, slow on the beat, fast; the music's beat or a
+  steady grid), text behind subject, karaoke captions, split screen or
+  duet (stacked or side by side), green-screen reaction, glitch hit (RGB
+  split, sideways jumps, noise; every frame is still one picture), zoom-
+  rotate spin (the zoom always covers the corners, so no black shows; a
+  hard cut inside the blur), dolly zoom, record-scratch freeze, snap zoom.
+- **Her outline (the person mask):** PP-HumanSeg from the OpenCV Zoo
+  (Apache-2.0, 6 MB), fetched by `npm run models` with the face models and
+  run on onnxruntime-web in the worker, free. Frames go through at
+  192x192, the soft mask is smoothed over time so the edge does not
+  flicker, then scaled and feathered. RVM (better on video) was left out:
+  it is GPL-3.0. Only the worker checks for the model; the API on Vercel
+  does not have it and never blocks on it.
+- **Text behind subject** lays big plain words between the room and her
+  (her outline goes back on top). **Green screen** puts her, cut out, at
+  the bottom over the post's B-roll; B-roll now takes a screenshot image
+  too (it becomes an 8-second still clip), and the green screen uses the
+  B-roll as its background instead of cutting to it. **Dolly zoom** keeps
+  her the same size while the room pushes in; the room behind her is
+  filled with a blur of itself first, so the bigger room never shows a
+  second copy of her (a soft halo can show on high-contrast hair; a better
+  fill is in LATER.md).
+- **The record scratch is made by code** (a pitch sweep and vinyl noise,
+  half a second); edits can now ask the sound bed for accents, mixed in at
+  their time before the loudness pass, so the scratch is heard even when
+  the post has no other sound. No sample, no AI.
+- **Caption styles:** TikTok's white box (default) or Outline (white text,
+  black stroke, TikTok Classic), per post, in the Caption step; the
+  default position is now the upper third (owner), so captions stay off
+  her mouth and hands. The freeze pop and the record-scratch line also
+  sit in the upper third, and the other captions step aside during the
+  freeze. Karaoke lights each word with a yellow pill (or the word's
+  color at Subtle), timed by word length, or by a voice line's own word
+  times when there are some.
+- **Stacking groundwork:** every edit now has a stage (layout, transition,
+  camera, hit, time, loop, text) in the yaml, the order stacked edits run
+  in (item 2).
