@@ -18,6 +18,9 @@ downloads:
   # are always refused, whatever this list says.
   allowed_hosts:
     higgsfield: [higgsfield.ai, cloudfront.net]
+    # Clip links for Recreate from a real clip: direct video files on
+    # Higgsfield's own hosts only (no scraping; anything else is uploaded).
+    clip_links: [higgsfield.ai, cloudfront.net]
 media:
   # Seams are cut, never crossfaded (SPEC 4.3).
   seam: { max_diff: 0.18, motion_max_diff: 0.35, motion_ratio: 1.5, motion_threshold: 0.10, color_match: true }

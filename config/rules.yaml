@@ -4,7 +4,8 @@
 #   fixed:   always on, cannot be switched off, and may block a run. Only
 #            the Realism principle (with a bare face on hero and sheet),
 #            adults 21 and over, no nudity or explicit content, a new person
-#            rather than a copy of a real one, the AI-generated label on
+#            rather than a copy of a real one (with Recreate's two face
+#            checks before the motion), the AI-generated label on
 #            posts, the price before any paid run, budget caps and
 #            server-side keys.
 #   default: on unless switched off (Settings, Rules, for all characters or
@@ -39,6 +40,13 @@ rules:
     title: A new person, never a copy of the inspiration face
     check: { type: code }
     message: A hero that matches the face of the person in an inspiration image cannot become REF-00. The character must be a new person.
+  - id: recreate-gates
+    bucket: fixed
+    area: safety
+    spec: "13.1"
+    title: Recreate's video waits for its two face checks
+    check: { type: code }
+    message: "Recreate from a real clip spends nothing on the motion until the still passes both free checks: the face matches REF-00 (0.363 or more) and it does not look like the person in the clip (under 0.36). A still that fails says why and offers another take. Owner ruling, 2026-10-14. Face drift anywhere else stays a strong warning you decide on."
   - id: ai-label
     bucket: fixed
     area: safety

@@ -4,10 +4,10 @@
 // - On the Higgsfield plan: the credits Higgsfield actually took, read from
 //   the account's transactions (free).
 // - Claude: the measured tokens.
-// - The Higgsfield API reports no cost, so the price book's figure stands
-//   and nothing is flagged.
+// - On the Higgsfield API: Higgsfield's own price for the exact request
+//   (its free estimate endpoint, read right after the submit).
 
-export type CostSource = 'transactions' | 'tokens' | 'quote' | 'not_found'
+export type CostSource = 'transactions' | 'tokens' | 'quote' | 'not_found' | 'provider_estimate'
 
 export interface CostCheck {
   quoted: { credits?: number; micros: number }
@@ -29,7 +29,7 @@ export function compareCost(quoted: CostCheck['quoted'], actual: CostCheck['actu
   const a = both ? actual.credits! : actual.micros
   const offPct = a == null || actual.source === 'quote' || actual.source === 'not_found' || q <= 0 ? null : Math.round(((a - q) / q) * 100)
   const flagged = offPct != null && Math.abs(offPct) > FLAG_PCT
-  const what = both ? `${fmt(actual.credits!)} credits taken, ${fmt(quoted.credits!)} quoted` : a != null ? `$${(a / 1e6).toFixed(3)} measured, $${(q / 1e6).toFixed(3)} quoted` : ''
+  const what = both ? `${fmt(actual.credits!)} credits taken, ${fmt(quoted.credits!)} quoted` : a != null ? `$${(a / 1e6).toFixed(3)} ${actual.source === 'provider_estimate' ? 'charged by Higgsfield for this exact request' : 'measured'}, $${(q / 1e6).toFixed(3)} quoted` : ''
   const note = actual.source === 'not_found' ? 'The charge was not found in your Higgsfield transactions yet, so the quote stands.'
     : actual.source === 'quote' ? 'The provider reports no cost for a run, so the price book figure stands.'
     : flagged ? `Quote off by ${offPct! > 0 ? '+' : ''}${offPct}%: ${what}. Fix the price book entry for this model.`

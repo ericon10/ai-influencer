@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState, type ReactNode } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { Archive, AudioLines, Clapperboard, Download, Film, History, Images, LayoutGrid, Loader2, Mic, Music, Plus, Sparkles, Upload, Wind } from 'lucide-react'
 import { api, assetUrl, downloadUrl } from '../api'
@@ -7,7 +7,7 @@ import { keys, useCharacters, useContent, useLibrary, useScenes, useSounds, useW
 import { Callout, Img, errorMessage, useToast } from '../ui'
 import { ClipGrid, ClipUpload, StillGrid } from '../library'
 import { RunStatus } from '../runs'
-import type { BrollClip, ContentData, ScenesData, SoundItem } from '../types'
+import type { BrollClip, ContentData, LibraryClip, ScenesData, SoundItem } from '../types'
 import { KIND_LABEL, fileSlug, postName, useNewPost } from './post/parts'
 import { HowTo } from '../guide/Guide'
 import { VoiceLinesTab } from './library/VoiceLines'
@@ -87,7 +87,10 @@ export default function Library() {
             </div>
             {!clips.length ? <Callout tone="info">No clips yet. Keep a take in a post's Video step, or upload a video.</Callout> : (
               <ClipGrid clips={clips} showCharacter={!characterId} action={c => (
-                <button type="button" className="st-btn sm" disabled={!!newPost.busy} onClick={() => void newPost.create('meme', { characterId: c.characterId, spec: { clipId: c.id }, step: 'text' })}><Plus size={13} />Make a video post</button>
+                <div className="st-row" style={{ gap: 6, flexWrap: 'wrap' }}>
+                  <button type="button" className="st-btn sm" disabled={!!newPost.busy} onClick={() => void newPost.create('meme', { characterId: c.characterId, spec: { clipId: c.id }, step: 'text' })}><Plus size={13} />Make a video post</button>
+                  {c.assetId && <UseThisClip clip={c} />}
+                </div>
               )} />
             )}
           </div>
@@ -294,5 +297,24 @@ function BrollCard({ b, products }: { b: BrollClip; products: string[] }) {
       <datalist id={listId}>{products.map(p => <option key={p} value={p} />)}</datalist>
       <div className="st-row"><span className="st-hint">{b.durationSec != null ? `${b.durationSec} s` : ''}</span><span className="st-spacer" /><button className="st-btn ghost sm" onClick={archive}><Archive size={13} />Archive</button></div>
     </div>
+  )
+}
+
+// "Use this clip" (owner, 2026-10-14): Recreate from a real clip with this
+// clip as the source, for its character. A new video post, open at Recreate.
+function UseThisClip({ clip }: { clip: LibraryClip }) {
+  const nav = useNavigate()
+  const toast = useToast()
+  const qc = useQueryClient()
+  const [busy, setBusy] = useState(false)
+  return (
+    <button type="button" className="st-btn sm primary" disabled={busy} title="Recreate it with a character: real motion, real light" onClick={async () => {
+      setBusy(true)
+      try {
+        const { id } = await api.startRecreate({ character: clip.characterId, assetId: clip.assetId!, name: clip.title || undefined })
+        await qc.invalidateQueries({ queryKey: keys.content })
+        nav(`/studio/posts/${id}`)
+      } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) } finally { setBusy(false) }
+    }}><Clapperboard size={13} />{busy ? 'Starting...' : 'Use this clip'}</button>
   )
 }

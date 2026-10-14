@@ -12,7 +12,9 @@ import { EditStylePicker } from './EditStyles'
 import { ImportCard } from './ImportCard'
 import { SceneDetails } from '../character/SceneStills'
 import { looksLikePrompt, readShot } from '../../../../server/core/shotParse'
-import type { SceneView, ScenesData } from '../../types'
+import type { CloneSource, SceneView, ScenesData } from '../../types'
+import { SourceBox } from './ClonePanel'
+import { HowTo } from '../../guide/Guide'
 
 // Step 1 (UX-PLAN.md section 15): one box by default. "Describe the shot or
 // paste a prompt"; what the words already say (camera, framing, outfit,
@@ -48,6 +50,8 @@ export function IdeaStep({ ctx }: { ctx: PostCtx }) {
   // Switching drops this character's own stills, clips and scene.
   const hasPicks = !!(item.sceneId || spec.clipId || spec.stillId || spec.stillIds?.length || spec.clipIds?.length)
   const meme = item.kind === 'meme'
+  // The two ways in for a video post (owner, 2026-10-14).
+  const start = (draft.spec as { start?: 'describe' | 'clip' }).start ?? 'describe'
 
   // More control: collapsed by default, remembered per post; other steps
   // open it ("Change in the Idea step").
@@ -130,6 +134,20 @@ export function IdeaStep({ ctx }: { ctx: PostCtx }) {
         <Callout tone="info">New stills of {v.data.name} need {v.data.pronouns.poss} face and reference sheet first. <Link to={`/studio/characters/${v.id}`}>Set up {v.data.name}</Link>, or use stills and clips already in the Library.</Callout>
       )}
 
+      {meme && (
+        <div className="st-startchoice" role="radiogroup" aria-label="How to start" data-field="post-start">
+          <button type="button" role="radio" aria-checked={start === 'describe'} className={`st-choice ${start === 'describe' ? 'on' : ''}`} onClick={() => draft.setSpec({ start: 'describe' })}>
+            <span className="st-row" style={{ gap: 8 }}><b>Describe it</b><span className="st-spacer" />{start === 'describe' && <Check size={14} />}</span>
+            <span className="st-hint">Write the shot or paste a prompt. Stills first, then the video.</span>
+          </button>
+          <button type="button" role="radio" aria-checked={start === 'clip'} className={`st-choice ${start === 'clip' ? 'on' : ''}`} onClick={() => draft.setSpec({ start: 'clip' })}>
+            <span className="st-row" style={{ gap: 8 }}><b>Start from a real clip</b><span className="st-spacer" />{start === 'clip' && <Check size={14} />}</span>
+            <span className="st-hint">Recreate a saved TikTok or Reel with {current?.name ?? 'your character'}: its real motion and light. Best for clubs, dark venues and real dancing.</span>
+          </button>
+        </div>
+      )}
+
+      {meme && start === 'clip' ? <StartFromClip ctx={ctx} /> : (<>
       <Field id="post-idea" label={copy.label} hint={meme ? 'In your own words, or a whole prompt. Nothing you write is rewritten: what it says about the camera, outfit and light is kept.' : 'In your own words. It feeds the slides or the captions; change it any time.'}>
         <textarea className="st-textarea" rows={meme ? 4 : 3} maxLength={2000} value={idea} onChange={e => draft.setFields({ idea: e.target.value })} placeholder={copy.placeholder} />
       </Field>
@@ -147,6 +165,7 @@ export function IdeaStep({ ctx }: { ctx: PostCtx }) {
           {ideasJob && <IdeaOptions jobId={ideasJob} current={idea} onPick={text => draft.setFields({ idea: text })} onClose={() => setIdeasJob(null)} />}
         </div>
       )}
+      </>)}
 
       {item.kind === 'batch' && <ImportCard ctx={ctx} />}
 
@@ -188,6 +207,24 @@ export function IdeaStep({ ctx }: { ctx: PostCtx }) {
         )}
       </section>
     </div>
+  )
+}
+
+// "Start from a real clip": the clip (upload, a link or a Higgsfield media
+// ID), then the post opens at Recreate in the Video step.
+function StartFromClip({ ctx }: { ctx: PostCtx }) {
+  const source = ((ctx.item.spec as { clone?: CloneSource | null }).clone ?? null)
+  const had = useRef(!!source)
+  useEffect(() => {
+    // Once a clip is chosen here, the post moves on to Recreate.
+    if (source && !had.current) { had.current = true; void ctx.draft.go('video', { spec: { start: 'clip' } }) }
+  }, [source]) // eslint-disable-line react-hooks/exhaustive-deps
+  return (
+    <Field id="post-clip" label="The real clip" required done={source?.status === 'ready'} group hint="Save it from TikTok or Instagram and choose the file, or paste a video link or a Higgsfield media ID. 3 to 30 s.">
+      <span className="st-row" style={{ gap: 8 }}><span className="st-hint grow">Then: what to keep, 4 stills, the face checks, the motion model, the review.</span><HowTo id="post-clone" label="How Recreate works" /></span>
+      <SourceBox ctx={ctx} source={source} maxMb={200} />
+      {source && <button type="button" className="st-btn sm" style={{ alignSelf: 'flex-start' }} onClick={() => void ctx.draft.go('video', { spec: { start: 'clip' } })}>Open Recreate<ChevronRight size={14} /></button>}
+    </Field>
   )
 }
 

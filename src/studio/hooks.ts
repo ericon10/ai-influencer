@@ -204,7 +204,8 @@ export function useSounds() {
 export function useClones(contentId: string) {
   const qc = useQueryClient()
   const active = useActiveJobs()
-  const busy = (active.data?.jobs ?? []).some(j => j.purpose.startsWith(`clone:${contentId}:`))
+  // A take, its trim, and its review (face, text, cuts) refresh the list.
+  const busy = (active.data?.jobs ?? []).some(j => j.purpose.startsWith(`clone:${contentId}:`) || j.purpose.startsWith(`clone_trim:${contentId}:`) || j.purpose.startsWith(`clone_review:${contentId}:`))
   const wasBusy = useRef(false)
   useEffect(() => {
     if (wasBusy.current && !busy) { qc.invalidateQueries({ queryKey: ['clones', contentId] }); qc.invalidateQueries({ queryKey: ['library'] }) }
@@ -221,7 +222,9 @@ export function useCloneStills(contentId: string) {
   const busy = (active.data?.jobs ?? []).some(j => j.purpose.startsWith(`clone_still:${contentId}:`) || j.purpose.startsWith(`clone_face:${contentId}:`) || j.purpose === `clone_traits:${contentId}`)
   const wasBusy = useRef(false)
   useEffect(() => {
-    if (wasBusy.current && !busy) { qc.invalidateQueries({ queryKey: ['clone-stills', contentId] }); qc.invalidateQueries({ queryKey: keys.content }) }
+    // What landed changes the next prompts (the chips, the stills), so the
+    // prices shown are fetched again.
+    if (wasBusy.current && !busy) { qc.invalidateQueries({ queryKey: ['clone-stills', contentId] }); qc.invalidateQueries({ queryKey: keys.content }); qc.invalidateQueries({ queryKey: ['estimate'] }) }
     wasBusy.current = busy
   }, [busy, qc, contentId])
   return useQuery({ queryKey: ['clone-stills', contentId], queryFn: () => api.cloneStills(contentId), refetchInterval: busy ? 3000 : false })

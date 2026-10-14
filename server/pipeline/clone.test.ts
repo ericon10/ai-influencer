@@ -122,14 +122,15 @@ describe('Clone Video: the run', () => {
     expect(o.model).toBe('higgsfield/seedance-2.5-video-edit')
     expect(o.models.map(m => m.ref)).toContain('higgsfield/kling-3.0-motion-control')
     expect(o.models.every(m => m.display)).toBe(true)
-    expect(o.models.find(m => m.ref === 'higgsfield/kling-3.0-motion-control')!.path).toBe('account')
+    // A motion model runs on the account's billing default (the API here).
+    expect(o.models.find(m => m.ref === 'higgsfield/kling-3.0-motion-control')!.path).toBe('api')
     expect(o.models.find(m => m.ref === 'higgsfield/seedance-2.5-video-edit')!.background).toEqual(['video'])
     expect(o.keepSound).toBe(false)
     // Two modes: "Replace the person" is the default (G28).
     expect(o.mode).toBe('replace')
-    expect(o.defaults.motion).toBe('higgsfield/kling-3.0-motion-control-pro')
+    expect(o.defaults.motion).toBe('higgsfield/wan-3.0-motion')
     expect(o.models.find(m => m.ref === 'higgsfield/genjutsu-replace')).toMatchObject({ mode: 'replace', path: 'account' })
-    expect(o.models.find(m => m.ref === 'higgsfield/genjutsu-motion-transfer')!.mode).toBe('motion')
+    expect(o.models.find(m => m.ref === 'higgsfield/genjutsu-motion-control')!.mode).toBe('motion')
   })
 
   it('one quote with a line per character; both clones are checked and kept in Library > Clips', async () => {
@@ -154,7 +155,7 @@ describe('Clone Video: the run', () => {
     expect(lib.clips.find(c => c.id === clones.find(x => x.characterId === callie)!.id)).toMatchObject({ op: 'clone', title: 'Clone: dance trend', status: 'approved' })
     // The picked model is the next clone's default for its mode.
     expect(await cloneModel(h.deps, h.ctx, 'replace')).toBe('higgsfield/kling-o3-video-edit')
-    expect(await cloneModel(h.deps, h.ctx, 'motion')).toBe('higgsfield/kling-3.0-motion-control-pro')
+    expect(await cloneModel(h.deps, h.ctx, 'motion')).toBe('higgsfield/wan-3.0-motion')
   }, 120_000)
 
   it('"Keep original sound" puts the source sound back, and the post MP4 keeps it, B-roll and all', async () => {

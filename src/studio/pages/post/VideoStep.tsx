@@ -8,6 +8,7 @@ import type { BatchSpec, BrollTiming, LibraryClip, MemeSpec } from '../../types'
 import { VideoSection } from '../character/VideoSection'
 import { BrollPicker } from './parts'
 import { ClonePanel } from './ClonePanel'
+import { RecreateBatch } from './RecreatePanel'
 import { ContinueButton, ContinuePanel } from './ContinueShot'
 import { ShotB } from './ShotB'
 import { editOf } from './EditStyles'
@@ -45,9 +46,13 @@ function PostClip({ ctx }: { ctx: PostCtx }) {
   const clip = clips.find(c => c.id === spec.clipId) ?? null
   const hasStills = !!scene?.candidates.some(c => c.media === 'image' && c.assetId)
   const [params] = useSearchParams()
-  const [way, setWay] = useState<Way | null>(params.get('clone') || (spec.clone && !clip) ? 'clone' : spec.stillId || (hasStills && !clip) ? 'animate' : null)
+  // A post started from a real clip opens at Recreate.
+  const fromClip = (spec as { start?: string }).start === 'clip'
+  const [way, setWay] = useState<Way | null>(params.get('clone') || ((spec.clone || fromClip) && !clip) ? 'clone' : spec.stillId || (hasStills && !clip) ? 'animate' : null)
   // A still picked in the Stills step opens "Make a video from a still" here.
   useEffect(() => { if (spec.stillId && !spec.clipId) setWay('animate') }, [spec.stillId]) // eslint-disable-line react-hooks/exhaustive-deps
+  // A clip brought in from the Idea step (or a Recreate link) opens Recreate.
+  useEffect(() => { if ((spec.clone || fromClip) && !spec.clipId) setWay('clone') }, [!!spec.clone, fromClip]) // eslint-disable-line react-hooks/exhaustive-deps
   const [changing, setChanging] = useState(false)
   const [library, setLibrary] = useState(false)
   const name = v?.data.name ?? 'this character'
@@ -84,7 +89,7 @@ function PostClip({ ctx }: { ctx: PostCtx }) {
         <>
           <div className="st-ways">
             <button type="button" className={`st-way ${way === 'animate' ? 'on' : ''}`} onClick={() => setWay(w => (w === 'animate' ? null : 'animate'))}><Wand2 size={18} /><b>Make a video from a still</b><span className="st-hint">Real video starting from your photo (Kling, Seedance...)</span></button>
-            <button type="button" className={`st-way ${way === 'clone' ? 'on' : ''}`} onClick={() => setWay(w => (w === 'clone' ? null : 'clone'))}><Clapperboard size={18} /><b>Clone a TikTok or Reel</b><span className="st-hint">Same motion and camera, with {name}</span></button>
+            <button type="button" className={`st-way ${way === 'clone' ? 'on' : ''}`} onClick={() => setWay(w => (w === 'clone' ? null : 'clone'))}><Clapperboard size={18} /><b>Start from a real clip</b><span className="st-hint">Recreate a TikTok or Reel with {name}, or replace the person</span></button>
             {item.characterId && (
               <div className="st-way as-upload">
                 <Film size={18} /><b>Upload a video</b><span className="st-hint">Any video file</span>
@@ -124,6 +129,7 @@ function BatchClips({ ctx }: { ctx: PostCtx }) {
   const [library, setLibrary] = useState(false)
   const [params] = useSearchParams()
   const [cloning, setCloning] = useState(!!params.get('clone') || !!spec.clone)
+  const [recreating, setRecreating] = useState(!!(spec as { recreate?: { rows?: unknown[] } | null }).recreate?.rows?.length)
   const picked = ids.map(id => lib?.clips.find(c => c.id === id)).filter((c): c is LibraryClip => !!c)
   const name = v?.data.name ?? 'this character'
   const toggle = (id: string) => { void ctx.advance('video', { clipIds: ids.includes(id) ? ids.filter(x => x !== id) : [...ids, id].slice(0, 20) }) }
@@ -139,6 +145,10 @@ function BatchClips({ ctx }: { ctx: PostCtx }) {
         </div>
       </Field>
       {cloning && <ClonePanel ctx={ctx} batch onUse={id => { if (!ids.includes(id)) toggle(id) }} usedIds={ids} />}
+      <Field id="batch-recreate" label="Recreate a batch of clips" group hint="Real clips recreated with your characters, step by step together, each row priced.">
+        {recreating ? <RecreateBatch ctx={ctx} onTakes={takes => void ctx.advance('video', { clipIds: [...new Set([...ids, ...takes])].slice(0, 20) })} />
+          : <button type="button" className="st-btn" style={{ alignSelf: 'flex-start' }} onClick={() => setRecreating(true)}><Clapperboard size={15} />Recreate a batch of clips</button>}
+      </Field>
       <Field id="batch-broll" label="B-roll (optional)" group hint="Pick several to rotate them too.">
         <BrollPicker data={data} ids={spec.brollIds ?? []} multi onChange={next => draft.setSpec({ brollIds: next })} timing={spec} setTiming={(p: Partial<BrollTiming>) => draft.setSpec(p)} />
       </Field>

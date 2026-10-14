@@ -160,6 +160,17 @@ clone:
   recreate_element_api: " (the person in the other reference images)"
   # The face-only pass on a chosen still: nothing else moves.
   face_pass: "Change only {poss} face to match {name}{element}: {face}. Keep everything else in the image exactly the same, pixel for pixel: the hair, the outfit, the pose, the hands, the light, the background and the framing."
+  # Step 2 chips (owner, 2026-10-14): what to keep from the frame, named.
+  recreate_keep: " Keep from it: {keep}."
+  outfit_keep_named: "{Subj} wears the outfit of the first image: {outfit}."
+  outfit_hers_named: "Dress {obj} in {outfit} instead of the clothes in the first image."
+  # The motion step (owner's proven motion prompt, the kitchen clip on Wan
+  # 3.0, 2026-10-14), for every motion model on both paths. @Image1 is the
+  # chosen still, @Video1 the cleaned clip. {scene} lists what to keep from
+  # the still; {motion} says what happens in the clip.
+  motion: "Motion transfer. @Image1 defines everything you see: this exact {noun}, {poss} face, {hair_color} hair, {scene}, exactly as in @Image1 for the whole clip. The first frame matches @Image1. @Video1 is used ONLY for motion: copy its body movement, head turns, facial expressions, timing and handheld phone camera movement exactly, beat for beat. Never copy the person, the room, the caption text or the logo from @Video1.{motion} {Poss} face stays the same person from every angle. {Poss} outfit stays exactly as in @Image1 for the whole clip, same cut, length and fit. One continuous take, no cuts. No text, no captions, no logos, no watermark. Silent. Candid phone video, natural skin, not retouched."
+  motion_scene: "{poss} outfit, the place and the light"
+  motion_what: " The motion: {motion}."
   outfit_source: "Keep the clothes, shoes and accessories that person wears in the source exactly the same."
   outfit_hers: "Dress {obj} in the outfit from the outfit reference image (the last reference image), not the clothes in the source."
   target_main: "the main person (the largest person, closest to the camera)"
@@ -168,16 +179,24 @@ clone:
 # in the clip's frame for the traits the character must not take.
 clone_traits:
   system: |
-    You look at one frame from a video and describe the person the owner
-    picked, so an image model can give a different, original character
-    their own look instead. Return only short visible traits, comma
-    separated, plain words: hair color and length, eye color if visible,
-    piercings, makeup (for example winged liner, glossy lips), tattoos.
-    Never guess identity, age, ethnicity or anything not visible. Never
-    describe the body. No full sentences.
+    You look at frames from a short video and help the owner recreate it
+    with a different, original character. Return three things:
+    traits: the person the owner picked, so the character does not take
+    their look. Short visible traits, comma separated, plain words: hair
+    color and length, eye color if visible, piercings, makeup (for example
+    winged liner, glossy lips), tattoos. Never guess identity, age,
+    ethnicity or anything not visible. Never describe the body.
+    keep: what to keep from the first frame, as 3 to 6 short items: the
+    place, the light, the camera angle and framing, the pose, the outfit
+    (named plainly, for example "dark green sleeveless dress").
+    outfit: the outfit the person wears, in a few words.
+    motion: one sentence of what the person does through the clip, in
+    order (looks into the lens, turns away, glances back...). Plain words,
+    no mood or camera words.
   prompt: |
-    The person to describe: {target}.
-    Write the traits.
+    The person: {target}. The first image is the first frame; the others
+    follow in order.
+    Write traits, keep, outfit and motion.
 
 # The prompt writer (owner, 2026-10-13, default rule scene-prompt-writer):
 # Claude turns the scene details into the final prompt as natural sentences.

@@ -1206,3 +1206,39 @@ button.st-chip:hover { color: var(--st-text); border-color: var(--st-text-3); }
 .st-detailsline { padding: 10px 14px; border: 1px solid var(--st-line-2); border-radius: 12px; }
 .st-modal.st-sent-modal { width: min(760px, calc(100vw - 32px)); }
 .st-sent .st-prompt pre { overflow-x: auto; }
+
+/* Recreate, finished (UX-PLAN.md 16): chips, gates, the cap, the review. */
+.st-chip-x { display: inline-grid; place-items: center; width: 16px; height: 16px; margin-right: -4px; border-radius: 999px; border: 0; background: transparent; color: inherit; cursor: pointer; opacity: 0.7; }
+.st-chip-x:hover { opacity: 1; background: rgba(255, 255, 255, 0.08); }
+.st-chip.drop { background: rgba(255, 86, 86, 0.10); border-color: rgba(255, 86, 86, 0.40); color: var(--st-text); text-decoration: line-through; text-decoration-color: rgba(255, 86, 86, 0.55); }
+.st-gate { display: block; padding: 3px 7px; margin: 0 4px; border-radius: 8px; font-size: 12px; line-height: 1.4; }
+.st-gate svg { vertical-align: -2px; }
+.st-gate.ok { color: var(--st-ok); background: rgba(52, 199, 89, 0.10); }
+.st-gate.held { color: var(--st-bad); background: rgba(255, 86, 86, 0.10); }
+.st-facepass { border-style: dashed; }
+.st-cap { flex-wrap: wrap; }
+.st-cap-bar { width: 120px; height: 6px; border-radius: 999px; background: var(--st-surface-2); border: 1px solid var(--st-line); overflow: hidden; }
+.st-cap-bar span { display: block; height: 100%; background: var(--st-accent); }
+.st-pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 220px)); gap: 12px; }
+.st-pair figure { margin: 0; display: grid; gap: 4px; }
+.st-pair video { width: 100%; aspect-ratio: 9 / 16; object-fit: cover; border-radius: 12px; background: #000; border: 1px solid var(--st-line); }
+.st-pair figcaption { font-size: 12px; color: var(--st-text-3); text-align: center; }
+.st-strip { position: relative; height: 22px; border-radius: 8px; background: var(--st-surface-2); border: 1px solid var(--st-line); overflow: hidden; }
+.st-strip-cell { position: absolute; top: 3px; bottom: 3px; cursor: pointer; border-right: 1px solid rgba(0, 0, 0, 0.25); }
+.st-strip-cell.ok { background: rgba(52, 199, 89, 0.55); }
+.st-strip-cell.drift { background: rgba(255, 86, 86, 0.75); }
+.st-strip-cell.none { background: rgba(255, 255, 255, 0.10); }
+.st-strip-cut { position: absolute; top: 0; bottom: 0; width: 2px; background: #fff; box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4); }
+.st-strip-text { position: absolute; bottom: 1px; width: 8px; height: 8px; margin-left: -4px; border-radius: 2px; background: var(--st-warn); }
+.st-strip-text.handle, .st-strip-text.logo { background: var(--st-bad); }
+.st-strip-head { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--st-accent); pointer-events: none; }
+.st-dot { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 4px; vertical-align: 0; }
+.st-dot.ok { background: rgba(52, 199, 89, 0.8); }
+.st-dot.drift { background: rgba(255, 86, 86, 0.85); }
+.st-chip.text-handle, .st-chip.text-logo { border-color: rgba(255, 86, 86, 0.45); }
+.st-take video { max-height: 420px; }
+.st-batchrows { display: grid; gap: 10px; }
+.st-batchrow { display: grid; grid-template-columns: 64px 1fr; gap: 12px; align-items: start; padding: 10px; border-radius: 12px; border: 1px solid var(--st-line); background: var(--st-surface); }
+.st-batchrow img { width: 64px; aspect-ratio: 9 / 16; object-fit: cover; border-radius: 8px; }
+.st-batchrow select { max-width: 220px; }
+.st-startchoice { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }

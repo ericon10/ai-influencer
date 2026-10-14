@@ -107,7 +107,7 @@ export interface ScenesData {
     diagnose: Array<{ symptom: string; revision: string }>
     stillModels: SceneModel[]; editModels: SceneModel[]; defaultModels: string[]
     maxVariations: number; maxModels: number; accountConnected: boolean; mode: 'demo' | 'live'
-    stillLevels: Array<{ id: string; label: string; quality: string; resolution: string }>; stillLevel: string; defaultVariations: number
+    stillLevels: Array<{ id: string; label: string; quality: string; resolution: string; models?: Record<string, { quality?: string; resolution?: string }> }>; stillLevel: string; defaultVariations: number
     promptWriter: { on: boolean; model: string; words: { still: [number, number]; video: [number, number] }; realism: string; directorsPass: boolean }
     video: {
       model: SceneModel; models: Array<SceneModel & { resolution: string | null }>; durations: number[]; duration: number; aspect: string; maxTakes: number; takes: number; directions: string
@@ -191,7 +191,8 @@ export type StudioAction =
   | { type: 'content_slides'; characterId: string; contentId: string }
   | { type: 'content_captions'; characterId: string; contentId: string }
   | { type: 'clone_caption'; characterId: string; contentId: string }
-  | { type: 'clone'; contentId: string; characterIds: string[]; model?: string; mode?: CloneMode; background?: 'video' | 'image'; outfit?: 'source' | 'hers'; looks: Record<string, string>; keepSound: boolean }
+  | { type: 'clone'; contentId: string; characterIds: string[]; model?: string; mode?: CloneMode; background?: 'video' | 'image'; outfit?: 'source' | 'hers'; looks: Record<string, string>; keepSound: boolean; stills?: Record<string, string> }
+  | { type: 'recreate_batch'; contentId: string; step: 'stills' | 'face' | 'video' }
   | { type: 'clone_still'; contentId: string; characterId: string; outfit?: 'source' | 'hers'; look?: string; takes?: number }
   | { type: 'clone_face'; contentId: string; characterId: string; candidateId: string; takes?: number }
   | { type: 'clone_traits'; contentId: string; characterId: string }
@@ -328,22 +329,54 @@ export interface CloneSource {
   // the free read of the clip (dark, movement) that suggests the route.
   rawFrameId?: string | null; motionAssetId?: string | null; notLike?: string
   look?: { dark: boolean; motion: number; suggest: CloneMode; why: string } | null
+  // Step 2 (owner, 2026-10-14): what to keep, the outfit, what happens in
+  // the clip; the post's credit cap and what its steps started so far.
+  keep?: string[]; outfit?: { choice: 'source' | 'hers'; text: string; lookId: string | null }; motion?: string
+  capCredits?: number | null; spentCredits?: number; from?: string
 }
+export interface StillGate { ok: boolean; face: number | null; likeness: number | null; reasons: string[]; note: string | null }
 export interface CloneStill {
   id: string; characterId: string; characterName: string; assetId: string | null; status: string; kept: boolean; error: string | null
   findings: Array<{ code: string; severity: string; message: string }>; createdAt: string
   // A face pass made from another still, and the free scores (face match
   // to REF-00, likeness to the person in the clip; null in demo mode).
   parentId: string | null; pass: 'still' | 'face'; faceScore: number | null; sourceScore: number | null
+  // The gates before the video (fixed): whether it can start it, and why not.
+  gate: StillGate
 }
 export interface CloneModel {
   ref: string; label: string; mode: CloneMode; resolution: string | null; background: Array<'video' | 'image'>; minSec: number; maxSec: number
-  path: 'account' | 'api'; note: string; display: string | null; verified: boolean; problem: string | null
+  path: 'account' | 'api'; pathLabel: string; note: string; display: string | null; verified: boolean; problem: string | null; takesPrompt: boolean
 }
-export interface CloneOptions { suggest: { mode: CloneMode; why: string } | null; takes: { still: number; face: number }; mode: CloneMode; outfit: 'source' | 'hers'; defaults: Record<CloneMode, string>; target: string; model: string; models: CloneModel[]; seconds: number; maxCharacters: number; keepSound: boolean; minSeconds: number; maxSeconds: number; maxUploadMb: number }
+export interface CloneOptions {
+  suggest: { mode: CloneMode; why: string } | null; takes: { still: number; face: number }; gate: { face_min: number; source_max: number }; cap: { credits: number | null; spent: number } | null
+  mode: CloneMode; outfit: 'source' | 'hers'; defaults: Record<CloneMode, string>; target: string; model: string; models: CloneModel[]; seconds: number; maxCharacters: number; keepSound: boolean; minSeconds: number; maxSeconds: number; maxUploadMb: number
+}
+// The review of a take (free, on the worker): the face every half second,
+// text found on the frames, and cuts.
+export interface CloneReview {
+  at: string; duration: number; step: number; faceMin: number
+  samples: Array<{ t: number; face: number | null; likeness: number | null }>
+  drift: Array<{ start: number; end: number }>
+  text: Array<{ t: number; kind: 'handle' | 'logo' | 'caption'; text: string }>
+  cuts: number[]; notes: string[]
+}
 export interface CloneResult {
   id: string; characterId: string; characterName: string; assetId: string | null; status: string; label: string
   durationSec: number | null; error: string | null; findings: Array<{ code: string; severity: string; message: string }>; createdAt: string
+  sourceAssetId: string | null; review: CloneReview | null; model: string | null; parentId: string | null
+  posters: { source: string | null; take: string | null }
+}
+// A batch of recreates: each row a clip and a character in its own post.
+export interface RecreateRow {
+  postId: string; characterId: string; characterName: string; name: string; status: string; error: string | null; frameId: string | null; seconds: number | null
+  model: string; modelLabel: string; stills: number; faces: number; still: { id: string; assetId: string | null; gate: StillGate } | null
+  take: { id: string; assetId: string | null; status: string } | null
+  next: 'preparing' | 'stills' | 'face' | 'video' | 'waiting' | 'done' | 'failed'; why: string | null
+}
+export interface RecreateBatchView {
+  rows: RecreateRow[]; max: number; defaultModel: string
+  prices: Record<string, { step: 'stills' | 'face' | 'video'; display: string; credits: number | null; micros: number } | null>
 }
 export type PostStep = 'idea' | 'stills' | 'video' | 'text' | 'finish'
 export interface ContentOutputs {

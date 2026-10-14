@@ -16,7 +16,7 @@ const cfg = loadConfig()
 const rules = cfg.pipeline.rules
 const EM = String.fromCharCode(0x2014)
 
-const FIXED = ['adult-21', 'no-explicit', 'distinct-person', 'ai-label', 'realism-block', 'realism-banned-words', 'realism-beautify-off', 'realism-texture', 'natural-baseline', 'price-first', 'budget-caps', 'keys-server-side']
+const FIXED = ['adult-21', 'no-explicit', 'distinct-person', 'recreate-gates', 'ai-label', 'realism-block', 'realism-banned-words', 'realism-beautify-off', 'realism-texture', 'natural-baseline', 'price-first', 'budget-caps', 'keys-server-side']
 
 // Prompts and requests that trip every default the prompt lint checks.
 const REALISM = '\nREALISM: Candid phone photo, natural skin texture with visible pores, no retouching.\nAVOID: plastic skin.'

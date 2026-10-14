@@ -15,16 +15,18 @@ entries:
   # They are set high on purpose and always shown as not confirmed.
   - { provider: higgsfield, model: gpt-image-2.5, unit: image, price: 0.10, verified: false, credits: 3, when: { quality: medium }, source: "Placeholder for Standard (medium, 1k). Not confirmed." }
   - { provider: higgsfield, model: gpt-image-2.5, unit: image, price: 0.25, verified: false, credits: 6, source: "Placeholder credits." }
-  # Flare: a flat $0.25 placeholder priced the owner's first real run (2k,
-  # high) the same as any other (2026-10-14). Now by quality; still
-  # placeholders, set high, until a real run's cost is logged against them
-  # (What was sent, Settings > Costs). The published Higgsfield rate for
-  # Flare was not reachable from the build sandbox.
-  - { provider: higgsfield, model: gpt-image-2.5-flare, unit: image, price: 0.10, verified: false, credits: 3, when: { quality: medium }, source: "Placeholder for Standard (medium, 1k). Not confirmed." }
-  - { provider: higgsfield, model: gpt-image-2.5-flare, unit: image, price: 0.25, verified: false, credits: 6, when: { quality: high }, source: "Placeholder for High (high, 2k). Not confirmed." }
-  - { provider: higgsfield, model: gpt-image-2.5-flare, unit: image, price: 0.25, verified: false, credits: 6, source: "Placeholder credits." }
+  # Flare, real charges (owner's runs, read from the account's Higgsfield
+  # transactions and generation history, 2026-10-14): Standard (medium) at
+  # 2k is 1 plan credit a still, High at 2k is 2.75. The API bills in
+  # credits too (its estimate endpoint returns credits and dollars); the
+  # dollar side is the credits at the API's published rate (1.5 credits =
+  # $0.094) until the first API run logs Higgsfield's own price.
+  - { provider: higgsfield, model: gpt-image-2.5-flare, unit: image, price: 0.0625, verified: false, credits: 1, credits_verified: true, when: { quality: medium }, source: "1 plan credit a still at medium, 2k: every Flare spend at medium in the account's transactions (2026-10-13 and 14). Dollars at the API's rate, not yet confirmed by an API run." }
+  - { provider: higgsfield, model: gpt-image-2.5-flare, unit: image, price: 0.172, verified: false, credits: 2.75, credits_verified: true, when: { quality: high }, source: "2.75 plan credits a still at high, 2k: the Flare and Sunburst spends at high in the account's transactions (2026-10-13). Dollars at the API's rate, not yet confirmed by an API run." }
+  - { provider: higgsfield, model: gpt-image-2.5-flare, unit: image, price: 0.172, verified: false, credits: 2.75, source: "Other qualities priced as High until a run shows the charge." }
   - { provider: higgsfield, model: nano-banana-2.1, unit: image, price: 0.15, verified: false, credits: 1.5, credits_verified: true, when: { resolution: 1k }, source: "1.5 plan credits per image at 1k: Higgsfield's live price in the model test (2026-10-13) and every Nano Banana 2.1 spend in the account's transactions on 2026-10-14." }
-  - { provider: higgsfield, model: nano-banana-2.1, unit: image, price: 0.15, verified: false, credits: 4, source: "Placeholder credits above 1k." }
+  - { provider: higgsfield, model: nano-banana-2.1, unit: image, price: 0.15, verified: false, credits: 2, credits_verified: true, when: { resolution: 2k }, source: "2 plan credits per image at 2k: the Studio's Nano Banana 2.1 runs at 2k in the account's transactions (2026-10-13)." }
+  - { provider: higgsfield, model: nano-banana-2.1, unit: image, price: 0.15, verified: false, credits: 4, source: "Placeholder credits above 2k." }
   - { provider: higgsfield, model: nano-banana-2, unit: image, price: 0.12, verified: false, credits: 3, source: "Placeholder credits." }
   - { provider: higgsfield, model: soul-2, unit: image, price: 0.10, verified: false, credits: 3, source: "Placeholder credits." }
   - { provider: higgsfield, model: bytedance-upscale, unit: image, price: 0.10, verified: false, credits: 2, credits_verified: true, source: "2 credits at 2k, verified live 2026-10-12" }
@@ -47,22 +49,27 @@ entries:
   # reachable from the build sandbox (2026-10-13). Each model's paid test
   # confirms its price. Kling 3.0 image to video is $0.063/s (Standard) and
   # $0.084/s (Pro), so motion control is expected near those.
-  - { provider: higgsfield, model: kling-3.0-motion-control, unit: second, price: 0.12, verified: false, credits: 2, when: { resolution: 720p }, source: "Placeholder credits per second at 720p, set high until the first run shows the charge (motion_control has no price preflight)." }
+  - { provider: higgsfield, model: kling-3.0-motion-control, unit: second, price: 0.12, verified: false, credits: 2, when: { resolution: 720p }, source: "Placeholder: 48 credits were reserved for a 30 s clip on the plan (1.6 a second) and refunded when the run failed (2026-10-14); set at 2 until a run finishes. API dollars near Kling 3.0 Standard image to video ($0.063/s), set high." }
   - { provider: higgsfield, model: kling-3.0-motion-control, unit: second, price: 0.16, verified: false, credits: 3, source: "Placeholder credits per second at 1080p." }
   - { provider: higgsfield, model: genjutsu-replace, unit: second, price: 0.15, verified: false, credits: 3, source: "Placeholder credits per second, set high until the first run shows the charge (the live price needs the uploaded clip)." }
   - { provider: higgsfield, model: kling-3.0-motion-control-pro, unit: second, price: 0.11, verified: false, source: "Placeholder near Kling 3.0 Pro image to video ($0.084/s)." }
   - { provider: higgsfield, model: kling-3.0-motion-control-standard, unit: second, price: 0.08, verified: false, source: "Placeholder near Kling 3.0 Standard image to video ($0.063/s)." }
   - { provider: higgsfield, model: genjutsu-motion-transfer, unit: second, price: 0.15, verified: false, source: "Placeholder." }
-  # Recreate from a real clip (owner, 2026-10-14). Genjutsu motion control on
-  # the plan: 70 credits for 10 s and 42 for 6 s in the account's
-  # transactions, so 7 credits a second at 720p. Plan-only (no USD price).
-  - { provider: higgsfield, model: genjutsu-motion-control, unit: second, price: 0.0, verified: false, credits: 7, credits_verified: true, when: { resolution: 720p }, source: "7 credits a second at 720p: 70 for 10 s and 42 for 6 s in the owner's Higgsfield transactions (2026-10-14)." }
-  - { provider: higgsfield, model: genjutsu-motion-control, unit: second, price: 0.0, verified: false, credits: 10, source: "Placeholder above 720p, set high." }
-  # The Vercel AI Gateway publishes no per-second rate we could read from
-  # the build sandbox; placeholders, set high, until a paid run's cost is
-  # logged (third-party listings give $0.11 to $0.15 a second).
-  - { provider: vercel, model: kling-3.0-motion-control, unit: second, price: 0.15, verified: false, source: "Placeholder, set high. Not confirmed." }
-  - { provider: vercel, model: kling-3.0-motion-control-pro, unit: second, price: 0.20, verified: false, source: "Placeholder, set high. Not confirmed." }
+  # Recreate from a real clip, the motion step (owner, 2026-10-14), per
+  # second at 720p. Plan credits are the real charges in the account's
+  # Higgsfield transactions: Genjutsu 70 for 10 s and 42 for 6 s (the
+  # kitchen clip); Wan 3.0 10.5 for 6 s; Wan 3.0 Prime 18 for 6 s and 15
+  # for 5 s. Kling 3.0 Motion Control on the plan has only a failed run (48
+  # reserved for a 30 s clip, refunded), so it stays a placeholder. Dollars
+  # on the API are the credits at the API's published rate (1.5 credits =
+  # $0.094), not yet confirmed; each API run logs Higgsfield's own price
+  # for its exact request (its free estimate endpoint).
+  - { provider: higgsfield, model: genjutsu-motion-control, unit: second, price: 0.4375, verified: false, credits: 7, credits_verified: true, when: { resolution: 720p }, source: "7 plan credits a second at 720p: 70 for 10 s and 42 for 6 s in the owner's Higgsfield transactions (2026-10-14). Dollars at the API's rate." }
+  - { provider: higgsfield, model: genjutsu-motion-control, unit: second, price: 0.625, verified: false, credits: 10, source: "Placeholder above 720p, set high." }
+  - { provider: higgsfield, model: wan-3.0-motion, unit: second, price: 0.11, verified: false, credits: 1.75, credits_verified: true, when: { resolution: 720p }, source: "1.75 plan credits a second at 720p: 10.5 for 6 s, the owner's kitchen clip run (2026-10-14). Dollars at the API's rate." }
+  - { provider: higgsfield, model: wan-3.0-motion, unit: second, price: 0.19, verified: false, credits: 3, source: "Placeholder above 720p, set high." }
+  - { provider: higgsfield, model: wan-3.0-prime-motion, unit: second, price: 0.1875, verified: false, credits: 3, credits_verified: true, when: { resolution: 720p }, source: "3 plan credits a second at 720p: 18 for 6 s and 15 for 5 s in the owner's transactions (2026-10-14). Dollars at the API's rate." }
+  - { provider: higgsfield, model: wan-3.0-prime-motion, unit: second, price: 0.30, verified: false, credits: 5, source: "Placeholder above 720p, set high." }
   - { provider: higgsfield, model: seedance-2.5-video-edit, unit: second, price: 0.25, verified: false, source: "Official pricing page: Seedance 2.5 video edit from $0.206/s (SPEC 13.1); placeholder above the starting tier." }
   - { provider: higgsfield, model: kling-o3-video-edit, unit: second, price: 0.17, verified: false, source: "Placeholder." }
   # Audio, per second of sound.

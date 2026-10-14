@@ -340,7 +340,8 @@ describe('account adapter edge cases', () => {
     fake.hangOn = 'generate_image'
     try {
       const started = Date.now()
-      const est = await slow.estimate(still().request as GenRequest)
+      // Above 2k Nano Banana 2.1 still has placeholder credits.
+      const est = await slow.estimate(still({ resolution: '4k' }).request as GenRequest)
       expect(est.credits).toBe(4)
       expect(est.verified).toBe(false)
       expect(est.note).toMatch(/no answer in 0 s.*price book/)

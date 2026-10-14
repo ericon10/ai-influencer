@@ -12,7 +12,6 @@ import { createContent, getContent, type MemeSpec } from './content.js'
 import { addCloneSource, cloneModel, cloneOptions, cloneStills, pickCloneStill, postClones, readLook, setCloneNotLike, trimClone } from './clone.js'
 import { jobs } from '../db/schema.js'
 import { renderPlaceholderPortrait } from '../providers/mock.js'
-import { saveCredential } from '../providers/credentials.js'
 import { makeClip } from '../media/testClips.js'
 import { probeFile } from '../media/ffmpeg.js'
 import { readAsset } from '../storage/assets.js'
@@ -76,10 +75,11 @@ describe('the free read of the clip suggests the route', () => {
     expect(await readLook(bright, h.deps.config.pipeline.content.clone.recreate)).toMatchObject({ dark: false, motion: 0, suggest: 'replace', why: '' })
   }, 60_000)
 
-  it('the motion model starts on whichever path has keys: the Higgsfield API, then the Vercel AI Gateway', async () => {
-    expect(await cloneModel(h.deps, h.ctx, 'motion')).toBe('higgsfield/kling-3.0-motion-control-pro')
-    await saveCredential(h.deps, h.ctx, 'vercel', 'vck_test_key_1234567890')
-    expect(await cloneModel(h.deps, h.ctx, 'motion')).toBe('vercel/kling-3.0-motion-control')
+  it('the motion step starts at Wan 3.0, then the last model used', async () => {
+    expect(await cloneModel(h.deps, h.ctx, 'motion')).toBe('higgsfield/wan-3.0-motion')
+    const o = await cloneOptions(h.deps, h.ctx, postId)
+    const motion = o.models.filter(m => m.mode === 'motion').map(m => m.label)
+    expect(motion).toEqual(['Genjutsu', 'Wan 3.0', 'Wan 3.0 Prime', 'Kling 3.0 Motion Control'])
   })
 })
 
@@ -117,11 +117,11 @@ describe('the stills, the face pass and the pick', () => {
 })
 
 describe('the motion and the trim', () => {
-  it('the motion comes from the clip as uploaded; Trim keeps a shorter copy and the original', async () => {
+  it('the motion comes from the cleaned clip; Trim keeps a shorter copy and the original', async () => {
     const c = await cloneOf()
-    await run({ type: 'clone', contentId: postId, characterIds: [callie], mode: 'motion', model: 'higgsfield/genjutsu-motion-transfer', looks: {}, keepSound: false })
+    await run({ type: 'clone', contentId: postId, characterIds: [callie], mode: 'motion', model: 'higgsfield/genjutsu-motion-control', looks: {}, keepSound: false })
     const [motion] = await requests(`clone:${postId}:`)
-    expect(motion!.sourceVideo!.assetId).toBe(c.motionAssetId)
+    expect(motion!.sourceVideo!.assetId).toBe(c.assetId)
     const [clone] = await postClones(h.deps, h.ctx, postId)
     expect(clone!.assetId).toBeTruthy()
     await expect(trimClone(h.deps, h.ctx, clone!.id, { start: 1, end: 1.2 })).rejects.toThrow(/half a second/)

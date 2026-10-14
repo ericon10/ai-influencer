@@ -399,15 +399,15 @@
     "y": 41.8,
     "w": 90.3,
     "h": 2,
-    "label": "Nano Banana 2.1 first; up to 2 to compare"
+    "label": "GPT Image 2.5 Flare first, 4 stills, 9:16; Nano Banana 2.1 one click"
    },
    {
     "n": 4,
     "x": 26.4,
     "y": 63.6,
-    "w": 22.6,
+    "w": 22.9,
     "h": 2.9,
-    "label": "Standard (1k) by default, High (2k) one click"
+    "label": "Standard by default, High one click"
    },
    {
     "n": 5,
@@ -694,84 +694,6 @@
     "w": 94.2,
     "h": 1.5,
     "label": "Turn on the AI-generated label when you post"
-   }
-  ]
- },
- "post-clone": {
-  "w": 1030,
-  "h": 3387,
-  "spots": [
-   {
-    "n": 1,
-    "x": 1.2,
-    "y": 1.7,
-    "w": 97.7,
-    "h": 10,
-    "label": "The saved TikTok or Reel"
-   },
-   {
-    "n": 2,
-    "x": 20.9,
-    "y": 12.8,
-    "w": 18.9,
-    "h": 6.1,
-    "label": "Recreate from a real clip: suggested for dark or busy clips"
-   },
-   {
-    "n": 3,
-    "x": 1.2,
-    "y": 43.5,
-    "w": 91.8,
-    "h": 1.3,
-    "label": "Not like the person in the clip: hair, eyes, piercings, makeup"
-   },
-   {
-    "n": 4,
-    "x": 1.2,
-    "y": 61.9,
-    "w": 19.6,
-    "h": 1.1,
-    "label": "Make 4 stills of her in the clip's frame (priced)"
-   },
-   {
-    "n": 5,
-    "x": 2,
-    "y": 57.3,
-    "w": 16.7,
-    "h": 4,
-    "label": "Use this still, or Fix the face (2 takes, priced)"
-   },
-   {
-    "n": 6,
-    "x": 42,
-    "y": 62.8,
-    "w": 9.4,
-    "h": 0.9,
-    "label": "You pick: the best face match, least like the person in the clip"
-   },
-   {
-    "n": 7,
-    "x": 1.2,
-    "y": 67.1,
-    "w": 97.7,
-    "h": 9.8,
-    "label": "The motion model, with its price: your plan or the API"
-   },
-   {
-    "n": 8,
-    "x": 1.2,
-    "y": 85.1,
-    "w": 16.5,
-    "h": 1.1,
-    "label": "Copy the clip's real motion onto the still (priced)"
-   },
-   {
-    "n": 9,
-    "x": 2.4,
-    "y": 98.4,
-    "w": 5.6,
-    "h": 0.7,
-    "label": "Trim, free, before you use the clip"
    }
   ]
  },
@@ -1402,6 +1324,224 @@
     "w": 94.5,
     "h": 54.9,
     "label": "The final prompt exactly as sent, with Copy"
+   }
+  ]
+ },
+ "post-idea-start": {
+  "w": 1068,
+  "h": 548,
+  "spots": [
+   {
+    "n": 1,
+    "x": 2.9,
+    "y": 23.7,
+    "w": 46.6,
+    "h": 17,
+    "label": "Describe it: write the shot, then stills and a video"
+   },
+   {
+    "n": 2,
+    "x": 50.5,
+    "y": 23.7,
+    "w": 46.6,
+    "h": 17,
+    "label": "Start from a real clip: your character in a TikTok or Reel"
+   }
+  ]
+ },
+ "recreate-step2": {
+  "w": 1030,
+  "h": 621,
+  "spots": [
+   {
+    "n": 1,
+    "x": 11.5,
+    "y": 9.9,
+    "w": 25.5,
+    "h": 4.5,
+    "label": "Scene to keep: the place, light and props"
+   },
+   {
+    "n": 2,
+    "x": 11.5,
+    "y": 31.5,
+    "w": 13,
+    "h": 4.5,
+    "label": "Source traits to drop: hair, eyes, piercings, makeup"
+   },
+   {
+    "n": 3,
+    "x": 11.5,
+    "y": 53.2,
+    "w": 15.7,
+    "h": 4.5,
+    "label": "The outfit: keep the clip's, or pick hers"
+   },
+   {
+    "n": 4,
+    "x": 11.5,
+    "y": 80.3,
+    "w": 22.5,
+    "h": 4.8,
+    "label": "Read them for me: Claude fills the chips (priced)"
+   }
+  ]
+ },
+ "recreate-stills": {
+  "w": 1030,
+  "h": 860,
+  "spots": [
+   {
+    "n": 1,
+    "x": 2.4,
+    "y": 44.6,
+    "w": 15.9,
+    "h": 2.7,
+    "label": "Face and Clip scores: the gate the video needs"
+   },
+   {
+    "n": 2,
+    "x": 2.2,
+    "y": 56,
+    "w": 17.2,
+    "h": 3.5,
+    "label": "Fix this face: only the face is redone (priced)"
+   },
+   {
+    "n": 3,
+    "x": 21,
+    "y": 4.3,
+    "w": 18.4,
+    "h": 60.3,
+    "label": "The face pass, with its own scores"
+   },
+   {
+    "n": 4,
+    "x": 22,
+    "y": 48.1,
+    "w": 17.1,
+    "h": 3.5,
+    "label": "Make the video: only on a still that passes both checks"
+   }
+  ]
+ },
+ "recreate-model": {
+  "w": 1030,
+  "h": 200,
+  "spots": [
+   {
+    "n": 1,
+    "x": 1.2,
+    "y": 18.4,
+    "w": 18.9,
+    "h": 63.6,
+    "label": "Each motion model with its price and billing path"
+   },
+   {
+    "n": 2,
+    "x": 2.8,
+    "y": 43.3,
+    "w": 15.6,
+    "h": 15.4,
+    "label": "The price on your plan (credits) or the API (dollars)"
+   }
+  ]
+ },
+ "recreate-review": {
+  "w": 1030,
+  "h": 786,
+  "spots": [
+   {
+    "n": 1,
+    "x": 1.3,
+    "y": 6,
+    "w": 97.5,
+    "h": 52.6,
+    "label": "The take and the source, playing in sync"
+   },
+   {
+    "n": 2,
+    "x": 1.3,
+    "y": 64.4,
+    "w": 97.5,
+    "h": 2.8,
+    "label": "The face check every 0.5 s; red marks are drift"
+   },
+   {
+    "n": 3,
+    "x": 1,
+    "y": 65.9,
+    "w": 0.8,
+    "h": 1,
+    "label": "Text found on the frames: logos, @handles, captions"
+   },
+   {
+    "n": 4,
+    "x": 1.3,
+    "y": 85.9,
+    "w": 13.6,
+    "h": 4.8,
+    "label": "Use this take: kept, no music, on to the Text step"
+   },
+   {
+    "n": 5,
+    "x": 75.5,
+    "y": 86.4,
+    "w": 23.3,
+    "h": 3.8,
+    "label": "The same clip with another character"
+   }
+  ]
+ },
+ "recreate-batch": {
+  "w": 1030,
+  "h": 825,
+  "spots": [
+   {
+    "n": 1,
+    "x": 7.2,
+    "y": 9.5,
+    "w": 26.8,
+    "h": 4,
+    "label": "Set all: one motion model for every row"
+   },
+   {
+    "n": 2,
+    "x": 1.2,
+    "y": 14.8,
+    "w": 97.7,
+    "h": 16.6,
+    "label": "A row: its clip, character, model and price"
+   },
+   {
+    "n": 3,
+    "x": 87.8,
+    "y": 16.1,
+    "w": 10,
+    "h": 2.7,
+    "label": "A row that waits says why"
+   },
+   {
+    "n": 4,
+    "x": 1.2,
+    "y": 87.1,
+    "w": 24.1,
+    "h": 4.6,
+    "label": "One price for every row at this step"
+   }
+  ]
+ },
+ "library-clips": {
+  "w": 1140,
+  "h": 900,
+  "spots": [
+   {
+    "n": 1,
+    "x": 5.2,
+    "y": 77.4,
+    "w": 15.4,
+    "h": 3.3,
+    "label": "Use this clip: Recreate it with this clip's character"
    }
   ]
  }

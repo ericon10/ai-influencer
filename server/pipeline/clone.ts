@@ -23,21 +23,24 @@ import { ffmpeg, probeFile, withTempDir } from '../media/ffmpeg.js'
 import { compareTexture } from '../qa/texture.js'
 import type { GenRequest } from '../providers/types.js'
 import { readBilling } from '../providers/billing.js'
+import type { HiggsfieldBilling } from '../providers/types.js'
 import { listCredentials } from '../providers/credentials.js'
 import { isOwnerAccount } from '../providers/serverKeys.js'
 import { ACCOUNT_PROVIDER } from '../providers/higgsfieldOAuth.js'
 import { effectiveModel, MODEL_OVERRIDES_KEY, readModelOverrides } from '../providers/modelOverrides.js'
 import { getAsset, readAsset, saveAsset } from '../storage/assets.js'
 import { uploadKey } from '../storage/uploads.js'
+import { safeDownload } from '../jobs/download.js'
 import { approvedAssets, getCandidate, getCharacter, toData } from './characters.js'
 import { pronounVars } from '../core/prompts.js'
 import { createContent, getContent, specSchemas, updateContent, type CloneSource, type ContentKind } from './content.js'
-import { lintOrThrow, runModel, type SceneBuilt } from './sceneActions.js'
+import { lintOrThrow, runModel, stillLevelFor, type SceneBuilt } from './sceneActions.js'
 import { freeChecksOnly } from './sceneHooks.js'
 import { clipFrames } from './videoAssets.js'
 import { scorePerformer, scoreSceneIdentity } from './identity.js'
+import type { CloneReview } from './recreate.js'
 import { ruleSwitches } from './rules.js'
-import { getSetting, resolveRoute, setSetting } from './settings.js'
+import { getSetting, providerMode, resolveRoute, setSetting } from './settings.js'
 
 // Clone Video (SPEC 13.1 R1; UX-PLAN.md: "Clone a TikTok or Reel" in a
 // post's Video step). The owner brings a saved TikTok or Reel; the worker
@@ -78,35 +81,96 @@ function cloneOf(post: { kind: string; spec: unknown }): CloneSource | null {
 
 // ── The source clip ─────────────────────────────────────────────────
 
-export async function addCloneSource(deps: Deps, ctx: Ctx, input: { contentId: string; uploadId: string; name: string }): Promise<{ ok: true }> {
+// Where a clip comes from: an upload, a saved clip (an asset), a direct
+// video link, or a video in the connected Higgsfield account's media.
+export type ClipFrom = { uploadId: string } | { assetId: string } | { link: string }
+
+const blankSource = (name: string, from: string): CloneSource => ({
+  status: 'preparing', name, uploadId: null, assetId: null, durationSec: null, hasAudio: false, trimmed: false, error: null, firstFrameId: null, people: [], target: null, stills: {},
+  originalAssetId: null, cleanAssetId: null, cleanup: null, textFrameId: null, sourceCaption: null, rawFrameId: null, motionAssetId: null, notLike: '', look: null,
+  keep: [], outfit: { choice: 'source', text: '', lookId: null }, motion: '', capCredits: null, spentCredits: 0, from, prep: '', motionFrameIds: [],
+})
+
+const MEDIA_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+export async function addCloneSource(deps: Deps, ctx: Ctx, input: { contentId: string; name?: string; capCredits?: number | null } & ClipFrom): Promise<{ ok: true }> {
   const post = await getContent(deps, ctx, input.contentId)
   if (post.kind !== 'meme' && post.kind !== 'batch') throw new AppError('bad_request', 'Clone a video in a video post or a batch.')
-  if (!/^upl_[a-z0-9]{20}$/.test(input.uploadId)) throw new AppError('bad_request', 'That upload id is not valid.')
-  if (!(await deps.store.exists(uploadKey(ctx.accountId, input.uploadId)))) throw new AppError('bad_request', `${input.name} did not finish uploading. Try again.`)
-  const name = input.name.replace(/\.[a-z0-9]+$/i, '').trim().slice(0, 120) || 'Clip to clone'
-  const clone: CloneSource = { status: 'preparing', name, uploadId: input.uploadId, assetId: null, durationSec: null, hasAudio: false, trimmed: false, error: null, firstFrameId: null, people: [], target: null, stills: {}, originalAssetId: null, cleanAssetId: null, cleanup: null, textFrameId: null, sourceCaption: null, rawFrameId: null, motionAssetId: null, notLike: '', look: null }
+  let request: Record<string, unknown>
+  let name = (input.name ?? '').replace(/\.[a-z0-9]+$/i, '').trim().slice(0, 120)
+  let from = ''
+  if ('uploadId' in input) {
+    if (!/^upl_[a-z0-9]{20}$/.test(input.uploadId)) throw new AppError('bad_request', 'That upload id is not valid.')
+    if (!(await deps.store.exists(uploadKey(ctx.accountId, input.uploadId)))) throw new AppError('bad_request', `${input.name ?? 'The clip'} did not finish uploading. Try again.`)
+    request = { uploadId: input.uploadId }
+    from = 'upload'
+  } else if ('assetId' in input) {
+    const asset = await getAsset(deps, ctx, input.assetId)
+    if (!asset.mime.startsWith('video/')) throw new AppError('bad_request', 'Pick a video clip.')
+    request = { assetId: asset.id }
+    name ||= (asset.label ?? '').replace(/^(Clip to clone|Clip|Clone)(\s*\([^)]*\))?:\s*/i, '').slice(0, 120)
+    from = 'library'
+  } else {
+    const link = input.link.trim()
+    if (MEDIA_ID.test(link)) {
+      request = { mediaId: link.toLowerCase() }
+      name ||= `Higgsfield clip ${link.slice(0, 8)}`
+      from = `higgsfield:${link.toLowerCase()}`
+    } else {
+      let url: URL
+      try { url = new URL(link) } catch { throw new AppError('invalid_request', 'Paste a direct video link (https) or a Higgsfield media ID.') }
+      if (url.protocol !== 'https:') throw new AppError('invalid_request', 'Paste a direct video link (https) or a Higgsfield media ID.')
+      const hosts = deps.config.runtime.downloads.allowed_hosts.clip_links ?? []
+      if (!hosts.some(h => url.hostname === h || url.hostname.endsWith(`.${h}`))) {
+        throw new AppError('invalid_request', `Links from ${url.hostname} are not read (no scraping). Save the video and upload it, or paste a link to the file on ${hosts.join(' or ')}.`)
+      }
+      request = { url: url.toString() }
+      name ||= decodeURIComponent(url.pathname.split('/').pop() ?? '').replace(/\.[a-z0-9]+$/i, '').slice(0, 120)
+      from = url.toString().slice(0, 400)
+    }
+  }
+  name ||= 'Clip to clone'
+  const prep = newId('prep')
+  const clone: CloneSource = { ...blankSource(name, from), uploadId: 'uploadId' in input ? input.uploadId : null, capCredits: input.capCredits ?? null, prep }
   await updateContent(deps, ctx, post.id, { spec: { clone } })
-  await enqueueLocalJob(deps, ctx, { stage: 'content', purpose: `clone_source:${post.id}`, label: `Prepare the clip to clone: ${name}`, characterId: post.characterId, request: { uploadId: input.uploadId, name } })
+  await enqueueLocalJob(deps, ctx, { stage: 'content', purpose: `clone_source:${post.id}`, label: `Prepare the clip to clone: ${name}`, characterId: post.characterId, request: { ...request, name, prep } })
   return { ok: true }
+}
+
+// The clip's bytes, from wherever it came.
+async function clipBytes(deps: Deps, ctx: Ctx, r: { uploadId?: string; assetId?: string; url?: string; mediaId?: string }): Promise<Buffer> {
+  if (r.uploadId) return deps.store.get(uploadKey(ctx.accountId, r.uploadId))
+  if (r.assetId) return (await readAsset(deps, ctx, r.assetId)).data
+  const d = deps.config.runtime.downloads
+  let url = r.url
+  if (r.mediaId) {
+    const found = await deps.providers.higgsfieldMedia(ctx.accountId, r.mediaId)
+    if (!found) throw new AppError('bad_request', `No video with ID ${r.mediaId} in your Higgsfield media. Check the ID, or upload the clip.`)
+    url = found.url
+  }
+  if (!url) throw new AppError('bad_request', 'There is no clip to read.')
+  const hosts = [...(d.allowed_hosts.clip_links ?? []), ...(r.mediaId ? d.allowed_hosts.higgsfield ?? [] : [])]
+  return (await safeDownload(url, { allowedHosts: hosts, maxBytes: deps.config.pipeline.content.clone.max_upload_mb * 1024 * 1024, timeoutMs: d.timeout_sec * 1000 })).data
 }
 
 async function runCloneSource(deps: Deps, ctx: Ctx, job: JobRow): Promise<unknown> {
   const postId = job.purpose.split(':')[1]!
-  const { uploadId, name } = job.request as { uploadId: string; name: string }
+  const req = job.request as { uploadId?: string; assetId?: string; url?: string; mediaId?: string; name: string }
+  const { uploadId, name } = req
   const cfg = deps.config.pipeline.content.clone
-  const key = uploadKey(ctx.accountId, uploadId)
-  // Only the upload the post still points at is written back (the owner may
+  const prep = (job.request as { prep?: string }).prep
+  // Only the clip the post still points at is written back (the owner may
   // have picked another clip meanwhile).
   const write = async (patch: Partial<CloneSource>) => {
     const post = await getContent(deps, ctx, postId)
     const current = cloneOf(post)
-    if (current?.uploadId !== uploadId) return
+    if (!current || (prep ? current.prep !== prep : current.uploadId !== uploadId)) return
     await updateContent(deps, ctx, postId, { spec: { clone: { ...current, ...patch } } })
   }
   try {
     const made = await withTempDir(async dir => {
       const input = join(dir, 'upload.bin'), out = join(dir, 'source.mp4')
-      await writeFile(input, await deps.store.get(key))
+      await writeFile(input, await clipBytes(deps, ctx, req))
       const original = await probeFile(input)
       const { hasAudio } = await transcodeSource(input, out, { maxSeconds: cfg.max_seconds })
       const asset = await saveAsset(deps, ctx, { data: await readFile(out), mime: 'video/mp4', origin: 'upload', label: `Clip to clone: ${name}`, sourceJobId: job.id })
@@ -138,11 +202,18 @@ async function runCloneSource(deps: Deps, ctx: Ctx, job: JobRow): Promise<unknow
       const rawFrame = await frameAt(deps, ctx, out, cfg.recreate.frame_at, `Frame of ${name}`, job.id).catch(() => null)
       const motion = clean?.endCardSec ? await cutBefore(deps, ctx, out, (await probeFile(join(dir, 'clean.mp4'))).durationSec ?? null, name, job.id).catch(() => null) : null
       const look = await readLook(out, cfg.recreate).catch(() => null)
-      return { asset, clean, hasAudio, trimmed: (original.durationSec ?? 0) > cfg.max_seconds + 0.25, frame, textFrame, rawFrame, motion, look }
+      const used = clean ? join(dir, 'clean.mp4') : out
+      const length = (await probeFile(used)).durationSec ?? 0
+      const motionFrames: string[] = []
+      for (const at of [0.25, 0.5, 0.75]) {
+        const id = await frameAt(deps, ctx, used, length * at, `Frame of ${name} at ${Math.round(at * 100)}%`, job.id).catch(() => null)
+        if (id) motionFrames.push(id)
+      }
+      return { asset, clean, hasAudio, trimmed: (original.durationSec ?? 0) > cfg.max_seconds + 0.25, frame, textFrame, rawFrame, motion, look, motionFrames }
     })
     const used = made.clean?.asset ?? made.asset
     const seconds = Math.round((used.durationMs ?? 0) / 100) / 10
-    await deps.store.delete(key).catch(() => undefined)
+    if (uploadId) await deps.store.delete(uploadKey(ctx.accountId, uploadId)).catch(() => undefined)
     if (seconds < cfg.min_seconds) {
       await write({ status: 'failed', error: `This clip is ${seconds} s long. A clone needs at least ${cfg.min_seconds} s of video.` })
       return { seconds }
@@ -151,7 +222,7 @@ async function runCloneSource(deps: Deps, ctx: Ctx, job: JobRow): Promise<unknow
       status: 'ready', assetId: used.id, durationSec: seconds, hasAudio: made.hasAudio, trimmed: made.trimmed, error: null, firstFrameId: made.frame?.assetId ?? null, people: made.frame?.people ?? [], target: null, stills: {},
       originalAssetId: made.asset.id, cleanAssetId: made.clean?.asset.id ?? null, textFrameId: made.textFrame, sourceCaption: null,
       cleanup: made.clean ? { endCardSec: made.clean.endCardSec, spots: made.clean.spots, on: true } : null,
-      rawFrameId: made.rawFrame, motionAssetId: made.motion ?? made.asset.id, notLike: '', look: made.look,
+      rawFrameId: made.rawFrame, motionAssetId: made.motion ?? made.asset.id, look: made.look, motionFrameIds: made.motionFrames,
     })
     return { assetId: used.id, seconds, cleanup: made.clean ? { endCardSec: made.clean.endCardSec, spots: made.clean.spots } : null }
   } catch (e) {
@@ -320,6 +391,14 @@ export async function setCloneTarget(deps: Deps, ctx: Ctx, contentId: string, at
 
 export const cloneTargetWords = (deps: Deps, source: CloneSource) => targetWords(deps.config.pipeline.templates.clone, source.people, source.target)
 
+// A vertical clip makes 9:16 stills and video; a wide one 16:9.
+async function sourcePortrait(deps: Deps, ctx: Ctx, source: CloneSource | null): Promise<boolean> {
+  const frameId = source?.rawFrameId ?? source?.firstFrameId
+  if (!frameId) return true
+  const frame = await getAsset(deps, ctx, frameId).catch(() => null)
+  return (frame?.height ?? 16) >= (frame?.width ?? 9)
+}
+
 // ── The model ───────────────────────────────────────────────────────
 
 async function onAccount(deps: Deps, ctx: Ctx): Promise<boolean> {
@@ -327,26 +406,46 @@ async function onAccount(deps: Deps, ctx: Ctx): Promise<boolean> {
   return billing === 'account' && (await listCredentials(deps.db, ctx.accountId)).some(c => c.provider === ACCOUNT_PROVIDER)
 }
 
-// The account's last pick for the mode; else the mode's default on the
-// owner's Higgsfield plan when that is the default and connected, else the
-// API one.
+// A Higgsfield API key: the account's own in Settings, or the server's
+// (HF_CREDENTIALS, the owner's account only). Nothing is decrypted.
+async function apiKeyReady(deps: Deps, ctx: Ctx): Promise<boolean> {
+  if ((await listCredentials(deps.db, ctx.accountId)).some(c => c.provider === 'higgsfield')) return true
+  return !!deps.env.HF_CREDENTIALS?.trim() && await isOwnerAccount(deps.db, ctx.accountId, deps.env.STUDIO_OWNER_EMAIL || 'owner@studio.local')
+}
+
+export type MotionPath = { billing: HiggsfieldBilling | null; problem: string | null }
+
+// The path a clone model runs on for this account (owner, 2026-10-14): the
+// Studio's Higgsfield billing default when that path works for the model,
+// else the other one, so every model the API offers keeps working when the
+// plan lapses. Null, with one line why, when neither works.
+export async function motionPath(deps: Deps, ctx: Ctx, ref: string): Promise<MotionPath> {
+  const entry = modelEntry(deps, ref)
+  const onPlan = !!entry.mcp_id && !!entry.mcp
+  const onApi = entry.api !== false && !!entry.endpoint
+  const prefer = (await readBilling(deps.db, ctx.accountId)).default
+  const order: HiggsfieldBilling[] = prefer === 'account' ? ['account', 'api'] : ['api', 'account']
+  // Demo mode runs the free mock on the path the account would use.
+  if ((await providerMode(deps.db, ctx.accountId)) !== 'live') return { billing: order.find(b => (b === 'account' ? onPlan : onApi)) ?? null, problem: null }
+  const plan = onPlan && (await listCredentials(deps.db, ctx.accountId)).some(c => c.provider === ACCOUNT_PROVIDER)
+  const api = onApi && await apiKeyReady(deps, ctx)
+  const billing = order.find(b => (b === 'account' ? plan : api)) ?? null
+  if (billing) return { billing, problem: null }
+  const problem = onPlan && onApi ? 'Needs your Higgsfield API key or plan: Settings > Connected accounts.'
+    : onPlan ? 'Runs only on your Higgsfield plan: connect it in Settings > Connected accounts.'
+    : 'Needs your Higgsfield API key: Settings > Connected accounts.'
+  return { billing: null, problem }
+}
+
+// The account's last pick for the mode; else the mode's default. Recreate's
+// motion step starts at the last model used (owner, 2026-10-14), Wan 3.0
+// until there is one.
 export async function cloneModel(deps: Deps, ctx: Ctx, mode: CloneMode = deps.config.pipeline.content.clone.mode): Promise<string> {
   const cfg = deps.config.pipeline.content.clone
   const saved = await getSetting<string | null>(deps.db, ctx.accountId, CLONE_MODEL_KEY[mode], null)
   if (saved && cfg.models.some(m => m.ref === saved) && modelEntry(deps, saved).clone.mode === mode) return saved
-  const account = await onAccount(deps, ctx)
-  if (mode === 'replace') return account ? cfg.account_model : cfg.model
-  // The motion model starts on whichever path has keys: the Higgsfield
-  // plan, then the Vercel AI Gateway, then the Higgsfield API.
-  if (account) return cfg.motion_account_model
-  return (await gatewayReady(deps, ctx)) ? cfg.motion_gateway_model : cfg.motion_model
-}
-
-// A Vercel AI Gateway key: the account's own in Settings, or the server's
-// (AI_GATEWAY_API_KEY, the owner's account only).
-async function gatewayReady(deps: Deps, ctx: Ctx): Promise<boolean> {
-  if ((await listCredentials(deps.db, ctx.accountId)).some(c => c.provider === 'vercel')) return true
-  return !!deps.env.AI_GATEWAY_API_KEY && await isOwnerAccount(deps.db, ctx.accountId, deps.env.STUDIO_OWNER_EMAIL || 'owner@studio.local')
+  if (mode === 'replace') return (await onAccount(deps, ctx)) ? cfg.account_model : cfg.model
+  return cfg.motion_model
 }
 
 export async function saveCloneModel(deps: Deps, ctx: Ctx, model: string): Promise<void> {
@@ -366,12 +465,25 @@ export async function cloneOptions(deps: Deps, ctx: Ctx, contentId: string) {
     if (!pending) await enqueueLocalJob(deps, ctx, { stage: 'content', purpose: `clone_frame:${post.id}`, label: `Find the people in ${source.name}`, characterId: post.characterId, request: {} })
   }
   const seconds = Math.max(1, Math.ceil(source?.durationSec ?? 10))
+  const portrait = await sourcePortrait(deps, ctx, source)
+  // Each model with its price for this clip and the path it runs on (your
+  // Higgsfield plan in credits, or the API in dollars); a model with no
+  // working plan or key is offered grey, with one line why.
   const models = await Promise.all(cfg.models.map(async m => {
     const entry = modelEntry(deps, m.ref)
-    const base = { ref: m.ref, label: entry.label, mode: entry.clone.mode, resolution: m.resolution ?? null, background: entry.clone.background, minSec: entry.clone.min_sec, maxSec: entry.clone.max_sec, path: entry.api === false ? 'account' : 'api', note: entry.notes ?? '' }
+    const path = await motionPath(deps, ctx, m.ref)
+    const billing = path.billing ?? (entry.api === false || !entry.endpoint ? 'account' : 'api')
+    const base = {
+      ref: m.ref, label: entry.label, mode: entry.clone.mode, resolution: m.resolution ?? null, background: entry.clone.background, minSec: entry.clone.min_sec, maxSec: entry.clone.max_sec,
+      path: billing, pathLabel: billing === 'account' ? 'Your Higgsfield plan' : 'Higgsfield API', note: entry.notes ?? '', takesPrompt: entry.clone.prompt !== 'none' && !(billing === 'account' && entry.mcp?.tool === 'motion_control'),
+    }
+    if (path.problem) return { ...base, display: null, verified: false, problem: path.problem }
+    if (source?.durationSec && (source.durationSec < entry.clone.min_sec - 0.05 || source.durationSec > entry.clone.max_sec + 0.05)) {
+      return { ...base, display: null, verified: false, problem: `Takes clips from ${entry.clone.min_sec} to ${entry.clone.max_sec} s; this one is ${source.durationSec} s.` }
+    }
     try {
       const run = await runModel(deps, ctx, m.ref, 'video_clone')
-      const request: GenRequest = { kind: 'video_clone', model: run.model, prompt: 'price', durationSec: seconds, resolution: m.resolution, audio: false, ...(run.billing ? { billing: run.billing } : {}) }
+      const request: GenRequest = { kind: 'video_clone', model: run.model, prompt: 'price', durationSec: seconds, resolution: m.resolution, aspect: portrait ? '9:16' : '16:9', audio: false, billing }
       const [item] = await quoteItemsFor(deps, ctx, [{ type: 'gen', stage: 'video', purpose: 'clone_price', label: entry.label, request }])
       const e = item!.estimate
       return { ...base, display: displayPrice([{ amountMicros: e.totalMicros, credits: e.credits ?? null }]), verified: e.verified, problem: null as string | null }
@@ -385,7 +497,8 @@ export async function cloneOptions(deps: Deps, ctx: Ctx, contentId: string) {
   const suggest = source?.look?.why ? { mode: source.look.suggest, why: source.look.why } : null
   const mode: CloneMode = suggest?.mode ?? cfg.mode
   return {
-    suggest, takes: { still: cfg.recreate.takes, face: cfg.recreate.face_takes },
+    suggest, takes: { still: cfg.recreate.takes, face: cfg.recreate.face_takes }, gate: cfg.recreate.gate,
+    cap: source ? { credits: source.capCredits, spent: Math.round(source.spentCredits * 100) / 100 } : null,
     mode, outfit: cfg.outfit, defaults, model: defaults[mode], models, seconds,
     target: source ? cloneTargetWords(deps, source) : deps.config.pipeline.templates.clone.target_main,
     maxCharacters: cfg.max_characters, keepSound: cfg.keep_sound, minSeconds: cfg.min_seconds, maxSeconds: cfg.max_seconds, maxUploadMb: cfg.max_upload_mb,
@@ -407,6 +520,8 @@ export interface CloneInput {
   // and place on a motion model run the older way (kept for old callers).
   looks: Record<string, string>
   keepSound: boolean
+  // Recreate: the still each character's video starts from (else the kept one).
+  stills?: Record<string, string>
 }
 
 // REF-00 and the first approved three-quarter view (content.yaml
@@ -433,6 +548,67 @@ function readySource(post: { kind: string; spec: unknown }): CloneSource & { ass
     throw new AppError('bad_request', source?.status === 'preparing' ? 'The clip to clone is still being prepared. Try again in a moment.' : 'Add the TikTok or Reel to clone first.')
   }
   return source as CloneSource & { assetId: string }
+}
+
+// ── The post's credit cap (the Recreate link's cap) ─────────────────
+
+const CAPPED = new Set(['clone_still', 'clone_face', 'clone'])
+const credits2 = (n: number) => String(Math.round(n * 100) / 100)
+
+// What a quote costs in credits: plan credits as quoted, API dollars at the
+// API's credit rate.
+function quoteCredits(deps: Deps, items: Array<{ credits: number | null; amountMicros: number }>): number {
+  const rate = deps.config.pipeline.content.clone.recreate.credit_usd
+  return items.reduce((s, i) => s + (i.credits ?? i.amountMicros / 1e6 / rate), 0)
+}
+
+// A step that would pass the post's cap is refused before any spend, with
+// what it costs and what is left.
+export async function checkCloneCap(deps: Deps, ctx: Ctx, action: { type: string; contentId?: string }, items: Array<{ credits: number | null; amountMicros: number }>): Promise<void> {
+  if (!CAPPED.has(action.type) || !action.contentId) return
+  const src = cloneOf(await getContent(deps, ctx, action.contentId))
+  if (!src?.capCredits) return
+  const cost = quoteCredits(deps, items)
+  const left = Math.max(0, src.capCredits - src.spentCredits)
+  if (cost > left + 1e-6) {
+    throw new AppError('budget_exceeded', `This step costs ${credits2(cost)} credits and ${credits2(left)} of this post's ${credits2(src.capCredits)}-credit cap are left. Raise the cap, or use fewer takes or a cheaper model.`, { cap: src.capCredits, spent: src.spentCredits, cost })
+  }
+}
+
+export async function addCloneSpend(deps: Deps, ctx: Ctx, action: { type: string; contentId?: string }, items: Array<{ credits: number | null; amountMicros: number }>): Promise<void> {
+  if (!CAPPED.has(action.type) || !action.contentId) return
+  const post = await getContent(deps, ctx, action.contentId)
+  const src = cloneOf(post)
+  if (!src) return
+  await updateContent(deps, ctx, post.id, { spec: { clone: { ...src, spentCredits: Math.round((src.spentCredits + quoteCredits(deps, items)) * 100) / 100 } } })
+}
+
+// ── The gates before any video spend (fixed, owner 2026-10-14) ──────
+
+export interface StillGate { ok: boolean; face: number | null; likeness: number | null; reasons: string[]; note: string | null }
+
+const two = (n: number) => n.toFixed(2)
+
+// The chosen still must match REF-00 (face_min or more) and look less like
+// the person in the clip than source_max. A still the face checks could
+// not read is held too, unless no face shows in the clip's frame to compare
+// with. Demo stills (the free mock) have no scores and pass, with a note.
+export function gateFor(g: { face_min: number; source_max: number }, still: { status: string; faceScore: number | null; sourceScore: number | null; demo: boolean }): StillGate {
+  const { faceScore: face, sourceScore: likeness } = still
+  if (still.demo) return { ok: true, face, likeness, reasons: [], note: 'Demo mode: the face checks do not run on mock stills.' }
+  const reasons: string[] = []
+  if (still.status === 'qa_failed') reasons.push('It looks like the person in the clip (a new person is a fixed rule).')
+  if (face == null) reasons.push('No face to match with REF-00 was found on it.')
+  else if (face < g.face_min) reasons.push(`Face match ${two(face)}, needs ${two(g.face_min)} or more.`)
+  if (likeness != null && likeness >= g.source_max) reasons.push(`Likeness to the clip's person ${two(likeness)}, must stay under ${two(g.source_max)}.`)
+  const note = likeness == null && !reasons.length ? 'No face showed in the clip\'s frame to compare with.' : null
+  return { ok: !reasons.length, face, likeness, reasons, note }
+}
+
+async function stillGate(deps: Deps, ctx: Ctx, still: { status: string; jobId: string | null; meta: unknown }): Promise<StillGate> {
+  const meta = (still.meta ?? {}) as { faceScore?: number | null; sourceScore?: number | null }
+  const [job] = still.jobId ? await deps.db.select({ provider: jobs.provider }).from(jobs).where(eq(jobs.id, still.jobId)) : []
+  return gateFor(deps.config.pipeline.content.clone.recreate.gate, { status: still.status, faceScore: meta.faceScore ?? null, sourceScore: meta.sourceScore ?? null, demo: job?.provider === 'mock' })
 }
 
 export async function buildClone(deps: Deps, ctx: Ctx, input: CloneInput) {
@@ -462,7 +638,12 @@ export async function buildClone(deps: Deps, ctx: Ctx, input: CloneInput) {
   // Replace keeps the clip's place; a motion run takes the place from its
   // scene still, which is the clip's own first frame.
   const background = mode === 'replace' ? 'video' : input.background && c.background.includes(input.background) ? input.background : c.background.includes('image') ? 'image' : c.background[0]!
+  // The path the picker showed (your plan or the API); a model with neither
+  // working is refused with the same line.
+  const path = await motionPath(deps, ctx, wanted)
+  if (!path.billing) throw new AppError('bad_request', `${entry.label}: ${path.problem}`)
   const run = await runModel(deps, ctx, wanted, 'video_clone')
+  const portrait = await sourcePortrait(deps, ctx, source)
   const warnings: RuleViolation[] = []
   if (input.keepSound && !source.hasAudio) warnings.push(warn('video-audio-off', 'No sound to keep', 'This clip has no sound, so the clone stays silent.'))
   const target = cloneTargetWords(deps, source)
@@ -496,25 +677,43 @@ export async function buildClone(deps: Deps, ctx: Ctx, input: CloneInput) {
     } else {
       // Never a bare sheet image: the scene still puts the character in the
       // clip's place first, and the owner sees it before this run.
-      const stillId = source.stills[cid]
-      if (!stillId) throw new AppError('bad_request', `Make ${row.name}'s scene still first. "Copy the moves" starts from ${ch.pronouns.obj} in the clip's place, never from a bare sheet image (that gives a gray studio).`)
+      const stillId = input.stills?.[cid] ?? source.stills[cid]
+      if (!stillId) throw new AppError('bad_request', `Make ${row.name}'s stills first and pick one. The video starts from ${ch.pronouns.obj} in the clip's place, never from a bare sheet image (that gives a gray studio).`)
       const still = await getCandidate(deps, ctx, stillId).catch(() => null)
-      if (!still?.assetId || still.characterId !== cid || still.op !== 'clone_still') throw new AppError('bad_request', `Make ${row.name}'s scene still again; the kept one is gone.`)
+      if (!still?.assetId || still.characterId !== cid || still.op !== 'clone_still') throw new AppError('bad_request', `Pick ${row.name}'s still again; the kept one is gone.`)
+      if (input.stills?.[cid]) {
+        const [run] = still.jobId ? await deps.db.select({ purpose: jobs.purpose }).from(jobs).where(eq(jobs.id, still.jobId)) : []
+        if (!run?.purpose.startsWith(`clone_still:${post.id}:`) && !run?.purpose.startsWith(`clone_face:${post.id}:`)) throw new AppError('bad_request', 'That still belongs to another post.')
+      }
+      // The gates (fixed, owner 2026-10-14): no video spend until the still
+      // matches REF-00 and does not look like the person in the clip.
+      const gate = await stillGate(deps, ctx, still)
+      if (!gate.ok) throw new AppError('gate_failed', `${row.name}'s still is not ready for the video: ${gate.reasons.join(' ')} Fix the face again or make new stills.`, { gate })
       refs = [still.assetId]
-      template = fill(t.clone.image, pronounVars(ch.pronouns))
+      // The owner's motion prompt template plus the outfit line, the same
+      // for every motion model on both paths.
+      const pv = pronounVars(ch.pronouns)
+      const keep = source.keep.map(k => k.trim()).filter(Boolean)
+      const motion = source.motion.trim().replace(/[.\s]+$/, '')
+      template = fill(t.clone.motion, {
+        ...pv, hair_color: faceWords(ch).hair, scene: keep.length ? keep.join(', ') : fill(t.clone.motion_scene, pv),
+        motion: motion ? fill(t.clone.motion_what, { motion }) : '',
+      })
     }
     const sw = await ruleSwitches(deps, ctx, cid)
-    // The REALISM block rides along on every model that takes a prompt.
-    const prompt = c.prompt === 'none' ? '' : assembleVideoPrompt(t, template, { directions: '', audio: false, realism: ch.realism?.block })
-    // Recreate copies the motion of the clip as uploaded (cut before the end
-    // card): its burned-in text does not carry over, and the cleanup's
-    // filled-in patches never reach the motion model.
-    const motionFrom = mode === 'motion' ? source.motionAssetId ?? source.originalAssetId ?? source.assetId : source.assetId
+    // The REALISM block rides along on every model that takes a prompt
+    // (Kling's motion_control on the plan takes none).
+    const noPrompt = c.prompt === 'none' || (path.billing === 'account' && entry.mcp?.tool === 'motion_control')
+    const prompt = noPrompt ? '' : assembleVideoPrompt(t, template, { directions: '', audio: false, realism: ch.realism?.block })
+    // Recreate sends the cleaned clip (owner, 2026-10-14): TikTok's end
+    // card off and its burned-in text filled in, or the clip as uploaded
+    // when the owner undid the cleanup. Audio off either way.
     const request: GenRequest = {
-      kind: 'video_clone', model: run.model, modelRef: wanted, prompt, refs: refs.map(assetId => ({ assetId })), sourceVideo: { assetId: motionFrom },
-      durationSec: Math.max(1, Math.ceil(seconds)), resolution: picked.resolution, cloneBackground: background, audio: false,
+      kind: 'video_clone', model: run.model, modelRef: wanted, prompt, refs: refs.map(assetId => ({ assetId })), sourceVideo: { assetId: source.assetId },
+      durationSec: Math.max(1, Math.ceil(seconds)), resolution: mode === 'motion' ? cfg.recreate.resolution : picked.resolution, cloneBackground: background, audio: false,
+      ...(mode === 'motion' ? { aspect: portrait ? '9:16' : '16:9' } : {}),
       ...(input.keepSound && source.hasAudio ? { keepSourceSound: true } : {}),
-      ...(run.billing ? { billing: run.billing } : {}),
+      billing: path.billing,
     }
     if (prompt) {
       warnings.push(...lintOrThrow(lintPrompt(deps.config.pipeline.rules, prompt, { stage: 'video', kind: 'video_clone', request: { ...request, model: wanted }, switches: sw }), `Clone for ${row.name}`))
@@ -567,7 +766,7 @@ async function stillRun(deps: Deps, ctx: Ctx, characterId: string) {
   // On the plan the element carries her face; elsewhere REF-00 and one
   // three-quarter view do (never the rest of the sheet).
   const element = account ? planElement(ch) : null
-  const level = sc.settings.still_levels[sc.settings.still_level] ?? { quality: sc.settings.quality, resolution: sc.settings.resolution }
+  const level = stillLevelFor(deps, model)
   return { row, ch, approved, model, run, entry, element, level }
 }
 
@@ -588,15 +787,25 @@ export async function buildCloneStill(deps: Deps, ctx: Ctx, input: CloneStillInp
   const refs = [frameId, ...(element ? [] : replaceRefs(deps, approved))]
   const warnings: RuleViolation[] = []
   const pv = pronounVars(ch.pronouns)
+  // The outfit (step 2): the clip's (named when known), or hers: one of her
+  // stills, or what the owner typed.
   let outfit = ''
-  if ((input.outfit ?? cfg.outfit) === 'hers') {
-    if (input.look) {
-      refs.push(await lookStill(deps, ctx, row.id, row.name, ch.pronouns.poss, input.look))
+  const choice = input.outfit ?? source.outfit.choice ?? cfg.outfit
+  const look = input.look ?? source.outfit.lookId
+  const named = source.outfit.text.trim().replace(/[.\s]+$/, '')
+  if (choice === 'hers') {
+    if (look) {
+      refs.push(await lookStill(deps, ctx, row.id, row.name, ch.pronouns.poss, look))
       outfit = fill(t.clone.outfit_hers, pv)
+    } else if (named) {
+      outfit = fill(t.clone.outfit_hers_named, { ...pv, outfit: named })
     } else {
-      warnings.push(warn('clone-outfit', 'The outfit stays', `There is no still of ${row.name} to take an outfit from, so ${ch.pronouns.subj} wears the clothes in the clip.`))
+      warnings.push(warn('clone-outfit', 'The outfit stays', `Pick one of ${row.name}'s stills or type an outfit; until then ${ch.pronouns.subj} wears the clothes in the clip.`))
     }
+  } else if (named) {
+    outfit = fill(t.clone.outfit_keep_named, { ...pv, outfit: named })
   }
+  const keep = source.keep.map(k => k.trim()).filter(Boolean)
   if (!element && ch.identities.some(i => i.kind === 'element')) warnings.push(warn('clone-element', 'No element off the plan', `${row.name}'s Higgsfield element works on your plan only; here REF-00 and one three-quarter view carry ${ch.pronouns.poss} face.`))
   const frame = await getAsset(deps, ctx, frameId)
   const portrait = (frame.height ?? 16) >= (frame.width ?? 9)
@@ -607,7 +816,7 @@ export async function buildCloneStill(deps: Deps, ctx: Ctx, input: CloneStillInp
   const change = fill(t.clone.recreate_still, {
     ...pv, name: ch.name, target: cloneTargetWords(deps, source), face, hair_color: hair,
     element: element ? ` <<<${element.externalId}>>>` : t.clone.recreate_element_api,
-    not_like: notLike ? fill(t.clone.recreate_not_like, { ...pv, traits: notLike }) : '',
+    not_like: `${notLike ? fill(t.clone.recreate_not_like, { ...pv, traits: notLike }) : ''}${keep.length ? fill(t.clone.recreate_keep, { keep: keep.join(', ') }) : ''}`,
     outfit,
   })
   const prompt = buildEditPrompt(t, `${change} ${fill(t.scene.adult, pv)}`, ch, false, { warnings: realism, flawDose: sw.on('realism-flaw-dose') })
@@ -676,28 +885,62 @@ export async function buildCloneTraits(deps: Deps, ctx: Ctx, row: { id: string }
   const prompt = fill(t.prompt, { target: cloneTargetWords(deps, source) })
   const route = await resolveRoute(deps, ctx, 'content_writer')
   const purpose = `clone_traits:${post.id}`
+  // The frame, plus frames through the clip so it can say what happens.
+  const images = [frameId, ...source.motionFrameIds].slice(0, 4)
+  const schema = {
+    type: 'object', additionalProperties: false, required: ['traits', 'keep', 'outfit', 'motion'],
+    properties: { traits: { type: 'string' }, keep: { type: 'array', items: { type: 'string' } }, outfit: { type: 'string' }, motion: { type: 'string' } },
+  }
   return {
     purpose,
-    preview: { title: 'Read the person in the clip', prompts: [{ label: 'Trait reader', text: `${t.system}\n${prompt}`, wrapped: hardWrap(`${t.system}\n${prompt}`) }], warnings: [], invalidates: [] },
-    specs: [{ type: 'llm', stage: 'content', purpose, label: 'Read the person in the clip', characterId: row.id, request: { model: route.model, system: t.system, prompt, schema: { type: 'object', properties: { traits: { type: 'string' } }, required: ['traits'], additionalProperties: false }, schemaName: 'clone_traits', maxTokens: 200, effort: 'low', imageAssetIds: [frameId], meta: { itemId: post.id } } } satisfies JobSpec],
+    preview: { title: 'Read the clip: what to keep, what to drop', prompts: [{ label: 'Clip reader', text: `${t.system}\n${prompt}`, wrapped: hardWrap(`${t.system}\n${prompt}`) }], warnings: [], invalidates: [] },
+    specs: [{ type: 'llm', stage: 'content', purpose, label: 'Read the clip', characterId: row.id, request: { model: route.model, system: t.system, prompt, schema, schemaName: 'clone_traits', maxTokens: 500, effort: 'low', imageAssetIds: images, meta: { itemId: post.id } } } satisfies JobSpec],
   }
 }
 
+const oneLine = (v: unknown, max: number) => (typeof v === 'string' ? v.replace(/\s+/g, ' ').trim().replace(/[.]+$/, '').slice(0, max) : '')
+const chipList = (v: unknown, max = 8) => [...new Set((Array.isArray(v) ? v : []).map(x => oneLine(x, 80)).filter(Boolean))].slice(0, max)
+
+// "Read them for me" lands: the traits to drop, what to keep, the outfit
+// (unless the owner typed one) and what happens in the clip. All editable.
 async function onCloneTraits(deps: Deps, ctx: Ctx, job: JobRow, out: JobOutcome): Promise<void> {
   if (out.status !== 'completed') return
-  const raw = (out.data as { traits?: unknown } | null)?.traits
-  const traits = typeof raw === 'string' ? raw.replace(/\s+/g, ' ').trim().replace(/[.]+$/, '').slice(0, 300) : ''
+  const d = (out.data ?? {}) as { traits?: unknown; keep?: unknown; outfit?: unknown; motion?: unknown }
   const post = await getContent(deps, ctx, job.purpose.split(':')[1]!)
   const src = cloneOf(post)
-  if (src && traits) await updateContent(deps, ctx, post.id, { spec: { clone: { ...src, notLike: traits } } })
+  if (!src) return
+  const traits = oneLine(d.traits, 300)
+  const keep = chipList(d.keep)
+  const outfit = oneLine(d.outfit, 160)
+  const motion = oneLine(d.motion, 400)
+  await updateContent(deps, ctx, post.id, { spec: { clone: {
+    ...src, ...(traits ? { notLike: traits } : {}), ...(keep.length ? { keep } : {}), ...(motion ? { motion } : {}),
+    ...(outfit && !src.outfit.text ? { outfit: { ...src.outfit, text: outfit } } : {}),
+  } } })
+}
+
+// Step 2 as the owner sets it: the chips (what to keep, the traits to
+// drop), the outfit, the line of what happens, and the post's credit cap.
+export async function setCloneChoices(deps: Deps, ctx: Ctx, contentId: string, input: { keep?: string[]; notLike?: string; outfit?: { choice?: 'source' | 'hers'; text?: string; lookId?: string | null }; motion?: string; capCredits?: number | null }): Promise<CloneSource> {
+  const post = await getContent(deps, ctx, contentId)
+  const src = cloneOf(post)
+  if (!src) throw new AppError('bad_request', 'Add the clip first.')
+  if (input.outfit?.lookId) await lookStill(deps, ctx, post.characterId ?? '', 'the character', 'the', input.outfit.lookId)
+  const next: CloneSource = {
+    ...src,
+    ...(input.keep ? { keep: chipList(input.keep, 12) } : {}),
+    ...(input.notLike != null ? { notLike: oneLine(input.notLike, 300) } : {}),
+    ...(input.outfit ? { outfit: { choice: input.outfit.choice ?? src.outfit.choice, text: input.outfit.text != null ? oneLine(input.outfit.text, 160) : src.outfit.text, lookId: input.outfit.lookId !== undefined ? input.outfit.lookId : src.outfit.lookId } } : {}),
+    ...(input.motion != null ? { motion: oneLine(input.motion, 400) } : {}),
+    ...(input.capCredits !== undefined ? { capCredits: input.capCredits } : {}),
+  }
+  await updateContent(deps, ctx, post.id, { spec: { clone: next } })
+  return next
 }
 
 // The traits typed or edited by the owner.
 export async function setCloneNotLike(deps: Deps, ctx: Ctx, contentId: string, text: string): Promise<{ ok: true }> {
-  const post = await getContent(deps, ctx, contentId)
-  const src = cloneOf(post)
-  if (!src) throw new AppError('bad_request', 'Add the TikTok or Reel to clone first.')
-  await updateContent(deps, ctx, post.id, { spec: { clone: { ...src, notLike: text.replace(/\s+/g, ' ').trim().slice(0, 300) } } })
+  await setCloneChoices(deps, ctx, contentId, { notLike: text })
   return { ok: true }
 }
 
@@ -756,13 +999,17 @@ export interface CloneStillView {
   id: string; characterId: string; characterName: string; assetId: string | null; status: string; kept: boolean; error: string | null
   findings: Array<{ code: string; severity: string; message: string }>; createdAt: string
   parentId: string | null; pass: 'still' | 'face'; faceScore: number | null; sourceScore: number | null
+  // The gates before the video (fixed): whether this still can start it, and why not.
+  gate: StillGate
 }
 
 export async function cloneStills(deps: Deps, ctx: Ctx, contentId: string): Promise<CloneStillView[]> {
   const post = await getContent(deps, ctx, contentId)
   const source = cloneOf(post)
-  const jobRows = await deps.db.select({ id: jobs.id }).from(jobs).where(and(eq(jobs.accountId, ctx.accountId), or(like(jobs.purpose, `clone_still:${contentId}:%`), like(jobs.purpose, `clone_face:${contentId}:%`))))
+  const jobRows = await deps.db.select({ id: jobs.id, provider: jobs.provider }).from(jobs).where(and(eq(jobs.accountId, ctx.accountId), or(like(jobs.purpose, `clone_still:${contentId}:%`), like(jobs.purpose, `clone_face:${contentId}:%`))))
   if (!jobRows.length) return []
+  const mock = new Set(jobRows.filter(j => j.provider === 'mock').map(j => j.id))
+  const g = deps.config.pipeline.content.clone.recreate.gate
   const rows = await deps.db.select().from(candidates)
     .where(and(eq(candidates.accountId, ctx.accountId), eq(candidates.op, 'clone_still'), inArray(candidates.jobId, jobRows.map(j => j.id))))
     .orderBy(desc(candidates.createdAt))
@@ -774,6 +1021,7 @@ export async function cloneStills(deps: Deps, ctx: Ctx, contentId: string): Prom
       error: c.status === 'failed' || c.status === 'qa_failed' ? c.rejectNote || 'The still failed.' : null,
       findings: ((c.qaReport as QaReport | null)?.findings ?? []).map(f => ({ code: f.code, severity: f.severity, message: f.message })), createdAt: c.createdAt.toISOString(),
       parentId: c.parentId, pass: meta.pass ?? 'still', faceScore: meta.faceScore ?? null, sourceScore: meta.sourceScore ?? null,
+      gate: gateFor(g, { status: c.status, faceScore: meta.faceScore ?? null, sourceScore: meta.sourceScore ?? null, demo: !!c.jobId && mock.has(c.jobId) }),
     }
   })
 }
@@ -783,12 +1031,17 @@ export async function cloneStills(deps: Deps, ctx: Ctx, contentId: string): Prom
 // still the checks left for a person, or a newer one, when there are no
 // scores (demo mode). Never one that looks like that person.
 export async function pickCloneStill(deps: Deps, ctx: Ctx, contentId: string, characterId: string): Promise<{ id: string }> {
-  const list = (await cloneStills(deps, ctx, contentId)).filter(x => x.characterId === characterId && x.assetId && !x.error && x.status !== 'qa_failed')
-  if (!list.length) throw new AppError('bad_request', 'Make the stills first, then pick one.')
-  const score = (x: CloneStillView) => (x.faceScore ?? 0) - (x.sourceScore ?? 0) + (x.status === 'approved' ? 0.001 : 0)
-  const best = [...list].sort((a, b) => score(b) - score(a) || b.createdAt.localeCompare(a.createdAt))[0]!
+  const best = bestCloneStill(await cloneStills(deps, ctx, contentId), characterId)
+  if (!best) throw new AppError('bad_request', 'Make the stills first, then pick one.')
   await useCloneStill(deps, ctx, contentId, best.id)
   return { id: best.id }
+}
+
+// The best still by the free checks (gate passing first), or null.
+export function bestCloneStill(stills: CloneStillView[], characterId: string, pass?: 'still' | 'face'): CloneStillView | null {
+  const list = stills.filter(x => x.characterId === characterId && x.assetId && !x.error && x.status !== 'qa_failed' && (!pass || x.pass === pass))
+  const score = (x: CloneStillView) => (x.gate.ok ? 1 : 0) + (x.faceScore ?? 0) - (x.sourceScore ?? 0) + (x.status === 'approved' ? 0.001 : 0)
+  return [...list].sort((a, b) => score(b) - score(a) || b.createdAt.localeCompare(a.createdAt))[0] ?? null
 }
 
 // "Use this still": the scene still a motion run starts from.
@@ -866,11 +1119,19 @@ async function onClone(deps: Deps, ctx: Ctx, job: JobRow, out: JobOutcome): Prom
   // copy), so it is not kept. Face drift is a strong warning: kept for a
   // person to decide, never picked automatically.
   const status = fails('too_similar') ? 'qa_failed' : fails('face_drift') ? 'in_review' : 'approved'
+  const id = newId('cand')
   await deps.db.insert(candidates).values({
-    ...base, id: newId('cand'), assetId: clipAssetId, status, qaReport: report, qaVerdict: report.verdict,
+    ...base, id, assetId: clipAssetId, status, qaReport: report, qaVerdict: report.verdict,
     ...(status === 'qa_failed' ? { rejectNote: findings.find(f => f.code === 'too_similar')!.message } : {}),
   })
   await confirmByRun(deps, ctx, job)
+  // The review (free, on the worker): the face every half second, text on
+  // the frames, cuts.
+  await queueCloneReview(deps, ctx, postId, id, characterId)
+}
+
+export async function queueCloneReview(deps: Deps, ctx: Ctx, postId: string, candidateId: string, characterId: string | null): Promise<void> {
+  await enqueueLocalJob(deps, ctx, { stage: 'content', purpose: `clone_review:${postId}:${candidateId}`, label: 'Review the take: face, text, cuts', characterId, request: {} })
 }
 
 // A real clone that finished on the API counts as the model's one paid test
@@ -895,12 +1156,20 @@ async function confirmByRun(deps: Deps, ctx: Ctx, job: JobRow): Promise<void> {
 export interface CloneView {
   id: string; characterId: string; characterName: string; assetId: string | null; status: string; label: string
   durationSec: number | null; error: string | null; findings: Array<{ code: string; severity: string; message: string }>; createdAt: string
+  // The clip it was made from (the review plays them side by side), the
+  // review once it ran, and the model.
+  sourceAssetId: string | null; review: CloneReview | null; model: string | null; parentId: string | null
+  // Frames shown until the videos load: the clip's first frame and the still
+  // the take started from.
+  posters: { source: string | null; take: string | null }
 }
 
 export async function postClones(deps: Deps, ctx: Ctx, contentId: string): Promise<CloneView[]> {
-  await getContent(deps, ctx, contentId)
-  const jobRows = await deps.db.select({ id: jobs.id }).from(jobs).where(and(eq(jobs.accountId, ctx.accountId), or(like(jobs.purpose, `clone:${contentId}:%`), like(jobs.purpose, `clone_trim:${contentId}:%`))))
+  const item = await getContent(deps, ctx, contentId)
+  const firstFrame = ((item.spec ?? {}) as { clone?: { firstFrameId?: string | null } }).clone?.firstFrameId ?? null
+  const jobRows = await deps.db.select({ id: jobs.id, request: jobs.request, purpose: jobs.purpose }).from(jobs).where(and(eq(jobs.accountId, ctx.accountId), or(like(jobs.purpose, `clone:${contentId}:%`), like(jobs.purpose, `clone_trim:${contentId}:%`))))
   if (!jobRows.length) return []
+  const runs = new Map(jobRows.map(j => [j.id, j]))
   const rows = await deps.db.select().from(candidates)
     .where(and(eq(candidates.accountId, ctx.accountId), eq(candidates.op, 'clone'), inArray(candidates.jobId, jobRows.map(j => j.id))))
     .orderBy(desc(candidates.createdAt))
@@ -913,7 +1182,18 @@ export async function postClones(deps: Deps, ctx: Ctx, contentId: string): Promi
       id: c.id, characterId: c.characterId, characterName: names.get(c.characterId) ?? '', assetId: c.assetId, status: c.status, label: c.label ?? 'Clone',
       durationSec: asset?.durationMs ? Math.round(asset.durationMs / 100) / 10 : null, error: c.status === 'failed' || c.status === 'qa_failed' ? c.rejectNote || 'The clone failed.' : null,
       findings: (report?.findings ?? []).map(f => ({ code: f.code, severity: f.severity, message: f.message })), createdAt: c.createdAt.toISOString(),
+      sourceAssetId: null, review: ((c.meta ?? {}) as { review?: CloneReview }).review ?? null, model: null, parentId: c.parentId,
+      posters: { source: firstFrame, take: null },
     })
+    const run = c.jobId ? runs.get(c.jobId) : undefined
+    const req = run && !run.purpose.startsWith('clone_trim:') ? run.request as GenRequest : null
+    if (req) Object.assign(out[out.length - 1]!, { sourceAssetId: req.sourceVideo?.assetId ?? null, model: deps.config.models.models.find(m => m.ref === (req.modelRef ?? req.model))?.label ?? req.modelRef ?? req.model, // A motion take (only it sets the aspect) starts from its still.
+      posters: { source: firstFrame, take: req.aspect ? req.refs?.[0]?.assetId ?? null : null } })
+  }
+  // A trimmed take plays against its parent's source.
+  for (const v of out) if (!v.sourceAssetId && v.parentId) {
+    const parent = out.find(p => p.id === v.parentId)
+    Object.assign(v, { sourceAssetId: parent?.sourceAssetId ?? null, model: parent?.model ?? null, posters: parent?.posters ?? v.posters })
   }
   return out
 }
@@ -983,6 +1263,7 @@ async function runCloneTrim(deps: Deps, ctx: Ctx, job: JobRow): Promise<unknown>
     label: `${parent.label} (trimmed ${start} to ${end} s)`, parentId: parent.id, assetId: made.id, status: parent.status === 'approved' ? 'approved' : 'in_review',
     qaReport: parent.qaReport, qaVerdict: parent.qaVerdict,
   })
+  await queueCloneReview(deps, ctx, job.purpose.split(':')[1]!, id, parent.characterId)
   return { candidateId: id, assetId: made.id }
 }
 

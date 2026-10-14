@@ -25,7 +25,8 @@ import { skinFor } from '../core/scenes.js'
 import { buildSceneEndFrame, buildSceneIdeas, buildScenePlan, buildScenePromptWrite, buildSceneRecheck, buildSceneRun, buildSceneEdit, buildSceneUpscale, buildSceneVideo, buildVideoUpscale, type SceneBuilt } from './sceneActions.js'
 import { markSceneBusy, saveVideoModel } from './scenes.js'
 import { buildContentCaptions, buildContentSlides } from './content.js'
-import { buildClone, buildCloneCaption, buildCloneFace, buildCloneStill, buildCloneTraits, saveCloneModel } from './clone.js'
+import { afterRecreateBatch, buildRecreateBatch } from './recreate.js'
+import { addCloneSpend, buildClone, buildCloneCaption, buildCloneFace, buildCloneStill, buildCloneTraits, checkCloneCap, saveCloneModel, useCloneStill } from './clone.js'
 import { ruleSwitches } from './rules.js'
 import { readBilling } from '../providers/billing.js'
 import { effectiveModel, readModelOverrides } from '../providers/modelOverrides.js'
@@ -112,6 +113,9 @@ export const actionSchema = z.discriminatedUnion('type', [
     model: z.string().max(80).optional(), mode: z.enum(['replace', 'motion']).optional(), background: z.enum(['video', 'image']).optional(),
     outfit: z.enum(['source', 'hers']).optional(),
     looks: z.record(z.string().max(60), z.string().max(60)).default({}), keepSound: z.boolean().default(false),
+    // Recreate: the still each character's video starts from ("Make the
+    // video" on a still picks it in the same click).
+    stills: z.record(z.string().max(60), z.string().max(60)).optional(),
   }),
   // "Recreate from a real clip": stills of the character in the clip's
   // frame (4 by default), shown before the motion run; then a face-only pass
@@ -120,6 +124,8 @@ export const actionSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('clone_still'), contentId: z.string(), characterId: z.string().max(60), outfit: z.enum(['source', 'hers']).optional(), look: z.string().max(60).optional(), takes: z.number().int().min(1).max(4).optional() }),
   z.object({ type: z.literal('clone_face'), contentId: z.string(), characterId: z.string().max(60), candidateId: z.string().max(60), takes: z.number().int().min(1).max(4).optional() }),
   z.object({ type: z.literal('clone_traits'), characterId: z.string(), contentId: z.string() }),
+  // A batch of recreates: one priced run for every row at the step.
+  z.object({ type: z.literal('recreate_batch'), contentId: z.string(), step: z.enum(['stills', 'face', 'video']) }),
   // Voice lines: the owner's takes in the character's voice, with word
   // timings (ElevenLabs), one quote with a line per take.
   z.object({ type: z.literal('voice_convert'), soundIds: z.array(z.string().max(60)).min(1).max(50) }),
@@ -144,6 +150,8 @@ export interface BuiltAction {
   specs: JobSpec[]
   preview: ActionPreview
   followUp?: { label: string; specs: JobSpec[] }
+  // A batch of recreates: the rows a run covered.
+  ran?: Array<{ postId: string; stillId: string | null; model: string }>
 }
 
 const QA_SIZE: Record<string, { width: number; height: number }> = {
@@ -219,6 +227,7 @@ export async function buildAction(deps: Deps, ctx: Ctx, action: StudioAction): P
   if (action.type === 'clone') return buildClone(deps, ctx, action)
   if (action.type === 'clone_still') return buildCloneStill(deps, ctx, action)
   if (action.type === 'clone_face') return buildCloneFace(deps, ctx, action)
+  if (action.type === 'recreate_batch') return buildRecreateBatch(deps, ctx, action)
   if (action.type === 'voice_convert') return buildVoiceConvert(deps, ctx, action.soundIds)
   if (action.type === 'hook_variants') return buildHookVariants(deps, ctx, action)
   const row = await getCharacter(deps, ctx, action.characterId)
@@ -414,6 +423,8 @@ export async function estimateAction(deps: Deps, ctx: Ctx, action: StudioAction)
   const built = await buildAction(deps, ctx, action)
   const quote = await quoteJobs(deps, ctx, { purpose: built.purpose, characterId: built.characterId, specs: built.specs })
   if (action.type === 'model_suite') assertSuiteCap(deps, quote.totalMicros)
+  // A post's credit cap (Recreate): refused before any spend.
+  await checkCloneCap(deps, ctx, action as { type: string; contentId?: string }, quote.items)
   const untested = action.type === 'model_test' || action.type === 'model_suite' ? [] : await untestedModels(deps, ctx, built)
   // A later step's price (for example "Upscale this take"), quoted for show.
   let followUp: ActionPreview['followUp']
@@ -454,7 +465,12 @@ export async function runAction(deps: Deps, ctx: Ctx, action: StudioAction, quot
     assertSuiteCap(deps, q.total)
   }
   const built = await buildAction(deps, ctx, action)
+  // The post's credit cap, checked again against the quote being run.
+  const [capQuote] = quoteId && (action.type === 'clone' || action.type === 'clone_still' || action.type === 'clone_face') ? await deps.db.select({ items: quotes.items }).from(quotes).where(and(eq(quotes.accountId, ctx.accountId), eq(quotes.id, quoteId))) : []
+  const capItems = ((capQuote?.items ?? []) as Array<{ credits?: number | null; amountMicros: number }>).map(i => ({ credits: i.credits ?? null, amountMicros: i.amountMicros }))
+  if (capQuote) await checkCloneCap(deps, ctx, action as { type: string; contentId?: string }, capItems)
   const jobs = await runJobs(deps, ctx, { quoteId, confirmed, purpose: built.purpose, characterId: built.characterId, specs: built.specs })
+  if (capQuote) await addCloneSpend(deps, ctx, action as { type: string; contentId?: string }, capItems)
   if (action.type === 'model_test') await startModelTest(deps, ctx, action.model, jobs[0]!.id)
   else if (action.type === 'model_suite') await startModelSuite(deps, ctx, jobs)
   else await afterStart(deps, ctx, action, built, jobs)
@@ -470,6 +486,15 @@ async function afterStart(deps: Deps, ctx: Ctx, action: StudioAction, built: Bui
   // The video model picked last is the next take's default.
   if (action.type === 'scene_video' && !action.test && action.model) await saveVideoModel(deps, ctx, action.model)
   if (action.type === 'clone' && action.model) await saveCloneModel(deps, ctx, action.model)
+  // "Make the video" on a still keeps that still; "Fix this face" picks the
+  // still it fixes (the same click).
+  if (action.type === 'clone' && action.stills) for (const id of Object.values(action.stills)) await useCloneStill(deps, ctx, action.contentId, id)
+  if (action.type === 'clone_face') await useCloneStill(deps, ctx, action.contentId, action.candidateId)
+  if (action.type === 'recreate_batch' && built.ran) {
+    await afterRecreateBatch(deps, ctx, action.step, built.ran)
+    // Each row's model counts as used (the next run starts there).
+    if (action.step === 'video') for (const m of new Set(built.ran.map(r => r.model))) await saveCloneModel(deps, ctx, m).catch(() => undefined)
+  }
   if (action.type === 'voice_convert') await markConverting(deps, ctx, action.soundIds, new Map(jobs.map(j => [j.purpose.split(':')[1]!, j.id])))
   if (action.type === 'hero') {
     const row = await getCharacter(deps, ctx, action.characterId)

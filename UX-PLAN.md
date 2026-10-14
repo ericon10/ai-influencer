@@ -597,10 +597,88 @@ default otherwise. Either can be picked.
 | b. Four stills | "Not like the person in the clip" field (hair color, eye color, piercings, makeup such as winged liner; **Read them for me** fills it, priced, Claude). **Make 4 stills** (Nano Banana 2.1, 9:16, the frame plus the character's element on the plan, or REF-00 and a three-quarter view on the API; price on the button). The prompt uses the frame only for place, light, angle, framing, pose and outfit, replaces the person completely, lists the character's face and hair, the traits she must not have, keeps the head angle and gaze, and removes caption text, the TikTok logo and the username | 2 |
 | c. Pick | Pick one, or **You pick** (best face match to REF-00 that is least like the person in the clip). Then **Fix the face** (2 takes, priced): only the face changes to match the character, everything else stays pixel for pixel. Optional; recommended when the face drifts | 1 + 2 |
 | d. Checks | Free on every still: face match to REF-00 and likeness to the person in the clip. A still that looks like that person cannot go on (fixed rule); face drift is a strong warning | 0 |
-| e. Copy the moves | **Copy the moves** (priced): the chosen still plus the ORIGINAL clip (as uploaded; its burned-in text does not carry over). Plan: Genjutsu motion control (hf_mult_motion_control), 720p, about 7 credits a second. API: Kling 3.0 Motion Control through Vercel AI Gateway (or the Higgsfield API). The motion model is the remembered pick in the same panel; it starts on whichever path has keys | 2 |
+| e. Copy the moves | **Copy the moves** (priced): the chosen still plus the ORIGINAL clip (as uploaded; its burned-in text does not carry over). Plan: Genjutsu motion control (hf_mult_motion_control), 720p, about 7 credits a second. API: Kling 3.0 Motion Control on the Higgsfield API (the Vercel AI Gateway path was removed, G39). The motion model is the remembered pick in the same panel; it starts on whichever path has keys | 2 |
 | f. Trim | Each result has **Trim** (start and end, free on the worker) before Use this clip, for a cut to a wide shot where background people melt | 1 to 3 |
 
 **Clicks, a rave clip to a usable clone:** choose the clip (2), Make 4
 stills, Run (2), pick one (1), Fix the face, Run (2, optional), Copy the
 moves, Run (2), Trim (optional), Use this clip (1). About 76 credits on
 the plan for a 10 s clip.
+
+## 16. Recreate, finished: entry points, motion picker, gates, review, scale (owner, 2026-10-14)
+
+Placed before building. No new page or sidebar item. Every priced button
+shows its price and runs in one click (a second "Confirm" only above the
+budget's confirm line, which plan credits never reach).
+
+**Stills default.** A post's Stills start at **GPT Image 2.5 Flare,
+Standard quality, 9:16, 4 stills** (Standard is Flare's medium quality at
+2k, 1 plan credit a still). Nano Banana 2.1 stays in the model setting.
+Every Flare prompt carries "bare natural lips, no gloss." The Recreate
+stills and the face pass stay on Nano Banana 2.1 (what was proven).
+
+**Entry points.** Three ways in, all landing on the same Recreate panel in
+the Video step:
+
+| Where | What | Clicks |
+|---|---|---|
+| Video post > Idea | A two-way choice above the box: **Describe it** (the box, as now) or **Start from a real clip** (upload a clip, or paste a direct video link or a Higgsfield media ID). Picking a clip opens Recreate | 1 + the file |
+| Library > Clips | **Use this clip** on any saved clip: a new video post of the character with that clip, open at Recreate | 1 |
+| A link | `/studio/recreate?clip=<Higgsfield media ID or video link>&character=<name>&model=<motion model>&cap=<credits>` makes the post, brings the clip in (free, on the worker) and opens at the first priced step | 0 |
+
+**Step 2: what to keep and what to drop.** Two chip lists under the frame,
+each chip with an x and an add field: **Scene to keep** (place, light,
+angle, framing, pose, outfit; read from the frame) and **Source traits to
+drop** (hair color, eye color, piercings, makeup such as winged liner).
+**Read them for me** (Claude, priced) fills both and writes one line of
+what happens in the clip for the motion prompt. **Outfit**: Keep the
+clip's outfit (default) or Pick hers (one of her stills, or type it).
+
+**Step 3: pick and fix.** Each still shows its face match to REF-00 and
+its likeness to the person in the clip. **Fix this face** on a still
+(price on it) picks it and runs the face pass (2 takes) in one click.
+**You pick** chooses for you.
+
+**Step 4: the gates (fixed, owner 2026-10-14).** Before any video spend
+the chosen still must match REF-00 (0.363 or more) and look less like the
+person in the clip than 0.36. Otherwise the video button is replaced by
+why ("Face match 0.31, needs 0.36"; "Likeness to the clip's person 0.41,
+must stay under 0.36") and the way on: **Fix the face again** or **Make
+new stills** (each priced). Nothing spends on its own.
+
+**Step 5: the motion model.** A list of choices, each with its price for
+this clip and its billing path (Your Higgsfield plan, credits; or the
+Higgsfield API, dollars): **Genjutsu**, **Wan 3.0**, **Wan 3.0 Prime**,
+**Kling 3.0 Motion Control**. A model with no working plan or key is grey
+with one line ("Needs your Higgsfield API key or plan: Settings >
+Connected accounts"). The last one used is pre-selected. Every model on
+both paths gets the same inputs: the chosen still as the image reference,
+the cleaned clip (end card off, burned-in text filled, no sound) as the
+video reference, 720p, 9:16, audio off, the preset suggestion declined,
+and the motion prompt template plus "Her outfit stays exactly as in
+@Image1 for the whole clip, same cut, length and fit." **Make the video**
+(price on it).
+
+**Step 6: review.** The result next to the source clip, playing in sync
+(one play button, one scrubber). Under them a strip: the face match to
+REF-00 every 0.5 s, with drift marked in red; text found on the frames
+(logos, @handles, captions) with times; cuts in the clip, each with **Trim
+at the cut**. Plus Trim (start and end). **Use this take** keeps it, puts
+it in the post and opens the Text step. Export has no music unless one is
+added.
+
+**Scale.** On a finished take: **Recreate with another character** (the
+same clip and chips, new stills for the other character). **Batch** (the
+batch post's Video step): up to 20 rows, each a clip and a character with
+its own motion model picker, plus **Set all**; each row shows its price
+and the batch shows the total. Rows run step by step together (stills,
+then the face pass, then the video); a row whose gates fail waits for you
+with the same way on, and the others carry on.
+
+**Spend cap.** A post can carry a credit cap (the link's `cap`, or set in
+Recreate). A step that would pass it is refused before any spend, with
+what it would cost and what is left.
+
+**Clicks, link to finished video:** open the link (0), Make 4 stills (1),
+Fix this face (1), Make the video (1), Use this take (1): **4**. From
+Library > Clips: Use this clip, then the same: **5**.

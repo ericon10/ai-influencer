@@ -96,7 +96,18 @@ export function PriceButton({ action, label, variant = 'primary', size = 'normal
       // Re-quote if this one is close to expiring, so the run never fails on time.
       let q = quote
       if (new Date(q.expiresAt).getTime() - Date.now() < 30_000) q = (await qc.fetchQuery({ queryKey: key, queryFn: () => api.estimate(action) })).quote
-      const { jobIds } = await api.run(action, q.id, confirming || !q.needsConfirm)
+      let jobIds: string[]
+      try {
+        ({ jobIds } = await api.run(action, q.id, confirming || !q.needsConfirm))
+      } catch (e) {
+        // What runs changed since the price was shown (a chip, a pick), but
+        // not the price: quote again and run at the same price shown.
+        if (!(e instanceof ApiError && e.code === 'quote_expired')) throw e
+        const fresh = (await qc.fetchQuery({ queryKey: key, queryFn: () => api.estimate(action), staleTime: 0 })).quote
+        if (fresh.display !== q.display || fresh.status !== 'open' || (fresh.needsConfirm && !confirming && !q.needsConfirm)) throw e
+        q = fresh
+        ;({ jobIds } = await api.run(action, q.id, confirming || !q.needsConfirm))
+      }
       // The live status shows right under the button; a toast only when it
       // is not shown here.
       if (noStatus) toast({ tone: 'ok', text: `Started ${jobIds.length === 1 ? '1 job' : `${jobIds.length} jobs`} for ${q.display}.` })

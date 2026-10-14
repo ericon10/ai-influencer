@@ -11,6 +11,7 @@ import type { CloneMode, CloneModel, CloneResult, CloneSource, CloneStill, MemeS
 import { pickPerson } from '../../../../server/core/cloneTarget'
 import type { PostCtx } from './ctx'
 import { HowTo } from '../../guide/Guide'
+import { ClipLink, RecreatePanel } from './RecreatePanel'
 
 // "Clone a TikTok or Reel" (SPEC 13.1 R1; UX-PLAN.md sections 15 and G28),
 // inline in the Video step. Choose the saved video, then the route: "Replace
@@ -46,7 +47,10 @@ export function ClonePanel({ ctx, onUse, usedIds, batch = false }: { ctx: PostCt
   // The owner's pick wins; until then the suggested route (from the free
   // read of the clip) is selected.
   const [mode, setMode] = useState<CloneMode | null>(null)
-  const m = mode ?? o?.mode ?? 'replace'
+  // A post started from a real clip (the Idea step, a Recreate link, Library
+  // > Clips) opens at Recreate.
+  const fromClip = (item.spec as { start?: string }).start === 'clip'
+  const m = mode ?? (fromClip ? 'motion' : o?.mode ?? 'replace')
   const [models, setModels] = useState<Partial<Record<CloneMode, string>>>({})
   const model = models[m] ?? o?.defaults?.[m] ?? null
   const picked = o?.models.find(x => x.ref === model && x.mode === m) ?? null
@@ -101,10 +105,12 @@ export function ClonePanel({ ctx, onUse, usedIds, batch = false }: { ctx: PostCt
       </Field>
 
       {ready && (
-        <Field id="clone-target" label="Who to replace" group hint="Only this person changes. Tap someone else on the frame to replace them instead.">
+        <Field id="clone-target" label={m === 'motion' ? '1. Who to replace' : 'Who to replace'} group hint="Only this person changes. Tap someone else on the frame to replace them instead.">
           <FramePick ctx={ctx} source={source!} words={o?.target ?? null} />
         </Field>
       )}
+
+      {m === 'motion' && !batch ? (ready ? <RecreatePanel ctx={ctx} source={source!} o={o} takes={o?.takes ?? { still: 4, face: 2 }} /> : null) : (<>
 
       <Field id="clone-characters" label={`Who is in it${characterIds.length > 1 ? ` (${characterIds.length})` : ''}`} required done={characterIds.length > 0} group hint="Rebuilt with each character. One price with a line each.">
         <div className="st-row" style={{ gap: 6, flexWrap: 'wrap' }}>
@@ -167,6 +173,7 @@ export function ClonePanel({ ctx, onUse, usedIds, batch = false }: { ctx: PostCt
       />
 
       <CloneResults ctx={ctx} onUse={onUse} usedIds={usedIds} batch={batch} />
+      </>)}
     </div>
   )
 }
@@ -339,7 +346,7 @@ function RecreateSteps({ ctx, source, characterIds, outfit, look, list, kept, ta
 }
 
 // The saved video: choose it, see it prepared (with its live status), play it.
-function SourceBox({ ctx, source, maxMb }: { ctx: PostCtx; source: CloneSource | null; maxMb: number }) {
+export function SourceBox({ ctx, source, maxMb }: { ctx: PostCtx; source: CloneSource | null; maxMb: number }) {
   const toast = useToast()
   const qc = useQueryClient()
   const worker = useWorkerGate()
@@ -355,6 +362,13 @@ function SourceBox({ ctx, source, maxMb }: { ctx: PostCtx; source: CloneSource |
       await qc.invalidateQueries({ queryKey: keys.content })
       qc.invalidateQueries({ queryKey: ['jobs'] })
     } catch (e) { toast({ tone: 'bad', text: `${file.name}: ${errorMessage(e)}` }) } finally { setBusy(null) }
+  }
+  async function link(text: string) {
+    try {
+      await api.addCloneLink(ctx.item.id, text)
+      await qc.invalidateQueries({ queryKey: keys.content })
+      qc.invalidateQueries({ queryKey: ['jobs'] })
+    } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) }
   }
   const choose = (label: string, variant = '') => (
     <button type="button" className={`st-btn ${variant}`} disabled={!!busy || !worker.ready} onClick={() => input.current?.click()} title={worker.ready ? undefined : worker.reason ?? undefined}>
@@ -387,9 +401,10 @@ function SourceBox({ ctx, source, maxMb }: { ctx: PostCtx; source: CloneSource |
           <RunStatus match={j => j.purpose === `clone_source:${ctx.item.id}`} />
         </div>
       ) : (
-        <div className="st-row" style={{ gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+        <div className="st-col" style={{ gap: 8 }}>
           {source?.status === 'failed' && <Callout tone="bad">{source.error}</Callout>}
-          {choose(source?.status === 'failed' ? 'Choose another video' : 'Choose the video', 'primary')}
+          <div className="st-row" style={{ gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>{choose(source?.status === 'failed' ? 'Choose another video' : 'Choose the video', 'primary')}</div>
+          <ClipLink onAdd={link} />
         </div>
       )}
       {busy && <span className="st-hint">{busy}</span>}

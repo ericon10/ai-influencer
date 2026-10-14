@@ -51,7 +51,7 @@ export default function Guide() {
         </ol>
         <div className="gd-shortcut gd-c-blue">
           <Clapperboard size={18} />
-          <div><b>Shortcut: clone a TikTok.</b> New post &gt; Video post from a TikTok. Choose the saved video, press Clone it, then Use this clip, add a caption and export. <button type="button" className="gd-link" onClick={() => jump('post-clone')}>How cloning works</button></div>
+          <div><b>Shortcut: start from a real clip.</b> New post &gt; Video post &gt; Start from a real clip, or Library &gt; Clips &gt; Use this clip. Make 4 stills, Make the video on one that passes the face checks, Use this take, add a caption and export. <button type="button" className="gd-link" onClick={() => jump('post-clone')}>How Recreate works</button></div>
         </div>
       </section>
 

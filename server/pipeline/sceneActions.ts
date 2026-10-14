@@ -66,6 +66,27 @@ function modelEntry(deps: Deps, ref: string): ModelEntry {
   return m
 }
 
+// A still level's settings for one model (scenes.yaml still_levels; a model
+// can set its own: Flare's Standard is medium at 2k).
+export function stillLevelFor(deps: Deps, model: string, id?: string): { quality: string; resolution: string } {
+  const sc = deps.config.pipeline.scenes.settings
+  const l = sc.still_levels[id ?? sc.still_level]
+  if (!l) return { quality: sc.quality, resolution: sc.resolution }
+  const own = l.models[model] ?? {}
+  return { quality: own.quality ?? l.quality, resolution: own.resolution ?? l.resolution }
+}
+
+// The model's own prompt lines (models.yaml prompt_lines: Flare's "Bare
+// natural lips, no gloss."), before the REALISM block, once.
+export function withModelLines(deps: Deps, model: string, prompt: string): string {
+  const lines = (deps.config.models.models.find(x => x.ref === model)?.prompt_lines ?? []).filter(l => !prompt.toLowerCase().includes(l.toLowerCase()))
+  if (!lines.length) return prompt
+  const add = lines.join(' ')
+  const at = prompt.search(/\n?REALISM:/)
+  if (at < 0) return `${prompt.trimEnd()} ${add}`
+  return `${prompt.slice(0, at).trimEnd()} ${add}${prompt.slice(at)}`
+}
+
 // The model that runs (the mock in demo mode) and the Higgsfield billing
 // path. A model the API does not offer runs on the owner's account, which
 // must be connected (DECISIONS E5).
@@ -312,7 +333,7 @@ export async function writtenStillPrompt(deps: Deps, ctx: Ctx, row: CharacterRow
   const reasonAction = reason ? review.reasons.find(r => r.id === reason)?.action : undefined
   const addendum = reasonAction ? review.actions[reasonAction]?.prompt_addendum ?? '' : ''
   const sceneRules = { outfitOverride: sw.on('scene-outfit-override'), brandFree: sw.on('scene-brand-free'), colors: sw.on('scene-colors'), referenceLine: sw.on('scene-reference-slot') }
-  return assembleStillPrompt(templates, sc, views, f, ch, mode, text, { identityBlock: identity?.promptBlock, warnings: [], addendum, rules: sceneRules, flawDose: sw.on('realism-flaw-dose') })
+  return withModelLines(deps, sceneModel, assembleStillPrompt(templates, sc, views, f, ch, mode, text, { identityBlock: identity?.promptBlock, warnings: [], addendum, rules: sceneRules, flawDose: sw.on('realism-flaw-dose') }))
 }
 
 export async function buildSceneRun(deps: Deps, ctx: Ctx, row: CharacterRow, input: { sceneId: string; models: string[]; variations: number; reason?: string; withQa: boolean; allowRepeat?: boolean; write?: boolean; level?: string }): Promise<SceneBuilt> {
@@ -360,8 +381,6 @@ export async function buildSceneRun(deps: Deps, ctx: Ctx, row: CharacterRow, inp
   const ownNotes = scenePrompts(scene.prompts).still
   const writer = input.write && !asWritten ? (await buildScenePromptWrite(deps, ctx, row, { sceneId: scene.id, target: 'still', ...(ownNotes?.notesBy === 'owner' && ownNotes.notes ? { notes: ownNotes.notes } : {}) })).specs[0]! : null
   if (writer) specs.push(writer)
-  // Standard by default (scenes.yaml still_levels), High on request.
-  const level = sc.settings.still_levels[input.level ?? sc.settings.still_level] ?? { quality: sc.settings.quality, resolution: sc.settings.resolution }
   if (sw.on('scene-prompt-writer') && !written && !input.write && !asWritten) {
     warnings.push({ ruleId: 'scene-prompt-writer', spec: '9', title: 'No written prompt yet', severity: 'warning', message: 'This run uses the template prompt. Write the prompt above Generate to use natural sentences instead.' })
   }
@@ -372,8 +391,11 @@ export async function buildSceneRun(deps: Deps, ctx: Ctx, row: CharacterRow, inp
     // trained one, the full card otherwise.
     const mode: ReferenceMode = entry.max_refs > 0 ? 'refs' : identity ? 'trained' : 'text'
     const o = { identityBlock: identity?.promptBlock, warnings: realism, addendum, rules: sceneRules, flawDose: sw.on('realism-flaw-dose') }
-    const prompt = asWritten ? assembleAsWritten(templates, sc, f, ch, mode, asWritten, o)
-      : written ? assembleStillPrompt(templates, sc, views, f, ch, mode, written.text, o) : buildScenePrompt(templates, sc, views, f, ch, mode, o)
+    const prompt = withModelLines(deps, model, asWritten ? assembleAsWritten(templates, sc, f, ch, mode, asWritten, o)
+      : written ? assembleStillPrompt(templates, sc, views, f, ch, mode, written.text, o) : buildScenePrompt(templates, sc, views, f, ch, mode, o))
+    // Standard by default (scenes.yaml still_levels), High on request; a
+    // model can set its own value for a level.
+    const level = stillLevelFor(deps, model, input.level)
     const kind: GenRequest['kind'] = mode === 'refs' ? 'image_edit' : 'image'
     const run = await runModel(deps, ctx, model, kind)
     const attached = mode === 'refs' ? refs.slice(0, Math.max(1, entry.max_refs)) : []
@@ -470,7 +492,7 @@ export async function buildSceneEdit(deps: Deps, ctx: Ctx, row: CharacterRow, in
   const ref00 = (await approvedAssets(deps, ctx, row.id)).get('REF-00')
   if (input.face && !ref00) throw new AppError('bad_request', 'A face edit attaches REF-00. Approve REF-00 first.')
   const realism: RealismWarning[] = []
-  const prompt = buildEditPrompt(templates, input.change, ch, input.face, { warnings: realism, flawDose: sw.on('realism-flaw-dose'), skin: skinFor(sc, f.framing) })
+  const prompt = withModelLines(deps, model, buildEditPrompt(templates, input.change, ch, input.face, { warnings: realism, flawDose: sw.on('realism-flaw-dose'), skin: skinFor(sc, f.framing) }))
   const request: GenRequest = {
     kind: 'image_edit', model: run.model, prompt, aspect: aspectFor(sc, f), quality: sc.settings.quality, resolution: sc.settings.resolution,
     refs: [{ assetId: cand.assetId }, ...(input.face && ref00 ? [{ assetId: ref00 }] : [])],

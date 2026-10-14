@@ -1733,3 +1733,58 @@ person" in the clone panel.
 - Prices on every paid step; on the plan, 4 stills are 6 credits (1.5
   each, from the transactions; the "1.5 per 2 takes" note was per image),
   a face pass 3, the motion about 7 a second.
+
+### G39. Recreate, finished; Flare default; no AI Gateway (owner, 2026-10-14)
+
+- **Stills default:** GPT Image 2.5 Flare, Standard quality (medium,
+  2k), 9:16, 4 takes (`scenes.yaml default_still_model`,
+  `still_levels.standard.models`). Nano Banana 2.1 stays one click away.
+  Every Flare prompt carries "Bare natural lips, no gloss."
+  (`models.yaml prompt_lines`, inserted before REALISM by
+  `withModelLines`). Recreate's stills and face pass stay on Nano Banana
+  2.1 for now.
+- **Real Flare prices (plan transactions):** Standard 2k 1 credit,
+  High 2k 2.75 credits a still. API dollars are not confirmed yet; every
+  API run now reads its exact price back from Higgsfield
+  (`POST /estimate/{endpoint}`, logged as `provider_estimate` in the real
+  cost log).
+- **Nano Banana 2.1, 0.75 vs 1.5 credits:** no setting explains it. The
+  plan bills each take as its own line: 1.5 credits at 1k, 2 at 2k. Two
+  takes are 3 credits, so the "0.75 per take" was a total divided by two
+  lines that were each one take.
+- **The AI Gateway path is removed** (`vercelGateway.ts`, the `ai` and
+  `@ai-sdk/gateway` packages, `AI_GATEWAY_API_KEY`). Kling runs on the
+  Higgsfield plan or the Higgsfield API only.
+- **Motion model picker:** Genjutsu, Wan 3.0, Wan 3.0 Prime and Kling 3.0
+  Motion Control, each priced on its billing path (plan or API, the
+  account's billing default first). A model with no working key or plan
+  is greyed with one line saying why. The last pick is selected. Every
+  model works on the API alone, so a lapsed plan still runs. All get the
+  still as image_references, the cleaned clip as video_references, 720p,
+  9:16, audio off, the preset declined, and the motion template with
+  "Her outfit stays exactly as in @Image1 for the whole clip, same cut,
+  length and fit." Wan 3.0 and Prime use `alibaba/wan-3.0[-prime]/
+  reference-to-video` (the `wan_reference` input map).
+- **Gates (fixed, rule `recreate-gates`):** the motion step refuses a
+  still unless its face matches REF-00 at 0.363 or more and its likeness
+  to the clip's person is under 0.36 (`content.yaml clone.recreate.gate`).
+  A null face blocks; demo mode passes. The refusal says why and offers
+  Fix the face again or new stills. Nothing auto-spends.
+- **Entry points:** the Idea step's "Describe it" or "Start from a real
+  clip" (file, link or Higgsfield media ID), Library > Clips > "Use this
+  clip", and `/studio/recreate?clip=&character=&model=&cap=`. Clicks to a
+  finished video: 4 from the link, 5 from the Library, 6 from the Idea
+  step (the choice and the file first).
+- **Step 2 chips:** "Scene to keep" and "Source traits to drop", the
+  outfit (keep the clip's, described, or pick hers), and the motion line;
+  Read them for me fills all four from up to 4 frames.
+- **Review (free, local job `clone_review`):** the take and the clip in
+  sync, the face every 0.5 s with drift marks, Tesseract OCR every 1 s
+  for logos, handles and captions (English data fetched with the face
+  models), cuts by ffmpeg scene change with Trim at the cut. Use this take
+  keeps it, sets no music and opens the Text step.
+- **Scale:** Recreate with another character (a new post, same clip);
+  a batch of up to 20 rows, each its own post, model per row and Set all,
+  one priced run per step, rows that cannot run wait and say why.
+- **Spend cap per post** (`cap=`): a step that would pass it is refused
+  with what is left; API dollars count at 0.0625 a credit.

@@ -201,7 +201,7 @@ function outputsFrom(job: Json): Output[] {
   return [...urls].map(url => ({ url, kind: kindOfUrl(url) ?? typed ?? 'image' }))
 }
 
-export function createHiggsfieldAccountAdapter(o: HiggsfieldAccountOptions): ProviderAdapter & { balance(): Promise<AccountBalance> } {
+export function createHiggsfieldAccountAdapter(o: HiggsfieldAccountOptions): ProviderAdapter & { balance(): Promise<AccountBalance>; findMedia(id: string): Promise<{ id: string; url: string } | null> } {
   const doFetch = o.fetchImpl ?? fetch
   const timeoutMs = o.timeoutMs ?? 60_000
   const creditMicros = usdToMicros(o.creditUsd)
@@ -434,6 +434,23 @@ export function createHiggsfieldAccountAdapter(o: HiggsfieldAccountOptions): Pro
       return items
         .filter(t => str(t.action) === 'spend' && typeof t.credits === 'number' && str(t.created_at))
         .map(t => ({ name: str(t.display_name) ?? '', credits: Math.abs(t.credits as number), at: str(t.created_at)! }))
+    },
+    // A video in the account's Higgsfield media by its ID (Recreate from a
+    // real clip, owner 2026-10-14), with its link. A free listing, newest
+    // first, a few pages deep.
+    async findMedia(id: string) {
+      let cursor: number | undefined
+      for (let page = 0; page < 6; page++) {
+        const value = await o.client.callTool('show_medias', { type: 'video', size: 100, ...(cursor != null ? { cursor } : {}) })
+        const items = isObj(value) && Array.isArray(value.items) ? value.items.filter(isObj) : isObj(value) && Array.isArray(value.medias) ? value.medias.filter(isObj) : []
+        const hit = items.find(m => str(m.id) === id)
+        const url = hit ? str(hit.url) ?? str(hit.media_url) : undefined
+        if (url) return { id, url }
+        const next = isObj(value) ? value.next_cursor : null
+        if (typeof next !== 'number') break
+        cursor = next
+      }
+      return null
     },
   }
 }

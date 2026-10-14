@@ -6,6 +6,8 @@ export type ErrorCode =
   | 'provider_error' | 'provider_not_configured' | 'invalid_request' | 'too_many_requests' | 'internal'
   // A strong warning the person confirms (for example face drift on a pick).
   | 'confirm_required'
+  // A fixed gate held a paid step (Recreate's face gates before the video).
+  | 'gate_failed'
 
 const STATUS: Record<ErrorCode, number> = {
   bad_request: 400,
@@ -23,6 +25,7 @@ const STATUS: Record<ErrorCode, number> = {
   too_many_requests: 429,
   internal: 500,
   confirm_required: 409,
+  gate_failed: 409,
 }
 
 export class AppError extends Error {

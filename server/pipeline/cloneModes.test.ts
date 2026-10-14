@@ -121,15 +121,15 @@ describe('Clone: "Replace the person (keep the scene)" is the default', () => {
   })
 
   it('a motion model is refused under "Replace the person", with the way forward', async () => {
-    await expect(estimateAction(h.deps, h.ctx, { type: 'clone', contentId: postId, characterIds: [callie], mode: 'replace', model: 'higgsfield/genjutsu-motion-transfer', looks: {}, keepSound: false }))
+    await expect(estimateAction(h.deps, h.ctx, { type: 'clone', contentId: postId, characterIds: [callie], mode: 'replace', model: 'higgsfield/genjutsu-motion-control', looks: {}, keepSound: false }))
       .rejects.toThrow(/does not keep the clip's scene/)
   })
 })
 
 describe('Clone: "Copy the moves into a new scene" never gets a bare sheet image', () => {
   it('refuses the motion run until there is a scene still (the rave bug path)', async () => {
-    await expect(estimateAction(h.deps, h.ctx, { type: 'clone', contentId: postId, characterIds: [callie], model: 'higgsfield/genjutsu-motion-transfer', looks: {}, keepSound: false }))
-      .rejects.toThrow(/scene still first/)
+    await expect(estimateAction(h.deps, h.ctx, { type: 'clone', contentId: postId, characterIds: [callie], model: 'higgsfield/genjutsu-motion-control', looks: {}, keepSound: false }))
+      .rejects.toThrow(/stills first and pick one/)
   })
 
   it('the scene still edits the first frame with her face images; the first good one is kept; the run uses only it', async () => {
@@ -156,13 +156,14 @@ describe('Clone: "Copy the moves into a new scene" never gets a bare sheet image
     const keptId = stills.find(x => x.kept)!.id
     expect(c.stills[callie]).toBe(keptId)
 
-    await run({ type: 'clone', contentId: postId, characterIds: [callie], model: 'higgsfield/genjutsu-motion-transfer', looks: {}, keepSound: false })
+    await run({ type: 'clone', contentId: postId, characterIds: [callie], model: 'higgsfield/genjutsu-motion-control', looks: {}, keepSound: false })
     const motion = (await requests(`clone:${postId}:`)).find(r => r.cloneBackground === 'image')!
     const { candidates } = await import('../db/schema.js')
     const [still] = await h.deps.db.select().from(candidates).where(eq(candidates.id, keptId))
     expect(motion.refs!.map(r => r.assetId)).toEqual([still!.assetId])
-    // The motion comes from the clip as uploaded, never the filled-in copy.
-    expect(motion.sourceVideo!.assetId).toBe(c.motionAssetId ?? c.originalAssetId)
+    // The motion comes from the cleaned clip (owner, 2026-10-14), audio off.
+    expect(motion.sourceVideo!.assetId).toBe(c.assetId)
+    expect(motion.audio).toBe(false)
     expect(motion.cloneBackground).toBe('image')
     for (const id of ['REF-00', 'REF-01', 'REF-06']) expect(motion.refs!.map(r => r.assetId)).not.toContain(approved.get(id))
     // "Use this still" checks the still belongs to this post.

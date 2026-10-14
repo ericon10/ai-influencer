@@ -12,10 +12,15 @@ settings:
   resolution: 2k
   # Scene stills (owner, 2026-10-14): Standard by default, High one click
   # away on the Generate card. Each level maps to the model's own settings.
+  # A model can set its own value for a level: Flare's Standard is medium
+  # at 2k (1 plan credit a still, the owner's runs), Nano Banana 2.1's is 1k.
   still_level: standard
   still_levels:
-    standard: { label: Standard, quality: medium, resolution: 1k }
+    standard: { label: Standard, quality: medium, resolution: 1k, models: { higgsfield/gpt-image-2.5-flare: { resolution: 2k } } }
     high: { label: High, quality: high, resolution: 2k }
+  # The model a new run starts with (owner, 2026-10-14): GPT Image 2.5
+  # Flare. Nano Banana 2.1 stays one click away in the model setting.
+  default_still_model: higgsfield/gpt-image-2.5-flare
   # Stills per model a new run starts with.
   default_variations: 4
   # A body ref (REF-06 to REF-08) is attached only at these framings: a

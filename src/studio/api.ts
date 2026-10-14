@@ -1,4 +1,4 @@
-import type { ActionPreview, CharacterSummary, CharacterView, HiggsfieldAccount, JobView, Me, QuoteView, RulesView, SceneFields, ScenesData, SettingsView, StudioAction, Usage, VideoPrice, BrollClip, ContentData, ContentKind, LibraryData, PostStep, WorkerStatus, CloneOptions, CloneResult, CloneSource, CloneStill, CutView, SoundItem, EditorStyle, ImportPreview, VoiceLine, ProductSummary, ProductView, ProductClaims, KitGroup, SocialAccount, SentView } from './types'
+import type { ActionPreview, CharacterSummary, CharacterView, HiggsfieldAccount, JobView, Me, QuoteView, RulesView, SceneFields, ScenesData, SettingsView, StudioAction, Usage, VideoPrice, BrollClip, ContentData, ContentKind, LibraryData, PostStep, WorkerStatus, CloneOptions, CloneResult, CloneSource, CloneStill, CutView, SoundItem, EditorStyle, ImportPreview, VoiceLine, ProductSummary, ProductView, ProductClaims, KitGroup, SocialAccount, SentView, RecreateBatchView } from './types'
 import { sheetRefOf, typeOf, uploadFiles } from './files'
 
 // Thin client for /api/v1. Every write sends the CSRF header the server
@@ -106,7 +106,18 @@ export const api = {
     const [up] = await uploadFiles([file], onProgress)
     return request<{ ok: true }>('POST', `/content/${contentId}/clone-source`, { uploadId: up!.uploadId, name: file.name })
   },
+  // A link to the file, or a video in the Higgsfield media by its ID.
+  addCloneLink: (contentId: string, link: string) => request<{ ok: true }>('POST', `/content/${contentId}/clone-source`, { link }),
   cloneOptions: (contentId: string) => request<CloneOptions>('GET', `/content/${contentId}/clone-options`),
+  // Recreate (UX-PLAN.md 16): a post from a link, a saved clip or an
+  // upload; the same clip for another character; step 2; Use this take.
+  startRecreate: (body: { character: string; link?: string; assetId?: string; uploadId?: string; name?: string; model?: string; cap?: number | null }) => request<{ id: string }>('POST', '/recreate', body),
+  recreateFor: (contentId: string, characterId: string) => request<{ id: string }>('POST', `/content/${contentId}/recreate-for`, { characterId }),
+  setCloneChoices: (contentId: string, body: { keep?: string[]; notLike?: string; motion?: string; outfit?: { choice?: 'source' | 'hers'; text?: string; lookId?: string | null }; capCredits?: number | null }) => request<{ clone: CloneSource }>('PUT', `/content/${contentId}/clone-choices`, body),
+  useCloneTake: (contentId: string, cloneId: string, acknowledge = false) => request<{ ok: true }>('POST', `/content/${contentId}/clones/${cloneId}/use`, { acknowledge }),
+  recreateBatch: (contentId: string) => request<RecreateBatchView>('GET', `/content/${contentId}/recreate-batch`),
+  addRecreateRow: (contentId: string, body: { character: string; link?: string; assetId?: string; uploadId?: string; name?: string }) => request<{ postId: string }>('POST', `/content/${contentId}/recreate-rows`, body),
+  setRecreateRows: (contentId: string, body: { all?: string | null; row?: { postId: string; model: string | null }; remove?: string }) => request<{ ok: true }>('PUT', `/content/${contentId}/recreate-rows`, body),
   clones: (contentId: string) => request<{ clones: CloneResult[] }>('GET', `/content/${contentId}/clones`),
   keepClone: (id: string, acknowledge = false) => request<{ ok: true }>('POST', `/clones/${id}/keep`, { acknowledge }),
   postFromClone: (contentId: string, cloneId: string, acknowledge = false) => request<{ id: string }>('POST', `/content/${contentId}/clones/${cloneId}/post`, { acknowledge }),

@@ -323,6 +323,17 @@ async function submitGen(deps: Deps, job: JobRow): Promise<void> {
     const now = deps.clock.now()
     await update(deps, job, { status: 'running', providerJobId: jobId, submittedAt: now, phase: 'sent', phaseAt: now, nextPollAt: new Date(now.getTime() + backoffMs(deps, 1)), lockedUntil: null })
     await event(deps.db, job, 'submitted', { providerJobId: jobId, webhook: !!webhookUrl })
+    // On the Higgsfield API, the provider's own price for this exact request
+    // (its free estimate endpoint) is the run's real cost, logged next to
+    // the quote (owner, 2026-10-14). It never holds the run up.
+    if (adapter.exactPrice && resolved.billing !== 'account') {
+      const price = await adapter.exactPrice(resolved).catch(() => null)
+      if (price) {
+        const check = compareCost({ credits: req.quotedCredits ?? undefined, micros: job.estimateMicros }, { micros: price.micros, credits: price.credits, source: 'provider_estimate' }, deps.clock.now())
+        await update(deps, job, { costCheck: check })
+        if (check.flagged) await event(deps.db, job, 'cost_off', { message: check.note })
+      }
+    }
   } catch (e) {
     await handleProviderError(deps, job, e, attempts, 'submit')
   }

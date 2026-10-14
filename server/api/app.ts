@@ -30,7 +30,8 @@ import { addVoiceTakes, getVoiceLine, listVoiceLines, updateVoiceLine, voiceLine
 import { addHook, archiveHook, archiveProduct, archiveVariant, importKit, productSummaries, productView, saveSocialAccount, scoreboard, starterKit, updateHook, updateProduct, useKitVoice } from '../pipeline/scaleKit.js'
 import { deleteStyle, editorManifest, listStyles, saveFromEditor, saveStyle } from '../pipeline/openreel.js'
 import { previewImport, runImport } from '../pipeline/csvImport.js'
-import { addCloneSource, cloneOptions, cloneStills, keepClone, pickCloneStill, postClones, postFromClone, saveCloneModel, setCloneCleanup, setCloneNotLike, setCloneTarget, trimClone, useCloneStill } from '../pipeline/clone.js'
+import { addCloneSource, cloneOptions, cloneStills, keepClone, pickCloneStill, postClones, postFromClone, saveCloneModel, setCloneChoices, setCloneCleanup, setCloneNotLike, setCloneTarget, trimClone, useCloneStill } from '../pipeline/clone.js'
+import { addRecreateRow, recreateBatch, recreateFor, setRecreateRows, startRecreate, useCloneTake } from '../pipeline/recreate.js'
 import { jobViews } from '../jobs/jobView.js'
 import { POST_STEPS, addBroll, archiveBroll, archiveContent, contentView, createContent, duplicateContent, postScene, retryFailedBatch, startRender, updateBroll, updateContent } from '../pipeline/content.js'
 import { rulesView, setRuleSwitch } from '../pipeline/rules.js'
@@ -578,8 +579,57 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
   app.post('/content/:id/clone-source', async c => {
     const ctx = c.get('ctx')
     requireRole(ctx, 'member')
-    const body = parse(z.object({ uploadId: z.string().max(40), name: z.string().max(300) }), await json(c))
+    // An upload, a saved clip (an asset), or a link or Higgsfield media ID.
+    const body = parse(z.union([
+      z.object({ uploadId: z.string().max(40), name: z.string().max(300) }),
+      z.object({ assetId: z.string().max(60), name: z.string().max(300).optional() }),
+      z.object({ link: z.string().min(8).max(2000), name: z.string().max(300).optional() }),
+    ]), await json(c))
     return c.json(await addCloneSource(deps, ctx, { contentId: c.req.param('id'), ...body }), 201)
+  })
+  // Recreate from a real clip, finished (UX-PLAN.md 16): a new post from a
+  // link, a saved clip or an upload; the same clip for another character;
+  // step 2's choices; Use this take.
+  app.post('/recreate', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    const body = parse(z.object({
+      character: z.string().min(1).max(120), link: z.string().max(2000).optional(), assetId: z.string().max(60).optional(), uploadId: z.string().max(40).optional(),
+      name: z.string().max(300).optional(), model: z.string().max(80).optional(), cap: z.number().positive().max(100000).nullable().optional(),
+    }), await json(c))
+    return c.json(await startRecreate(deps, ctx, body), 201)
+  })
+  app.post('/content/:id/recreate-for', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    const body = parse(z.object({ characterId: z.string().max(120) }), await json(c))
+    return c.json(await recreateFor(deps, ctx, { contentId: c.req.param('id'), characterId: body.characterId }), 201)
+  })
+  app.put('/content/:id/clone-choices', async c => {
+    const body = parse(z.object({
+      keep: z.array(z.string().max(80)).max(12).optional(), notLike: z.string().max(300).optional(), motion: z.string().max(400).optional(),
+      outfit: z.object({ choice: z.enum(['source', 'hers']).optional(), text: z.string().max(160).optional(), lookId: z.string().max(60).nullable().optional() }).optional(),
+      capCredits: z.number().positive().max(100000).nullable().optional(),
+    }), await json(c))
+    return c.json({ clone: await setCloneChoices(deps, c.get('ctx'), c.req.param('id'), body) })
+  })
+  // A batch of recreates: its rows, a row added, a row's model or Set all.
+  app.get('/content/:id/recreate-batch', async c => c.json(await recreateBatch(deps, c.get('ctx'), c.req.param('id'))))
+  app.post('/content/:id/recreate-rows', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    const body = parse(z.object({ character: z.string().min(1).max(120), link: z.string().max(2000).optional(), assetId: z.string().max(60).optional(), uploadId: z.string().max(40).optional(), name: z.string().max(300).optional() }), await json(c))
+    return c.json(await addRecreateRow(deps, ctx, c.req.param('id'), body), 201)
+  })
+  app.put('/content/:id/recreate-rows', async c => {
+    const body = parse(z.object({ all: z.string().max(80).nullable().optional(), row: z.object({ postId: z.string().max(60), model: z.string().max(80).nullable() }).optional(), remove: z.string().max(60).optional() }), await json(c))
+    return c.json(await setRecreateRows(deps, c.get('ctx'), c.req.param('id'), body))
+  })
+  app.post('/content/:id/clones/:cid/use', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    const body = parse(z.object({ acknowledge: z.boolean().default(false) }), await json(c))
+    return c.json(await useCloneTake(deps, ctx, c.req.param('id'), c.req.param('cid'), body.acknowledge))
   })
   app.get('/content/:id/clone-options', async c => c.json(await cloneOptions(deps, c.get('ctx'), c.req.param('id'))))
   app.get('/content/:id/clones', async c => c.json({ clones: await postClones(deps, c.get('ctx'), c.req.param('id')) }))

@@ -462,7 +462,11 @@ function GenerateCard({ v, data, scene, todo, saving, setRefs, onStarted }: { v:
           {o.stillLevels.length > 1 && (
             <div className="st-row" style={{ gap: 6 }} role="radiogroup" aria-label="Quality">
               <span className="st-label">Quality</span>
-              {o.stillLevels.map(l => <button key={l.id} type="button" role="radio" aria-checked={level === l.id} className={`st-chip ${level === l.id ? 'on' : ''}`} onClick={() => setLevel(l.id)} title={`${l.resolution}, ${l.quality} quality where the model has one`}>{level === l.id && <Check size={12} />}{l.label} <span className="st-muted">{l.resolution}</span></button>)}
+              {o.stillLevels.map(l => {
+                // A model can set its own value for a level (Flare's Standard is 2k).
+                const res = models.length === 1 ? (l.models?.[models[0]!]?.resolution ?? l.resolution) : l.resolution
+                return <button key={l.id} type="button" role="radio" aria-checked={level === l.id} className={`st-chip ${level === l.id ? 'on' : ''}`} onClick={() => setLevel(l.id)} title={`${res}, ${l.quality} quality where the model has one`}>{level === l.id && <Check size={12} />}{l.label} <span className="st-muted">{res}</span></button>
+              })}
             </div>
           )}
           <span className="st-hint">{data.options.destinations.find(d => d.id === (scene.fields.destination ?? 'vertical'))?.aspect ?? scene.aspect}</span>

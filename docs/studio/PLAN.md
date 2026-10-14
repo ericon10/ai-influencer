@@ -418,9 +418,24 @@ Decisions: `DECISIONS.md` G37 and G38. UX: `UX-PLAN.md` section 15.
 - [x] Prices: Nano Banana 2.1, 4 stills, Standard, 9:16 by default; real cost logged and flagged over 20% (G37)
 - [x] ElevenLabs: Callie's voice ID; the importer skips spare voices (G37)
 - [x] Recreate from a real clip: frame, 4 stills, You pick, face pass, checks, motion from the clip as uploaded, Trim (G38)
-- [x] Kling 3.0 Motion Control on the Vercel AI Gateway (G38)
-- [ ] First paid Gateway run, after the owner adds AI_GATEWAY_API_KEY (its price is a placeholder until then)
-- [ ] Flare's real price per quality, from its first logged runs
+- [x] Kling 3.0 Motion Control on the Vercel AI Gateway (G38; removed in G39)
+- [x] Flare's real price per quality, from its first logged runs (G39: Standard 1 credit, High 2.75)
+
+### Round 16: Recreate finished (G39, UX-PLAN.md section 16)
+
+- [x] Stills default: GPT Image 2.5 Flare, Standard, 9:16, 4 takes; "Bare natural lips, no gloss." on every Flare prompt
+- [x] Nano Banana 2.1 credits explained (each take is its own line: 1.5 at 1k, 2 at 2k)
+- [x] AI Gateway path removed (code, packages, env, to-dos)
+- [x] Motion picker: Genjutsu, Wan 3.0, Wan 3.0 Prime, Kling 3.0 Motion Control, priced per billing path, greyed with a reason, last pick selected, per row in a batch with Set all
+- [x] Exact API price read back after each API run (provider_estimate)
+- [x] Gates fixed: face 0.363 or more, likeness under 0.36, before any motion spend
+- [x] Entry points: Idea "Start from a real clip", Library "Use this clip", the recreate link (4 clicks from the link, 5 from the Library)
+- [x] Step 2 chips: Scene to keep, Source traits to drop, the outfit, the motion line
+- [x] Review: synced pair, face every 0.5 s with drift, OCR (Tesseract), cuts with Trim at the cut; Use this take goes to Text with no music
+- [x] Recreate with another character; batch of up to 20 rows; spend cap per post
+- [x] Guide and help: Start from a real clip section, Idea, Stills, Library, glossary, fresh screenshots
+- [ ] E2E on production: kitchen clip, Callie, Genjutsu, 50-credit cap (waits for the owner's approve click)
+- [ ] First paid Wan 3.0, Wan 3.0 Prime and Kling 3.0 Motion Control runs on the API (prices confirmed from provider_estimate)
 
 ## Roadmap after Phase 4 (owner, 2026-10-13; not started)
 

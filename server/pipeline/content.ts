@@ -156,6 +156,23 @@ const cloneSource = z.object({
   motionAssetId: id.nullable().default(null),
   notLike: z.string().max(300).default(''),
   look: z.object({ dark: z.boolean(), motion: z.number(), suggest: z.enum(['replace', 'motion']), why: z.string().max(200) }).nullable().default(null),
+  // Step 2 (owner, 2026-10-14): what to keep from the frame (chips), the
+  // outfit (the clip's, named, or hers: one of her stills or typed), and
+  // one line of what happens in the clip for the motion prompt.
+  keep: z.array(z.string().max(80)).max(12).default([]),
+  outfit: z.object({ choice: z.enum(['source', 'hers']).default('source'), text: z.string().max(160).default(''), lookId: id.nullable().default(null) }).prefault({}),
+  motion: z.string().max(400).default(''),
+  // A spend cap for this post in credits (the Recreate link's cap), and
+  // what its priced steps have started so far.
+  capCredits: z.number().positive().max(100000).nullable().default(null),
+  spentCredits: z.number().min(0).default(0),
+  // Where the clip came from (an upload, a link, a Higgsfield media ID).
+  from: z.string().max(400).default(''),
+  // The preparation run this record waits for.
+  prep: z.string().max(40).default(''),
+  // Frames through the clip (a quarter, half, three quarters) for "Read
+  // them for me" to say what happens in it.
+  motionFrameIds: z.array(id).max(4).default([]),
 })
 export type CloneSource = z.infer<typeof cloneSource>
 // The sound bed (Phase 3; SPEC 5.5): ambience ("none", "room" for the
@@ -211,6 +228,9 @@ export type EditSpec = z.infer<typeof editSpec>
 // content.yaml): TikTok's white box or the Outline style.
 const captionStyle = z.enum(['box', 'outline']).nullable().default(null)
 const memeSpec = z.object({
+  // The Idea step's two ways in (owner, 2026-10-14): "Describe it" or
+  // "Start from a real clip" (Recreate).
+  start: z.enum(['describe', 'clip']).default('describe'),
   clipId: id.nullable().default(null),
   // The still the clip was made from, when it was made in this post.
   stillId: id.nullable().default(null),
@@ -264,6 +284,9 @@ const batchObject = z.object({
   // every video at that video's own payoff, cuts and beats.
   stack: stackSchema.nullable().default(null),
   styleName: z.string().max(60).nullable().default(null),
+  // A batch of recreates (owner, 2026-10-14): up to 20 rows, each a clip
+  // and a character in its own video post, with its own motion model.
+  recreate: z.object({ rows: z.array(z.object({ postId: id, model: z.string().max(80).nullable().default(null) })).max(50).default([]) }).nullable().default(null),
 })
 const batchSpec = z.preprocess(raw => {
   if (!raw || typeof raw !== 'object') return raw

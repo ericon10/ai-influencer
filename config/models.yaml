@@ -49,6 +49,9 @@ models:
     mcp: { params: [aspect_ratio, resolution, quality], fixed: { variant: flare }, roles: { refs: image_references } }
     aliases: [GPT Image 2.5 Flare, Flare]
     params: { variant: flare }
+    # Flare adds lip gloss and a pout unless told otherwise (Callie's file,
+    # Oct 13 test); every Flare prompt says it (owner, 2026-10-14).
+    prompt_lines: ["Bare natural lips, no gloss."]
     use_for: [scene_still]
     notes: Strong for stills; made Callie's best beach shot with real skin texture and the right ear cuff, though it once distorted her hair in a scene. Run it alongside Nano Banana 2.1 and pick the best.
   - ref: higgsfield/nano-banana-2.1
@@ -255,73 +258,94 @@ models:
     params: { resolution: [480p, 720p, 1080p] }
     use_for: [video_clone]
     notes: Your Higgsfield plan. Swaps only the person you pick and keeps the clip's place, light, crowd and outfit.
-  # The owner's proven motion route (2026-10-14, a rave clip and a kitchen
-  # hair-flip clip): generate_video with model hf_mult_motion_control, the
-  # chosen still in image_references and the ORIGINAL clip in
-  # video_references, 720p, the preset suggestion declined. Real charges in
-  # the account's transactions: 70 credits for 10 s, 42 for 6 s.
+  # Recreate from a real clip, the motion step (owner, 2026-10-14): four
+  # models, each on the Higgsfield plan (MCP) and on the Higgsfield API, so
+  # every one keeps working when the plan lapses. Every model gets the same
+  # inputs: the chosen still as the image reference, the cleaned clip as the
+  # video reference, 720p, 9:16, audio off, the preset suggestion declined.
+  # Genjutsu: on the plan generate_video with model hf_mult_motion_control
+  # (the owner's proven route, a rave clip and a kitchen hair-flip clip); on
+  # the API higgsfield/genjutsu/motion-transfer/v1.0 (video_url, image_urls
+  # 1 to 8, prompt, resolution; source at least 4 s, longer than 30 s
+  # trimmed; docs.higgsfield.ai, read 2026-10-14).
   - ref: higgsfield/genjutsu-motion-control
-    label: Genjutsu motion control
+    label: Genjutsu
     kinds: [video_clone]
     max_refs: 1
-    api: false
-    endpoint: null
+    reference: https://docs.higgsfield.ai/docs/models/genjutsu/motion-transfer
+    endpoint: higgsfield/genjutsu/motion-transfer/v1.0
     input_map: genjutsu_motion
     verified: false
     mcp_id: hf_mult_motion_control
     mcp: { params: [resolution], roles: { refs: image_references, video: video_references } }
-    clone: { mode: motion, background: [image], image_refs: 1, min_sec: 3, max_sec: 30, prompt: optional }
-    aliases: [Genjutsu motion control, Higgsfield Genjutsu - Motion Transfer, hf_mult_motion_control]
+    clone: { mode: motion, background: [image], image_refs: 1, min_sec: 4, max_sec: 30, prompt: optional }
+    aliases: [Genjutsu, Genjutsu motion control, Higgsfield Genjutsu - Motion Transfer, hf_mult_motion_control]
     charge_names: [Higgsfield Genjutsu - Motion Transfer]
     params: { resolution: [480p, 720p, 1080p] }
     use_for: [video_clone]
-    notes: Your Higgsfield plan. The clip's real motion and camera onto the chosen still; her face held through the turns in the owner's tests.
-  # Kling 3.0 Motion Control on the Vercel AI Gateway (owner, 2026-10-14):
-  # klingai/kling-v3.0-motion-control, a character image plus a reference
-  # video (vercel.com/docs/ai-gateway, video generation, motion control).
-  # Needs AI_GATEWAY_API_KEY on the server. Not confirmed until a paid run.
-  - ref: vercel/kling-3.0-motion-control
-    label: Kling 3.0 Motion Control (Vercel AI Gateway)
+    notes: The clip's real motion and camera onto the chosen still; her face held through the turns in the owner's tests.
+  # Wan 3.0 and Wan 3.0 Prime, reference to video: on the plan generate_video
+  # with wan3_0 or wan3_0_prime and the still in image_references, the clip
+  # in video_references (models_explore, read 2026-10-14); on the API
+  # alibaba/wan-3.0/reference-to-video and alibaba/wan-3.0-prime/
+  # reference-to-video (prompt, image_urls up to 10, video_urls up to 5 of
+  # 1 to 30 s, duration 2 to 30, resolution, aspect_ratio, generate_audio).
+  - ref: higgsfield/wan-3.0-motion
+    label: Wan 3.0
     kinds: [video_clone]
     max_refs: 1
-    reference: https://vercel.com/docs/ai-gateway/modalities/video-generation/motion-control
-    endpoint: klingai/kling-v3.0-motion-control
-    input_map: gateway_motion
+    reference: https://docs.higgsfield.ai/docs/models/wan-3/reference-to-video
+    endpoint: alibaba/wan-3.0/reference-to-video
+    input_map: wan_reference
     verified: false
-    clone: { mode: motion, background: [image], image_refs: 1, min_sec: 3, max_sec: 30, prompt: optional }
-    params: { mode: std }
-    aliases: [Kling 3.0 Motion Control Gateway]
-    notes: Standard quality. The still sets the look and place; the clip gives the motion and camera. The clip's own sound is never kept by the provider.
-  - ref: vercel/kling-3.0-motion-control-pro
-    label: Kling 3.0 Motion Control Pro (Vercel AI Gateway)
+    mcp_id: wan3_0
+    mcp: { params: [aspect_ratio, duration, resolution], fixed: { generate_audio: false }, roles: { refs: image_references, video: video_references } }
+    clone: { mode: motion, background: [image], image_refs: 1, min_sec: 2, max_sec: 30, prompt: required }
+    aliases: [Wan 3.0, wan3_0, Wan 3.0 Video]
+    charge_names: [Wan 3.0 Video]
+    audio: off_switch
+    params: { resolution: [480p, 720p, 1080p] }
+    use_for: [video_clone]
+    notes: Follows the motion prompt closely; the cheapest of the four.
+  - ref: higgsfield/wan-3.0-prime-motion
+    label: Wan 3.0 Prime
     kinds: [video_clone]
     max_refs: 1
-    reference: https://vercel.com/docs/ai-gateway/modalities/video-generation/motion-control
-    endpoint: klingai/kling-v3.0-motion-control
-    input_map: gateway_motion
+    reference: https://docs.higgsfield.ai/docs/models/wan-3-prime/reference-to-video
+    endpoint: alibaba/wan-3.0-prime/reference-to-video
+    input_map: wan_reference
     verified: false
-    clone: { mode: motion, background: [image], image_refs: 1, min_sec: 3, max_sec: 30, prompt: optional }
-    params: { mode: pro }
-    aliases: [Kling 3.0 Motion Control Pro Gateway]
-    notes: Pro quality, the same inputs.
+    mcp_id: wan3_0_prime
+    mcp: { params: [aspect_ratio, duration, resolution], fixed: { generate_audio: false }, roles: { refs: image_references, video: video_references } }
+    clone: { mode: motion, background: [image], image_refs: 1, min_sec: 2, max_sec: 30, prompt: required }
+    aliases: [Wan 3.0 Prime Motion, Wan 3.0 Prime Video]
+    charge_names: [Wan 3.0 Prime Video]
+    audio: off_switch
+    params: { resolution: [480p, 720p, 1080p] }
+    use_for: [video_clone]
+    notes: Wan 3.0's higher tier.
+  # Kling 3.0 Motion Control: on the plan the account tool motion_control
+  # (its own tool, no prompt: image_id, motion_video_id, resolution 720p or
+  # 1080p, scene_control image or video; read from the connector
+  # 2026-10-13); on the API kling-video/v3/motion-control/std (image_url,
+  # video_url of 3 to 30 s, prompt, keep_original_sound "no",
+  # character_orientation; the output follows the clip's length).
   - ref: higgsfield/kling-3.0-motion-control
     label: Kling 3.0 Motion Control
     kinds: [video_clone]
     max_refs: 1
-    api: false
-    endpoint: null
+    reference: https://docs.higgsfield.ai/docs/models/kling-3-motion-control/std
+    endpoint: kling-video/v3/motion-control/std
     input_map: kling_motion_control
     verified: false
-    # The account tool motion_control (its own tool, no prompt): image_id,
-    # motion_video_id, resolution 720p or 1080p, scene_control image or video
-    # (where the background comes from). Read from the connector 2026-10-13.
     mcp_id: kling3_0_motion_control
     mcp: { tool: motion_control, params: [resolution] }
-    clone: { mode: motion, background: [video, image], image_refs: 1, min_sec: 3, max_sec: 30, prompt: none }
-    aliases: [Kling 3.0 Motion Control, motion_control]
+    clone: { mode: motion, background: [video, image], image_refs: 1, min_sec: 3, max_sec: 30, prompt: optional }
+    aliases: [Kling 3.0 Motion Control, motion_control, Motion Control]
+    charge_names: [Motion Control]
     params: { resolution: [720p, 1080p] }
     use_for: [video_clone]
-    notes: Your Higgsfield plan. The character follows the clip's motion and camera; the place comes from the clip or the character image.
+    notes: The character follows the clip's motion and camera. On your plan it takes no prompt.
   - ref: higgsfield/kling-3.0-motion-control-pro
     label: Kling 3.0 Motion Control Pro
     kinds: [video_clone]

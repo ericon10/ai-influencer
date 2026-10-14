@@ -151,11 +151,6 @@ export async function settingsView(deps: Deps, ctx: Ctx) {
         // The owner's account can run on the server key (ELEVENLABS_API_KEY).
         serverKey: !!(await serverKeyFor(deps.db, { ownerEmail: deps.env.STUDIO_OWNER_EMAIL || 'owner@studio.local', elevenlabs: deps.env.ELEVENLABS_API_KEY }, ctx.accountId, 'elevenlabs')),
       },
-      {
-        id: 'vercel', label: 'Vercel AI Gateway', hint: 'An AI Gateway API key from Vercel (AI Gateway, API keys).', placeholder: 'e.g. vck_...', usedFor: 'Kling 3.0 Motion Control for Recreate from a real clip, off the Higgsfield plan',
-        // The owner's account can run on the server key (AI_GATEWAY_API_KEY).
-        serverKey: !!(await serverKeyFor(deps.db, { ownerEmail: deps.env.STUDIO_OWNER_EMAIL || 'owner@studio.local', vercel: deps.env.AI_GATEWAY_API_KEY }, ctx.accountId, 'vercel')),
-      },
     ],
     budgets: {
       job: microsToUsd(b.jobCapMicros), character: microsToUsd(b.characterCapMicros), month: microsToUsd(b.monthCapMicros),
@@ -265,10 +260,12 @@ export async function scenesView(deps: Deps, ctx: Ctx, characterId: string) {
       views: Object.entries(views.views).map(([id, v]) => ({ id, label: v.label })),
       editPresets: sc.edits.presets.map(e => ({ id: e.id, label: e.label, text: withPronouns(e.text, p), face: e.face, group: e.group, hint: e.hint ?? '' })),
       diagnose: sc.diagnose,
-      stillModels, editModels, defaultModels: stillModels.slice(0, 1).map(m => m.ref),
+      // The Studio's default still model (Flare) first, else the character's
+      // preference.
+      stillModels, editModels, defaultModels: [stillModels.find(m => m.ref === sc.settings.default_still_model) ?? stillModels[0]!].map(m => m.ref),
       maxVariations: sc.settings.max_variations, maxModels: sc.settings.max_models,
       // Standard or High for stills, and how many a run starts with.
-      stillLevels: Object.entries(sc.settings.still_levels).map(([id, l]) => ({ id, label: l.label, quality: l.quality, resolution: l.resolution })),
+      stillLevels: Object.entries(sc.settings.still_levels).map(([id, l]) => ({ id, label: l.label, quality: l.quality, resolution: l.resolution, models: l.models })),
       stillLevel: sc.settings.still_level, defaultVariations: sc.settings.default_variations,
       accountConnected: connected, mode: await providerMode(deps.db, ctx.accountId),
       // The prompt writer (default rule scene-prompt-writer), its model as

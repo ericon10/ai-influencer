@@ -157,6 +157,9 @@ export interface ProviderAdapter {
   // The account's recent charges (Higgsfield plan: its transactions), for
   // the real cost of a run next to its quote. Free; newest first.
   charges?(): Promise<Array<{ name: string; credits: number; at: string }>>
+  // The provider's own price for one exact request (the Higgsfield API's free
+  // estimate endpoint): what the run costs, in credits and dollars.
+  exactPrice?(req: GenRequest): Promise<{ credits: number; micros: number } | null>
 }
 
 // Thrown by adapters so the runner can decide between retry, fail and

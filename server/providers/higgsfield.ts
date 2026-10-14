@@ -186,6 +186,22 @@ function mapFamily(entry: ModelEntry, req: GenRequest): Record<string, unknown> 
         generate_audio: req.audio === true,
         enable_thinking: false,
       })
+    case 'wan_reference':
+      // Wan 3.0 and Wan 3.0 Prime, reference to video (Recreate's motion
+      // step): the chosen still as the image reference, the cleaned clip as
+      // the video reference, the length of the clip, audio as asked (off),
+      // and the model's own reasoning off.
+      return clean({
+        prompt: req.prompt,
+        image_urls: (req.refs ?? []).slice(0, 10).map(r => needUrl(r, 'A reference image')),
+        video_urls: req.sourceVideo ? [needUrl(req.sourceVideo, 'The source clip')] : undefined,
+        duration: req.durationSec != null ? Math.min(30, Math.max(2, Math.round(req.durationSec))) : undefined,
+        resolution: req.resolution,
+        aspect_ratio: req.aspect,
+        seed: req.seed || undefined,
+        generate_audio: req.audio === true,
+        enable_thinking: false,
+      })
     case 'kling_v3':
       // Standard and Pro: sound defaults to on, so it is sent off unless the
       // request asks for audio. Turbo has no sound field; its audio is
@@ -327,6 +343,17 @@ export function createHiggsfieldAdapter(opts: HiggsfieldOptions): ProviderAdapte
         .map(m => ({ ref: m.ref, provider: 'higgsfield', label: m.label, kinds: m.kinds, maxRefs: m.max_refs, verified: m.verified && !!m.endpoint }))
     },
     async estimate(req) { return estimateGen(opts.config, req) },
+    // Higgsfield's own price for the exact request: POST /estimate/{endpoint}
+    // with the same input answers { credits, usd } (docs.higgsfield.ai,
+    // Billing and retention). Free; never charges.
+    async exactPrice(req) {
+      const entry = entryFor(req.model)
+      const endpoint = entry.endpoint!.replace(/^\//, '')
+      const r = await call<{ credits?: string | number; usd?: string | number }>('POST', `/estimate/${endpoint}`, mapInput(entry, req))
+      const credits = Number(r.credits), usd = Number(r.usd)
+      if (!Number.isFinite(credits) || !Number.isFinite(usd)) return null
+      return { credits, micros: Math.round(usd * 1e6) }
+    },
     async uploadAsset(data, mime) {
       const slot = await call<{ upload_url?: string; public_url?: string; upload_headers?: Record<string, string> }>('POST', '/files/generate-upload-url', { content_type: mime })
       if (!slot.upload_url?.startsWith('https://') || !slot.public_url?.startsWith('https://')) {

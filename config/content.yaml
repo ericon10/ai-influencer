@@ -73,24 +73,18 @@ clone:
   # remembered.
   model: higgsfield/seedance-2.5-video-edit
   account_model: higgsfield/genjutsu-replace
-  # "Recreate from a real clip" (owner, 2026-10-14): the motion model is
-  # the remembered pick; it starts on whichever path has keys: Genjutsu
-  # motion control on the Higgsfield plan, then Kling 3.0 Motion Control on
-  # the Vercel AI Gateway (AI_GATEWAY_API_KEY), then the Higgsfield API.
-  motion_model: higgsfield/kling-3.0-motion-control-pro
-  motion_account_model: higgsfield/genjutsu-motion-control
-  motion_gateway_model: vercel/kling-3.0-motion-control
+  # Recreate from a real clip, the motion step (owner, 2026-10-14): four
+  # models, each on the Higgsfield plan or the API (whichever works), with
+  # the last one used pre-selected; Wan 3.0 until there is one.
+  motion_model: higgsfield/wan-3.0-motion
   models:
     - { ref: higgsfield/genjutsu-motion-control, resolution: 720p }
-    - { ref: vercel/kling-3.0-motion-control }
-    - { ref: vercel/kling-3.0-motion-control-pro }
+    - { ref: higgsfield/wan-3.0-motion, resolution: 720p }
+    - { ref: higgsfield/wan-3.0-prime-motion, resolution: 720p }
+    - { ref: higgsfield/kling-3.0-motion-control, resolution: 720p }
     - { ref: higgsfield/genjutsu-replace, resolution: 720p }
     - { ref: higgsfield/seedance-2.5-video-edit, resolution: 720p }
     - { ref: higgsfield/kling-o3-video-edit }
-    - { ref: higgsfield/kling-3.0-motion-control, resolution: 720p }
-    - { ref: higgsfield/kling-3.0-motion-control-pro }
-    - { ref: higgsfield/kling-3.0-motion-control-standard }
-    - { ref: higgsfield/genjutsu-motion-transfer, resolution: 720p }
   # The outfit: the one in the clip (default) or one of the character's
   # stills.
   outfit: source
@@ -115,6 +109,23 @@ clone:
     face_takes: 2
     dark_luma: 70
     busy_motion: 14
+    # The gates before any video spend (fixed, owner 2026-10-14): the chosen
+    # still matches REF-00 at face_min or more and looks less like the
+    # person in the clip than source_max.
+    gate: { face_min: 0.363, source_max: 0.36 }
+    # The video: 720p, 9:16 for a vertical clip, audio off.
+    resolution: 720p
+    # The review: the face checked every review_step seconds; text found on
+    # frames every ocr_step seconds; a cut where the picture changes more
+    # than cut_threshold (ffmpeg's scene score, 0 to 1).
+    review_step: 0.5
+    ocr_step: 1
+    cut_threshold: 0.35
+    # A batch of recreates: up to batch_max rows.
+    batch_max: 20
+    # What one credit is worth on the Higgsfield API (1.5 credits = $0.094,
+    # its billing docs), to count API dollars against a post's credit cap.
+    credit_usd: 0.0625
   # The source clip: cut to max_seconds on arrival (with its sound, kept for
   # "Keep original sound"); shorter than min_seconds is refused.
   min_seconds: 3

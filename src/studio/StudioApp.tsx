@@ -18,6 +18,7 @@ const Review = lazy(() => import('./pages/Review'))
 const Library = lazy(() => import('./pages/Library'))
 const Settings = lazy(() => import('./pages/Settings'))
 const Guide = lazy(() => import('./pages/Guide'))
+const RecreateLink = lazy(() => import('./pages/RecreateLink'))
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { staleTime: 5_000, refetchOnWindowFocus: true } } })
 
@@ -50,6 +51,7 @@ function Gate() {
               <Route path="library" element={<Library />} />
               <Route path="settings" element={<Settings />} />
               <Route path="guide" element={<Guide />} />
+              <Route path="recreate" element={<RecreateLink />} />
               {/* Old addresses (UX-PLAN.md section 2) */}
               <Route path="c/:id" element={<OldCharacter />} />
               <Route path="content" element={<OldContent />} />

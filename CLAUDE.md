@@ -49,7 +49,9 @@ restrictions. Every rule is in exactly one of two buckets
   skin, the REALISM block, banned words, beautify off, the texture
   check, the natural baseline); bare face on hero and sheet;
   characters are 21 or older; no nudity or explicit content; a new
-  person, never a copy of the inspiration face; posts labeled as
+  person, never a copy of the inspiration face (with Recreate's two
+  face checks before the motion: face 0.363 or more against REF-00,
+  likeness to the clip's person under 0.36); posts labeled as
   AI-generated; the price shown before any paid run; budget caps;
   keys server-side only. Fixed rules can
   stop a run and cannot be switched off.
@@ -180,7 +182,7 @@ the Studio; they are not creative limits on a character.
 | `config/presets.yaml`, `server/core/camera.ts`, `server/media/camera.ts`, `server/core/timelinePlan.ts`, `server/pipeline/workerTimeline.ts` | The worker renders the post's timeline (G32): the editor's preset library as data (`npm run presets:sync`), the editor's camera math frame by frame, saved timelines, carried stacks and a batch's style (`src/studio/pages/post/BatchStyle.tsx`); parity script `scripts/editor-parity.mjs` |
 | `server/core/shotParse.ts`, `src/studio/pages/post/IdeaStep.tsx` | The owner's words read for free (camera, front or rear, framing, outfit, makeup, place, light; a pasted prompt) as scene fields under the owner's own (G37); the Idea step's one box, chips and More control; mood words the writer added are taken out |
 | `server/pipeline/sent.ts`, `server/core/costCheck.ts`, `src/studio/pages/character/SentPanel.tsx` | What was sent under every still (prompt, refs by REF id, model, path, settings, quote and real cost); the real cost of each run (plan credits from the Higgsfield transactions, Claude tokens), flagged when more than 20% off (G37) |
-| `server/providers/vercelGateway.ts` | Kling 3.0 Motion Control on the Vercel AI Gateway (AI SDK start and status; `AI_GATEWAY_API_KEY`) for Recreate from a real clip (G38) |
+| `server/pipeline/recreate.ts`, `server/qa/ocr.ts`, `server/media/cuts.ts`, `src/studio/pages/post/RecreatePanel.tsx`, `src/studio/pages/RecreateLink.tsx` | Recreate, finished (G39): entry points (Idea "Start from a real clip", Library "Use this clip", `/studio/recreate?clip=&character=&model=&cap=`), keep and drop chips, the outfit choice, the fixed face gates before the motion, the motion picker (Genjutsu, Wan 3.0, Wan 3.0 Prime, Kling 3.0 Motion Control on the plan or the API), the free review (synced pair, face every 0.5 s, OCR, cuts), Use this take, another character, batch of 20, spend cap per post |
 | `server/core/promptWriter.ts`, `src/studio/pages/character/PromptBox.tsx` | The prompt writer: Claude writes the final still or video prompt (editable above Generate); code adds the reference line, mark sides and REALISM |
 | `src/studio/pages/character/SceneStills.tsx`, `VideoSection.tsx`, `server/pipeline/videoAssets.ts`, `server/media/mask.ts` | A post's Stills (details, Write and generate, Use this still) and Video (takes, Use this take, upscale this take, end frame helper, clip QA) |
 | `config/edits.yaml`, `server/media/edits.ts`, `src/studio/pages/post/EditStyles.tsx`, `editZones.ts` | Amazing Edits (G24, G26): twenty edits made by code on the worker (never a video model); Format in Idea; the worker's renderer for the editor's time, text and layout presets (G32); thumbnails from `scripts/edit-thumbs.ts` in `public/studio-edits/` |

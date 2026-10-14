@@ -18,6 +18,7 @@ import { freeChecksOnly, registerSceneHooks } from './sceneHooks.js'
 import { registerContent } from './content.js'
 import { registerClips } from './clips.js'
 import { registerClone } from './clone.js'
+import { registerRecreate } from './recreate.js'
 import { registerOpenReel } from './openreel.js'
 import { registerChain } from './chain.js'
 import { registerSounds } from './sounds.js'
@@ -201,6 +202,7 @@ export function registerPipelineHooks(): void {
   registerContent()
   registerClips()
   registerClone()
+  registerRecreate()
   registerOpenReel()
   registerChain()
   registerSounds()
