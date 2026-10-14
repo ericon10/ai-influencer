@@ -1269,3 +1269,66 @@ new pages or sidebar items; one new Library tab (Sounds).
   address opens the editor. On a phone the Finish step offers the preview,
   Trim start and end, and Export. A post edited in the editor exports from
   the editor (Done) until the worker renders timelines itself (phase D).
+
+### G30. Editor phase B: presets on the timeline (overnight run, 2026-10-14)
+
+- **What shipped:** the editor's Presets tab (the default tab in the
+  Studio) holds 28 presets in five groups, each a card with a moving
+  thumbnail and one line:
+  - Transitions (land on the nearest cut): crash zoom, whip pan,
+    zoom-through, spin, glitch/RGB split, flash cut, hand over the lens,
+    match cut.
+  - Moments (at the playhead): speed ramp, velocity, snap zoom, punch-in,
+    impact shake, freeze and text pop, record scratch, dolly zoom, slow
+    push in, slow pull out, rewind.
+  - Text (on the caption): karaoke, word-by-word pop, caption slam, text
+    behind her.
+  - Caption looks: white box, outline; both put the caption in the upper
+    third (26 percent down), clear of TikTok's buttons and its own caption.
+  - Layouts: split screen, picture in picture, green-screen reaction.
+- **How each kind maps onto OpenReel:**
+  - Camera presets are adjustment-layer blocks on a "Presets" track. Each
+    block carries its keyframes (time 0 to 1 across the block, so a trim
+    stretches the move) for zoom, move, rotate, blur, streak, RGB split,
+    shake, flash, dark, colour, brightness and vignette, with an easing per
+    key. Subtle, Normal and Strong scale the distance from as-shot (0.55,
+    1, 1.6), never the as-shot frame itself. The math (`cameraAt`) is pure
+    and unit tested in the fork; the worker will mirror it (phase D).
+  - Time presets use OpenReel's speed engine: ramps as speed keyframes,
+    freeze as a held frame, rewind as a reversed split with an RGB hit.
+    The record scratch adds a short desaturated freeze and a scratch sound
+    made in code (`public/studio-sfx/record-scratch.mp3`, no stock audio).
+  - Text presets use OpenReel's own text animations, behind-subject text
+    and karaoke subtitles. Layouts use clip transforms and crops; the green
+    screen moves her to an Overlay track with the person cutout on.
+- **A block is editable like any clip:** drag to move, drag an edge to trim
+  (snapping to cuts, beats, markers, the playhead and zero; a transition
+  snaps by its centre, the cut), each gesture one undo step. Clicking it
+  opens its panel: Subtle/Normal/Strong, start and length, the keyframe
+  table (add a key at the playhead, remove one, Reset), Delete. Delete or
+  Backspace removes the selected block.
+- **Suggested spots:** the manifest sends the payoff (the post's own, else
+  2 s before the end) as a spot. It shows as a marker on the timeline and
+  as a button in the Presets tab; one click moves the playhead there, a
+  second click places the preset. Nothing is placed without a click.
+- **Format as a template:** each edit style in `config/edits.yaml` names
+  its editor preset (`preset:`). A post whose Idea step Format is set gets
+  that preset placed once, at the payoff, the first time the editor opens
+  (no saved timeline yet). Seamless loop has no preset yet (null).
+- **Track order (a fix found in the export check):** OpenReel paints the
+  top track last. The Studio's caption track was being added under the
+  video, so the caption was hidden in the preview and the export. Now the
+  order is captions, Presets, footage, audio, and a preset moves only the
+  tracks below its own track, so the caption stays still and readable over
+  a zoom. Saved timelines from phase A are reordered when they open.
+- **OpenReel's own Export button is hidden in the embed:** Done is the one
+  way to export, so the video always lands on the post.
+- **Measured (browser test, local, mock data):** Payoff spot, Snap zoom,
+  open the block, Strong, Close, Outline look, Done: 7 clicks, back on the
+  Finish step in 14 s with no page errors. The exported MP4 shows the
+  caption in the upper third at 1 s, the footage zoomed under a still
+  caption at 4.5 s, and as-shot again at 5.5 s.
+- **Not yet:** nine presets share a near thumbnail (zoom-through, flash
+  cut, match cut, push in, pull out, rewind, caption slam, the two caption
+  looks, picture in picture). Their own thumbnails come from the worker's
+  preset renderer in phase D, rendered from the same keys.

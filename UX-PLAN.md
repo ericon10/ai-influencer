@@ -470,4 +470,11 @@ JSON, with each video's clip and caption swapped in.
 
 The video-post flow stays at **8** clicks to an exported MP4 without the
 editor (the Studio's own render of the timeline). With the editor and one
-preset: **+3** (Open the editor, place the preset, Done).
+preset: **+3** (Open the editor, place the preset, Done), **+4** when the
+preset goes on a suggested spot (one more click moves the playhead there).
+Measured in phase B: spot, preset, Strong and an Outline caption look, then
+Done, is 7 clicks inside the editor.
+
+**Track order.** Top to bottom: captions, Presets, footage, audio. A
+preset moves only what is below its track, so captions stay still and
+readable over a zoom or a shake.

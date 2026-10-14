@@ -6,7 +6,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createHarness, drain, type Harness } from '../testing/harness.js'
 import { registerPipelineHooks } from './hooks.js'
 import { importCharacter } from './files.js'
-import { createContent, getContent, type ContentOutputs, type MemeSpec } from './content.js'
+import { createContent, getContent, updateContent, type ContentOutputs, type MemeSpec } from './content.js'
 import { addClip } from './clips.js'
 import { editorManifest, saveFromEditor } from './openreel.js'
 import { renderPlaceholderPortrait } from '../providers/mock.js'
@@ -61,6 +61,24 @@ describe('the editor manifest', () => {
     expect(m.duration).toBeGreaterThan(3.5)
     expect(m.captions).toEqual([{ text: 'when the drop finally hits', start: 0, end: null }])
     expect(m.project).toBeNull()
+  })
+
+  it('suggests the payoff as a spot, and places the Idea step\'s Format once, as an editor preset', async () => {
+    const plain = await editorManifest(h.deps, h.ctx, postId)
+    expect(plain.suggestions).toHaveLength(1)
+    expect(plain.suggestions[0]!.label).toBe('Payoff')
+    expect(plain.suggestions[0]!.time).toBeCloseTo(plain.duration - h.deps.config.pipeline.edits.payoff_from_end, 1)
+    expect(plain.format).toBeNull()
+    const styled = (await createContent(h.deps, h.ctx, { kind: 'meme', characterId, spec: { clipId, caption: 'zoom', edit: { style: 'zoom_reveal', strength: 'strong', payoff: 1.5 } } })).id
+    const m = await editorManifest(h.deps, h.ctx, styled)
+    expect(m.format).toEqual({ preset: 'pull_out', strength: 'strong' })
+    expect(m.suggestions[0]!.time).toBe(1.5)
+    // A style with no matching preset places nothing.
+    await updateContent(h.deps, h.ctx, styled, { spec: { clipId, caption: 'zoom', edit: { style: 'seamless_loop' } } })
+    expect((await editorManifest(h.deps, h.ctx, styled)).format).toBeNull()
+    // Every preset the yaml names is one the editor has (the fork's list).
+    const known = ['crash_zoom', 'whip_pan', 'zoom_through', 'spin', 'glitch', 'flash_cut', 'hand_lens', 'match_cut', 'speed_ramp', 'velocity', 'snap_zoom', 'punch_in', 'shake', 'freeze_pop', 'record_scratch', 'dolly_zoom', 'push_in', 'pull_out', 'rewind', 'karaoke', 'word_pop', 'caption_slam', 'text_behind', 'look_box', 'look_outline', 'split_screen', 'pip', 'green_screen']
+    for (const st of h.deps.config.pipeline.edits.styles) if (st.preset) expect(known, st.id).toContain(st.preset)
   })
 
   it('opens video posts only, and says so', async () => {

@@ -297,6 +297,8 @@ const editsSchema = z.object({
     variants: z.array(z.object({ id: z.string(), label: z.string() })).optional(),
     // Default text (the record scratch's line).
     text: z.string().optional(),
+    // The editor preset the Idea step's Format places on first open (G29).
+    preset: z.string().nullable().default(null),
   })).min(1),
 })
 

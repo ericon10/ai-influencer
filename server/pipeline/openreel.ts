@@ -67,7 +67,15 @@ export async function editorManifest(deps: Deps, ctx: Ctx, contentId: string) {
     known.add(assetId)
     media.push({ id: assetId, name: asset.label || assetId, kind: asset.kind === 'audio' ? 'audio' : asset.kind === 'image' ? 'image' : 'video', url: assetUrl(assetId), role: 'broll', start: 0, in: 0, out: null })
   }
-  return { post: { id: post.id, title: post.title || s.caption.slice(0, 60) || 'Video post' }, canvas: CANVAS, media, captions, duration, project }
+  // The payoff the video builds to (the post's own, else a little before
+  // the end) as a suggested spot, and the Idea step's Format as the preset
+  // placed on first open.
+  const edits = deps.config.pipeline.edits
+  const payoff = Math.max(0, Math.min(duration, s.edit.payoff ?? duration - edits.payoff_from_end))
+  const suggestions = duration > 1 ? [{ label: 'Payoff', time: Math.round(payoff * 100) / 100, why: 'The moment the video builds to. Good for a speed ramp, a freeze or a snap zoom.' }] : []
+  const style = edits.styles.find(x => x.id === s.edit.style)
+  const format = !project && style?.preset ? { preset: style.preset, strength: s.edit.strength } : null
+  return { post: { id: post.id, title: post.title || s.caption.slice(0, 60) || 'Video post' }, canvas: CANVAS, media, captions, duration, project, suggestions, format }
 }
 
 const saveBody = z.object({ uploadId: z.string().regex(/^upl_[a-z0-9]{20}$/), project: z.record(z.string(), z.unknown()) })

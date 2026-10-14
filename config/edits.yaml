@@ -17,8 +17,11 @@ payoff_from_end: 2
 # priced Upscale 2x and Generate a take come after it, as usual.
 closeup: { share: 0.42 }
 
+# preset: the editor preset (OpenReel fork, G29) the Idea step's Format
+# places on the post's timeline on first open; null when none matches.
 styles:
   - id: crash_zoom
+    preset: crash_zoom
     stage: transition
     label: Crash zoom cut
     line: The end of shot A rushes into her face, then a hard cut to a close-up.
@@ -33,6 +36,7 @@ styles:
       strong: { seconds: 0.8, zoom: 3.4 }
 
   - id: speed_ramp
+    preset: speed_ramp
     stage: time
     label: Speed ramp to slow motion
     line: The payoff slows to a smooth slow motion, then snaps back.
@@ -46,6 +50,7 @@ styles:
       strong: { seconds: 1.2, speed: 0.3, smooth: 0 }
 
   - id: punch_in
+    preset: punch_in
     stage: camera
     label: Punch-in on the beat
     line: Quick zoom punches land on the beat of your music (every second without music).
@@ -57,6 +62,7 @@ styles:
       strong: { zoom: 1.22, every: 0.5 }
 
   - id: freeze_pop
+    preset: freeze_pop
     stage: time
     label: Freeze frame and caption pop
     line: The payoff freezes for a beat while a caption pops in the middle.
@@ -68,6 +74,7 @@ styles:
       strong: { seconds: 1.5 }
 
   - id: flash_shake
+    preset: shake
     stage: hit
     label: Flash and impact shake
     line: A white flash and a short camera shake hit on the first cut, or where you place it.
@@ -79,6 +86,7 @@ styles:
       strong: { flash: 0.18, shake: 30, seconds: 0.5 }
 
   - id: seamless_loop
+    preset: null
     stage: loop
     label: Seamless loop
     line: Ends on the frame closest to the first, so the video loops without a visible jump.
@@ -90,6 +98,7 @@ styles:
       strong: { min_share: 0.45 }
 
   - id: word_pop
+    preset: word_pop
     stage: text
     label: Word-by-word text pop
     line: The caption appears one word at a time, each word popping in.
@@ -101,6 +110,7 @@ styles:
       strong: { per_word: 0.22, pop: 1.14 }
 
   - id: whip_pan
+    preset: whip_pan
     stage: transition
     label: Whip pan transition
     line: Shot A whips away and shot B whips in, joined by a hard cut inside the blur.
@@ -115,6 +125,7 @@ styles:
       strong: { seconds: 0.2, shift: 0.42, blur: 60 }
 
   - id: hand_lens
+    preset: hand_lens
     stage: transition
     label: Hand over the lens
     line: Her hand covers the lens, and the new shot starts as it pulls away (an outfit change).
@@ -129,6 +140,7 @@ styles:
       strong: { search: 1.2, dip: 0.25 }
 
   - id: zoom_reveal
+    preset: pull_out
     stage: camera
     label: Zoom-out reveal
     line: Starts tight on her face and pulls back fast to reveal the whole scene.
@@ -141,6 +153,7 @@ styles:
 
   # Edit pack 2 (overnight run, 2026-10-14).
   - id: velocity
+    preset: velocity
     stage: time
     label: Velocity edit
     line: Fast, then slow motion right on the beat, then fast again, all through the clip.
@@ -152,6 +165,7 @@ styles:
       strong: { fast: 2.5, slow: 0.3, window: 0.6, every: 0.8 }
 
   - id: text_behind
+    preset: text_behind
     stage: text
     label: Text behind subject
     line: The caption sits behind her and in front of the room, big and bold.
@@ -164,6 +178,7 @@ styles:
       strong: { size: 2.8 }
 
   - id: karaoke
+    preset: karaoke
     stage: text
     label: Karaoke captions
     line: The whole caption shows and each word lights up in time, like karaoke.
@@ -175,6 +190,7 @@ styles:
       strong: { pill: 1, pop: 1.12 }
 
   - id: split_screen
+    preset: split_screen
     stage: layout
     label: Split screen or duet
     line: Shot A and shot B play at once, stacked or side by side (before and after, or her reacting).
@@ -192,6 +208,7 @@ styles:
       strong: { gap: 18 }
 
   - id: green_screen
+    preset: green_screen
     stage: layout
     label: Green-screen reaction
     line: Her clip over a screenshot, a post or your B-roll, cut out and placed at the bottom.
@@ -204,6 +221,7 @@ styles:
       strong: { scale: 0.85 }
 
   - id: glitch
+    preset: glitch
     stage: hit
     label: Glitch hit
     line: An RGB split, sideways jumps and noise for a split second on the cut or the payoff.
@@ -215,6 +233,7 @@ styles:
       strong: { seconds: 0.5, shift: 28 }
 
   - id: spin
+    preset: spin
     stage: transition
     label: Zoom-rotate spin
     line: Shot A spins away as it zooms in, and shot B spins in and settles.
@@ -229,6 +248,7 @@ styles:
       strong: { seconds: 0.35, angle: 140, zoom: 1.6 }
 
   - id: dolly_zoom
+    preset: dolly_zoom
     stage: camera
     label: Dolly zoom (vertigo)
     line: On the reveal she stays the same size while the room behind her pushes in.
@@ -241,6 +261,7 @@ styles:
       strong: { seconds: 2, zoom: 1.6 }
 
   - id: record_scratch
+    preset: record_scratch
     stage: time
     label: Record-scratch freeze
     line: A record scratch, the frame freezes and drains of color, and the caption says how she got here.
@@ -253,6 +274,7 @@ styles:
       strong: { seconds: 2.8, color: 0, zoom: 1.12 }
 
   - id: snap_zoom
+    preset: snap_zoom
     stage: camera
     label: Snap zoom
     line: Two instant punch-ins on her reaction, then back out.

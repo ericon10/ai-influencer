@@ -61,3 +61,12 @@ rule.
 - Split screen: a "reaction" layout (her small in a corner over shot A).
 - The green screen in batches (one background per video).
 - A person mask cache per clip, so a re-export skips making it again.
+
+## Editor (OpenReel)
+
+- Own moving thumbnails for the nine presets that share one (rendered by
+  the worker's preset renderer from the same keys).
+- Drag a preset card straight onto the timeline (today: click places it at
+  the playhead).
+- More suggested spots: a reaction peak (face motion) and the loudest beat.
+- Seamless loop as a preset (trim to the frame closest to the first).

@@ -282,7 +282,7 @@ export const GUIDE: GuideSection[] = [
     intro: 'The Timeline lays the post out from the steps above: its shots, B-roll and captions. Open the editor to place edits exactly where you want them on that timeline (OpenReel, full screen): drop a preset at the playhead, drag it, trim it, set Subtle, Normal or Strong. Done in the editor exports the video, saves it here with the timeline, and brings you back. Without the editor, Export MP4 renders the timeline on the Studio\'s own worker, for free. A slideshow exports JPEG slides; a batch exports every video and a zip.',
     steps: [
       'Check the Timeline: the shots and captions the Studio laid out for you.',
-      'Open the editor (best on a computer): place presets where you want them (a crash zoom, a speed ramp, karaoke captions and more), trim and move shots, retime captions, add music. Press Done: it exports, saves to the post and comes back here.',
+      'Open the editor (best on a computer): click a suggested spot (the payoff) or move the playhead, then click a preset (a crash zoom, a speed ramp, karaoke captions and more). Drag or trim its block; click it for Subtle, Normal or Strong and its keyframes. Press Done: it exports, saves to the post and comes back here.',
       'Pick the sound: Room tone (the default), a recording you uploaded, or None; add a music track you uploaded if you like. Music dips under the clip\'s own sound.',
       'Or press Export MP4 (it shows what is still missing if anything is). On a phone: Trim start and end, then Export MP4.',
       'Download MP4.',
