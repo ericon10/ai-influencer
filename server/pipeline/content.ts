@@ -21,6 +21,7 @@ import { soundFile } from './sounds.js'
 import { EDIT_IDS } from '../config/pipeline.js'
 import { applyEdit, DEFAULT_FACE, detectBeats, mapTime, overlayBehind, type EditStyle } from '../media/edits.js'
 import { personMaskVideo, segmentAvailable } from '../media/segment.js'
+import { normalizeForRender, NORMALIZE_VERSION } from '../media/normalize.js'
 import { makeScratch } from '../media/sound.js'
 import { extractFrameAt } from '../media/frames.js'
 import { withTempDir } from '../media/ffmpeg.js'
@@ -464,16 +465,19 @@ async function renderCut(deps: Deps, ctx: Ctx, job: JobRow, fullCut: Cut, input:
       background = join(dir, `background.${a.row.mime.startsWith('image/') ? 'png' : 'mp4'}`)
       await writeFile(background, a.data)
     }
+    // Every shot is made plain first (one size, square pixels, constant
+    // frame rate, yuv420p, 48 kHz stereo or no sound): the render only ever
+    // sees plain files. A clip's plain copy is kept for the next render.
     for (const [i, sh] of cut.shots.entries()) {
-      const path = join(dir, `shot${i}.mp4`)
       if (sh.kind === 'clip') {
-        const asset = await candidateAsset(deps, ctx, sh.ref, input.characterId, 'video')
-        await writeFile(path, (await readAsset(deps, ctx, asset)).data)
+        const path = await plainClip(deps, ctx, sh.ref, input.characterId, dir, `shot${i}`, input.sound.clipSound)
         shots.push({ path, in: sh.in, out: sh.out, maxSeconds: cfg.meme.max_clip_seconds })
       } else {
         const b = await getBroll(deps, ctx, sh.ref)
         if (b.status !== 'ready' || !b.assetId) throw new AppError('bad_request', `The B-roll clip "${b.title}" is not ready yet.`)
-        await writeFile(path, (await readAsset(deps, ctx, b.assetId)).data)
+        const raw = join(dir, `shot${i}.raw.mp4`), path = join(dir, `shot${i}.mp4`)
+        await writeFile(raw, (await readAsset(deps, ctx, b.assetId)).data)
+        await normalizeForRender(raw, path, { canvas: cfg.canvas, keepSound: false })
         shots.push({ path, in: sh.in, out: sh.out, maxSeconds: cfg.meme.max_broll_seconds })
       }
     }
@@ -523,6 +527,31 @@ async function renderCut(deps: Deps, ctx: Ctx, job: JobRow, fullCut: Cut, input:
     const asset = await saveAsset(deps, ctx, { data: await readFile(out), mime: 'video/mp4', origin: 'derived', label: input.label, sourceJobId: job.id })
     return { assetId: asset.id, dropped, durationSec, editNote, sound: { layers: bed.layers, targetLufs: bed.targetLufs, ducked: bed.ducked } }
   })
+}
+
+// A clip as a plain file for the render (server/media/normalize.ts). The
+// plain copy is saved once per clip (with or without its sound) and reused.
+async function plainClip(deps: Deps, ctx: Ctx, clipId: string, characterId: string, dir: string, name: string, keepSound: boolean): Promise<string> {
+  const assetId = await candidateAsset(deps, ctx, clipId, characterId, 'video')
+  const canvas = deps.config.pipeline.content.canvas
+  const key = `v${NORMALIZE_VERSION}:${canvas.width}x${canvas.height}@${canvas.fps}:${keepSound ? 'sound' : 'silent'}:${assetId}`
+  const [cand] = await deps.db.select().from(candidates).where(and(eq(candidates.accountId, ctx.accountId), eq(candidates.id, clipId)))
+  const meta = (cand?.meta ?? {}) as { plain?: Record<string, string> }
+  const path = join(dir, `${name}.mp4`)
+  const cached = meta.plain?.[key]
+  if (cached) {
+    try { await writeFile(path, (await readAsset(deps, ctx, cached)).data); return path } catch { /* made again below */ }
+  }
+  const raw = join(dir, `${name}.raw`)
+  await writeFile(raw, (await readAsset(deps, ctx, assetId)).data)
+  await normalizeForRender(raw, path, { canvas, keepSound })
+  if (cand) {
+    const saved = await saveAsset(deps, ctx, { data: await readFile(path), mime: 'video/mp4', origin: 'derived', label: `Plain copy of ${clipId} for renders` })
+    // Only the newest plain copy per clip and sound choice is kept in the list.
+    const plain = Object.fromEntries(Object.entries(meta.plain ?? {}).filter(([k]) => !k.endsWith(`:${assetId}`) || k.split(':')[2] !== (keepSound ? 'sound' : 'silent')))
+    await deps.db.update(candidates).set({ meta: { ...meta, plain: { ...plain, [key]: saved.id } } }).where(eq(candidates.id, cand.id))
+  }
+  return path
 }
 
 // One edit on the clean picture (Phase 5). Two-shot edits work on the cut

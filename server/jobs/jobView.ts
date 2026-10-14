@@ -28,8 +28,19 @@ type JobRow = typeof jobs.$inferSelect
 const LOCAL = 'local'
 
 // What a failure means, in plain words; the raw message goes under Details.
-export function explainFailure(message: string | null | undefined): { plain: string; detail: string | null } {
+// Work the worker does itself (a render, a check) never blames a provider.
+export const OUR_SIDE = 'The render failed on our side. Nothing was charged.'
+const TECHNICAL = /ffmpeg|ffprobe|filter|exited with code|invalid argument|errno|stack|\bat \w+ \(|enoent|eacces/i
+
+export function explainFailure(message: string | null | undefined, opts: { local?: boolean } = {}): { plain: string; detail: string | null } {
   const raw = (message ?? '').trim()
+  if (opts.local) {
+    if (!raw) return { plain: OUR_SIDE, detail: null }
+    // Our own plain messages ("Add shot B ...") stay; anything technical
+    // becomes one line, with the detail kept under Details.
+    if (TECHNICAL.test(raw) || raw.length > 160 || /[{}[\]\\]/.test(raw)) return { plain: OUR_SIDE, detail: raw }
+    return { plain: raw, detail: null }
+  }
   if (!raw) return { plain: 'The provider reported a failure without a reason.', detail: null }
   const m = raw.toLowerCase()
   const known: Array<[RegExp, string]> = [
@@ -107,7 +118,7 @@ export async function jobViews(deps: Deps, accountId: string, rows: JobRow[], la
     const ref = `${j.provider}/${j.model}`
     const name = j.provider === LOCAL ? 'the worker' : j.provider === 'mock' ? 'the demo' : modelLabel(deps, ref)
     const failed = phase === 'failed' || phase === 'canceled' || phase === 'needs_attention'
-    const why = failed ? explainFailure((j.error as { message?: string } | null)?.message) : null
+    const why = failed ? explainFailure((j.error as { message?: string } | null)?.message, { local: j.provider === LOCAL }) : null
     const since = (['sent', 'provider_queued', 'generating', 'checking'].includes(phase) ? j.phaseAt : null) ?? j.submittedAt ?? j.createdAt
     const parent = !!(j.request as { parentJobId?: string } | null)?.parentJobId
     return {

@@ -3,7 +3,7 @@ import { CopyPlus, Download, RotateCcw, Scissors } from 'lucide-react'
 import { api, assetUrl, downloadUrl } from '../../api'
 import { AsyncButton, Img, errorMessage, scrollToField, useToast, type TodoItem } from '../../ui'
 import type { BatchSpec, MemeSpec, SlideshowSpec } from '../../types'
-import { DownloadLink, ExportPanel, fileSlug, postName, useDuplicate } from './parts'
+import { DownloadLink, ExportPanel, fileSlug, postName, renderFailure, useDuplicate } from './parts'
 import type { PostCtx } from './ctx'
 import { RoughCut, SoundRow, autoCut } from './RoughCut'
 import { EditStylePicker, editOf } from './EditStyles'
@@ -89,7 +89,7 @@ export function FinishStep({ ctx }: { ctx: PostCtx }) {
                 <span className="st-hint">Free. Only those videos render again.</span>
               </div>
             )}
-            {Object.entries(o.errors ?? {}).filter(([k]) => !o.videos?.[Number(k)]).slice(0, 5).map(([k, msg]) => <span key={k} className="st-hint st-warntext">{msg}</span>)}
+            {Object.entries(o.errors ?? {}).filter(([k]) => !o.videos?.[Number(k)]).slice(0, 5).map(([k, msg]) => <span key={k} className="st-hint st-warntext" title={renderFailure(msg).detail ?? undefined}>Video {Number(k) + 1}: {renderFailure(msg).plain}</span>)}
             <div className="st-content-videos">
               {o.videos!.map((x, i) => x && (
                 <div key={x.assetId} className="st-col" style={{ gap: 6 }}>

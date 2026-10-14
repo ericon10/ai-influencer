@@ -313,10 +313,32 @@ export function ExportPanel({ item, todo, saving, flush, label, onStart, childre
       {!worker.ready && <span className="st-hint st-warntext" role="status">{worker.reason}</span>}
       <RunStatus match={j => j.purpose === `content_render:${item.id}`} pending={starting} />
       <span className="st-hint">Renders on the Studio's worker: no provider, no cost. 9:16, silent unless the clip kept its original sound. {AI_LABEL}</span>
-      {item.status === 'failed' && item.error && <Callout tone="bad">{item.error}</Callout>}
+      {item.status === 'failed' && item.error && (() => {
+        const why = renderFailure(item.error)
+        return (
+          <Callout tone="bad">
+            <div className="st-col" style={{ gap: 6 }}>
+              <span>{why.plain}</span>
+              <div className="st-row" style={{ gap: 8, flexWrap: 'wrap' }}>
+                <button type="button" className="st-btn sm" disabled={starting || rendering || !worker.ready || todo.length > 0} onClick={go}><RotateCcw size={13} />Retry<span className="st-price">Free</span></button>
+              </div>
+              {why.detail && <details><summary className="st-hint">Details</summary><pre className="st-license" style={{ maxHeight: 160 }}>{why.detail}</pre></details>}
+            </div>
+          </Callout>
+        )
+      })()}
       {children}
     </div>
   )
+}
+
+// A failed render in plain words: our own messages stay; anything technical
+// (an ffmpeg error) becomes one line with the detail under Details. Mirrors
+// server/jobs/jobView.ts explainFailure for work done on the worker.
+export function renderFailure(error: string): { plain: string; detail: string | null } {
+  const raw = error.trim()
+  if (/ffmpeg|ffprobe|filter|exited with code|invalid argument|provider reported a failure/i.test(raw) || raw.length > 160 || /[{}[\]\\]/.test(raw)) return { plain: 'The render failed on our side. Nothing was charged.', detail: raw }
+  return { plain: raw, detail: null }
 }
 
 export function DownloadLink({ assetId, name, children }: { assetId: string; name: string; children: ReactNode }) {

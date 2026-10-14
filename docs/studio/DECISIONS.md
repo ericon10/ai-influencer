@@ -1108,3 +1108,37 @@ new pages or sidebar items; one new Library tab (Sounds).
 - **Stacking groundwork:** every edit now has a stage (layout, transition,
   camera, hit, time, loop, text) in the yaml, the order stacked edits run
   in (item 2).
+
+### G27. Every input made plain before a render; worker errors say "our side" (owner bug report, 2026-10-14)
+
+- **The bug:** a video post whose clip was a clone (712x1294, with the
+  source's sound put back) failed on the worker with "Error reinitializing
+  filters! Failed to inject frame into filter network: Invalid argument,
+  stream #1:0", with and without an edit. No video post had rendered in
+  production before it. The worker runs Debian's ffmpeg 5.1, which is
+  stricter than the 6.1 used in development: when one input of a graph
+  that joins several inputs has unusual properties, the graph can fail to
+  start. Synthetic odd sizes, mid-stream size and sound changes, variable
+  frame rates and rotated files all rendered on 5.1 here, so the exact
+  property of that clone file is not known; the fix does not depend on it.
+- **The fix (owner's):** every shot (clips and B-roll) first goes through
+  its own one-input pass: the canvas size (1080x1920) with the renderer's
+  own fit, square pixels, a constant frame rate, yuv420p, and the sound as
+  48 kHz stereo AAC padded to the picture, or none. A one-input chain can
+  rebuild itself when a file changes mid-stream, so the multi-input render
+  only ever sees plain files. A sound track that cannot be read is left
+  out rather than stopping the picture.
+- **Cached per clip:** the plain copy is saved as an asset on the clip's
+  first render and reused (keyed by version, canvas, with or without sound,
+  and the source asset), instead of being made at upload, so clips that
+  are never rendered cost no worker time.
+- **Tests:** odd sizes (712x1294 and 711x1293), full-range color, a size
+  and sound-layout change mid-stream, a variable frame rate, a TikTok-style
+  download (rotation, a cover image stream, 44.1 kHz stereo), and all of
+  them cut together with a caption, run on ffmpeg 6.1 and on 5.1 (the
+  worker's version).
+- **Error copy:** work the worker does itself never says "The provider
+  reported a failure." A technical failure there reads "The render failed
+  on our side. Nothing was charged." with Retry, and the ffmpeg message
+  stays under Details. The Studio's own plain messages ("Add shot B ...")
+  are shown as they are.

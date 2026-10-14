@@ -76,4 +76,11 @@ describe('failures in plain words', () => {
     expect(explainFailure('Something short and clear.')).toEqual({ plain: 'Something short and clear.', detail: null })
     expect(explainFailure('{"weird":"json"}').plain).toBe('The provider reported a failure.')
   })
+
+  it('a render on the worker never blames the provider', () => {
+    const ffmpeg = 'ffmpeg exited with code 1: Error reinitializing filters! | Failed to inject frame into filter network: Invalid argument'
+    expect(explainFailure(ffmpeg, { local: true })).toEqual({ plain: 'The render failed on our side. Nothing was charged.', detail: ffmpeg })
+    expect(explainFailure('Add shot B for the crash zoom cut (Video step).', { local: true }).plain).toMatch(/Add shot B/)
+    expect(explainFailure(ffmpeg).plain).not.toMatch(/our side/)
+  })
 })
