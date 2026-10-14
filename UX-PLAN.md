@@ -634,17 +634,32 @@ drop** (hair color, eye color, piercings, makeup such as winged liner).
 what happens in the clip for the motion prompt. **Outfit**: Keep the
 clip's outfit (default) or Pick hers (one of her stills, or type it).
 
-**Step 3: pick and fix.** Each still shows its face match to REF-00 and
-its likeness to the person in the clip. **Fix this face** on a still
-(price on it) picks it and runs the face pass (2 takes) in one click.
-**You pick** chooses for you.
+**Step 3: stills and the face pass (owner, round 17).** One priced button,
+**Make 4 stills + face pass**: the 4 stills, then the face pass (2 takes)
+on the best one (You pick's choice), both in the one price shown before
+the click. A switch beside it, **Face pass on the best still** (on by
+default; both proven hand runs needed it), skips it: the button then reads
+**Make 4 stills** at the lower price. Each still and face pass shows its
+face match to REF-00, its likeness to the person in the clip, and the
+margin between them. **Fix this face** on any other still (price on it)
+still runs a face pass on that one. **You pick** chooses for you.
 
-**Step 4: the gates (fixed, owner 2026-10-14).** Before any video spend
-the chosen still must match REF-00 (0.363 or more) and look less like the
-person in the clip than 0.36. Otherwise the video button is replaced by
-why ("Face match 0.31, needs 0.36"; "Likeness to the clip's person 0.41,
-must stay under 0.36") and the way on: **Fix the face again** or **Make
-new stills** (each priced). Nothing spends on its own.
+When the plan is not connected, the stills run on GPT Image 2.5 on the API
+(Nano Banana 2.1 is plan-only; the Higgsfield API does not offer it). The
+button then says so: **Make 4 stills (GPT Image 2.5, untested for
+recreates)**.
+
+**Step 4: the gates (fixed, owner 2026-10-14; margin added in round 17).**
+Before any video spend the chosen still must pass three free checks: the
+face matches REF-00 at 0.45 or more; the face match beats the likeness to
+the person in the clip by a clear margin, 0.12 or more; and the likeness
+stays under 0.45. Calibrated on the two proven stills (kitchen: face 0.71,
+likeness 0.26, margin 0.45; rave: 0.54, 0.37, 0.17) and the rave still
+before its face pass, which must fail (0.45, 0.57, margin -0.11).
+Otherwise the video button is replaced by why ("Face match 0.40, needs
+0.45"; "Beats the clip's person by 0.05, needs 0.12") and the way on:
+**Fix the face again** or **Make new stills** (each priced). Nothing
+spends on its own.
 
 **Step 5: the motion model.** A list of choices, each with its price for
 this clip and its billing path (Your Higgsfield plan, credits; or the
@@ -672,13 +687,14 @@ same clip and chips, new stills for the other character). **Batch** (the
 batch post's Video step): up to 20 rows, each a clip and a character with
 its own motion model picker, plus **Set all**; each row shows its price
 and the batch shows the total. Rows run step by step together (stills,
-then the face pass, then the video); a row whose gates fail waits for you
+with the face pass, then the video); a row whose gates fail waits for you
 with the same way on, and the others carry on.
 
 **Spend cap.** A post can carry a credit cap (the link's `cap`, or set in
 Recreate). A step that would pass it is refused before any spend, with
 what it would cost and what is left.
 
-**Clicks, link to finished video:** open the link (0), Make 4 stills (1),
-Fix this face (1), Make the video (1), Use this take (1): **4**. From
-Library > Clips: Use this clip, then the same: **5**.
+**Clicks, link to finished video:** open the link (0), Make 4 stills +
+face pass (1), Make the video (1), Use this take (1): **3**. From
+Library > Clips: Use this clip, then the same: **4**. From the Idea step:
+the choice and the file, then the same: **5**.

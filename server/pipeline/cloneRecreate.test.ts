@@ -9,7 +9,7 @@ import { registerPipelineHooks } from './hooks.js'
 import { estimateAction, runAction, type StudioAction } from './actions.js'
 import { importCharacter } from './files.js'
 import { createContent, getContent, type MemeSpec } from './content.js'
-import { addCloneSource, cloneModel, cloneOptions, cloneStills, pickCloneStill, postClones, readLook, setCloneNotLike, trimClone } from './clone.js'
+import { addCloneSource, bestCloneStill, cloneModel, cloneOptions, cloneStills, pickCloneStill, postClones, readLook, setCloneNotLike, trimClone } from './clone.js'
 import { jobs } from '../db/schema.js'
 import { renderPlaceholderPortrait } from '../providers/mock.js'
 import { makeClip } from '../media/testClips.js'
@@ -89,24 +89,40 @@ describe('the stills, the face pass and the pick', () => {
     expect((await cloneOf()).notLike).toBe('dark brown hair, brown eyes, a nose ring, winged liner')
     await setCloneNotLike(h.deps, h.ctx, postId, 'dark brown hair, brown eyes, a septum piercing, winged liner')
     const { preview, quote } = await run({ type: 'clone_still', contentId: postId, characterId: callie })
-    expect(quote.items).toHaveLength(4)
+    // 4 stills plus the face pass (2 takes) on the best one, in one price.
+    expect(quote.items).toHaveLength(6)
+    expect(preview.title).toMatch(/then the face pass on the best one$/)
     expect(preview.prompts[0]!.text).toContain("She must not have that person's dark brown hair, brown eyes, a septum piercing, winged liner.")
     const reqs = await requests(`clone_still:${postId}:`)
     expect(reqs[0]!.refs![0]!.assetId).toBe((await cloneOf()).rawFrameId)
     // Standard: 1k, like every still (1.5 plan credits for Nano Banana 2.1).
     expect(reqs.map(r => r.resolution)).toEqual(['1k', '1k', '1k', '1k'])
+    // The face pass started on the best still once all four were in.
+    const stills = await cloneStills(h.deps, h.ctx, postId)
+    const best = bestCloneStill(stills, callie, 'still')!
+    const auto = await requests(`clone_face:${postId}:${callie}:auto`)
+    expect(auto).toHaveLength(2)
+    expect(auto.every(r => r.refs![0]!.assetId === best.assetId && (r as { faceOf?: string }).faceOf === best.id)).toBe(true)
+    expect(stills.filter(x => x.pass === 'face' && x.parentId === best.id && !x.error)).toHaveLength(2)
+  }, 120_000)
+
+  it('the face pass can be skipped: then the stills alone, at the lower price', async () => {
+    const { quote, preview } = await run({ type: 'clone_still', contentId: postId, characterId: callie, facePass: false })
+    expect(quote.items).toHaveLength(4)
+    expect(preview.title).not.toMatch(/face pass/)
   }, 120_000)
 
   it('Fix the face: 2 takes on the chosen still, only the face changes', async () => {
     const stills = await cloneStills(h.deps, h.ctx, postId)
-    const chosen = stills.find(x => x.pass === 'still' && !x.error)!
+    // A still the automatic face pass did not take.
+    const chosen = stills.find(x => x.pass === 'still' && !x.error && !stills.some(f => f.parentId === x.id))!
     const { preview } = await run({ type: 'clone_face', contentId: postId, characterId: callie, candidateId: chosen.id })
     expect(preview.prompts[0]!.text).toMatch(/^Change only her face to match Callie \(the person in the other reference images\)/)
     expect(preview.prompts[0]!.text).toMatch(/Keep everything else in the image exactly the same, pixel for pixel/)
-    const face = (await cloneStills(h.deps, h.ctx, postId)).filter(x => x.pass === 'face')
+    const face = (await cloneStills(h.deps, h.ctx, postId)).filter(x => x.pass === 'face' && x.parentId === chosen.id)
     expect(face).toHaveLength(2)
-    expect(face.every(x => x.parentId === chosen.id && !x.kept)).toBe(true)
-    const reqs = await requests(`clone_face:${postId}:`)
+    expect(face.every(x => !x.kept)).toBe(true)
+    const reqs = await requests(`clone_face:${postId}:${callie}:${chosen.id}`)
     expect(reqs[0]!.refs![0]!.assetId).toBe(chosen.assetId)
   }, 120_000)
 

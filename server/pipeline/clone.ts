@@ -6,7 +6,7 @@ import type { Ctx, Deps } from '../context.js'
 import { AppError } from '../lib/errors.js'
 import { newId } from '../lib/ids.js'
 import { registerJobHook, registerLocalJob, type JobOutcome, type JobRow } from '../jobs/hooks.js'
-import { enqueueLocalJob, quoteItemsFor, type JobSpec } from '../jobs/runner.js'
+import { activateChildren, cancelChildren, childJobs, enqueueLocalJob, quoteItemsFor, type JobSpec } from '../jobs/runner.js'
 import { displayPrice } from '../costs/quotes.js'
 import { isVideoOp } from '../core/clips.js'
 import { fill, hardWrap } from '../core/text.js'
@@ -497,7 +497,14 @@ export async function cloneOptions(deps: Deps, ctx: Ctx, contentId: string) {
   const suggest = source?.look?.why ? { mode: source.look.suggest, why: source.look.why } : null
   const mode: CloneMode = suggest?.mode ?? cfg.mode
   return {
-    suggest, takes: { still: cfg.recreate.takes, face: cfg.recreate.face_takes }, gate: cfg.recreate.gate,
+    suggest, takes: { still: cfg.recreate.takes, face: cfg.recreate.face_takes }, gate: cfg.recreate.gate, facePass: cfg.recreate.face_pass,
+    // The Recreate stills' model: Nano Banana 2.1 on the plan, or the API
+    // model (untested for recreates) without the plan.
+    stillModel: await (async () => {
+      const onPlan = (await listCredentials(deps.db, ctx.accountId)).some(c => c.provider === ACCOUNT_PROVIDER)
+      const ref = onPlan ? cfg.scene_still.model : cfg.scene_still.api_model
+      return { ref, label: deps.config.models.models.find(m => m.ref === ref)?.label ?? ref, onPlan, note: onPlan ? null : cfg.scene_still.api_note || null }
+    })(),
     cap: source ? { credits: source.capCredits, spent: Math.round(source.spentCredits * 100) / 100 } : null,
     mode, outfit: cfg.outfit, defaults, model: defaults[mode], models, seconds,
     target: source ? cloneTargetWords(deps, source) : deps.config.pipeline.templates.clone.target_main,
@@ -585,24 +592,29 @@ export async function addCloneSpend(deps: Deps, ctx: Ctx, action: { type: string
 
 // ── The gates before any video spend (fixed, owner 2026-10-14) ──────
 
-export interface StillGate { ok: boolean; face: number | null; likeness: number | null; reasons: string[]; note: string | null }
+export interface StillGate { ok: boolean; face: number | null; likeness: number | null; margin: number | null; reasons: string[]; note: string | null }
 
 const two = (n: number) => n.toFixed(2)
 
-// The chosen still must match REF-00 (face_min or more) and look less like
-// the person in the clip than source_max. A still the face checks could
-// not read is held too, unless no face shows in the clip's frame to compare
-// with. Demo stills (the free mock) have no scores and pass, with a note.
-export function gateFor(g: { face_min: number; source_max: number }, still: { status: string; faceScore: number | null; sourceScore: number | null; demo: boolean }): StillGate {
+// The chosen still must match REF-00 (face_min or more), its face match
+// must beat its likeness to the person in the clip by a clear margin, and
+// the likeness must stay under source_max (owner, round 17: two numbers
+// that close let a still pass looking almost as much like the source as
+// like the character). A still the face checks could not read is held too,
+// unless no face shows in the clip's frame to compare with. Demo stills
+// (the free mock) have no scores and pass, with a note.
+export function gateFor(g: { face_min: number; margin: number; source_max: number }, still: { status: string; faceScore: number | null; sourceScore: number | null; demo: boolean }): StillGate {
   const { faceScore: face, sourceScore: likeness } = still
-  if (still.demo) return { ok: true, face, likeness, reasons: [], note: 'Demo mode: the face checks do not run on mock stills.' }
+  const margin = face != null && likeness != null ? Math.round((face - likeness) * 1000) / 1000 : null
+  if (still.demo) return { ok: true, face, likeness, margin, reasons: [], note: 'Demo mode: the face checks do not run on mock stills.' }
   const reasons: string[] = []
   if (still.status === 'qa_failed') reasons.push('It looks like the person in the clip (a new person is a fixed rule).')
   if (face == null) reasons.push('No face to match with REF-00 was found on it.')
   else if (face < g.face_min) reasons.push(`Face match ${two(face)}, needs ${two(g.face_min)} or more.`)
+  if (margin != null && margin < g.margin) reasons.push(`Beats the clip's person by ${two(margin)} (face ${two(face!)}, likeness ${two(likeness!)}), needs ${two(g.margin)} or more.`)
   if (likeness != null && likeness >= g.source_max) reasons.push(`Likeness to the clip's person ${two(likeness)}, must stay under ${two(g.source_max)}.`)
-  const note = likeness == null && !reasons.length ? 'No face showed in the clip\'s frame to compare with.' : null
-  return { ok: !reasons.length, face, likeness, reasons, note }
+  const note = likeness == null && !reasons.length ? 'No face showed in the clip\'s frame to compare with, so the margin was not checked.' : null
+  return { ok: !reasons.length, face, likeness, margin, reasons, note }
 }
 
 async function stillGate(deps: Deps, ctx: Ctx, still: { status: string; jobId: string | null; meta: unknown }): Promise<StillGate> {
@@ -738,7 +750,7 @@ export async function buildClone(deps: Deps, ctx: Ctx, input: CloneInput) {
 
 // ── Recreate from a real clip: the stills (owner, 2026-10-14) ───────
 
-export interface CloneStillInput { contentId: string; characterId: string; outfit?: 'source' | 'hers'; look?: string; takes?: number }
+export interface CloneStillInput { contentId: string; characterId: string; outfit?: 'source' | 'hers'; look?: string; takes?: number; facePass?: boolean; facePassTakes?: number }
 
 // The character's element on the plan (a Higgsfield element named in the
 // character file), used through its placeholder in the prompt.
@@ -831,11 +843,24 @@ export async function buildCloneStill(deps: Deps, ctx: Ctx, input: CloneStillInp
   warnings.push(...lintOrThrow(lintPrompt(rules, prompt, { stage: 'edit', kind: 'image_edit', request: { ...request, model }, switches: sw }), 'Recreate still'))
   for (const w of realism) warnings.push(w)
   if (!notLike) warnings.push(warn('clone-not-like', 'Nothing named to keep away', `Naming the person's traits (hair color, eye color, piercings, makeup) keeps ${row.name}'s face from drifting toward theirs. Optional.`))
+  if (cfg.scene_still.api_note && model === cfg.scene_still.api_model) warnings.push(warn('clone-still-untested', `${entry.label}, ${cfg.scene_still.api_note}`, `Nano Banana 2.1 made the proven recreates and runs only on your Higgsfield plan (the API does not offer it). Without the plan these stills run on ${entry.label}, which has not been proven for a recreate yet. Connect the plan in Settings > Connected accounts to use Nano Banana 2.1.`))
+  const specs: JobSpec[] = Array.from({ length: takes }, (_, v) => ({ type: 'gen' as const, stage: 'edit', purpose: `clone_still:${post.id}:${row.id}`, label: `Still ${v + 1} of ${takes} for ${row.name}`, request: { ...request, seed: v + 1 }, characterId: row.id }))
+  const prompts = [{ label: 'Still prompt', text: prompt, wrapped: hardWrap(prompt) }]
+  // The face pass on the best still, in the same price (owner, round 17):
+  // waiting children of the first still, started on the best one when all
+  // the stills are in, or canceled (hold released) if none is usable.
+  const withFace = input.facePass ?? cfg.recreate.face_pass
+  if (withFace) {
+    const fp = await facePassRun(deps, ctx, { postId: post.id, characterId: row.id, still: 'auto', assetId: frameId, aspect: request.aspect!, takes: input.facePassTakes })
+    for (const sp of fp.specs) specs.push({ ...sp, parentIndex: 0 })
+    prompts.push(...fp.prompts)
+    warnings.push(...fp.warnings)
+  }
   return {
     purpose: `clone_still:${post.id}`,
     characterId: row.id,
-    specs: Array.from({ length: takes }, (_, v) => ({ type: 'gen' as const, stage: 'edit', purpose: `clone_still:${post.id}:${row.id}`, label: `Still ${v + 1} of ${takes} for ${row.name}`, request: { ...request, seed: v + 1 }, characterId: row.id })),
-    preview: { title: `${takes} stills of ${row.name} in "${source.name}"`, prompts: [{ label: 'Still prompt', text: prompt, wrapped: hardWrap(prompt) }], warnings, invalidates: [] as string[] },
+    specs,
+    preview: { title: `${takes} stills of ${row.name} in "${source.name}"${withFace ? ', then the face pass on the best one' : ''}`, prompts, warnings, invalidates: [] as string[] },
   }
 }
 
@@ -847,15 +872,28 @@ export async function buildCloneStill(deps: Deps, ctx: Ctx, input: CloneStillInp
 export async function buildCloneFace(deps: Deps, ctx: Ctx, input: { contentId: string; characterId: string; candidateId: string; takes?: number }) {
   const post = await getContent(deps, ctx, input.contentId)
   readySource(post)
-  const cfg = deps.config.pipeline.content.clone
-  const { templates: t, rules } = deps.config.pipeline
   const still = await getCandidate(deps, ctx, input.candidateId)
   if (still.op !== 'clone_still' || !still.assetId || still.characterId !== input.characterId) throw new AppError('bad_request', 'Pick a finished still of this character.')
   if (still.status === 'qa_failed') throw new AppError('bad_request', 'This still looks like the person in the clip; make new stills instead.')
-  const { row, ch, approved, model, run, entry, element, level } = await stillRun(deps, ctx, input.characterId)
-  const takes = Math.min(Math.max(1, Math.round(input.takes ?? cfg.recreate.face_takes)), 4)
-  const refs = [still.assetId, ...(element ? [] : replaceRefs(deps, approved))]
   const asset = await getAsset(deps, ctx, still.assetId)
+  const fp = await facePassRun(deps, ctx, { postId: post.id, characterId: input.characterId, still: still.id, assetId: still.assetId, aspect: (asset.height ?? 16) >= (asset.width ?? 9) ? '9:16' : '16:9', takes: input.takes })
+  return {
+    purpose: `clone_face:${post.id}`,
+    characterId: input.characterId,
+    specs: fp.specs,
+    preview: { title: `Fix ${fp.name}'s face on a still`, prompts: fp.prompts, warnings: fp.warnings, invalidates: [] as string[] },
+  }
+}
+
+// The face pass request (shared by "Fix this face" and the face pass that
+// follows "Make 4 stills"). `still: 'auto'` is the one after the stills: its
+// image is a placeholder until the best still is known.
+async function facePassRun(deps: Deps, ctx: Ctx, o: { postId: string; characterId: string; still: string; assetId: string; aspect: string; takes?: number }) {
+  const cfg = deps.config.pipeline.content.clone
+  const { templates: t, rules } = deps.config.pipeline
+  const { row, ch, approved, model, run, entry, element, level } = await stillRun(deps, ctx, o.characterId)
+  const takes = Math.min(Math.max(1, Math.round(o.takes ?? cfg.recreate.face_takes)), 4)
+  const refs = [o.assetId, ...(element ? [] : replaceRefs(deps, approved))]
   const pv = pronounVars(ch.pronouns)
   const { face } = faceWords(ch)
   const sw = await ruleSwitches(deps, ctx, row.id)
@@ -863,18 +901,15 @@ export async function buildCloneFace(deps: Deps, ctx: Ctx, input: { contentId: s
   const change = fill(t.clone.face_pass, { ...pv, name: ch.name, face, element: element ? ` <<<${element.externalId}>>>` : t.clone.recreate_element_api })
   const prompt = buildEditPrompt(t, `${change} ${fill(t.scene.adult, pv)}`, ch, false, { warnings: realism, flawDose: sw.on('realism-flaw-dose') })
   const request: GenRequest = {
-    kind: 'image_edit', model: run.model, modelRef: model, prompt, aspect: (asset.height ?? 16) >= (asset.width ?? 9) ? '9:16' : '16:9', quality: level.quality, resolution: level.resolution,
+    kind: 'image_edit', model: run.model, modelRef: model, prompt, aspect: o.aspect, quality: level.quality, resolution: level.resolution,
     refs: refs.slice(0, entry.max_refs).map(assetId => ({ assetId })),
     ...(run.billing ? { billing: run.billing } : {}),
   }
   const warnings = lintOrThrow(lintPrompt(rules, prompt, { stage: 'edit', kind: 'image_edit', request: { ...request, model }, switches: sw }), 'Face pass')
   for (const w of realism) warnings.push(w)
-  return {
-    purpose: `clone_face:${post.id}`,
-    characterId: row.id,
-    specs: Array.from({ length: takes }, (_, v) => ({ type: 'gen' as const, stage: 'edit', purpose: `clone_face:${post.id}:${row.id}:${still.id}`, label: `Face pass ${v + 1} of ${takes} for ${row.name}`, request: { ...request, seed: v + 1 }, characterId: row.id })),
-    preview: { title: `Fix ${row.name}'s face on a still`, prompts: [{ label: 'Face pass prompt', text: prompt, wrapped: hardWrap(prompt) }], warnings, invalidates: [] as string[] },
-  }
+  const auto = o.still === 'auto'
+  const specs: JobSpec[] = Array.from({ length: takes }, (_, v) => ({ type: 'gen' as const, stage: 'edit', purpose: `clone_face:${o.postId}:${row.id}:${o.still}`, label: `Face pass ${v + 1} of ${takes} for ${row.name}${auto ? ' (on the best still)' : ''}`, request: { ...request, seed: v + 1 }, characterId: row.id }))
+  return { name: row.name, specs, prompts: [{ label: auto ? 'Face pass prompt (on the best still)' : 'Face pass prompt', text: prompt, wrapped: hardWrap(prompt) }], warnings }
 }
 
 // "Read them for me": Claude reads the person in the clip's frame for the
@@ -950,9 +985,11 @@ export async function setCloneNotLike(deps: Deps, ctx: Ctx, contentId: string, t
 // A still or a face pass (clone_face:post:character:still) lands: the free
 // checks, with their scores kept for "You pick".
 async function onCloneStill(deps: Deps, ctx: Ctx, job: JobRow, out: JobOutcome): Promise<void> {
-  const [kind, postId, , parentId] = job.purpose.split(':') as [string, string, string, string | undefined]
+  const [kind, postId, , part] = job.purpose.split(':') as [string, string, string, string | undefined]
   const face = kind === 'clone_face'
   const req = job.request as GenRequest
+  // The face pass after "Make 4 stills" learns its still when it starts.
+  const parentId = part === 'auto' ? (req as { faceOf?: string }).faceOf : part
   const characterId = job.characterId!
   const post = await getContent(deps, ctx, postId).catch(() => null)
   const source = post ? cloneOf(post) : null
@@ -960,6 +997,7 @@ async function onCloneStill(deps: Deps, ctx: Ctx, job: JobRow, out: JobOutcome):
   const asset = out.assets?.find(a => a.kind === 'image') ?? out.assets?.[0]
   if (out.status !== 'completed' || !asset) {
     await deps.db.insert(candidates).values({ ...base, id: newId('cand'), status: 'failed', rejectNote: out.error || 'The scene still did not finish.' })
+    if (!face) await startAutoFace(deps, ctx, job, postId, characterId)
     return
   }
   // Free checks: the face against REF-00, and that it is not the person
@@ -996,6 +1034,33 @@ async function onCloneStill(deps: Deps, ctx: Ctx, job: JobRow, out: JobOutcome):
   if (now && !face && status === 'approved' && !now.stills[characterId] && now.firstFrameId === source?.firstFrameId) {
     await updateContent(deps, ctx, postId, { spec: { clone: { ...now, stills: { ...now.stills, [characterId]: id } } } })
   }
+  if (!face) await startAutoFace(deps, ctx, job, postId, characterId)
+}
+
+const DONE = new Set(['completed', 'failed', 'canceled', 'needs_attention'])
+
+// The face pass that came with "Make 4 stills" waits as children of the
+// first still. Once every still of that run has landed and been checked,
+// it starts on the best one (You pick's choice), or is canceled with its
+// hold released when none is usable.
+async function startAutoFace(deps: Deps, ctx: Ctx, job: JobRow, postId: string, characterId: string): Promise<void> {
+  if (!job.quoteId) return
+  const run = await deps.db.select().from(jobs).where(and(eq(jobs.accountId, job.accountId), eq(jobs.quoteId, job.quoteId), eq(jobs.purpose, job.purpose)))
+  let parent: JobRow | null = null
+  for (const r of run) if ((await childJobs(deps, r.id)).some(c => c.status === 'waiting' && c.purpose.endsWith(':auto'))) parent = r
+  if (!parent || run.some(r => !DONE.has(r.status))) return
+  const landed = await deps.db.select({ id: candidates.id }).from(candidates).where(and(eq(candidates.accountId, job.accountId), inArray(candidates.jobId, run.map(r => r.id))))
+  if (landed.length < run.length) return
+  const ids = new Set(landed.map(c => c.id))
+  const best = bestCloneStill((await cloneStills(deps, ctx, postId)).filter(x => ids.has(x.id)), characterId, 'still')
+  if (!best?.assetId) {
+    await cancelChildren(deps, parent.id, 'No still came out usable, so the face pass did not run. Nothing was charged for it.')
+    return
+  }
+  await activateChildren(deps, parent.id, child => {
+    const refs = ((child.request as GenRequest).refs ?? []).slice(1)
+    return { refs: [{ assetId: best.assetId! }, ...refs], faceOf: best.id }
+  })
 }
 
 export interface CloneStillView {

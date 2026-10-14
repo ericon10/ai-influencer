@@ -130,23 +130,38 @@ describe('step 2, the stills and the gates', () => {
 
   it('the stills stay on Nano Banana 2.1 on the plan whenever it is connected, even with the API as the billing default', async () => {
     await saveBilling(h.deps, h.ctx, { default: 'api', creditUsd: 0 })
-    expect((await buildCloneStill(h.deps, h.ctx, { contentId: postId, characterId: callie })).specs[0]!.request.modelRef).toBe('higgsfield/gpt-image-2.5')
+    const off = await buildCloneStill(h.deps, h.ctx, { contentId: postId, characterId: callie })
+    expect((off.specs[0]!.request as GenRequest).modelRef).toBe('higgsfield/gpt-image-2.5')
+    // Without the plan the stills say they are untested for a recreate.
+    expect(off.preview.warnings.find(w => w.ruleId === 'clone-still-untested')).toMatchObject({ title: 'GPT Image 2.5, untested for recreates' })
+    expect((await cloneOptions(h.deps, h.ctx, postId)).stillModel).toEqual({ ref: 'higgsfield/gpt-image-2.5', label: 'GPT Image 2.5', onPlan: false, note: 'untested for recreates' })
     await storeSecret(h.deps, h.ctx, ACCOUNT_PROVIDER, JSON.stringify({ accessToken: 'at-1', refreshToken: 'rt-1', expiresAt: Date.now() + 3600_000, clientId: 'client-1' }), 'Higgsfield account', '')
     try {
-      expect((await buildCloneStill(h.deps, h.ctx, { contentId: postId, characterId: callie })).specs[0]!.request.modelRef).toBe('higgsfield/nano-banana-2.1')
+      const on = await buildCloneStill(h.deps, h.ctx, { contentId: postId, characterId: callie })
+      expect((on.specs[0]!.request as GenRequest).modelRef).toBe('higgsfield/nano-banana-2.1')
+      expect(on.preview.warnings.some(w => w.ruleId === 'clone-still-untested')).toBe(false)
+      expect((await cloneOptions(h.deps, h.ctx, postId)).stillModel).toMatchObject({ label: 'Nano Banana 2.1', onPlan: true, note: null })
     } finally {
       await revokeCredential(h.deps, h.ctx, ACCOUNT_PROVIDER)
     }
   })
 
-  it('the gates: a face match under 0.363 or a likeness of 0.36 or more holds the video, with why', () => {
+  it('the gates: face 0.45 or more, a clear margin over the likeness (0.12), likeness under 0.45; calibrated on the proven stills', () => {
     const g = h.deps.config.pipeline.content.clone.recreate.gate
-    expect(gateFor(g, { status: 'approved', faceScore: 0.31, sourceScore: 0.1, demo: false })).toMatchObject({ ok: false, reasons: ['Face match 0.31, needs 0.36 or more.'] })
-    expect(gateFor(g, { status: 'approved', faceScore: 0.5, sourceScore: 0.41, demo: false })).toMatchObject({ ok: false, reasons: ["Likeness to the clip's person 0.41, must stay under 0.36."] })
-    expect(gateFor(g, { status: 'approved', faceScore: null, sourceScore: null, demo: false }).ok).toBe(false)
-    expect(gateFor(g, { status: 'qa_failed', faceScore: 0.5, sourceScore: 0.2, demo: false }).ok).toBe(false)
-    expect(gateFor(g, { status: 'approved', faceScore: 0.5, sourceScore: 0.2, demo: false })).toMatchObject({ ok: true, reasons: [] })
-    expect(gateFor(g, { status: 'approved', faceScore: 0.5, sourceScore: null, demo: false })).toMatchObject({ ok: true, note: "No face showed in the clip's frame to compare with." })
+    expect(g).toEqual({ face_min: 0.45, margin: 0.12, source_max: 0.45 })
+    const gate = (faceScore: number | null, sourceScore: number | null, status = 'approved') => gateFor(g, { status, faceScore, sourceScore, demo: false })
+    // The owner's two proven stills against REF-00 and their source frames
+    // (scored with the Studio's matcher, round 17): both pass.
+    expect(gate(0.711, 0.263)).toMatchObject({ ok: true, margin: 0.448 })
+    expect(gate(0.537, 0.37)).toMatchObject({ ok: true, margin: 0.167 })
+    // The rave still before its face pass looks more like the clip's person.
+    expect(gate(0.454, 0.568)).toMatchObject({ ok: false, reasons: ["Beats the clip's person by -0.11 (face 0.45, likeness 0.57), needs 0.12 or more.", "Likeness to the clip's person 0.57, must stay under 0.45."] })
+    // Close numbers no longer pass: 0.50 against 0.40 is only 0.10 apart.
+    expect(gate(0.5, 0.4)).toMatchObject({ ok: false, reasons: ["Beats the clip's person by 0.10 (face 0.50, likeness 0.40), needs 0.12 or more."] })
+    expect(gate(0.41, 0.1)).toMatchObject({ ok: false, reasons: ['Face match 0.41, needs 0.45 or more.'] })
+    expect(gate(null, null).ok).toBe(false)
+    expect(gate(0.6, 0.2, 'qa_failed').ok).toBe(false)
+    expect(gate(0.6, null)).toMatchObject({ ok: true, margin: null, note: "No face showed in the clip's frame to compare with, so the margin was not checked." })
   })
 
   it('no video spend past a failing gate: the estimate is refused with the reason and the way on', async () => {
@@ -154,9 +169,9 @@ describe('step 2, the stills and the gates', () => {
     // A still as if it ran live, with its scores from the free checks.
     const [cand] = await h.deps.db.select().from(candidates).where(eq(candidates.id, still.id))
     await h.deps.db.update(jobs).set({ provider: 'higgsfield' }).where(eq(jobs.id, cand!.jobId!))
-    await h.deps.db.update(candidates).set({ meta: { pass: 'still', faceScore: 0.3, sourceScore: 0.2 } }).where(eq(candidates.id, still.id))
+    await h.deps.db.update(candidates).set({ meta: { pass: 'still', faceScore: 0.4, sourceScore: 0.2 } }).where(eq(candidates.id, still.id))
     const action: StudioAction = { type: 'clone', contentId: postId, characterIds: [callie], mode: 'motion', model: 'higgsfield/genjutsu-motion-control', looks: {}, keepSound: false, stills: { [callie]: still.id } }
-    await expect(estimateAction(h.deps, h.ctx, action)).rejects.toThrow(/Face match 0\.30, needs 0\.36 or more\. Fix the face again or make new stills\./)
+    await expect(estimateAction(h.deps, h.ctx, action)).rejects.toThrow(/Face match 0\.40, needs 0\.45 or more\. Fix the face again or make new stills\./)
     expect((await cloneStills(h.deps, h.ctx, postId)).find(x => x.id === still.id)!.gate.ok).toBe(false)
     await h.deps.db.update(candidates).set({ meta: { pass: 'still', faceScore: 0.52, sourceScore: 0.18 } }).where(eq(candidates.id, still.id))
     const { preview } = await estimateAction(h.deps, h.ctx, action)
@@ -244,10 +259,12 @@ describe('the credit cap, the ways in and scale', () => {
     view = await recreateBatch(h.deps, h.ctx, batch.id)
     expect(view.rows.map(r => r.modelLabel)).toEqual(['Wan 3.0 Prime', 'Kling 3.0 Motion Control'])
     const { quote, preview } = await run({ type: 'recreate_batch', contentId: batch.id, step: 'stills' })
-    expect(quote.items).toHaveLength(8)
+    // 4 stills and the face pass (2 takes) per row.
+    expect(quote.items).toHaveLength(12)
     expect(preview.title).toBe('Stills for 2 of 2 rows')
     view = await recreateBatch(h.deps, h.ctx, batch.id)
-    expect(view.rows.map(r => r.next)).toEqual(['face', 'face'])
+    expect(view.rows.map(r => r.next)).toEqual(['video', 'video'])
+    expect(view.rows.every(r => r.faces === 2)).toBe(true)
     await expect(setRecreateRows(h.deps, h.ctx, batch.id, { all: 'higgsfield/genjutsu-replace' })).rejects.toThrow(/not one of the motion models/)
     // A row that cannot be priced (no face yet) waits and says why; the
     // other rows still run.

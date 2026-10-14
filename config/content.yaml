@@ -101,18 +101,33 @@ clone:
   scene_still:
     model: higgsfield/nano-banana-2.1
     api_model: higgsfield/gpt-image-2.5
+    # Nano Banana 2.1 is plan-only (the Higgsfield API does not offer it), so
+    # without the plan the stills run on GPT Image 2.5, never proven for a
+    # recreate; its button says so (owner, round 17).
+    api_note: untested for recreates
   # Recreate from a real clip: the frame (seconds in), the takes, and what
   # suggests the route (a dark clip or a lot of movement, read free).
   recreate:
     frame_at: 0.2
     takes: 4
     face_takes: 2
+    # "Make 4 stills" runs the face pass (face_takes) on the best still in
+    # the same price, unless skipped (owner, round 17: both proven hand runs
+    # needed it).
+    face_pass: true
     dark_luma: 70
     busy_motion: 14
-    # The gates before any video spend (fixed, owner 2026-10-14): the chosen
-    # still matches REF-00 at face_min or more and looks less like the
-    # person in the clip than source_max.
-    gate: { face_min: 0.363, source_max: 0.36 }
+    # The gates before any video spend (fixed, owner 2026-10-14; margin in
+    # round 17): the chosen still matches REF-00 at face_min or more, the
+    # face match beats its likeness to the person in the clip by margin or
+    # more, and the likeness stays under source_max. Calibrated with the
+    # Studio's matcher on the two proven hand-run stills against REF-00 and
+    # the frame each was made from: kitchen face 0.711, likeness 0.263
+    # (margin 0.448); rave face 0.537, likeness 0.370 (margin 0.167). The
+    # rave still before its face pass must fail: face 0.454, likeness 0.568
+    # (margin -0.114). The old 0.36 cap alone would have blocked the proven
+    # rave still.
+    gate: { face_min: 0.45, margin: 0.12, source_max: 0.45 }
     # The video: 720p, 9:16 for a vertical clip, audio off.
     resolution: 720p
     # The review: the face checked every review_step seconds; text found on

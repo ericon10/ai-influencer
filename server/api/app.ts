@@ -614,7 +614,7 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
     return c.json({ clone: await setCloneChoices(deps, c.get('ctx'), c.req.param('id'), body) })
   })
   // A batch of recreates: its rows, a row added, a row's model or Set all.
-  app.get('/content/:id/recreate-batch', async c => c.json(await recreateBatch(deps, c.get('ctx'), c.req.param('id'))))
+  app.get('/content/:id/recreate-batch', async c => c.json(await recreateBatch(deps, c.get('ctx'), c.req.param('id'), { facePass: c.req.query('facePass') === '0' ? false : c.req.query('facePass') === '1' ? true : undefined })))
   app.post('/content/:id/recreate-rows', async c => {
     const ctx = c.get('ctx')
     requireRole(ctx, 'member')

@@ -55,8 +55,8 @@ export function RecreatePanel({ ctx, source, o, takes }: { ctx: PostCtx; source:
       <Field id="recreate-keep" label="2. What to keep, what to drop" group hint="Read from the frame; every chip is yours to change.">
         <StepTwo ctx={ctx} source={source} />
       </Field>
-      <Field id="recreate-stills" label={`3. ${takes.still} stills of ${name}, then fix the face`} group done={!!keptStill?.gate.ok} hint="Each still shows its face match to REF-00 and its likeness to the person in the clip. Fix this face picks the still and redoes only the face.">
-        <StillsStep ctx={ctx} list={list} kept={kept} takes={takes} picked={picked} />
+      <Field id="recreate-stills" label={`3. ${takes.still} stills of ${name} and the face pass`} group done={!!keptStill?.gate.ok} hint="One price for the stills and the face pass on the best one (switch it off to skip). Each shows its face match to REF-00, its likeness to the person in the clip, and the margin between them. Fix this face redoes only the face on any other still.">
+        <StillsStep ctx={ctx} list={list} kept={kept} takes={takes} picked={picked} opts={o} />
       </Field>
       <Field id="recreate-model" label="5. The motion model" group hint={`The still as the image, the cleaned clip as the motion, 720p, 9:16, audio off. Price for this ${source.durationSec ?? ''} s clip; your last pick is selected.`}>
         <MotionPicker models={motion} picked={picked?.ref ?? null} onPick={pick} loading={!o} />
@@ -185,9 +185,15 @@ function ChipList({ label, items, placeholder, onChange, tone }: { label: string
 
 // Step 3 and 4: the stills with their scores and gates; the face pass in
 // one click; "Make the video" on a still that passes.
-function StillsStep({ ctx, list, kept, takes, picked }: { ctx: PostCtx; list: CloneStill[]; kept: string | null; takes: { still: number; face: number }; picked: CloneModel | null }) {
+function StillsStep({ ctx, list, kept, takes, picked, opts }: { ctx: PostCtx; list: CloneStill[]; kept: string | null; takes: { still: number; face: number }; picked: CloneModel | null; opts: CloneOptions | undefined }) {
   const toast = useToast()
   const qc = useQueryClient()
+  const gateMargin = opts?.gate.margin ?? null
+  // The face pass on the best still rides with the stills, in one price
+  // (owner, round 17); the switch skips it.
+  const [facePass, setFacePass] = useState<boolean>(opts?.facePass ?? true)
+  const untested = opts?.stillModel && !opts.stillModel.onPlan ? `${opts.stillModel.label}, ${opts.stillModel.note ?? 'untested for recreates'}` : null
+  const stillsLabel = `${list.length ? `Make ${takes.still} new stills` : `Make ${takes.still} stills`}${facePass ? ' + face pass' : ''}${untested ? ` (${untested})` : ''}`
   const cid = ctx.item.characterId ?? ''
   const usable = list.filter(x => x.assetId && !x.error)
   async function youPick() {
@@ -213,6 +219,7 @@ function StillsStep({ ctx, list, kept, takes, picked }: { ctx: PostCtx; list: Cl
                 <span className="st-tile-label">{x.pass === 'face' ? 'Face pass' : 'Still'}</span>
                 {x.faceScore != null && <span className="st-badge plain" title="Face match to REF-00 (higher is better)">Face {pct(x.faceScore)}</span>}
                 {x.sourceScore != null && <span className="st-badge plain" title="Likeness to the person in the clip (must stay low)">Clip {pct(x.sourceScore)}</span>}
+                {x.gate.margin != null && <span className={`st-badge ${x.gate.margin >= (gateMargin ?? 0) ? 'plain' : 'bad'}`} title="How much more it looks like her than the person in the clip (face minus clip)">Margin {pct(x.gate.margin)}</span>}
               </div>
               {x.error ? <span className="st-hint" style={{ color: 'var(--st-bad)', padding: '0 4px' }}>{x.error}</span> : <GatePill gate={x.gate} />}
               {x.assetId && !x.error && (
@@ -231,7 +238,11 @@ function StillsStep({ ctx, list, kept, takes, picked }: { ctx: PostCtx; list: Cl
         </div>
       )}
       <div className="st-row" style={{ gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-        <PriceButton label={list.length ? `Make ${takes.still} new stills` : `Make ${takes.still} stills`} variant={list.length ? 'secondary' : 'primary'} action={{ type: 'clone_still', contentId: ctx.item.id, characterId: cid, takes: takes.still }} watch={j => j.purpose === `clone_still:${ctx.item.id}:${cid}`} />
+        <span className="st-row" style={{ gap: 8, alignItems: 'center' }} data-field="recreate-facepass" title={`Runs the face pass (${takes.face} takes) on the best still, in the same price. Both proven hand runs needed it.`}>
+          <button type="button" role="switch" aria-checked={facePass} aria-label="Face pass on the best still" className={`st-switch ${facePass ? 'on' : ''}`} onClick={() => setFacePass(f => !f)}><span /></button>
+          <span className="st-hint">Face pass on the best still{facePass ? '' : ' (skipped)'}</span>
+        </span>
+        <PriceButton label={stillsLabel} variant={list.length ? 'secondary' : 'primary'} action={{ type: 'clone_still', contentId: ctx.item.id, characterId: cid, takes: takes.still, facePass }} watch={j => j.purpose === `clone_still:${ctx.item.id}:${cid}` || j.purpose === `clone_face:${ctx.item.id}:${cid}:auto`} />
         {usable.length > 1 && <AsyncButton className="st-btn sm ghost" onClick={youPick} icon={<Sparkles size={14} />}>You pick</AsyncButton>}
       </div>
     </div>
@@ -461,7 +472,9 @@ export function RecreateBatch({ ctx, onTakes }: { ctx: PostCtx; onTakes: (ids: s
   const qc = useQueryClient()
   const toast = useToast()
   const nav = useNavigate()
-  const view = useQuery({ queryKey: ['recreate-batch', ctx.item.id], queryFn: () => api.recreateBatch(ctx.item.id), refetchInterval: q => (q.state.data?.rows.some(r => r.next === 'preparing') ? 4000 : false) })
+  // The face pass rides with each row's stills unless skipped (owner, round 17).
+  const [facePass, setFacePass] = useState(true)
+  const view = useQuery({ queryKey: ['recreate-batch', ctx.item.id, facePass], queryFn: () => api.recreateBatch(ctx.item.id, facePass), refetchInterval: q => (q.state.data?.rows.some(r => r.next === 'preparing' || r.next === 'working') ? 4000 : false) })
   const options = useQuery({ queryKey: ['clone-options', ctx.item.id, 'batch'], queryFn: () => api.cloneOptions(ctx.item.id), staleTime: 60_000, retry: false })
   const models = (options.data?.models ?? []).filter(m => m.mode === 'motion')
   const rows = view.data?.rows ?? []
@@ -526,7 +539,7 @@ export function RecreateBatch({ ctx, onTakes }: { ctx: PostCtx; onTakes: (ids: s
                     <select className="st-input sm" style={{ width: 'auto' }} aria-label={`Row ${i + 1} motion model`} value={r.model} onChange={e => void setModel({ row: { postId: r.postId, model: e.target.value } })}>
                       {models.map(m => <option key={m.ref} value={m.ref} disabled={!!m.problem}>{m.label} ({m.pathLabel}){m.problem ? `: ${m.problem}` : ''}</option>)}
                     </select>
-                    {p && <span className="st-hint">{p.step === 'stills' ? 'Stills' : p.step === 'face' ? 'Face pass' : 'Video'}: <b>{p.display}</b></span>}
+                    {p && <span className="st-hint">{p.step === 'stills' ? (facePass ? 'Stills + face pass' : 'Stills') : p.step === 'face' ? 'Face pass' : 'Video'}: <b>{p.display}</b></span>}
                     {r.still && <GatePill gate={r.still.gate} />}
                   </div>
                   {r.why && <span className="st-hint" style={{ color: 'var(--st-bad)' }}>{r.why}</span>}
@@ -555,8 +568,14 @@ export function RecreateBatch({ ctx, onTakes }: { ctx: PostCtx; onTakes: (ids: s
       {steps.length > 0 && (
         <div className="st-row" style={{ gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
           {steps.map((st, i) => (
-            <PriceButton key={st} label={`${STEP_LABEL[st]} for ${at(st).length} row${at(st).length === 1 ? '' : 's'}`} variant={i === 0 ? 'primary' : 'secondary'} action={{ type: 'recreate_batch', contentId: ctx.item.id, step: st }} onStarted={refresh} />
+            <PriceButton key={st} label={`${st === 'stills' && facePass ? 'Make stills + face pass' : STEP_LABEL[st]} for ${at(st).length} row${at(st).length === 1 ? '' : 's'}`} variant={i === 0 ? 'primary' : 'secondary'} action={{ type: 'recreate_batch', contentId: ctx.item.id, step: st, ...(st === 'stills' ? { facePass } : {}) }} onStarted={refresh} />
           ))}
+          {steps.includes('stills') && (
+            <span className="st-row" style={{ gap: 8, alignItems: 'center' }}>
+              <button type="button" role="switch" aria-checked={facePass} aria-label="Face pass on each row's best still" className={`st-switch ${facePass ? 'on' : ''}`} onClick={() => setFacePass(f => !f)}><span /></button>
+              <span className="st-hint">Face pass on each row's best still{facePass ? '' : ' (skipped)'}</span>
+            </span>
+          )}
         </div>
       )}
       {rows.length > 0 && <span className="st-hint">{[total('stills') && `Stills: ${total('stills')}`, total('face') && `face pass: ${total('face')}`, total('video') && `videos: ${total('video')}`].filter(Boolean).join(', ') || 'Nothing to run right now'}.{waiting.length ? ` ${waiting.length} row${waiting.length === 1 ? '' : 's'} wait for you; each says why.` : ''}</span>}
@@ -572,4 +591,4 @@ export function RecreateBatch({ ctx, onTakes }: { ctx: PostCtx; onTakes: (ids: s
 
 const STEP_LABEL = { stills: 'Make stills', face: 'Fix faces', video: 'Make videos' } as const
 
-const ROW_NEXT: Record<string, string> = { preparing: 'Preparing the clip', stills: 'Next: stills', face: 'Next: face pass', video: 'Ready for the video', waiting: 'Waits for you', done: 'Take ready', failed: 'Clip failed' }
+const ROW_NEXT: Record<string, string> = { preparing: 'Preparing the clip', working: 'Working on it', stills: 'Next: stills', face: 'Next: face pass', video: 'Ready for the video', waiting: 'Waits for you', done: 'Take ready', failed: 'Clip failed' }

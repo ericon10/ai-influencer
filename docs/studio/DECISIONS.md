@@ -1790,3 +1790,47 @@ person" in the clone panel.
   one priced run per step, rows that cannot run wait and say why.
 - **Spend cap per post** (`cap=`): a step that would pass it is refused
   with what is left; API dollars count at 0.0625 a credit.
+
+### G40. Recreate gate margin, face pass by default, no-plan stills (owner, round 17)
+
+- **Gate margin, calibrated.** The face match to REF-00 (0.363) and the
+  likeness to the clip's person (0.36) were nearly the same number, so a
+  still could pass looking almost as much like the source as like the
+  character. The gate now passes only when: face 0.45 or more; the face
+  match beats the likeness by 0.12 or more; likeness under 0.45
+  (`content.yaml clone.recreate.gate`, fixed rule `recreate-gates`).
+- **Calibration.** Scored with the Studio's own matcher (YuNet and SFace,
+  `server/qa/faces.ts`) against production REF-00 (found byte for byte in
+  the owner's Higgsfield media, checksum match) and the clip frame each
+  still was made from (0.2 s), in a short-lived Vercel Sandbox (the
+  session's network cannot reach the media host):
+
+  | Still | Face | Likeness | Margin | Gate |
+  |---|---|---|---|---|
+  | Kitchen, face pass `8ea5646f` (proven) | 0.711 | 0.263 | 0.448 | passes |
+  | Kitchen, before the face pass `d0db0f08` | 0.762 | 0.239 | 0.523 | passes |
+  | Rave, face pass `ccfd745f` (proven) | 0.537 | 0.370 | 0.167 | passes |
+  | Rave, before the face pass `04c7e0ed` | 0.454 | 0.568 | -0.114 | fails |
+
+  REF-00 against the clip's person: kitchen 0.20, rave 0.18. The proven
+  rave still reads 0.370 on its 0.2 s frame, so the old 0.36 cap alone
+  would have blocked it; its other frames read 0.18 to 0.29 (the 50% and
+  75% frames show no detectable face). The rave still before its face
+  pass is the case the margin exists for: a passing face match (0.45) but
+  more like the source (0.57). Review drift marks keep the standard 0.363
+  (moving frames read lower than a still).
+- **Face pass on by default.** "Make 4 stills + face pass" quotes the 4
+  stills and the face pass (2 takes) together; the face pass jobs wait as
+  children of the first still and start on the best still (You pick's
+  rule) once every still has landed and been checked, or are canceled
+  with their hold released if none is usable. A switch skips it (the
+  lower price). Batches do the same per row.
+- **No-plan stills.** Nano Banana 2.1 is not on the Higgsfield API (the
+  official Model API Reference lists 84 models, none of them Nano Banana;
+  GPT Image 2.5 is there as Marketing Studio Image). Without the plan the
+  Recreate stills run on GPT Image 2.5, and the button says
+  "(GPT Image 2.5, untested for recreates)", with a quote warning.
+- **Real costs of the proven recipe** (plan transactions, 2026-10-14):
+  kitchen, 6 s: 4 stills 6 credits, face pass 3, Genjutsu 42, total 51;
+  Wan 3.0 10.5 and Wan 3.0 Prime 18 on the same still and clip. Rave,
+  10 s: 4 stills 6, face pass 3, Genjutsu 70 (plus 3 for 2 earlier takes).

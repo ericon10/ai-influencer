@@ -1,6 +1,6 @@
 import { readFile, readdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { and, eq } from 'drizzle-orm'
+import { and, eq, inArray, like, or } from 'drizzle-orm'
 import { candidates, characters, jobs } from '../db/schema.js'
 import type { Ctx, Deps } from '../context.js'
 import { AppError } from '../lib/errors.js'
@@ -128,7 +128,7 @@ interface RowState {
   postId: string; characterId: string; characterName: string; name: string; status: string; error: string | null; frameId: string | null; seconds: number | null
   model: string; modelLabel: string; stills: number; faces: number; still: { id: string; assetId: string | null; gate: StillGate } | null
   take: { id: string; assetId: string | null; status: string } | null
-  next: 'preparing' | 'stills' | 'face' | 'video' | 'waiting' | 'done' | 'failed'; why: string | null
+  next: 'preparing' | 'working' | 'stills' | 'face' | 'video' | 'waiting' | 'done' | 'failed'; why: string | null
 }
 
 async function rowState(deps: Deps, ctx: Ctx, row: Row, fallbackModel: string): Promise<RowState | null> {
@@ -155,13 +155,16 @@ async function rowState(deps: Deps, ctx: Ctx, row: Row, fallbackModel: string): 
   if (src.status === 'failed') return { ...base, next: 'failed', why: src.error }
   if (src.status !== 'ready') return { ...base, next: 'preparing', why: null }
   if (take && take.status !== 'failed') return { ...base, next: 'done', why: null }
+  // Stills, a face pass or the video still running (or waiting to start).
+  const busy = await deps.db.select({ id: jobs.id }).from(jobs).where(and(eq(jobs.accountId, ctx.accountId), inArray(jobs.status, ['waiting', 'queued', 'submitting', 'running', 'ingesting']), or(like(jobs.purpose, `clone_still:${post.id}:%`), like(jobs.purpose, `clone_face:${post.id}:%`), like(jobs.purpose, `clone:${post.id}:%`)))).limit(1)
+  if (busy.length) return { ...base, next: 'working', why: null }
   if (!base.stills) return { ...base, next: 'stills', why: null }
   if (!base.faces) return { ...base, next: 'face', why: null }
   if (chosen?.gate.ok) return { ...base, next: 'video', why: null }
   return { ...base, next: 'waiting', why: chosen ? chosen.gate.reasons.join(' ') : 'No still passed the checks yet.' }
 }
 
-export async function recreateBatch(deps: Deps, ctx: Ctx, batchId: string) {
+export async function recreateBatch(deps: Deps, ctx: Ctx, batchId: string, opts: { facePass?: boolean } = {}) {
   const { rows } = await batchOf(deps, ctx, batchId)
   const fallback = await cloneModel(deps, ctx, 'motion')
   const states = (await Promise.all(rows.map(r => rowState(deps, ctx, r, fallback)))).filter((r): r is RowState => !!r)
@@ -171,7 +174,7 @@ export async function recreateBatch(deps: Deps, ctx: Ctx, batchId: string) {
     const step = r.next === 'stills' || r.next === 'face' || r.next === 'video' ? r.next : null
     if (!step) { prices[r.postId] = null; continue }
     try {
-      const built = await rowSpecs(deps, ctx, r, step)
+      const built = await rowSpecs(deps, ctx, r, step, opts.facePass)
       const items = await quoteItemsFor(deps, ctx, built.specs)
       const credits = items.some(i => i.estimate.credits != null) ? items.reduce((s, i) => s + (i.estimate.credits ?? 0), 0) : null
       const micros = items.reduce((s, i) => s + i.estimate.totalMicros, 0)
@@ -187,8 +190,8 @@ export async function recreateBatch(deps: Deps, ctx: Ctx, batchId: string) {
   return { rows: states, prices, max: deps.config.pipeline.content.clone.recreate.batch_max, defaultModel: fallback }
 }
 
-async function rowSpecs(deps: Deps, ctx: Ctx, r: RowState, step: BatchStep) {
-  if (step === 'stills') return buildCloneStill(deps, ctx, { contentId: r.postId, characterId: r.characterId })
+async function rowSpecs(deps: Deps, ctx: Ctx, r: RowState, step: BatchStep, facePass?: boolean) {
+  if (step === 'stills') return buildCloneStill(deps, ctx, { contentId: r.postId, characterId: r.characterId, facePass })
   if (step === 'face') {
     if (!r.still) throw new AppError('bad_request', 'No still to fix yet.')
     return buildCloneFace(deps, ctx, { contentId: r.postId, characterId: r.characterId, candidateId: r.still.id })
@@ -199,9 +202,9 @@ async function rowSpecs(deps: Deps, ctx: Ctx, r: RowState, step: BatchStep) {
 
 // One priced run for every row at the step: rows not there yet, or held by
 // their gates, are listed and left waiting.
-export async function buildRecreateBatch(deps: Deps, ctx: Ctx, input: { contentId: string; step: BatchStep }) {
+export async function buildRecreateBatch(deps: Deps, ctx: Ctx, input: { contentId: string; step: BatchStep; facePass?: boolean }) {
   const { batch } = await batchOf(deps, ctx, input.contentId)
-  const view = await recreateBatch(deps, ctx, batch.id)
+  const view = await recreateBatch(deps, ctx, batch.id, { facePass: input.facePass })
   const specs: JobSpec[] = []
   const prompts: Array<{ label: string; text: string; wrapped: string }> = []
   const warnings: RuleViolation[] = []
@@ -213,7 +216,7 @@ export async function buildRecreateBatch(deps: Deps, ctx: Ctx, input: { contentI
       continue
     }
     try {
-      const built = await rowSpecs(deps, ctx, r, input.step)
+      const built = await rowSpecs(deps, ctx, r, input.step, input.facePass)
       specs.push(...built.specs)
       for (const p of built.preview.prompts) if (!prompts.some(x => x.text === p.text)) prompts.push({ ...p, label: `${label}: ${p.label}` })
       warnings.push(...built.preview.warnings)
@@ -268,6 +271,9 @@ async function runCloneReview(deps: Deps, ctx: Ctx, job: JobRow): Promise<unknow
   const cand = await getCandidate(deps, ctx, candidateId)
   if (!cand.assetId) return { skipped: true }
   const cfg = deps.config.pipeline.content.clone.recreate
+  // Moving frames read lower than a still; drift is the standard face match
+  // (the same bar as scene QA), not the stills' stricter gate.
+  const faceMin = deps.config.pipeline.review.qa.identity_min_similarity
   // The clip it was made from, and whether it ran on the free mock.
   const origin = async (id: string | null): Promise<{ source: string | null; demo: boolean }> => {
     if (!id) return { source: null, demo: false }
@@ -313,7 +319,7 @@ async function runCloneReview(deps: Deps, ctx: Ctx, job: JobRow): Promise<unknow
     const drift: CloneReview['drift'] = []
     if (refFace) {
       for (const s of samples) {
-        const bad = s.face == null || s.face < cfg.gate.face_min
+        const bad = s.face == null || s.face < faceMin
         const last = drift[drift.length - 1]
         if (bad && last && Math.abs(last.end - s.t) < 1e-6) last.end = round2(Math.min(duration, s.t + cfg.review_step))
         else if (bad) drift.push({ start: s.t, end: round2(Math.min(duration, s.t + cfg.review_step)) })
@@ -346,7 +352,7 @@ async function runCloneReview(deps: Deps, ctx: Ctx, job: JobRow): Promise<unknow
       }
     }
     const cuts = await detectCuts(r, cfg.cut_threshold).catch(() => [])
-    return { at: deps.clock.now().toISOString(), duration, step: cfg.review_step, faceMin: cfg.gate.face_min, samples, drift, text, cuts, notes } satisfies CloneReview
+    return { at: deps.clock.now().toISOString(), duration, step: cfg.review_step, faceMin, samples, drift, text, cuts, notes } satisfies CloneReview
   })
   const meta = (cand.meta ?? {}) as Record<string, unknown>
   await deps.db.update(candidates).set({ meta: { ...meta, review }, updatedAt: deps.clock.now() }).where(and(eq(candidates.id, cand.id), eq(candidates.accountId, ctx.accountId)))

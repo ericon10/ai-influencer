@@ -49,9 +49,10 @@ restrictions. Every rule is in exactly one of two buckets
   skin, the REALISM block, banned words, beautify off, the texture
   check, the natural baseline); bare face on hero and sheet;
   characters are 21 or older; no nudity or explicit content; a new
-  person, never a copy of the inspiration face (with Recreate's two
-  face checks before the motion: face 0.363 or more against REF-00,
-  likeness to the clip's person under 0.36); posts labeled as
+  person, never a copy of the inspiration face (with Recreate's face
+  checks before the motion: face 0.45 or more against REF-00, beating
+  the likeness to the clip's person by 0.12 or more, likeness under
+  0.45); posts labeled as
   AI-generated; the price shown before any paid run; budget caps;
   keys server-side only. Fixed rules can
   stop a run and cannot be switched off.

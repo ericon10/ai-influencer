@@ -260,17 +260,17 @@ const contentSchema = z.object({
     motion_model: z.string(),
     outfit: z.enum(['source', 'hers']).default('source'),
     face_refs: z.array(z.string()).min(1).default(['REF-00', 'REF-01', 'REF-02']),
-    scene_still: z.object({ model: z.string(), api_model: z.string() }),
+    scene_still: z.object({ model: z.string(), api_model: z.string(), api_note: z.string().default('') }),
     // Recreate from a real clip (owner, 2026-10-14).
     recreate: z.object({
-      frame_at: z.number().min(0).max(5), takes: z.number().int().min(1).max(4), face_takes: z.number().int().min(1).max(4), dark_luma: z.number(), busy_motion: z.number(),
-      gate: z.object({ face_min: z.number().min(0).max(1), source_max: z.number().min(0).max(1) }).default({ face_min: 0.363, source_max: 0.36 }),
+      frame_at: z.number().min(0).max(5), takes: z.number().int().min(1).max(4), face_takes: z.number().int().min(1).max(4), face_pass: z.boolean().default(true), dark_luma: z.number(), busy_motion: z.number(),
+      gate: z.object({ face_min: z.number().min(0).max(1), margin: z.number().min(0).max(1).default(0.12), source_max: z.number().min(0).max(1) }).default({ face_min: 0.45, margin: 0.12, source_max: 0.45 }),
       resolution: z.string().default('720p'),
       review_step: z.number().positive().default(0.5), ocr_step: z.number().positive().default(1), cut_threshold: z.number().min(0).max(1).default(0.35),
       batch_max: z.number().int().min(1).max(50).default(20),
       credit_usd: z.number().positive().default(0.0625),
     })
-      .default({ frame_at: 0.2, takes: 4, face_takes: 2, dark_luma: 70, busy_motion: 14, gate: { face_min: 0.363, source_max: 0.36 }, resolution: '720p', review_step: 0.5, ocr_step: 1, cut_threshold: 0.35, batch_max: 20, credit_usd: 0.0625 }),
+      .default({ frame_at: 0.2, takes: 4, face_takes: 2, face_pass: true, dark_luma: 70, busy_motion: 14, gate: { face_min: 0.45, margin: 0.12, source_max: 0.45 }, resolution: '720p', review_step: 0.5, ocr_step: 1, cut_threshold: 0.35, batch_max: 20, credit_usd: 0.0625 }),
     models: z.array(z.object({ ref: z.string(), resolution: z.string().optional() })).min(1),
     min_seconds: z.number().positive(),
     max_seconds: z.number().positive(),

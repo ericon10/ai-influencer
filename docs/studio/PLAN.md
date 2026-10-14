@@ -437,6 +437,14 @@ Decisions: `DECISIONS.md` G37 and G38. UX: `UX-PLAN.md` section 15.
 - [ ] E2E on production: kitchen clip, Callie, Genjutsu, 50-credit cap (waits for the owner's approve click)
 - [ ] First paid Wan 3.0, Wan 3.0 Prime and Kling 3.0 Motion Control runs on the API (prices confirmed from provider_estimate)
 
+### Round 17: gate margin, face pass by default (G40)
+
+- [x] Gate margin calibrated on the two proven stills: face 0.45 or more, margin 0.12 or more, likeness under 0.45
+- [x] Face pass on by default with the stills (one price), a switch to skip it; batches too
+- [x] No-plan stills on GPT Image 2.5 say "untested for recreates" on the button
+- [x] Nano Banana 2.1 on the Higgsfield API: not offered (official Model API Reference)
+- [ ] E2E through the Studio: kitchen clip, Callie, Genjutsu, 50-credit cap (waits for the owner's approve click)
+
 ## Roadmap after Phase 4 (owner, 2026-10-13; not started)
 
 SPEC 13.1, R1 to R7: Clone Video (first after Phase 3), Inspo board

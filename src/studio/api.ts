@@ -115,7 +115,7 @@ export const api = {
   recreateFor: (contentId: string, characterId: string) => request<{ id: string }>('POST', `/content/${contentId}/recreate-for`, { characterId }),
   setCloneChoices: (contentId: string, body: { keep?: string[]; notLike?: string; motion?: string; outfit?: { choice?: 'source' | 'hers'; text?: string; lookId?: string | null }; capCredits?: number | null }) => request<{ clone: CloneSource }>('PUT', `/content/${contentId}/clone-choices`, body),
   useCloneTake: (contentId: string, cloneId: string, acknowledge = false) => request<{ ok: true }>('POST', `/content/${contentId}/clones/${cloneId}/use`, { acknowledge }),
-  recreateBatch: (contentId: string) => request<RecreateBatchView>('GET', `/content/${contentId}/recreate-batch`),
+  recreateBatch: (contentId: string, facePass?: boolean) => request<RecreateBatchView>('GET', `/content/${contentId}/recreate-batch${facePass == null ? '' : `?facePass=${facePass ? 1 : 0}`}`),
   addRecreateRow: (contentId: string, body: { character: string; link?: string; assetId?: string; uploadId?: string; name?: string }) => request<{ postId: string }>('POST', `/content/${contentId}/recreate-rows`, body),
   setRecreateRows: (contentId: string, body: { all?: string | null; row?: { postId: string; model: string | null }; remove?: string }) => request<{ ok: true }>('PUT', `/content/${contentId}/recreate-rows`, body),
   clones: (contentId: string) => request<{ clones: CloneResult[] }>('GET', `/content/${contentId}/clones`),

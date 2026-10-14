@@ -44,9 +44,9 @@ rules:
     bucket: fixed
     area: safety
     spec: "13.1"
-    title: Recreate's video waits for its two face checks
+    title: Recreate's video waits for its face checks
     check: { type: code }
-    message: "Recreate from a real clip spends nothing on the motion until the still passes both free checks: the face matches REF-00 (0.363 or more) and it does not look like the person in the clip (under 0.36). A still that fails says why and offers another take. Owner ruling, 2026-10-14. Face drift anywhere else stays a strong warning you decide on."
+    message: "Recreate from a real clip spends nothing on the motion until the still passes the free face checks: the face matches REF-00 (0.45 or more), the face match beats its likeness to the person in the clip by a clear margin (0.12 or more), and the likeness stays under 0.45. Calibrated on the two proven stills. A still that fails says why and offers another take. Owner rulings, 2026-10-14 and round 17. Face drift anywhere else stays a strong warning you decide on."
   - id: ai-label
     bucket: fixed
     area: safety

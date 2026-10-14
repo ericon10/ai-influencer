@@ -1389,39 +1389,55 @@
  },
  "recreate-stills": {
   "w": 1030,
-  "h": 860,
+  "h": 1355,
   "spots": [
    {
     "n": 1,
-    "x": 2.4,
-    "y": 44.6,
-    "w": 15.9,
-    "h": 2.7,
-    "label": "Face and Clip scores: the gate the video needs"
+    "x": 21,
+    "y": 2.7,
+    "w": 18.4,
+    "h": 35.4,
+    "label": "The face pass on the best still, made with the stills"
    },
    {
     "n": 2,
-    "x": 2.2,
-    "y": 56,
-    "w": 17.2,
-    "h": 3.5,
-    "label": "Fix this face: only the face is redone (priced)"
+    "x": 2.4,
+    "y": 28.3,
+    "w": 15.9,
+    "h": 1.7,
+    "label": "The gate: face 0.45+, margin 0.12+, likeness under 0.45"
    },
    {
     "n": 3,
-    "x": 21,
-    "y": 4.3,
-    "w": 18.4,
-    "h": 60.3,
-    "label": "The face pass, with its own scores"
+    "x": 22,
+    "y": 30.5,
+    "w": 17.1,
+    "h": 2.2,
+    "label": "Make the video: only on a still that passes"
    },
    {
     "n": 4,
-    "x": 22,
-    "y": 48.1,
-    "w": 17.1,
-    "h": 3.5,
-    "label": "Make the video: only on a still that passes both checks"
+    "x": 2.2,
+    "y": 30.5,
+    "w": 17.2,
+    "h": 2.2,
+    "label": "Fix this face on any other still (priced)"
+   },
+   {
+    "n": 5,
+    "x": 20.9,
+    "y": 78.3,
+    "w": 54.8,
+    "h": 2.8,
+    "label": "One price: 4 stills and the face pass"
+   },
+   {
+    "n": 6,
+    "x": 1.2,
+    "y": 84.8,
+    "w": 18.9,
+    "h": 1.9,
+    "label": "Switch off to skip the face pass"
    }
   ]
  },
@@ -1525,9 +1541,9 @@
     "n": 4,
     "x": 1.2,
     "y": 87.1,
-    "w": 24.1,
+    "w": 31.6,
     "h": 4.6,
-    "label": "One price for every row at this step"
+    "label": "One price for every row at this step, face pass included"
    }
   ]
  },

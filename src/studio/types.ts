@@ -192,8 +192,8 @@ export type StudioAction =
   | { type: 'content_captions'; characterId: string; contentId: string }
   | { type: 'clone_caption'; characterId: string; contentId: string }
   | { type: 'clone'; contentId: string; characterIds: string[]; model?: string; mode?: CloneMode; background?: 'video' | 'image'; outfit?: 'source' | 'hers'; looks: Record<string, string>; keepSound: boolean; stills?: Record<string, string> }
-  | { type: 'recreate_batch'; contentId: string; step: 'stills' | 'face' | 'video' }
-  | { type: 'clone_still'; contentId: string; characterId: string; outfit?: 'source' | 'hers'; look?: string; takes?: number }
+  | { type: 'recreate_batch'; contentId: string; step: 'stills' | 'face' | 'video'; facePass?: boolean }
+  | { type: 'clone_still'; contentId: string; characterId: string; outfit?: 'source' | 'hers'; look?: string; takes?: number; facePass?: boolean }
   | { type: 'clone_face'; contentId: string; characterId: string; candidateId: string; takes?: number }
   | { type: 'clone_traits'; contentId: string; characterId: string }
   | { type: 'voice_convert'; soundIds: string[] }
@@ -334,7 +334,7 @@ export interface CloneSource {
   keep?: string[]; outfit?: { choice: 'source' | 'hers'; text: string; lookId: string | null }; motion?: string
   capCredits?: number | null; spentCredits?: number; from?: string
 }
-export interface StillGate { ok: boolean; face: number | null; likeness: number | null; reasons: string[]; note: string | null }
+export interface StillGate { ok: boolean; face: number | null; likeness: number | null; margin: number | null; reasons: string[]; note: string | null }
 export interface CloneStill {
   id: string; characterId: string; characterName: string; assetId: string | null; status: string; kept: boolean; error: string | null
   findings: Array<{ code: string; severity: string; message: string }>; createdAt: string
@@ -349,7 +349,7 @@ export interface CloneModel {
   path: 'account' | 'api'; pathLabel: string; note: string; display: string | null; verified: boolean; problem: string | null; takesPrompt: boolean
 }
 export interface CloneOptions {
-  suggest: { mode: CloneMode; why: string } | null; takes: { still: number; face: number }; gate: { face_min: number; source_max: number }; cap: { credits: number | null; spent: number } | null
+  suggest: { mode: CloneMode; why: string } | null; takes: { still: number; face: number }; gate: { face_min: number; margin: number; source_max: number }; facePass: boolean; stillModel: { ref: string; label: string; onPlan: boolean; note: string | null }; cap: { credits: number | null; spent: number } | null
   mode: CloneMode; outfit: 'source' | 'hers'; defaults: Record<CloneMode, string>; target: string; model: string; models: CloneModel[]; seconds: number; maxCharacters: number; keepSound: boolean; minSeconds: number; maxSeconds: number; maxUploadMb: number
 }
 // The review of a take (free, on the worker): the face every half second,
@@ -372,7 +372,7 @@ export interface RecreateRow {
   postId: string; characterId: string; characterName: string; name: string; status: string; error: string | null; frameId: string | null; seconds: number | null
   model: string; modelLabel: string; stills: number; faces: number; still: { id: string; assetId: string | null; gate: StillGate } | null
   take: { id: string; assetId: string | null; status: string } | null
-  next: 'preparing' | 'stills' | 'face' | 'video' | 'waiting' | 'done' | 'failed'; why: string | null
+  next: 'preparing' | 'working' | 'stills' | 'face' | 'video' | 'waiting' | 'done' | 'failed'; why: string | null
 }
 export interface RecreateBatchView {
   rows: RecreateRow[]; max: number; defaultModel: string

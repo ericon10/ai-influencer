@@ -136,8 +136,9 @@ describe('Clone: "Copy the moves into a new scene" never gets a bare sheet image
     const approved = await approvedAssets(h.deps, h.ctx, callie)
     // Recreate from a real clip (owner, 2026-10-14): 4 stills from the frame
     // as uploaded, used only for place, light, angle, framing, pose and
-    // outfit; the person replaced completely; text and logos removed.
-    const { preview } = await run({ type: 'clone_still', contentId: postId, characterId: callie })
+    // outfit; the person replaced completely; text and logos removed. The
+    // face pass that rides with the stills is covered in cloneRecreate.
+    const { preview } = await run({ type: 'clone_still', contentId: postId, characterId: callie, facePass: false })
     const text = preview.prompts[0]!.text
     expect(text).toMatch(/^Use the first image only for the place, the light, the camera angle, the framing, the pose and the outfit\. Replace the main person \(the largest person, closest to the camera\) in it completely with Callie \(the person in the other reference images\)/)
     expect(text).toMatch(/Her hair is long honey-blonde\./)
