@@ -244,6 +244,8 @@ export interface MemeSpec extends BrollTiming {
   clipId: string | null; stillId: string | null; brollId: string | null; caption: string; clone: CloneSource | null
   sound?: Partial<SoundSpec>; cut?: Cut | null; continueFrom?: ContinueFrom | null
   edit?: Partial<EditSpec>; clipB?: string | null; stillB?: string | null; captionStyle?: CaptionStyle | null
+  // The OpenReel editor's saved timeline (G29).
+  editor?: { projectAssetId: string | null; savedAt: string | null } | null
 }
 // Phase 5: Amazing Edits (config/edits.yaml).
 export type EditStyleId = 'crash_zoom' | 'speed_ramp' | 'punch_in' | 'freeze_pop' | 'flash_shake' | 'seamless_loop' | 'word_pop' | 'whip_pan' | 'hand_lens' | 'zoom_reveal'
@@ -298,6 +300,7 @@ export interface ContentOutputs {
   done?: number; failed?: number; total?: number; dropped?: string[]; renderedAt?: string
   durationSec?: number; sound?: { layers: Array<'clip' | 'ambience' | 'music'>; targetLufs: number | null; ducked: boolean }
   errors?: Record<string, string>; zipParts?: Array<{ assetId: string; from: number; to: number }>; editNote?: string | null
+  fromEditor?: boolean
 }
 export interface ContentItem {
   id: string; kind: ContentKind; characterId: string | null; title: string; spec: Record<string, unknown>

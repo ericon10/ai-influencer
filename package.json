@@ -8,7 +8,7 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && node scripts/build-editor.mjs --into dist",
     "preview": "vite preview",
     "dev:api": "tsx watch --clear-screen=false server/dev.ts",
     "studio": "node scripts/studio.mjs",
@@ -21,7 +21,9 @@
     "test:watch": "vitest",
     "lint:text": "tsx scripts/check-no-emdash.ts",
     "check": "npm run typecheck && npm run lint:text && npm run test",
-    "db:generate": "drizzle-kit generate"
+    "db:generate": "drizzle-kit generate",
+    "build:app": "vite build",
+    "build:editor": "node scripts/build-editor.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.133.0",

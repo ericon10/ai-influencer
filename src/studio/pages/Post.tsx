@@ -1,5 +1,5 @@
-import { useState, type ReactNode } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { Archive, ArrowLeft, Check, CopyPlus, Loader2 } from 'lucide-react'
 import { api } from '../api'
@@ -13,7 +13,7 @@ import { VideoStep, videoSummary } from './post/VideoStep'
 import { TextStep, textSummary } from './post/TextStep'
 import { FinishStep } from './post/FinishStep'
 import type { PostCtx } from './post/ctx'
-import { Editor } from './post/Editor'
+import { editorUrl, scrollKey } from './post/EditorCard'
 import { HowTo } from '../guide/Guide'
 import type { GuideId } from '../guide/content'
 
@@ -24,8 +24,9 @@ const STEP_GUIDE: Record<PostStep, GuideId> = { idea: 'post-idea', stills: 'post
 // and those after it stay open, so nothing needs a Next click. Pickers open
 // as drawers; uploads happen in the step that needs them.
 
-// "/studio/posts/:id/edit" is the same workspace with Fine-tune open over
-// it (UX-PLAN.md section 9), so closing it returns to the same spot.
+// "/studio/posts/:id/edit" (the old Fine-tune address) opens the editor.
+// The editor's Back and Done return to "?step=finish": the Finish step,
+// scrolled to where the owner left it (UX-PLAN.md section 12).
 export default function Post({ editing = false }: { editing?: boolean }) {
   const { id = '' } = useParams()
   const content = useContent()
@@ -42,10 +43,14 @@ export default function Post({ editing = false }: { editing?: boolean }) {
       </div>
     )
   }
-  return <Workspace key={item.id} item={item} data={content.data} editing={editing} />
+  if (editing && item.kind === 'meme') {
+    window.location.replace(editorUrl(item.id))
+    return <div className="st-page"><span className="st-hint"><Loader2 size={13} className="st-spin" style={{ verticalAlign: -2 }} /> Opening the editor...</span></div>
+  }
+  return <Workspace key={item.id} item={item} data={content.data} />
 }
 
-function Workspace({ item, data, editing }: { item: ContentItem; data: ContentData; editing: boolean }) {
+function Workspace({ item, data }: { item: ContentItem; data: ContentData }) {
   const nav = useNavigate()
   const toast = useToast()
   const qc = useQueryClient()
@@ -79,6 +84,21 @@ function Workspace({ item, data, editing }: { item: ContentItem; data: ContentDa
       toast({ tone: '', text: 'Post archived. Its stills and clips stay in the Library.' })
     } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) }
   }
+  // Back from the editor: the Finish step, where the owner was.
+  const [params, setParams] = useSearchParams()
+  const returned = useRef(false)
+  useEffect(() => {
+    if (returned.current || params.get('step') !== 'finish') return
+    returned.current = true
+    if (steps.findIndex(([k]) => k === 'finish') > ci) void draft.go('finish')
+    let y = NaN
+    try { y = Number(sessionStorage.getItem(scrollKey(item.id)) ?? NaN); sessionStorage.removeItem(scrollKey(item.id)) } catch { /* private window */ }
+    window.setTimeout(() => { if (Number.isFinite(y)) window.scrollTo({ top: y }); else scrollToField('step-finish') }, 150)
+    void qc.invalidateQueries({ queryKey: keys.content })
+    params.delete('step')
+    setParams(params, { replace: true })
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
   function jump(step: PostStep, state: 'done' | 'current' | 'waiting') {
     if (state === 'done') void draft.go(step)
     window.setTimeout(() => scrollToField(`step-${step}`), 60)
@@ -137,7 +157,6 @@ function Workspace({ item, data, editing }: { item: ContentItem; data: ContentDa
           )
         })}
       </div>
-      {editing && item.kind === 'meme' && <Editor ctx={ctx} onClose={() => { nav(`/studio/posts/${item.id}`, { replace: true }); window.setTimeout(() => scrollToField('step-finish'), 80) }} />}
     </div>
   )
 }

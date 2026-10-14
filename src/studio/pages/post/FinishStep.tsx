@@ -1,17 +1,18 @@
-import { Link } from 'react-router-dom'
-import { CopyPlus, Download, RotateCcw, Scissors } from 'lucide-react'
+import { CopyPlus, Download, RotateCcw } from 'lucide-react'
 import { api, assetUrl, downloadUrl } from '../../api'
 import { AsyncButton, Img, errorMessage, scrollToField, useToast, type TodoItem } from '../../ui'
 import type { BatchSpec, MemeSpec, SlideshowSpec } from '../../types'
 import { DownloadLink, ExportPanel, fileSlug, postName, renderFailure, useDuplicate } from './parts'
 import type { PostCtx } from './ctx'
-import { RoughCut, SoundRow, autoCut } from './RoughCut'
-import { EditStylePicker, editOf } from './EditStyles'
+import { SoundRow, autoCut } from './SoundRow'
+import { editOf } from './EditStyles'
+import { EditorCard, editorUrl, scrollKey } from './EditorCard'
 import { keys, useSounds } from '../../hooks'
 import { useQueryClient } from '@tanstack/react-query'
 
-// The Finish step: the rough cut and sound, export (free, on the worker),
-// download, make another like this, and Fine-tune (the editor over the post).
+// The Finish step: the timeline (Open the editor, UX-PLAN.md section 12),
+// sound, export (free, on the worker), download, and make another like
+// this. Edits are placed in the editor, never guessed for the whole video.
 
 export function FinishStep({ ctx }: { ctx: PostCtx }) {
   const { item, draft, lib } = ctx
@@ -34,6 +35,9 @@ export function FinishStep({ ctx }: { ctx: PostCtx }) {
     const waiting = cut.shots.filter(x => x.kind === 'clip').map(x => lib?.clips.find(c => c.id === x.ref)).some(c => c && c.status !== 'approved')
     if (waiting) todo.push({ label: 'Wait for the clip to be prepared' })
     if (s.continueFrom?.status === 'joining') todo.push({ label: 'Wait for the takes to be joined', target: 'continue-shot' })
+    // An edited timeline is exported by the editor (Done) until the worker
+    // renders timelines itself.
+    if (s.editor?.projectAssetId) todo.push({ label: 'This post was edited in the editor: export it there with Done', onGo: () => { void draft.flush().then(() => { try { sessionStorage.setItem(scrollKey(item.id), String(window.scrollY)) } catch { /* private window */ } window.location.assign(editorUrl(item.id)) }) } })
     const style = ctx.data.options.edits?.styles.find(x => x.id === editOf(s).style)
     if (style?.shots === 2 && cut.shots.filter(x => x.kind === 'clip').length < 2) todo.push({ label: `Add shot B for the ${style.label.toLowerCase()}`, onGo: inStep('video', 'shot-b') })
     if (style?.needs?.includes('background') && !cut.shots.some(x => x.kind === 'broll')) todo.push({ label: `Pick B-roll or a screenshot for the ${style.label.toLowerCase()} background`, onGo: inStep('video', 'post-broll') })
@@ -52,13 +56,7 @@ export function FinishStep({ ctx }: { ctx: PostCtx }) {
   if (item.kind !== 'slideshow' && sounds.some(x => x.status === 'processing' && (x.id === sp?.ambience || x.id === sp?.music))) todo.push({ label: 'Wait for the sound to be prepared', target: 'post-sound' })
   return (
     <div className="st-col" style={{ gap: 16 }}>
-      {item.kind === 'meme' && <RoughCut ctx={ctx} />}
-      {item.kind !== 'slideshow' && (
-        <section className="st-card" data-field="post-edit">
-          <div className="st-card-head"><div className="grow"><div className="st-h3">Edit style</div><div className="st-hint">A finishing edit, rendered by code with the export. Default: None.</div></div></div>
-          <div className="st-card-body"><EditStylePicker ctx={ctx} mode="finish" /></div>
-        </section>
-      )}
+      {item.kind === 'meme' && <EditorCard ctx={ctx} />}
       {item.kind !== 'slideshow' && <SoundRow ctx={ctx} />}
       <ExportPanel item={item} todo={todo} saving={draft.saving} flush={draft.flush} label={label} onStart={() => void ctx.advance('finish')}>
         {item.kind === 'meme' && item.status === 'ready' && o.videoAssetId && (
@@ -66,6 +64,7 @@ export function FinishStep({ ctx }: { ctx: PostCtx }) {
             <video className="st-content-result" src={assetUrl(o.videoAssetId)} controls playsInline />
             <div className="st-col" style={{ gap: 6 }}>
               <DownloadLink assetId={o.videoAssetId} name={`${name}.mp4`}>Download MP4</DownloadLink>
+              {o.fromEditor && <span className="st-hint">Exported from the editor.</span>}
               {o.editNote && <span className="st-hint">Edit: {o.editNote}</span>}
             </div>
           </div>
@@ -104,7 +103,6 @@ export function FinishStep({ ctx }: { ctx: PostCtx }) {
       </ExportPanel>
       <div className="st-row" style={{ gap: 8, flexWrap: 'wrap' }}>
         <button type="button" className="st-btn" onClick={() => void duplicate(item.id)}><CopyPlus size={15} />Make another like this</button>
-        {item.kind === 'meme' && <Link className="st-btn" to={`/studio/posts/${item.id}/edit`} onClick={() => void draft.flush()} title="The rough cut as layers, full screen; Done saves and exports"><Scissors size={15} />Fine-tune</Link>}
       </div>
     </div>
   )

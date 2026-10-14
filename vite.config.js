@@ -1,5 +1,29 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import { createReadStream, existsSync, statSync } from 'node:fs'
+import { extname, join, normalize } from 'node:path'
+
+// The OpenReel editor (G29) at /editor/, built from the owner's fork by
+// scripts/build-editor.mjs into dist-editor/. Production serves the same
+// files from dist/editor with the same two headers (vercel.json): the
+// editor's export needs a cross-origin isolated page.
+const EDITOR_DIR = join(process.cwd(), 'dist-editor')
+const EDITOR_MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.wasm': 'application/wasm', '.svg': 'image/svg+xml', '.png': 'image/png', '.webp': 'image/webp', '.woff2': 'font/woff2', '.ttf': 'font/ttf', '.onnx': 'application/octet-stream' }
+const editorPlugin = {
+  name: 'openreel-editor',
+  configureServer(server) {
+    server.middlewares.use('/editor', (req, res) => {
+      res.setHeader('Cross-Origin-Opener-Policy', 'same-origin')
+      res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp')
+      const rel = normalize(decodeURIComponent((req.url || '/').split('?')[0])).replace(/^([/\\]*\.\.)+/, '')
+      let file = join(EDITOR_DIR, rel)
+      if (!file.startsWith(EDITOR_DIR) || !existsSync(file) || statSync(file).isDirectory()) file = join(EDITOR_DIR, 'index.html')
+      if (!existsSync(file)) { res.writeHead(404, { 'Content-Type': 'text/plain' }); res.end('Build the editor first: npm run build:editor'); return }
+      res.setHeader('Content-Type', EDITOR_MIME[extname(file)] || 'application/octet-stream')
+      createReadStream(file).pipe(res)
+    })
+  },
+}
 
 // Local dev search proxy — mirrors api/search.js for Vercel production
 const searchPlugin = {
@@ -101,7 +125,7 @@ const claudePlugin = {
 }
 
 export default defineConfig({
-  plugins: [react(), searchPlugin, imgProxyPlugin, claudePlugin],
+  plugins: [react(), searchPlugin, imgProxyPlugin, claudePlugin, editorPlugin],
   server: {
     proxy: {
       // Character Studio API (npm run dev:api). Keep before /api/hf.

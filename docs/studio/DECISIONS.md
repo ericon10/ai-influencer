@@ -1197,3 +1197,75 @@ new pages or sidebar items; one new Library tab (Sounds).
   the outfit choice, and the account adapter's media roles.
 - **Re-run of the rave clip:** a paid run, so it waits for the owner's
   click in Replace mode (counts toward the 150-credit cap).
+
+### G29. The editor is the owner's OpenReel fork, on one timeline (owner, 2026-10-14)
+
+- **Why:** an edit like a crash zoom must be placed on a timeline where the
+  owner chooses the spot, sees it, drags it and trims it. A whole-video
+  "give me a crash cut" button guesses and can wreck a video. OpenReel
+  (MIT, React and TypeScript, multi-track timeline, keyframes with easing,
+  text with animations and karaoke, transitions, effects, chroma key,
+  WebCodecs export) replaces Fine-tune, the rough cut panel and the Finish
+  step's Edit style. Items 1 and 2 of the overnight list are built here,
+  on the timeline.
+- **Spike (time-boxed to 3 hours, took about 40 minutes): PASS.**
+  1. Builds: the fork's web app builds in about 40 s to 59 MB of static
+     files (89 MB with ffmpeg.wasm).
+  2. Embedded: served by the Studio at `/editor/` on its own origin, with
+     `Cross-Origin-Opener-Policy: same-origin` and
+     `Cross-Origin-Embedder-Policy: require-corp` (the export needs an
+     isolated page). Opened as `/editor/?studio=<post>`: no welcome
+     screen, tour or recovery dialog; a Studio bar on top (Back to the
+     post, status, Done).
+  3. Loads a post from storage: `GET /api/v1/content/<id>/editor` gives
+     the post's shots in order, its captions, the canvas and the saved
+     project; media come through the Studio's asset route (in production
+     a short-lived R2 link, which R2's CORS rule already allows for GET).
+     A test post opened with its shot and caption on the timeline in 5 s.
+  4. Saves back: Done exports in the browser, uploads through the
+     Studio's upload slots, and `POST /api/v1/content/<id>/editor` keeps
+     the project (JSON in R2) and queues a free worker job that makes the
+     export the post's video. Verified end to end.
+- **Export format:** MP4 with H.264 and AAC where the browser can encode
+  them (Chrome, Edge); WebM with VP9 otherwise. The worker passes every
+  export through the same plain-input pass as renders (G27: 1080x1920,
+  30 fps, H.264, 48 kHz AAC), so the post never depends on the browser's
+  encoder. The test container's Chromium has neither H.264 nor AAC, so
+  the end-to-end check fed the editor a VP9 copy of the clip (test only);
+  the owner's Chrome reads the Studio's MP4 directly.
+- **Fork layout:** branch `studio-embed` on ericon10/openreel-video, with
+  upstream (Augani/openreel-video) kept as a remote. Everything added lives
+  in `apps/web/src/studio/`; upstream files get three one-line hooks,
+  listed in the fork's `STUDIO.md` (main entry, recovery dialog, the
+  ffmpeg.wasm base URL). The Studio pins a commit in
+  `editor/openreel.json`; `scripts/build-editor.mjs` clones that commit,
+  installs with the fork's pnpm, builds its small AssemblyScript helpers
+  (FFT, WAV, beat detection), builds the app under `/editor/` and serves
+  ffmpeg.wasm next to it, so the isolated page never needs a CDN. The
+  Vercel build runs it (`npm run build`).
+- **License check:** OpenReel is MIT (Copyright (c) 2024-2026 Augustus Otu
+  and Contributors); its notice and full text are in Settings, Notices.
+  Of the 781 packages in the web app's install, 765 are MIT, Apache-2.0,
+  BSD, ISC or similar. Not MIT/Apache/BSD:
+  - `mediabunny` 1.25.3: MPL-2.0 (file-level copyleft; used unmodified,
+    named in Notices).
+  - `gsap` 3.14.2 and `@gsap/react` 2.1.2: GSAP's standard "no charge"
+    license (free to use, including commercially; not open source).
+  - `@paper-design/shaders` and `-react` 0.0.76: PolyForm Shield 1.0.0
+    (not open source; forbids competing with the licensor). Used only by
+    OpenReel's motion-graphics shaders; the Studio does not need them and
+    they can be dropped from the fork if that matters.
+  - `posthog-js`: its own permissive license; analytics only run when
+    OpenReel's PostHog keys are set, and the Studio build sets none.
+  - `@img/sharp-libvips` (LGPL-3.0) and `caniuse-lite` (CC-BY-4.0):
+    build tools only, not shipped to the browser.
+  - `@ffmpeg/core` says MIT, but the FFmpeg build inside carries LGPL and
+    GPL terms; it is only the editor's fallback for files the browser
+    cannot read, and is named in Notices.
+- **What changes in the Studio:** the Finish step's rough cut panel, Edit
+  style row and Fine-tune are gone. The Timeline card shows what the
+  Studio laid out and opens the editor; Back and Done return to the
+  Finish step where the owner left it (`?step=finish`). The old Fine-tune
+  address opens the editor. On a phone the Finish step offers the preview,
+  Trim start and end, and Export. A post edited in the editor exports from
+  the editor (Done) until the worker renders timelines itself (phase D).

@@ -23,6 +23,7 @@ import { cancelContinue, continueShot, keepTwoShots, useChainTake } from '../pip
 import { postCutView, postEditorProject } from '../pipeline/cutView.js'
 import { makeCloseup } from '../pipeline/closeup.js'
 import { addSound, archiveSound, listSounds, soundView, updateSound } from '../pipeline/sounds.js'
+import { editorManifest, saveFromEditor } from '../pipeline/openreel.js'
 import { addCloneSource, cloneOptions, cloneStills, keepClone, postClones, postFromClone, saveCloneModel, setCloneTarget, useCloneStill } from '../pipeline/clone.js'
 import { jobViews } from '../jobs/jobView.js'
 import { POST_STEPS, addBroll, archiveBroll, archiveContent, contentView, createContent, duplicateContent, postScene, retryFailedBatch, startRender, updateBroll, updateContent } from '../pipeline/content.js'
@@ -573,6 +574,10 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
     const body = z.object({ at: z.object({ x: z.number().min(0).max(1), y: z.number().min(0).max(1) }).nullable() }).parse(await c.req.json())
     return c.json({ clone: await setCloneTarget(deps, c.get('ctx'), c.req.param('id'), body.at) })
   })
+  // The OpenReel editor (G29): the post to load, and Done (the MP4 and the
+  // project back).
+  app.get('/content/:id/editor', async c => c.json(await editorManifest(deps, c.get('ctx'), c.req.param('id'))))
+  app.post('/content/:id/editor', async c => c.json(await saveFromEditor(deps, c.get('ctx'), c.req.param('id'), await json(c))))
   app.get('/content/:id/clone-stills', async c => c.json({ stills: await cloneStills(deps, c.get('ctx'), c.req.param('id')) }))
   app.post('/content/:id/clone-stills/:cid/use', async c => c.json(await useCloneStill(deps, c.get('ctx'), c.req.param('id'), c.req.param('cid'))))
   app.post('/clones/:id/keep', async c => {

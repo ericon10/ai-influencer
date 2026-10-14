@@ -1,11 +1,10 @@
 import { Check, Film, Sparkles } from 'lucide-react'
 import type { EditSpec, EditStrength, EditStyleView } from '../../types'
 import type { PostCtx } from './ctx'
-export { editZones, type EditZones } from './editZones'
 
-// Amazing Edits (Phase 5; UX-PLAN.md section 10): edits made by code on the
-// worker, free, never by a video model. The Idea step's Format and the
-// Finish step's Edit style set the same field; Fine-tune changes it too.
+// Amazing Edits (Phase 5; UX-PLAN.md sections 10 and 12): edits made by
+// code, free, never by a video model. The Idea step's Format picks one as a
+// template for the post; edits are placed on the timeline in the editor.
 
 export const EDIT_DEFAULT: EditSpec = { style: 'none', strength: 'normal', payoff: null, text: '', variant: '' }
 export const editOf = (spec: unknown): EditSpec => ({ ...EDIT_DEFAULT, ...((spec as { edit?: Partial<EditSpec> } | null)?.edit ?? {}) })

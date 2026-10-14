@@ -502,14 +502,21 @@ function ModelRow({ m, live }: { m: SettingsView['models'][number]; live: boolea
 }
 
 // Open-source notices for what the Studio ships to the browser or uses to
-// draw exports. OpenCut's notice joins these when it is embedded (Phase 4).
+// draw exports. The editor is the owner's OpenReel fork (DECISIONS G29).
 const NOTICES: Array<{ name: string; what: string; license: string; copyright: string; url: string }> = [
   { name: 'TikTok Sans', what: 'Caption text in exports and previews', license: 'SIL Open Font License 1.1', copyright: 'Copyright 2024 TikTok Inc.', url: 'https://github.com/tiktok/TikTokSans' },
   { name: 'Noto Emoji', what: 'Emoji in captions', license: 'SIL Open Font License 1.1', copyright: 'Copyright 2013 Google LLC', url: 'https://github.com/googlefonts/noto-emoji' },
   { name: 'opentype.js', what: 'Drawing caption text', license: 'MIT', copyright: 'Copyright the opentype.js authors', url: 'https://github.com/opentypejs/opentype.js' },
   { name: 'fflate', what: 'Zip downloads', license: 'MIT', copyright: 'Copyright 2023 Arjun Barrett', url: 'https://github.com/101arrowz/fflate' },
-  { name: 'OpenCut', what: 'Fine-tune: the editor\'s project layout (tracks and ticks) follows OpenCut, the editor planned inside it (DECISIONS G13, G23)', license: 'MIT', copyright: 'Copyright 2025-2026 OpenCut', url: 'https://github.com/OpenCut-app/OpenCut' },
+  { name: 'OpenReel', what: 'The editor (the owner\'s fork, served at /editor): timeline, presets, keyframes, captions, export (DECISIONS G29)', license: 'MIT', copyright: 'Copyright (c) 2024-2026 Augustus Otu and Contributors', url: 'https://github.com/ericon10/openreel-video' },
+  { name: 'MediaBunny', what: 'Reading and writing video files inside the editor', license: 'MPL-2.0 (used unmodified)', copyright: 'Copyright Vanilagy', url: 'https://github.com/Vanilagy/mediabunny' },
+  { name: 'ffmpeg.wasm', what: 'The editor\'s fallback for files the browser cannot read', license: 'MIT (the FFmpeg build inside carries its own LGPL and GPL terms)', copyright: 'Copyright ffmpegwasm contributors', url: 'https://github.com/ffmpegwasm/ffmpeg.wasm' },
+  { name: 'OpenCut', what: 'The post\'s parts are kept as layers in OpenCut\'s project layout (tracks and ticks), so any editor can load them (DECISIONS G13, G23)', license: 'MIT', copyright: 'Copyright 2025-2026 OpenCut', url: 'https://github.com/OpenCut-app/OpenCut' },
 ]
+
+// OpenReel's license, verbatim (DECISIONS G29: it stays in the app).
+const OPENREEL_LICENSE = "MIT License\n\nCopyright (c) 2024-2026 Augustus Otu and Contributors\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE."
+
 
 // OpenCut's license, verbatim (DECISIONS G13: it stays in the app).
 const OPENCUT_LICENSE = "Copyright 2025-2026 OpenCut\n\nPermission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the \u201cSoftware\u201d), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \u201cAS IS\u201d, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE."
@@ -517,12 +524,16 @@ const OPENCUT_LICENSE = "Copyright 2025-2026 OpenCut\n\nPermission is hereby gra
 function NoticesCard() {
   return (
     <div className="st-card">
-      <div className="st-card-head"><div className="grow"><div className="st-h2">Open-source notices</div><div className="st-hint">Fonts and libraries the Studio uses, with their licenses, and OpenCut's license in full.</div></div></div>
+      <div className="st-card-head"><div className="grow"><div className="st-h2">Open-source notices</div><div className="st-hint">Fonts and libraries the Studio uses, with their licenses, and the OpenReel and OpenCut licenses in full.</div></div></div>
       <div style={{ overflowX: 'auto' }}>
         <table className="st-table">
           <thead><tr><th>Name</th><th>Used for</th><th>License</th></tr></thead>
           <tbody>{NOTICES.map(n => <tr key={n.name}><td className="strong"><a href={n.url} target="_blank" rel="noreferrer">{n.name}</a></td><td>{n.what}</td><td>{n.license}. {n.copyright}.</td></tr>)}</tbody>
         </table>
+      </div>
+      <div className="st-card-body st-col" style={{ gap: 8 }} data-field="openreel-license">
+        <div className="st-h3">OpenReel license (MIT)</div>
+        <pre className="st-license">{OPENREEL_LICENSE}</pre>
       </div>
       <div className="st-card-body st-col" style={{ gap: 8 }} data-field="opencut-license">
         <div className="st-h3">OpenCut license (MIT)</div>

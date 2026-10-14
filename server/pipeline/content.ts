@@ -52,7 +52,7 @@ export async function listBroll(deps: Deps, ctx: Ctx): Promise<BrollRow[]> {
     .orderBy(desc(brollClips.createdAt))
 }
 
-async function getBroll(deps: Deps, ctx: Ctx, id: string): Promise<BrollRow> {
+export async function getBroll(deps: Deps, ctx: Ctx, id: string): Promise<BrollRow> {
   const [row] = await deps.db.select().from(brollClips).where(and(eq(brollClips.accountId, ctx.accountId), eq(brollClips.id, id)))
   if (!row || row.archivedAt) throw notFound('B-roll clip')
   return row
@@ -196,6 +196,8 @@ const memeSpec = z.object({
   clipB: id.nullable().default(null),
   stillB: id.nullable().default(null),
   captionStyle,
+  // The OpenReel editor's project for this post (G29), saved by Done.
+  editor: z.object({ projectAssetId: id.nullable().default(null), savedAt: z.string().max(40).nullable().default(null) }).nullable().default(null),
 })
 const slideshowSpec = z.object({
   stillIds: z.array(id).max(20).default([]),
@@ -267,6 +269,8 @@ export interface ContentOutputs {
   zipParts?: Array<{ assetId: string; from: number; to: number }>
   // What the edit did (Phase 5), in plain words.
   editNote?: string | null
+  // Exported from the OpenReel editor (G29) rather than rendered here.
+  fromEditor?: boolean
 }
 
 function parseSpec(kind: string, raw: unknown) {
@@ -389,7 +393,7 @@ export async function archiveContent(deps: Deps, ctx: Ctx, itemId: string): Prom
 
 // A kept clip (a take, its upscale, later a clone) or a still, from this
 // account and character.
-async function candidateAsset(deps: Deps, ctx: Ctx, candidateId: string, characterId: string, media: 'video' | 'image'): Promise<string> {
+export async function candidateAsset(deps: Deps, ctx: Ctx, candidateId: string, characterId: string, media: 'video' | 'image'): Promise<string> {
   const [c] = await deps.db.select({ assetId: candidates.assetId, op: candidates.op, characterId: candidates.characterId }).from(candidates)
     .where(and(eq(candidates.accountId, ctx.accountId), eq(candidates.id, candidateId)))
   const isVideo = !!c && isVideoOp(c.op)
@@ -447,7 +451,7 @@ const batchCaptions = (deps: Deps, s: BatchSpec) => s.captions.map(c => c.trim()
 
 const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'content'
 
-async function setOutputs(deps: Deps, itemId: string, outputs: ContentOutputs, status?: string): Promise<void> {
+export async function setOutputs(deps: Deps, itemId: string, outputs: ContentOutputs, status?: string): Promise<void> {
   await deps.db.update(contentItems).set({ outputs, ...(status ? { status } : {}), updatedAt: deps.clock.now() }).where(eq(contentItems.id, itemId))
 }
 

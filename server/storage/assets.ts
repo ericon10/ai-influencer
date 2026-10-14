@@ -14,15 +14,16 @@ const EXT: Record<string, string> = {
   'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp', 'image/gif': 'gif',
   'video/mp4': 'mp4', 'video/quicktime': 'mov', 'video/webm': 'webm',
   'audio/mpeg': 'mp3', 'audio/wav': 'wav', 'audio/x-wav': 'wav', 'audio/mp4': 'm4a', 'audio/aac': 'aac',
-  'application/zip': 'zip',
+  'application/zip': 'zip', 'application/json': 'json',
 }
 
-// `file` is a download bundle (a zip of slideshow images or batch videos).
+// `file` is a download bundle (a zip of slideshow images or batch videos)
+// or a saved editor project (JSON, G29).
 export function kindOf(mime: string): 'image' | 'video' | 'audio' | 'file' {
   if (mime.startsWith('image/')) return 'image'
   if (mime.startsWith('video/')) return 'video'
   if (mime.startsWith('audio/')) return 'audio'
-  if (mime === 'application/zip') return 'file'
+  if (mime === 'application/zip' || mime === 'application/json') return 'file'
   throw new Error(`Unsupported media type: ${mime}`)
 }
 

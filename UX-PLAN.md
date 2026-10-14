@@ -409,3 +409,65 @@ workspace, drawers and inline steps; no new page or sidebar item.
 | Green-screen reaction | Her clip over the post's B-roll (a screen recording, or a screenshot image uploaded as B-roll). The Finish step lists "Pick B-roll for the background" until there is one, linked to the B-roll field | 1 to 2 |
 | Text behind subject, green screen, dolly zoom | Need her outline (a person mask). The worker makes it at export, free; nothing to click | 0 |
 | Karaoke captions, word pop | Caption edits: the caption itself changes, the picture does not | 0 |
+
+## 12. The editor: OpenReel on one timeline (owner, 2026-10-14)
+
+The owner's OpenReel fork replaces Fine-tune, the rough cut panel and the
+whole-video Edit style. Edits are placed on a timeline where the owner
+sees, drags and trims them; nothing is guessed for the whole video. Rule 1
+holds: no new page in the sidebar; the editor opens from the post and
+returns to it.
+
+**Where it lives.** Finish step, "Open the editor" (desktop). It opens full
+screen in the same tab at `/editor/?studio=<post>` with a slim Studio bar
+on top: "Back to the post", what is happening, and **Done**. Done exports
+in the browser, saves the MP4 to the post and the Library, keeps the
+timeline for the next edit, and returns to the Finish step scrolled to
+where the owner left it. Back returns without saving.
+
+**One timeline per post.** The timeline (an OpenReel project, JSON in R2)
+is the post's source of truth: video track(s), B-roll, captions, effects
+(presets), voice lines, the sound bed and music. The Studio assembles it
+from the steps above (clips, B-roll, captions, sound) the first time it
+opens, so there is no separate rough cut to build. Posts made before keep
+their cut and edit style; the first open turns them into a timeline.
+
+**Presets, not whole-video styles.** The editor's Presets panel lists the
+library (transitions, moments, text, caption looks, layouts), each with a
+moving thumbnail and one line. A preset drops at the playhead as a block
+with handles: drag, trim, Subtle/Normal/Strong, and its keyframes stay
+editable. The Studio may suggest spots (the payoff, a beat, a reaction
+peak) as markers; one click accepts one; nothing is placed without the
+owner. The Idea step's Format stays as a template that pre-places presets
+for the owner to adjust. Two-shot presets keep shot B in the Video step,
+with "Make the close-up".
+
+**Beat sync.** In the editor: add a track or tap the tempo; beat markers
+show on the timeline and cuts and presets snap to them. Done asks nothing
+extra; "Include the music in the export" is a switch in the Studio bar,
+off when the owner adds the TikTok sound in the app.
+
+**Saved styles.** "Save as a style" in the Presets panel keeps the stack
+with relative places ("at the payoff", "on beat 4"). "Make another like
+this" carries the style into the new post's timeline.
+
+**Phone.** Editing is desktop first. On a phone the Finish step shows the
+preview, Trim start and end, and Export (the worker renders the same
+timeline). "Open the editor" says it works best on a computer.
+
+**Batch.** Up to 50 videos render on the worker from the same timeline
+JSON, with each video's clip and caption swapped in.
+
+| Piece | Where | Clicks |
+|---|---|---|
+| Open the editor | Finish step | 1 |
+| Place a preset | Editor, Presets panel: click (at the playhead) or drag onto the timeline | 1 to 2 |
+| Accept a suggested spot | Editor, a marker on the timeline | 1 |
+| Strength, trim, keyframes | Editor, the block and its panel | 1 each |
+| Beat sync | Editor, add a track or tap tempo | 2 |
+| Done (export, save, return) | Studio bar | 1 |
+| Save a style | Editor, Presets panel | 2 |
+
+The video-post flow stays at **8** clicks to an exported MP4 without the
+editor (the Studio's own render of the timeline). With the editor and one
+preset: **+3** (Open the editor, place the preset, Done).

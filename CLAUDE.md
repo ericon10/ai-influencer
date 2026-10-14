@@ -136,13 +136,13 @@ the Studio; they are not creative limits on a character.
   its quote. USD prices from open.higgsfield.ai/pricing.
 - **Never crossfade a seam.** Cut, grade, or mark the seam failed. Prefer
   one take with start and end frames (SPEC 4.3).
-- Fine-tune (Phase 4, DECISIONS G13 and G23) is the Studio's own layer
-  editor over the workspace, on OpenCut's project layout. The owner
-  decided (G25): keep our own editor, keep the OpenCut project format so
-  their engine can drop in if it ships, and spend no time on the classic
-  OpenCut build. Keep posts' parts as
-  data (clips, B-roll, caption text, sound) so any editor can load them
-  as layers, and keep OpenCut's license notice in Settings > Notices.
+- **The editor is the owner's OpenReel fork** (DECISIONS G29; it replaced
+  Fine-tune, the rough cut panel and the whole-video Edit style). Edits
+  are placed on the post's timeline by the owner, never guessed for the
+  whole video. Our changes live on the fork's `studio-embed` branch in
+  `apps/web/src/studio/`, with upstream kept as a remote; bump
+  `editor/openreel.json` to ship a new fork commit. Keep OpenReel's (and
+  OpenCut's) license notice in Settings > Notices.
 
 ## Character Studio layout
 
@@ -162,9 +162,9 @@ the Studio; they are not creative limits on a character.
 | `server/pipeline/clips.ts` | Uploaded clips (kept clips of a character) and the Library view |
 | `server/pipeline/clone.ts`, `src/studio/pages/post/ClonePanel.tsx` | Clone Video (SPEC 13.1 R1, DECISIONS G18): the source clip with its sound, the run for one or more characters, free checks (face, skin, not the performer), original sound put back, results kept in Library > Clips |
 | `server/pipeline/chain.ts`, `src/studio/pages/post/ContinueShot.tsx` | Chaining (DECISIONS G22): Continue this shot, the last frame as the next start frame on the same model, takes joined into one clip (seams scored, never crossfaded), two shots when a seam fails |
-| `server/core/cut.ts`, `server/media/timeline.ts`, `server/pipeline/cutView.ts`, `src/studio/pages/post/RoughCut.tsx` | The rough cut (G22): a post as one timeline (shots, timed captions, sound lane), automatic until edited; Export renders exactly it |
+| `server/core/cut.ts`, `server/media/timeline.ts`, `server/pipeline/cutView.ts`, `src/studio/pages/post/SoundRow.tsx` | The automatic cut (G22): what the Studio lays out on the timeline from the steps (shots, timed captions); the Sound row. Export renders it on the worker |
 | `server/media/sound.ts`, `server/pipeline/sounds.ts` | The sound bed (G22): Room tone or uploaded ambience, uploaded music ducked under clip sound, two-pass loudness to -14 LUFS (-28 for ambience only); Library > Sounds. No AI music |
-| `src/studio/pages/post/Editor.tsx`, `server/core/opencut.ts` | Fine-tune (DECISIONS G23): the editor over the workspace at /studio/posts/:id/edit (layers, preview, split, trim, undo; Done saves and renders); the post as an OpenCut project for the engine later |
+| `editor/openreel.json`, `scripts/build-editor.mjs`, `server/pipeline/openreel.ts`, `src/studio/pages/post/EditorCard.tsx` | The editor (DECISIONS G29): the owner's OpenReel fork (branch `studio-embed`, upstream kept as a remote, our code in `apps/web/src/studio/`, see its STUDIO.md) pinned by commit, built into `/editor/` (COOP/COEP); the post's manifest and Done (`/content/:id/editor`); the Finish step's Timeline card. `server/core/opencut.ts` keeps the post as an OpenCut project too |
 | `server/core/promptWriter.ts`, `src/studio/pages/character/PromptBox.tsx` | The prompt writer: Claude writes the final still or video prompt (editable above Generate); code adds the reference line, mark sides and REALISM |
 | `src/studio/pages/character/SceneStills.tsx`, `VideoSection.tsx`, `server/pipeline/videoAssets.ts`, `server/media/mask.ts` | A post's Stills (details, Write and generate, Use this still) and Video (takes, Use this take, upscale this take, end frame helper, clip QA) |
 | `config/edits.yaml`, `server/media/edits.ts`, `src/studio/pages/post/EditStyles.tsx`, `editZones.ts` | Amazing Edits (G24, G26): twenty edits made by code on the worker (never a video model); Format in Idea, Edit style in Finish, the Edit lane in Fine-tune; thumbnails from `scripts/edit-thumbs.ts` in `public/studio-edits/` |

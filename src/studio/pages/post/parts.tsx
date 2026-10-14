@@ -311,7 +311,7 @@ export function ExportPanel({ item, todo, saving, flush, label, onStart, childre
         {saving && <span className="st-hint st-row" style={{ gap: 6 }}><Loader2 size={13} className="st-spin" />Saving...</span>}
       </div>
       {!worker.ready && <span className="st-hint st-warntext" role="status">{worker.reason}</span>}
-      <RunStatus match={j => j.purpose === `content_render:${item.id}`} pending={starting} />
+      <RunStatus match={j => j.purpose === `content_render:${item.id}` || j.purpose === `editor_save:${item.id}`} pending={starting} />
       <span className="st-hint">Renders on the Studio's worker: no provider, no cost. 9:16, silent unless the clip kept its original sound. {AI_LABEL}</span>
       {item.status === 'failed' && item.error && (() => {
         const why = renderFailure(item.error)
