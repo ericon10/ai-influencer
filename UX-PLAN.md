@@ -357,3 +357,22 @@ with one new Library tab.
 
 The video-post flow stays at **8** clicks; a two-shot chained video post is
 **11** (8 plus Continue, Generate, Use).
+
+---
+
+## 9. Phase 4: Fine-tune over the workspace, batch at scale (2026-10-14)
+
+Still no new pages and no sidebar items: the editor route was already in
+the sitemap (`/studio/posts/:id/edit`, "Editor overlay").
+
+| Piece | Where it lives | What I do | Clicks |
+|---|---|---|---|
+| **Fine-tune** | Finish step, next to Export; opens `/studio/posts/:id/edit` full screen over the workspace | The rough cut opens as layers: Video (clips and B-roll), Text (captions), Sound (ambience and music), and later Edit style. The preview plays the cut with its captions. Click the timeline to move the playhead; split a shot at the playhead, trim it, move it, delete it; drag a caption or change its text and times; set the levels; undo and redo. Nothing is downloaded: the clips stream from storage | **1** to open |
+| **Done** | The editor's header | Saves the cut and the sound to the post, renders the MP4 on the worker (free), and returns to the Finish step, where the render shows live. The MP4 is the post's export, so it is also in Library > Posts | **1** |
+| Cancel | The editor's header (or Esc) | Back to the Finish step with the post unchanged (asks first when something changed) | 1 |
+| Editor engine | Inside the overlay | The Studio's own layer editor, on OpenCut's track layout (one main video track, text over it, audio under it) so the OpenCut engine can take the same project later. Why OpenCut itself is not inside yet: DECISIONS G23 | |
+| Notices | Settings > Notices | OpenCut's MIT license, verbatim, with the other open-source notices | |
+| **Batch at scale** | A batch post's Finish step | Up to 50 videos, clips and B-roll rotated. Each video is its own short job on the worker, so a crash or a deploy never counts a video twice or loses one; "Retry the failed ones" re-renders only those; the download is a zip, in parts of at most 150 MB | **1** to retry |
+
+The video-post flow stays at **8** clicks; Fine-tune adds **2** (Fine-tune,
+Done) when used.

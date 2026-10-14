@@ -20,11 +20,11 @@ import { videoPrices } from '../pipeline/sceneActions.js'
 import { expectedVersion, readWorkerStatus } from '../jobs/workerStatus.js'
 import { addClip, libraryView } from '../pipeline/clips.js'
 import { cancelContinue, continueShot, keepTwoShots, useChainTake } from '../pipeline/chain.js'
-import { postCutView } from '../pipeline/cutView.js'
+import { postCutView, postEditorProject } from '../pipeline/cutView.js'
 import { addSound, archiveSound, listSounds, soundView, updateSound } from '../pipeline/sounds.js'
 import { addCloneSource, cloneOptions, keepClone, postClones, postFromClone, saveCloneModel } from '../pipeline/clone.js'
 import { jobViews } from '../jobs/jobView.js'
-import { POST_STEPS, addBroll, archiveBroll, archiveContent, contentView, createContent, duplicateContent, postScene, startRender, updateBroll, updateContent } from '../pipeline/content.js'
+import { POST_STEPS, addBroll, archiveBroll, archiveContent, contentView, createContent, duplicateContent, postScene, retryFailedBatch, startRender, updateBroll, updateContent } from '../pipeline/content.js'
 import { rulesView, setRuleSwitch } from '../pipeline/rules.js'
 import { chooseConcept } from '../pipeline/concepts.js'
 import { approveCandidate, keepStale, pickHero, rejectCandidate, reopenCandidate, setFavorite, mirrorCandidate } from '../pipeline/review.js'
@@ -647,6 +647,9 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
   // Phase 3: the rough cut and sound bed the Finish step shows, and
   // "Continue this shot" (chaining) in the Video step. All free.
   app.get('/content/:id/cut', async c => c.json(await postCutView(deps, c.get('ctx'), c.req.param('id'))))
+  // Fine-tune (Phase 4): the cut as editor layers, streamed by URL, and in
+  // OpenCut's project layout.
+  app.get('/content/:id/editor', async c => c.json(await postEditorProject(deps, c.get('ctx'), c.req.param('id'))))
   app.post('/content/:id/continue', async c => {
     const ctx = c.get('ctx')
     requireRole(ctx, 'member')
@@ -690,6 +693,13 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
     requireRole(ctx, 'member')
     await archiveSound(deps, ctx, c.req.param('id'))
     return c.json({ ok: true })
+  })
+  // A batch's failed videos render again (free).
+  app.post('/content/:id/render/retry-failed', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    const row = await retryFailedBatch(deps, ctx, c.req.param('id'))
+    return c.json({ id: row.id, status: row.status }, 202)
   })
   // Rendering is local and free (ffmpeg and sharp on the worker).
   app.post('/content/:id/render', async c => {

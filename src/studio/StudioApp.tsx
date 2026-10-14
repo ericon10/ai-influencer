@@ -44,6 +44,7 @@ function Gate() {
             <Routes>
               <Route index element={<Posts />} />
               <Route path="posts/:id" element={<Post />} />
+              <Route path="posts/:id/edit" element={<Post editing />} />
               <Route path="characters" element={<Characters />} />
               <Route path="characters/:id" element={<Character />} />
               <Route path="library" element={<Library />} />

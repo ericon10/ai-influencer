@@ -136,11 +136,11 @@ the Studio; they are not creative limits on a character.
   its quote. USD prices from open.higgsfield.ai/pricing.
 - **Never crossfade a seam.** Cut, grade, or mark the seam failed. Prefer
   one take with start and end frames (SPEC 4.3).
-- OpenCut gets embedded in the Studio in Phase 4 (DECISIONS G13: one
-  app, one login; Export or Fine-tune; Done saves back to the post).
-  Do not start it before Phase 4. Keep posts' parts as data (clips,
-  B-roll, caption text) so the editor can load them as layers, and keep
-  OpenCut's license notice in the app once it is in.
+- Fine-tune (Phase 4, DECISIONS G13 and G23) is the Studio's own layer
+  editor over the workspace, on OpenCut's project layout; the OpenCut
+  engine itself waits for the owner's call (G23). Keep posts' parts as
+  data (clips, B-roll, caption text, sound) so any editor can load them
+  as layers, and keep OpenCut's license notice in Settings > Notices.
 
 ## Character Studio layout
 
@@ -162,6 +162,7 @@ the Studio; they are not creative limits on a character.
 | `server/pipeline/chain.ts`, `src/studio/pages/post/ContinueShot.tsx` | Chaining (DECISIONS G22): Continue this shot, the last frame as the next start frame on the same model, takes joined into one clip (seams scored, never crossfaded), two shots when a seam fails |
 | `server/core/cut.ts`, `server/media/timeline.ts`, `server/pipeline/cutView.ts`, `src/studio/pages/post/RoughCut.tsx` | The rough cut (G22): a post as one timeline (shots, timed captions, sound lane), automatic until edited; Export renders exactly it |
 | `server/media/sound.ts`, `server/pipeline/sounds.ts` | The sound bed (G22): Room tone or uploaded ambience, uploaded music ducked under clip sound, two-pass loudness to -14 LUFS (-28 for ambience only); Library > Sounds. No AI music |
+| `src/studio/pages/post/Editor.tsx`, `server/core/opencut.ts` | Fine-tune (DECISIONS G23): the editor over the workspace at /studio/posts/:id/edit (layers, preview, split, trim, undo; Done saves and renders); the post as an OpenCut project for the engine later |
 | `server/core/promptWriter.ts`, `src/studio/pages/character/PromptBox.tsx` | The prompt writer: Claude writes the final still or video prompt (editable above Generate); code adds the reference line, mark sides and REALISM |
 | `src/studio/pages/character/SceneStills.tsx`, `VideoSection.tsx`, `server/pipeline/videoAssets.ts`, `server/media/mask.ts` | A post's Stills (details, Write and generate, Use this still) and Video (takes, Use this take, upscale this take, end frame helper, clip QA) |
 | `server/core/qa/scene.ts` | Scene QA as advice: one-click fixes, the free mirror, face drift as a strong warning |

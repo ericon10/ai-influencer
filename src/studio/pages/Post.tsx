@@ -13,6 +13,7 @@ import { VideoStep, videoSummary } from './post/VideoStep'
 import { TextStep, textSummary } from './post/TextStep'
 import { FinishStep } from './post/FinishStep'
 import type { PostCtx } from './post/ctx'
+import { Editor } from './post/Editor'
 import { HowTo } from '../guide/Guide'
 import type { GuideId } from '../guide/content'
 
@@ -23,7 +24,9 @@ const STEP_GUIDE: Record<PostStep, GuideId> = { idea: 'post-idea', stills: 'post
 // and those after it stay open, so nothing needs a Next click. Pickers open
 // as drawers; uploads happen in the step that needs them.
 
-export default function Post() {
+// "/studio/posts/:id/edit" is the same workspace with Fine-tune open over
+// it (UX-PLAN.md section 9), so closing it returns to the same spot.
+export default function Post({ editing = false }: { editing?: boolean }) {
   const { id = '' } = useParams()
   const content = useContent()
   const item = content.data?.items.find(i => i.id === id)
@@ -39,10 +42,10 @@ export default function Post() {
       </div>
     )
   }
-  return <Workspace key={item.id} item={item} data={content.data} />
+  return <Workspace key={item.id} item={item} data={content.data} editing={editing} />
 }
 
-function Workspace({ item, data }: { item: ContentItem; data: ContentData }) {
+function Workspace({ item, data, editing }: { item: ContentItem; data: ContentData; editing: boolean }) {
   const nav = useNavigate()
   const toast = useToast()
   const qc = useQueryClient()
@@ -134,6 +137,7 @@ function Workspace({ item, data }: { item: ContentItem; data: ContentData }) {
           )
         })}
       </div>
+      {editing && item.kind === 'meme' && <Editor ctx={ctx} onClose={() => { nav(`/studio/posts/${item.id}`, { replace: true }); window.setTimeout(() => scrollToField('step-finish'), 80) }} />}
     </div>
   )
 }

@@ -29,10 +29,10 @@ export function autoCut(s: MemeSpec, maxBroll: number): Cut {
   return { auto: true, shots, captions: [{ id: 'main', text: null, start: 0, end: null }] }
 }
 
-interface Placed { shot: CutShot; start: number; in: number; out: number; dur: number; src: number | null; title: string; poster: string | null; video: string | null; ready: boolean }
+export interface Placed { shot: CutShot; start: number; in: number; out: number; dur: number; src: number | null; title: string; poster: string | null; video: string | null; ready: boolean }
 
 // Each shot's real trim and place (the renderer's planShots, in short).
-function place(cut: Cut, info: (s: CutShot) => { src: number | null; title: string; poster: string | null; video: string | null; ready: boolean }, o: { maxClip: number; maxBroll: number; maxTotal: number }): Placed[] {
+export function place(cut: Cut, info: (s: CutShot) => { src: number | null; title: string; poster: string | null; video: string | null; ready: boolean }, o: { maxClip: number; maxBroll: number; maxTotal: number }): Placed[] {
   const out: Placed[] = []
   let at = 0
   for (const shot of cut.shots) {
@@ -48,6 +48,20 @@ function place(cut: Cut, info: (s: CutShot) => { src: number | null; title: stri
     at += dur
   }
   return out
+}
+
+// What the timeline knows about a shot's source: from the Library's clips
+// and the B-roll list (lengths, titles, pictures, readiness).
+export function shotInfo(ctx: PostCtx) {
+  const clips = ctx.lib?.clips ?? []
+  return (s: CutShot) => {
+    if (s.kind === 'clip') {
+      const c: LibraryClip | undefined = clips.find(x => x.id === s.ref)
+      return { src: c?.durationSec ?? null, title: c?.title ?? 'Clip', poster: c?.posterId ?? null, video: c?.assetId || null, ready: c?.status === 'approved' && !!c.assetId }
+    }
+    const b = ctx.data.broll.find(x => x.id === s.ref)
+    return { src: b?.durationSec ?? null, title: b ? `B-roll: ${b.title}` : 'B-roll', poster: null, video: b?.assetId ?? null, ready: b?.status === 'ready' && !!b.assetId }
+  }
 }
 
 export function RoughCut({ ctx }: { ctx: PostCtx }) {

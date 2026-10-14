@@ -905,3 +905,54 @@ new pages or sidebar items; one new Library tab (Sounds).
   is 3 more (Continue, Generate a take, Use this take), measured in the
   browser in demo mode.
 
+### G23. Phase 4: Fine-tune over the workspace; the OpenCut engine waits; batch at scale (evening build, 2026-10-14)
+
+- **Fine-tune ships** as planned in UX-PLAN.md (section 9): the Finish
+  step's Fine-tune opens `/studio/posts/:id/edit`, full screen over the
+  same workspace (the post page stays mounted under it). The rough cut
+  opens as layers: Video (clips and B-roll), Text (captions), Sound
+  (ambience and music). The preview plays the cut with captions in
+  TikTok's box and the music, streamed from storage (same origin, same
+  login, nothing downloaded). Split at the playhead, trim by the edges,
+  drag to move, delete, duplicate, retime and rewrite captions, sound
+  levels, undo and redo (a drag is one step). Done saves the cut and the
+  sound to the post, renders the MP4 on the worker (free, the same
+  renderer as Export) and returns to the Finish step, where the render
+  shows live; the MP4 is the post's export, so it is in Library > Posts.
+  Cancel leaves the post as it was.
+- **The editor inside is the Studio's own, not OpenCut, for now.** Call
+  made tonight, and the first thing for the owner to decide. What was
+  checked:
+  - OpenCut's main repository is being rewritten from the ground up
+    (pre-release; it lives at new.opencut.app). Its README promises an
+    Editor API, plugins and a headless mode, which are exactly what an
+    embed needs, and they are not out yet.
+  - The usable version, opencut-classic, is a Next.js 16 server app
+    (auth, a database, a Cloudflare deploy), about 685 source files, with
+    no embedding or import API. Its dependencies install cleanly here
+    (bun, 974 packages), but its current main fails its own TypeScript
+    check (`isShortcutKey` is not exported), so it does not build as is.
+  - Embedding it would mean keeping a fork, a second deployment (or a
+    large static build committed into this repository) and a bridge into
+    its internal stores, unattended and untested in a real browser.
+  - So the Fine-tune editor follows OpenCut's project layout instead (one
+    main video track, text tracks over it, audio tracks under it, times
+    in ticks of 1/120000 s): `server/core/opencut.ts` turns a post into
+    an OpenCut project, and `GET /content/:id/editor` returns it with
+    every media file's streaming URL. When the owner picks a route
+    (embed a classic fork in an iframe at /editor, wait for the
+    rewrite's Editor API, or keep the Studio editor), the data is ready.
+- **OpenCut's MIT license** is in Settings > Notices, verbatim, with a
+  line in the notices table.
+- **Batch at scale:** up to 50 videos (was 20). Each video is its own
+  short job and owns one slot of the post's outputs: a job that runs again
+  (a crash, a deploy overlap) overwrites its own slot instead of counting
+  twice, results merge under a row lock (`SELECT ... FOR UPDATE`), and a
+  failed video keeps its reason by index. "Retry the failed ones"
+  re-renders only those. The download is a zip in parts of at most 150 MB
+  (`batch.zip_part_mb`), so the worker never holds all the videos in
+  memory at once. The runner now renews each claimed job's lock right
+  before it runs (compare and set), so a job whose lock lapsed while it
+  waited behind others is skipped if another worker took it; a render
+  never runs twice at once. Tested with 25 rotated videos.
+

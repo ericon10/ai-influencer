@@ -44,8 +44,11 @@ slideshow:
   image: { quality: 90 }
 
 batch:
-  max: 20
+  # Up to 50 videos (Phase 4: batch at scale); each is its own short job on
+  # the worker. The download is a zip in parts of at most zip_part_mb.
+  max: 50
   default_count: 20
+  zip_part_mb: 150
 
 # Clone Video (SPEC 13.1 R1; UX-PLAN.md: "Clone a TikTok or Reel" in the
 # Video step). A saved TikTok or Reel is rebuilt with the post's character,

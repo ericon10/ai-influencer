@@ -281,6 +281,7 @@ export interface ContentOutputs {
   videoAssetId?: string; imageAssetIds?: string[]; videos?: Array<{ caption: string; assetId: string; clipId?: string; brollId?: string | null } | null>; zipAssetId?: string
   done?: number; failed?: number; total?: number; dropped?: string[]; renderedAt?: string
   durationSec?: number; sound?: { layers: Array<'clip' | 'ambience' | 'music'>; targetLufs: number | null; ducked: boolean }
+  errors?: Record<string, string>; zipParts?: Array<{ assetId: string; from: number; to: number }>
 }
 export interface ContentItem {
   id: string; kind: ContentKind; characterId: string | null; title: string; spec: Record<string, unknown>

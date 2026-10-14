@@ -262,3 +262,31 @@ describe('webhooks', () => {
     } finally { await h.close(); await h2.close() }
   })
 })
+
+// Phase 4, batch at scale: claimed jobs run one after another, and a job
+// another worker took meanwhile (its lock lapsed, a deploy overlap) is
+// skipped here instead of running twice.
+describe('claims', () => {
+  it('renews each claim before running it, and skips a job another worker took', async () => {
+    const { registerLocalJob } = await import('./hooks.js')
+    const { enqueueLocalJob } = await import('./runner.js')
+    const h = await createHarness()
+    const ran: string[] = []
+    let bId = ''
+    registerLocalJob('test_claim_a', async deps => {
+      ran.push('a')
+      // Meanwhile another worker claims job B with its own lock.
+      await deps.db.update(jobs).set({ lockedUntil: new Date(deps.clock.now().getTime() + 999_000) }).where(eq(jobs.id, bId))
+      return {}
+    })
+    registerLocalJob('test_claim_b', async () => { ran.push('b'); return {} })
+    const a = await enqueueLocalJob(h.deps, h.ctx, { stage: 'content', purpose: 'test_claim_a:1', label: 'A', characterId: null, request: {} })
+    const b = await enqueueLocalJob(h.deps, h.ctx, { stage: 'content', purpose: 'test_claim_b:1', label: 'B', characterId: null, request: {} })
+    bId = (b as { id: string }).id
+    expect((a as { id: string }).id).toBeTruthy()
+    await tick(h.deps, 5)
+    expect(ran).toEqual(['a'])
+    expect((await getJob(h.deps, h.ctx, bId)).status).toBe('queued')
+    await h.close()
+  })
+})

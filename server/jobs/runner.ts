@@ -196,7 +196,7 @@ async function update(deps: Deps, job: JobRow, patch: Partial<typeof jobs.$infer
   await deps.db.update(jobs).set({ ...patch, updatedAt: deps.clock.now() }).where(eq(jobs.id, job.id))
 }
 
-async function claimDue(deps: Deps, limit: number): Promise<JobRow[]> {
+async function claimDue(deps: Deps, limit: number): Promise<{ jobs: JobRow[]; lockUntil: Date }> {
   const now = deps.clock.now()
   const lockUntil = new Date(now.getTime() + deps.config.runtime.jobs.lock_sec * 1000)
   const res = await deps.db.execute(sql`
@@ -212,15 +212,31 @@ async function claimDue(deps: Deps, limit: number): Promise<JobRow[]> {
     )
     returning id`)
   const ids = (res as unknown as { rows: Array<{ id: string }> }).rows.map(r => r.id)
-  if (!ids.length) return []
-  return deps.db.select().from(jobs).where(inArray(jobs.id, ids))
+  if (!ids.length) return { jobs: [], lockUntil }
+  return { jobs: await deps.db.select().from(jobs).where(inArray(jobs.id, ids)), lockUntil }
+}
+
+// Claimed jobs run one after another, so a later one can wait longer than
+// its lock (a batch of renders). Before each one starts, the claim is
+// checked and renewed in one step: if the lock lapsed and another worker
+// took the job (two workers overlap during a deploy), it is skipped here,
+// so a render never runs twice at once.
+async function renewClaim(deps: Deps, jobId: string, claimed: Date): Promise<boolean> {
+  const next = new Date(deps.clock.now().getTime() + deps.config.runtime.jobs.lock_sec * 1000)
+  const res = await deps.db.execute(sql`
+    update jobs set locked_until = ${next.toISOString()}::timestamptz
+    where id = ${jobId} and locked_until = ${claimed.toISOString()}::timestamptz
+    returning id`)
+  return (res as unknown as { rows: unknown[] }).rows.length > 0
 }
 
 export async function tick(deps: Deps, limit = 10): Promise<number> {
-  const due = await claimDue(deps, limit)
+  const { jobs: due, lockUntil } = await claimDue(deps, limit)
   for (const job of due) {
     try {
-      await processJob(deps, job)
+      if (!(await renewClaim(deps, job.id, lockUntil))) continue
+      const fresh = (await deps.db.select().from(jobs).where(eq(jobs.id, job.id)))[0] ?? job
+      await processJob(deps, fresh)
     } catch (e) {
       deps.log.error({ err: e, jobId: job.id }, 'job processing crashed')
       await update(deps, job, { lockedUntil: null, nextPollAt: new Date(deps.clock.now().getTime() + 10_000), error: { message: (e as Error).message } })

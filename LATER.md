@@ -22,3 +22,18 @@ rule.
 - Show each chained clip's seam scores in the clip drawer (they are stored
   in candidates.meta).
 - Let "Continue this shot" also continue a clip picked in a batch.
+
+## Phase 4 (Fine-tune, batch at scale)
+
+- The owner's call on the OpenCut engine (DECISIONS G23): a classic fork
+  in an iframe at /editor, the rewrite's Editor API when it ships, or the
+  Studio editor as it is.
+- Snap to shot edges and to the playhead when dragging in Fine-tune.
+- A waveform under the Sound lane in Fine-tune, and the clip's own sound
+  as a lane when a clone keeps it.
+- Keyboard nudge (arrow keys move the playhead one frame) and J/K/L
+  playback in Fine-tune.
+- Preview Room tone in the browser (today it is mixed only in the export).
+- Batches: a progress line per batch on Posts home ("12 of 50 done"), and
+  a batch Fine-tune that edits the template every video shares.
+

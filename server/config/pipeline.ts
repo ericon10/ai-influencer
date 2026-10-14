@@ -236,7 +236,7 @@ const contentSchema = z.object({
   meme: z.object({ max_clip_seconds: z.number().positive(), broll_seconds: z.number().positive(), max_broll_seconds: z.number().positive(), order: z.enum(['clip_first', 'broll_first']) }),
   broll: z.object({ max_upload_mb: z.number().positive(), max_seconds: z.number().positive(), products: z.array(z.string()).default([]) }),
   slideshow: z.object({ slides: z.tuple([z.number().int().positive(), z.number().int().positive()]), hashtags: z.tuple([z.number().int().min(0), z.number().int().positive()]), max_stills: z.number().int().positive(), image: z.object({ quality: z.number().int().min(50).max(100) }) }),
-  batch: z.object({ max: z.number().int().positive(), default_count: z.number().int().positive() }),
+  batch: z.object({ max: z.number().int().positive(), default_count: z.number().int().positive(), zip_part_mb: z.number().positive().default(150) }),
   clone: z.object({
     model: z.string(),
     account_model: z.string(),

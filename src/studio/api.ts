@@ -111,6 +111,7 @@ export const api = {
   setCloneModel: (model: string) => request<{ model: string }>('PUT', '/settings/clone-model', { model }),
   archiveContent: (id: string) => request<{ ok: true }>('DELETE', `/content/${id}`),
   renderContent: (id: string) => request<{ id: string; status: string }>('POST', `/content/${id}/render`, {}),
+  retryFailed: (id: string) => request<{ id: string; status: string }>('POST', `/content/${id}/render/retry-failed`, {}),
   // Phase 3: the rough cut and sound bed, "Continue this shot", the sound library.
   cut: (id: string) => request<CutView>('GET', `/content/${id}/cut`),
   continueShot: (id: string) => request<{ id: string }>('POST', `/content/${id}/continue`, {}),

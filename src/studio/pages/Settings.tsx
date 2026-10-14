@@ -508,17 +508,25 @@ const NOTICES: Array<{ name: string; what: string; license: string; copyright: s
   { name: 'Noto Emoji', what: 'Emoji in captions', license: 'SIL Open Font License 1.1', copyright: 'Copyright 2013 Google LLC', url: 'https://github.com/googlefonts/noto-emoji' },
   { name: 'opentype.js', what: 'Drawing caption text', license: 'MIT', copyright: 'Copyright the opentype.js authors', url: 'https://github.com/opentypejs/opentype.js' },
   { name: 'fflate', what: 'Zip downloads', license: 'MIT', copyright: 'Copyright 2023 Arjun Barrett', url: 'https://github.com/101arrowz/fflate' },
+  { name: 'OpenCut', what: 'Fine-tune: the editor\'s project layout (tracks and ticks) follows OpenCut, the editor planned inside it (DECISIONS G13, G23)', license: 'MIT', copyright: 'Copyright 2025-2026 OpenCut', url: 'https://github.com/OpenCut-app/OpenCut' },
 ]
+
+// OpenCut's license, verbatim (DECISIONS G13: it stays in the app).
+const OPENCUT_LICENSE = "Copyright 2025-2026 OpenCut\n\nPermission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the \u201cSoftware\u201d), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \u201cAS IS\u201d, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE."
 
 function NoticesCard() {
   return (
     <div className="st-card">
-      <div className="st-card-head"><div className="grow"><div className="st-h2">Open-source notices</div><div className="st-hint">Fonts and libraries the Studio uses, with their licenses. OpenCut's notice is added here when the editor is built into the Studio.</div></div></div>
+      <div className="st-card-head"><div className="grow"><div className="st-h2">Open-source notices</div><div className="st-hint">Fonts and libraries the Studio uses, with their licenses, and OpenCut's license in full.</div></div></div>
       <div style={{ overflowX: 'auto' }}>
         <table className="st-table">
           <thead><tr><th>Name</th><th>Used for</th><th>License</th></tr></thead>
           <tbody>{NOTICES.map(n => <tr key={n.name}><td className="strong"><a href={n.url} target="_blank" rel="noreferrer">{n.name}</a></td><td>{n.what}</td><td>{n.license}. {n.copyright}.</td></tr>)}</tbody>
         </table>
+      </div>
+      <div className="st-card-body st-col" style={{ gap: 8 }} data-field="opencut-license">
+        <div className="st-h3">OpenCut license (MIT)</div>
+        <pre className="st-license">{OPENCUT_LICENSE}</pre>
       </div>
     </div>
   )

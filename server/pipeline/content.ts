@@ -223,6 +223,9 @@ export interface ContentOutputs {
   renderedAt?: string
   durationSec?: number
   sound?: Pick<SoundBedResult, 'layers' | 'targetLufs' | 'ducked'>
+  // A batch: why each failed video failed (by index), and the zip parts.
+  errors?: Record<string, string>
+  zipParts?: Array<{ assetId: string; from: number; to: number }>
 }
 
 function parseSpec(kind: string, raw: unknown) {
@@ -382,7 +385,7 @@ export async function startRender(deps: Deps, ctx: Ctx, itemId: string): Promise
   // A batch is one short job per video (the worker takes other work in
   // between), and the last one bundles the zip.
   const total = row.kind === 'batch' ? batchCaptions(deps, batchSpec.parse(row.spec)).length : 0
-  const outputs: ContentOutputs = row.kind === 'batch' ? { videos: [], done: 0, failed: 0, total } : {}
+  const outputs: ContentOutputs = row.kind === 'batch' ? { videos: [], errors: {}, done: 0, failed: 0, total } : {}
   const [out] = await deps.db.update(contentItems).set({ status: 'rendering', error: null, outputs, updatedAt: deps.clock.now() }).where(eq(contentItems.id, row.id)).returning()
   if (row.kind === 'batch') {
     for (let i = 0; i < total; i++) await enqueueLocalJob(deps, ctx, { stage: 'content', purpose: `content_render:${row.id}`, label: `Render batch video ${i + 1} of ${total}`, characterId: row.characterId, request: { index: i } })
@@ -494,16 +497,23 @@ async function runContentRender(deps: Deps, ctx: Ctx, job: JobRow): Promise<unkn
   }
 }
 
-// One video of a batch. The worker runs jobs one at a time, so the outputs
-// are read and written in turn; the last video bundles the zip.
+// One video of a batch (Phase 4: batch at scale). Each video is its own
+// short job and owns one slot of the outputs, so a job that runs again
+// after a crash or during a deploy overwrites its own slot instead of being
+// counted twice. Results are merged under a row lock, so two workers never
+// lose each other's results. When every slot is settled, the zip is built
+// (in parts, so a big batch never needs all its videos in memory at once).
+type BatchVideo = { caption: string; assetId: string; clipId?: string; brollId?: string | null }
+
 async function renderBatchVideo(deps: Deps, ctx: Ctx, job: JobRow, row: ContentRow, name: string): Promise<unknown> {
   const s = batchSpec.parse(row.spec)
   const captions = batchCaptions(deps, s)
   const index = (job.request as { index?: number }).index ?? 0
   const caption = captions[index]
-  let result: { caption: string; assetId: string; clipId?: string; brollId?: string | null } | null = null
+  let result: BatchVideo | null = null
   let error: string | null = null
-  if (caption) {
+  if (!caption) error = `Video ${index + 1} has no caption any more.`
+  else {
     try {
       const src = batchSources(s, index)
       const cut = effectiveCut({ ...s, ...src }, deps.config.pipeline.content.meme.max_broll_seconds)
@@ -513,27 +523,75 @@ async function renderBatchVideo(deps: Deps, ctx: Ctx, job: JobRow, row: ContentR
       error = `Video ${index + 1} failed: ${(e as Error).message.slice(0, 300)}`
     }
   }
-  const now = await getContent(deps, ctx, row.id)
-  const prev = now.outputs as ContentOutputs
-  const videos = [...(prev.videos ?? [])]
-  if (result) videos[index] = result
-  const done = (prev.done ?? 0) + (result ? 1 : 0)
-  const failed = (prev.failed ?? 0) + (result ? 0 : 1)
-  const total = prev.total ?? captions.length
-  const outputs: ContentOutputs = { ...prev, videos, done, failed, total }
-  if (done + failed < total) {
-    await setOutputs(deps, row.id, outputs)
-  } else {
-    // One download for all of them (stored, not compressed: MP4 is already).
-    const kept = videos.map((v, i) => ({ v, i })).filter((x): x is { v: { caption: string; assetId: string }; i: number } => !!x.v)
-    const files: Record<string, Uint8Array> = { 'captions.txt': Buffer.from(kept.map(({ v, i }) => `${String(i + 1).padStart(2, '0')}. ${v.caption}`).join('\n') + '\n') }
-    for (const { v, i } of kept) files[`${name}-${String(i + 1).padStart(2, '0')}.mp4`] = (await readAsset(deps, ctx, v.assetId)).data
-    const zip = kept.length ? await saveAsset(deps, ctx, { data: Buffer.from(zipSync(files, { level: 0 })), mime: 'application/zip', origin: 'derived', label: `Batch ${name} (zip)`, sourceJobId: job.id }) : null
-    await setOutputs(deps, row.id, { ...outputs, ...(zip ? { zipAssetId: zip.id } : {}), renderedAt: deps.clock.now().toISOString() }, failed ? 'failed' : 'ready')
-    if (failed) await deps.db.update(contentItems).set({ error: `${failed} of ${total} videos failed; the rest are ready.` }).where(eq(contentItems.id, row.id))
-  }
+  const settled = await deps.db.transaction(async tx => {
+    const [now] = await tx.select().from(contentItems).where(eq(contentItems.id, row.id)).for('update')
+    const prev = (now?.outputs ?? {}) as ContentOutputs
+    const videos = [...(prev.videos ?? [])]
+    const errors = { ...(prev.errors ?? {}) }
+    if (result) { videos[index] = result; delete errors[String(index)] } else { videos[index] = videos[index] ?? null; errors[String(index)] = error! }
+    const total = prev.total ?? captions.length
+    const done = videos.filter(Boolean).length
+    const failed = Object.keys(errors).filter(k => !videos[Number(k)]).length
+    const outputs: ContentOutputs = { ...prev, videos, errors, done, failed, total }
+    const complete = done + failed >= total
+    await tx.update(contentItems).set({ outputs, updatedAt: deps.clock.now() }).where(eq(contentItems.id, row.id))
+    return { outputs, complete }
+  })
+  if (settled.complete) await finishBatch(deps, ctx, job, row.id, name, settled.outputs)
   if (error) throw new Error(error)
   return result
+}
+
+// The batch's download: its videos and captions.txt, in zip parts of at
+// most batch.zip_part_mb (stored, not compressed: MP4 is already).
+async function finishBatch(deps: Deps, ctx: Ctx, job: JobRow, itemId: string, name: string, outputs: ContentOutputs): Promise<void> {
+  const cfg = deps.config.pipeline.content.batch
+  const videos = outputs.videos ?? []
+  const kept = videos.map((v, i) => ({ v, i })).filter((x): x is { v: BatchVideo; i: number } => !!x.v)
+  const captionsTxt = Buffer.from(kept.map(({ v, i }) => `${String(i + 1).padStart(2, '0')}. ${v.caption}`).join('\n') + '\n')
+  const cap = cfg.zip_part_mb * 1024 * 1024
+  const parts: NonNullable<ContentOutputs['zipParts']> = []
+  let files: Record<string, Uint8Array> = {}
+  let size = 0, from = -1, to = -1
+  const flush = async () => {
+    if (!Object.keys(files).length) return
+    files['captions.txt'] = captionsTxt
+    const n = parts.length + 1
+    const zip = await saveAsset(deps, ctx, { data: Buffer.from(zipSync(files, { level: 0 })), mime: 'application/zip', origin: 'derived', label: `Batch ${name} (zip${n > 1 ? ` part ${n}` : ''})`, sourceJobId: job.id })
+    parts.push({ assetId: zip.id, from: from + 1, to: to + 1 })
+    files = {}; size = 0; from = -1
+  }
+  for (const { v, i } of kept) {
+    const data = (await readAsset(deps, ctx, v.assetId)).data
+    if (size && size + data.length > cap) await flush()
+    if (from < 0) from = i
+    to = i
+    files[`${name}-${String(i + 1).padStart(2, '0')}.mp4`] = data
+    size += data.length
+  }
+  await flush()
+  const failed = outputs.failed ?? 0
+  const final: ContentOutputs = { ...outputs, zipParts: parts, renderedAt: deps.clock.now().toISOString() }
+  if (parts[0]) final.zipAssetId = parts[0].assetId
+  else delete final.zipAssetId
+  await deps.db.update(contentItems).set({
+    outputs: final, status: failed ? 'failed' : 'ready', error: failed ? `${failed} of ${outputs.total ?? videos.length} videos failed; the rest are ready. Retry the failed ones.` : null, updatedAt: deps.clock.now(),
+  }).where(eq(contentItems.id, itemId))
+}
+
+// "Retry the failed ones": only the videos that failed render again (free).
+export async function retryFailedBatch(deps: Deps, ctx: Ctx, itemId: string): Promise<ContentRow> {
+  const row = await getContent(deps, ctx, itemId)
+  if (row.kind !== 'batch') throw new AppError('bad_request', 'Retry the failed ones works on a batch.')
+  if (row.status === 'rendering') throw new AppError('bad_request', 'This batch is still rendering.')
+  const prev = row.outputs as ContentOutputs
+  const failed = Object.keys(prev.errors ?? {}).map(Number).filter(i => !(prev.videos ?? [])[i]).sort((a, b) => a - b)
+  if (!failed.length) throw new AppError('bad_request', 'No video in this batch failed.')
+  const errors = { ...(prev.errors ?? {}) }
+  for (const i of failed) delete errors[String(i)]
+  const [out] = await deps.db.update(contentItems).set({ status: 'rendering', error: null, outputs: { ...prev, errors, failed: 0 }, updatedAt: deps.clock.now() }).where(eq(contentItems.id, row.id)).returning()
+  for (const i of failed) await enqueueLocalJob(deps, ctx, { stage: 'content', purpose: `content_render:${row.id}`, label: `Render batch video ${i + 1} again`, characterId: row.characterId, request: { index: i } })
+  return out!
 }
 
 // ── Claude: slideshow text and batch captions (priced) ───────────────

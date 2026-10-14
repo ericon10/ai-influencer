@@ -12,7 +12,7 @@ import { importCharacter } from './files.js'
 import { approveSceneCandidate, createScene, sceneCandidates, updateScene } from './scenes.js'
 import { addBroll, createContent, getContent, startRender, updateContent, type ContentOutputs, type MemeSpec } from './content.js'
 import { cancelContinue, continueShot, keepTwoShots, useChainTake } from './chain.js'
-import { postCutView } from './cutView.js'
+import { postCutView, postEditorProject } from './cutView.js'
 import { addSound, listSounds } from './sounds.js'
 import { renderPlaceholderPortrait } from '../providers/mock.js'
 import { makeClip } from '../media/testClips.js'
@@ -240,6 +240,18 @@ describe('sound bed and rough cut', () => {
     const p = await probeFile(await fileOf(out.videoAssetId!, 'edited.mp4'))
     expect(p.durationSec).toBeCloseTo(5, 0)
     expect(p.hasAudio).toBe(false)
+  })
+
+  it('Fine-tune gets the same layers, streamed by URL, in OpenCut\'s layout (Phase 4)', async () => {
+    const post = (await createContent(h.deps, h.ctx, { kind: 'meme', characterId, spec: { clipId, brollId, brollSeconds: 2, caption: 'layers', sound: { music: musicId } } })).id
+    const e = await postEditorProject(h.deps, h.ctx, post)
+    expect(e.builtInAmbience).toBe('Room tone')
+    expect(e.media.map(m => m.kind).sort()).toEqual(['audio', 'video', 'video'])
+    expect(e.media.every(m => m.url.startsWith('/api/v1/assets/'))).toBe(true)
+    const tracks = e.opencut.scenes[0]!.tracks
+    expect(tracks.main.elements.map(x => x.duration / 120000)).toEqual([5, 2])
+    expect(tracks.overlay[0]!.elements[0]!.params).toEqual({ content: 'layers' })
+    expect(tracks.audio).toHaveLength(1)
   })
 
   it('a cut with problems is refused before it is queued, in plain words', async () => {

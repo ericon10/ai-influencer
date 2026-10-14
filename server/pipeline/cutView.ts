@@ -8,6 +8,7 @@ import { getAsset } from '../storage/assets.js'
 import { getContent, specSchemas, type MemeSpec } from './content.js'
 import { listSounds, soundView } from './sounds.js'
 import { partsOf } from './chain.js'
+import { toOpenCutProject, type EditorAudio, type EditorCaption, type EditorMedia, type EditorProjectInput, type EditorShot } from '../core/opencut.js'
 
 // What the Finish step shows for a video post (UX-PLAN.md section 8): the
 // rough cut as tracks (each shot with its title, picture, source length and
@@ -107,3 +108,37 @@ export async function postCutView(deps: Deps, ctx: Ctx, postId: string) {
 }
 
 export type CutView = Awaited<ReturnType<typeof postCutView>>
+
+// The Fine-tune editor's project (Phase 4): the cut as layers, with every
+// clip, B-roll and sound streamed from storage by URL (same origin, same
+// login; nothing is downloaded), and the same project in OpenCut's layout
+// for the OpenCut engine (DECISIONS G23).
+export async function postEditorProject(deps: Deps, ctx: Ctx, postId: string) {
+  const row = await getContent(deps, ctx, postId)
+  const view = await postCutView(deps, ctx, postId)
+  const cfg = deps.config.pipeline.content
+  const url = (assetId: string) => `/api/v1/assets/${assetId}/content`
+  const media: EditorMedia[] = []
+  const shots: EditorShot[] = []
+  for (const s of view.shots) {
+    if (!s.assetId || s.start == null || s.durationSec == null) continue
+    if (!media.some(m => m.id === s.assetId)) media.push({ id: s.assetId, kind: 'video', name: s.title, url: url(s.assetId), durationSec: s.sourceSec })
+    shots.push({ id: s.id, kind: s.kind, mediaId: s.assetId, title: s.title, start: s.start, in: s.in, out: s.in + s.durationSec, sourceSec: s.sourceSec, sound: s.hasSound })
+  }
+  const total = view.totalSec
+  const captions: EditorCaption[] = view.captions.filter(c => c.shown).map(c => ({ id: c.id, text: c.shown, start: c.start, end: c.end == null ? total : Math.min(total, c.end) }))
+  const audio: EditorAudio[] = []
+  const levels = cfg.sound.levels
+  const s = view.sound.spec
+  for (const [role, id, level] of [['ambience', s.ambience, s.ambienceLevel], ['music', s.music, s.musicLevel]] as const) {
+    const snd = id ? view.sound.sounds.find(x => x.id === id && x.assetId) : null
+    if (!snd?.assetId) continue
+    media.push({ id: snd.assetId, kind: 'audio', name: snd.title, url: url(snd.assetId), durationSec: snd.durationSec })
+    audio.push({ id: snd.id, mediaId: snd.assetId, name: snd.title, role, gainDb: levels[level], durationSec: snd.durationSec ?? total })
+  }
+  const input: EditorProjectInput = {
+    id: row.id, name: row.title || row.idea.slice(0, 60) || 'Video post', canvas: cfg.canvas, totalSec: total, shots, captions, audio,
+    createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString(),
+  }
+  return { media, opencut: toOpenCutProject(input), builtInAmbience: s.ambience === 'room' ? 'Room tone' : null }
+}

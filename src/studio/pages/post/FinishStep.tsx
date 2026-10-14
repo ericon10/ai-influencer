@@ -1,18 +1,22 @@
-import { CopyPlus, Download, Scissors } from 'lucide-react'
-import { assetUrl, downloadUrl } from '../../api'
-import { Img, type TodoItem } from '../../ui'
+import { Link } from 'react-router-dom'
+import { CopyPlus, Download, RotateCcw, Scissors } from 'lucide-react'
+import { api, assetUrl, downloadUrl } from '../../api'
+import { AsyncButton, Img, errorMessage, useToast, type TodoItem } from '../../ui'
 import type { BatchSpec, MemeSpec, SlideshowSpec } from '../../types'
 import { DownloadLink, ExportPanel, fileSlug, postName, useDuplicate } from './parts'
 import type { PostCtx } from './ctx'
 import { RoughCut, SoundRow, autoCut } from './RoughCut'
-import { useSounds } from '../../hooks'
+import { keys, useSounds } from '../../hooks'
+import { useQueryClient } from '@tanstack/react-query'
 
-// The Finish step: export (free, on the worker), download, and make another
-// like this. Fine-tune opens the editor over the post in Phase 4.
+// The Finish step: the rough cut and sound, export (free, on the worker),
+// download, make another like this, and Fine-tune (the editor over the post).
 
 export function FinishStep({ ctx }: { ctx: PostCtx }) {
   const { item, draft, lib } = ctx
   const duplicate = useDuplicate()
+  const qc = useQueryClient()
+  const toast = useToast()
   const name = fileSlug(postName({ ...item, title: draft.fields.title, idea: draft.fields.idea }))
   const o = item.outputs
   const sounds = useSounds().data?.sounds ?? []
@@ -61,7 +65,16 @@ export function FinishStep({ ctx }: { ctx: PostCtx }) {
         )}
         {item.kind === 'batch' && (o.videos?.length ?? 0) > 0 && (
           <div className="st-col" style={{ gap: 10 }}>
-            {o.zipAssetId && <div className="st-row"><DownloadLink assetId={o.zipAssetId} name={`${name}-batch.zip`}>Download all (zip, with captions.txt)</DownloadLink></div>}
+            {(o.zipParts?.length ?? 0) > 1
+              ? <div className="st-row" style={{ gap: 8, flexWrap: 'wrap' }}>{o.zipParts!.map((z, i) => <DownloadLink key={z.assetId} assetId={z.assetId} name={`${name}-batch-part${i + 1}.zip`}>Part {i + 1} (videos {z.from} to {z.to})</DownloadLink>)}<span className="st-hint">Each part has captions.txt.</span></div>
+              : o.zipAssetId && <div className="st-row"><DownloadLink assetId={o.zipAssetId} name={`${name}-batch.zip`}>Download all (zip, with captions.txt)</DownloadLink></div>}
+            {item.status !== 'rendering' && (o.failed ?? 0) > 0 && (
+              <div className="st-row" style={{ gap: 8, flexWrap: 'wrap' }}>
+                <AsyncButton className="st-btn sm" icon={<RotateCcw size={13} />} onClick={async () => { try { await api.retryFailed(item.id); await qc.invalidateQueries({ queryKey: keys.content }) } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) } }}>Retry the failed ones ({o.failed})</AsyncButton>
+                <span className="st-hint">Free. Only those videos render again.</span>
+              </div>
+            )}
+            {Object.entries(o.errors ?? {}).filter(([k]) => !o.videos?.[Number(k)]).slice(0, 5).map(([k, msg]) => <span key={k} className="st-hint st-warntext">{msg}</span>)}
             <div className="st-content-videos">
               {o.videos!.map((x, i) => x && (
                 <div key={x.assetId} className="st-col" style={{ gap: 6 }}>
@@ -76,7 +89,7 @@ export function FinishStep({ ctx }: { ctx: PostCtx }) {
       </ExportPanel>
       <div className="st-row" style={{ gap: 8, flexWrap: 'wrap' }}>
         <button type="button" className="st-btn" onClick={() => void duplicate(item.id)}><CopyPlus size={15} />Make another like this</button>
-        <button type="button" className="st-btn ghost" disabled title="Phase 4: the editor opens over this post, and Done brings you back here"><Scissors size={15} />Fine-tune (coming with the editor)</button>
+        {item.kind === 'meme' && <Link className="st-btn" to={`/studio/posts/${item.id}/edit`} onClick={() => void draft.flush()} title="The rough cut as layers, full screen; Done saves and exports"><Scissors size={15} />Fine-tune</Link>}
       </div>
     </div>
   )

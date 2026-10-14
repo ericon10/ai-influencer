@@ -365,12 +365,17 @@ Decisions: `DECISIONS.md` G14, G15.
   framing-aware REALISM; task, trigger, distance and phone camera fields;
   Diagnose and revise (G20)
 
-## Phase 4: OpenCut embedded (planned, not started)
+## Phase 4: Fine-tune and batch at scale (evening build 2026-10-14)
 
 Decisions: `DECISIONS.md` G13. Export or Fine-tune from the post screen;
 OpenCut as a page in the Studio, project from R2, Done saves back.
 
-- [ ] OpenCut's license notice in the app
+- [x] Fine-tune over the workspace: layers, preview, split, trim, move,
+      undo; Done saves the cut, renders the MP4 back to the post (G23)
+- [ ] The OpenCut engine inside Fine-tune (blocked: rewrite not released,
+      classic does not build and has no embed API; owner decides, G23)
+- [x] Batch at scale: 50 videos, idempotent slots, retry failed, zip parts
+- [x] OpenCut's license notice in the app (Settings > Notices)
 - [ ] Written permission from the ai-influencer author (owner)
 - [ ] First live take, then confirm the upscaler's real price
 - [x] Chaining (continue from the last frame), sound bed, rough cut
