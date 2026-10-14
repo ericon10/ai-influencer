@@ -5,6 +5,7 @@ import { api } from '../api'
 import { useSocialAccounts } from '../hooks'
 import { errorMessage, useToast } from '../ui'
 import type { CharacterSummary, SocialAccount } from '../types'
+import { HowTo } from '../guide/Guide'
 
 // Posts home > Accounts (UX-PLAN.md section 14): one row per account tag
 // with its tracked link or promo code and its signups, ranked by signups
@@ -26,7 +27,8 @@ export function AccountsCard({ characters }: { characters: CharacterSummary[] })
   }
   return (
     <section className="st-card st-accounts" data-field="accounts" style={{ marginBottom: 18 }}>
-      <button type="button" className="st-card-head st-row" style={{ width: '100%', background: 'none', border: 0, cursor: 'pointer', textAlign: 'left', gap: 10 }} onClick={() => setOpen(!open)} aria-expanded={open}>
+      <div className="st-card-head st-row" style={{ gap: 10 }}>
+      <button type="button" className="st-row grow" style={{ flex: 1, background: 'none', border: 0, cursor: 'pointer', textAlign: 'left', gap: 10, color: 'inherit', font: 'inherit', padding: 0 }} onClick={() => setOpen(!open)} aria-expanded={open}>
         {open ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
         <Trophy size={16} />
         <div className="grow">
@@ -34,6 +36,8 @@ export function AccountsCard({ characters }: { characters: CharacterSummary[] })
           <div className="st-hint">{rows.length ? `${rows.length} account${rows.length === 1 ? '' : 's'} · ${q.data?.totalSignups ?? 0} signups${top && top.signups > 0 ? ` · top: ${top.tag}` : ''}. Ranked by signups, not views.` : 'Each account\'s tracked link or promo code, and a scoreboard by signups.'}</div>
         </div>
       </button>
+      <HowTo id="hooks" label="How the scoreboard works" />
+      </div>
       {open && (
         <div className="st-card-body st-col" style={{ gap: 10 }}>
           {rows.length > 0 && (

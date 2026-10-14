@@ -76,23 +76,31 @@
    {
     "n": 1,
     "x": 64.6,
-    "y": 10.2,
+    "y": 11.3,
     "w": 31.1,
     "h": 4.2,
     "label": "Start a post right here too"
    },
    {
     "n": 2,
+    "x": 6.1,
+    "y": 36,
+    "w": 69.2,
+    "h": 4.3,
+    "label": "Accounts: tracked links, promo codes and signups"
+   },
+   {
+    "n": 3,
     "x": 4.2,
-    "y": 18.1,
+    "y": 44.8,
     "w": 6.7,
     "h": 2.1,
     "label": "Filter by account (the tag you set on a post)"
    },
    {
-    "n": 3,
+    "n": 4,
     "x": 4.2,
-    "y": 22.7,
+    "y": 49.4,
     "w": 21.8,
     "h": 50,
     "label": "A post: open it to keep going where you left off"
@@ -615,18 +623,26 @@
  },
  "post-caption": {
   "w": 1068,
-  "h": 588,
+  "h": 590,
   "spots": [
    {
     "n": 1,
     "x": 2.9,
-    "y": 14.6,
+    "y": 21,
     "w": 67.8,
-    "h": 24.4,
+    "h": 15.6,
     "label": "The caption, in TikTok's white box"
    },
    {
     "n": 2,
+    "x": 13.8,
+    "y": 14.9,
+    "w": 10.7,
+    "h": 5.1,
+    "label": "Pick a hook from the vault"
+   },
+   {
+    "n": 3,
     "x": 72.8,
     "y": 88.6,
     "w": 24.3,
@@ -637,38 +653,54 @@
  },
  "post-finish": {
   "w": 1068,
-  "h": 748,
+  "h": 1200,
   "spots": [
    {
     "n": 1,
-    "x": 26.7,
-    "y": 31.6,
-    "w": 12.7,
-    "h": 4,
-    "label": "Download the finished MP4"
+    "x": 4.9,
+    "y": 18.4,
+    "w": 14.5,
+    "h": 3.2,
+    "label": "Open the editor: place presets exactly where you want them"
    },
    {
     "n": 2,
     "x": 2.9,
-    "y": 11.5,
-    "w": 25.2,
-    "h": 7.2,
-    "label": "Export again after a change (free)"
+    "y": 24.7,
+    "w": 94.2,
+    "h": 6.1,
+    "label": "Sound: ambience, music and a voiceover, mixed for you"
    },
    {
     "n": 3,
-    "x": 2.9,
-    "y": 90.8,
-    "w": 18.5,
-    "h": 5.1,
-    "label": "Make another like this: a filled-in copy"
+    "x": 4.9,
+    "y": 49.9,
+    "w": 38.6,
+    "h": 5.3,
+    "label": "Voiceover: one of the character's converted voice lines"
    },
    {
     "n": 4,
+    "x": 26.7,
+    "y": 70.8,
+    "w": 12.7,
+    "h": 2.5,
+    "label": "Download the finished MP4"
+   },
+   {
+    "n": 5,
     "x": 2.9,
-    "y": 27.8,
+    "y": 58.3,
+    "w": 25.2,
+    "h": 4.5,
+    "label": "Export again after a change (free)"
+   },
+   {
+    "n": 6,
+    "x": 2.9,
+    "y": 68.5,
     "w": 94.2,
-    "h": 2.4,
+    "h": 1.5,
     "label": "Turn on the AI-generated label when you post"
    }
   ]
@@ -802,7 +834,7 @@
    {
     "n": 1,
     "x": 4.6,
-    "y": 16.2,
+    "y": 19.3,
     "w": 6.5,
     "h": 3,
     "label": "Stills you made"
@@ -810,7 +842,7 @@
    {
     "n": 2,
     "x": 11.3,
-    "y": 16.2,
+    "y": 19.3,
     "w": 6.5,
     "h": 3,
     "label": "Kept clips: takes, uploads and clones"
@@ -818,23 +850,39 @@
    {
     "n": 3,
     "x": 18,
-    "y": 16.2,
+    "y": 19.3,
     "w": 6.8,
     "h": 3,
     "label": "B-roll: screen recordings and phone videos"
    },
    {
     "n": 4,
-    "x": 25,
-    "y": 16.2,
+    "x": 33,
+    "y": 19.3,
+    "w": 9.6,
+    "h": 3,
+    "label": "Voice lines: your takes in the character's voice"
+   },
+   {
+    "n": 5,
+    "x": 42.7,
+    "y": 19.3,
+    "w": 7.2,
+    "h": 3,
+    "label": "Hooks: the vault, the claims sheet and buyer language"
+   },
+   {
+    "n": 6,
+    "x": 50,
+    "y": 19.3,
     "w": 6.8,
     "h": 3,
     "label": "Finished posts and their exports"
    },
    {
-    "n": 5,
+    "n": 7,
     "x": 4.2,
-    "y": 21.4,
+    "y": 24.5,
     "w": 17.3,
     "h": 45.4,
     "label": "Open any item, or start a new post from it"
@@ -988,6 +1036,258 @@
     "w": 18.1,
     "h": 4.2,
     "label": "Run the edit (priced)"
+   }
+  ]
+ },
+ "accounts": {
+  "w": 1068,
+  "h": 424,
+  "spots": [
+   {
+    "n": 1,
+    "x": 3.1,
+    "y": 33.7,
+    "w": 3.5,
+    "h": 13.3,
+    "label": "Ranked by signups, never by views"
+   },
+   {
+    "n": 2,
+    "x": 30.3,
+    "y": 36.4,
+    "w": 22.7,
+    "h": 7.9,
+    "label": "This account's tracked link (it goes in the caption or bio)"
+   },
+   {
+    "n": 3,
+    "x": 55.3,
+    "y": 36.4,
+    "w": 10.3,
+    "h": 7.9,
+    "label": "Or its promo code"
+   },
+   {
+    "n": 4,
+    "x": 77.2,
+    "y": 36.4,
+    "w": 7.5,
+    "h": 7.9,
+    "label": "Signups from your link tracker"
+   },
+   {
+    "n": 5,
+    "x": 3.1,
+    "y": 75.9,
+    "w": 24.3,
+    "h": 10.1,
+    "label": "Add an account by hand"
+   }
+  ]
+ },
+ "voice-lines": {
+  "w": 1140,
+  "h": 1151,
+  "spots": [
+   {
+    "n": 1,
+    "x": 6.1,
+    "y": 30.2,
+    "w": 17.7,
+    "h": 3.3,
+    "label": "Upload takes: one WAV per line, named by hook"
+   },
+   {
+    "n": 2,
+    "x": 7.8,
+    "y": 41.4,
+    "w": 5.9,
+    "h": 1.9,
+    "label": "The hook number, read from the file name"
+   },
+   {
+    "n": 3,
+    "x": 7.8,
+    "y": 53,
+    "w": 22.8,
+    "h": 2.8,
+    "label": "Your take"
+   },
+   {
+    "n": 4,
+    "x": 7.8,
+    "y": 58.4,
+    "w": 22.8,
+    "h": 2.8,
+    "label": "The same line in the character's voice"
+   },
+   {
+    "n": 5,
+    "x": 7.8,
+    "y": 61.7,
+    "w": 37.7,
+    "h": 1.6,
+    "label": "The words it timed, for captions"
+   },
+   {
+    "n": 6,
+    "x": 46.5,
+    "y": 40.5,
+    "w": 16.9,
+    "h": 2.6,
+    "label": "Convert (priced first)"
+   }
+  ]
+ },
+ "voice-card": {
+  "w": 560,
+  "h": 852,
+  "spots": [
+   {
+    "n": 1,
+    "x": 3.8,
+    "y": 16,
+    "w": 92.5,
+    "h": 12.9,
+    "label": "The ElevenLabs voice for voice lines"
+   },
+   {
+    "n": 2,
+    "x": 3.8,
+    "y": 40.1,
+    "w": 92.5,
+    "h": 13.7,
+    "label": "How the character talks"
+   },
+   {
+    "n": 3,
+    "x": 51.1,
+    "y": 55.5,
+    "w": 45.2,
+    "h": 10.8,
+    "label": "Never: advice for the writers, not a block"
+   },
+   {
+    "n": 4,
+    "x": 3.8,
+    "y": 89.9,
+    "w": 92.5,
+    "h": 8,
+    "label": "One line in this voice for the writers to match"
+   }
+  ]
+ },
+ "voiceover": {
+  "w": 1030,
+  "h": 509,
+  "spots": [
+   {
+    "n": 1,
+    "x": 22.8,
+    "y": 68.9,
+    "w": 20.6,
+    "h": 5.5,
+    "label": "The character's converted line"
+   },
+   {
+    "n": 2,
+    "x": 8.3,
+    "y": 76,
+    "w": 7,
+    "h": 8.5,
+    "label": "Where it starts"
+   },
+   {
+    "n": 3,
+    "x": 17.9,
+    "y": 76.5,
+    "w": 16.8,
+    "h": 7.5,
+    "label": "How loud it is (music and ambience dip under it)"
+   },
+   {
+    "n": 4,
+    "x": 36,
+    "y": 77.7,
+    "w": 4.3,
+    "h": 5.1,
+    "label": "Captions from its words, each word timed"
+   }
+  ]
+ },
+ "hooks": {
+  "w": 1140,
+  "h": 1100,
+  "spots": [
+   {
+    "n": 1,
+    "x": 4.2,
+    "y": 22.4,
+    "w": 8.8,
+    "h": 2.5,
+    "label": "The product (import another script kit any time)"
+   },
+   {
+    "n": 2,
+    "x": 6.1,
+    "y": 33.4,
+    "w": 6.6,
+    "h": 2.5,
+    "label": "Filter the vault by type"
+   },
+   {
+    "n": 3,
+    "x": 6.1,
+    "y": 37.5,
+    "w": 9.1,
+    "h": 1.7,
+    "label": "Which characters get a variant"
+   },
+   {
+    "n": 4,
+    "x": 6.1,
+    "y": 40.7,
+    "w": 87.5,
+    "h": 5.1,
+    "label": "A hook: edit its words in place"
+   }
+  ]
+ },
+ "hook-variants": {
+  "w": 1030,
+  "h": 342,
+  "spots": [
+   {
+    "n": 1,
+    "x": 6.2,
+    "y": 22.5,
+    "w": 21.3,
+    "h": 8.8,
+    "label": "Write variants: priced first"
+   },
+   {
+    "n": 2,
+    "x": 7.3,
+    "y": 39.2,
+    "w": 5.8,
+    "h": 6.4,
+    "label": "Whose voice it is in"
+   },
+   {
+    "n": 3,
+    "x": 14.1,
+    "y": 36.3,
+    "w": 41.8,
+    "h": 12.3,
+    "label": "The variant"
+   },
+   {
+    "n": 4,
+    "x": 78.2,
+    "y": 38,
+    "w": 14.5,
+    "h": 8.8,
+    "label": "Use in a new post, as the caption"
    }
   ]
  }

@@ -3,6 +3,7 @@ import { api } from '../../api'
 import { useRefresh } from '../../hooks'
 import { Field, Modal, errorMessage, useToast } from '../../ui'
 import type { CharacterView, VoiceCard } from '../../types'
+import { HowTo } from '../../guide/Guide'
 
 // The voice card (UX-PLAN.md sections 13 and 14): the character's
 // ElevenLabs voice for voice lines, and how the character talks, which the
@@ -54,7 +55,7 @@ export function VoiceEditor({ v, open, onClose }: { v: CharacterView; open: bool
   return (
     <Modal open={open} onClose={onClose}>
       <div className="st-card-body st-col" style={{ gap: 14 }}>
-        <div><div className="st-kicker">Voice</div><div className="st-h2">How {name} sounds and talks</div><span className="st-hint">All optional. The caption, script and hook writers write in this voice, so accounts never sound alike.</span></div>
+        <div><div className="st-kicker st-row" style={{ gap: 10 }}>Voice<HowTo id="voice" label="How voices work" /></div><div className="st-h2">How {name} sounds and talks</div><span className="st-hint">All optional. The caption, script and hook writers write in this voice, so accounts never sound alike.</span></div>
         <Field id="voice-eleven" label="ElevenLabs voice ID" hint="For voice lines: your takes are turned into this voice. Copy it from ElevenLabs (Voices, the voice, ID).">
           <input className="st-input st-mono" value={form.elevenlabsId} placeholder="e.g. 21m00Tcm4TlvDq8ikWAM" onChange={set('elevenlabsId')} />
         </Field>

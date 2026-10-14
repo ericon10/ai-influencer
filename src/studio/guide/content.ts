@@ -9,11 +9,11 @@ export type GuideColor = 'orange' | 'pink' | 'violet' | 'blue' | 'teal' | 'green
 export type GuideId =
   | 'big-picture' | 'posts' | 'characters' | 'setup-start' | 'setup-face' | 'setup-sheet' | 'setup-file'
   | 'post-idea' | 'post-stills' | 'post-video' | 'post-clone' | 'post-text' | 'post-finish'
-  | 'library' | 'settings' | 'feedback' | 'realism'
+  | 'library' | 'settings' | 'feedback' | 'realism' | 'voice' | 'hooks'
 
 export interface GuideSection {
   id: GuideId
-  group: 'Start here' | 'Set up a character' | 'Make a post' | 'Everything else'
+  group: 'Start here' | 'Set up a character' | 'Make a post' | 'Grow your accounts' | 'Everything else'
   title: string
   // One line: what this is for.
   tagline: string
@@ -38,7 +38,7 @@ export const QUICK_START: Array<{ n: number; title: string; text: string; shot: 
   { n: 4, title: 'Make stills', text: 'Press Write and generate. Claude writes the prompt and the stills come back. Press Use this still on the best one.', shot: 'post-stills-done', color: 'amber', focus: [10, 84, 1.7] },
   { n: 5, title: 'Make the video', text: 'Claude has written the video prompt. Pick a model, press Generate a take, then Use this take.', shot: 'post-video-still', color: 'blue', focus: [0, 22, 1.7] },
   { n: 6, title: 'Add the caption', text: 'Type the caption. The preview shows it in TikTok\'s white box, clear of the buttons.', shot: 'post-caption', color: 'teal', focus: [30, 30, 1.5] },
-  { n: 7, title: 'Export and download', text: 'Export MP4 is free. Download it, post it, and turn on the AI-generated label.', shot: 'post-finish', color: 'green', focus: [8, 22, 1.8] },
+  { n: 7, title: 'Export and download', text: 'Export MP4 is free. Download it, post it, and turn on the AI-generated label.', shot: 'post-finish', color: 'green', focus: [16, 62, 1.8] },
 ]
 
 export const GUIDE: GuideSection[] = [
@@ -51,7 +51,7 @@ export const GUIDE: GuideSection[] = [
       'New post (the orange button) starts a post. Everything for that post happens on its page, top to bottom.',
       'Posts lists your posts. Open one to keep going where you left off.',
       'Characters is for setting up a person. You rarely go back once the sheet is done.',
-      'Library has every still, clip, B-roll video and export. Any of them can start a new post.',
+      'Library has every still, clip, B-roll video, sound, voice line, hook and export. Any of them can start a new post.',
       'Settings holds your keys, Higgsfield billing, the Claude models, the rules and the budgets.',
     ],
     tips: [
@@ -86,6 +86,7 @@ export const GUIDE: GuideSection[] = [
       'Start a post with the buttons at the top right, or New post in the sidebar.',
       'Filter by account (the tag you give a post, like "Callie TikTok") or by character.',
       'Another on a card makes a filled-in copy that opens at the caption: the fastest way to make a series.',
+      'Accounts (the card at the top, folded until you open it): each account\'s tracked link or promo code and its signups, ranked by signups. See Hooks and the scoreboard.',
     ],
     tips: ['Video post from a TikTok (in the New post menu) opens a post with Clone already open.'],
     shots: [
@@ -102,6 +103,7 @@ export const GUIDE: GuideSection[] = [
       'New character starts from inspiration photos (Inspiration step).',
       'Import brings in a character file (.md) and, if you have them, sheet images named REF-00 to REF-11.',
       'Open a character to see its four setup steps.',
+      'Voice (next to Edit card on the character page): the character\'s ElevenLabs voice and how they talk. The writers and voice lines use it.',
     ],
     tips: ['The character is always a new person, never a copy of someone in the inspiration photos.'],
     shots: [{ id: 'characters', caption: 'Your characters' }],
@@ -165,7 +167,10 @@ export const GUIDE: GuideSection[] = [
       'Edit the Card, Body and Notes sections freely.',
       'Import edits or sheet images to apply changes. The previous version stays in history.',
     ],
-    tips: ['Images named REF 00 to REF 11 (or REF-00) become approved sheet shots when you import them.'],
+    tips: [
+      'Images named REF 00 to REF 11 (or REF-00) become approved sheet shots when you import them.',
+      'A "## Voice" section in the file (Who, POV, Talks like, Never, Pillars, Example, ElevenLabs voice ID) becomes the voice card.',
+    ],
     shots: [{ id: 'setup-file', caption: 'The character file' }],
   },
   {
@@ -265,11 +270,15 @@ export const GUIDE: GuideSection[] = [
     where: 'Any post > Caption (Slides for a slideshow, Captions for a batch)',
     intro: 'A video post has one caption in TikTok\'s white box. A slideshow has a hook on slide 1, slides, a post caption and hashtags; Claude can write them. A batch has one caption per line, one video each; Claude can write as many as you ask for.',
     steps: [
-      'Video post: type the caption and watch the preview. Pick White box or Outline (white text with a black stroke, TikTok Classic). It sits in the upper third, off her mouth and hands.',
+      'Video post: type the caption and watch the preview, or press Pick a hook to use one from the vault (this character\'s own variants come first). Pick White box or Outline (white text with a black stroke, TikTok Classic). It sits in the upper third, off her mouth and hands.',
       'Slideshow: press Write the slides (or type them), add or remove slides, then the caption and hashtags.',
       'Batch: set How many, press Write, and edit the list. The clips rotate across the captions.',
     ],
-    tips: ['The preview uses the same font, box and safe zones as the export, so what you see is what you get.'],
+    tips: [
+      'The preview uses the same font, box and safe zones as the export, so what you see is what you get.',
+      'Claude writes slides and captions in the character\'s voice card when there is one (the character page, Voice).',
+      'A voiceover with "Captions from the voice line" on replaces the typed caption with the line\'s own words (Finish, Sound).',
+    ],
     cost: 'Writing slides or captions is a small Claude call. Typing them is free.',
     shots: [
       { id: 'post-caption', caption: 'Video post: the caption' },
@@ -297,6 +306,56 @@ export const GUIDE: GuideSection[] = [
     shots: [{ id: 'post-finish', caption: 'Finish' }],
   },
   {
+    id: 'voice', group: 'Grow your accounts', title: 'Voice and voice lines', color: 'pink',
+    tagline: 'How each character talks, and lines in their own voice.',
+    where: 'A character > Voice, Library > Voice lines, and a post\'s Finish step > Sound',
+    intro: 'Every character has a voice card: who they are, their point of view, how they talk, the words they use and never use, their emoji habit, their humor, their content pillars and an example line. Claude writes captions, slides and hook variants in that voice, so thirty accounts never sound like one. The card also holds the character\'s ElevenLabs voice: you perform a line yourself, and Convert turns your take into the character\'s voice with every word timed. A converted line becomes a post\'s voiceover, with captions from its words. There is no lip sync yet.',
+    steps: [
+      'On the character page, press Voice. Paste the ElevenLabs voice ID (ElevenLabs, Voices, the voice, ID) and fill in as much of the card as you like. Every field is optional.',
+      'Record each line as its own WAV, named by hook: 047_check-my-match-score.wav is Hook 47, "Check my match score".',
+      'Library > Voice lines: pick the character, press Upload takes and choose the files. The worker prepares each take for free.',
+      'Press Convert on a take, or Convert all, and check the price. When it is done, play your take and the converted line side by side; "Heard" shows the words it timed.',
+      'In a video post, Finish > Sound > Voiceover: pick the line, set where it starts and how loud it is. Captions from the voice line is on by default.',
+    ],
+    tips: [
+      'Captions from the voice line show a few words at a time, each timed to when it is said; with Karaoke captions each word lights up as it is spoken.',
+      'Music and ambience dip under the voice, and the finished post is leveled to -14 LUFS.',
+      'A voice line belongs to one character: switching the post\'s character drops it. A batch has no voiceover.',
+      'The "never" list is advice for the writers, never a block.',
+    ],
+    cost: 'Preparing takes is free. Convert is priced per second of the take, shown on the button first (an estimate until the first real run confirms it).',
+    shots: [
+      { id: 'voice-card', caption: 'The voice card' },
+      { id: 'voice-lines', caption: 'Library > Voice lines' },
+      { id: 'voiceover', caption: 'The voiceover in the Sound row' },
+    ],
+  },
+  {
+    id: 'hooks', group: 'Grow your accounts', title: 'Hooks and the scoreboard', color: 'orange',
+    tagline: 'A hook vault per product, variants in each voice, and signups per account.',
+    where: 'Library > Hooks, a post\'s Caption > Pick a hook, and Posts home > Accounts',
+    intro: 'Each product has a script kit: the hook vault (numbered hooks, grouped by type), the claims sheet (what you can say about the product, and what never to say) and the buyer-language bank (how buyers really talk). SideStep is loaded from your script kit. Write variants asks Claude to rewrite one hook in each character\'s voice, inside the claims sheet, so no two accounts post the same line. The Accounts card on Posts home keeps each account\'s tracked link or promo code and its signups, and ranks the accounts by signups, never by views.',
+    steps: [
+      'Library > Hooks: pick the product. Filter the vault by type (Relatable pain, Myth bust, Soft product and more).',
+      'Under Write variants for, pick the characters. Open a hook and press Write variants (priced first). Each variant shows the character\'s name, with Copy, Use in a new post and Archive.',
+      'Edit anything in place: a hook\'s words, a new hook, the claims sheet or the buyer language (Edit, one item per line; a line ending in a colon starts a group).',
+      'In a video post, press Pick a hook next to Caption: this character\'s variants come first under each hook.',
+      'On Posts home, open Accounts: add each account, its character, its tracked link or promo code, and type its signups from your link tracker. The table re-ranks itself.',
+    ],
+    tips: [
+      'Keep the 80/20 mix: about 80% pure value and relatable posts, 20% soft product mentions.',
+      'A variant that mentions the product next to a watch word from the claims sheet (interviews, hired, beats) gets a warning to check it. It never blocks.',
+      'Import a script kit (.md) to add another product. The kit\'s voice cards can be used for any character.',
+      'The link goes in the post caption or bio, never on the video.',
+    ],
+    cost: 'Write variants is a small Claude call, priced on the button. Everything else is free.',
+    shots: [
+      { id: 'hooks', caption: 'Library > Hooks' },
+      { id: 'hook-variants', caption: 'A hook with a variant in Callie\'s voice' },
+      { id: 'accounts', caption: 'Posts home > Accounts' },
+    ],
+  },
+  {
     id: 'library', group: 'Everything else', title: 'Library', color: 'teal',
     tagline: 'Everything you made, ready to reuse.',
     where: 'Sidebar > Library',
@@ -305,14 +364,11 @@ export const GUIDE: GuideSection[] = [
       'Pick a tab: Stills, Clips, B-roll, Sounds, Voice lines or Posts.',
       'Filter by character.',
       'Open an item, then Use in a new post.',
-      'Voice lines: pick the character, Upload takes (one WAV per line, named by hook, like 047_check-my-match-score.wav), then Convert (priced first) to hear each line in the character\'s voice with every word timed. Use it as a post\'s voiceover in the Finish step.',
-      'Hooks: pick the product (SideStep is loaded for you). The hook vault, the claims sheet and how buyers talk are on one page, all editable. Open a hook, pick the characters, and Write variants (priced first): Claude rewrites it once in each character\'s voice, inside the claims sheet. Use a variant in a new post, or pick it from the Text step with Pick a hook.',
+      'Voice lines: your performed takes, turned into the character\'s voice. See Voice and voice lines.',
+      'Hooks: each product\'s hook vault, claims sheet and buyer language, with variants in each character\'s voice. See Hooks and the scoreboard.',
     ],
     tips: [
       'Inside a post, the same Library opens as a drawer: pick, and it drops into the step.',
-      'Converting needs the character\'s ElevenLabs voice ID: the character page, Voice.',
-      'A variant that mentions the product next to a word the claims sheet warns about (interviews, hired) gets a warning to check it. It never blocks.',
-      'Posts home > Accounts: each account\'s tracked link or promo code, and signups from your link tracker. The scoreboard ranks by signups, never by views.',
     ],
     shots: [{ id: 'library', caption: 'The Library' }],
   },
@@ -386,6 +442,14 @@ export const GLOSSARY: Array<[string, string]> = [
   ['Plan credits / API', 'Higgsfield billing: your own account\'s credits, or the pay-per-use API.'],
   ['Fixed rule / default', 'Fixed rules always apply. Defaults are pre-filled and you can switch them off.'],
   ['Account tag', 'Which social account a post is for, like "Callie TikTok". Posts home filters by it.'],
+  ['Voice card', 'How a character talks: point of view, words used and never used, emoji, humor, pillars, an example line, and their ElevenLabs voice. The writers follow it.'],
+  ['Voice line', 'One line you performed, turned into the character\'s voice with every word timed. Library > Voice lines.'],
+  ['Voiceover', 'A voice line laid over a video post, with the music and ambience dipping under it and captions from its words.'],
+  ['Hook vault', 'A product\'s numbered opening lines, grouped by type. Library > Hooks.'],
+  ['Variant', 'A hook rewritten in one character\'s voice, so accounts never post the same line.'],
+  ['Claims sheet', 'What you can say about a product, and what never to say. Anything about the product stays inside it.'],
+  ['Buyer language', 'Real phrases buyers use, collected from comments and reviews. The writers use them instead of marketing words.'],
+  ['Scoreboard', 'Posts home > Accounts: accounts ranked by signups from their tracked link or promo code, never by views.'],
 ]
 
 export const sectionById = (id: GuideId): GuideSection => GUIDE.find(s => s.id === id)!

@@ -8,6 +8,7 @@ import { Callout, errorMessage, useToast } from '../../ui'
 import type { Cut, CutShot, MemeSpec, PostVoice, SoundItem, SoundLevel, SoundSpec } from '../../types'
 import type { PostCtx } from './ctx'
 import { Link } from 'react-router-dom'
+import { HowTo } from '../../guide/Guide'
 
 // The automatic cut and the Sound row (Phase 3; UX-PLAN.md sections 8 and
 // 12). The cut is what the Studio lays out on the post's timeline from the
@@ -142,7 +143,7 @@ function VoiceoverLine({ ctx, voice, onChange }: { ctx: PostCtx; voice: PostVoic
   const saved = !!(ctx.draft.spec as unknown as MemeSpec).editor?.projectAssetId
   return (
     <div className="st-soundline" data-field="post-voiceover">
-      <span className="st-label"><Mic size={13} />Voiceover</span>
+      <span className="st-label st-row" style={{ gap: 8 }}><Mic size={13} />Voiceover<HowTo id="voice" label="How voiceovers work" /></span>
       <div className="st-row" style={{ gap: 6, flexWrap: 'wrap' }}>
         <button type="button" className={`st-chip ${!voice ? 'on' : ''}`} onClick={() => onChange(null)}>None</button>
         {ready.map(l => <button key={l.id} type="button" className={`st-chip ${voice?.id === l.id ? 'on' : ''}`} onClick={() => pick(l.id)} title={l.transcript || l.line}>{l.tag ? `${l.tag}: ` : ''}{l.title}</button>)}

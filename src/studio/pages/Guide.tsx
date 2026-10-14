@@ -9,7 +9,7 @@ import { SectionView, shotUrl } from '../guide/Guide'
 // the real screens, and a glossary. Each section also opens from its page.
 
 const QUICK_TO: Record<number, GuideId> = { 1: 'setup-face', 2: 'posts', 3: 'post-idea', 4: 'post-stills', 5: 'post-video', 6: 'post-text', 7: 'post-finish' }
-const GROUPS: Array<GuideSection['group']> = ['Start here', 'Set up a character', 'Make a post', 'Everything else']
+const GROUPS: Array<GuideSection['group']> = ['Start here', 'Set up a character', 'Make a post', 'Grow your accounts', 'Everything else']
 
 const jump = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 

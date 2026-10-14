@@ -3,6 +3,7 @@ import { Copy, Plus, Sparkles, X } from 'lucide-react'
 import { PriceButton } from '../../PriceButton'
 import { Drawer, Field, useToast, type TodoItem } from '../../ui'
 import { useProduct, useProducts } from '../../hooks'
+import { HowTo } from '../../guide/Guide'
 import type { BatchSpec, CaptionStyle, MemeSpec, SlideshowSpec } from '../../types'
 import { CaptionPreview, CaptionStylePick } from './parts'
 import type { PostCtx } from './ctx'
@@ -157,6 +158,7 @@ function HookPicker({ open, onClose, characterId, onPick }: { open: boolean; onC
   return (
     <Drawer open={open} onClose={onClose} title="Pick a hook" wide>
       <div className="st-col" style={{ gap: 12 }}>
+        <div className="st-row"><HowTo id="hooks" label="How hooks work" /></div>
         {list.length > 1 && <div className="st-row" style={{ gap: 6, flexWrap: 'wrap' }}>{list.map(p => <button key={p.id} className={`st-chip ${p.id === current ? 'on' : ''}`} onClick={() => setProductId(p.id)}>{p.name}</button>)}</div>}
         {!products.data ? <div className="st-skel" style={{ height: 120 }} /> : !list.length ? <span className="st-hint">No hooks yet. Load a script kit in Library, Hooks.</span> : !product.data ? <div className="st-skel" style={{ height: 200 }} /> : (
           <div className="st-col" style={{ gap: 6 }}>
