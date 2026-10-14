@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Clapperboard, Copy, Loader2, Music, Pause, Play, Plus, Redo2, Scissors, SkipBack, Trash2, Type, Undo2, Wind, X, ZoomIn, ZoomOut } from 'lucide-react'
+import { ArrowLeft, Clapperboard, Copy, Loader2, Music, Pause, Play, Plus, Redo2, Scissors, SkipBack, Sparkles, Trash2, Type, Undo2, Wind, X, ZoomIn, ZoomOut } from 'lucide-react'
 import { api, assetUrl } from '../../api'
 import { keys, useSounds } from '../../hooks'
 import { LibraryDrawer } from '../../library'
 import { Drawer, errorMessage, useToast } from '../../ui'
-import type { Cut, CutCaption, CutShot, MemeSpec, SoundLevel, SoundSpec } from '../../types'
+import type { Cut, CutCaption, CutShot, EditSpec, EditStrength, EditStyleView, MemeSpec, SoundLevel, SoundSpec } from '../../types'
 import { autoCut, place, shotInfo, type Placed } from './RoughCut'
 import { firstFrame, postName } from './parts'
+import { editOf, editStyles, editZones, type EditZones } from './EditStyles'
 import type { PostCtx } from './ctx'
 
 // Fine-tune (Phase 4; UX-PLAN.md section 9): the post's rough cut as
@@ -17,10 +18,12 @@ import type { PostCtx } from './ctx'
 // (nothing is downloaded). Split at the playhead, trim by the edges, drag
 // to move, undo and redo. Done saves the cut and the sound to the post,
 // renders the MP4 on the worker (free) and returns to the Finish step. The
-// layers follow OpenCut's layout (DECISIONS G23).
+// layers follow OpenCut's layout (DECISIONS G23). The Edit lane (Phase 5)
+// shows where the post's edit acts; the preview plays the plain cut and
+// Export renders the edit.
 
-type Sel = { kind: 'shot' | 'caption'; id: string } | null
-interface State { cut: Cut; sound: SoundSpec }
+type Sel = { kind: 'shot' | 'caption' | 'edit'; id: string } | null
+interface State { cut: Cut; sound: SoundSpec; edit: EditSpec }
 const r1 = (n: number) => Math.round(n * 10) / 10
 const r2 = (n: number) => Math.round(n * 100) / 100
 const uid = () => Math.random().toString(36).slice(2, 8)
@@ -40,6 +43,7 @@ export function Editor({ ctx, onClose }: { ctx: PostCtx; onClose: () => void }) 
     return {
       cut: { auto: false, shots: cut.shots.map(s => ({ ...s })), captions: cut.captions.map(c => ({ ...c })) },
       sound: { ambience: def, ambienceLevel: 'normal', music: null, musicLevel: 'normal', duck: true, clipSound: true, ...(spec.sound ?? {}) },
+      edit: editOf(spec),
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
   const [st, setSt] = useState<State>(initial)
@@ -60,18 +64,21 @@ export function Editor({ ctx, onClose }: { ctx: PostCtx; onClose: () => void }) 
 
   // Every change is a step that Undo can take back. A drag changes the
   // state live and records one step when it ends.
-  const commit = useCallback((next: State | ((s: State) => State), record = true, fromCut?: Cut) => {
+  const commit = useCallback((next: State | ((s: State) => State), record = true, from?: Partial<State>) => {
     setSt(prev => {
       const value = typeof next === 'function' ? next(prev) : next
-      // A drag records the cut as it was before the drag began.
-      if (record) { setPast(p => [...p.slice(-80), fromCut ? { ...prev, cut: fromCut } : prev]); setFuture([]) }
+      // A drag records the state as it was before the drag began.
+      if (record) { setPast(p => [...p.slice(-80), from ? { ...prev, ...from } : prev]); setFuture([]) }
       return value
     })
   }, [])
   const undo = () => { if (!past.length) return; setFuture(f => [st, ...f]); setSt(past[past.length - 1]!); setPast(p => p.slice(0, -1)) }
   const redo = () => { if (!future.length) return; setPast(p => [...p, st]); setSt(future[0]!); setFuture(f => f.slice(1)) }
-  const editCut = (fn: (c: Cut) => Cut, record = true, fromCut?: Cut) => commit(s => ({ ...s, cut: fn({ ...s.cut, shots: s.cut.shots.map(x => ({ ...x })), captions: s.cut.captions.map(x => ({ ...x })) }) }), record, fromCut)
+  const editCut = (fn: (c: Cut) => Cut, record = true, fromCut?: Cut) => commit(s => ({ ...s, cut: fn({ ...s.cut, shots: s.cut.shots.map(x => ({ ...x })), captions: s.cut.captions.map(x => ({ ...x })) }) }), record, fromCut ? { cut: fromCut } : undefined)
   const setSound = (patch: Partial<SoundSpec>) => commit(s => ({ ...s, sound: { ...s.sound, ...patch } }))
+  const setEdit = (patch: Partial<EditSpec>, record = true, fromEdit?: EditSpec) => commit(s => ({ ...s, edit: { ...s.edit, ...patch } }), record, fromEdit ? { edit: fromEdit } : undefined)
+  const styles = editStyles(ctx)
+  const style = styles.find(x => x.id === st.edit.style) ?? null
 
   const atTime = (t: number) => placed.find(p => t >= p.start - 1e-6 && t < p.start + p.dur - 1e-6) ?? null
   function split() {
@@ -90,6 +97,7 @@ export function Editor({ ctx, onClose }: { ctx: PostCtx; onClose: () => void }) 
   function remove() {
     if (!sel) return
     if (sel.kind === 'shot') editCut(c => ({ ...c, shots: c.shots.filter(s => s.id !== sel.id) }))
+    else if (sel.kind === 'edit') setEdit({ style: 'none', payoff: null })
     else editCut(c => ({ ...c, captions: c.captions.filter(x => x.id !== sel.id) }))
     setSel(null)
   }
@@ -117,7 +125,7 @@ export function Editor({ ctx, onClose }: { ctx: PostCtx; onClose: () => void }) 
     setSaving(true)
     try {
       await draft.flush()
-      await api.updateContent(item.id, { spec: { cut: st.cut, sound: st.sound }, step: 'finish' })
+      await api.updateContent(item.id, { spec: { cut: st.cut, sound: st.sound, edit: st.edit }, step: 'finish' })
       await api.renderContent(item.id)
       await qc.invalidateQueries({ queryKey: keys.content })
       qc.invalidateQueries({ queryKey: ['cut'] })
@@ -164,6 +172,8 @@ export function Editor({ ctx, onClose }: { ctx: PostCtx; onClose: () => void }) 
   const selShot = sel?.kind === 'shot' ? placed.find(p => p.shot.id === sel.id) ?? null : null
   const selCaption = sel?.kind === 'caption' ? st.cut.captions.find(c => c.id === sel.id) ?? null : null
   const musicAsset = st.sound.music ? sounds.find(x => x.id === st.sound.music)?.assetId ?? null : null
+  const zones = editZones(style, st.edit, placed.map(p => ({ kind: p.shot.kind, start: p.start })), total, o.edits?.payoffFromEnd ?? 2, !!st.sound.music)
+  const zoneNow = zones.zones.find(z => time >= z.start - 1e-3 && time <= z.end + 1e-3)?.label ?? null
 
   return (
     <div className="st-root ed-root" role="dialog" aria-modal="true" aria-label="Fine-tune">
@@ -179,7 +189,7 @@ export function Editor({ ctx, onClose }: { ctx: PostCtx; onClose: () => void }) 
       </header>
 
       <div className="ed-body">
-        <Preview ctx={ctx} placed={placed} captions={st.cut.captions} caption={spec.caption} time={time} setTime={setTime} playing={playing} setPlaying={setPlaying} total={total} musicAsset={musicAsset} musicVolume={VOLUME[st.sound.musicLevel]} clipSound={st.sound.clipSound} />
+        <Preview ctx={ctx} placed={placed} captions={st.cut.captions} caption={spec.caption} time={time} setTime={setTime} playing={playing} setPlaying={setPlaying} total={total} musicAsset={musicAsset} musicVolume={VOLUME[st.sound.musicLevel]} clipSound={st.sound.clipSound} badge={style && zoneNow ? `${style.label}: ${zoneNow}` : null} />
         <aside className="ed-side">
           {selShot ? (
             <ShotPanel p={selShot} onTrim={patch => editCut(c => ({ ...c, shots: c.shots.map(s => (s.id === selShot.shot.id ? { ...s, ...patch } : s)) }))}
@@ -187,6 +197,8 @@ export function Editor({ ctx, onClose }: { ctx: PostCtx; onClose: () => void }) 
               onSplit={split} onDuplicate={duplicate} onDelete={remove} canSplit={!!atTime(time) && atTime(time)!.shot.id === selShot.shot.id} />
           ) : selCaption ? (
             <CaptionPanel c={selCaption} postCaption={spec.caption} total={total} onChange={patch => editCut(c => ({ ...c, captions: c.captions.map(x => (x.id === selCaption.id ? { ...x, ...patch } : x)) }))} onDelete={remove} canDelete={st.cut.captions.length > 1} />
+          ) : sel?.kind === 'edit' ? (
+            <EditPanel styles={styles} edit={st.edit} setEdit={setEdit} zones={zones} total={total} payoffFromEnd={o.edits?.payoffFromEnd ?? 2} />
           ) : (
             <SoundPanel sound={st.sound} setSound={setSound} sounds={sounds} def={o.sound?.defaultAmbience ?? 'room'} />
           )}
@@ -209,7 +221,8 @@ export function Editor({ ctx, onClose }: { ctx: PostCtx; onClose: () => void }) 
       </div>
 
       <Timeline placed={placed} cut={st.cut} caption={spec.caption} total={total} px={px} time={time} sel={sel} sound={st.sound} sounds={sounds}
-        onSeek={t => { setPlaying(false); setTime(Math.max(0, Math.min(total, t))) }} onSelect={setSel} editCut={editCut} limits={limits} />
+        onSeek={t => { setPlaying(false); setTime(Math.max(0, Math.min(total, t))) }} onSelect={setSel} editCut={editCut} limits={limits}
+        style={style} edit={st.edit} zones={zones} setEdit={setEdit} />
 
       {item.characterId && <LibraryDrawer open={adding === 'clip'} onClose={() => setAdding(null)} kind="clips" characterId={item.characterId} characterName={ctx.v?.data.name ?? 'this character'} picked={[]} onPick={id => addShot('clip', id)} />}
       <Drawer open={adding === 'broll'} onClose={() => setAdding(null)} title="Add B-roll">
@@ -228,9 +241,9 @@ export function Editor({ ctx, onClose }: { ctx: PostCtx; onClose: () => void }) 
 
 // The preview: one video per shot (only the current one shows), so a cut
 // plays without reloading; captions in TikTok's box; the music under it.
-function Preview({ ctx, placed, captions, caption, time, setTime, playing, setPlaying, total, musicAsset, musicVolume, clipSound }: {
+function Preview({ ctx, placed, captions, caption, time, setTime, playing, setPlaying, total, musicAsset, musicVolume, clipSound, badge }: {
   ctx: PostCtx; placed: Placed[]; captions: CutCaption[]; caption: string; time: number; setTime: (t: number) => void; playing: boolean; setPlaying: (p: boolean) => void
-  total: number; musicAsset: string | null; musicVolume: number; clipSound: boolean
+  total: number; musicAsset: string | null; musicVolume: number; clipSound: boolean; badge: string | null
 }) {
   const o = ctx.data.options
   const vids = useRef<Record<string, HTMLVideoElement | null>>({})
@@ -315,6 +328,7 @@ function Preview({ ctx, placed, captions, caption, time, setTime, playing, setPl
             style={{ opacity: current?.shot.id === p.shot.id ? 1 : 0, objectFit: p.shot.kind === 'broll' ? 'contain' : 'cover' }} />
         ))}
         {!placed.length && <div className="ed-empty">Add a clip to start</div>}
+        {badge && <span className="ed-edit-badge"><Sparkles size={11} />{badge}</span>}
         {shown.map((text, i) => (
           <div key={i} className={`st-captionbox ${c.position}`} style={{ top: c.position === 'top' ? c.safe.top * k : undefined, bottom: c.position === 'bottom' ? c.safe.bottom * k : undefined, width: 2 * half * k, fontSize: c.size * k }}>
             <span style={{ padding: `${c.box.pad_y * k}px ${c.box.pad_x * k}px`, borderRadius: c.box.radius * k, background: c.box.fill, color: c.box.text }}>{text}</span>
@@ -322,16 +336,17 @@ function Preview({ ctx, placed, captions, caption, time, setTime, playing, setPl
         ))}
       </div>
       {musicAsset && <audio ref={music} src={assetUrl(musicAsset)} preload="auto" />}
-      <span className="st-hint">Preview. Export renders it exactly, with the sound mixed and leveled.</span>
+      <span className="st-hint">Preview. Export renders it exactly, with the sound mixed and leveled and the edit (if any) applied.</span>
     </div>
   )
 }
 
 // The timeline: Video, Text and Sound lanes in seconds, a ruler to click,
 // the playhead, trim handles on each edge and drag to move.
-function Timeline({ placed, cut, caption, total, px, time, sel, sound, sounds, onSeek, onSelect, editCut, limits }: {
+function Timeline({ placed, cut, caption, total, px, time, sel, sound, sounds, onSeek, onSelect, editCut, limits, style, edit, zones, setEdit }: {
   placed: Placed[]; cut: Cut; caption: string; total: number; px: number; time: number; sel: Sel; sound: SoundSpec; sounds: Array<{ id: string; title: string }>
   onSeek: (t: number) => void; onSelect: (s: Sel) => void; editCut: (fn: (c: Cut) => Cut, record?: boolean, fromCut?: Cut) => void; limits: { maxClip: number; maxBroll: number }
+  style: EditStyleView | null; edit: EditSpec; zones: EditZones; setEdit: (patch: Partial<EditSpec>, record?: boolean, fromEdit?: EditSpec) => void
 }) {
   const width = Math.max(total * px, 320)
   const lanes = useRef<HTMLDivElement | null>(null)
@@ -416,6 +431,14 @@ function Timeline({ placed, cut, caption, total, px, time, sel, sound, sounds, o
     }), record))
   }
 
+  // The payoff marker: where a speed ramp, freeze or flash lands.
+  function dragPayoff(e: ReactPointerEvent) {
+    const from = { ...edit }
+    const t0 = zones.marker ?? 0
+    onSelect({ kind: 'edit', id: 'edit' })
+    drag(e, (dx, record) => setEdit({ payoff: r2(Math.max(0.2, Math.min(total - 0.2, t0 + dx))) }, record, record ? from : undefined))
+  }
+
   const ambience = sound.ambience === 'none' ? null : sound.ambience === 'room' ? 'Room tone' : sounds.find(s => s.id === sound.ambience)?.title ?? 'Ambience'
   const music = sound.music ? sounds.find(s => s.id === sound.music)?.title ?? 'Music' : null
   return (
@@ -424,6 +447,7 @@ function Timeline({ placed, cut, caption, total, px, time, sel, sound, sounds, o
         <span />
         <span><Clapperboard size={12} />Video</span>
         <span><Type size={12} />Text</span>
+        <span><Sparkles size={12} />Edit</span>
         <span><Music size={12} />Sound</span>
       </div>
       <div className="ed-scroll">
@@ -455,6 +479,18 @@ function Timeline({ placed, cut, caption, total, px, time, sel, sound, sounds, o
                 </div>
               )
             })}
+          </div>
+          <div className="ed-lane edit">
+            <div className={`ed-bar edit ${style ? '' : 'none'} ${sel?.kind === 'edit' ? 'on' : ''}`} style={{ width: total * px }} onPointerDown={e => { e.stopPropagation(); onSelect({ kind: 'edit', id: 'edit' }) }}
+              title={style ? style.line : 'Pick an edit style'}>
+              <Sparkles size={11} />{style ? `${style.label} · ${edit.strength}` : 'No edit. Click to pick one.'}{zones.problem ? ` · ${zones.problem}` : ''}
+            </div>
+            {zones.zones.map((z, i) => <div key={i} className="ed-zone" style={{ left: z.start * px, width: Math.max(3, (z.end - z.start) * px) }} title={z.label} />)}
+            {zones.marker != null && (
+              <span className={`ed-marker ${zones.movable ? 'movable' : ''}`} style={{ left: zones.marker * px }} onPointerDown={zones.movable ? dragPayoff : e => { e.stopPropagation(); onSelect({ kind: 'edit', id: 'edit' }) }}
+                role={zones.movable ? 'slider' : undefined} aria-label={zones.movable ? 'Where the edit lands' : 'The cut'} aria-valuenow={zones.movable ? zones.marker : undefined} aria-valuemin={0} aria-valuemax={total}
+                title={zones.movable ? `Lands at ${r1(zones.marker)} s. Drag to move it.` : `At the cut, ${r1(zones.marker)} s`} />
+            )}
           </div>
           <div className="ed-lane sound">
             {ambience && <div className="ed-bar amb" style={{ width: total * px }}><Wind size={11} />{ambience} · {sound.ambienceLevel}</div>}
@@ -509,6 +545,39 @@ function CaptionPanel({ c, postCaption, total, onChange, onDelete, canDelete }: 
   )
 }
 
+function EditPanel({ styles, edit, setEdit, zones, total, payoffFromEnd }: {
+  styles: EditStyleView[]; edit: EditSpec; setEdit: (patch: Partial<EditSpec>) => void; zones: EditZones; total: number; payoffFromEnd: number
+}) {
+  const style = styles.find(x => x.id === edit.style) ?? null
+  return (
+    <div className="st-col" style={{ gap: 12 }}>
+      <div className="st-label">Edit style</div>
+      <div className="st-row" style={{ gap: 6, flexWrap: 'wrap' }} role="radiogroup" aria-label="Edit style">
+        <button type="button" role="radio" aria-checked={!style} className={`st-chip ${!style ? 'on' : ''}`} onClick={() => setEdit({ style: 'none', payoff: null })}>None</button>
+        {styles.map(x => <button key={x.id} type="button" role="radio" aria-checked={edit.style === x.id} className={`st-chip ${edit.style === x.id ? 'on' : ''}`} title={x.line} onClick={() => setEdit({ style: x.id, payoff: edit.style === x.id ? edit.payoff : null })}>{x.label}{x.shots === 2 ? ' (2 shots)' : ''}</button>)}
+      </div>
+      {style && <span className="st-hint">{style.line}</span>}
+      {zones.problem && <span className="st-callout warn">{zones.problem} Add it in the Video step, or drag a second clip into the timeline.</span>}
+      {style && (
+        <>
+          <div className="st-seg sm" role="radiogroup" aria-label="Strength">
+            {(['subtle', 'normal', 'strong'] as EditStrength[]).map(k => <button key={k} type="button" role="radio" aria-checked={edit.strength === k} className={edit.strength === k ? 'on' : ''} onClick={() => setEdit({ strength: k })}>{k === 'subtle' ? 'Subtle' : k === 'normal' ? 'Normal' : 'Strong'}</button>)}
+          </div>
+          {zones.movable && (
+            <label className="st-row" style={{ gap: 6 }}>Lands at
+              <input className="st-input st-num" type="number" min={0} max={r1(total)} step={0.1} value={edit.payoff ?? ''} placeholder={zones.marker != null ? String(r1(zones.marker)) : 'auto'} onChange={e => setEdit({ payoff: e.target.value === '' ? null : Math.max(0, Number(e.target.value) || 0) })} aria-label="Where the edit lands, in seconds" /> s
+              {edit.payoff != null && <button type="button" className="st-btn sm ghost" onClick={() => setEdit({ payoff: null })}>Auto</button>}
+            </label>
+          )}
+          {zones.movable && <span className="st-hint">{edit.payoff == null ? `Auto: ${payoffFromEnd} s before the end${style.anchor === 'cut_or_payoff' ? ', or the first cut' : ''}. ` : ''}Drag the marker on the Edit lane to move it.</span>}
+          {style.id === 'freeze_pop' && <input className="st-input" maxLength={120} value={edit.text} onChange={e => setEdit({ text: e.target.value })} placeholder="Pop text, e.g. NO WAY (else the caption)" aria-label="Pop text" />}
+        </>
+      )}
+      <span className="st-hint">The preview plays the plain cut; the highlighted part of the Edit lane is where the edit acts. Export renders it, free, on the worker.</span>
+    </div>
+  )
+}
+
 function SoundPanel({ sound, setSound, sounds, def }: { sound: SoundSpec; setSound: (p: Partial<SoundSpec>) => void; sounds: Array<{ id: string; kind: string; title: string; status: string }>; def: string }) {
   const amb = sound.ambience || def
   const levels = (value: SoundLevel, onChange: (l: SoundLevel) => void, label: string) => (
@@ -519,7 +588,7 @@ function SoundPanel({ sound, setSound, sounds, def }: { sound: SoundSpec; setSou
   return (
     <div className="st-col" style={{ gap: 12 }}>
       <div className="st-label">Sound</div>
-      <span className="st-hint">Click a shot or a caption to edit it. With nothing picked, this is the post's sound.</span>
+      <span className="st-hint">Click a shot, a caption or the Edit lane to change it. With nothing picked, this is the post's sound.</span>
       <b className="st-row" style={{ gap: 6 }}><Wind size={13} />Ambience</b>
       <div className="st-row" style={{ gap: 6, flexWrap: 'wrap' }}>
         <button type="button" className={`st-chip ${amb === 'none' ? 'on' : ''}`} onClick={() => setSound({ ambience: 'none' })}>None</button>

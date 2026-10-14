@@ -381,6 +381,23 @@ OpenCut as a page in the Studio, project from R2, Done saves back.
 - [x] Chaining (continue from the last frame), sound bed, rough cut
       (Phase 3 finish, G22; UX-PLAN.md section 8)
 
+## Phase 5: Amazing Edits (evening build 2026-10-14)
+
+Decisions: `DECISIONS.md` G24. UX: `UX-PLAN.md` section 10.
+
+- [x] Ten edits made by code on the worker (`config/edits.yaml`,
+      `server/media/edits.ts`), each with Subtle, Normal and Strong
+- [x] Idea step Format; Finish step Edit style (default None) with moving
+      thumbnails and one-line descriptions
+- [x] Shot B for two-shot edits: from a still, the Library or an upload;
+      directions added to both takes; Make the close-up (free crop)
+- [x] Captions follow the edit's time; word pop and freeze pop captions
+- [x] Fine-tune Edit lane: style, strength, draggable payoff marker
+- [x] Batches take the one-shot edits
+- [ ] Live takes that test the whip pan and hand-over-lens directions
+      (paid; owner approval)
+- [ ] First close-up upscale on a live take (paid; owner approval)
+
 ## Roadmap after Phase 4 (owner, 2026-10-13; not started)
 
 SPEC 13.1, R1 to R7: Clone Video (first after Phase 3), Inspo board

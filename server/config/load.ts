@@ -238,6 +238,7 @@ export function loadConfig(dir = resolve(process.cwd(), 'config')): StudioConfig
       review: readConfigFile(dir, 'review.yaml', pipelineSchemas.review),
       scenes: readConfigFile(dir, 'scenes.yaml', pipelineSchemas.scenes),
       content: readConfigFile(dir, 'content.yaml', pipelineSchemas.content),
+      edits: readConfigFile(dir, 'edits.yaml', pipelineSchemas.edits),
     },
   }
   validateCrossRefs(cfg)

@@ -20,7 +20,7 @@ import { getContent, updateContent, type BatchSpec } from './content.js'
 // picker. The worker keeps a lean copy (H.264, no sound); the upload itself
 // is then removed. Uploading from a post's Video step also picks it there.
 
-export async function addClip(deps: Deps, ctx: Ctx, input: { characterId: string; uploadId: string; name: string; contentId?: string }): Promise<{ id: string }> {
+export async function addClip(deps: Deps, ctx: Ctx, input: { characterId: string; uploadId: string; name: string; contentId?: string; slot?: 'a' | 'b' }): Promise<{ id: string }> {
   await getCharacter(deps, ctx, input.characterId)
   if (!/^upl_[a-z0-9]{20}$/.test(input.uploadId)) throw new AppError('bad_request', 'That upload id is not valid.')
   if (!(await deps.store.exists(uploadKey(ctx.accountId, input.uploadId)))) throw new AppError('bad_request', `${input.name} did not finish uploading. Try again.`)
@@ -33,7 +33,8 @@ export async function addClip(deps: Deps, ctx: Ctx, input: { characterId: string
     prompt: '', label: title, createdBy: ctx.userId,
   })
   await enqueueLocalJob(deps, ctx, { stage: 'content', purpose: `clip_ingest:${id}`, label: `Prepare clip: ${title}`, characterId: input.characterId, request: { uploadId: input.uploadId, title } })
-  if (post?.kind === 'meme') await updateContent(deps, ctx, post.id, { spec: { clipId: id } })
+  // A two-shot edit's shot B can be uploaded straight into its slot.
+  if (post?.kind === 'meme') await updateContent(deps, ctx, post.id, { spec: input.slot === 'b' ? { clipB: id } : { clipId: id } })
   if (post?.kind === 'batch') await updateContent(deps, ctx, post.id, { spec: { clipIds: [...(post.spec as BatchSpec).clipIds ?? [], id].slice(-20) } })
   return { id }
 }

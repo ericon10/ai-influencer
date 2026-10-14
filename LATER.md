@@ -37,3 +37,20 @@ rule.
 - Batches: a progress line per batch on Posts home ("12 of 50 done"), and
   a batch Fine-tune that edits the template every video shares.
 
+## Phase 5 (Amazing Edits)
+
+- A live preview of the edit inside Fine-tune (CSS zooms and a slowed
+  playback rate in the browser), instead of the badge.
+- Per-edit fine numbers in Fine-tune (zoom amount, slow-motion speed,
+  freeze length) on top of Subtle, Normal and Strong.
+- More than one edit per post (a zoom-out reveal at the start and a freeze
+  at the payoff), each with its own marker on the Edit lane.
+- Sound accents that ride with an edit: a whoosh under the whip pan, a hit
+  under the flash, from the owner's uploaded sounds (no AI sound).
+- Pick the punch-in beats by hand (tap along while the music plays).
+- Thumbnails rendered from one of the owner's own kept clips, once there
+  are clips to choose from.
+- Trim shot B's handoff automatically for the whip pan (start it on its
+  blurriest frame).
+- Make the close-up for the whip pan and hand over the lens too (today it
+  is offered for the crash zoom).

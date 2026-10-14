@@ -21,6 +21,7 @@ import { expectedVersion, readWorkerStatus } from '../jobs/workerStatus.js'
 import { addClip, libraryView } from '../pipeline/clips.js'
 import { cancelContinue, continueShot, keepTwoShots, useChainTake } from '../pipeline/chain.js'
 import { postCutView, postEditorProject } from '../pipeline/cutView.js'
+import { makeCloseup } from '../pipeline/closeup.js'
 import { addSound, archiveSound, listSounds, soundView, updateSound } from '../pipeline/sounds.js'
 import { addCloneSource, cloneOptions, keepClone, postClones, postFromClone, saveCloneModel } from '../pipeline/clone.js'
 import { jobViews } from '../jobs/jobView.js'
@@ -554,7 +555,7 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
   app.post('/characters/:id/clips', async c => {
     const ctx = c.get('ctx')
     requireRole(ctx, 'member')
-    const body = parse(z.object({ uploadId: z.string().max(40), name: z.string().max(300), contentId: z.string().max(60).optional() }), await json(c))
+    const body = parse(z.object({ uploadId: z.string().max(40), name: z.string().max(300), contentId: z.string().max(60).optional(), slot: z.enum(['a', 'b']).optional() }), await json(c))
     return c.json(await addClip(deps, ctx, { characterId: c.req.param('id'), ...body }), 201)
   })
   // Clone Video (SPEC 13.1 R1): the post's clip to clone, the models with
@@ -674,6 +675,13 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
     requireRole(ctx, 'member')
     const row = await cancelContinue(deps, ctx, c.req.param('id'))
     return c.json({ id: row.id })
+  })
+  // Phase 5: "Make the close-up" for a crash zoom's shot B (free crop).
+  app.post('/content/:id/closeup', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    const row = await makeCloseup(deps, ctx, c.req.param('id'))
+    return c.json({ id: row.id }, 202)
   })
   app.get('/sounds', async c => c.json({ sounds: (await listSounds(deps, c.get('ctx'))).map(soundView) }))
   app.post('/sounds', async c => {

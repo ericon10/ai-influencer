@@ -94,9 +94,9 @@ export const api = {
   library: (characterId?: string | null) => request<LibraryData>('GET', `/library${characterId ? `?characterId=${encodeURIComponent(characterId)}` : ''}`),
   // Any video file becomes a kept clip of the character (and is picked in
   // the post it was uploaded from).
-  addClip: async (characterId: string, file: File, contentId?: string, onProgress?: (done: number, total: number) => void) => {
+  addClip: async (characterId: string, file: File, contentId?: string, onProgress?: (done: number, total: number) => void, slot?: 'a' | 'b') => {
     const [up] = await uploadFiles([file], onProgress)
-    return request<{ id: string }>('POST', `/characters/${characterId}/clips`, { uploadId: up!.uploadId, name: file.name, ...(contentId ? { contentId } : {}) })
+    return request<{ id: string }>('POST', `/characters/${characterId}/clips`, { uploadId: up!.uploadId, name: file.name, ...(contentId ? { contentId } : {}), ...(slot ? { slot } : {}) })
   },
   // Clone Video: the saved TikTok or Reel goes up, the worker keeps a lean
   // copy with its sound; then the models with prices, and the results.
@@ -118,6 +118,7 @@ export const api = {
   chainUse: (id: string, takeId: string) => request<{ id: string }>('POST', `/content/${id}/continue/use`, { takeId }),
   twoShots: (id: string) => request<{ id: string }>('POST', `/content/${id}/continue/two-shots`, {}),
   cancelContinue: (id: string) => request<{ id: string }>('DELETE', `/content/${id}/continue`),
+  makeCloseup: (id: string) => request<{ id: string }>('POST', `/content/${id}/closeup`, {}),
   sounds: () => request<{ sounds: SoundItem[] }>('GET', '/sounds'),
   addSound: async (file: File, kind: 'ambience' | 'music', onProgress?: (done: number, total: number) => void) => {
     const [up] = await uploadFiles([file], onProgress)

@@ -376,3 +376,22 @@ the sitemap (`/studio/posts/:id/edit`, "Editor overlay").
 
 The video-post flow stays at **8** clicks; Fine-tune adds **2** (Fine-tune,
 Done) when used.
+
+---
+
+## 10. Phase 5: Amazing Edits (2026-10-14)
+
+One feature, about ten edits, all rendered free by code (ffmpeg on the
+worker), never by a video model. It lives in exactly four places, and
+nowhere else:
+
+| Place | What it does | Clicks |
+|---|---|---|
+| **Idea step: Format** (default "Single take") | Pick the post's format up front: a one-shot edit (speed ramp, punch-in, freeze and caption pop, flash and shake, seamless loop, word pop, zoom-out reveal) or a two-shot edit (crash zoom cut, whip pan, hand over lens). It sets the edit style, and a two-shot format plans the shots below | 1 (optional) |
+| **Video step: shot slots** (two-shot formats only) | Shot A (the post's clip, as today) and Shot B, each with its direction already in its prompt (for example "ends with a fast whip to the left"). Shot B: make it from a still, pick it from the Library, or upload it. Crash zoom adds **Make the close-up**: a free crop of A's last frame around the face, then the existing priced Upscale and Generate a take | 2 to 3 for Shot B |
+| **Finish step: Edit style** (default None) | A row of the edits, each with a moving preview thumbnail and a one-line description, plus Subtle, Normal or Strong. Export renders it | 1 (optional) |
+| **Fine-tune** | The Edit lane (between Text and Sound) shows where the edit acts, striped. Click it for the Edit panel: style, strength, where it lands. Drag the payoff marker (where a speed ramp, freeze or flash lands); Undo takes it back. The preview plays the plain cut with a badge inside the edit; Export renders it | 1 to open the panel |
+
+No edit adds a page, a drawer or a sidebar item. A post with no edit
+exports exactly as before.
+

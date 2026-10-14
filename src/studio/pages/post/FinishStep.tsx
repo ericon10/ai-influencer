@@ -1,11 +1,12 @@
 import { Link } from 'react-router-dom'
 import { CopyPlus, Download, RotateCcw, Scissors } from 'lucide-react'
 import { api, assetUrl, downloadUrl } from '../../api'
-import { AsyncButton, Img, errorMessage, useToast, type TodoItem } from '../../ui'
+import { AsyncButton, Img, errorMessage, scrollToField, useToast, type TodoItem } from '../../ui'
 import type { BatchSpec, MemeSpec, SlideshowSpec } from '../../types'
 import { DownloadLink, ExportPanel, fileSlug, postName, useDuplicate } from './parts'
 import type { PostCtx } from './ctx'
 import { RoughCut, SoundRow, autoCut } from './RoughCut'
+import { EditStylePicker, editOf } from './EditStyles'
 import { keys, useSounds } from '../../hooks'
 import { useQueryClient } from '@tanstack/react-query'
 
@@ -20,6 +21,8 @@ export function FinishStep({ ctx }: { ctx: PostCtx }) {
   const name = fileSlug(postName({ ...item, title: draft.fields.title, idea: draft.fields.idea }))
   const o = item.outputs
   const sounds = useSounds().data?.sounds ?? []
+  // A field in an earlier step: open that step, then go to the field.
+  const inStep = (step: 'video' | 'text', field: string) => () => { void draft.go(step); window.setTimeout(() => scrollToField(field), 150) }
   let todo: TodoItem[] = []
   let label = 'Export MP4'
   if (item.kind === 'meme') {
@@ -27,10 +30,12 @@ export function FinishStep({ ctx }: { ctx: PostCtx }) {
     // The rough cut decides what is in the video (Phase 3).
     const cut = s.cut && !s.cut.auto && s.cut.shots.length ? s.cut : autoCut(s, ctx.data.options.meme.max_broll_seconds)
     const captioned = cut.captions.some(c => (c.text ?? s.caption ?? '').trim())
-    todo = [...(!cut.shots.length ? [{ label: 'Pick a clip', target: 'step-video' }] : []), ...(!captioned ? [{ label: 'Write the caption', target: 'post-caption' }] : [])]
+    todo = [...(!cut.shots.length ? [{ label: 'Pick a clip', target: 'step-video' }] : []), ...(!captioned ? [{ label: 'Write the caption', onGo: inStep('text', 'post-caption') }] : [])]
     const waiting = cut.shots.filter(x => x.kind === 'clip').map(x => lib?.clips.find(c => c.id === x.ref)).some(c => c && c.status !== 'approved')
     if (waiting) todo.push({ label: 'Wait for the clip to be prepared' })
     if (s.continueFrom?.status === 'joining') todo.push({ label: 'Wait for the takes to be joined', target: 'continue-shot' })
+    const style = ctx.data.options.edits?.styles.find(x => x.id === editOf(s).style)
+    if (style?.shots === 2 && cut.shots.filter(x => x.kind === 'clip').length < 2) todo.push({ label: `Add shot B for the ${style.label.toLowerCase()}`, onGo: inStep('video', 'shot-b') })
   } else if (item.kind === 'slideshow') {
     const s = draft.spec as unknown as SlideshowSpec
     todo = [...(!s.stillIds.length ? [{ label: 'Pick stills', target: 'step-stills' }] : []), ...(![s.hook, ...s.slides].some(t => t.trim()) ? [{ label: 'Write the slides (or type them)', target: 'slides-text' }] : [])]
@@ -47,12 +52,21 @@ export function FinishStep({ ctx }: { ctx: PostCtx }) {
   return (
     <div className="st-col" style={{ gap: 16 }}>
       {item.kind === 'meme' && <RoughCut ctx={ctx} />}
+      {item.kind !== 'slideshow' && (
+        <section className="st-card" data-field="post-edit">
+          <div className="st-card-head"><div className="grow"><div className="st-h3">Edit style</div><div className="st-hint">A finishing edit, rendered by code with the export. Default: None.</div></div></div>
+          <div className="st-card-body"><EditStylePicker ctx={ctx} mode="finish" /></div>
+        </section>
+      )}
       {item.kind !== 'slideshow' && <SoundRow ctx={ctx} />}
       <ExportPanel item={item} todo={todo} saving={draft.saving} flush={draft.flush} label={label} onStart={() => void ctx.advance('finish')}>
         {item.kind === 'meme' && item.status === 'ready' && o.videoAssetId && (
           <div className="st-row" style={{ gap: 14, alignItems: 'flex-start', flexWrap: 'wrap' }}>
             <video className="st-content-result" src={assetUrl(o.videoAssetId)} controls playsInline />
-            <DownloadLink assetId={o.videoAssetId} name={`${name}.mp4`}>Download MP4</DownloadLink>
+            <div className="st-col" style={{ gap: 6 }}>
+              <DownloadLink assetId={o.videoAssetId} name={`${name}.mp4`}>Download MP4</DownloadLink>
+              {o.editNote && <span className="st-hint">Edit: {o.editNote}</span>}
+            </div>
           </div>
         )}
         {item.kind === 'slideshow' && item.status === 'ready' && o.imageAssetIds && (

@@ -71,7 +71,7 @@ export function ClipGrid({ clips, picked = [], onPick, action, showCharacter = f
 
 // Any video becomes a kept clip of the character (picked in the post it came
 // from, when there is one). The worker prepares a lean copy without sound.
-export function ClipUpload({ characterId, contentId, label = 'Upload a video', onUploaded, variant = '' }: { characterId: string; contentId?: string; label?: string; onUploaded?: (id: string) => void; variant?: string }) {
+export function ClipUpload({ characterId, contentId, label = 'Upload a video', onUploaded, variant = '', slot }: { characterId: string; contentId?: string; label?: string; onUploaded?: (id: string) => void; variant?: string; slot?: 'a' | 'b' }) {
   const toast = useToast()
   const refresh = useRefresh()
   const worker = useWorkerGate()
@@ -83,7 +83,7 @@ export function ClipUpload({ characterId, contentId, label = 'Upload a video', o
     if (!videos.length) { toast({ tone: 'bad', text: 'Pick a video file (MP4, MOV or WebM).' }); return }
     for (const [i, f] of videos.entries()) {
       setBusy(`Uploading ${f.name}${videos.length > 1 ? ` (${i + 1} of ${videos.length})` : ''}...`)
-      try { const { id } = await api.addClip(characterId, f, contentId); setAdded(a => [...a, id]); onUploaded?.(id) } catch (e) { toast({ tone: 'bad', text: `${f.name}: ${errorMessage(e)}` }) }
+      try { const { id } = await api.addClip(characterId, f, contentId, undefined, slot); setAdded(a => [...a, id]); onUploaded?.(id) } catch (e) { toast({ tone: 'bad', text: `${f.name}: ${errorMessage(e)}` }) }
     }
     setBusy(null)
     refresh(characterId)

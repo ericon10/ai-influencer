@@ -9,6 +9,8 @@ import { VideoSection } from '../character/VideoSection'
 import { BrollPicker } from './parts'
 import { ClonePanel } from './ClonePanel'
 import { ContinueButton, ContinuePanel } from './ContinueShot'
+import { ShotB } from './ShotB'
+import { editOf } from './EditStyles'
 import type { PostCtx } from './ctx'
 
 // The Video step. A video post gets its clip four ways, all right here:
@@ -52,10 +54,13 @@ function PostClip({ ctx }: { ctx: PostCtx }) {
   const use = (id: string) => { setChanging(false); void ctx.advance('text', { clipId: id }) }
   // "Continue this shot" (Phase 3): the clip is being continued.
   const cont = spec.continueFrom ?? null
+  // A two-shot edit (Phase 5) plans shot A (this clip) and shot B.
+  const twoShot = data.options.edits?.styles.find(s => s.id === editOf(spec).style && s.shots === 2) ?? null
   const showWays = (!clip || changing) && !cont
 
   return (
     <div className="st-col" style={{ gap: 16 }}>
+      {twoShot && <Callout tone="info"><b>{twoShot.label}:</b> two shots. Shot A is the clip here ({twoShot.slots?.a}); shot B comes right after it, below. Both directions are added to their takes.</Callout>}
       {clip && (
         <div className="st-row" style={{ gap: 14, alignItems: 'flex-start', flexWrap: 'wrap' }}>
           <ClipPreview clip={clip} />
@@ -89,11 +94,12 @@ function PostClip({ ctx }: { ctx: PostCtx }) {
           {way === 'animate' && (
             !scene || !scenes || !v ? <Callout tone="info">A video from a still starts from a photo of this post. Make one in the Stills step, or pick one there from the Library.</Callout>
               : !hasStills ? <Callout tone="info">No stills in this post yet. Make one in the Stills step above, then make the video from it here.</Callout>
-              : <VideoSection v={v} data={scenes} scene={scene} startId={spec.stillId} setStartId={id => draft.setSpec({ stillId: id })} onUseTake={use} usedId={spec.clipId} />
+              : <VideoSection v={v} data={scenes} scene={scene} startId={spec.stillId} setStartId={id => draft.setSpec({ stillId: id })} onUseTake={use} usedId={spec.clipId} extraDirections={twoShot?.slots?.a ?? ''} />
           )}
           {way === 'clone' && <ClonePanel ctx={ctx} onUse={use} usedIds={spec.clipId ? [spec.clipId] : []} />}
         </>
       )}
+      {twoShot && <ShotB ctx={ctx} style={twoShot} />}
       <Field id="post-broll" label="B-roll (optional)" group hint="A screen recording or phone video, cut in hard before or after the clip.">
         <BrollPicker data={data} ids={spec.brollId ? [spec.brollId] : []} multi={false} onChange={ids => draft.setSpec({ brollId: ids[0] ?? null })} timing={spec} setTiming={(p: Partial<BrollTiming>) => draft.setSpec(p)} />
       </Field>

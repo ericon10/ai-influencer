@@ -1075,11 +1075,11 @@ button.st-chip:hover { color: var(--st-text); border-color: var(--st-text-3); }
 .ed-side { border-left: 1px solid var(--st-line); padding: 16px; overflow-y: auto; background: var(--st-surface); }
 .ed-tools { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 8px 16px; border-top: 1px solid var(--st-line); background: var(--st-bg-2); }
 .ed-clock { font-variant-numeric: tabular-nums; font-size: 13px; color: var(--st-text-2); min-width: 92px; }
-.ed-timeline { display: grid; grid-template-columns: 76px minmax(0, 1fr); height: 196px; border-top: 1px solid var(--st-line); background: var(--st-bg-2); }
-.ed-labels { display: grid; grid-template-rows: 22px repeat(3, 1fr); padding: 0 0 8px 12px; }
+.ed-timeline { display: grid; grid-template-columns: 76px minmax(0, 1fr); height: 226px; border-top: 1px solid var(--st-line); background: var(--st-bg-2); }
+.ed-labels { display: grid; grid-template-rows: 22px 1fr 1fr 26px 1fr; padding: 0 0 8px 12px; }
 .ed-labels span { display: flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase; color: var(--st-text-3); }
 .ed-scroll { overflow-x: auto; overflow-y: hidden; padding-right: 16px; }
-.ed-lanes { position: relative; height: 100%; display: grid; grid-template-rows: 22px repeat(3, 1fr); gap: 4px; padding-bottom: 8px; touch-action: none; user-select: none; }
+.ed-lanes { position: relative; height: 100%; display: grid; grid-template-rows: 22px 1fr 1fr 26px 1fr; gap: 4px; padding-bottom: 8px; touch-action: none; user-select: none; }
 .ed-ruler { position: relative; cursor: pointer; border-bottom: 1px solid var(--st-line); }
 .ed-ruler span { position: absolute; top: 4px; transform: translateX(-50%); font-size: 10px; color: var(--st-text-3); font-variant-numeric: tabular-nums; }
 .ed-ruler span:first-child { transform: none; }
@@ -1105,12 +1105,38 @@ button.st-chip:hover { color: var(--st-text); border-color: var(--st-text-3); }
 .ed-bar.amb { background: rgba(63, 209, 143, 0.14); border: 1px solid rgba(63, 209, 143, 0.35); }
 .ed-bar.mus { background: rgba(243, 194, 79, 0.16); border: 1px solid rgba(243, 194, 79, 0.4); }
 .ed-bar.none { border: 1px dashed var(--st-line-2); color: var(--st-text-3); width: 100%; }
+/* Phase 5: the Edit lane (where the edit acts, the payoff marker). */
+.ed-lane.edit { display: flex; background: transparent; }
+.ed-bar.edit { cursor: pointer; background: rgba(196, 140, 255, 0.12); border: 1px solid rgba(196, 140, 255, 0.35); }
+.ed-bar.edit.none { background: transparent; border: 1px dashed var(--st-line-2); }
+.ed-bar.edit.on { box-shadow: 0 0 0 2px var(--st-accent); }
+.ed-zone { position: absolute; top: 3px; bottom: 3px; border-radius: 4px; background: repeating-linear-gradient(135deg, rgba(196, 140, 255, 0.55) 0 4px, rgba(196, 140, 255, 0.3) 4px 8px); pointer-events: none; }
+.ed-marker { position: absolute; top: -3px; bottom: -3px; width: 12px; margin-left: -6px; z-index: 2; cursor: pointer; }
+.ed-marker::before { content: ''; position: absolute; left: 5px; top: 0; bottom: 0; width: 2px; background: #c48cff; }
+.ed-marker.movable { cursor: ew-resize; }
+.ed-marker.movable::after { content: ''; position: absolute; left: 1px; top: -1px; width: 10px; height: 10px; border-radius: 50%; background: #c48cff; box-shadow: 0 0 0 2px var(--st-bg-2); }
+.ed-edit-badge { position: absolute; left: 8px; bottom: 8px; z-index: 2; display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; color: #fff; background: rgba(110, 60, 170, 0.85); pointer-events: none; }
+/* Phase 5: the Format and Edit style pickers. */
+.ed-styles { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 230px), 1fr)); gap: 8px; }
+.ed-style { position: relative; display: grid; grid-template-columns: 54px minmax(0, 1fr); gap: 10px; align-items: center; padding: 6px 10px 6px 6px; border-radius: var(--st-r); border: 1px solid var(--st-line); background: var(--st-surface-2); color: var(--st-text-2); text-align: left; font: inherit; font-size: 12.5px; cursor: pointer; }
+.ed-style:hover { border-color: var(--st-line-2); }
+.ed-style.on { border-color: rgba(255, 106, 61, 0.7); box-shadow: 0 0 0 2px var(--st-accent-soft); color: var(--st-text); }
+.ed-style:focus-visible { outline: none; box-shadow: var(--st-ring); }
+.ed-style-thumb { position: relative; display: grid; place-items: center; width: 54px; aspect-ratio: 9 / 16; border-radius: 7px; overflow: hidden; background: var(--st-surface-3); color: var(--st-text-3); }
+.ed-style-thumb img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1; }
+.ed-style-text { display: grid; gap: 2px; min-width: 0; padding-right: 14px; }
+.ed-style-text b { color: var(--st-text); font-weight: 600; }
+.ed-style-text .st-hint { font-size: 11.5px; line-height: 1.35; }
+.ed-style-check { position: absolute; top: 7px; right: 7px; color: var(--st-accent); }
+.ed-style-badge { margin-left: 6px; padding: 1px 6px; font-size: 10px; vertical-align: 1px; }
 .ed-playhead { position: absolute; top: 0; bottom: 6px; width: 2px; margin-left: -1px; background: var(--st-accent); box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.25); pointer-events: none; z-index: 3; }
 .ed-playhead::before { content: ''; position: absolute; top: 0; left: -5px; border: 6px solid transparent; border-top-color: var(--st-accent); }
 @media (max-width: 860px) {
   .ed-body { grid-template-columns: 1fr; grid-template-rows: minmax(0, 1fr) auto; }
   .ed-side { border-left: 0; border-top: 1px solid var(--st-line); max-height: 34vh; }
-  .ed-timeline { height: 168px; grid-template-columns: 58px minmax(0, 1fr); }
+  .ed-timeline { height: 196px; grid-template-columns: 58px minmax(0, 1fr); }
+  .ed-labels { padding-left: 6px; }
+  .ed-labels span { gap: 3px; font-size: 9px; letter-spacing: 0.2px; }
   .ed-title .st-hint { max-width: 50vw; }
 }
 .st-license { margin: 0; padding: 12px 14px; max-height: 260px; overflow: auto; white-space: pre-wrap; font-family: var(--st-mono); font-size: 11.5px; line-height: 1.5; color: var(--st-text-2); border-radius: var(--st-r); border: 1px solid var(--st-line); background: var(--st-bg-2); }

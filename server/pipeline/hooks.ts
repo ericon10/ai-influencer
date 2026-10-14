@@ -20,6 +20,7 @@ import { registerClips } from './clips.js'
 import { registerClone } from './clone.js'
 import { registerChain } from './chain.js'
 import { registerSounds } from './sounds.js'
+import { registerCloseup } from './closeup.js'
 import type { GenRequest } from '../providers/types.js'
 
 // What each finished job does to the character. Registered once at boot.
@@ -199,4 +200,5 @@ export function registerPipelineHooks(): void {
   registerClone()
   registerChain()
   registerSounds()
+  registerCloseup()
 }

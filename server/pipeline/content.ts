@@ -18,6 +18,9 @@ import { renderTimeline, type TimelineCaption, type TimelineShot } from '../medi
 import { applySoundBed, type SoundBedResult } from '../media/sound.js'
 import { cutProblems, cutSchema, effectiveCut, type Cut } from '../core/cut.js'
 import { soundFile } from './sounds.js'
+import { EDIT_IDS } from '../config/pipeline.js'
+import { applyEdit, DEFAULT_FACE, detectBeats, mapTime, type EditStyle } from '../media/edits.js'
+import { extractFrameAt } from '../media/frames.js'
 import { withTempDir } from '../media/ffmpeg.js'
 import { getAsset, readAsset, saveAsset } from '../storage/assets.js'
 import { uploadKey } from '../storage/uploads.js'
@@ -146,6 +149,17 @@ const continueFrom = z.object({
   error: z.string().max(600).nullable().default(null),
 })
 export type ContinueFrom = z.infer<typeof continueFrom>
+// Amazing Edits (Phase 5; config/edits.yaml): the post's edit style (the
+// Idea step's Format and the Finish step's Edit style set the same field),
+// its strength, where a one-shot edit lands (null: near the end), and the
+// pop text of a freeze. Rendered free by code.
+export const editSpec = z.object({
+  style: z.enum(['none', ...EDIT_IDS]).default('none'),
+  strength: z.enum(['subtle', 'normal', 'strong']).default('normal'),
+  payoff: z.number().min(0).max(600).nullable().default(null),
+  text: z.string().max(120).default(''),
+}).prefault({})
+export type EditSpec = z.infer<typeof editSpec>
 const memeSpec = z.object({
   clipId: id.nullable().default(null),
   // The still the clip was made from, when it was made in this post.
@@ -160,6 +174,11 @@ const memeSpec = z.object({
   // The rough cut once the owner edits it (null: the automatic cut).
   cut: cutSchema.nullable().default(null),
   continueFrom: continueFrom.nullable().default(null),
+  edit: editSpec,
+  // Shot B of a two-shot edit (crash zoom, whip pan, hand over the lens),
+  // and the still it is being made from.
+  clipB: id.nullable().default(null),
+  stillB: id.nullable().default(null),
 })
 const slideshowSpec = z.object({
   stillIds: z.array(id).max(20).default([]),
@@ -183,6 +202,8 @@ const batchObject = z.object({
   captions: z.array(z.string().max(400)).max(50).default([]),
   clone: cloneSource.nullable().default(null),
   sound: soundSpec,
+  // A batch takes the one-shot edits (each video has one clip).
+  edit: editSpec,
 })
 const batchSpec = z.preprocess(raw => {
   if (!raw || typeof raw !== 'object') return raw
@@ -226,6 +247,8 @@ export interface ContentOutputs {
   // A batch: why each failed video failed (by index), and the zip parts.
   errors?: Record<string, string>
   zipParts?: Array<{ assetId: string; from: number; to: number }>
+  // What the edit did (Phase 5), in plain words.
+  editNote?: string | null
 }
 
 function parseSpec(kind: string, raw: unknown) {
@@ -286,7 +309,7 @@ export interface PostPatch { title?: string; spec?: unknown; idea?: string; acco
 // The picks that belong to a character (its clips and stills); B-roll is the
 // account's and stays when the character changes.
 const CHARACTER_PICKS: Record<ContentKind, Record<string, unknown>> = {
-  meme: { clipId: null, stillId: null },
+  meme: { clipId: null, stillId: null, clipB: null, stillB: null },
   slideshow: { stillIds: [] },
   batch: { clipIds: [] },
 }
@@ -364,10 +387,14 @@ function renderProblems(deps: Deps, row: ContentRow): string[] {
   if (row.kind === 'meme') {
     const s = memeSpec.parse(row.spec)
     const cfg = deps.config.pipeline.content
-    out.push(...cutProblems(effectiveCut(s, cfg.meme.max_broll_seconds), s.caption, { maxShots: cfg.cut.max_shots, maxCaptions: cfg.cut.max_captions }))
+    const cut = effectiveCut(s, cfg.meme.max_broll_seconds)
+    out.push(...cutProblems(cut, s.caption, { maxShots: cfg.cut.max_shots, maxCaptions: cfg.cut.max_captions }))
+    const style = deps.config.pipeline.edits.styles.find(x => x.id === s.edit.style)
+    if (style?.shots === 2 && cut.shots.filter(x => x.kind === 'clip').length < 2) out.push(`Add shot B for the ${style.label.toLowerCase()} (Video step)`)
   } else if (row.kind === 'batch') {
     const s = batchSpec.parse(row.spec)
     if (!s.clipIds.length) out.push('Pick a clip')
+    if (deps.config.pipeline.edits.styles.find(x => x.id === s.edit.style)?.shots === 2) out.push('A batch takes one-shot edits only; pick another edit style')
     if (!s.captions.some(c => c.trim())) out.push('Add captions (paste them or write them with Claude)')
   } else {
     const s = slideshowSpec.parse(row.spec)
@@ -406,7 +433,7 @@ async function setOutputs(deps: Deps, itemId: string, outputs: ContentOutputs, s
 // One video from a cut (Phase 3 rough cut): the shots joined with hard
 // cuts, the captions by time, then the sound bed, normalized to social
 // loudness. Free: ffmpeg and sharp on the worker.
-async function renderCut(deps: Deps, ctx: Ctx, job: JobRow, cut: Cut, input: { characterId: string; caption: string; sound: SoundSpec; label: string }) {
+async function renderCut(deps: Deps, ctx: Ctx, job: JobRow, cut: Cut, input: { characterId: string; caption: string; sound: SoundSpec; label: string; edit?: EditSpec }) {
   const cfg = deps.config.pipeline.content
   return withTempDir(async dir => {
     const shots: TimelineShot[] = []
@@ -437,11 +464,125 @@ async function renderCut(deps: Deps, ctx: Ctx, job: JobRow, cut: Cut, input: { c
     const picture = join(dir, 'picture.mp4'), out = join(dir, 'out.mp4')
     // A clip only has sound when the owner kept it (a clone with "Keep
     // original sound", an upload's own sound); every take is stored silent.
-    const t = await renderTimeline({ shots, captions, canvas: cfg.canvas, out: picture, keepSound: input.sound.clipSound, maxSeconds: cfg.cut.max_seconds })
-    const bed = await layBed(deps, ctx, picture, out, dir, input.sound)
+    const style = input.edit?.style ?? 'none'
+    let finalPicture = picture
+    let durationSec: number
+    let editNote: string | null = null
+    if (style === 'none') {
+      durationSec = (await renderTimeline({ shots, captions, canvas: cfg.canvas, out: picture, keepSound: input.sound.clipSound, maxSeconds: cfg.cut.max_seconds })).durationSec
+    } else {
+      // Amazing Edits (Phase 5): the clean picture, then the edit, then the
+      // captions (moved with the edit's time), then the sound bed.
+      const clean = join(dir, 'clean.mp4'), edited = join(dir, 'edited.mp4')
+      const t = await renderTimeline({ shots, captions: [], canvas: cfg.canvas, out: clean, keepSound: input.sound.clipSound, maxSeconds: cfg.cut.max_seconds })
+      const r = await runEdit(deps, ctx, { style, edit: input.edit!, cut, plan: t.shots, picture: clean, out: edited, dir, totalSec: t.durationSec, sound: input.sound })
+      editNote = r.note
+      const moved = await editCaptions(deps, cut, captions, { style, edit: input.edit!, caption: input.caption, timeMap: r.timeMap, payoff: r.payoff, durationSec: r.durationSec, dir })
+      finalPicture = join(dir, 'captioned.mp4')
+      durationSec = (await renderTimeline({ shots: [{ path: edited, in: 0, out: null }], captions: moved, canvas: cfg.canvas, out: finalPicture, keepSound: input.sound.clipSound })).durationSec
+    }
+    const bed = await layBed(deps, ctx, finalPicture, out, dir, input.sound)
     const asset = await saveAsset(deps, ctx, { data: await readFile(out), mime: 'video/mp4', origin: 'derived', label: input.label, sourceJobId: job.id })
-    return { assetId: asset.id, dropped, durationSec: t.durationSec, sound: { layers: bed.layers, targetLufs: bed.targetLufs, ducked: bed.ducked } }
+    return { assetId: asset.id, dropped, durationSec, editNote, sound: { layers: bed.layers, targetLufs: bed.targetLufs, ducked: bed.ducked } }
   })
+}
+
+// One edit on the clean picture (Phase 5). Two-shot edits work on the cut
+// where shot B (the second clip) starts; a zoom finds her face first (the
+// face models on the worker), else the middle of the upper frame.
+async function runEdit(deps: Deps, ctx: Ctx, a: { style: EditStyle; edit: EditSpec; cut: Cut; plan: Array<{ start: number }>; picture: string; out: string; dir: string; totalSec: number; sound: SoundSpec }) {
+  const cfg = deps.config.pipeline
+  const def = cfg.edits.styles.find(x => x.id === a.style)
+  if (!def) throw new AppError('bad_request', `Unknown edit style "${a.style}".`)
+  const params = def.params[a.edit.strength] ?? def.params.normal
+  const clipIdx = a.cut.shots.map((s, i) => (s.kind === 'clip' ? i : -1)).filter(i => i >= 0)
+  const shotB = clipIdx[1] != null ? a.plan[clipIdx[1]]?.start : undefined
+  const anyCut = a.plan.slice(1).map(p => p.start)
+  // Flash and shake hits the first cut unless the owner placed it.
+  const cuts = def.shots === 2 ? (shotB != null ? [shotB] : []) : def.anchor === 'cut_or_payoff' && a.edit.payoff == null ? anyCut.slice(0, 1) : []
+  if (def.shots === 2 && !cuts.length) throw new AppError('bad_request', `${def.label} needs shot B: add it in the Video step.`)
+  const payoff = Math.max(0.2, Math.min(a.totalSec - 0.2, a.edit.payoff ?? a.totalSec - cfg.edits.payoff_from_end))
+  let face = DEFAULT_FACE
+  if (['crash_zoom', 'zoom_reveal', 'punch_in'].includes(a.style)) {
+    const at = a.style === 'crash_zoom' ? Math.max(0, cuts[0]! - (params.seconds ?? 0.6)) : a.style === 'zoom_reveal' ? 0.05 : 0.5
+    face = await faceCenter(deps, a.picture, Math.min(at, a.totalSec - 0.05), a.dir) ?? DEFAULT_FACE
+  }
+  let beats: number[] | undefined
+  if (a.style === 'punch_in' && a.sound.music) beats = await detectBeats(await soundFile(deps, ctx, a.sound.music, a.dir, 'beat-music.m4a'), a.totalSec).catch(() => undefined)
+  const r = await applyEdit({ style: a.style, video: a.picture, out: a.out, workDir: a.dir, canvas: cfg.content.canvas, params, cuts, payoff, face, beats })
+  return { ...r, payoff }
+}
+
+// Where her face is in a frame, as a share of the frame; null when the face
+// models are off or no face is found.
+async function faceCenter(deps: Deps, video: string, at: number, dir: string): Promise<{ x: number; y: number } | null> {
+  try {
+    if (!(await deps.faces.status()).available) return null
+    const png = join(dir, `face-${Math.round(at * 1000)}.png`)
+    await extractFrameAt(video, at, png)
+    const img = await readFile(png)
+    const meta = await (await import('sharp')).default(img).metadata()
+    const [f] = (await deps.faces.detect(img)).sort((x, y) => y.box.w * y.box.h - x.box.w * x.box.h)
+    if (!f || !meta.width || !meta.height) return null
+    return { x: (f.box.x + f.box.w / 2) / meta.width, y: (f.box.y + f.box.h / 2) / meta.height }
+  } catch { return null }
+}
+
+// The captions after an edit: moved with its time; word by word for Word
+// pop; a pop in the middle during a freeze.
+async function editCaptions(deps: Deps, cut: Cut, captions: TimelineCaption[], a: { style: EditStyle; edit: EditSpec; caption: string; timeMap: Array<[number, number]>; payoff: number; durationSec: number; dir: string }): Promise<TimelineCaption[]> {
+  const cfg = deps.config.pipeline.content
+  const def = deps.config.pipeline.edits.styles.find(x => x.id === a.style)!
+  const params = def.params[a.edit.strength] ?? def.params.normal
+  const moved = captions.map(c => ({ ...c, start: mapTime(a.timeMap, c.start), end: c.end == null ? null : Math.min(a.durationSec, mapTime(a.timeMap, c.end)) }))
+  const fps = cfg.canvas.fps
+  const png = async (text: string, name: string, over: Partial<typeof cfg.caption> = {}) => {
+    const file = join(a.dir, name)
+    await writeFile(file, (await captionPng(text, { canvas: cfg.canvas, caption: { ...cfg.caption, ...over } })).png)
+    return file
+  }
+  if (a.style === 'word_pop') {
+    // Each caption appears one word at a time; each new word pops for two
+    // frames. Long captions step a few words at a time.
+    const out: TimelineCaption[] = []
+    for (const [ci, c] of cut.captions.entries()) {
+      const text = (c.text ?? a.caption).trim()
+      const at = moved[ci]
+      if (!text || !at) continue
+      const words = text.split(/\s+/)
+      const per = Math.max(1, Math.ceil(words.length / 24))
+      const steps = Math.ceil(words.length / per)
+      const end = at.end ?? a.durationSec
+      for (let k = 1; k <= steps; k++) {
+        const shown = words.slice(0, k * per).join(' ')
+        const t0 = Math.min(end - 0.05, at.start + (k - 1) * (params.per_word ?? 0.3))
+        const t1 = k < steps ? Math.min(end, at.start + k * (params.per_word ?? 0.3)) : end
+        if (t1 - t0 < 0.02) continue
+        const pop = Math.min(t1, t0 + 2 / fps)
+        out.push({ png: await png(shown, `w${ci}_${k}_pop.png`, { size: cfg.caption.size * (params.pop ?? 1.08) }), start: t0, end: pop })
+        if (t1 > pop) out.push({ png: await png(shown, `w${ci}_${k}.png`), start: pop, end: k < steps ? t1 : at.end })
+      }
+    }
+    return out
+  }
+  if (a.style === 'freeze_pop') {
+    // The pop text (or the main caption) springs in the middle of the
+    // frozen frame: small, overshoot, settle, then holds.
+    const text = (a.edit.text || cut.captions.map(c => (c.text ?? a.caption).trim()).find(Boolean) || '').trim()
+    if (!text) return moved
+    const start = a.payoff
+    // The freeze is the jump in the edit's time map at the payoff.
+    const held = Math.max(0.3, mapTime(a.timeMap, a.payoff + 0.0001) - a.payoff)
+    const end = Math.min(a.durationSec, start + held)
+    const scales = [0.6, 0.85, 1.12, 1.04, 1]
+    const out = [...moved]
+    for (const [i, k] of scales.entries()) {
+      const t0 = start + i / fps, t1 = i < scales.length - 1 ? start + (i + 1) / fps : end
+      out.push({ png: await png(text, `pop${i}.png`, { size: cfg.caption.size * 1.25 * k, position: 'middle' }), start: t0, end: t1 })
+    }
+    return out
+  }
+  return moved
 }
 
 // The sound bed under a finished picture (SPEC 5.5).
@@ -464,8 +605,8 @@ async function runContentRender(deps: Deps, ctx: Ctx, job: JobRow): Promise<unkn
     if (row.kind === 'meme') {
       const s = memeSpec.parse(row.spec)
       const cut = effectiveCut(s, deps.config.pipeline.content.meme.max_broll_seconds)
-      const v = await renderCut(deps, ctx, job, cut, { characterId: row.characterId!, caption: s.caption, sound: s.sound, label: `Video post: ${s.caption.slice(0, 60)}` })
-      const outputs: ContentOutputs = { videoAssetId: v.assetId, dropped: v.dropped, durationSec: v.durationSec, sound: v.sound, renderedAt: deps.clock.now().toISOString() }
+      const v = await renderCut(deps, ctx, job, cut, { characterId: row.characterId!, caption: s.caption, sound: s.sound, edit: s.edit, label: `Video post: ${s.caption.slice(0, 60)}` })
+      const outputs: ContentOutputs = { videoAssetId: v.assetId, dropped: v.dropped, durationSec: v.durationSec, sound: v.sound, editNote: v.editNote, renderedAt: deps.clock.now().toISOString() }
       await setOutputs(deps, itemId, outputs, 'ready')
       return outputs
     }
@@ -517,7 +658,7 @@ async function renderBatchVideo(deps: Deps, ctx: Ctx, job: JobRow, row: ContentR
     try {
       const src = batchSources(s, index)
       const cut = effectiveCut({ ...s, ...src }, deps.config.pipeline.content.meme.max_broll_seconds)
-      const v = await renderCut(deps, ctx, job, cut, { characterId: row.characterId!, caption, sound: s.sound, label: `Batch ${name} ${index + 1}: ${caption.slice(0, 50)}` })
+      const v = await renderCut(deps, ctx, job, cut, { characterId: row.characterId!, caption, sound: s.sound, edit: s.edit, label: `Batch ${name} ${index + 1}: ${caption.slice(0, 50)}` })
       result = { caption, assetId: v.assetId, clipId: src.clipId!, brollId: src.brollId }
     } catch (e) {
       error = `Video ${index + 1} failed: ${(e as Error).message.slice(0, 300)}`
@@ -728,6 +869,7 @@ export async function contentView(deps: Deps, ctx: Ctx) {
       cut: cfg.cut,
       sound: { defaultAmbience: cfg.sound.default_ambience, targetLufs: cfg.sound.target_lufs, maxUploadMb: cfg.sound.max_upload_mb },
       chain: { maxParts: cfg.chain.max_parts },
+      edits: { styles: deps.config.pipeline.edits.styles.map(e => ({ id: e.id, label: e.label, line: e.line, shots: e.shots, anchor: e.anchor, slots: e.slots ?? null, params: e.params })), payoffFromEnd: deps.config.pipeline.edits.payoff_from_end },
     },
   }
 }

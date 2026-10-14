@@ -242,7 +242,13 @@ export interface BrollTiming { order: 'clip_first' | 'broll_first'; brollStart: 
 export interface MemeSpec extends BrollTiming {
   clipId: string | null; stillId: string | null; brollId: string | null; caption: string; clone: CloneSource | null
   sound?: Partial<SoundSpec>; cut?: Cut | null; continueFrom?: ContinueFrom | null
+  edit?: Partial<EditSpec>; clipB?: string | null; stillB?: string | null
 }
+// Phase 5: Amazing Edits (config/edits.yaml).
+export type EditStyleId = 'crash_zoom' | 'speed_ramp' | 'punch_in' | 'freeze_pop' | 'flash_shake' | 'seamless_loop' | 'word_pop' | 'whip_pan' | 'hand_lens' | 'zoom_reveal'
+export type EditStrength = 'subtle' | 'normal' | 'strong'
+export interface EditSpec { style: 'none' | EditStyleId; strength: EditStrength; payoff: number | null; text: string }
+export interface EditStyleView { id: EditStyleId; label: string; line: string; shots: 1 | 2; anchor: string; slots: { a: string; b: string } | null; params: Record<EditStrength, Record<string, number>> }
 // Phase 3: the sound bed, the rough cut and "Continue this shot".
 export type SoundLevel = 'quiet' | 'normal' | 'loud'
 export interface SoundSpec { ambience: string; ambienceLevel: SoundLevel; music: string | null; musicLevel: SoundLevel; duck: boolean; clipSound: boolean }
@@ -259,7 +265,7 @@ export interface CutView {
 }
 export interface SlideshowSpec { stillIds: string[]; topic: string; hook: string; slides: string[]; caption: string; hashtags: string[] }
 // A batch rotates its clips and B-roll across the captions.
-export interface BatchSpec extends BrollTiming { clipIds: string[]; brollIds: string[]; topic: string; count: number; captions: string[]; clone: CloneSource | null; sound?: Partial<SoundSpec> }
+export interface BatchSpec extends BrollTiming { clipIds: string[]; brollIds: string[]; topic: string; count: number; captions: string[]; clone: CloneSource | null; sound?: Partial<SoundSpec>; edit?: Partial<EditSpec> }
 
 // Clone Video (SPEC 13.1 R1): the post's saved TikTok or Reel, the models
 // with their prices, and the results.
@@ -281,7 +287,7 @@ export interface ContentOutputs {
   videoAssetId?: string; imageAssetIds?: string[]; videos?: Array<{ caption: string; assetId: string; clipId?: string; brollId?: string | null } | null>; zipAssetId?: string
   done?: number; failed?: number; total?: number; dropped?: string[]; renderedAt?: string
   durationSec?: number; sound?: { layers: Array<'clip' | 'ambience' | 'music'>; targetLufs: number | null; ducked: boolean }
-  errors?: Record<string, string>; zipParts?: Array<{ assetId: string; from: number; to: number }>
+  errors?: Record<string, string>; zipParts?: Array<{ assetId: string; from: number; to: number }>; editNote?: string | null
 }
 export interface ContentItem {
   id: string; kind: ContentKind; characterId: string | null; title: string; spec: Record<string, unknown>
@@ -300,6 +306,7 @@ export interface ContentData {
     cut?: { max_seconds: number; max_shots: number; max_captions: number }
     sound?: { defaultAmbience: 'none' | 'room'; targetLufs: number; maxUploadMb: number }
     chain?: { maxParts: number }
+    edits?: { styles: EditStyleView[]; payoffFromEnd: number }
   }
 }
 

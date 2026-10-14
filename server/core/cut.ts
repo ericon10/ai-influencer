@@ -39,6 +39,8 @@ export type Cut = z.infer<typeof cutSchema>
 
 export interface CutSource {
   clipId: string | null
+  // Shot B of a two-shot edit (Phase 5), right after the clip.
+  clipB?: string | null
   brollId: string | null
   order: 'clip_first' | 'broll_first'
   brollStart: number
@@ -53,7 +55,8 @@ export function autoCut(s: Omit<CutSource, 'cut'>, maxBrollSeconds = 20): Cut {
   const broll: CutShot | null = s.brollId
     ? { id: 'broll', kind: 'broll', ref: s.brollId, in: s.brollStart, out: s.brollStart + Math.min(s.brollSeconds, maxBrollSeconds) }
     : null
-  const shots = (s.order === 'broll_first' ? [broll, clip] : [clip, broll]).filter((x): x is CutShot => !!x)
+  const clipB: CutShot | null = s.clipId && s.clipB ? { id: 'clipB', kind: 'clip', ref: s.clipB, in: 0, out: null } : null
+  const shots = (s.order === 'broll_first' ? [broll, clip, clipB] : [clip, clipB, broll]).filter((x): x is CutShot => !!x)
   return { auto: true, shots, captions: [{ id: 'main', text: null, start: 0, end: null }] }
 }
 

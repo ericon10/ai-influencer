@@ -1,0 +1,129 @@
+# Amazing Edits (Phase 5; UX-PLAN.md section 10): edits rendered free by
+# code (ffmpeg on the worker), never by a video model. Data, not code: the
+# names, the one-line descriptions, how many shots each needs, the shot
+# directions a two-shot edit adds to its takes, and the numbers behind
+# Subtle, Normal and Strong. Every edit is a default the owner picks; none
+# is ever applied on its own. "Never crossfade a seam" holds: every cut is
+# a hard cut; frame blending appears only inside one shot (motion blur).
+version: 1
+
+# The payoff (where a speed ramp, a freeze or a flash lands on a one-shot
+# edit) defaults to this many seconds before the end. Fine-tune moves it.
+payoff_from_end: 2
+
+# "Make the close-up" (crash zoom, shot B): a free crop of shot A's last
+# frame around her face, this share of the frame's height, in 9:16. The
+# priced Upscale 2x and Generate a take come after it, as usual.
+closeup: { share: 0.42 }
+
+styles:
+  - id: crash_zoom
+    label: Crash zoom cut
+    line: The end of shot A rushes into her face, then a hard cut to a close-up.
+    shots: 2
+    anchor: cut
+    slots:
+      a: "The shot ends steady on her face, ready for a crash zoom into it."
+      b: "A close-up of her face, the same moment, the same light and wardrobe."
+    params:
+      subtle: { seconds: 0.4, zoom: 2.2 }
+      normal: { seconds: 0.6, zoom: 3 }
+      strong: { seconds: 0.8, zoom: 3.4 }
+
+  - id: speed_ramp
+    label: Speed ramp to slow motion
+    line: The payoff slows to a smooth slow motion, then snaps back.
+    shots: 1
+    anchor: payoff
+    # smooth: 0 blends frames (quick); 1 builds motion-compensated frames
+    # (smoother, but minutes on the worker at 1080x1920).
+    params:
+      subtle: { seconds: 0.8, speed: 0.6, smooth: 0 }
+      normal: { seconds: 1, speed: 0.4, smooth: 0 }
+      strong: { seconds: 1.2, speed: 0.3, smooth: 0 }
+
+  - id: punch_in
+    label: Punch-in on the beat
+    line: Quick zoom punches land on the beat of your music (every second without music).
+    shots: 1
+    anchor: beats
+    params:
+      subtle: { zoom: 1.08, every: 1 }
+      normal: { zoom: 1.14, every: 1 }
+      strong: { zoom: 1.22, every: 0.5 }
+
+  - id: freeze_pop
+    label: Freeze frame and caption pop
+    line: The payoff freezes for a beat while a caption pops in the middle.
+    shots: 1
+    anchor: payoff
+    params:
+      subtle: { seconds: 0.8 }
+      normal: { seconds: 1.1 }
+      strong: { seconds: 1.5 }
+
+  - id: flash_shake
+    label: Flash and impact shake
+    line: A white flash and a short camera shake hit on the first cut, or where you place it.
+    shots: 1
+    anchor: cut_or_payoff
+    params:
+      subtle: { flash: 0.1, shake: 10, seconds: 0.3 }
+      normal: { flash: 0.14, shake: 18, seconds: 0.4 }
+      strong: { flash: 0.18, shake: 30, seconds: 0.5 }
+
+  - id: seamless_loop
+    label: Seamless loop
+    line: Ends on the frame closest to the first, so the video loops without a visible jump.
+    shots: 1
+    anchor: end
+    params:
+      subtle: { min_share: 0.75 }
+      normal: { min_share: 0.6 }
+      strong: { min_share: 0.45 }
+
+  - id: word_pop
+    label: Word-by-word text pop
+    line: The caption appears one word at a time, each word popping in.
+    shots: 1
+    anchor: words
+    params:
+      subtle: { per_word: 0.4, pop: 1.04 }
+      normal: { per_word: 0.3, pop: 1.08 }
+      strong: { per_word: 0.22, pop: 1.14 }
+
+  - id: whip_pan
+    label: Whip pan transition
+    line: Shot A whips away and shot B whips in, joined by a hard cut inside the blur.
+    shots: 2
+    anchor: cut
+    slots:
+      a: "The shot ends with a fast whip pan of the phone to the left, motion blurred."
+      b: "The shot starts with a fast whip pan of the phone arriving from the right, motion blurred, then settles."
+    params:
+      subtle: { seconds: 0.12, shift: 0.18, blur: 24 }
+      normal: { seconds: 0.16, shift: 0.3, blur: 40 }
+      strong: { seconds: 0.2, shift: 0.42, blur: 60 }
+
+  - id: hand_lens
+    label: Hand over the lens
+    line: Her hand covers the lens, and the new shot starts as it pulls away (an outfit change).
+    shots: 2
+    anchor: cut
+    slots:
+      a: "She raises her open palm and covers the phone lens; the frame goes dark."
+      b: "The shot starts with her palm covering the lens, then she pulls her hand away to reveal the new look."
+    params:
+      subtle: { search: 0.8, dip: 0.15 }
+      normal: { search: 1, dip: 0.2 }
+      strong: { search: 1.2, dip: 0.25 }
+
+  - id: zoom_reveal
+    label: Zoom-out reveal
+    line: Starts tight on her face and pulls back fast to reveal the whole scene.
+    shots: 1
+    anchor: start
+    params:
+      subtle: { seconds: 1, zoom: 1.8 }
+      normal: { seconds: 1.2, zoom: 2.4 }
+      strong: { seconds: 1.4, zoom: 3 }

@@ -24,7 +24,9 @@ const usable = (c: SceneStill) => c.media === 'image' && !!c.assetId && !['faile
 // Chaining ("Continue this shot"): `preferModel` starts on the model of the
 // clip being continued, and `takesFrom` shows only the takes that start
 // from its last frame.
-export function VideoSection({ v, data, scene, startId, setStartId, onUseTake, usedId = null, preferModel = null, takesFrom = null }: { v: CharacterView; data: ScenesData; scene: SceneView; startId: string | null; setStartId: (id: string | null) => void; onUseTake?: (id: string) => void | Promise<void>; usedId?: string | null; preferModel?: string | null; takesFrom?: string | null }) {
+// `extraDirections`: a shot slot's direction from a two-shot edit (Phase 5),
+// added to the take's directions (for example "ends with a fast whip pan").
+export function VideoSection({ v, data, scene, startId, setStartId, onUseTake, usedId = null, preferModel = null, takesFrom = null, extraDirections = '' }: { v: CharacterView; data: ScenesData; scene: SceneView; startId: string | null; setStartId: (id: string | null) => void; onUseTake?: (id: string) => void | Promise<void>; usedId?: string | null; preferModel?: string | null; takesFrom?: string | null; extraDirections?: string }) {
   const toast = useToast()
   const refresh = useRefresh()
   const o = data.options.video
@@ -34,6 +36,7 @@ export function VideoSection({ v, data, scene, startId, setStartId, onUseTake, u
   const start = stills.find(c => c.id === startId) ?? stills.find(c => c.status === 'approved') ?? null
   const [endId, setEndId] = useState<string | null>(null)
   const [directions, setDirections] = useState(o.directions)
+  const allDirections = [extraDirections.trim(), directions.trim()].filter(Boolean).join(' ')
   const [duration, setDuration] = useState(o.duration)
   const [aspect, setAspect] = useState(o.aspect)
   const [audio, setAudio] = useState(false)
@@ -125,7 +128,7 @@ export function VideoSection({ v, data, scene, startId, setStartId, onUseTake, u
                   placeholder={`Press "Use this still" or "Write it" and Claude writes the video prompt (who records, the action, the light, the camera), or type your own: e.g. ${v.data.name} laughs softly and turns toward the camera.`}
                   written={written} templateText={null} words={pw.words.video} model={pw.model} realism={pw.realism}
                   writeTodo={writeTodo}
-                  writeAction={saved => (!start || (saved.trim() || seed).length < 3 ? null : { type: 'scene_prompt', characterId: v.id, sceneId: scene.id, target: 'video', motion: (saved.trim() || seed).slice(0, 3000), directions: directions.trim(), startCandidateId: start.id, ...(endId ? { endCandidateId: endId } : {}), durationSec: duration, audio, aspect })}
+                  writeAction={saved => (!start || (saved.trim() || seed).length < 3 ? null : { type: 'scene_prompt', characterId: v.id, sceneId: scene.id, target: 'video', motion: (saved.trim() || seed).slice(0, 3000), directions: allDirections, startCandidateId: start.id, ...(endId ? { endCandidateId: endId } : {}), durationSec: duration, audio, aspect })}
                   directors={pw.directorsPass}
                   addedNote="Added when it runs: the directions, the silent line when sound is off, and the REALISM block (always)."
                   onDirty={setPromptDirty}
@@ -133,7 +136,7 @@ export function VideoSection({ v, data, scene, startId, setStartId, onUseTake, u
                   watch={j => j.purpose === `scene_prompt:${scene.id}:video`}
                 >
                   <details className="st-directions">
-                  <summary>Directions, added after it: <span className="st-muted">{directions.trim() || 'none'}</span></summary>
+                  <summary>Directions, added after it: <span className="st-muted">{allDirections || 'none'}</span></summary>
                   <textarea className="st-textarea" rows={2} style={{ minHeight: 0 }} maxLength={600} value={directions} onChange={e => setDirections(e.target.value)} aria-label="Directions" />
                 </details>
                   {data.options.diagnose.length > 0 && (
@@ -148,7 +151,7 @@ export function VideoSection({ v, data, scene, startId, setStartId, onUseTake, u
                 <Field id="video-motion" label="What happens in the video" required done={motion.trim().length >= 3} hint="Motion only: one action and at most one camera move. Calm motion keeps the face steady.">
                   <textarea className="st-textarea" rows={3} style={{ minHeight: 0 }} maxLength={3000} value={motion} onChange={e => setMotion(e.target.value)} placeholder={`e.g. ${v.data.name} laughs softly and turns toward the camera`} />
                   <details className="st-directions">
-                  <summary>Directions, added after it: <span className="st-muted">{directions.trim() || 'none'}</span></summary>
+                  <summary>Directions, added after it: <span className="st-muted">{allDirections || 'none'}</span></summary>
                   <textarea className="st-textarea" rows={2} style={{ minHeight: 0 }} maxLength={600} value={directions} onChange={e => setDirections(e.target.value)} aria-label="Directions" />
                 </details>
                 </Field>
@@ -207,7 +210,7 @@ export function VideoSection({ v, data, scene, startId, setStartId, onUseTake, u
                 waiting={promptDirty ? 'Saving your changes...' : undefined}
                 action={todo.length || !start || promptDirty ? null : {
                   type: 'scene_video', characterId: v.id, candidateId: start.id, ...(endId ? { endCandidateId: endId } : {}), ...(test ? {} : { model: picked.ref }),
-                  motion: motion.trim(), directions: directions.trim(), durationSec: test ? o.test.duration : duration, aspect, audio, takes: test ? 1 : takes, test,
+                  motion: motion.trim(), directions: allDirections, durationSec: test ? o.test.duration : duration, aspect, audio, takes: test ? 1 : takes, test,
                 }}
               />
             </>

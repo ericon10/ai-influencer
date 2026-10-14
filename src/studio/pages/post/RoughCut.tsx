@@ -25,7 +25,8 @@ const uid = () => Math.random().toString(36).slice(2, 8)
 export function autoCut(s: MemeSpec, maxBroll: number): Cut {
   const clip: CutShot | null = s.clipId ? { id: 'clip', kind: 'clip', ref: s.clipId, in: 0, out: null } : null
   const broll: CutShot | null = s.brollId ? { id: 'broll', kind: 'broll', ref: s.brollId, in: s.brollStart, out: s.brollStart + Math.min(s.brollSeconds, maxBroll) } : null
-  const shots = (s.order === 'broll_first' ? [broll, clip] : [clip, broll]).filter((x): x is CutShot => !!x)
+  const clipB: CutShot | null = s.clipId && s.clipB ? { id: 'clipB', kind: 'clip', ref: s.clipB, in: 0, out: null } : null
+  const shots = (s.order === 'broll_first' ? [broll, clip, clipB] : [clip, clipB, broll]).filter((x): x is CutShot => !!x)
   return { auto: true, shots, captions: [{ id: 'main', text: null, start: 0, end: null }] }
 }
 

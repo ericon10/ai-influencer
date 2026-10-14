@@ -8,6 +8,7 @@ import { PriceButton } from '../../PriceButton'
 import { Callout, Field, Img, errorMessage, useToast } from '../../ui'
 import { jobDone, noDash, remember, useJobResult } from './parts'
 import type { PostCtx } from './ctx'
+import { EditStylePicker } from './EditStyles'
 
 // Step 1: what the post is, for which account, with which character. Only
 // the character is needed to go on; the idea feeds the stills, the slides
@@ -116,6 +117,11 @@ export function IdeaStep({ ctx }: { ctx: PostCtx }) {
         <div className="st-row" style={{ gap: 6, flexWrap: 'wrap', marginTop: -10 }}>
           {tags.slice(0, 8).map(t => <button key={t} type="button" className="st-chip" onClick={() => { draft.setFields({ accountTag: t }); remember('tag', t) }}>{t}</button>)}
         </div>
+      )}
+      {item.kind !== 'slideshow' && (
+        <Field id="post-format" label="Format (optional)" group hint="An edit made by code, free. A two-shot format plans shot A and shot B in the Video step. Change it any time in the Finish step.">
+          <EditStylePicker ctx={ctx} mode="format" />
+        </Field>
       )}
     </div>
   )

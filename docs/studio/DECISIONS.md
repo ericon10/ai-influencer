@@ -972,3 +972,73 @@ new pages or sidebar items; one new Library tab (Sounds).
 - The test double now answers a recommendation as a tool error, like the
   live service; the normal-answer shape is still covered.
 
+
+### G24. Phase 5: Amazing Edits, ten edits made by code (evening build, 2026-10-14)
+
+- **One field, four places.** A post's edit is `spec.edit` (style,
+  strength, payoff, pop text), default none. The Idea step's Format, the
+  Finish step's Edit style and Fine-tune's Edit lane all set that same
+  field (UX-PLAN.md section 10). No page, drawer or sidebar item was
+  added. The edits are data in `config/edits.yaml`: names, one-line
+  descriptions, one or two shots, where each lands, the directions a
+  two-shot edit adds to its takes, and the numbers behind Subtle, Normal
+  and Strong. Every edit is a default the owner picks; none is applied on
+  its own.
+- **Made by code, never by a video model.** `server/media/edits.ts` runs
+  each edit as one ffmpeg pass on the worker (split, trim and concat in a
+  single filter graph), with filters that ffmpeg 5.1 on the worker image
+  has. Free, like the export.
+- **Render order:** the clean picture (the rough cut without captions),
+  then the edit, then the captions moved with the edit's time map (a speed
+  ramp or a freeze makes the video longer; the captions after it move
+  too), then the sound bed. Captions are never zoomed or blurred, and
+  loudness is measured on the final length.
+- **The ten edits (Normal numbers; Subtle and Strong in the yaml):**
+  crash zoom cut (the last 0.6 s of shot A zooms to 3x on her face, eased
+  in, with motion blur inside the shot, then a hard cut to shot B); speed
+  ramp (0.2 s ramp into 0.4x for 1 s at the payoff, frames blended, the
+  clip's own sound slowed with it); punch-in on the beat (instant 1.14x
+  zooms held between alternate beats of the uploaded music, found by onset
+  detection, else every second); freeze and caption pop (the payoff frame
+  holds 1.1 s while the pop text, or the caption, springs in the middle
+  over 5 frames); flash and impact shake (a 0.14 s white flash and a shake
+  that dies out over 0.4 s, on the first cut or where the owner placed
+  it); seamless loop (ends on the frame most like the first, searched
+  after 60% of the video); word-by-word pop (the caption builds one word at
+  a time, each new word popping for 2 frames); whip pan (both sides slide
+  under a directional blur that peaks at the cut, a hard cut inside the
+  blur); hand over the lens (cuts from shot A's first dark frame to shot
+  B's last one; with no dark frame, a 0.2 s dip to black on each side, a
+  dip and never a blend); zoom-out reveal (from 2.4x on her face to the
+  full frame in 1.2 s).
+- **"Never crossfade a seam" holds.** Every cut stays a hard cut. Frame
+  blending (motion blur) happens only inside one shot.
+- **Her face** for the zooms comes from the free face matcher on the frame
+  where the zoom starts; without a face it centers at 50% across, 38% down.
+- **Speed ramp blends frames by default.** Motion-compensated frames are
+  smoother but took 82 s on a 3 s test clip against 11 s for blending;
+  `smooth: 1` in the yaml turns them on.
+- **Shot B** (`spec.clipB`) sits right after the clip in the automatic
+  cut. The Video step shows it only for a two-shot edit: make it from a
+  still (the take's prompt gets the shot B direction), pick it from the
+  Library, or upload it straight into the slot. Shot A's takes get the
+  shot A direction. **Make the close-up** (crash zoom) is a free crop of
+  shot A's last frame, 42% of the frame's height in 9:16 around her face;
+  it becomes a still of the post's scene and shot B's start frame, and the
+  priced Upscale 2x and Generate a take follow as usual.
+- **Payoff:** where a speed ramp, freeze or flash lands, 2 s before the end
+  until moved (`payoff_from_end`). Fine-tune's Edit lane shows where the
+  edit acts (striped) and a marker; the payoff marker drags, with undo.
+  Flash and shake hits the first cut unless the owner placed it.
+- **Batches** take the one-shot edits only (each video has one clip); the
+  edit runs on every video.
+- **Fine-tune's preview** plays the plain cut with a badge while the
+  playhead is inside the edit; the export renders the edit. A live
+  in-browser preview of each edit is in LATER.md.
+- **Thumbnails** are rendered by the real edit code on two drawn demo
+  shots (`scripts/edit-thumbs.ts`): animated WebP, 144x256, 12 fps, about
+  420 KB for all ten, in `public/studio-edits/`. Drawn figures rather than
+  a character, so no paid run was needed and no character's face sits on
+  a UI tile. Run the script again after an edit changes.
+- No paid run was made. The live checks this phase needs are queued for
+  the owner's approval (the evening report lists them).

@@ -259,6 +259,24 @@ const contentSchema = z.object({
   cut: z.object({ max_seconds: z.number().positive(), max_shots: z.number().int().positive(), max_captions: z.number().int().positive() }),
 })
 
+// Amazing Edits (Phase 5; config/edits.yaml): code-rendered edits.
+const strength = z.record(z.string(), z.number())
+export const EDIT_IDS = ['crash_zoom', 'speed_ramp', 'punch_in', 'freeze_pop', 'flash_shake', 'seamless_loop', 'word_pop', 'whip_pan', 'hand_lens', 'zoom_reveal'] as const
+const editsSchema = z.object({
+  version: z.number(),
+  payoff_from_end: z.number().positive(),
+  closeup: z.object({ share: z.number().min(0.15).max(1) }).default({ share: 0.42 }),
+  styles: z.array(z.object({
+    id: z.enum(EDIT_IDS),
+    label: z.string(),
+    line: z.string(),
+    shots: z.union([z.literal(1), z.literal(2)]),
+    anchor: z.enum(['cut', 'payoff', 'beats', 'cut_or_payoff', 'end', 'words', 'start']),
+    slots: z.object({ a: z.string(), b: z.string() }).optional(),
+    params: z.object({ subtle: strength, normal: strength, strong: strength }),
+  })).min(1),
+})
+
 export const pipelineSchemas = {
   sheet: sheetSchema,
   views: viewsSchema,
@@ -267,6 +285,7 @@ export const pipelineSchemas = {
   review: reviewSchema,
   scenes: scenesSchema,
   content: contentSchema,
+  edits: editsSchema,
 }
 
 export type SheetConfig = z.infer<typeof sheetSchema>
@@ -279,6 +298,8 @@ export type TemplatesConfig = z.infer<typeof templatesSchema>
 export type ReviewConfig = z.infer<typeof reviewSchema>
 export type ScenesConfig = z.infer<typeof scenesSchema>
 export type ContentConfig = z.infer<typeof contentSchema>
+export type EditsConfig = z.infer<typeof editsSchema>
+export type EditId = (typeof EDIT_IDS)[number]
 
 export interface PipelineConfig {
   sheet: SheetConfig
@@ -288,4 +309,5 @@ export interface PipelineConfig {
   review: ReviewConfig
   scenes: ScenesConfig
   content: ContentConfig
+  edits: EditsConfig
 }
