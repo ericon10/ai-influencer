@@ -170,7 +170,13 @@ prompt_writer:
       catches {poss} attention, and the small reaction the photo catches (a
       glance, a half-smile, a pause), never a pose for the camera.
     - The light: a named source (a window, the low sun, a pendant lamp) and
-      where it is relative to the camera.
+      where it is relative to the camera. The light always has a direction
+      that shapes the face (from one side, above and in front, behind and
+      to the side), never flat, frontal or shadowless.
+    - How much fine detail the light allows (owner, 2026-10-14): in bright
+      or raking light, real texture shows on its own; in a dim or low-light
+      scene, ask for less micro detail (soft phone grain, gentle shadow,
+      a little noise) so the face never turns crunchy or over-sharpened.
     - One cause-and-effect camera imperfection that fits the moment (the
       moving hand is slightly blurred; focus lands on the nearer cup; the
       frame is a little off-center because the friend was laughing).
@@ -211,7 +217,10 @@ prompt_writer:
     SUBJECT: {name} exactly as in the start frame: the same face, hair and
     outfit. Never describe how {subj} looks.
     SETTING/LIGHT: the place as in the start frame, in a few words, then the
-    light source by name and its direction relative to the camera.
+    light source by name and its direction relative to the camera. The
+    light always has a direction that shapes the face, never flat or
+    frontal. In a dim scene, say so and keep the detail soft (phone grain,
+    gentle shadow) so the face never looks crunchy or over-sharpened.
     CAMERA: who records, the front or rear camera, the position and the
     distance; small human hand movement; one or two cause-and-effect
     imperfections (an event, the camera's response, the recovery).
@@ -296,11 +305,14 @@ content_slides:
       case, without the # sign.
     Rules: plain words, no quotation marks, at most one emoji per slide,
     nothing sexual, no claims about real people, no medical or money
-    promises. Never say the photos are real or that {name} is a real
+    promises. When a voice card is given, write every slide and the
+    caption the way {name} talks (the card's words, point of view, humor
+    and emoji), never what the card says to avoid. Never say the photos are real or that {name} is a real
     person.
   prompt: |
     Topic: {topic}
     {name}'s persona: {vibe}
+    {voice}
     The photos, in order: {photos}
 
     Write the hook, {slides} slides, the caption and the hashtags.
@@ -326,12 +338,53 @@ content_captions:
     {count} different captions, each under 18 words: relatable, specific
     "POV", "me when", "nobody:" or situation captions that fit the topic,
     funny without being mean. At most one emoji each. No hashtags, no
-    quotation marks, nothing sexual, no claims about real people.
+    quotation marks, nothing sexual, no claims about real people. When a
+    voice card is given, every caption sounds like {name}: their words,
+    their point of view, their humor and emoji habit, never what the card
+    says they avoid.
   prompt: |
     Topic: {topic}
     {name}'s persona: {vibe}
+    {voice}
 
     Write {count} captions.
+
+# Hook variants (scale kit, overnight item 5): one hook from a product's
+# vault rewritten in each character's voice, so accounts never post the
+# same line. Anything about the product stays inside its claims sheet.
+hook_variants:
+  system: |
+    You rewrite one TikTok hook for several creator accounts. Each account
+    is an original, fictional adult character with their own voice card.
+    Write exactly {per} variant(s) of the hook for each character
+    ({names}), {count} in all, so no two accounts post the same line.
+    Rules for every variant:
+    - Keep what the hook is about and its type ({kind}). Keep its
+      opening move: a conflict, a surprise or a question. Never open with
+      "hey guys" or "today I want to talk about".
+    - Write it the way that character talks: their words and phrases,
+      their point of view, their humor, their emoji habit. Avoid what the
+      card says they never say.
+    - Use the buyers' own words where they fit, not marketing words.
+    - If a variant mentions {product}, it stays inside the claims sheet:
+      approved phrasings only, no promise of results, nothing it does not
+      do, no made-up results from the character. Tips and observations,
+      not results claims.
+    - Under 25 words, plain text, no hashtags, no quotation marks around
+      the line, no em-dashes. Nothing sexual, no claims about real
+      people.
+    Return each variant with the character's name exactly as given.
+  prompt: |
+    The hook: {hook}
+
+    {claims}
+
+    {language}
+
+    The characters:
+    {voices}
+
+    Write {count} variants: {per} for each of {names}.
 
 # "Punch it up": the owner's rough idea becomes three specific moments to
 # pick from. The pick fills the scene box and stays editable.

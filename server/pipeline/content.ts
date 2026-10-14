@@ -19,6 +19,8 @@ import { applySoundBed, type SoundBedResult } from '../media/sound.js'
 import { cutProblems, cutSchema, effectiveCut, type Cut } from '../core/cut.js'
 import { stackSchema } from '../core/editorStyle.js'
 import { soundFile } from './sounds.js'
+import { voiceFile, voiceForPost } from './voiceLines.js'
+import { cleanVoiceCard, voiceCardText } from '../core/voiceCard.js'
 import { EDIT_IDS } from '../config/pipeline.js'
 import { applyEdit, DEFAULT_FACE, detectBeats, mapTime, overlayBehind, type EditStyle } from '../media/edits.js'
 import { personMaskVideo, segmentAvailable } from '../media/segment.js'
@@ -160,6 +162,17 @@ export const soundSpec = z.object({
   musicLevel: level,
   duck: z.boolean().default(true),
   clipSound: z.boolean().default(true),
+  // A voiceover (voice lines, overnight item 4): a converted voice line,
+  // where it starts, its level, and whether its words are the captions.
+  // The words are copied from the line when it is picked.
+  voice: z.object({
+    id,
+    at: z.number().min(0).max(600).default(0),
+    level,
+    captions: z.boolean().default(true),
+    title: z.string().max(120).default(''),
+    words: z.array(z.object({ text: z.string().max(80), start: z.number().min(0).max(700), end: z.number().min(0).max(700) })).max(400).default([]),
+  }).nullable().default(null),
 }).prefault({})
 export type SoundSpec = z.infer<typeof soundSpec>
 // "Continue this shot" (Phase 3 chaining): the clip being continued, the
@@ -370,6 +383,7 @@ export async function updateContent(deps: Deps, ctx: Ctx, itemId: string, patch:
   let spec = row.spec
   if (patch.spec !== undefined || switching) {
     spec = parseSpec(kind, { ...(row.spec as object), ...((patch.spec as object) ?? {}), ...(switching ? CHARACTER_PICKS[kind] : {}) })
+    spec = await withVoice(deps, ctx, kind, row.spec, spec, switching ? null : characterId)
   }
   const sceneId = patch.sceneId !== undefined ? await checkScene(deps, ctx, patch.sceneId, characterId) : switching ? null : row.sceneId
   // The scene made from the idea follows the idea while it still reads the
@@ -385,6 +399,20 @@ export async function updateContent(deps: Deps, ctx: Ctx, itemId: string, patch:
     step: patch.step ?? row.step, characterId, sceneId, updatedAt: deps.clock.now(),
   }).where(eq(contentItems.id, row.id)).returning()
   return out!
+}
+
+// A voiceover's words come from its voice line when it is picked (and a
+// voice line belongs to one character, so switching drops it). Only video
+// posts take one.
+async function withVoice(deps: Deps, ctx: Ctx, kind: ContentKind, before: unknown, spec: unknown, characterId: string | null): Promise<unknown> {
+  const sp = spec as { sound?: SoundSpec }
+  const v = sp.sound?.voice
+  if (!v) return spec
+  if (kind !== 'meme' || !characterId) return { ...sp, sound: { ...sp.sound!, voice: null } }
+  const old = (before as { sound?: Partial<SoundSpec> } | null)?.sound?.voice
+  if (old && old.id === v.id && v.words.length) return spec
+  const line = await voiceForPost(deps, ctx, v.id, characterId)
+  return { ...sp, sound: { ...sp.sound!, voice: { ...v, words: line.words, title: line.title } } }
 }
 
 // "Make another like this" (owner, 2026-10-13): the same post with
@@ -436,7 +464,7 @@ function renderProblems(deps: Deps, row: ContentRow): string[] {
   if (row.kind === 'meme') {
     const s = memeSpec.parse(row.spec)
     const cfg = deps.config.pipeline.content
-    const cut = effectiveCut(s, cfg.meme.max_broll_seconds)
+    const cut = effectiveCut(s, cfg.meme.max_broll_seconds, voicePhrases(deps))
     out.push(...cutProblems(cut, s.caption, { maxShots: cfg.cut.max_shots, maxCaptions: cfg.cut.max_captions }))
     // A timeline saved by the editor decides its own shots (editor phase D).
     const style = s.editor?.projectAssetId ? undefined : deps.config.pipeline.edits.styles.find(x => x.id === s.edit.style)
@@ -686,7 +714,11 @@ async function editCaptions(deps: Deps, cut: Cut, captions: TimelineCaption[], a
   const cfg = a.cfg ?? deps.config.pipeline.content
   const def = deps.config.pipeline.edits.styles.find(x => x.id === a.style)!
   const params = def.params[a.edit.strength] ?? def.params.normal
-  const moved = captions.map(c => ({ ...c, start: mapTime(a.timeMap, c.start), end: c.end == null ? null : Math.min(a.durationSec, mapTime(a.timeMap, c.end)) }))
+  // A voiceover is laid over the finished picture, so captions made from it
+  // keep its times; text captions move with the edit's time.
+  const voiced = cut.captions.length > 0 && cut.captions.every(c => !!c.words)
+  const when = (t: number) => (voiced ? t : mapTime(a.timeMap, t))
+  const moved = captions.map(c => ({ ...c, start: when(c.start), end: c.end == null ? null : Math.min(a.durationSec, when(c.end)) }))
   const fps = cfg.canvas.fps
   const png = async (text: string, name: string, over: Partial<typeof cfg.caption> = {}, look: CaptionLook = {}) => {
     const file = join(a.dir, name)
@@ -726,9 +758,9 @@ async function editCaptions(deps: Deps, cut: Cut, captions: TimelineCaption[], a
       if (!text || !at) continue
       const words = captionWords(text, { canvas: cfg.canvas, caption: cfg.caption })
       const end = at.end ?? a.durationSec
-      const timed = (cut.captions[ci] as { words?: Array<{ start: number; end: number }> }).words
+      const timed = cut.captions[ci]?.words
       const times = timed?.length === words.length
-        ? timed.map(w => mapTime(a.timeMap, w.start))
+        ? timed.map(w => (voiced ? w.start : mapTime(a.timeMap, w.start)))
         : wordStarts(words, at.start, end)
       for (const [k, t0] of times.entries()) {
         const t1 = k < times.length - 1 ? times[k + 1]! : end
@@ -791,15 +823,24 @@ export function wordStarts(words: string[], start: number, end: number): number[
   return out
 }
 
+// How a voiceover's words break into captions (config, content.yaml).
+export function voicePhrases(deps: Deps) {
+  const p = deps.config.pipeline.content.sound.voice.phrases
+  return { maxWords: p.max_words, maxSec: p.max_sec, pauseSec: p.pause_sec, holdSec: p.hold_sec, maxPhrases: deps.config.pipeline.content.cut.max_captions }
+}
+
 // The sound bed under a finished picture (SPEC 5.5).
 async function layBed(deps: Deps, ctx: Ctx, picture: string, out: string, dir: string, s: SoundSpec, accents: Array<{ path: string; at: number; db?: number }> = []): Promise<SoundBedResult> {
   const cfg = deps.config.pipeline.content.sound
   const ambienceId = s.ambience ?? cfg.default_ambience
   const ambience = ambienceId === 'none' ? null : ambienceId === 'room' ? { builtin: 'room' as const } : { path: await soundFile(deps, ctx, ambienceId, dir, 'ambience.m4a') }
   const music = s.music ? { path: await soundFile(deps, ctx, s.music, dir, 'music.m4a') } : null
+  // The voiceover is the foreground: the music and ambience dip under it.
+  const voice = s.voice ? { path: await voiceFile(deps, ctx, s.voice.id, dir), at: s.voice.at } : null
   return applySoundBed({
     video: picture, out, workDir: dir, clipSound: s.clipSound, ambience, ambienceDb: cfg.levels[s.ambienceLevel], music, musicDb: cfg.levels[s.musicLevel], duck: s.duck, accents,
-    levels: { target: cfg.target_lufs, truePeak: cfg.true_peak, ambienceAlone: cfg.ambience_only_lufs, ambience: cfg.ambience_lufs, music: cfg.music_lufs, duck: { threshold: cfg.duck.threshold, ratio: cfg.duck.ratio, attackMs: cfg.duck.attack_ms, releaseMs: cfg.duck.release_ms } },
+    voice, voiceDb: s.voice ? cfg.levels[s.voice.level] : 0,
+    levels: { target: cfg.target_lufs, truePeak: cfg.true_peak, ambienceAlone: cfg.ambience_only_lufs, ambience: cfg.ambience_lufs, music: cfg.music_lufs, voice: cfg.voice.lufs, duck: { threshold: cfg.duck.threshold, ratio: cfg.duck.ratio, attackMs: cfg.duck.attack_ms, releaseMs: cfg.duck.release_ms } },
   })
 }
 
@@ -809,8 +850,12 @@ async function runContentRender(deps: Deps, ctx: Ctx, job: JobRow): Promise<unkn
   const name = slug(row.title || row.kind)
   try {
     if (row.kind === 'meme') {
-      const s = memeSpec.parse(row.spec)
-      const cut = effectiveCut(s, deps.config.pipeline.content.meme.max_broll_seconds)
+      const parsed = memeSpec.parse(row.spec)
+      // The voiceover's words as the line has them now (it may have been
+      // converted again since it was picked).
+      const vo = parsed.sound.voice
+      const s = vo ? { ...parsed, sound: { ...parsed.sound, voice: { ...vo, words: (await voiceForPost(deps, ctx, vo.id, row.characterId)).words } } } : parsed
+      const cut = effectiveCut(s, deps.config.pipeline.content.meme.max_broll_seconds, voicePhrases(deps))
       // The post's timeline (editor phase D): the saved one, a carried
       // stack, or the Format's preset, else the cut as before.
       const { v, notes, timeline } = await withTempDir(async dir => {
@@ -859,7 +904,9 @@ async function runContentRender(deps: Deps, ctx: Ctx, job: JobRow): Promise<unkn
 type BatchVideo = { caption: string; assetId: string; clipId?: string; brollId?: string | null }
 
 async function renderBatchVideo(deps: Deps, ctx: Ctx, job: JobRow, row: ContentRow, name: string): Promise<unknown> {
-  const s = batchSpec.parse(row.spec)
+  // A batch has no voiceover: one line would not match every caption.
+  const parsed = batchSpec.parse(row.spec)
+  const s = { ...parsed, sound: { ...parsed.sound, voice: null } }
   const captions = batchCaptions(deps, s)
   const index = (job.request as { index?: number }).index ?? 0
   const caption = captions[index]
@@ -1011,7 +1058,7 @@ export async function buildContentSlides(deps: Deps, ctx: Ctx, row: CharacterRow
   const n = slideCount(deps, s.stillIds.length)
   const vars = { ...pronounVars(ch.pronouns), name: ch.name, slides: String(n), hashtags_min: String(cfg.slideshow.hashtags[0]), hashtags_max: String(cfg.slideshow.hashtags[1]) }
   const system = fill(t.system, vars)
-  const prompt = fill(t.prompt, { ...vars, topic, vibe: ch.persona.vibe ?? 'not given', photos: await photoNotes(deps, ctx, s.stillIds) })
+  const prompt = fill(t.prompt, { ...vars, topic, vibe: ch.persona.vibe ?? 'not given', voice: voiceCardText(ch.name, cleanVoiceCard(ch.persona.voice)), photos: await photoNotes(deps, ctx, s.stillIds) })
   const purpose = `content_slides:${item.id}`
   const mock = { hook: `${topic.slice(0, 60)}`, slides: Array.from({ length: n }, (_, i) => `Slide ${i + 2}: ${topic.slice(0, 40)}`), caption: topic, hashtags: ['fyp', 'dayinmylife', 'relatable'].slice(0, Math.max(cfg.slideshow.hashtags[0], 1)) }
   return {
@@ -1033,7 +1080,7 @@ export async function buildContentCaptions(deps: Deps, ctx: Ctx, row: CharacterR
   const route = await resolveRoute(deps, ctx, 'content_writer')
   const vars = { ...pronounVars(ch.pronouns), name: ch.name, count: String(count) }
   const system = fill(t.system, vars)
-  const prompt = fill(t.prompt, { ...vars, topic, vibe: ch.persona.vibe ?? 'not given' })
+  const prompt = fill(t.prompt, { ...vars, topic, vibe: ch.persona.vibe ?? 'not given', voice: voiceCardText(ch.name, cleanVoiceCard(ch.persona.voice)) })
   const purpose = `content_captions:${item.id}`
   const mock = { captions: Array.from({ length: count }, (_, i) => `POV: ${topic.slice(0, 60)} (${i + 1})`) }
   return {

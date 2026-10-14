@@ -10,6 +10,7 @@ import type { BatchSpec, ContentItem, LibraryData, MemeSpec, SlideshowSpec } fro
 import { KIND_LABEL, NEW_POST, STEPS, postName, useDuplicate, useNewPost } from './post/parts'
 import { batchProgress } from './post/batchProgress'
 import { HowTo, QuickStartBanner } from '../guide/Guide'
+import { AccountsCard } from './AccountsCard'
 
 // Home (UX-PLAN.md): every post, newest work first, filtered by account
 // and character. One click opens a post where it was left.
@@ -53,6 +54,7 @@ export default function Posts() {
       </div>
 
       <QuickStartBanner />
+      {characters.length > 0 && <AccountsCard characters={characters} />}
 
       {(tags.length > 0 || used.size > 1) && (
         <div className="st-col" style={{ gap: 8, marginBottom: 18 }}>

@@ -114,13 +114,13 @@ top; Activity, the month's spend and Demo/Live sit at the bottom.
 | **Characters** | `/studio/characters` | All characters; make or import one | "Your characters" |
 | **Character setup** | `/studio/characters/:id` | Inspiration > Face > Reference sheet > Character file, as a stepper | "Set up Callie": a finished reference sheet and character file |
 | Sheet review | `/studio/characters/:id/review/:ref` | Full-screen review of sheet results (setup only) | An approved sheet shot |
-| **Library** | `/studio/library` | Browse everything made: tabs Stills, Clips, B-roll, Sounds, Posts; filter by character and product; download; "Use in a new post"; upload B-roll, clips and sounds | My library |
+| **Library** | `/studio/library` | Browse everything made: tabs Stills, Clips, B-roll, Sounds, Voice lines, Hooks, Posts; filter by character and product; download; "Use in a new post"; upload B-roll, clips, sounds and voice takes | My library |
 | **Settings** | `/studio/settings` | Tabs: General (mode, keys, Higgsfield billing), Models (Claude, Higgsfield), Rules, Budgets and usage, Notices | A Studio set up the way I want |
 | **Guide** | `/studio/guide` | The visual manual (owner, 2026-10-13): Quick start, the big picture, every page and step with an annotated screenshot, and a glossary. In the sidebar under Settings | "How do I use this?" answered with pictures |
 
 **Not pages** (they open as drawers inside whatever page I'm on):
 
-- **Library drawer**: Stills, Clips, B-roll, Posts. Pick, and it drops in.
+- **Library drawer**: Stills, Clips, B-roll, Posts, Hooks. Pick, and it drops in.
 - **Character drawer**: switch the post's character; "Set up a new
   character" opens Characters.
 - **Upload**: inline in the step that needs it (a drop zone).
@@ -509,3 +509,41 @@ Done, is 7 clicks inside the editor.
 **Track order.** Top to bottom: captions, Presets, footage, audio. A
 preset moves only what is below its track, so captions stay still and
 readable over a zoom or a shake.
+
+## 13. Voice lines (overnight item 4, 2026-10-14)
+
+Placed before building. Nothing new in the sidebar.
+
+| Piece | Where it lives | Clicks |
+|---|---|---|
+| The character's voice | Character page, Profile: a **Voice** button next to Edit card opens the voice card (a modal): the ElevenLabs voice ID on top, then how the character talks (item 5). Imported from a "## Voice" section of the character file too | 2 to open and save |
+| Upload takes | Library > **Voice lines** (a new tab beside Sounds): pick the character, "Upload takes" (several WAV files at once, one line each). The file name gives the hook and the words: `047_check-my-match-score.wav` is Hook 47, "Check my match score". The worker prepares each take free (mono WAV, length and loudness) | 2 (Upload takes, pick files) |
+| Convert | Same tab: each take has a play button and a **Convert** price button (ElevenLabs speech to speech, then speech to text for word timings, one price). "Convert all N takes" converts every waiting take in one quote. The row then plays the converted line and shows what was heard | 2 per take, or 2 for all |
+| Voiceover on a post | Finish step, Sound row: a **Voiceover** line under Music: None, or the character's converted lines (hook and title). Starts at (seconds), Level (Quiet, Normal, Loud), and **Captions from the voice line** (on by default). Music and ambience dip under the voice | 1 to pick |
+| Captions from the voice line | Automatic: the words become short captions (a few words at a time, broken where the speaker breaks), each timed by its words, so Karaoke captions light each word as it is said. Off: the typed caption stays | 0 |
+| The editor | The voice opens on its own audio track at its start, and the captions are the voice line's phrases | 0 |
+
+A batch has no voiceover (one line cannot match fifty captions); a video
+post made from a spreadsheet row can pick its own. Lip sync is not built
+(plan in LATER.md).
+
+**Clicks, voiceover on a post:** Library > Voice lines, Upload takes, pick
+files (2); Convert all, Run (2); in the post's Finish step, pick the line
+(1). The post then exports as before (1).
+
+## 14. Scale kit (overnight item 5, 2026-10-14)
+
+For thirty characters and twenty accounts. Placed before building; no new
+page or sidebar item.
+
+| Piece | Where it lives | Clicks |
+|---|---|---|
+| Voice card | The same **Voice** modal on the character page: who, point of view, talks like, words used, words never used, emoji, humor, content pillars, an example line. Every field optional (a default, never a lock). The caption, slide, script and hook writers read it and write in that voice | 2 to open and save |
+| Hook vault, claims sheet, buyer language | Library > **Hooks** (a new tab): pick the product (SideStep is seeded from the script kit). Three parts on one page: the hook vault (numbered, grouped by type, with the 80/20 mix note), the claims sheet (what it is, what it does, price, approved phrasings, never say), and the buyer-language bank (pain, feelings, small wins). All editable inline; add a hook, a phrase or a claim in one field | 1 to open |
+| Hook variants | Each hook: **Write variants** (a price button): Claude rewrites the hook once in each chosen character's voice, inside the claims sheet, using buyer language. Variants are listed under the hook with the character's name, each with Copy and "Use in a new post" | 2 |
+| Use a hook | Library drawer > Hooks from the post's Text step: pick a hook or a variant and it becomes the caption | 2 |
+| Tracked link or promo code | Posts home, **Accounts** card (top, collapsed by default): one row per account tag with its character, its tracked link or promo code, posts made, and signups (typed in or pasted from the link tracker) | 1 to open, 1 per edit |
+| Scoreboard | The same card, sorted by signups (then signups per post), never by views. Views can be noted but do not rank | 0 |
+
+**Clicks, a hook in a character's voice into a post:** Library > Hooks (1),
+Write variants, Run (2), Use in a new post (1).

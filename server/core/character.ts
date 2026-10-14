@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { wordCount } from './text.js'
+import type { VoiceCard } from './voiceCard.js'
 
 // The character record shared by the pipeline, the character file and QA.
 
@@ -63,7 +64,9 @@ export interface CharacterData {
   }
   makeup: { default: string; glam_when: string[]; glam?: string }
   // `never` and `defaults` are suggestions for the planner, never limits.
-  persona: { vibe?: string; settings?: string[]; never?: string[]; defaults?: string }
+  // `voice`: the voice card and the ElevenLabs voice (voice lines, the
+  // caption and hook writers); every field optional.
+  persona: { vibe?: string; settings?: string[]; never?: string[]; defaults?: string; voice?: VoiceCard }
   pronouns: Pronouns
   avoidModels: string[]
   preferredModels: Record<string, string>

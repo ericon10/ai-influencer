@@ -304,7 +304,11 @@ export const brollClips = pgTable('broll_clips', {
 export const sounds = pgTable('sounds', {
   id: text('id').primaryKey(),
   accountId: text('account_id').notNull().references(() => accounts.id),
-  kind: text('kind').notNull(), // ambience | music
+  kind: text('kind').notNull(), // ambience | music | voice
+  // Voice lines (overnight item 4): the character whose voice it is, and
+  // the performed take, the voice and the word timings in meta.
+  characterId: text('character_id'),
+  meta: jsonb('meta').notNull().default({}),
   assetId: text('asset_id'),
   title: text('title').notNull().default(''),
   tag: text('tag').notNull().default(''),
@@ -460,3 +464,66 @@ export const budgets = pgTable('budgets', {
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 }, t => [uniqueIndex('budgets_scope_uq').on(t.accountId, t.scope, t.scopeRef)])
+
+// The scale kit (overnight item 5, DECISIONS G35): per product, the hook
+// vault, the claims sheet and the buyer-language bank; hook variants in
+// each character's voice; and per social account (a post's account tag),
+// its tracked link or promo code and signups for the scoreboard.
+export const products = pgTable('products', {
+  id: text('id').primaryKey(),
+  accountId: text('account_id').notNull().references(() => accounts.id),
+  name: text('name').notNull(),
+  // Claims sheet, buyer language, the kit's voice cards and notes (JSON,
+  // edited inline; server/core/scriptKit.ts has the shape).
+  claims: jsonb('claims').notNull().default({}),
+  language: jsonb('language').notNull().default({}),
+  voices: jsonb('voices').notNull().default([]),
+  notes: text('notes').notNull().default(''),
+  createdBy: text('created_by'),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+  archivedAt: timestamp('archived_at', { withTimezone: true }),
+}, t => [index('products_account_idx').on(t.accountId, t.createdAt)])
+
+export const hooks = pgTable('hooks', {
+  id: text('id').primaryKey(),
+  accountId: text('account_id').notNull().references(() => accounts.id),
+  productId: text('product_id').notNull(),
+  number: integer('number').notNull(),
+  // The hook's type in the vault ("Relatable pain", "Soft product").
+  kind: text('kind').notNull().default(''),
+  text: text('text').notNull(),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+  archivedAt: timestamp('archived_at', { withTimezone: true }),
+}, t => [index('hooks_product_idx').on(t.accountId, t.productId, t.number)])
+
+export const hookVariants = pgTable('hook_variants', {
+  id: text('id').primaryKey(),
+  accountId: text('account_id').notNull().references(() => accounts.id),
+  hookId: text('hook_id').notNull(),
+  characterId: text('character_id').notNull(),
+  text: text('text').notNull(),
+  // Free checks against the claims sheet (warnings, never a block).
+  flags: jsonb('flags').notNull().default([]),
+  jobId: text('job_id'),
+  createdAt: createdAt(),
+  archivedAt: timestamp('archived_at', { withTimezone: true }),
+}, t => [index('hook_variants_hook_idx').on(t.accountId, t.hookId, t.createdAt)])
+
+export const socialAccounts = pgTable('social_accounts', {
+  id: text('id').primaryKey(),
+  accountId: text('account_id').notNull().references(() => accounts.id),
+  // The account tag posts carry (Posts home filter), e.g. "callie.jobs".
+  tag: text('tag').notNull(),
+  characterId: text('character_id'),
+  productId: text('product_id'),
+  link: text('link').notNull().default(''),
+  code: text('code').notNull().default(''),
+  signups: integer('signups').notNull().default(0),
+  views: integer('views'),
+  notes: text('notes').notNull().default(''),
+  updatedBy: text('updated_by'),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+}, t => [uniqueIndex('social_accounts_tag_uq').on(t.accountId, t.tag)])

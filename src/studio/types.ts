@@ -175,6 +175,8 @@ export type StudioAction =
   | { type: 'clone_caption'; characterId: string; contentId: string }
   | { type: 'clone'; contentId: string; characterIds: string[]; model?: string; mode?: CloneMode; background?: 'video' | 'image'; outfit?: 'source' | 'hers'; looks: Record<string, string>; keepSound: boolean }
   | { type: 'clone_still'; contentId: string; characterId: string; outfit?: 'source' | 'hers'; look?: string }
+  | { type: 'voice_convert'; soundIds: string[] }
+  | { type: 'hook_variants'; hookId: string; characterIds: string[]; perCharacter?: number }
 
 // A run's live status (server/jobs/jobView.ts).
 export type JobPhase = 'waiting' | 'queued' | 'submitting' | 'working' | 'sent' | 'provider_queued' | 'generating' | 'downloading' | 'checking' | 'done' | 'failed' | 'canceled' | 'needs_attention'
@@ -257,11 +259,26 @@ export type CaptionStyle = 'box' | 'outline'
 export interface EditStyleView { id: EditStyleId; label: string; line: string; shots: 1 | 2; anchor: string; slots: { a: string; b: string } | null; params: Record<EditStrength, Record<string, number>>; stage?: string; needs?: Array<'mask' | 'background'>; variants?: Array<{ id: string; label: string }> | null; text?: string | null }
 // Phase 3: the sound bed, the rough cut and "Continue this shot".
 export type SoundLevel = 'quiet' | 'normal' | 'loud'
-export interface SoundSpec { ambience: string; ambienceLevel: SoundLevel; music: string | null; musicLevel: SoundLevel; duck: boolean; clipSound: boolean }
+export interface VoiceWord { text: string; start: number; end: number }
+// A post's voiceover (voice lines): the line, where it starts, its level,
+// and whether its words are the captions. The server copies the words.
+export interface PostVoice { id: string; at: number; level: SoundLevel; captions: boolean; title?: string; words?: VoiceWord[] }
+export interface SoundSpec { ambience: string; ambienceLevel: SoundLevel; music: string | null; musicLevel: SoundLevel; duck: boolean; clipSound: boolean; voice?: PostVoice | null }
 export interface CutShot { id: string; kind: 'clip' | 'broll'; ref: string; in: number; out: number | null }
 export interface CutCaption { id: string; text: string | null; start: number; end: number | null }
 export interface Cut { auto: boolean; shots: CutShot[]; captions: CutCaption[] }
 export interface ContinueFrom { clipId: string; frameId: string | null; status: 'preparing' | 'ready' | 'joining' | 'failed'; model: string | null; takeId: string | null; error: string | null }
+// A voice line (Library > Voice lines): the owner's take, then the line in
+// the character's voice with its word timings.
+export interface VoiceLine {
+  id: string; characterId: string | null; title: string; tag: string; hook: number | null; line: string
+  status: 'processing' | 'take' | 'converting' | 'ready' | 'failed'; error: string | null
+  takeAssetId: string | null; takeSec: number | null; assetId: string | null; durationSec: number | null
+  words: VoiceWord[]; transcript: string; convertedAt: string | null; createdAt: string
+}
+// The voice card (Profile, Voice): how the character talks, and the
+// ElevenLabs voice for voice lines. Every field optional.
+export interface VoiceCard { elevenlabsId?: string; who?: string; talks?: string; uses?: string[]; never?: string[]; emoji?: string; humor?: string; pov?: string; pillars?: string[]; example?: string }
 export interface SoundItem { id: string; kind: 'ambience' | 'music'; title: string; tag: string; status: 'processing' | 'ready' | 'failed'; error: string | null; assetId: string | null; durationSec: number | null; loudness: number | null; createdAt: string }
 export interface CutShotView extends CutShot { title: string; assetId: string | null; posterId: string | null; sourceSec: number | null; start: number | null; durationSec: number | null; hasSound: boolean; ready: boolean; takes: number }
 export interface CutView {
@@ -351,3 +368,18 @@ export interface ImportRow {
   status: 'reuse' | 'generate' | 'problem'; problems: string[]; priceUsd: number
 }
 export interface ImportPreview { rows: ImportRow[]; problems: string[]; totals: { rows: number; reuse: number; generate: number; problem: number; usd: number }; priceNote: string }
+
+// The scale kit (Library > Hooks, Posts home > Accounts).
+export interface KitGroup { label: string; items: string[] }
+export interface ProductClaims { groups: KitGroup[]; lines: KitGroup[]; watch: string[]; mentions: string[] }
+export interface HookVariant { id: string; characterId: string; text: string; flags: string[]; createdAt: string }
+export interface KitHook { id: string; number: number; kind: string; text: string; variants: HookVariant[] }
+export interface ProductSummary { id: string; name: string; hooks: number }
+export interface ProductView {
+  id: string; name: string; claims: ProductClaims; language: { groups: KitGroup[] }
+  voices: Array<{ name: string; status: 'live' | 'proposed'; card: VoiceCard }>; notes: string; hooks: KitHook[]
+}
+export interface SocialAccount {
+  tag: string; characterId: string | null; productId: string | null; link: string; code: string; signups: number; views: number | null; notes: string
+  posts: number; exported: number; perPost: number | null; updatedAt: string | null; rank: number
+}

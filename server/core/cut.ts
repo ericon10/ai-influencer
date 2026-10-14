@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { voiceCaptions, type PhraseOptions, type Word } from './voiceLines.js'
 
 // The rough cut (Phase 3): a video post as one timeline. Shots are clips
 // and B-roll, each trimmed, joined with hard cuts in order; captions are
@@ -25,6 +26,9 @@ export const cutCaptionSchema = z.object({
   text: z.string().max(400).nullable().default(null),
   start: z.number().min(0).max(600).default(0),
   end: z.number().min(0).max(600).nullable().default(null),
+  // A caption made from a voice line knows when each word is said (the
+  // karaoke edit lights them in time).
+  words: z.array(z.object({ text: z.string().max(80), start: z.number().min(0).max(700), end: z.number().min(0).max(700) })).max(200).optional(),
 })
 
 export const cutSchema = z.object({
@@ -46,6 +50,9 @@ export interface CutSource {
   brollStart: number
   brollSeconds: number
   cut?: Cut | null
+  // A voiceover (a converted voice line) with "Captions from the voice
+  // line" on: its phrases are the captions, timed by its words.
+  sound?: { voice?: { at: number; captions: boolean; words: Word[] } | null }
 }
 
 // The automatic cut: the clip (in full), the B-roll cut in hard before or
@@ -60,10 +67,13 @@ export function autoCut(s: Omit<CutSource, 'cut'>, maxBrollSeconds = 20): Cut {
   return { auto: true, shots, captions: [{ id: 'main', text: null, start: 0, end: null }] }
 }
 
-// The cut a render uses: the owner's when edited, else the automatic one.
-export function effectiveCut(s: CutSource, maxBrollSeconds = 20): Cut {
-  if (s.cut && !s.cut.auto && s.cut.shots.length) return s.cut
-  return autoCut(s, maxBrollSeconds)
+// The cut a render uses: the owner's when edited, else the automatic one;
+// with a voiceover's captions in place of the text captions when asked.
+export function effectiveCut(s: CutSource, maxBrollSeconds = 20, phrases?: PhraseOptions & { holdSec?: number }): Cut {
+  const base = s.cut && !s.cut.auto && s.cut.shots.length ? s.cut : autoCut(s, maxBrollSeconds)
+  const v = s.sound?.voice
+  if (!v?.captions || !v.words.length) return base
+  return { ...base, captions: voiceCaptions(v.words, v.at, phrases) }
 }
 
 // Two shots instead of one chained clip (a seam that failed): a real cut

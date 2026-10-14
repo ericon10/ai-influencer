@@ -9,6 +9,7 @@ import type { Db } from '../db/client.js'
 export interface ServerKeys {
   ownerEmail: string
   higgsfield?: string
+  elevenlabs?: string
 }
 
 const ownerCache = new Map<string, boolean>()
@@ -29,6 +30,7 @@ export async function isOwnerAccount(db: Db, accountId: string, ownerEmail: stri
 
 // The server key for a provider, when this is the owner's account.
 export async function serverKeyFor(db: Db, keys: ServerKeys | undefined, accountId: string, provider: string): Promise<string | null> {
-  if (!keys || provider !== 'higgsfield' || !keys.higgsfield?.trim()) return null
-  return (await isOwnerAccount(db, accountId, keys.ownerEmail)) ? keys.higgsfield.trim() : null
+  const key = provider === 'higgsfield' ? keys?.higgsfield : provider === 'elevenlabs' ? keys?.elevenlabs : undefined
+  if (!keys || !key?.trim()) return null
+  return (await isOwnerAccount(db, accountId, keys.ownerEmail)) ? key.trim() : null
 }

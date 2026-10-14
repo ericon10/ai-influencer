@@ -170,6 +170,30 @@ export function useCut(contentId: string, version: string, enabled = true) {
   })
 }
 
+// A character's voice lines (or everyone's), polled while takes are being
+// prepared or converted.
+export function useVoiceLines(characterId?: string | null) {
+  return useQuery({
+    queryKey: ['voice-lines', characterId ?? 'all'],
+    queryFn: () => api.voiceLines(characterId),
+    refetchInterval: q => (q.state.data?.lines.some(x => x.status === 'processing' || x.status === 'converting') ? 2500 : false),
+  })
+}
+
+// The scale kit: products (the owner's account starts with the SideStep
+// kit), one product's vault, and the accounts scoreboard.
+export function useProducts() {
+  return useQuery({ queryKey: ['products'], queryFn: api.products })
+}
+export function useProduct(id: string | null) {
+  const active = useActiveJobs()
+  const writing = (active.data?.jobs ?? []).some(j => j.purpose.startsWith('hook_variants:'))
+  return useQuery({ queryKey: ['product', id], queryFn: () => api.product(id!), enabled: !!id, refetchInterval: writing ? 2500 : false })
+}
+export function useSocialAccounts() {
+  return useQuery({ queryKey: ['social-accounts'], queryFn: api.socialAccounts })
+}
+
 export function useSounds() {
   const active = useActiveJobs()
   const busy = (active.data?.jobs ?? []).some(j => j.purpose.startsWith('sound_ingest:'))

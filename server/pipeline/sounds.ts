@@ -1,6 +1,6 @@
 import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { and, desc, eq, isNull } from 'drizzle-orm'
+import { and, desc, eq, isNull, ne } from 'drizzle-orm'
 import { sounds } from '../db/schema.js'
 import type { Ctx, Deps } from '../context.js'
 import { AppError, notFound } from '../lib/errors.js'
@@ -16,13 +16,14 @@ import { uploadKey } from '../storage/uploads.js'
 // recordings and music tracks the owner uploads, from the Finish step or
 // Library > Sounds. The worker converts each to AAC and measures its
 // loudness, so the mix can level it. Room tone is built in and needs no
-// upload. There is no AI music.
+// upload. There is no AI music. Voice lines live in the same table (kind
+// "voice", pipeline/voiceLines.ts) and have their own list.
 
 export type SoundRow = typeof sounds.$inferSelect
 export type SoundKind = 'ambience' | 'music'
 
 export async function listSounds(deps: Deps, ctx: Ctx): Promise<SoundRow[]> {
-  return deps.db.select().from(sounds).where(and(eq(sounds.accountId, ctx.accountId), isNull(sounds.archivedAt))).orderBy(desc(sounds.createdAt))
+  return deps.db.select().from(sounds).where(and(eq(sounds.accountId, ctx.accountId), ne(sounds.kind, 'voice'), isNull(sounds.archivedAt))).orderBy(desc(sounds.createdAt))
 }
 
 export async function getSound(deps: Deps, ctx: Ctx, soundId: string): Promise<SoundRow> {

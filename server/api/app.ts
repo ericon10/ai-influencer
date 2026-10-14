@@ -14,7 +14,9 @@ import { verifyAssetSignature } from '../jobs/assetUrls.js'
 import { cancelJob, getJob, resolveJob, wakeFromWebhook } from '../jobs/runner.js'
 import { wakeWorker } from '../jobs/wake.js'
 import { actionSchema, estimateAction, runAction } from '../pipeline/actions.js'
-import { createCharacter, getCandidate, getCharacter, linkInspiration, listCharacters, setCharacterFields, updateCharacter } from '../pipeline/characters.js'
+import { createCharacter, getCandidate, getCharacter, linkInspiration, listCharacters, setCharacterFields, toData, updateCharacter } from '../pipeline/characters.js'
+import { cleanVoiceCard } from '../core/voiceCard.js'
+import type { CharacterData } from '../core/character.js'
 import { approveSceneCandidate, archiveScene, copyScene, createScene, cropCandidate, saveVideoModel, updateScene } from '../pipeline/scenes.js'
 import { videoPrices } from '../pipeline/sceneActions.js'
 import { expectedVersion, readWorkerStatus } from '../jobs/workerStatus.js'
@@ -23,6 +25,8 @@ import { cancelContinue, continueShot, keepTwoShots, useChainTake } from '../pip
 import { postCutView, postEditorProject } from '../pipeline/cutView.js'
 import { makeCloseup } from '../pipeline/closeup.js'
 import { addSound, archiveSound, listSounds, soundView, updateSound } from '../pipeline/sounds.js'
+import { addVoiceTakes, getVoiceLine, listVoiceLines, updateVoiceLine, voiceLineView } from '../pipeline/voiceLines.js'
+import { addHook, archiveHook, archiveProduct, archiveVariant, importKit, productSummaries, productView, saveSocialAccount, scoreboard, starterKit, updateHook, updateProduct, useKitVoice } from '../pipeline/scaleKit.js'
 import { deleteStyle, editorManifest, listStyles, saveFromEditor, saveStyle } from '../pipeline/openreel.js'
 import { previewImport, runImport } from '../pipeline/csvImport.js'
 import { addCloneSource, cloneOptions, cloneStills, keepClone, postClones, postFromClone, saveCloneModel, setCloneCleanup, setCloneTarget, useCloneStill } from '../pipeline/clone.js'
@@ -214,13 +218,18 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
     card: z.string().max(600).optional(), eyes: z.string().max(80).optional(), body: z.string().max(400).optional(),
     marks: z.array(markInput).max(4).optional(), notes: z.string().max(4000).optional(), disclosure: z.string().max(200).optional(),
     pronouns: z.object({ subj: z.string(), obj: z.string(), poss: z.string(), noun: z.string() }).optional(),
+    // The voice card (Profile, Voice): kept in the persona, cleaned.
+    voice: z.record(z.string(), z.unknown()).optional(),
   })
 
   app.patch('/characters/:id', async c => {
     const ctx = c.get('ctx')
     requireRole(ctx, 'member')
     const body = parse(z.object({ patch: patchSchema, reason: z.string().max(200).default('edited') }), await json(c))
-    await updateCharacter(deps, ctx, c.req.param('id'), body.patch, body.reason)
+    const { voice, ...rest } = body.patch
+    const patch: Partial<CharacterData> = rest
+    if (voice) patch.persona = { ...toData(await getCharacter(deps, ctx, c.req.param('id'))).persona, voice: cleanVoiceCard(voice) }
+    await updateCharacter(deps, ctx, c.req.param('id'), patch, body.reason)
     return c.json(await characterView(deps, ctx, c.req.param('id')))
   })
 
@@ -739,6 +748,99 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
     requireRole(ctx, 'member')
     await archiveSound(deps, ctx, c.req.param('id'))
     return c.json({ ok: true })
+  })
+  // Voice lines (overnight item 4): the owner's takes, prepared free; the
+  // conversion is a priced action (voice_convert).
+  app.get('/voice-lines', async c => c.json({ lines: (await listVoiceLines(deps, c.get('ctx'), c.req.query('characterId') || null)).map(voiceLineView) }))
+  app.post('/voice-lines', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    const body = parse(z.object({ characterId: z.string().max(60), takes: z.array(z.object({ uploadId: z.string().max(40), name: z.string().max(300) })).min(1).max(50) }), await json(c))
+    return c.json({ lines: (await addVoiceTakes(deps, ctx, body)).map(voiceLineView) }, 201)
+  })
+  app.patch('/voice-lines/:id', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    const body = parse(z.object({ title: z.string().max(120).optional(), line: z.string().max(400).optional(), hook: z.number().int().min(0).max(9999).nullable().optional() }), await json(c))
+    return c.json(voiceLineView(await updateVoiceLine(deps, ctx, c.req.param('id'), body)))
+  })
+  app.delete('/voice-lines/:id', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    await getVoiceLine(deps, ctx, c.req.param('id'))
+    await archiveSound(deps, ctx, c.req.param('id'))
+    return c.json({ ok: true })
+  })
+  // The scale kit (overnight item 5): products (hook vault, claims, buyer
+  // language), hooks and variants; accounts and the signups scoreboard.
+  app.get('/products', async c => c.json({ products: await productSummaries(deps, c.get('ctx')) }))
+  app.post('/products/import', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    const body = parse(z.object({ markdown: z.string().max(200_000).optional(), starter: z.boolean().optional(), name: z.string().max(80).optional() }), await json(c))
+    if (!body.starter && !body.markdown?.trim()) throw new AppError('bad_request', 'Pick a script kit file (.md) to import.')
+    const r = await importKit(deps, ctx, body.starter ? starterKit() : body.markdown!, body.name || undefined)
+    return c.json({ product: { id: r.product.id, name: r.product.name, hooks: r.hooks }, hooks: r.hooks, voicesApplied: r.voicesApplied }, 201)
+  })
+  app.get('/products/:id', async c => c.json(await productView(deps, c.get('ctx'), c.req.param('id'))))
+  const groupBody = z.array(z.object({ label: z.string().max(80), items: z.array(z.string().max(400)).max(80) })).max(30)
+  app.patch('/products/:id', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    const body = parse(z.object({
+      name: z.string().max(80).optional(), notes: z.string().max(20_000).optional(),
+      claims: z.object({ groups: groupBody.optional(), lines: groupBody.optional(), watch: z.array(z.string().max(60)).max(60).optional(), mentions: z.array(z.string().max(60)).max(60).optional() }).optional(),
+      language: z.object({ groups: groupBody }).optional(),
+    }), await json(c))
+    await updateProduct(deps, ctx, c.req.param('id'), body)
+    return c.json(await productView(deps, ctx, c.req.param('id')))
+  })
+  app.delete('/products/:id', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    await archiveProduct(deps, ctx, c.req.param('id'))
+    return c.json({ ok: true })
+  })
+  app.post('/products/:id/hooks', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    const body = parse(z.object({ text: z.string().max(600), kind: z.string().max(80).optional() }), await json(c))
+    return c.json({ id: (await addHook(deps, ctx, c.req.param('id'), body)).id }, 201)
+  })
+  app.post('/products/:id/voices/use', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    const body = parse(z.object({ voice: z.string().max(120), characterId: z.string().max(60) }), await json(c))
+    await useKitVoice(deps, ctx, c.req.param('id'), body.voice, body.characterId)
+    return c.json({ ok: true })
+  })
+  app.patch('/hooks/:id', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    const body = parse(z.object({ text: z.string().max(600).optional(), kind: z.string().max(80).optional() }), await json(c))
+    return c.json({ id: (await updateHook(deps, ctx, c.req.param('id'), body)).id })
+  })
+  app.delete('/hooks/:id', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    await archiveHook(deps, ctx, c.req.param('id'))
+    return c.json({ ok: true })
+  })
+  app.delete('/hook-variants/:id', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    await archiveVariant(deps, ctx, c.req.param('id'))
+    return c.json({ ok: true })
+  })
+  app.get('/social-accounts', async c => c.json(await scoreboard(deps, c.get('ctx'))))
+  app.put('/social-accounts/:tag', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    const body = parse(z.object({
+      link: z.string().max(400).optional(), code: z.string().max(60).optional(), signups: z.number().int().min(0).max(10_000_000).optional(),
+      views: z.number().int().min(0).nullable().optional(), characterId: z.string().max(60).nullable().optional(), productId: z.string().max(60).nullable().optional(), notes: z.string().max(400).optional(),
+    }), await json(c))
+    return c.json(await saveSocialAccount(deps, ctx, decodeURIComponent(c.req.param('tag')), body))
   })
   // A batch's failed videos render again (free).
   app.post('/content/:id/render/retry-failed', async c => {

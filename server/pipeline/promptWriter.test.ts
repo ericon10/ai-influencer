@@ -62,6 +62,11 @@ describe('the prompt writer (default on)', () => {
     expect(preview.prompts[0]!.text).toMatch(/Camera ownership: who takes the photo, the front or rear camera/)
     expect(preview.prompts[0]!.text).toMatch(/cause-and-effect camera imperfection/)
     expect(preview.prompts[0]!.text).toMatch(/think like a film director and DP/)
+    // Item 6: light with a direction that shapes the face; dim scenes ask
+    // for less micro detail so faces never go crunchy.
+    expect(preview.prompts[0]!.text).toMatch(/direction\s+that shapes the face/)
+    expect(preview.prompts[0]!.text).toMatch(/dim or low-light\s+scene, ask for less micro detail/)
+    expect(preview.prompts[0]!.text).toMatch(/crunchy/)
     expect(preview.prompts[0]!.text).toContain('- Outfit: a faded denim jacket over a white tank.')
     // The Studio's own lines are not the writer's job.
     expect(preview.prompts[0]!.text).not.toMatch(/LEFT|RIGHT/)
@@ -141,6 +146,8 @@ describe('the prompt writer (default on)', () => {
     expect(seen.system).toMatch(/110 to 180 words/)
     expect(seen.system).toContain('No talking, no winking, steady eye contact.')
     expect(seen.system).toMatch(/Write exactly these labeled lines/)
+    expect(seen.system).toMatch(/direction that shapes the face/)
+    expect(seen.system).toMatch(/crunchy or over-sharpened/)
     expect(seen.system).toMatch(/the payoff in the last 2 seconds/)
     // The start frame shows the place: the setting is not handed over.
     expect(seen.prompt).not.toContain('farmers market')

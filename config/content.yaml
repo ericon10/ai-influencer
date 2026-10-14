@@ -143,6 +143,16 @@ sound:
   default_ambience: room
   max_upload_mb: 50
   max_seconds: 600
+  # Voice lines (overnight item 4): the owner's performed takes turned into
+  # the character's voice (ElevenLabs speech to speech, with word timings).
+  # The voiceover sits here before the mix; the music and ambience dip
+  # under it. Captions follow the words a few at a time.
+  voice:
+    model: elevenlabs/sts-v2
+    lufs: -16
+    max_seconds: 60
+    max_takes: 50
+    phrases: { max_words: 6, max_sec: 2.4, pause_sec: 0.35, hold_sec: 0.6 }
 
 # The rough cut (Phase 3): the post's clips, B-roll and captions on one
 # timeline in the Finish step, built automatically from the steps above.

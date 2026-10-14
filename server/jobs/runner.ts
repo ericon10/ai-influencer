@@ -428,7 +428,8 @@ async function ingestGen(deps: Deps, job: JobRow): Promise<void> {
         data = s.data
         if (s.hadAudio) await event(deps.db, job, 'audio_stripped', { position: i })
       }
-      const asset = await saveAsset(deps, ctx, { data, origin: 'generated', sourceJobId: job.id, sourceUrl: o.url, label: job.purpose })
+      // The output's own type when it says one (an MP3, word timings as JSON).
+      const asset = await saveAsset(deps, ctx, { data, mime: o.mime, origin: 'generated', sourceJobId: job.id, sourceUrl: o.url, label: job.purpose })
       await deps.db.insert(jobOutputs).values({ accountId: job.accountId, jobId: job.id, position: i, assetId: asset.id, providerUrl: o.url })
       assets.push(asset)
       measured.push({ ...o, width: asset.width ?? undefined, height: asset.height ?? undefined, durationSec: asset.durationMs != null ? asset.durationMs / 1000 : undefined })

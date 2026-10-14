@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState, type ReactNode } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
-import { Archive, AudioLines, Clapperboard, Download, Film, History, Images, LayoutGrid, Loader2, Music, Plus, Upload, Wind } from 'lucide-react'
+import { Archive, AudioLines, Clapperboard, Download, Film, History, Images, LayoutGrid, Loader2, Mic, Music, Plus, Sparkles, Upload, Wind } from 'lucide-react'
 import { api, assetUrl, downloadUrl } from '../api'
 import { keys, useCharacters, useContent, useLibrary, useScenes, useSounds, useWorkerGate } from '../hooks'
 import { Callout, Img, errorMessage, useToast } from '../ui'
@@ -10,17 +10,21 @@ import { RunStatus } from '../runs'
 import type { BrollClip, ContentData, ScenesData, SoundItem } from '../types'
 import { KIND_LABEL, fileSlug, postName, useNewPost } from './post/parts'
 import { HowTo } from '../guide/Guide'
+import { VoiceLinesTab } from './library/VoiceLines'
+import { HooksTab } from './library/Hooks'
 
 // The Library (UX-PLAN.md): browse everything made, across characters.
 // Stills and clips start a new post in one click; B-roll is uploaded and
 // tagged here; exported posts can be downloaded again.
 
-type Tab = 'stills' | 'clips' | 'broll' | 'sounds' | 'posts'
+type Tab = 'stills' | 'clips' | 'broll' | 'sounds' | 'voice' | 'hooks' | 'posts'
 const TABS: Array<[Tab, string, ReactNode]> = [
   ['stills', 'Stills', <Images size={14} key="s" />],
   ['clips', 'Clips', <Film size={14} key="c" />],
   ['broll', 'B-roll', <Clapperboard size={14} key="b" />],
   ['sounds', 'Sounds', <AudioLines size={14} key="a" />],
+  ['voice', 'Voice lines', <Mic size={14} key="v" />],
+  ['hooks', 'Hooks', <Sparkles size={14} key="h" />],
   ['posts', 'Posts', <LayoutGrid size={14} key="p" />],
 ]
 
@@ -46,13 +50,13 @@ export default function Library() {
   return (
     <div className="st-page wide">
       <div className="st-pagehead">
-        <div className="grow"><div className="st-kicker st-row" style={{ gap: 10 }}>Library<HowTo id="library" /></div><h1 className="st-h1">Everything you made</h1><p className="st-sub">Stills, clips, B-roll and exported posts. Start a new post from any still or clip.</p></div>
+        <div className="grow"><div className="st-kicker st-row" style={{ gap: 10 }}>Library<HowTo id="library" /></div><h1 className="st-h1">Everything you made</h1><p className="st-sub">Stills, clips, B-roll, sounds, voice lines, hooks and exported posts. Start a new post from any still, clip or hook.</p></div>
       </div>
       <div className="st-row" style={{ gap: 12, flexWrap: 'wrap', marginBottom: 18 }}>
         <div className="st-seg" role="tablist">
           {TABS.map(([k, label, icon]) => <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => set({ tab: k, scene: null })}><span className="st-row" style={{ gap: 6 }}>{icon}{label}</span></button>)}
         </div>
-        {tab !== 'broll' && characters.length > 1 && (
+        {tab !== 'broll' && tab !== 'hooks' && characters.length > 1 && (
           <div className="st-row" style={{ gap: 6, flexWrap: 'wrap' }}>
             <button className={`st-chip ${!characterId ? 'on' : ''}`} onClick={() => set({ c: null })}>All characters</button>
             {characters.map(c => <button key={c.id} className={`st-chip ${characterId === c.id ? 'on' : ''}`} onClick={() => set({ c: c.id })}>{c.name}</button>)}
@@ -93,6 +97,8 @@ export default function Library() {
       {tab === 'broll' && (!content.data ? <Skel /> : <BrollTab data={content.data} />)}
 
       {tab === 'sounds' && <SoundsTab />}
+      {tab === 'voice' && <VoiceLinesTab characterId={characterId} characters={characters} />}
+      {tab === 'hooks' && <HooksTab characters={characters} />}
 
       {tab === 'posts' && (
         !content.data ? <Skel /> : <ExportedPosts data={content.data} characterId={characterId} />

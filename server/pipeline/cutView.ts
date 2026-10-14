@@ -5,7 +5,7 @@ import { AppError } from '../lib/errors.js'
 import { effectiveCut, type Cut } from '../core/cut.js'
 import { planShots } from '../media/timeline.js'
 import { getAsset } from '../storage/assets.js'
-import { getContent, specSchemas, type MemeSpec } from './content.js'
+import { getContent, specSchemas, voicePhrases, type MemeSpec } from './content.js'
 import { listSounds, soundView } from './sounds.js'
 import { partsOf } from './chain.js'
 import { toOpenCutProject, type EditorAudio, type EditorCaption, type EditorMedia, type EditorProjectInput, type EditorShot } from '../core/opencut.js'
@@ -40,7 +40,7 @@ export async function postCutView(deps: Deps, ctx: Ctx, postId: string) {
   if (row.kind !== 'meme') throw new AppError('bad_request', 'Only a video post has a rough cut.')
   const spec = specSchemas.meme.parse(row.spec) as MemeSpec
   const cfg = deps.config.pipeline.content
-  const cut: Cut = effectiveCut(spec, cfg.meme.max_broll_seconds)
+  const cut: Cut = effectiveCut(spec, cfg.meme.max_broll_seconds, voicePhrases(deps))
   const clipIds = cut.shots.filter(s => s.kind === 'clip').map(s => s.ref)
   const brollIds = cut.shots.filter(s => s.kind === 'broll').map(s => s.ref)
   const [clipRows, brollRows] = await Promise.all([

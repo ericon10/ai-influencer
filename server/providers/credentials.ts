@@ -11,7 +11,7 @@ import { AppError } from '../lib/errors.js'
 // are sealed with the key vault and only the last four characters are ever
 // returned to the browser.
 
-const KNOWN = new Set(['higgsfield', 'anthropic', 'wavespeed', 'fal'])
+const KNOWN = new Set(['higgsfield', 'anthropic', 'elevenlabs', 'wavespeed', 'fal'])
 const aad = (accountId: string, provider: string) => `${accountId}|${provider}`
 
 export interface CredentialView {

@@ -139,6 +139,7 @@ const templatesSchema = z.object({
   content_slides: z.object({ system: z.string(), prompt: z.string() }),
   content_captions: z.object({ system: z.string(), prompt: z.string() }),
   clone_caption: z.object({ system: z.string(), prompt: z.string() }),
+  hook_variants: z.object({ system: z.string(), prompt: z.string() }),
   prompt_writer: z.object({
     still_system: z.string(), still_prompt: z.string(), video_system: z.string(), video_prompt: z.string(),
     end_frame: z.string(),
@@ -271,6 +272,12 @@ const contentSchema = z.object({
     default_ambience: z.enum(['none', 'room']),
     max_upload_mb: z.number().positive(),
     max_seconds: z.number().positive(),
+    // Voice lines (overnight item 4): the converted line's level before the
+    // mix, the model, the longest take, and how captions break into phrases.
+    voice: z.object({
+      model: z.string(), lufs: z.number(), max_seconds: z.number().positive(), max_takes: z.number().int().positive(),
+      phrases: z.object({ max_words: z.number().int().positive(), max_sec: z.number().positive(), pause_sec: z.number().positive(), hold_sec: z.number().min(0) }),
+    }),
   }),
   cut: z.object({ max_seconds: z.number().positive(), max_shots: z.number().int().positive(), max_captions: z.number().int().positive() }),
 })

@@ -2,6 +2,7 @@ import { parse as parseYaml, stringify as toYaml } from 'yaml'
 import { z } from 'zod'
 import { markSchema, pronounsSchema, type CharacterData, type CharacterIdentity, type CharacterMark, type FileSection, type Pronouns } from './character.js'
 import { capitalize, hardWrap, wordCount } from './text.js'
+import { parseVoiceSection } from './voiceCard.js'
 
 // character-[name].md is the human-readable source of truth (SPEC 8). It
 // round-trips with the Character record: structured fields live in a YAML
@@ -357,6 +358,12 @@ export function importFreeform(md: string, opts: ImportOptions = {}): ImportResu
     else if (/vibe|personality/.test(k)) persona.vibe = b.value
     else if (/setting|places|locations/.test(k)) persona.settings = splitList(b.value, ',')
     else if (/^(never|avoid|don)/.test(k)) persona.never = splitList(b.value, ',')
+  }
+  // The voice card (a "## Voice" section, like the script kit's cards).
+  const voiceSec = find(sections, /^voice(?: card)?$/, /voice card$/)
+  if (voiceSec) {
+    const voice = parseVoiceSection(bullets(voiceSec.body))
+    if (Object.keys(voice).length) persona.voice = voice
   }
 
   // Disclosure.

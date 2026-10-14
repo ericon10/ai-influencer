@@ -1156,3 +1156,27 @@ button.st-chip:hover { color: var(--st-text); border-color: var(--st-text-3); }
 .st-clonepreview-ref { width: 64px; height: 64px; object-fit: cover; border-radius: 10px; border: 1px solid var(--st-line); }
 .st-clonepreview-still { width: 90px; aspect-ratio: 9 / 16; object-fit: cover; border-radius: 10px; border: 1px solid var(--st-line); }
 @media (max-width: 640px) { .st-framepick { width: 150px; } }
+
+/* Voice lines and the scale kit (overnight items 4 and 5). */
+.st-voiceline { align-items: flex-start; }
+.st-voiceline .st-audio { height: 32px; }
+.st-hooklist { max-height: 70vh; overflow: auto; padding-right: 4px; }
+.st-hookrow { border-bottom: 1px solid var(--st-line); padding: 6px 0; }
+.st-hookrow.open { background: var(--st-surface); border-radius: var(--st-r); padding: 8px; }
+.st-input.bare { background: transparent; border-color: transparent; padding-left: 4px; }
+.st-input.bare:hover, .st-input.bare:focus { border-color: var(--st-line); }
+.st-input.sm { padding: 6px 8px; font-size: 13px; min-height: 0; }
+.st-variant { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 8px 10px; border: 1px solid var(--st-line); border-radius: var(--st-r); }
+.st-variant-text { flex: 1 1 260px; min-width: 0; }
+.st-hookpick { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; padding: 8px 10px; border: 1px solid var(--st-line); border-radius: var(--st-r); background: none; color: inherit; cursor: pointer; font: inherit; }
+.st-hookpick:hover { border-color: var(--st-text-3); }
+.st-hookpick.mine { border-style: dashed; }
+.st-hookpick .st-hint { margin-left: auto; white-space: nowrap; }
+.st-tablewrap { overflow-x: auto; }
+.st-accounts .st-table td { vertical-align: middle; }
+.st-pre { font: inherit; font-size: 13px; color: var(--st-text-2); }
+.st-list li { margin: 2px 0; color: var(--st-text-2); font-size: 13.5px; }
+.st-hookrow > .st-row { flex-wrap: nowrap; }
+.st-hookrow .st-input.bare { flex: 1 1 auto; width: auto; min-width: 0; }
+.st-hookrow .st-btn { white-space: nowrap; }
+@media (max-width: 720px) { .st-hookrow > .st-row { flex-wrap: wrap; } .st-hookrow .st-hint { display: none; } }

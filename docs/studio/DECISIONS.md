@@ -1487,3 +1487,127 @@ new pages or sidebar items; one new Library tab (Sounds).
 - **Read its caption** (Clone panel, Claude, priced on the button): reads
   the caption from a frame of the clip as uploaded (the cleaned copy has
   it filled in) and puts it in the post's caption, editable.
+
+### G34. Item 4: voice lines (overnight run, 2026-10-14)
+
+- **The character's voice**: an ElevenLabs voice ID in the character file
+  (`persona.voice.elevenlabsId`), set in the character page's Voice modal
+  or imported from a "## Voice" section (the script kit's card format).
+  The same card holds how the character talks (item 5, G35).
+- **Takes** (Library > Voice lines, a new tab; UX-PLAN section 13): one
+  file per line, named by hook. `047_check-my-match-score.wav` reads as
+  Hook 47, "Check my match score"; a name without a number keeps its
+  words. The worker prepares each take free: mono WAV at 44.1 kHz, at most
+  60 s, loudness measured; a file that is not sound fails with a reason.
+  - Stored in `sounds` (kind `voice`, migration 0011 adds `character_id`
+    and `meta`), never listed with ambience and music.
+- **Convert** (priced, `voice_convert`, one quote for one take or all):
+  ElevenLabs speech to speech (`eleven_multilingual_sts_v2`, MP3 44.1
+  kHz) into the character's voice, then speech to text (`scribe_v1`, word
+  timestamps) on the converted audio. One priced request per take.
+  - Price: `elevenlabs/sts-v2`, USD 0.006 per second of take, marked
+    unverified (ElevenLabs bills credits by plan; the estimate is a
+    ceiling until the first real run confirms it).
+  - Both calls answer directly, so the adapter does them at submit and
+    keeps the results in storage under the job id; the runner then
+    ingests them as usual (audio and a JSON of words). A failed run leaves
+    the take as it was.
+  - Key: `ELEVENLABS_API_KEY` on Vercel and Railway (the owner's account),
+    or an account's own ElevenLabs key in Settings, Provider keys. With
+    neither, production refuses the quote in plain words; local dev and
+    tests use the mock voice (the take a little higher, words spread).
+- **Voiceover on a post** (Finish step, Sound row, video posts): pick a
+  converted line, Starts at, level, and "Captions from the voice line"
+  (on by default).
+  - The line's words are copied into the post when picked (and refreshed
+    at export), so the cut, the editor and the render read the same words
+    without another lookup.
+  - Captions: the words in short phrases (6 words, 2.4 s, a 0.35 s pause
+    or a sentence end breaks a phrase; at most the cut's 8 captions),
+    each held until the next phrase, each with its word times. Karaoke
+    lights each word when it is said. A voiceover is laid over the
+    finished picture, so its captions keep their times through a time
+    edit (speed ramp, freeze).
+  - Mix: the voice at -16 LUFS before the mix; music and ambience dip
+    under it (the same sidechain ducking as for a clip's own sound); the
+    finished post at -14 LUFS.
+  - The editor gets the voice on its own audio track and the phrases as
+    captions. A timeline saved before the voiceover was picked keeps its
+    own captions; the editor adds the voice track when it next opens (fork
+    commit 676dd49), and the export mixes it in either way.
+  - Switching the post's character drops the voiceover (a line belongs to
+    one character). A batch takes none (one line cannot match fifty
+    captions; LATER has per-caption lines).
+- **Lip sync**: not built; the plan is in LATER.md.
+
+### G35. Item 5: the scale kit (overnight run, 2026-10-14)
+
+For thirty characters and twenty accounts (UX-PLAN section 14). Items 4
+and 5 ship in one push: they share the voice card and the new Library
+tabs, and one deploy instead of two saves a Vercel build and a worker
+restart.
+
+- **Voice card per character** (the character page's Voice modal, also
+  "## Voice" in the character file, `persona.voice`): who, point of view,
+  talks like, words used, words never used, emoji, humor, content pillars,
+  an example line, and the ElevenLabs voice (G34). Every field optional.
+  - The batch caption writer, the slideshow writer and the hook variant
+    writer get the card as plain lines and are told to write in that
+    voice. With no card, the prompts read as before.
+  - The "never" words are suggestions to the writer, not a block (rule
+    one: the persona never list is a default).
+- **Products** (Library > Hooks, a new tab): a product is a script kit as
+  data: the claims sheet (labeled lists: what it is, what it does, price,
+  approved phrasings, never say; one-line rules such as safe framing and
+  where the link goes), the buyer-language bank (labeled lists), the hook
+  vault (numbered, grouped by type) and the kit's notes (how to use it,
+  the weekly rhythm). Tables `products`, `hooks`, `hook_variants`
+  (migration 0012).
+  - Seeded from the owner's `sidestep-script-kit.md`, kept as data in
+    `config/kits/`. The owner's account gets it automatically the first
+    time the Hooks tab opens; any other account starts empty and can load
+    it in one click or import its own kit (.md, same format; a parser in
+    `server/core/scriptKit.ts`, no Claude call).
+  - Import fills a character's empty voice card from the kit's live card
+    with the same name (Callie). The kit's proposed cards (the
+    ex-recruiter, the career switcher) are listed with "Use this voice"
+    for any character; the character's ElevenLabs voice is kept.
+  - Everything edits inline: a hook's text, a new hook (numbered next),
+    the claims and the buyer language as plain text (a line ending in a
+    colon starts a group).
+- **Hook variants** (priced on the button, `hook_variants`, Claude on the
+  content writer route, Sonnet by default): one hook rewritten once per
+  picked character, in each voice card, using buyer language, inside the
+  claims sheet (the whole sheet, never-say list included, is in the
+  prompt). Variants are kept under the hook with the character's name,
+  Copy, "Use in a new post" (a video post for that character with the
+  variant as the caption) and Archive. Em-dashes in a reply become commas.
+  - Claims check (free, code, a warning only): a variant that mentions the
+    product (its name or "extension") and a watch word gets a note. Watch
+    words come from the never-say list (quoted short phrases, the things a
+    "promise of" lists, "hired" for fake results) and are editable. Not a
+    block: the claims sheet is the owner's default, and the fixed rules
+    are only those in rule one.
+- **Pick a hook** (the video post's Text step, beside Caption): a drawer
+  with the vault; this character's variants first under each hook. One
+  click makes it the caption.
+- **Accounts** (Posts home, a card collapsed by default; table
+  `social_accounts`): one row per account tag (from posts, or added by
+  hand) with its character, tracked link (https only) or promo code,
+  posts made, and signups typed in from the link tracker. Ranked by
+  signups, then signups per exported post, never by views (views can be
+  stored but never rank). Link clicks are not tracked by the Studio; the
+  link tracker (or the promo code at checkout) is the source.
+
+### G36. Item 6: light in the prompt writer (overnight run, 2026-10-14)
+
+- The still and video writers now say: the light always has a direction
+  that shapes the face (from one side, above and in front, behind and to
+  the side), never flat, frontal or shadowless; and skin detail follows
+  the light: in bright or raking light real texture shows on its own, in a
+  dim or low-light scene the writer asks for less micro detail (soft phone
+  grain, gentle shadow, a little noise) so the face never turns crunchy or
+  over-sharpened.
+- The REALISM block itself is unchanged (rule zero, fixed): it is still
+  added to every image prompt. The note only changes how the writer
+  describes the light around it.

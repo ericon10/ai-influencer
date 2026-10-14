@@ -331,6 +331,20 @@ models:
     aliases: [Kling O3 video edit]
     notes: Keeps the clip's place and swaps the person by prompt. Sources from 3 to 15.5 s.
 
+  # ── ElevenLabs (voice lines, overnight item 4) ──
+  # Speech to speech (eleven_multilingual_sts_v2) into the character's
+  # voice, then speech to text (scribe_v1) for word timings, in one priced
+  # request. Endpoints from the ElevenLabs API reference. Needs
+  # ELEVENLABS_API_KEY on the server or the account's key in Settings; not
+  # confirmed by a paid test yet.
+  - ref: elevenlabs/sts-v2
+    label: ElevenLabs voice (speech to speech)
+    kinds: [audio]
+    max_refs: 1
+    endpoint: elevenlabs
+    input_map: elevenlabs
+    verified: false
+
   # ── Mock (free, deterministic; tests and demo mode) ──
   - ref: mock/image
     label: Mock image

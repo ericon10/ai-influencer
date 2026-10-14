@@ -29,6 +29,8 @@ import { buildClone, buildCloneCaption, buildCloneStill, saveCloneModel } from '
 import { ruleSwitches } from './rules.js'
 import { readBilling } from '../providers/billing.js'
 import { effectiveModel, readModelOverrides } from '../providers/modelOverrides.js'
+import { buildVoiceConvert, markConverting } from './voiceLines.js'
+import { buildHookVariants } from './scaleKit.js'
 
 // Every paid step is an action. The same builder produces the job specs for
 // the estimate and for the run, so the run's fingerprint must match its
@@ -112,6 +114,11 @@ export const actionSchema = z.discriminatedUnion('type', [
   // "Copy the moves into a new scene": the clip's first frame with the
   // character in place of the picked person, shown before the motion run.
   z.object({ type: z.literal('clone_still'), contentId: z.string(), characterId: z.string().max(60), outfit: z.enum(['source', 'hers']).optional(), look: z.string().max(60).optional() }),
+  // Voice lines: the owner's takes in the character's voice, with word
+  // timings (ElevenLabs), one quote with a line per take.
+  z.object({ type: z.literal('voice_convert'), soundIds: z.array(z.string().max(60)).min(1).max(50) }),
+  // Scale kit: one hook rewritten in each picked character's voice.
+  z.object({ type: z.literal('hook_variants'), hookId: z.string().max(60), characterIds: z.array(z.string().max(60)).min(1).max(30), perCharacter: z.number().int().min(1).max(3).optional() }),
 ])
 
 export type StudioAction = z.infer<typeof actionSchema>
@@ -205,6 +212,8 @@ export async function buildAction(deps: Deps, ctx: Ctx, action: StudioAction): P
   if (action.type === 'retry') return buildRetry(deps, ctx, action.jobId)
   if (action.type === 'clone') return buildClone(deps, ctx, action)
   if (action.type === 'clone_still') return buildCloneStill(deps, ctx, action)
+  if (action.type === 'voice_convert') return buildVoiceConvert(deps, ctx, action.soundIds)
+  if (action.type === 'hook_variants') return buildHookVariants(deps, ctx, action)
   const row = await getCharacter(deps, ctx, action.characterId)
   const ch = toData(row)
   const tpl = deps.config.pipeline.templates
@@ -440,11 +449,11 @@ export async function runAction(deps: Deps, ctx: Ctx, action: StudioAction, quot
   const jobs = await runJobs(deps, ctx, { quoteId, confirmed, purpose: built.purpose, characterId: built.characterId, specs: built.specs })
   if (action.type === 'model_test') await startModelTest(deps, ctx, action.model, jobs[0]!.id)
   else if (action.type === 'model_suite') await startModelSuite(deps, ctx, jobs)
-  else await afterStart(deps, ctx, action, built)
+  else await afterStart(deps, ctx, action, built, jobs)
   return { jobs, preview: built.preview }
 }
 
-async function afterStart(deps: Deps, ctx: Ctx, action: StudioAction, built: BuiltAction): Promise<void> {
+async function afterStart(deps: Deps, ctx: Ctx, action: StudioAction, built: BuiltAction, jobs: Array<{ id: string; purpose: string }>): Promise<void> {
   const now = deps.clock.now()
   if (action.type === 'scene' || action.type === 'scene_edit' || action.type === 'scene_upscale' || action.type === 'scene_video' || action.type === 'scene_video_upscale' || action.type === 'scene_end_frame'
     || (action.type === 'retry' && /^(scene|scene_edit|scene_upscale|scene_video|scene_video_upscale|scene_end_frame|drift_lock):/.test(built.purpose))) {
@@ -453,6 +462,7 @@ async function afterStart(deps: Deps, ctx: Ctx, action: StudioAction, built: Bui
   // The video model picked last is the next take's default.
   if (action.type === 'scene_video' && !action.test && action.model) await saveVideoModel(deps, ctx, action.model)
   if (action.type === 'clone' && action.model) await saveCloneModel(deps, ctx, action.model)
+  if (action.type === 'voice_convert') await markConverting(deps, ctx, action.soundIds, new Map(jobs.map(j => [j.purpose.split(':')[1]!, j.id])))
   if (action.type === 'hero') {
     const row = await getCharacter(deps, ctx, action.characterId)
     if (row.stage < 3) await setCharacterFields(deps, ctx, row.id, { stage: 3 })

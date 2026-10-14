@@ -57,6 +57,8 @@ export interface GenRequest {
   // prompt is rebuilt from the written text for this scene model when the
   // writer finishes. Never sent to a provider.
   promptFrom?: { sceneModel: string; reason?: string }
+  // Speech to speech (voice lines): the character's ElevenLabs voice.
+  voiceId?: string
   // The Studio's model pick for this run (demo mode runs a mock in its
   // place), so a chained take can use the same model. Never sent to a
   // provider.

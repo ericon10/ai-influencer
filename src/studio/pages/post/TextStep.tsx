@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
-import { Copy, Plus, X } from 'lucide-react'
+import { Copy, Plus, Sparkles, X } from 'lucide-react'
 import { PriceButton } from '../../PriceButton'
-import { Field, useToast, type TodoItem } from '../../ui'
+import { Drawer, Field, useToast, type TodoItem } from '../../ui'
+import { useProduct, useProducts } from '../../hooks'
 import type { BatchSpec, CaptionStyle, MemeSpec, SlideshowSpec } from '../../types'
 import { CaptionPreview, CaptionStylePick } from './parts'
 import type { PostCtx } from './ctx'
@@ -30,12 +31,15 @@ function Caption({ ctx }: { ctx: PostCtx }) {
   const { data, draft, lib } = ctx
   const spec = draft.spec as unknown as MemeSpec
   const clip = lib?.clips.find(c => c.id === spec.clipId && c.status === 'approved')
+  const [hooks, setHooks] = useState(false)
   return (
     <div className="st-content-grid">
       <div className="st-col" style={{ gap: 14 }}>
-        <Field id="post-caption" label="Caption" required done={!!spec.caption?.trim()} hint={`In the upper third, kept clear of her mouth and hands and of TikTok's buttons. Up to ${data.options.caption.maxChars} characters; emoji work.`}>
-          <textarea className="st-textarea" rows={3} maxLength={data.options.caption.maxChars} value={spec.caption ?? ''} onChange={e => draft.setSpec({ caption: e.target.value })} placeholder="e.g. me when the code finally works and I have no idea why 💀" />
+        <Field id="post-caption" group label="Caption" required done={!!spec.caption?.trim()} hint={`In the upper third, kept clear of her mouth and hands and of TikTok's buttons. Up to ${data.options.caption.maxChars} characters; emoji work.`}
+          extra={<button type="button" className="st-btn sm ghost" onClick={() => setHooks(true)}><Sparkles size={13} />Pick a hook</button>}>
+          <textarea className="st-textarea" rows={3} aria-label="Caption" maxLength={data.options.caption.maxChars} value={spec.caption ?? ''} onChange={e => draft.setSpec({ caption: e.target.value })} placeholder="e.g. me when the code finally works and I have no idea why 💀" />
         </Field>
+        <HookPicker open={hooks} onClose={() => setHooks(false)} characterId={ctx.item.characterId} onPick={t => { draft.setSpec({ caption: t.slice(0, data.options.caption.maxChars) }); setHooks(false) }} />
         <Field id="post-caption-style" label="Caption style" hint="TikTok's white box, or white text with a black outline (TikTok Classic).">
           <CaptionStylePick value={spec.captionStyle} data={data} onChange={v => draft.setSpec({ captionStyle: v } as never)} />
         </Field>
@@ -138,5 +142,37 @@ function Captions({ ctx }: { ctx: PostCtx }) {
       </div>
       <div className="st-content-side"><CaptionPreview text={captions[0] ?? ''} data={data} video={first?.assetId} look={(draft.spec as { captionStyle?: CaptionStyle | null }).captionStyle} /><span className="st-hint">The first caption, as a preview.</span></div>
     </div>
+  )
+}
+
+// Library drawer > Hooks (UX-PLAN.md section 14): a hook, or a variant
+// written in this character's voice, becomes the caption.
+function HookPicker({ open, onClose, characterId, onPick }: { open: boolean; onClose: () => void; characterId: string | null; onPick: (text: string) => void }) {
+  const products = useProducts()
+  const list = products.data?.products ?? []
+  const [productId, setProductId] = useState<string | null>(null)
+  const current = productId ?? list[0]?.id ?? null
+  const product = useProduct(open ? current : null)
+  const hooks = product.data?.hooks ?? []
+  return (
+    <Drawer open={open} onClose={onClose} title="Pick a hook" wide>
+      <div className="st-col" style={{ gap: 12 }}>
+        {list.length > 1 && <div className="st-row" style={{ gap: 6, flexWrap: 'wrap' }}>{list.map(p => <button key={p.id} className={`st-chip ${p.id === current ? 'on' : ''}`} onClick={() => setProductId(p.id)}>{p.name}</button>)}</div>}
+        {!products.data ? <div className="st-skel" style={{ height: 120 }} /> : !list.length ? <span className="st-hint">No hooks yet. Load a script kit in Library, Hooks.</span> : !product.data ? <div className="st-skel" style={{ height: 200 }} /> : (
+          <div className="st-col" style={{ gap: 6 }}>
+            <span className="st-hint">Variants in this character's voice come first under each hook. Write more in Library, Hooks.</span>
+            {hooks.map(h => {
+              const mine = h.variants.filter(v => v.characterId === characterId)
+              return (
+                <div key={h.id} className="st-col" style={{ gap: 4 }}>
+                  {mine.map(v => <button key={v.id} type="button" className="st-hookpick mine" onClick={() => onPick(v.text)}><span className="st-badge ok">{h.number}</span>{v.text}</button>)}
+                  <button type="button" className="st-hookpick" onClick={() => onPick(h.text)}><span className="st-badge">{h.number}</span>{h.text}<span className="st-hint">{h.kind}</span></button>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+    </Drawer>
   )
 }

@@ -146,6 +146,11 @@ export async function settingsView(deps: Deps, ctx: Ctx) {
         serverKey: !!(await serverKeyFor(deps.db, { ownerEmail: deps.env.STUDIO_OWNER_EMAIL || 'owner@studio.local', higgsfield: deps.env.HF_CREDENTIALS }, ctx.accountId, 'higgsfield')),
       },
       { id: 'anthropic', label: 'Anthropic', hint: 'An API key from the Anthropic Console.', placeholder: 'e.g. sk-ant-...', usedFor: 'Scene planner, Punch it up, concepts and Check this' },
+      {
+        id: 'elevenlabs', label: 'ElevenLabs', hint: 'An API key from ElevenLabs (Developers, API keys) with speech to speech and speech to text.', placeholder: 'e.g. sk_...', usedFor: 'Voice lines (your takes in the character\'s voice, with word timings)',
+        // The owner's account can run on the server key (ELEVENLABS_API_KEY).
+        serverKey: !!(await serverKeyFor(deps.db, { ownerEmail: deps.env.STUDIO_OWNER_EMAIL || 'owner@studio.local', elevenlabs: deps.env.ELEVENLABS_API_KEY }, ctx.accountId, 'elevenlabs')),
+      },
     ],
     budgets: {
       job: microsToUsd(b.jobCapMicros), character: microsToUsd(b.characterCapMicros), month: microsToUsd(b.monthCapMicros),

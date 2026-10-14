@@ -31,6 +31,7 @@ node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"     
 | `STUDIO_SESSION_SECRET` | yes | yes | no | Generated above, same in both (the worker wake token comes from it) |
 | `STUDIO_OWNER_PASSPHRASE` | yes | yes | no | The owner's sign-in passphrase |
 | `HF_CREDENTIALS` | yes | yes | optional | Higgsfield API key, `KEY_ID:KEY_SECRET` |
+| `ELEVENLABS_API_KEY` | yes | yes | optional | ElevenLabs API key for voice lines (speech to speech and speech to text). Owner's account only; without it the deployment refuses Convert with a plain reason (local dev uses the mock voice) |
 | `STORAGE_DRIVER` | set (`s3`) | yes, `s3` | no | |
 | `S3_REGION` | set (`auto`) | yes, `auto` | no | |
 | `STUDIO_OWNER_EMAIL` | set | yes | no | `eric@erichelsel.com` |

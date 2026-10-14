@@ -30,6 +30,10 @@ const schema = z.object({
   // The owner's Higgsfield API key (KEY_ID:KEY_SECRET), server side only. It
   // serves the owner's own account; customers add their own key in Settings.
   HF_CREDENTIALS: z.string().optional().default(''),
+  // The owner's ElevenLabs API key (voice lines, speech to speech), server
+  // side only, for the owner's own account. Without it voice lines say how
+  // to add it; tests and local dev use the mock.
+  ELEVENLABS_API_KEY: z.string().optional().default(''),
   // The job worker's address (Railway), woken when jobs are queued.
   STUDIO_WORKER_URL: z.string().optional().default(''),
   // Worker loop: "poll" checks every second (local dev); "wake" sleeps when

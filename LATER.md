@@ -78,3 +78,45 @@ rule.
 - Tune the clone cleanup on real saved TikToks (the end card and the
   handle positions); a per-clip "these spots" picker on the frame.
 - CSV import: a "Generate all new rows" button with one combined price.
+
+## Voice lines
+
+- **Lip sync (plan only, owner 2026-10-14).** A converted voice line on a
+  talking take: the take's mouth re-timed to the line. Plan:
+  1. Model: a lip-sync model on the official Higgsfield Model API
+     Reference, or ElevenLabs' own when it ships one; confirmed by one small
+     paid test (Settings, Higgsfield models) like every model. Prices from
+     open.higgsfield.ai/pricing, shown before the run.
+  2. Input: the post's clip (a front-facing take, the mouth visible for the
+     whole line) and the converted line's MP3. The Video step offers "Lip
+     sync to the voiceover" only when the post has a voiceover and a clip
+     at least as long as the line.
+  3. Realism: the free face match against REF-00 and the skin texture
+     check run on the result, like an upscale; a smoothed or drifted face
+     is flagged, never silently kept. No beautify or face-enhance option.
+  4. Captions stay from the line's word timings; the take's own sound is
+     replaced by the line (the voiceover layer, ducked bed).
+  5. Kept as a new take of the clip (Use this take decides), so the
+     original stays.
+- A "voice" column in the CSV import (a hook number picks that
+  character's converted line for the row's post).
+- Re-time a voice line's captions by hand (drag word edges) when the word
+  timings are off.
+- Batch voiceovers: one converted line per caption, matched by hook
+  number.
+
+## Scale kit
+
+- Pull signups from the link tracker or the checkout (an API key or a
+  CSV upload) instead of typing them; keep a weekly history per account
+  so the scoreboard can show "this week".
+- "Clone what sells": from the top account, one click makes the same
+  posts for a paused account's character.
+- Write variants for many hooks at once (pick 10 to 15 for the week, one
+  price), matching the kit's weekly rhythm.
+- A Hook column in the CSV import (the hook number fills the caption with
+  that character's variant, or the hook).
+- Show which hooks each account already posted, so the vault suggests the
+  ones it has not.
+- A claims check on the batch caption writer's output too (today on hook
+  variants only).

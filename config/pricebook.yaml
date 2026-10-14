@@ -51,6 +51,10 @@ entries:
   - { provider: higgsfield, model: mirelo-sfx, unit: second, price: 0.05, verified: false }
 
   # Anthropic, per million tokens (first-party API rates, Oct 2026)
+  # ElevenLabs voice lines: speech to speech plus word timings, per second
+  # of the line. Placeholder, set high on purpose (ElevenLabs bills credits
+  # by the minute of audio on the plan); confirm with the first paid test.
+  - { provider: elevenlabs, model: sts-v2, unit: second, price: 0.006, verified: false, source: "Placeholder: speech to speech about $0.30 a minute plus speech to text, rounded up." }
   - { provider: anthropic, model: claude-opus-5-5, unit: mtok_in, price: 4.00, verified: true }
   - { provider: anthropic, model: claude-opus-5-5, unit: mtok_out, price: 20.00, verified: true }
   - { provider: anthropic, model: claude-opus-5-5, unit: mtok_cache_read, price: 0.20, verified: true }

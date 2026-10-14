@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
-import { ArrowLeft, Check, Film, Pencil } from 'lucide-react'
+import { ArrowLeft, Check, Film, Mic, Pencil } from 'lucide-react'
 import { useCharacter } from '../hooks'
 import { Img, MarkChip, Meter } from '../ui'
 import { CardEditor } from './character/CardEditor'
+import { VoiceEditor, voiceSummary } from './character/VoiceEditor'
 import { StartTab } from './character/StartTab'
 import { HeroTab } from './character/HeroTab'
 import { SheetTab } from './character/SheetTab'
@@ -33,6 +34,8 @@ export default function Character() {
   const [params] = useSearchParams()
   const [tab, setTab] = useState<Tab | null>(null)
   const [editing, setEditing] = useState(false)
+  // The Voice modal (a link can open it: ?voice=1, from Library > Voice lines).
+  const [voicing, setVoicing] = useState(params.get('voice') === '1')
   const newPost = useNewPost()
   const v = q.data
   useEffect(() => { if (v && tab === null) setTab(defaultTab(v)) }, [v, tab])
@@ -69,7 +72,7 @@ export default function Character() {
       </nav>
 
       <div className="st-character">
-        <Profile v={v} onEdit={() => setEditing(true)} />
+        <Profile v={v} onEdit={() => setEditing(true)} onVoice={() => setVoicing(true)} />
         <div style={{ minWidth: 0 }}>
           {current === 'start' && <StartTab v={v} onEditCard={() => setEditing(true)} goHero={() => setTab('hero')} />}
           {current === 'hero' && <HeroTab v={v} onEditCard={() => setEditing(true)} goSheet={() => setTab('sheet')} />}
@@ -78,11 +81,12 @@ export default function Character() {
         </div>
       </div>
       <CardEditor v={v} open={editing} onClose={() => setEditing(false)} />
+      <VoiceEditor v={v} open={voicing} onClose={() => setVoicing(false)} />
     </div>
   )
 }
 
-function Profile({ v, onEdit }: { v: CharacterView; onEdit: () => void }) {
+function Profile({ v, onEdit, onVoice }: { v: CharacterView; onEdit: () => void; onVoice: () => void }) {
   const portrait = v.ref00?.assetId ?? null
   return (
     <aside className="st-profile">
@@ -94,6 +98,7 @@ function Profile({ v, onEdit }: { v: CharacterView; onEdit: () => void }) {
         <div className="st-row">
           <span className="st-muted">{v.data.age ? `${v.data.age}` : 'Age not set'}{v.data.eyes ? ` · ${v.data.eyes} eyes` : ''}</span>
           <span className="st-spacer" />
+          <button className="st-btn sm ghost" onClick={onVoice} title={voiceSummary(v)}><Mic size={13} />Voice</button>
           <button className="st-btn sm ghost" onClick={onEdit}><Pencil size={13} />Edit card</button>
         </div>
         <p className="st-cardtext" style={{ margin: 0 }}>{v.data.card || <span className="st-muted">No card yet. Run concepts or write one yourself.</span>}</p>

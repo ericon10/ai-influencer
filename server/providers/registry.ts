@@ -8,6 +8,7 @@ import { createMockAdapter, type MockOptions } from './mock.js'
 import { createMockLlm, type LlmResponder } from './mockLlm.js'
 import { createAnthropicLlm } from './anthropic.js'
 import { createHiggsfieldAdapter } from './higgsfield.js'
+import { createElevenLabsAdapter } from './elevenlabs.js'
 import { createHiggsfieldAccountAdapter, type AccountBalance, type LivePriceStore } from './higgsfieldAccount.js'
 import { getSetting, putCacheSetting } from '../pipeline/settings.js'
 import { accountTokenSource, readAccountTokens } from './higgsfieldOAuth.js'
@@ -51,8 +52,11 @@ export interface RegistryOptions {
   overrides?: { gen?: Record<string, ProviderAdapter>; llm?: Record<string, LlmProvider> }
   // Network for the Higgsfield account path (tests pass a fake server).
   fetchImpl?: typeof fetch
-  // Keys set on the server for the owner's own account (HF_CREDENTIALS).
+  // Keys set on the server for the owner's own account (HF_CREDENTIALS,
+  // ELEVENLABS_API_KEY).
   serverKeys?: ServerKeys
+  // Voice lines without an ElevenLabs key use the mock voice (local dev).
+  voiceMock?: boolean
 }
 
 export function createRegistry(o: RegistryOptions): ProviderRegistry & { mockFor(accountId: string): ReturnType<typeof createMockAdapter>; mockLlm: ReturnType<typeof createMockLlm> } {
@@ -130,6 +134,13 @@ export function createRegistry(o: RegistryOptions): ProviderRegistry & { mockFor
       }
       if (o.overrides?.gen?.[p]) return o.overrides.gen[p]!
       if (p === 'mock') return mockFor(accountId)
+      if (p === 'elevenlabs') {
+        const key = (await readSecret(o.db, o.vault, accountId, p)) ?? (await serverKeyFor(o.db, o.serverKeys, accountId, p))
+        const base = { config: o.config, store: o.store, loadAsset: (id: string) => o.loadAsset(accountId, id), fetchImpl: o.fetchImpl }
+        if (key) return createElevenLabsAdapter({ ...base, apiKey: key })
+        if (o.voiceMock) return createElevenLabsAdapter({ ...base, mock: true })
+        throw new AppError('provider_not_configured', 'Voice lines need an ElevenLabs key: add ELEVENLABS_API_KEY to the server (Vercel and Railway), or your ElevenLabs key in Settings.')
+      }
       // The account's own key first; the owner's account can also use the
       // server key (HF_CREDENTIALS).
       const secret = (await readSecret(o.db, o.vault, accountId, p)) ?? (await serverKeyFor(o.db, o.serverKeys, accountId, p))

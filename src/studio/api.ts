@@ -1,4 +1,4 @@
-import type { ActionPreview, CharacterSummary, CharacterView, HiggsfieldAccount, JobView, Me, QuoteView, RulesView, SceneFields, ScenesData, SettingsView, StudioAction, Usage, VideoPrice, BrollClip, ContentData, ContentKind, LibraryData, PostStep, WorkerStatus, CloneOptions, CloneResult, CloneSource, CloneStill, CutView, SoundItem, EditorStyle, ImportPreview } from './types'
+import type { ActionPreview, CharacterSummary, CharacterView, HiggsfieldAccount, JobView, Me, QuoteView, RulesView, SceneFields, ScenesData, SettingsView, StudioAction, Usage, VideoPrice, BrollClip, ContentData, ContentKind, LibraryData, PostStep, WorkerStatus, CloneOptions, CloneResult, CloneSource, CloneStill, CutView, SoundItem, EditorStyle, ImportPreview, VoiceLine, ProductSummary, ProductView, ProductClaims, KitGroup, SocialAccount } from './types'
 import { sheetRefOf, typeOf, uploadFiles } from './files'
 
 // Thin client for /api/v1. Every write sends the CSRF header the server
@@ -133,6 +133,28 @@ export const api = {
   },
   updateSound: (id: string, patch: { title?: string; tag?: string; kind?: 'ambience' | 'music' }) => request<SoundItem>('PATCH', `/sounds/${id}`, patch),
   archiveSound: (id: string) => request<{ ok: true }>('DELETE', `/sounds/${id}`),
+  // Voice lines: the owner's takes (one per line), then converted (priced).
+  voiceLines: (characterId?: string | null) => request<{ lines: VoiceLine[] }>('GET', `/voice-lines${characterId ? `?characterId=${encodeURIComponent(characterId)}` : ''}`),
+  addVoiceTakes: async (characterId: string, files: File[], onProgress?: (done: number, total: number) => void) => {
+    const ups = await uploadFiles(files, onProgress)
+    return request<{ lines: VoiceLine[] }>('POST', '/voice-lines', { characterId, takes: ups.map((u, i) => ({ uploadId: u.uploadId, name: files[i]!.name })) })
+  },
+  updateVoiceLine: (id: string, patch: { title?: string; line?: string; hook?: number | null }) => request<VoiceLine>('PATCH', `/voice-lines/${id}`, patch),
+  archiveVoiceLine: (id: string) => request<{ ok: true }>('DELETE', `/voice-lines/${id}`),
+  // The scale kit: products (hook vault, claims, buyer language), variants.
+  products: () => request<{ products: ProductSummary[] }>('GET', '/products'),
+  product: (id: string) => request<ProductView>('GET', `/products/${id}`),
+  importKit: (body: { markdown?: string; starter?: boolean; name?: string }) => request<{ product: ProductSummary; hooks: number; voicesApplied: string[] }>('POST', '/products/import', body),
+  updateProduct: (id: string, patch: { name?: string; claims?: Partial<ProductClaims>; language?: { groups: KitGroup[] }; notes?: string }) => request<ProductView>('PATCH', `/products/${id}`, patch),
+  archiveProduct: (id: string) => request<{ ok: true }>('DELETE', `/products/${id}`),
+  addHook: (productId: string, body: { text: string; kind?: string }) => request<{ id: string }>('POST', `/products/${productId}/hooks`, body),
+  updateHook: (id: string, patch: { text?: string; kind?: string }) => request<{ id: string }>('PATCH', `/hooks/${id}`, patch),
+  archiveHook: (id: string) => request<{ ok: true }>('DELETE', `/hooks/${id}`),
+  archiveVariant: (id: string) => request<{ ok: true }>('DELETE', `/hook-variants/${id}`),
+  useKitVoice: (productId: string, voice: string, characterId: string) => request<{ ok: true }>('POST', `/products/${productId}/voices/use`, { voice, characterId }),
+  // Accounts: tracked link or promo code, signups (ranked by signups).
+  socialAccounts: () => request<{ accounts: SocialAccount[]; totalSignups: number }>('GET', '/social-accounts'),
+  saveSocialAccount: (tag: string, patch: Partial<Pick<SocialAccount, 'link' | 'code' | 'signups' | 'views' | 'characterId' | 'productId' | 'notes'>>) => request<SocialAccount>('PUT', `/social-accounts/${encodeURIComponent(tag)}`, patch),
   archiveScene: (sceneId: string) => request<{ ok: true }>('DELETE', `/scenes/${sceneId}`),
   crop: (candidateId: string, rect: { x: number; y: number; w: number; h: number }) => request<{ candidateId: string; width: number; height: number }>('POST', `/candidates/${candidateId}/crop`, rect),
 

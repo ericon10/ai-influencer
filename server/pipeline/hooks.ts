@@ -21,6 +21,8 @@ import { registerClone } from './clone.js'
 import { registerOpenReel } from './openreel.js'
 import { registerChain } from './chain.js'
 import { registerSounds } from './sounds.js'
+import { registerVoiceLines } from './voiceLines.js'
+import { registerScaleKit } from './scaleKit.js'
 import { registerCloseup } from './closeup.js'
 import type { GenRequest } from '../providers/types.js'
 
@@ -202,5 +204,7 @@ export function registerPipelineHooks(): void {
   registerOpenReel()
   registerChain()
   registerSounds()
+  registerVoiceLines()
+  registerScaleKit()
   registerCloseup()
 }

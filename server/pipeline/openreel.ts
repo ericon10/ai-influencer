@@ -12,8 +12,9 @@ import { normalizeForRender } from '../media/normalize.js'
 import { enqueueLocalJob } from '../jobs/runner.js'
 import { getAsset, readAsset, saveAsset } from '../storage/assets.js'
 import { uploadKey } from '../storage/uploads.js'
-import { candidateAsset, getBroll, getContent, setOutputs, specSchemas, updateContent, type ContentOutputs, type MemeSpec } from './content.js'
+import { candidateAsset, getBroll, getContent, setOutputs, specSchemas, updateContent, voicePhrases, type ContentOutputs, type MemeSpec } from './content.js'
 import { getSound } from './sounds.js'
+import { getVoiceLine } from './voiceLines.js'
 import { getSetting, setSetting } from './settings.js'
 import { newId } from '../lib/ids.js'
 import { editorStyleSchema, stackSchema, type EditorStyle } from '../core/editorStyle.js'
@@ -41,7 +42,7 @@ export async function editorManifest(deps: Deps, ctx: Ctx, contentId: string) {
   const post = await getContent(deps, ctx, contentId)
   const s = memeOf(post)
   if (!post.characterId) throw new AppError('bad_request', 'Pick a character for this post first.')
-  const cut = effectiveCut(s, deps.config.pipeline.content.meme.max_broll_seconds)
+  const cut = effectiveCut(s, deps.config.pipeline.content.meme.max_broll_seconds, voicePhrases(deps))
   if (!cut.shots.length) throw new AppError('bad_request', 'Pick a clip in the Video step first.')
   const media: EditorMedia[] = []
   let at = 0
@@ -62,6 +63,12 @@ export async function editorManifest(deps: Deps, ctx: Ctx, contentId: string) {
     const sound = await getSound(deps, ctx, soundId).catch(() => null)
     if (!sound?.assetId || sound.status !== 'ready') continue
     media.push({ id: sound.assetId, name: sound.title || (role === 'music' ? 'Music' : 'Ambience'), kind: 'audio', url: assetUrl(sound.assetId), role, start: 0, in: 0, out: null })
+  }
+  // The voiceover (a converted voice line) at its place; its phrases are
+  // the captions when "Captions from the voice line" is on.
+  if (s.sound.voice) {
+    const line = await getVoiceLine(deps, ctx, s.sound.voice.id).catch(() => null)
+    if (line?.assetId && line.status === 'ready') media.push({ id: line.assetId, name: `Voice: ${line.title}`, kind: 'audio', url: assetUrl(line.assetId), role: 'voice', start: s.sound.voice.at, in: 0, out: null })
   }
   const captions = cut.captions.map(c => ({ text: (c.text ?? s.caption).trim(), start: c.start, end: c.end })).filter(c => c.text)
   let project: unknown = null
