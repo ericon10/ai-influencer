@@ -1,4 +1,4 @@
-import type { ActionPreview, CharacterSummary, CharacterView, HiggsfieldAccount, JobView, Me, QuoteView, RulesView, SceneFields, ScenesData, SettingsView, StudioAction, Usage, VideoPrice, BrollClip, ContentData, ContentKind, LibraryData, PostStep, WorkerStatus, CloneOptions, CloneResult, CloneSource, CloneStill, CutView, SoundItem, EditorStyle, ImportPreview, VoiceLine, ProductSummary, ProductView, ProductClaims, KitGroup, SocialAccount } from './types'
+import type { ActionPreview, CharacterSummary, CharacterView, HiggsfieldAccount, JobView, Me, QuoteView, RulesView, SceneFields, ScenesData, SettingsView, StudioAction, Usage, VideoPrice, BrollClip, ContentData, ContentKind, LibraryData, PostStep, WorkerStatus, CloneOptions, CloneResult, CloneSource, CloneStill, CutView, SoundItem, EditorStyle, ImportPreview, VoiceLine, ProductSummary, ProductView, ProductClaims, KitGroup, SocialAccount, SentView } from './types'
 import { sheetRefOf, typeOf, uploadFiles } from './files'
 
 // Thin client for /api/v1. Every write sends the CSRF header the server
@@ -75,7 +75,8 @@ export const api = {
   scenes: (characterId: string) => request<ScenesData>('GET', `/characters/${characterId}/scenes`),
   copyScene: (id: string, characterIds: string[]) => request<{ copies: Array<{ characterId: string; sceneId: string; name: string }> }>('POST', `/scenes/${id}/copy`, { characterIds }),
   createScene: (characterId: string, body: { brief?: string; title?: string; fields?: Partial<SceneFields> }) => request<{ id: string }>('POST', `/characters/${characterId}/scenes`, body),
-  updateScene: (sceneId: string, body: { brief?: string; title?: string; fields?: Partial<SceneFields>; prompts?: { still?: string; video?: string }; fromTemplate?: boolean; notes?: { still?: string; video?: string } }) => request<{ id: string }>('PATCH', `/scenes/${sceneId}`, body),
+  candidateSent: (id: string) => request<SentView>('GET', `/candidates/${id}/sent`),
+  updateScene: (sceneId: string, body: { brief?: string; title?: string; fields?: Partial<Record<keyof SceneFields, unknown>>; prompts?: { still?: string; video?: string }; fromTemplate?: boolean; notes?: { still?: string; video?: string } }) => request<{ id: string }>('PATCH', `/scenes/${sceneId}`, body),
   videoPrices: (characterId: string, duration: number, aspect: string) => request<{ prices: VideoPrice[] }>('GET', `/characters/${characterId}/video-prices?duration=${duration}&aspect=${encodeURIComponent(aspect)}`),
   setVideoModel: (model: string) => request<{ model: string }>('PUT', '/settings/video-model', { model }),
   worker: () => request<WorkerStatus>('GET', '/worker'),
@@ -113,6 +114,11 @@ export const api = {
   setCloneTarget: (contentId: string, at: { x: number; y: number } | null) => request<{ clone: CloneSource }>('PUT', `/content/${contentId}/clone-target`, { at }),
   cloneStills: (contentId: string) => request<{ stills: CloneStill[] }>('GET', `/content/${contentId}/clone-stills`),
   useCloneStill: (contentId: string, id: string) => request<{ ok: true }>('POST', `/content/${contentId}/clone-stills/${id}/use`),
+  // "You pick": the best still by the free checks.
+  pickCloneStill: (contentId: string, characterId: string) => request<{ id: string }>('POST', `/content/${contentId}/clone-stills/pick`, { characterId }),
+  setCloneNotLike: (contentId: string, text: string) => request<{ ok: true }>('PUT', `/content/${contentId}/clone-not-like`, { text }),
+  // Trim a clone before export (free, on the worker).
+  trimClone: (candidateId: string, start: number, end: number) => request<{ ok: true }>('POST', `/clones/${candidateId}/trim`, { start, end }),
   archiveContent: (id: string) => request<{ ok: true }>('DELETE', `/content/${id}`),
   renderContent: (id: string) => request<{ id: string; status: string }>('POST', `/content/${id}/render`, {}),
   cloneCleanup: (id: string, on: boolean) => request<CloneSource>('POST', `/content/${id}/clone-source/cleanup`, { on }),

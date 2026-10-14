@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { useUsage } from '../hooks'
 import { Meter } from '../ui'
+import { HowTo } from '../guide/Guide'
 
 // Money is always visible (SPEC 9 and 11). The ledger is append-only and
 // detailed enough to become metering and billing later.
@@ -37,6 +38,23 @@ export function UsagePanel() {
                 {d.byModel.map(m => <tr key={m.model}><td className="strong st-mono">{m.model}</td><td>{m.runs}</td><td style={{ textAlign: 'right' }}>{m.amount}</td></tr>)}
               </tbody></table>
             </div>
+          </div>
+          <div className="st-card" data-field="cost-checks">
+            <div className="st-card-head"><div className="grow"><div className="st-h2">Quote against real cost</div><div className="st-hint">On your Higgsfield plan, the credits each run actually took (from your Higgsfield transactions); for Claude, the measured tokens. More than 20% off is flagged.</div></div>{d.flaggedChecks > 0 && <span className="st-badge warn">{d.flaggedChecks} off by more than 20%</span>}<HowTo id="feedback" label="How real cost works" /></div>
+            {d.costChecks.length === 0 ? <div className="st-card-body"><span className="st-hint">No checked runs yet. Each paid run on the plan or Claude shows here when it finishes.</span></div> : (
+              <div style={{ overflowX: 'auto' }}>
+                <table className="st-table"><thead><tr><th>When</th><th>Model</th><th>Off by</th><th>What happened</th></tr></thead><tbody>
+                  {d.costChecks.map(c => (
+                    <tr key={c.jobId}>
+                      <td>{new Date(c.at).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</td>
+                      <td className="strong">{c.model}</td>
+                      <td>{c.offPct == null ? <span className="st-muted">n/a</span> : <span className={`st-badge plain ${c.flagged ? 'warn' : 'ok'}`}>{c.offPct > 0 ? '+' : ''}{c.offPct}%</span>}</td>
+                      <td className="st-hint">{c.note}</td>
+                    </tr>
+                  ))}
+                </tbody></table>
+              </div>
+            )}
           </div>
           <div className="st-card">
             <div className="st-card-head"><div className="st-h2">Ledger</div><span className="st-hint">Latest 50 entries</span></div>

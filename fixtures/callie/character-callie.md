@@ -26,9 +26,15 @@ Callie looks real because she is not perfect. Her hero and sheet were made with 
 - Makeup: natural by default (light skin, groomed brows, tinted lip). Soft glam (bronzer, warm blush, glossy nude-pink lip) for nights out and events.
 - Footwear: always name her shoes in scene prompts (the sheet sneakers should not carry into scenes)
 
+## Voice
+- ElevenLabs voice "Callie" (voice_id v3PqSRD51socDi8mEJ5f), picked Oct 14 from design round 3 (preview H).
+- Method: Eric performs her lines and runs them through ElevenLabs speech-to-speech into the Callie voice (no real voice talent needed).
+- Sound: early 20s, bright, fun, light vocal fry, upspeak, a very slight smoky edge (heavy rasp made her sound mid-30s).
+- Spare from the same round: "Spare: young female 1" (SifNfmAby6mpNZSg7knN), held for a future character.
+
 ## Persona
 - Vibe: sunny, approachable, real girl you'd see on the street, a little playful
-- Usual settings: neighborhood cafes, farmers markets, her apartment kitchen, the car, gym and pilates studio, pool and beach, tropical coves, rooftops at golden hour, lakeside terraces, raw urban concrete backdrops
+- Usual settings: neighborhood cafes, farmers markets, her apartment kitchen, the car, gym and pilates studio, pool and beach, tropical coves, rooftops at golden hour, lakeside terraces, raw urban concrete backdrops, nights out at clubs and raves
 - Usual defaults (overridable, never locks): light makeup in daytime, real-moment feel over staged ad shoot, no visible logos unless it's a brand deal. Every scene, angle, outfit and setting is open; nothing about her is fixed except her face and the realism principle.
 
 ## Reference sheet
@@ -58,12 +64,13 @@ Bonus: BONUS-01 (seated, near-front, logo removed). Old body build; keep out of 
 ## Models
 - Soul 2.0 character "Callie" (soul_id 0fdc33c0-7a1a-40a9-9b12-0dc35f44e29e): trained after two attempts. Works well for stills when the SOUL IDENTITY block is in the prompt. Without it she drifts to a brunette, tan, slimmer-faced look, especially with moodboards like Siren or wet hair. Use the General moodboard as the neutral default.
 - Drift lock: after any Soul still, run a Nano Banana 2.1 face-only pass with the Soul image as base plus @REF-00 and the closest-angle ref; keep everything else identical (inpaint mask on face and hair if it re-composes).
-- Saved identity: Higgsfield Element "Callie-1" (id 1602db94-79e3-4e5a-bbe5-de3537cd0b83), made from REF-00. Instant, no training. Works with Nano Banana 2 / Pro, GPT Image 2, Seedream, Seedance 2.0, Kling 3.0 (Kling needs a start frame too). Reference it with @Callie-1 in Higgsfield.
+- Saved identity: Higgsfield Elements "Callie" (id 705d2b7d-596d-468e-bd2c-b171799cd7a6) and "Callie-1" (id 1602db94-79e3-4e5a-bbe5-de3537cd0b83), made from REF-00. Instant, no training. Work with Nano Banana 2 / 2.1 / Pro, GPT Image 2, Seedream, Seedance 2.0, Kling 3.0 (Kling needs a start frame too).
 - Stills with refs and all edits: Nano Banana 2.1. Use @ references in Higgsfield so the model knows which image is which.
 - Model feel (Oct 13 test, new REALISM block): Nano Banana 2.1 gives the most candid, truly bare-faced everyday look; GPT Image 2.5 Flare gives polished close-up selfies (adds lip gloss and a pout unless told "bare natural lips, no gloss").
 - Stills, also strong: GPT Image 2.5 Flare. Produced her best beach shot (Koh Samui, real skin texture), though it once distorted her hair in an earlier scene. Worth running alongside Nano Banana and picking the best.
-- Video, final: Seedance 2.5 (mode omni_reference, start + end frame). Best faces by far.
-- Video, cheap motion tests only: Kling 3.0 Turbo. Faces melt when she is small in frame. Kling 3.0 Pro distorted her face when she talked animatedly.
+- Video, final: Seedance 2.5 (mode omni_reference, start + end frame). Best faces by far, but expensive.
+- Video, cheap default: Kling 3.0 Pro. Kling 3.0 Turbo for motion tests only; faces melt when she is small in frame. Kling 3.0 Pro distorted her face when she talked animatedly.
+- Real-motion clips: Genjutsu motion transfer (hf_mult_motion_control) on the Higgsfield plan; Kling 3.0 Motion Control on the API path.
 - Sheet images were built in GPT Image 2.5
 
 ## Scene rules learned
@@ -74,6 +81,10 @@ Bonus: BONUS-01 (seated, near-front, logo removed). Old body build; keep out of 
 - Upscale with an upscaler, not Nano Banana; Nano Banana re-composes the frame.
 - Expression edits on an existing frame (e.g. turning to look at the lens) work well in Nano Banana 2.1 when the prompt says to keep everything else identical and attaches REF-00 for the face.
 - Background people and tourists are fine and add realism; only edit out what breaks the shot.
+- Light, principle not rule: models brighten faces by default. Describe the real light the place would have (whatever its sources) and how much of it actually reaches her; dark places stay dark. Seen once in a dim diner test.
+- Attaching another person's photo as a style reference copies its grain and compression into the result. Use it for composition only or describe the look instead.
+- Handheld wins: "handheld iPhone, held mostly steady, slight natural sway" reads more real than a locked-off shot.
+- Club and night scenes generated from prompts alone came out lit like a film set (Oct 13). Use the real-clip recipe below for these.
 
 ## Proven recipe: the candid "caught you" shot
 1. Still A: wide, from inside a venue looking out, she is small in frame, chatting with a friend.
@@ -82,6 +93,15 @@ Bonus: BONUS-01 (seated, near-front, logo removed). Old body build; keep out of 
 4. One Seedance 2.5 take, start = Still A, end = look frame, about 12 s: holds wide 3 s, the model zooms in smoothly, she chats calmly, then turns and finds the lens near the end.
 5. Trim the ending before any wink or over-held stare; ending on the side-glance toward the camera works well.
 6. Mix: terrace ambience, light clinks, low deep house track, normalized to social loudness.
+
+## Proven recipe: recreate from a real clip (Oct 14, rave)
+For clubs, dark venues and any clip with real dancing or tricky motion. Prompted motion and prompted club light look fake; real footage fixes both.
+1. First frame of the real source clip (about 0.2 s in).
+2. Nano Banana 2.1, 4 takes, 9:16: source frame as image reference plus the @Callie element. Use the photo only for place, light, angle, framing, pose and outfit; replace the woman completely; list Callie's face traits and the source person's traits she must not have (eye color, piercings); keep the head tilt and gaze; remove the TikTok logo and handle.
+3. Pick one, then a face-only pass: chosen still as reference plus the element, "change only her face to match, keep everything else pixel-for-pixel," 2 takes. The real frame always pulls her toward the source person (thinner lips); this pass brings her back without recomposing.
+4. Motion transfer with the chosen still plus the ORIGINAL source clip: Genjutsu (hf_mult_motion_control) at 720p, about 70 credits for 10 s. On the API path, Kling 3.0 Motion Control.
+5. Trim off any cut to a wide shot where background people melt.
+Total about 76 credits on the Higgsfield plan.
 
 ## Video rules
 - Candid format: one continuous take. Let the video model perform the zoom (start and end frames) so her face renders at full size. Never digitally zoom into a tiny face, and never stitch two generations for a "continuous" shot.
@@ -105,3 +125,4 @@ Label all posted content as AI-generated per each platform's rules.
 - 2026-10-12 POV / Event photographer, long lens / Golden hour / Rooftop
 - 2026-10-12 Caught you / Phone from inside, model zoom / Overcast daylight / Lakeside terrace
 - 2026-10-12 Laughing in the water / Friend shot from rocks / Tropical late morning / Koh Samui cove
+- 2026-10-14 Dancing at a rave / Friend handheld, real-clip motion / Club red and magenta / Rave

@@ -4,6 +4,7 @@ import { api, ApiError } from '../../api'
 import { useRefresh } from '../../hooks'
 import { PriceButton } from '../../PriceButton'
 import { Callout, Drawer, Field, Img, PromptViewer, errorMessage, useToast } from '../../ui'
+import { SentPanel } from './SentPanel'
 import type { CharacterView, QaReport, SceneStill, SceneView, ScenesData } from '../../types'
 import { CropTool } from './CropTool'
 
@@ -189,7 +190,12 @@ export function StillDrawer({ v, data, scene, still, onClose, onOpen, action }: 
           </div>
         )}
 
-        {still.prompt && <PromptViewer label="Prompt sent" wrapped={wrap(still.prompt)} text={still.prompt} />}
+        <details className="st-sent-details" open>
+          <summary className="st-h3">What was sent</summary>
+          {still.op === 'crop' || still.op === 'mirror' || still.op === 'upload'
+            ? (still.prompt ? <PromptViewer label="Prompt sent" wrapped={wrap(still.prompt)} text={still.prompt} /> : <span className="st-hint">Made for free on the Studio; nothing was sent to a model.</span>)
+            : <SentPanel candidateId={still.id} />}
+        </details>
       </div>
       {cropping && still.assetId && <CropTool assetId={still.assetId} aspect={scene.aspect} onClose={() => setCropping(false)} onCropped={id => { setCropping(false); refresh(v.id); onOpen(id) }} candidateId={still.id} />}
     </Drawer>

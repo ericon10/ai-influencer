@@ -33,6 +33,8 @@ export interface SceneFields {
   task: string; trigger: string; distance: string; phone: '' | 'rear' | 'front'
   height: string; framing: string; light: string; destination: string
   brands: boolean; refs: string[]
+  // A pasted prompt goes as written, plus only the fixed blocks.
+  asWritten: boolean
 }
 
 // The rule book (Settings, Rules): fixed rules are always on; defaults are
@@ -60,6 +62,9 @@ export interface SceneView {
   comboProblem: string | null
   refs: Array<{ refId: string; role: 'face' | 'angle' | 'body' | 'expression'; assetId: string }>
   refsChosen: boolean
+  // What the owner's words say (free, shotParse.ts), and the fields the
+  // owner set by hand (which win).
+  words: { read: Partial<SceneFields>; ownerSet: string[] }
   candidates: SceneStill[]
   // The prompt writer's text (or the owner's edit) for stills and video.
   prompts: { still: WrittenPrompt | null; video: WrittenPrompt | null }
@@ -72,6 +77,18 @@ export interface WrittenPrompt {
   motion?: string; directions?: string
   // The director's notes (default rule scene-directors-pass) and who set them.
   notes?: string; notesBy?: 'claude' | 'owner'
+  // Mood words taken out (default rule prompt-no-flourish).
+  removed?: string[]
+}
+
+// "What was sent" under a still or a take.
+export interface SentView {
+  candidateId: string; prompt: string; wrapped: string
+  images: Array<{ assetId: string; role: 'ref' | 'start' | 'end' | 'source'; refId: string | null }>
+  model: string; ranOn: string; path: 'plan' | 'api' | 'demo'; pathLabel: string
+  settings: Array<{ label: string; value: string }>
+  quoted: string; actual: string | null; costNote: string | null; flagged: boolean; offPct: number | null
+  status: string; at: string | null
 }
 
 export interface ScenePreset { id: string; label: string; hint?: string }
@@ -90,6 +107,7 @@ export interface ScenesData {
     diagnose: Array<{ symptom: string; revision: string }>
     stillModels: SceneModel[]; editModels: SceneModel[]; defaultModels: string[]
     maxVariations: number; maxModels: number; accountConnected: boolean; mode: 'demo' | 'live'
+    stillLevels: Array<{ id: string; label: string; quality: string; resolution: string }>; stillLevel: string; defaultVariations: number
     promptWriter: { on: boolean; model: string; words: { still: [number, number]; video: [number, number] }; realism: string; directorsPass: boolean }
     video: {
       model: SceneModel; models: Array<SceneModel & { resolution: string | null }>; durations: number[]; duration: number; aspect: string; maxTakes: number; takes: number; directions: string
@@ -166,7 +184,7 @@ export type StudioAction =
   | { type: 'scene_video'; characterId: string; candidateId: string; endCandidateId?: string; model?: string; motion: string; directions: string; durationSec: number; aspect: string; audio: boolean; takes: number; test: boolean }
   | { type: 'scene_video_upscale'; characterId: string; candidateId: string }
   | { type: 'scene_end_frame'; characterId: string; candidateId: string; change: string; withQa?: boolean }
-  | { type: 'scene'; characterId: string; sceneId: string; models: string[]; variations: number; reason?: string; withQa?: boolean; allowRepeat?: boolean; write?: boolean }
+  | { type: 'scene'; characterId: string; sceneId: string; models: string[]; variations: number; reason?: string; withQa?: boolean; allowRepeat?: boolean; write?: boolean; level?: string }
   | { type: 'scene_edit'; characterId: string; candidateId: string; change: string; face?: boolean; model?: string; withQa?: boolean }
   | { type: 'scene_upscale'; characterId: string; candidateId: string }
   | { type: 'scene_qa'; characterId: string; candidateId: string }
@@ -174,7 +192,9 @@ export type StudioAction =
   | { type: 'content_captions'; characterId: string; contentId: string }
   | { type: 'clone_caption'; characterId: string; contentId: string }
   | { type: 'clone'; contentId: string; characterIds: string[]; model?: string; mode?: CloneMode; background?: 'video' | 'image'; outfit?: 'source' | 'hers'; looks: Record<string, string>; keepSound: boolean }
-  | { type: 'clone_still'; contentId: string; characterId: string; outfit?: 'source' | 'hers'; look?: string }
+  | { type: 'clone_still'; contentId: string; characterId: string; outfit?: 'source' | 'hers'; look?: string; takes?: number }
+  | { type: 'clone_face'; contentId: string; characterId: string; candidateId: string; takes?: number }
+  | { type: 'clone_traits'; contentId: string; characterId: string }
   | { type: 'voice_convert'; soundIds: string[] }
   | { type: 'hook_variants'; hookId: string; characterIds: string[]; perCharacter?: number }
 
@@ -235,6 +255,9 @@ export interface Usage {
   byCharacter: Array<{ characterId: string | null; name: string; amount: string; micros: number }>
   byModel: Array<{ model: string; runs: number; amount: string; micros: number }>
   recent: Array<{ id: string; at: string; type: string; amount: string; micros: number; stage: string; model: string; note: string; source: string }>
+  // Quote against real cost, per run (flagged when more than 20% off).
+  costChecks: Array<{ jobId: string; at: string; model: string; offPct: number | null; flagged: boolean; note: string; source: string }>
+  flaggedChecks: number
 }
 
 export interface VideoPrice { model: string; label: string; display: string | null; verified: boolean; note: string | null }
@@ -300,16 +323,24 @@ export interface CloneSource {
   firstFrameId?: string | null; people?: PersonBox[]; target?: { x: number; y: number } | null; stills?: Record<string, string>
   originalAssetId?: string | null; cleanAssetId?: string | null; cleanup?: { endCardSec: number | null; spots: number; on: boolean } | null
   textFrameId?: string | null; sourceCaption?: string | null
+  // Recreate from a real clip: the frame about 0.2 s into the clip as
+  // uploaded, the traits the character must not take from that person, and
+  // the free read of the clip (dark, movement) that suggests the route.
+  rawFrameId?: string | null; motionAssetId?: string | null; notLike?: string
+  look?: { dark: boolean; motion: number; suggest: CloneMode; why: string } | null
 }
 export interface CloneStill {
   id: string; characterId: string; characterName: string; assetId: string | null; status: string; kept: boolean; error: string | null
   findings: Array<{ code: string; severity: string; message: string }>; createdAt: string
+  // A face pass made from another still, and the free scores (face match
+  // to REF-00, likeness to the person in the clip; null in demo mode).
+  parentId: string | null; pass: 'still' | 'face'; faceScore: number | null; sourceScore: number | null
 }
 export interface CloneModel {
   ref: string; label: string; mode: CloneMode; resolution: string | null; background: Array<'video' | 'image'>; minSec: number; maxSec: number
   path: 'account' | 'api'; note: string; display: string | null; verified: boolean; problem: string | null
 }
-export interface CloneOptions { mode: CloneMode; outfit: 'source' | 'hers'; defaults: Record<CloneMode, string>; target: string; model: string; models: CloneModel[]; seconds: number; maxCharacters: number; keepSound: boolean; minSeconds: number; maxSeconds: number; maxUploadMb: number }
+export interface CloneOptions { suggest: { mode: CloneMode; why: string } | null; takes: { still: number; face: number }; mode: CloneMode; outfit: 'source' | 'hers'; defaults: Record<CloneMode, string>; target: string; model: string; models: CloneModel[]; seconds: number; maxCharacters: number; keepSound: boolean; minSeconds: number; maxSeconds: number; maxUploadMb: number }
 export interface CloneResult {
   id: string; characterId: string; characterName: string; assetId: string | null; status: string; label: string
   durationSec: number | null; error: string | null; findings: Array<{ code: string; severity: string; message: string }>; createdAt: string

@@ -148,6 +148,14 @@ const cloneSource = z.object({
   // caption", and what was read.
   textFrameId: id.nullable().default(null),
   sourceCaption: z.string().max(400).nullable().default(null),
+  // Recreate from a real clip (owner, 2026-10-14): the frame about 0.2 s
+  // into the clip as uploaded (captions still on; the still removes them),
+  // the traits the character must not take from that person, and the free
+  // read of the clip that suggests the route (dark, a lot of movement).
+  rawFrameId: id.nullable().default(null),
+  motionAssetId: id.nullable().default(null),
+  notLike: z.string().max(300).default(''),
+  look: z.object({ dark: z.boolean(), motion: z.number(), suggest: z.enum(['replace', 'motion']), why: z.string().max(200) }).nullable().default(null),
 })
 export type CloneSource = z.infer<typeof cloneSource>
 // The sound bed (Phase 3; SPEC 5.5): ambience ("none", "room" for the

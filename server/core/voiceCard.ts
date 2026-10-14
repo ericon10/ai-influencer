@@ -48,8 +48,16 @@ export function parseVoiceSection(bullets: Array<{ key: string | null; value: st
   for (const b of bullets) {
     const k = (b.key ?? '').toLowerCase()
     const value = b.value.trim()
-    if (!k || !value) continue
-    if (/eleven|voice id|voice_id/.test(k)) v.elevenlabsId = value.replace(/[`"']/g, '').trim()
+    // A spare voice held for another character is never this one's.
+    if (/^spare/.test(k) || /^spare\b/i.test(value)) continue
+    // "ElevenLabs voice "Callie" (voice_id v3Pq...), picked Oct 14": the id
+    // inside a sentence (the owner's file, 2026-10-14).
+    const inline = `${b.key ?? ''} ${value}`.match(/\bvoice[_ ]id[:\s]+([A-Za-z0-9]{12,40})\b/i)?.[1]
+    if (!k || !value) {
+      if (inline && !v.elevenlabsId) v.elevenlabsId = inline
+      continue
+    }
+    if (/eleven|voice id|voice_id/.test(k)) v.elevenlabsId = inline ?? value.replace(/[`"']/g, '').trim()
     else if (/^who/.test(k)) v.who = value
     else if (/^pov|point of view/.test(k)) v.pov = value
     else if (/talk|tone|speaks|how (?:she|he|they)/.test(k)) {

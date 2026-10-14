@@ -1611,3 +1611,125 @@ restart.
 - The REALISM block itself is unchanged (rule zero, fixed): it is still
   added to every image prompt. The note only changes how the writer
   describes the light around it.
+
+### G37. Fixes from the first real run (owner, 2026-10-14)
+
+The owner asked for a front-camera selfie in a black tank at a rave and
+got a friend's photo in the sheet outfit (white tee, jeans) with glossy
+lips. What happened, read from production:
+
+- The text was not sent as written. Punch it up's pick kept only the
+  moment; its "Callie herself, front camera" line was dropped, so the
+  camera stayed at the default Friend shot and the writer was told "a
+  friend about 6 feet away". No black tank was ever in the post (no outfit
+  field, nothing in the words), so no outfit line went out.
+- Refs: REF-00 and REF-06 (full body, front). A waist-up framing pulled the
+  full-body sheet shot, which carries the sheet outfit.
+- Makeup: the natural line said "tinted lip"; Flare adds gloss on its own.
+- Model: GPT Image 2.5 Flare on the Higgsfield API, 2k, high, 9:16.
+- Price: $0.25 a still from a flat placeholder in the price book (no
+  quality or resolution), not a live price.
+
+Changes:
+
+- **The owner's words are read** (`server/core/shotParse.ts`, free, plain
+  code, shared with the browser): camera (selfie, mirror selfie, POV,
+  over the shoulder, long lens, timer, a friend), front or rear camera,
+  framing, outfit (phrases ending in a clothing word), makeup, place, and
+  whether the words describe the light. Layering, last wins: presets,
+  defaults, what the words say, what the owner set. The planner never
+  plans away what the words say. A run records what it used in
+  `scenes.ran_fields` instead of freezing the fields.
+- **Refs by framing:** a body ref only at knees-up and full body
+  (`scenes.yaml body_ref_framings`, a default). Chest-up and waist-up get
+  face refs only.
+- **No sheet clothes:** with refs attached and no outfit named, the prompt
+  says the character is dressed for the moment instead of the sheet
+  outfit (rule scene-outfit-override, a default).
+- **No gloss:** the natural makeup line adds "lips natural and matte, no
+  gloss" (template data).
+- **21+ in every still prompt** (fixed): "She is an adult, 21 or older."
+- **Punch it up** keeps what the idea says (a selfie stays one), and the
+  pick carries who takes the photo into the idea.
+- **What was sent** (`GET /candidates/:id/sent`): the final prompt as
+  sent, the images with their REF ids, model, path, settings, quote and
+  real cost. In the still drawer and under every still.
+- **A pasted prompt goes as written** (scene field `asWritten`, on by
+  itself when the box holds a prompt, a switch in the Idea step): the
+  owner's text plus only the reference line (refs for the face only), the
+  21+ line and REALISM/AVOID. No writer, no camera, light or outfit line.
+  Banned skin words still come out (rule zero).
+- **No mood words** (default rule prompt-no-flourish): glowing, cinematic,
+  soft light, beautiful, stunning, dreamy and the like come out of the
+  writer's text unless the owner used them; the prompt box says which.
+- **The Idea step** is one box ("Describe the shot or paste a prompt"),
+  the chips, Punch it up, and More control (collapsed) with the character,
+  account, format, places and the scene details moved from Stills.
+- **Prices:** stills start at Nano Banana 2.1, 4 takes, Standard (1k,
+  medium quality where the model has one), 9:16 by destination; High (2k)
+  is one click. Flare's placeholder is now by quality and still marked
+  not confirmed. The account's own transactions show Nano Banana 2.1 at
+  1.5 credits per image (the face pass of 2 images took 3 credits), so a
+  4-take run is 6 credits, not 3.
+- **Real cost log** (`jobs.cost_check`): on the plan, the matching spend in
+  the account's Higgsfield transactions (read-only, free) next to the
+  quoted credits; for Claude, the measured tokens. More than 20% off is
+  flagged in What was sent and in Settings > Costs. The Higgsfield API
+  reports no cost per run, so its quote stands.
+- **ElevenLabs:** Callie's voice ID v3PqSRD51socDi8mEJ5f is in her Voice
+  (production revision 8). The importer reads a voice_id inside a
+  sentence and never takes a "Spare" voice. The spare voice "Spare: young
+  female 1" (SifNfmAby6mpNZSg7knN) is held for a future character and is
+  not assigned.
+
+### G38. Recreate from a real clip (owner, 2026-10-14)
+
+The owner's route, proven twice by hand in Higgsfield (a rave clip and a
+kitchen hair-flip clip): real motion, real light, her face held through
+the turns, no caption or watermark. It replaces "Copy the moves into a new
+scene" (the same idea with a weaker still) and sits next to "Replace the
+person" in the clone panel.
+
+- **Suggested, never forced:** when a clip is prepared, the worker reads
+  it for free (small gray frames, two a second): average brightness under
+  70 is "dark", average change between frames over 14 is "a lot of
+  movement" (`content.yaml clone.recreate`). Either suggests Recreate, with
+  the reason; otherwise Replace. The owner's pick wins.
+- **a. The frame:** about 0.2 s into the clip as uploaded (captions still
+  on; the still removes them, no blur needed).
+- **b. Four stills:** Nano Banana 2.1, 9:16, Standard (1k): the frame
+  first, then the character's Higgsfield element on the plan
+  (`<<<element_id>>>` in the prompt; Callie's "Callie" element from her
+  file) or REF-00 and one three-quarter view off the plan. The prompt
+  (`templates.yaml clone.recreate_still`) uses the frame only for place,
+  light, angle, framing, pose and outfit, replaces the person completely,
+  names her face (the card) and hair color, the traits she must not have
+  ("Not like the person in the clip", typed or read by Claude, priced),
+  keeps the head angle and gaze, and removes caption text, the TikTok logo
+  and the username. 21+ and REALISM as always.
+- **c. Pick:** Use this still, or You pick (the best face match to REF-00
+  minus the likeness to the person in the clip; the newest in demo mode).
+  Fix the face: the chosen still plus the element, "change only her face,
+  keep everything else pixel for pixel", 2 takes. The masked inpaint is not
+  used ("Unknown media role: mask" through the Higgsfield connector).
+- **d. Checks:** every still and face pass gets the free face match to
+  REF-00 and the likeness check against the person in the clip, with the
+  scores shown. A still like that person cannot be used (fixed rule).
+- **e. Motion:** the chosen still plus the clip as uploaded, cut before
+  TikTok's end card (`motionAssetId`), never the filled-in copy. Plan:
+  Genjutsu motion control (`hf_mult_motion_control`, image_references and
+  video_references, 720p, the preset suggestion declined): 7 credits a
+  second, from the owner's transactions (70 for 10 s, 42 for 6 s). API:
+  Kling 3.0 Motion Control through the Vercel AI Gateway
+  (`klingai/kling-v3.0-motion-control`, checked in Vercel's docs; the AI
+  SDK's start and status calls, the operation stored as the job id so a
+  worker restart never loses or repeats a run; `AI_GATEWAY_API_KEY` on the
+  server or a Gateway key in Settings), or the Higgsfield API's Kling 3.0
+  Motion Control Pro. The motion model is the remembered pick; it starts on
+  whichever path has keys (plan, Gateway, Higgsfield API). Gateway prices
+  are placeholders until a paid run's cost is logged.
+- **f. Trim:** each result has Trim (start and end, free on the worker):
+  a new kept clip, the original stays. Cut, never crossfaded.
+- Prices on every paid step; on the plan, 4 stills are 6 credits (1.5
+  each, from the transactions; the "1.5 per 2 takes" note was per image),
+  a face pass 3, the motion about 7 a second.

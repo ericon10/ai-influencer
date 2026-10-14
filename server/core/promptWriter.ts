@@ -28,6 +28,9 @@ export interface WrittenPrompt {
   // that make the shot memorable, one short line, and who set them.
   notes?: string
   notesBy?: 'claude' | 'owner'
+  // Mood words taken out of the writer's text (default rule
+  // prompt-no-flourish), shown as a note in the prompt box.
+  removed?: string[]
 }
 
 export interface ScenePrompts { still?: WrittenPrompt; video?: WrittenPrompt }

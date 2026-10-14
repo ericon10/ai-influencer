@@ -348,6 +348,15 @@ rules:
     title: Claude writes the final prompt
     check: { type: behavior }
     message: Claude (the Prompt writer in Settings, Claude models) turns the scene details into the final still or video prompt, as natural sentences about a real candid moment. You can edit it or rewrite it before you generate. The Studio still adds the reference line, the mark sides and the REALISM block. Switched off, the template builds the prompt.
+  - id: prompt-no-flourish
+    bucket: default
+    area: scene
+    spec: "9"
+    # Owner, 2026-10-14: "Never add words like glowing, cinematic, soft
+    # light, beautiful." They make a photo look staged.
+    title: The writer adds no mood words you did not use
+    check: { type: behavior }
+    message: Words like glowing, cinematic, soft light, beautiful, stunning or dreamy are taken out of a written prompt unless your own words use them, and the prompt box says which were taken out.
   - id: scene-directors-pass
     bucket: default
     area: scene

@@ -30,6 +30,9 @@ const modelsSchema = z.object({
     // Other names people use for the model (character files, the Higgsfield
     // web app). The character-file importer maps them to this ref.
     aliases: z.array(z.string()).default([]),
+    // How the model shows in the Higgsfield account's transactions, when it
+    // differs from its label (for the real cost of a plan run).
+    charge_names: z.array(z.string()).default([]),
     // The model id in the Higgsfield web app and MCP connector. Models with
     // one can also run through the owner's Higgsfield account (plan credits).
     mcp_id: z.string().optional(),

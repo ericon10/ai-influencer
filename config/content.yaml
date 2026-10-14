@@ -73,9 +73,17 @@ clone:
   # remembered.
   model: higgsfield/seedance-2.5-video-edit
   account_model: higgsfield/genjutsu-replace
+  # "Recreate from a real clip" (owner, 2026-10-14): the motion model is
+  # the remembered pick; it starts on whichever path has keys: Genjutsu
+  # motion control on the Higgsfield plan, then Kling 3.0 Motion Control on
+  # the Vercel AI Gateway (AI_GATEWAY_API_KEY), then the Higgsfield API.
   motion_model: higgsfield/kling-3.0-motion-control-pro
-  motion_account_model: higgsfield/kling-3.0-motion-control
+  motion_account_model: higgsfield/genjutsu-motion-control
+  motion_gateway_model: vercel/kling-3.0-motion-control
   models:
+    - { ref: higgsfield/genjutsu-motion-control, resolution: 720p }
+    - { ref: vercel/kling-3.0-motion-control }
+    - { ref: vercel/kling-3.0-motion-control-pro }
     - { ref: higgsfield/genjutsu-replace, resolution: 720p }
     - { ref: higgsfield/seedance-2.5-video-edit, resolution: 720p }
     - { ref: higgsfield/kling-o3-video-edit }
@@ -99,6 +107,14 @@ clone:
   scene_still:
     model: higgsfield/nano-banana-2.1
     api_model: higgsfield/gpt-image-2.5
+  # Recreate from a real clip: the frame (seconds in), the takes, and what
+  # suggests the route (a dark clip or a lot of movement, read free).
+  recreate:
+    frame_at: 0.2
+    takes: 4
+    face_takes: 2
+    dark_luma: 70
+    busy_motion: 14
   # The source clip: cut to max_seconds on arrival (with its sound, kept for
   # "Keep original sound"); shorter than min_seconds is refused.
   min_seconds: 3

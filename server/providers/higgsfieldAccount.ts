@@ -425,5 +425,15 @@ export function createHiggsfieldAccountAdapter(o: HiggsfieldAccountOptions): Pro
       }
     },
     balance,
+    // The plan's recent spends (the `transactions` tool, read-only):
+    // "Nano Banana 2.1", -1.5 credits, at a time. Refunds and grants are
+    // left out.
+    async charges() {
+      const value = await o.client.callTool('transactions', { size: 50 })
+      const items = isObj(value) && Array.isArray(value.items) ? value.items.filter(isObj) : []
+      return items
+        .filter(t => str(t.action) === 'spend' && typeof t.credits === 'number' && str(t.created_at))
+        .map(t => ({ name: str(t.display_name) ?? '', credits: Math.abs(t.credits as number), at: str(t.created_at)! }))
+    },
   }
 }

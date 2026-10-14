@@ -255,6 +255,55 @@ models:
     params: { resolution: [480p, 720p, 1080p] }
     use_for: [video_clone]
     notes: Your Higgsfield plan. Swaps only the person you pick and keeps the clip's place, light, crowd and outfit.
+  # The owner's proven motion route (2026-10-14, a rave clip and a kitchen
+  # hair-flip clip): generate_video with model hf_mult_motion_control, the
+  # chosen still in image_references and the ORIGINAL clip in
+  # video_references, 720p, the preset suggestion declined. Real charges in
+  # the account's transactions: 70 credits for 10 s, 42 for 6 s.
+  - ref: higgsfield/genjutsu-motion-control
+    label: Genjutsu motion control
+    kinds: [video_clone]
+    max_refs: 1
+    api: false
+    endpoint: null
+    input_map: genjutsu_motion
+    verified: false
+    mcp_id: hf_mult_motion_control
+    mcp: { params: [resolution], roles: { refs: image_references, video: video_references } }
+    clone: { mode: motion, background: [image], image_refs: 1, min_sec: 3, max_sec: 30, prompt: optional }
+    aliases: [Genjutsu motion control, Higgsfield Genjutsu - Motion Transfer, hf_mult_motion_control]
+    charge_names: [Higgsfield Genjutsu - Motion Transfer]
+    params: { resolution: [480p, 720p, 1080p] }
+    use_for: [video_clone]
+    notes: Your Higgsfield plan. The clip's real motion and camera onto the chosen still; her face held through the turns in the owner's tests.
+  # Kling 3.0 Motion Control on the Vercel AI Gateway (owner, 2026-10-14):
+  # klingai/kling-v3.0-motion-control, a character image plus a reference
+  # video (vercel.com/docs/ai-gateway, video generation, motion control).
+  # Needs AI_GATEWAY_API_KEY on the server. Not confirmed until a paid run.
+  - ref: vercel/kling-3.0-motion-control
+    label: Kling 3.0 Motion Control (Vercel AI Gateway)
+    kinds: [video_clone]
+    max_refs: 1
+    reference: https://vercel.com/docs/ai-gateway/modalities/video-generation/motion-control
+    endpoint: klingai/kling-v3.0-motion-control
+    input_map: gateway_motion
+    verified: false
+    clone: { mode: motion, background: [image], image_refs: 1, min_sec: 3, max_sec: 30, prompt: optional }
+    params: { mode: std }
+    aliases: [Kling 3.0 Motion Control Gateway]
+    notes: Standard quality. The still sets the look and place; the clip gives the motion and camera. The clip's own sound is never kept by the provider.
+  - ref: vercel/kling-3.0-motion-control-pro
+    label: Kling 3.0 Motion Control Pro (Vercel AI Gateway)
+    kinds: [video_clone]
+    max_refs: 1
+    reference: https://vercel.com/docs/ai-gateway/modalities/video-generation/motion-control
+    endpoint: klingai/kling-v3.0-motion-control
+    input_map: gateway_motion
+    verified: false
+    clone: { mode: motion, background: [image], image_refs: 1, min_sec: 3, max_sec: 30, prompt: optional }
+    params: { mode: pro }
+    aliases: [Kling 3.0 Motion Control Pro Gateway]
+    notes: Pro quality, the same inputs.
   - ref: higgsfield/kling-3.0-motion-control
     label: Kling 3.0 Motion Control
     kinds: [video_clone]

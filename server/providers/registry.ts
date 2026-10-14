@@ -9,6 +9,7 @@ import { createMockLlm, type LlmResponder } from './mockLlm.js'
 import { createAnthropicLlm } from './anthropic.js'
 import { createHiggsfieldAdapter } from './higgsfield.js'
 import { createElevenLabsAdapter } from './elevenlabs.js'
+import { createVercelGatewayAdapter, gatewaySdk } from './vercelGateway.js'
 import { createHiggsfieldAccountAdapter, type AccountBalance, type LivePriceStore } from './higgsfieldAccount.js'
 import { getSetting, putCacheSetting } from '../pipeline/settings.js'
 import { accountTokenSource, readAccountTokens } from './higgsfieldOAuth.js'
@@ -140,6 +141,13 @@ export function createRegistry(o: RegistryOptions): ProviderRegistry & { mockFor
         if (key) return createElevenLabsAdapter({ ...base, apiKey: key })
         if (o.voiceMock) return createElevenLabsAdapter({ ...base, mock: true })
         throw new AppError('provider_not_configured', 'Voice lines need an ElevenLabs key: add ELEVENLABS_API_KEY to the server (Vercel and Railway), or your ElevenLabs key in Settings.')
+      }
+      // Kling 3.0 Motion Control on the Vercel AI Gateway: the account's key
+      // from Settings, or the server's (AI_GATEWAY_API_KEY, the owner only).
+      if (p === 'vercel') {
+        const key = (await readSecret(o.db, o.vault, accountId, p)) ?? (await serverKeyFor(o.db, o.serverKeys, accountId, p))
+        if (!key) throw new AppError('provider_not_configured', 'The Vercel AI Gateway needs a key: add AI_GATEWAY_API_KEY to the server (Vercel and Railway), or your Gateway key in Settings.')
+        return createVercelGatewayAdapter({ config: o.config, sdk: gatewaySdk(key), fetchImpl: o.fetchImpl })
       }
       // The account's own key first; the owner's account can also use the
       // server key (HF_CREDENTIALS).

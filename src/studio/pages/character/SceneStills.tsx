@@ -5,10 +5,11 @@ import { useNavigate } from 'react-router-dom'
 import { api } from '../../api'
 import { useCharacters, useRefresh } from '../../hooks'
 import { PriceButton } from '../../PriceButton'
-import { Field, Img, Modal, SectionProgress, errorMessage, isFresh, scrollToField, useToast, type TodoItem } from '../../ui'
+import { Field, Img, Modal, PromptViewer, SectionProgress, errorMessage, isFresh, scrollToField, useToast, type TodoItem } from '../../ui'
 import type { CharacterView, SceneFields, SceneStill, SceneView, ScenesData } from '../../types'
-import { StillDrawer, STILL_STATUS, OP_LABEL, claudeChecked } from './StillDrawer'
+import { StillDrawer, STILL_STATUS, OP_LABEL, claudeChecked, wrap } from './StillDrawer'
 import { PromptBox } from './PromptBox'
+import { SentButton } from './SentPanel'
 
 // The stills of a post (UX-PLAN.md, the Stills step): its scene's details
 // (planned by Claude or filled in, all optional, saved as you type), the
@@ -24,6 +25,7 @@ const FIELD_LABEL: Record<string, string> = {
 }
 
 const ROLE: Record<string, string> = { face: 'Face', angle: 'Closest angle', body: 'Body', expression: 'Expression' }
+
 
 // Only the moment itself is required (owner, 2026-10-13: keep required fields
 // to the minimum). Moment type, camera and light start pre-filled, and the
@@ -57,7 +59,7 @@ function sceneChecks(data: ScenesData, draft: Partial<SceneFields>, missing: str
   return { required, done, progress, left }
 }
 
-export function SceneStills({ v, data, scene, action, picked = [], onStarted }: {
+export function SceneStills({ v, data, scene, action, picked = [], onStarted, onEditDetails }: {
   v: CharacterView; data: ScenesData; scene: SceneView
   // Called when a run starts (the post moves to this step).
   onStarted?: () => void
@@ -65,19 +67,78 @@ export function SceneStills({ v, data, scene, action, picked = [], onStarted }: 
   action?: (c: SceneStill) => ReactNode
   // Stills the post already uses (marked on their tiles).
   picked?: string[]
+  // The details live in the Idea step (More control): this opens them.
+  onEditDetails?: () => void
 }) {
+  const refresh = useRefresh()
+  const toast = useToast()
+  const [open, setOpen] = useState<string | null>(null)
+  const checks = sceneChecks(data, scene.fields, scene.missing)
+  const todo: TodoItem[] = checks.left.map(k => ({ label: FIELD_LABEL[k] ?? k, target: `scene-${k}`, onGo: () => onEditDetails?.() }))
+  const still = scene.candidates.find(c => c.id === open && c.media !== 'video') ?? null
+  const tiles = scene.candidates.filter(c => c.media !== 'video' && (c.assetId || c.status === 'failed'))
+  async function setRefs(refs: string[]) {
+    try { await api.updateScene(scene.id, { fields: { refs } }); refresh(v.id) } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) }
+  }
+
+  return (
+    <div className="st-col" style={{ gap: 18 }}>
+      <div className="st-row st-detailsline" style={{ gap: 8, flexWrap: 'wrap' }}>
+        <Wand2 size={15} />
+        <span className="st-label">Details</span>
+        <span className="st-hint grow">{detailsSummary(data, scene) || 'From your words; nothing else set.'}</span>
+        {onEditDetails && <button className="st-btn sm ghost" onClick={onEditDetails}>Change in the Idea step</button>}
+      </div>
+
+      <GenerateCard v={v} data={data} scene={scene} todo={todo} saving={false} setRefs={refs => void setRefs(refs)} onStarted={onStarted} />
+
+      <section>
+        <div className="st-section-head"><div className="st-h2">Stills</div><span className="st-muted">{tiles.filter(c => c.assetId).length}</span></div>
+        {scene.busy && (
+          <div className="st-card pad st-row" style={{ gap: 14, marginBottom: 14 }}>
+            <Loader2 className="st-spin" size={18} />
+            <div className="grow"><div className="st-h3">Working on these stills</div><div className="st-hint">Writing the prompt or rendering, then the free checks: face match against REF-00 and skin texture. Look each still over yourself; Check this asks Claude.</div></div>
+          </div>
+        )}
+        {tiles.length === 0 && !scene.busy && <span className="st-hint">No stills yet. Generate to see them here.</span>}
+        <div className="st-grid scenes">
+          {tiles.map(c => <StillTile key={c.id} c={c} aspect={scene.aspect} onOpen={() => setOpen(c.id)} action={action} picked={picked.indexOf(c.id)} />)}
+        </div>
+      </section>
+
+      <StillDrawer v={v} data={data} scene={scene} still={still} onClose={() => setOpen(null)} onOpen={setOpen} action={action} />
+    </div>
+  )
+}
+
+// One line: what the scene will use (camera, framing, outfit, light), for
+// the Stills step and the Idea step's summary.
+export function detailsSummary(data: ScenesData, scene: SceneView): string {
+  const f = scene.fields
+  const o = data.options
+  if (f.asWritten) return 'Your prompt, sent as written'
+  return [
+    o.cameras.find(m => m.id === f.camera)?.label,
+    f.phone === 'front' ? 'front camera' : f.phone === 'rear' ? 'rear camera' : '',
+    o.framings.find(m => m.id === f.framing)?.label,
+    f.outfit,
+    f.light === 'as_written' ? 'light from your words' : o.lights.find(m => m.id === f.light)?.label,
+  ].filter(Boolean).join(' · ')
+}
+
+// The scene's details (UX-PLAN.md section 15: the Idea step, More control):
+// planned by Claude or filled in, all optional, saved as you type.
+export function SceneDetails({ v, data, scene }: { v: CharacterView; data: ScenesData; scene: SceneView }) {
   const toast = useToast()
   const refresh = useRefresh()
   const qc = useQueryClient()
   const [draft, setDraft] = useState<Partial<SceneFields>>(scene.fields)
   const [saving, setSaving] = useState<'idle' | 'saving' | 'saved'>('idle')
-  const [open, setOpen] = useState<string | null>(null)
   const [copying, setCopying] = useState(false)
-  const [details, setDetails] = useState(false)
   const dirty = useRef<Partial<SceneFields>>({})
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // New fields from the planner (or another tab) replace untouched ones.
+  // New fields from the planner, the chips or another tab replace untouched ones.
   const serverKey = JSON.stringify(scene.fields)
   useEffect(() => {
     setDraft(d => ({ ...scene.fields, ...Object.fromEntries(Object.entries(d).filter(([k]) => k in dirty.current)) }))
@@ -110,46 +171,17 @@ export function SceneStills({ v, data, scene, action, picked = [], onStarted }: 
   }
 
   const checks = sceneChecks(data, draft, scene.missing)
-  const todo: TodoItem[] = checks.left.map(k => ({ label: FIELD_LABEL[k] ?? k, target: `scene-${k}`, onGo: () => { setDetails(true); window.setTimeout(() => scrollToField(`scene-${k}`), 120) } }))
-  const still = scene.candidates.find(c => c.id === open && c.media !== 'video') ?? null
-  const tiles = scene.candidates.filter(c => c.media !== 'video' && (c.assetId || c.status === 'failed'))
-  const summary = [data.options.moments.find(m => m.id === draft.momentType)?.label, data.options.cameras.find(m => m.id === draft.camera)?.label, data.options.lights.find(m => m.id === draft.light)?.label, draft.outfit].filter(Boolean).join(' · ')
-
   return (
-    <div className="st-col" style={{ gap: 18 }}>
-      <section className="st-card">
-        <div className="st-card-head">
-          <Wand2 size={16} />
-          <div className="grow"><div className="st-h3">Details <span className="st-muted" style={{ fontWeight: 400 }}>(optional)</span></div><div className="st-hint">{scene.planned ? summary || 'Planned.' : `Outfit, place, camera and light. Claude can plan them from your idea, following ${v.data.name}'s rules, or leave them to the prompt writer.`}</div></div>
-          <SaveState state={saving} />
-          <button className="st-btn sm ghost" onClick={() => setDetails(d => !d)} aria-expanded={details}>{details ? 'Hide' : 'Show'} the details</button>
-        </div>
-        <div className="st-card-body st-col" style={{ gap: 12 }}>
-          <div className="st-row" style={{ gap: 10, flexWrap: 'wrap' }}>
-            {scene.brief && <PriceButton action={{ type: 'scene_plan', characterId: v.id, sceneId: scene.id }} label={scene.planned ? 'Plan it again' : 'Plan the details'} variant="secondary" size="sm" onStarted={() => setDetails(true)} />}
-            <button className="st-btn sm ghost" onClick={async () => { if (timer.current) { clearTimeout(timer.current); timer.current = null; await flush() } setCopying(true) }} title="Copy this scene to other characters"><Copy size={14} />Use for other characters</button>
-          </div>
-          {details && <SceneForm data={data} draft={draft} set={set} checks={checks} v={v} />}
-        </div>
-      </section>
-
-      <GenerateCard v={v} data={data} scene={scene} todo={todo} saving={saving === 'saving' || Object.keys(dirty.current).length > 0} setRefs={refs => set('refs', refs)} onStarted={onStarted} />
-
-      <section>
-        <div className="st-section-head"><div className="st-h2">Stills</div><span className="st-muted">{tiles.filter(c => c.assetId).length}</span></div>
-        {scene.busy && (
-          <div className="st-card pad st-row" style={{ gap: 14, marginBottom: 14 }}>
-            <Loader2 className="st-spin" size={18} />
-            <div className="grow"><div className="st-h3">Working on these stills</div><div className="st-hint">Writing the prompt or rendering, then the free checks: face match against REF-00 and skin texture. Look each still over yourself; Check this asks Claude.</div></div>
-          </div>
-        )}
-        {tiles.length === 0 && !scene.busy && <span className="st-hint">No stills yet. Generate to see them here.</span>}
-        <div className="st-grid scenes">
-          {tiles.map(c => <StillTile key={c.id} c={c} aspect={scene.aspect} onOpen={() => setOpen(c.id)} action={action} picked={picked.indexOf(c.id)} />)}
-        </div>
-      </section>
-
-      <StillDrawer v={v} data={data} scene={scene} still={still} onClose={() => setOpen(null)} onOpen={setOpen} action={action} />
+    <div className="st-col" style={{ gap: 12 }} data-field="scene-details">
+      <div className="st-row" style={{ gap: 10, flexWrap: 'wrap' }}>
+        <div className="grow"><div className="st-h3">Details <span className="st-muted" style={{ fontWeight: 400 }}>(optional)</span></div><div className="st-hint">{scene.planned ? 'Planned or set by you. What your words say is never planned away.' : `Outfit, place, camera and light. Claude can plan them from your words, following ${v.data.name}'s rules, or leave them to the prompt writer.`}</div></div>
+        <SaveState state={saving} />
+      </div>
+      <div className="st-row" style={{ gap: 10, flexWrap: 'wrap' }}>
+        {scene.brief && <PriceButton action={{ type: 'scene_plan', characterId: v.id, sceneId: scene.id }} label={scene.planned ? 'Plan it again' : 'Plan the details'} variant="secondary" size="sm" />}
+        <button className="st-btn sm ghost" onClick={async () => { if (timer.current) { clearTimeout(timer.current); timer.current = null; await flush() } setCopying(true) }} title="Copy this scene to other characters"><Copy size={14} />Use for other characters</button>
+      </div>
+      <SceneForm data={data} draft={draft} set={set} checks={checks} v={v} />
       <CopyScene v={v} scene={scene} open={copying} onClose={() => setCopying(false)} />
     </div>
   )
@@ -234,6 +266,7 @@ function StillTile({ c, aspect, onOpen, action, picked }: { c: SceneStill; aspec
       </div>
       {c.status === 'failed' && c.rejectNote && <span className="st-hint" style={{ padding: '0 4px' }}>{c.rejectNote}</span>}
       {action && usable && <div className="st-tile-action">{action(c)}</div>}
+      {c.op !== 'crop' && c.op !== 'mirror' && <div className="st-tile-sent"><SentButton candidateId={c.id} size="xs" /></div>}
     </div>
   )
 }
@@ -345,7 +378,9 @@ function GenerateCard({ v, data, scene, todo, saving, setRefs, onStarted }: { v:
   const o = data.options
   const usable = (m: (typeof o.stillModels)[number]) => !(o.mode === 'live' && m.path === 'account' && !o.accountConnected)
   const [models, setModels] = useState<string[]>(() => o.defaultModels.filter(r => usable(o.stillModels.find(m => m.ref === r)!)).slice(0, 1))
-  const [variations, setVariations] = useState(2)
+  const [variations, setVariations] = useState(o.defaultVariations)
+  // Standard by default; High is one click (owner, 2026-10-14).
+  const [level, setLevel] = useState(o.stillLevel)
   const [choosing, setChoosing] = useState(false)
   const chosen = useMemo(() => o.stillModels.filter(m => models.includes(m.ref)), [o.stillModels, models])
   function toggle(ref: string) {
@@ -357,7 +392,9 @@ function GenerateCard({ v, data, scene, todo, saving, setRefs, onStarted }: { v:
   const [promptDirty, setPromptDirty] = useState(false)
   // With nothing written yet, Generate writes the prompt first ("Write and
   // generate", one price); the box stays for typing or writing it first.
-  const needsPrompt = pw.on && !(scene.prompts.still?.text ?? '').trim()
+  // A pasted prompt goes as written: no writer, no prompt box.
+  const asWritten = !!scene.fields.asWritten
+  const needsPrompt = pw.on && !asWritten && !(scene.prompts.still?.text ?? '').trim()
   const [showBox, setShowBox] = useState(false)
   const left: TodoItem[] = [
     ...todo,
@@ -417,11 +454,26 @@ function GenerateCard({ v, data, scene, todo, saving, setRefs, onStarted }: { v:
           </div>
           {trained && <span className="st-hint">{trained.label} uses {v.data.name}'s saved character: no attachments, then a face-only drift lock to REF-00 on every still.</span>}
         </div>
-        <div className="st-row">
-          <span className="st-label">Stills per model</span>
-          <div className="st-stepnum"><button onClick={() => setVariations(n => Math.max(1, n - 1))} aria-label="Fewer">-</button><span>{variations}</span><button onClick={() => setVariations(n => Math.min(o.maxVariations, n + 1))} aria-label="More">+</button></div>
+        <div className="st-row" style={{ gap: 18, flexWrap: 'wrap' }}>
+          <div className="st-row">
+            <span className="st-label">Stills per model</span>
+            <div className="st-stepnum"><button onClick={() => setVariations(n => Math.max(1, n - 1))} aria-label="Fewer">-</button><span>{variations}</span><button onClick={() => setVariations(n => Math.min(o.maxVariations, n + 1))} aria-label="More">+</button></div>
+          </div>
+          {o.stillLevels.length > 1 && (
+            <div className="st-row" style={{ gap: 6 }} role="radiogroup" aria-label="Quality">
+              <span className="st-label">Quality</span>
+              {o.stillLevels.map(l => <button key={l.id} type="button" role="radio" aria-checked={level === l.id} className={`st-chip ${level === l.id ? 'on' : ''}`} onClick={() => setLevel(l.id)} title={`${l.resolution}, ${l.quality} quality where the model has one`}>{level === l.id && <Check size={12} />}{l.label} <span className="st-muted">{l.resolution}</span></button>)}
+            </div>
+          )}
+          <span className="st-hint">{data.options.destinations.find(d => d.id === (scene.fields.destination ?? 'vertical'))?.aspect ?? scene.aspect}</span>
         </div>
-        {pw.on && needsPrompt && !showBox ? (
+        {asWritten ? (
+          <div className="st-col" style={{ gap: 6 }}>
+            <span className="st-label">Your prompt, sent as written</span>
+            <PromptViewer label="Your words (the Idea step)" wrapped={wrap(scene.brief)} text={scene.brief} />
+            <span className="st-hint">Added around it, nothing else: the reference line (the refs give the face only), the 21+ line, and the REALISM and AVOID blocks. Switch "Send my prompt as written" off in the Idea step to have it written for you instead.</span>
+          </div>
+        ) : pw.on && needsPrompt && !showBox ? (
           <button type="button" className="st-btn ghost sm" style={{ alignSelf: 'flex-start' }} onClick={() => setShowBox(true)}><PenLine size={14} />See or type the prompt first</button>
         ) : pw.on ? (
           <PromptBox
@@ -441,7 +493,7 @@ function GenerateCard({ v, data, scene, todo, saving, setRefs, onStarted }: { v:
           label={`${needsPrompt ? 'Write and generate' : 'Generate'} ${count} still${count > 1 ? 's' : ''}`}
           todo={left}
           waiting={saving || promptDirty ? 'Saving your changes...' : undefined}
-          action={left.length || saving || promptDirty ? null : { type: 'scene', characterId: v.id, sceneId: scene.id, models, variations, withQa: o.autoQa, allowRepeat: true, ...(needsPrompt ? { write: true } : {}) }}
+          action={left.length || saving || promptDirty ? null : { type: 'scene', characterId: v.id, sceneId: scene.id, models, variations, withQa: o.autoQa, allowRepeat: true, level, ...(needsPrompt && !asWritten ? { write: true } : {}) }}
           onStarted={() => onStarted?.()}
           watch={j => new RegExp(`^(scene|drift_lock|scene_qa|scene_edit|scene_upscale|scene_end_frame):${scene.id}(:|$)`).test(j.purpose) && !/^scene_qa:.*:video/.test(j.purpose)}
         />

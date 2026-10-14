@@ -154,6 +154,9 @@ export interface ProviderAdapter {
   download?(output: Output): Promise<Buffer>
   // A free call that proves the stored credentials work.
   verifyCredentials?(): Promise<{ ok: boolean; message: string }>
+  // The account's recent charges (Higgsfield plan: its transactions), for
+  // the real cost of a run next to its quote. Free; newest first.
+  charges?(): Promise<Array<{ name: string; credits: number; at: string }>>
 }
 
 // Thrown by adapters so the runner can decide between retry, fail and

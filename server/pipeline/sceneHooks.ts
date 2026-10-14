@@ -4,7 +4,7 @@ import type { Ctx, Deps } from '../context.js'
 import { newId } from '../lib/ids.js'
 import { registerJobHook, type JobOutcome, type JobRow } from '../jobs/hooks.js'
 import { activateChildren, cancelChildren, childJobs } from '../jobs/runner.js'
-import { checkSceneFields, sceneFieldsSchema, type SceneFields } from '../core/scenes.js'
+import { checkSceneFields, fieldsFromWords, sceneFieldsSchema, type SceneFields } from '../core/scenes.js'
 import { finalize, type QaReport } from '../core/qa/marks.js'
 import { evaluateScene, sceneMirrorFix } from '../core/qa/scene.js'
 import { parseObservation } from '../core/qa/perception.js'
@@ -17,6 +17,7 @@ import { scoreSceneIdentity } from './identity.js'
 import { draftFields, getScene, refreshSceneStatus, sceneFields, setScenePrompt, updateScene } from './scenes.js'
 import { cleanWriterOutput, enforceVideoLines, isLabeled, type PromptTarget } from '../core/promptWriter.js'
 import { normalizePrompt } from '../core/text.js'
+import { stripFlourishes } from '../core/shotParse.js'
 import { modelLabel } from '../costs/quotes.js'
 import { textureCheck, textureSummary } from './texture.js'
 import { ruleSwitches } from './rules.js'
@@ -63,8 +64,13 @@ async function onScenePlan(deps: Deps, ctx: Ctx, job: JobRow, out: JobOutcome): 
   if (out.status !== 'completed') return
   const scene = await getScene(deps, ctx, sceneIdOf(job))
   const raw = (out.data ?? {}) as Record<string, unknown>
-  const merged: Record<string, unknown> = { ...draftFields(scene) }
+  const own = draftFields(scene)
+  const merged: Record<string, unknown> = { ...own }
   for (const key of Object.keys(sceneFieldsSchema.shape)) if (typeof raw[key] === 'string') merged[key] = raw[key]
+  // What the owner's words say (a selfie, a black tank) is never planned
+  // away; a field the owner set stays as set.
+  const words = fieldsFromWords(deps.config.pipeline.scenes, scene.brief)
+  for (const [key, value] of Object.entries(words)) merged[key] = (own as Record<string, unknown>)[key] ?? value
   // A preset the planner made up is dropped, so the form asks for it.
   const parsed = sceneFieldsSchema.safeParse(merged)
   if (parsed.success) for (const issue of checkSceneFields(deps.config.pipeline.scenes, deps.config.pipeline.views, parsed.data)) delete merged[issue.field]
@@ -86,6 +92,16 @@ async function onScenePrompt(deps: Deps, ctx: Ctx, job: JobRow, out: JobOutcome)
   let { text } = cleanWriterOutput(raw.prompt)
   // A video prompt's FORMAT and AUDIO lines are the Studio's own.
   if (meta.target === 'video' && meta.format && meta.audioLine && isLabeled(text)) text = enforceVideoLines(text, { format: meta.format, audio: meta.audioLine })
+  // Default rule prompt-no-flourish: mood words the owner never used come
+  // out (glowing, cinematic, soft light, beautiful), and the box says so.
+  let removed: string[] = []
+  if (job.characterId && (await ruleSwitches(deps, ctx, job.characterId)).on('prompt-no-flourish')) {
+    const scene = await getScene(deps, ctx, sceneIdOf(job))
+    const own = [scene.brief, ...Object.values(draftFields(scene)).filter((v): v is string => typeof v === 'string'), meta.motion ?? '', meta.notes ?? ''].join(' ')
+    const out = stripFlourishes(text, own)
+    text = out.text
+    removed = out.removed
+  }
   // The director's notes: the owner's, kept as set, or the writer's.
   const notes = meta.notes ? meta.notes : typeof raw.notes === 'string' ? normalizePrompt(stripBannedTerms(raw.notes).prompt).slice(0, 600) : ''
   await setScenePrompt(deps, ctx, sceneIdOf(job), meta.target, {
@@ -93,6 +109,7 @@ async function onScenePrompt(deps: Deps, ctx: Ctx, job: JobRow, out: JobOutcome)
     ...(meta.basis ? { basis: meta.basis } : {}),
     ...(meta.target === 'video' ? { motion: meta.motion ?? '', directions: meta.directions ?? '' } : {}),
     ...(meta.directors && notes ? { notes, notesBy: meta.notes ? 'owner' as const : 'claude' as const } : {}),
+    ...(removed.length ? { removed } : {}),
   })
   await startWrittenStills(deps, ctx, job, text)
 }

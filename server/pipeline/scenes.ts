@@ -7,7 +7,7 @@ import { audit } from '../lib/audit.js'
 import { newId } from '../lib/ids.js'
 import { readAsset, saveAsset } from '../storage/assets.js'
 import {
-  COMBO_TITLE, appendCombo, aspectFor, checkSceneFields, comboConflict, comboEntryFor, isComboSection, parseComboLog,
+  COMBO_TITLE, appendCombo, aspectFor, checkSceneFields, comboConflict, comboEntryFor, fieldsFromWords, isComboSection, parseComboLog,
   pickSceneRefs, sceneFieldsSchema, type ComboEntry, type RefPick, type SceneFields,
 } from '../core/scenes.js'
 import { getCandidate, getCharacter, toData, updateCharacter, approvedAssets, sheetState } from './characters.js'
@@ -50,10 +50,22 @@ const PRESET_DEFAULTS: Partial<SceneFields> = (() => {
   return { view: d.view, expression: d.expression, height: d.height, framing: d.framing, destination: d.destination, makeup: d.makeup }
 })()
 
-// Once a scene has run, its fields are saved, so they never shift after.
+// Layers, last wins: the presets, the pre-filled defaults, the owner's
+// words (the moment, and what they say about the camera, outfit, framing,
+// makeup, place and light, shotParse.ts), then every field the owner or the
+// planner set. A run records what it used in `ranFields`; it never freezes
+// the fields, so editing the words later still counts (owner, 2026-10-14).
 export function effectiveFields(deps: Deps, row: SceneRow): Partial<SceneFields> {
   const brief = (row.brief ?? '').trim()
-  return { ...PRESET_DEFAULTS, ...deps.config.pipeline.scenes.settings.defaults, ...(brief.length >= 3 ? { moment: brief.slice(0, 400) } : {}), ...draftFields(row) }
+  const sc = deps.config.pipeline.scenes
+  return { ...PRESET_DEFAULTS, ...sc.settings.defaults, ...(brief.length >= 3 ? { moment: brief.slice(0, 400), ...fieldsFromWords(sc, brief) } : {}), ...draftFields(row) }
+}
+
+// What the owner's words gave, for the Idea step's chips: each field read
+// from the words, and the fields the owner set (which win).
+export function wordFields(deps: Deps, row: SceneRow): { read: Partial<SceneFields>; ownerSet: string[] } {
+  const brief = (row.brief ?? '').trim()
+  return { read: brief.length >= 3 ? fieldsFromWords(deps.config.pipeline.scenes, brief) : {}, ownerSet: Object.keys(draftFields(row)) }
 }
 
 export function sceneFields(deps: Deps, row: SceneRow): SceneFields {
@@ -120,14 +132,17 @@ function cleanFields(f: Partial<SceneFields>): Partial<SceneFields> {
 
 // `prompts` is the owner's own edit of a written prompt (or "" to clear it):
 // the text becomes theirs, and what it was written from is kept.
-export async function updateScene(deps: Deps, ctx: Ctx, id: string, patch: { brief?: string; title?: string; fields?: Partial<SceneFields>; prompts?: Partial<Record<PromptTarget, string>>; fromTemplate?: boolean; notes?: Partial<Record<PromptTarget, string>> }): Promise<SceneRow> {
+// A field set to null is taken away: the owner's words, or the default,
+// count for it again (the x on an Idea step chip).
+export async function updateScene(deps: Deps, ctx: Ctx, id: string, patch: { brief?: string; title?: string; fields?: Partial<{ [K in keyof SceneFields]: SceneFields[K] | null }>; prompts?: Partial<Record<PromptTarget, string>>; fromTemplate?: boolean; notes?: Partial<Record<PromptTarget, string>> }): Promise<SceneRow> {
   const row = await getScene(deps, ctx, id)
-  const fields = patch.fields ? { ...draftFields(row), ...cleanFields(patch.fields) } : draftFields(row)
+  const cleared = Object.entries(patch.fields ?? {}).filter(([, v]) => v === null).map(([k]) => k)
+  const fields = patch.fields ? Object.fromEntries(Object.entries({ ...draftFields(row), ...cleanFields(patch.fields as Partial<SceneFields>) }).filter(([k]) => !cleared.includes(k))) as Partial<SceneFields> : draftFields(row)
   let prompts = scenePrompts(row.prompts)
   for (const [target, text] of Object.entries(patch.prompts ?? {}) as Array<[PromptTarget, string]>) {
     const before = prompts[target]
     const source = patch.fromTemplate ? 'template' as const : before?.text === text ? before.source : 'owner' as const
-    prompts = { ...prompts, [target]: text.trim() ? { ...before, text: text.slice(0, MAX_PROMPT), source, at: deps.clock.now().toISOString(), words: wordCount(text) } : undefined }
+    prompts = { ...prompts, [target]: text.trim() ? { ...before, text: text.slice(0, MAX_PROMPT), source, at: deps.clock.now().toISOString(), words: wordCount(text), ...(source === 'owner' ? { removed: undefined } : {}) } : undefined }
   }
   // The director's notes, edited by the owner: kept with the prompt and
   // followed by the next Rewrite.
@@ -233,11 +248,12 @@ export async function sceneBusy(deps: Deps, ctx: Ctx, sceneId: string): Promise<
   return rows.length > 0
 }
 
-// A run saves the fields it used (pre-filled defaults included), so the
-// scene shows and logs exactly what was generated.
+// A run records the fields it used (pre-filled defaults and what was read
+// from the words included) in `ranFields`, so the scene shows exactly what
+// was generated without freezing the fields for the next run.
 export async function markSceneBusy(deps: Deps, ctx: Ctx, sceneId: string): Promise<void> {
-  const fields = effectiveFields(deps, await getScene(deps, ctx, sceneId))
-  await deps.db.update(scenes).set({ status: 'generating', fields, updatedAt: deps.clock.now() }).where(and(eq(scenes.accountId, ctx.accountId), eq(scenes.id, sceneId)))
+  const ranFields = effectiveFields(deps, await getScene(deps, ctx, sceneId))
+  await deps.db.update(scenes).set({ status: 'generating', ranFields, updatedAt: deps.clock.now() }).where(and(eq(scenes.accountId, ctx.accountId), eq(scenes.id, sceneId)))
 }
 
 export async function refreshSceneStatus(deps: Deps, ctx: Ctx, sceneId: string): Promise<void> {

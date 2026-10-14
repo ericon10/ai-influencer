@@ -157,7 +157,7 @@ describe('scenes (Stage 7, demo mode)', () => {
     expect(p).toContain('instead of the white t-shirt, jeans and sneakers in the reference images')
     expect(p).toContain('Ordinary background, not a professional shoot.')
     const view = (await scenesView(h.deps, h.ctx, characterId)).scenes.find(s => s.id === sceneId)!
-    expect(view.refs.map(r => r.refId)).toEqual(['REF-00', 'REF-01', 'REF-07', 'REF-10'])
+    expect(view.refs.map(r => r.refId)).toEqual(['REF-00', 'REF-01', 'REF-10'])
     const made = (await stills(sceneId)).filter(c => c.op === 'generate')
     expect(made).toHaveLength(2)
     for (const c of made) {
@@ -200,7 +200,7 @@ describe('scenes (Stage 7, demo mode)', () => {
     expect((await approveSceneCandidate(h.deps, h.ctx, pick.id)).comboLogged).toBe(true)
     const ch = toData(await getCharacter(h.deps, h.ctx, characterId))
     const log = parseComboLog(ch.sections.find(s => s.title.startsWith('Combo log'))!.body)
-    expect(log).toHaveLength(5)
+    expect(log).toHaveLength(6)
     expect(log.at(-1)!.date).toBe('2026-10-12')
     expect((await getScene(h.deps, h.ctx, sceneId)).status).toBe('approved')
     const second = (await stills(sceneId)).find(c => c.op === 'generate' && c.status === 'in_review')!

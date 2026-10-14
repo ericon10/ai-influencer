@@ -125,7 +125,7 @@ describe('Studio API', () => {
     const created = await call('POST', '/characters/import', { cookie: cookieA, form })
     expect(created.status).toBe(201)
     expect(created.json.importedShots).toEqual([])
-    expect(created.json.warnings.join(' ')).toMatch(/Element "Callie-1"/)
+    expect(created.json.warnings.join(' ')).toMatch(/Element "Callie"/)
     const id = created.json.characterId
 
     const png = async (label: string) => new Blob([new Uint8Array(await renderPlaceholderPortrait(label))], { type: 'image/png' })
@@ -141,7 +141,7 @@ describe('Studio API', () => {
     const ref04 = (added.json.view.sheet.shots as Array<{ id: string; status: string; candidates: Array<{ status: string }> }>).find(s => s.id === 'REF-04')!
     expect(ref04.status).toBe('pending')
     expect(ref04.candidates.map(c => c.status)).toEqual(['check'])
-    expect(added.json.view.data.identities.map((i: { name: string }) => i.name)).toEqual(['Callie', 'Callie-1'])
+    expect(added.json.view.data.identities.map((i: { name: string }) => i.name)).toEqual(['Callie', 'Callie'])
 
     // A new REF-00 replaces the old one and sends REF-01 back for a re-check.
     const again = new FormData()

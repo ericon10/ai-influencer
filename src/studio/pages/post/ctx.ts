@@ -14,4 +14,11 @@ export interface PostCtx {
   lib: LibraryData | undefined
   current: PostStep
   advance: (step: PostStep, spec?: Record<string, unknown>) => Promise<void>
+  // Opens a step (going back to it when it is done) and scrolls to a field
+  // in it; `more` also opens the Idea step's More control.
+  open: (step: PostStep, o?: { field?: string; more?: boolean }) => void
 }
+
+// The Idea step's More control, opened from elsewhere in the post.
+export const MORE_EVENT = 'st-more-control'
+export const moreKey = (postId: string) => `st-more:${postId}`

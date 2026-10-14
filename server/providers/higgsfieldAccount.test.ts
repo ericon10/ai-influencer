@@ -88,6 +88,28 @@ describe('Higgsfield account path (plan credits)', () => {
     expect(charge).toMatchObject({ quantity: 1.5, unit: 'credit', amountMicros: 0 })
   })
 
+  it('logs the credits Higgsfield actually took next to the quote, and flags one more than 20% off', async () => {
+    fake.now = () => h.clock.now()
+    const spec = still({ seed: 7 })
+    const quote = await quoteJobs(h.deps, h.ctx, { purpose: 'test_still', characterId: null, specs: [spec] })
+    const [job] = await runJobs(h.deps, h.ctx, { quoteId: quote.id, purpose: 'test_still', characterId: null, specs: [spec] })
+    await drain(h)
+    expect(fake.tool('transactions').length).toBeGreaterThan(0)
+    expect((await getJob(h.deps, h.ctx, job!.id)).costCheck).toMatchObject({ quoted: { credits: 1.5 }, actual: { credits: 1.5, source: 'transactions' }, offPct: 0, flagged: false })
+    fake.chargeFactor = 2
+    try {
+      const spec2 = still({ seed: 8 })
+      const q2 = await quoteJobs(h.deps, h.ctx, { purpose: 'test_still', characterId: null, specs: [spec2] })
+      const [j2] = await runJobs(h.deps, h.ctx, { quoteId: q2.id, purpose: 'test_still', characterId: null, specs: [spec2] })
+      await drain(h)
+      const check = (await getJob(h.deps, h.ctx, j2!.id)).costCheck as { actual: { credits: number }; offPct: number; flagged: boolean; note: string }
+      expect(check).toMatchObject({ actual: { credits: 3 }, offPct: 100, flagged: true })
+      expect(check.note).toMatch(/^Quote off by \+100%: 3 credits taken, 1.5 quoted/)
+    } finally {
+      fake.chargeFactor = 1
+    }
+  })
+
   it('counts credits toward budgets at the value the owner sets', async () => {
     await saveBilling(h.deps, h.ctx, { default: 'account', creditUsd: 0.05 })
     const quote = await quoteJobs(h.deps, h.ctx, { purpose: 'test_still', characterId: null, specs: [still()] })
@@ -418,6 +440,24 @@ describe('account adapter edge cases', () => {
     const sent = fake.tool('generate_video_batch').at(-1)!.args.requests[0].params
     expect(sent).toMatchObject({ model: 'hf_mult_replace_object', use_unlim: false })
     expect(sent.medias.filter((m: { role: string }) => m.role === 'video_references')).toHaveLength(1)
+  })
+
+  it('Recreate from a real clip runs Genjutsu motion control: the still and the clip as uploaded, 7 credits a second at 720p', async () => {
+    const a = adapter()
+    const req: GenRequest = {
+      kind: 'video_clone', model: 'higgsfield/genjutsu-motion-control', prompt: 'The person in the reference image performs the exact motion of the source video.', resolution: '720p', durationSec: 10, cloneBackground: 'image', audio: false,
+      refs: [{ assetId: 'still', url: '4b2f7a10-3c4d-4e5f-8a9b-0c1d2e3f4a5b' }], sourceVideo: { assetId: 's', url: '5b2f7a10-3c4d-4e5f-8a9b-0c1d2e3f4a5b' },
+    }
+    expect(accountParams(accountModel(h.deps.config, req.model), req)).toMatchObject({
+      model: 'hf_mult_motion_control', resolution: '720p',
+      medias: [{ value: '4b2f7a10-3c4d-4e5f-8a9b-0c1d2e3f4a5b', role: 'image_references' }, { value: '5b2f7a10-3c4d-4e5f-8a9b-0c1d2e3f4a5b', role: 'video_references' }],
+    })
+    // The owner's real charges: 70 credits for 10 s, 42 for 6 s.
+    const est = await a.estimate(req)
+    expect(est.credits).toBe(70)
+    expect((await a.estimate({ ...req, durationSec: 6 })).credits).toBe(42)
+    await a.submit(req, { idempotencyKey: 'k-recreate' })
+    expect(fake.tool('generate_video_batch').at(-1)!.args.requests[0].params).toMatchObject({ model: 'hf_mult_motion_control', use_unlim: false })
   })
 
   it('refuses a clone on a model the account path cannot clone with', async () => {

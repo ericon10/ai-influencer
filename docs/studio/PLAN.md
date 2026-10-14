@@ -407,6 +407,21 @@ Decisions: `DECISIONS.md` G25 onward. UX: `UX-PLAN.md` section 11.
 - [ ] Approved paid tests 1 to 6 (not run tonight; G25)
 - [x] Edit pack 2: ten more edits, the person mask, caption styles (G26)
 
+## Fixes from the first real run, and Recreate from a real clip (2026-10-14)
+
+Decisions: `DECISIONS.md` G37 and G38. UX: `UX-PLAN.md` section 15.
+
+- [x] The owner's words read for free; refs by framing; no sheet clothes; no gloss; 21+ (G37)
+- [x] What was sent under every still (G37)
+- [x] A pasted prompt sent as written; no mood words the owner did not use (G37)
+- [x] The Idea step: one box, chips, More control (G37)
+- [x] Prices: Nano Banana 2.1, 4 stills, Standard, 9:16 by default; real cost logged and flagged over 20% (G37)
+- [x] ElevenLabs: Callie's voice ID; the importer skips spare voices (G37)
+- [x] Recreate from a real clip: frame, 4 stills, You pick, face pass, checks, motion from the clip as uploaded, Trim (G38)
+- [x] Kling 3.0 Motion Control on the Vercel AI Gateway (G38)
+- [ ] First paid Gateway run, after the owner adds AI_GATEWAY_API_KEY (its price is a placeholder until then)
+- [ ] Flare's real price per quality, from its first logged runs
+
 ## Roadmap after Phase 4 (owner, 2026-10-13; not started)
 
 SPEC 13.1, R1 to R7: Clone Video (first after Phase 3), Inspo board

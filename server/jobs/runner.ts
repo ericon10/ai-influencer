@@ -1,4 +1,4 @@
-import { and, eq, inArray, sql } from 'drizzle-orm'
+import { and, eq, gte, inArray, sql } from 'drizzle-orm'
 import sharp from 'sharp'
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -25,6 +25,7 @@ import { publicAssetUrl } from './assetUrls.js'
 import { safeDownload } from './download.js'
 import { hookFor, localJobFor, type JobOutcome, type JobRow } from './hooks.js'
 import { wakeWorker } from './wake.js'
+import { compareCost, matchCharge, type CostCheck } from '../core/costCheck.js'
 
 // Async job runner (SPEC 3): every generation is a Job. Submit, then wake on
 // a webhook or poll; on completion copy every output into our own storage
@@ -446,9 +447,11 @@ async function ingestGen(deps: Deps, job: JobRow): Promise<void> {
   }
 
   if (req.billing === 'account') {
-    // Plan credits are charged as quoted (the request fixes the duration).
+    // Plan credits are charged as quoted (the request fixes the duration);
+    // the credits Higgsfield actually took are logged next to the quote.
     const credits = req.quotedCredits ?? 0
     await settle(deps, job, 'completed', job.estimateMicros, `${credits} plan credits`, { quantity: credits, unit: 'credit' })
+    await recordPlanCost(deps, job, adapter, req)
   } else {
     const actual = actualGen(deps.config, req, measured)
     await settle(deps, job, 'completed', actual.totalMicros, `${actual.lines.map(l => l.label).join(', ')}`)
@@ -485,6 +488,7 @@ async function runLlm(deps: Deps, job: JobRow): Promise<void> {
     const cost = llm.actualCost(full, result.usage)
     await update(deps, job, { resultMeta: { data: result.data, usage: result.usage } })
     await settle(deps, job, 'completed', cost.totalMicros, `${result.usage.inputTokens} in, ${result.usage.outputTokens} out`)
+    if (job.provider !== 'mock') await update(deps, job, { costCheck: compareCost({ micros: job.estimateMicros }, { micros: cost.totalMicros, source: 'tokens' }, deps.clock.now()) })
     await runHook(deps, ctx, job, { status: 'completed', data: result.data })
   } catch (e) {
     await handleProviderError(deps, job, e, attempts, 'llm')
@@ -530,6 +534,28 @@ async function settle(deps: Deps, job: JobRow, status: 'completed', actualMicros
     await tx.update(jobs).set({ status, actualMicros, actualSource: 'computed', completedAt: deps.clock.now(), lockedUntil: null, nextPollAt: null, error: null, updatedAt: deps.clock.now() }).where(eq(jobs.id, job.id))
   })
   await event(deps.db, job, status, { actualMicros })
+}
+
+// The real cost of a plan run (owner, 2026-10-14): the matching spend in
+// the account's Higgsfield transactions, next to the quoted credits, flagged
+// when more than 20% off. Best effort: a run never fails for it.
+async function recordPlanCost(deps: Deps, job: JobRow, adapter: ProviderAdapter, req: GenRequest): Promise<void> {
+  if (!adapter.charges || !job.submittedAt) return
+  try {
+    const entry = deps.config.models.models.find(m => m.ref === (req.modelRef ?? req.model))
+    const names = [entry?.label, ...(entry?.aliases ?? []), ...(entry?.charge_names ?? []), entry?.mcp_id].filter((x): x is string => !!x)
+    const since = new Date(job.submittedAt.getTime() - 60 * 60_000)
+    const rows = await deps.db.select({ costCheck: jobs.costCheck }).from(jobs)
+      .where(and(eq(jobs.accountId, job.accountId), sql`${jobs.costCheck} ->> 'txKey' is not null`, gte(jobs.submittedAt, since)))
+    const claimed = new Set(rows.map(r => (r.costCheck as CostCheck).txKey!))
+    const hit = matchCharge(await adapter.charges(), { names, submittedAt: job.submittedAt, claimed })
+    const quoted = { credits: req.quotedCredits ?? undefined, micros: job.estimateMicros }
+    const check = hit ? compareCost(quoted, { credits: hit.charge.credits, source: 'transactions' }, deps.clock.now(), hit.key) : compareCost(quoted, { source: 'not_found' }, deps.clock.now())
+    await update(deps, job, { costCheck: check })
+    if (check.flagged) await event(deps.db, job, 'cost_off', { message: check.note })
+  } catch (e) {
+    deps.log.warn({ jobId: job.id, err: e }, 'could not read the plan charge')
+  }
 }
 
 async function finishWithoutCharge(deps: Deps, job: JobRow, status: 'failed' | 'canceled', message: string): Promise<void> {

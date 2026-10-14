@@ -19,7 +19,7 @@ import { checkSceneFields, sceneFieldsSchema, templateBody } from '../core/scene
 import { scenePrompts } from '../core/promptWriter.js'
 import { realismBlock } from '../core/realism.js'
 import { modelLabel } from '../costs/quotes.js'
-import { comboEntries, comboProblem, draftFields, effectiveFields, listScenes, sceneAspect, sceneCandidates, sceneRefs, videoModel } from '../pipeline/scenes.js'
+import { comboEntries, comboProblem, draftFields, effectiveFields, listScenes, wordFields, sceneAspect, sceneCandidates, sceneRefs, videoModel } from '../pipeline/scenes.js'
 import { ruleSwitches } from '../pipeline/rules.js'
 import { comboPreview, stillBasis } from '../pipeline/sceneActions.js'
 
@@ -151,6 +151,11 @@ export async function settingsView(deps: Deps, ctx: Ctx) {
         // The owner's account can run on the server key (ELEVENLABS_API_KEY).
         serverKey: !!(await serverKeyFor(deps.db, { ownerEmail: deps.env.STUDIO_OWNER_EMAIL || 'owner@studio.local', elevenlabs: deps.env.ELEVENLABS_API_KEY }, ctx.accountId, 'elevenlabs')),
       },
+      {
+        id: 'vercel', label: 'Vercel AI Gateway', hint: 'An AI Gateway API key from Vercel (AI Gateway, API keys).', placeholder: 'e.g. vck_...', usedFor: 'Kling 3.0 Motion Control for Recreate from a real clip, off the Higgsfield plan',
+        // The owner's account can run on the server key (AI_GATEWAY_API_KEY).
+        serverKey: !!(await serverKeyFor(deps.db, { ownerEmail: deps.env.STUDIO_OWNER_EMAIL || 'owner@studio.local', vercel: deps.env.AI_GATEWAY_API_KEY }, ctx.accountId, 'vercel')),
+      },
     ],
     budgets: {
       job: microsToUsd(b.jobCapMicros), character: microsToUsd(b.characterCapMicros), month: microsToUsd(b.monthCapMicros),
@@ -225,6 +230,9 @@ export async function scenesView(deps: Deps, ctx: Ctx, characterId: string) {
       comboProblem: complete && !s.comboLoggedAt && sw.on('scene-combo-log') ? comboProblem(deps, ch, parsed.data) : null,
       refs: await sceneRefs(deps, ctx, characterId, { view: f.view ?? 'front', framing: f.framing ?? 'waist_up', expression: f.expression ?? 'neutral', refs: f.refs ?? [] }, sw.on('scene-refs-by-angle')),
       refsChosen: (f.refs ?? []).length > 0,
+      // What the owner's words say (the Idea step's chips) and which fields
+      // the owner set by hand (they win).
+      words: wordFields(deps, s),
       candidates: cands.filter(c => c.sceneId === s.id).map(shape),
       // The written prompts (prompt writer), with whether the details
       // changed after the still prompt was written.
@@ -259,6 +267,9 @@ export async function scenesView(deps: Deps, ctx: Ctx, characterId: string) {
       diagnose: sc.diagnose,
       stillModels, editModels, defaultModels: stillModels.slice(0, 1).map(m => m.ref),
       maxVariations: sc.settings.max_variations, maxModels: sc.settings.max_models,
+      // Standard or High for stills, and how many a run starts with.
+      stillLevels: Object.entries(sc.settings.still_levels).map(([id, l]) => ({ id, label: l.label, quality: l.quality, resolution: l.resolution })),
+      stillLevel: sc.settings.still_level, defaultVariations: sc.settings.default_variations,
       accountConnected: connected, mode: await providerMode(deps.db, ctx.accountId),
       // The prompt writer (default rule scene-prompt-writer), its model as
       // it runs live, its word ranges, and the REALISM block it always gets.

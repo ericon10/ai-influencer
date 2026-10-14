@@ -13,9 +13,17 @@ entries:
   # `credits` on the still models answer an account-path estimate only when
   # Higgsfield is too slow to price live and no recent live price is saved.
   # They are set high on purpose and always shown as not confirmed.
+  - { provider: higgsfield, model: gpt-image-2.5, unit: image, price: 0.10, verified: false, credits: 3, when: { quality: medium }, source: "Placeholder for Standard (medium, 1k). Not confirmed." }
   - { provider: higgsfield, model: gpt-image-2.5, unit: image, price: 0.25, verified: false, credits: 6, source: "Placeholder credits." }
+  # Flare: a flat $0.25 placeholder priced the owner's first real run (2k,
+  # high) the same as any other (2026-10-14). Now by quality; still
+  # placeholders, set high, until a real run's cost is logged against them
+  # (What was sent, Settings > Costs). The published Higgsfield rate for
+  # Flare was not reachable from the build sandbox.
+  - { provider: higgsfield, model: gpt-image-2.5-flare, unit: image, price: 0.10, verified: false, credits: 3, when: { quality: medium }, source: "Placeholder for Standard (medium, 1k). Not confirmed." }
+  - { provider: higgsfield, model: gpt-image-2.5-flare, unit: image, price: 0.25, verified: false, credits: 6, when: { quality: high }, source: "Placeholder for High (high, 2k). Not confirmed." }
   - { provider: higgsfield, model: gpt-image-2.5-flare, unit: image, price: 0.25, verified: false, credits: 6, source: "Placeholder credits." }
-  - { provider: higgsfield, model: nano-banana-2.1, unit: image, price: 0.15, verified: false, credits: 1.5, credits_verified: true, when: { resolution: 1k }, source: "1.5 plan credits at 1k, Higgsfield's live price in the model test (2026-10-13)." }
+  - { provider: higgsfield, model: nano-banana-2.1, unit: image, price: 0.15, verified: false, credits: 1.5, credits_verified: true, when: { resolution: 1k }, source: "1.5 plan credits per image at 1k: Higgsfield's live price in the model test (2026-10-13) and every Nano Banana 2.1 spend in the account's transactions on 2026-10-14." }
   - { provider: higgsfield, model: nano-banana-2.1, unit: image, price: 0.15, verified: false, credits: 4, source: "Placeholder credits above 1k." }
   - { provider: higgsfield, model: nano-banana-2, unit: image, price: 0.12, verified: false, credits: 3, source: "Placeholder credits." }
   - { provider: higgsfield, model: soul-2, unit: image, price: 0.10, verified: false, credits: 3, source: "Placeholder credits." }
@@ -45,6 +53,16 @@ entries:
   - { provider: higgsfield, model: kling-3.0-motion-control-pro, unit: second, price: 0.11, verified: false, source: "Placeholder near Kling 3.0 Pro image to video ($0.084/s)." }
   - { provider: higgsfield, model: kling-3.0-motion-control-standard, unit: second, price: 0.08, verified: false, source: "Placeholder near Kling 3.0 Standard image to video ($0.063/s)." }
   - { provider: higgsfield, model: genjutsu-motion-transfer, unit: second, price: 0.15, verified: false, source: "Placeholder." }
+  # Recreate from a real clip (owner, 2026-10-14). Genjutsu motion control on
+  # the plan: 70 credits for 10 s and 42 for 6 s in the account's
+  # transactions, so 7 credits a second at 720p. Plan-only (no USD price).
+  - { provider: higgsfield, model: genjutsu-motion-control, unit: second, price: 0.0, verified: false, credits: 7, credits_verified: true, when: { resolution: 720p }, source: "7 credits a second at 720p: 70 for 10 s and 42 for 6 s in the owner's Higgsfield transactions (2026-10-14)." }
+  - { provider: higgsfield, model: genjutsu-motion-control, unit: second, price: 0.0, verified: false, credits: 10, source: "Placeholder above 720p, set high." }
+  # The Vercel AI Gateway publishes no per-second rate we could read from
+  # the build sandbox; placeholders, set high, until a paid run's cost is
+  # logged (third-party listings give $0.11 to $0.15 a second).
+  - { provider: vercel, model: kling-3.0-motion-control, unit: second, price: 0.15, verified: false, source: "Placeholder, set high. Not confirmed." }
+  - { provider: vercel, model: kling-3.0-motion-control-pro, unit: second, price: 0.20, verified: false, source: "Placeholder, set high. Not confirmed." }
   - { provider: higgsfield, model: seedance-2.5-video-edit, unit: second, price: 0.25, verified: false, source: "Official pricing page: Seedance 2.5 video edit from $0.206/s (SPEC 13.1); placeholder above the starting tier." }
   - { provider: higgsfield, model: kling-o3-video-edit, unit: second, price: 0.17, verified: false, source: "Placeholder." }
   # Audio, per second of sound.

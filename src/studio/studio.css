@@ -1180,3 +1180,29 @@ button.st-chip:hover { color: var(--st-text); border-color: var(--st-text-3); }
 .st-hookrow .st-input.bare { flex: 1 1 auto; width: auto; min-width: 0; }
 .st-hookrow .st-btn { white-space: nowrap; }
 @media (max-width: 720px) { .st-hookrow > .st-row { flex-wrap: wrap; } .st-hookrow .st-hint { display: none; } }
+
+/* What was sent (UX-PLAN.md section 15) */
+.st-btn.xs { height: 24px; padding: 0 8px; font-size: 11.5px; border-radius: 8px; gap: 4px; }
+.st-tile-sent { padding: 0 2px 2px; }
+.st-sent-facts { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px 14px; font-size: 13px; }
+.st-sent-facts > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; overflow-wrap: anywhere; }
+.st-sent-details > summary { cursor: pointer; list-style: revert; margin-bottom: 10px; }
+.st-sent-clip { width: 44px; height: 58px; border-radius: 8px; display: grid; place-items: center; background: var(--st-surface-2); font-size: 10px; color: var(--st-text-3); }
+.st-sent .st-refpick span { font-weight: 600; }
+
+/* The Idea step: one box, chips, More control (UX-PLAN.md section 15) */
+.st-forline { font-size: 13.5px; }
+.st-forline-img.st-img, .st-forline .st-img { width: 26px; height: 26px; border-radius: 50%; }
+.st-more { overflow: hidden; }
+.st-more-head { width: 100%; background: none; border: 0; cursor: pointer; color: inherit; font: inherit; gap: 10px; }
+.st-shotchip { padding: 0; gap: 0; overflow: hidden; }
+.st-shotchip-main { background: none; border: 0; color: inherit; font: inherit; padding: 5px 10px; cursor: pointer; text-align: left; }
+.st-shotchip-main:disabled { cursor: default; }
+.st-shotchip-x { background: none; border: 0; border-left: 1px solid var(--st-line-2); color: var(--st-text-3); padding: 0 7px; align-self: stretch; cursor: pointer; display: grid; place-items: center; }
+.st-shotchip-x:hover { color: var(--st-text); }
+.st-shotchip.editing { outline: 2px solid var(--st-accent); outline-offset: 1px; }
+.st-select.sm { height: 30px; font-size: 12.5px; padding-top: 0; padding-bottom: 0; width: auto; }
+.st-chipedit { padding: 10px 12px; border: 1px solid var(--st-line-2); border-radius: 12px; background: var(--st-surface-2); }
+.st-detailsline { padding: 10px 14px; border: 1px solid var(--st-line-2); border-radius: 12px; }
+.st-modal.st-sent-modal { width: min(760px, calc(100vw - 32px)); }
+.st-sent .st-prompt pre { overflow-x: auto; }

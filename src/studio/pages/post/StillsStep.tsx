@@ -114,6 +114,7 @@ export function StillsStep({ ctx }: { ctx: PostCtx }) {
           v={v} data={scenes} scene={scene}
           picked={slideshow ? stillIds : stillId ? [stillId] : []}
           onStarted={() => void ctx.advance('stills')}
+          onEditDetails={() => ctx.open('idea', { field: 'post-more', more: true })}
           action={c => (slideshow ? <AddToSlideshow c={c} on={stillIds.includes(c.id)} n={stillIds.indexOf(c.id)} toggle={() => toggle(c.id)} /> : <UseStill ctx={ctx} c={c} used={c.id === stillId} />)}
         />
       )}

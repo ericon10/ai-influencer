@@ -12,7 +12,7 @@ import { StillsStep, stillsSummary } from './post/StillsStep'
 import { VideoStep, videoSummary } from './post/VideoStep'
 import { TextStep, textSummary } from './post/TextStep'
 import { FinishStep } from './post/FinishStep'
-import type { PostCtx } from './post/ctx'
+import { MORE_EVENT, moreKey, type PostCtx } from './post/ctx'
 import { editorUrl, scrollKey } from './post/EditorCard'
 import { HowTo } from '../guide/Guide'
 import type { GuideId } from '../guide/content'
@@ -73,6 +73,14 @@ function Workspace({ item, data }: { item: ContentItem; data: ContentData }) {
       const to = steps.findIndex(([k]) => k === step)
       if (to > ci) await draft.go(step, spec ? { spec } : {})
       else if (spec) { draft.setSpec(spec); await draft.flush() }
+    },
+    open: (step: PostStep, o: { field?: string; more?: boolean } = {}) => {
+      if (o.more) {
+        try { localStorage.setItem(moreKey(item.id), '1') } catch { /* private window */ }
+        window.dispatchEvent(new CustomEvent(MORE_EVENT))
+      }
+      if (steps.findIndex(([k]) => k === step) < ci) void draft.go(step)
+      window.setTimeout(() => scrollToField(o.field ?? `step-${step}`), 160)
     },
   }
 

@@ -18,6 +18,7 @@ import { createCharacter, getCandidate, getCharacter, linkInspiration, listChara
 import { cleanVoiceCard } from '../core/voiceCard.js'
 import type { CharacterData } from '../core/character.js'
 import { approveSceneCandidate, archiveScene, copyScene, createScene, cropCandidate, saveVideoModel, updateScene } from '../pipeline/scenes.js'
+import { whatWasSent } from '../pipeline/sent.js'
 import { videoPrices } from '../pipeline/sceneActions.js'
 import { expectedVersion, readWorkerStatus } from '../jobs/workerStatus.js'
 import { addClip, libraryView } from '../pipeline/clips.js'
@@ -29,7 +30,7 @@ import { addVoiceTakes, getVoiceLine, listVoiceLines, updateVoiceLine, voiceLine
 import { addHook, archiveHook, archiveProduct, archiveVariant, importKit, productSummaries, productView, saveSocialAccount, scoreboard, starterKit, updateHook, updateProduct, useKitVoice } from '../pipeline/scaleKit.js'
 import { deleteStyle, editorManifest, listStyles, saveFromEditor, saveStyle } from '../pipeline/openreel.js'
 import { previewImport, runImport } from '../pipeline/csvImport.js'
-import { addCloneSource, cloneOptions, cloneStills, keepClone, postClones, postFromClone, saveCloneModel, setCloneCleanup, setCloneTarget, useCloneStill } from '../pipeline/clone.js'
+import { addCloneSource, cloneOptions, cloneStills, keepClone, pickCloneStill, postClones, postFromClone, saveCloneModel, setCloneCleanup, setCloneNotLike, setCloneTarget, trimClone, useCloneStill } from '../pipeline/clone.js'
 import { jobViews } from '../jobs/jobView.js'
 import { POST_STEPS, addBroll, archiveBroll, archiveContent, contentView, createContent, duplicateContent, postScene, retryFailedBatch, startRender, updateBroll, updateContent } from '../pipeline/content.js'
 import { rulesView, setRuleSwitch } from '../pipeline/rules.js'
@@ -324,7 +325,8 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
   const sceneBody = z.object({
     brief: z.string().max(2000).optional(),
     title: z.string().max(80).optional(),
-    fields: z.record(z.string(), z.union([z.string().max(400), z.boolean(), z.array(z.string().max(20)).max(8)])).optional(),
+    // null takes the owner's value away, so the words or the default count again.
+    fields: z.record(z.string(), z.union([z.string().max(400), z.boolean(), z.array(z.string().max(20)).max(8), z.null()])).optional(),
     prompts: z.object({ still: z.string().max(4000).optional(), video: z.string().max(4000).optional() }).optional(),
     // The director's notes the owner edited.
     notes: z.object({ still: z.string().max(600).optional(), video: z.string().max(600).optional() }).optional(),
@@ -400,6 +402,8 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
   app.post('/candidates/:id/reopen', async c => { const ctx = c.get('ctx'); requireRole(ctx, 'member'); await reopenCandidate(deps, ctx, c.req.param('id')); return c.json({ ok: true }) })
   // Free fix for a shot QA found mirrored: flip it, no provider call.
   app.post('/candidates/:id/mirror', async c => { const ctx = c.get('ctx'); requireRole(ctx, 'member'); return c.json(await mirrorCandidate(deps, ctx, c.req.param('id'))) })
+  // "What was sent": the final prompt, the images, the model and the cost.
+  app.get('/candidates/:id/sent', async c => c.json(await whatWasSent(deps, c.get('ctx'), c.req.param('id'))))
   app.post('/candidates/:id/favorite', async c => {
     const body = parse(z.object({ favorite: z.boolean() }), await json(c))
     await setFavorite(deps, c.get('ctx'), c.req.param('id'), body.favorite)
@@ -604,7 +608,20 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
     return c.json(await setCloneCleanup(deps, c.get('ctx'), c.req.param('id'), body.on))
   })
   app.get('/content/:id/clone-stills', async c => c.json({ stills: await cloneStills(deps, c.get('ctx'), c.req.param('id')) }))
+  app.post('/content/:id/clone-stills/pick', async c => {
+    const body = parse(z.object({ characterId: z.string().max(60) }), await json(c))
+    return c.json(await pickCloneStill(deps, c.get('ctx'), c.req.param('id'), body.characterId))
+  })
   app.post('/content/:id/clone-stills/:cid/use', async c => c.json(await useCloneStill(deps, c.get('ctx'), c.req.param('id'), c.req.param('cid'))))
+  app.put('/content/:id/clone-not-like', async c => {
+    const body = parse(z.object({ text: z.string().max(300) }), await json(c))
+    return c.json(await setCloneNotLike(deps, c.get('ctx'), c.req.param('id'), body.text))
+  })
+  // Trim a clone before export (free, on the worker).
+  app.post('/clones/:id/trim', async c => {
+    const body = parse(z.object({ start: z.number().min(0).max(60), end: z.number().min(0).max(60) }), await json(c))
+    return c.json(await trimClone(deps, c.get('ctx'), c.req.param('id'), body))
+  })
   app.post('/clones/:id/keep', async c => {
     const ctx = c.get('ctx')
     requireRole(ctx, 'member')

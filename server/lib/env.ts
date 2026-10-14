@@ -34,6 +34,10 @@ const schema = z.object({
   // side only, for the owner's own account. Without it voice lines say how
   // to add it; tests and local dev use the mock.
   ELEVENLABS_API_KEY: z.string().optional().default(''),
+  // The owner's Vercel AI Gateway key, server side only: Kling 3.0 Motion
+  // Control for "Recreate from a real clip" on the API path. The worker runs
+  // on Railway (outside Vercel), so it needs the key itself.
+  AI_GATEWAY_API_KEY: z.string().optional().default(''),
   // The job worker's address (Railway), woken when jobs are queued.
   STUDIO_WORKER_URL: z.string().optional().default(''),
   // Worker loop: "poll" checks every second (local dev); "wake" sleeps when

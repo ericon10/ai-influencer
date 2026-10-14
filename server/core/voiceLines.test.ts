@@ -86,6 +86,15 @@ describe('the voice card', () => {
     expect(v.emoji).toMatch(/one per caption/)
   })
 
+  it('reads the voice id inside a sentence, and never takes a spare voice (the owner\'s file, 2026-10-14)', () => {
+    const v = parseVoiceSection([
+      { key: null, value: 'ElevenLabs voice "Callie" (voice_id v3PqSRD51socDi8mEJ5f), picked Oct 14 from design round 3 (preview H).' },
+      { key: 'Method', value: 'Eric performs her lines and runs them through ElevenLabs speech-to-speech.' },
+      { key: 'Spare from the same round', value: '"Spare: young female 1" (SifNfmAby6mpNZSg7knN), held for a future character.' },
+    ])
+    expect(v).toEqual({ elevenlabsId: 'v3PqSRD51socDi8mEJ5f' })
+  })
+
   it('writes the card as plain lines for a writer, and nothing when there is no card', () => {
     const text = voiceCardText('Callie', parseVoiceSection(callie))
     expect(text).toMatch(/^Callie's voice card/)

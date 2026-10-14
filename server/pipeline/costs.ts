@@ -1,5 +1,7 @@
-import { and, desc, eq, ne, sql } from 'drizzle-orm'
-import { candidates, characters, ledgerEntries } from '../db/schema.js'
+import { and, desc, eq, isNotNull, ne, sql } from 'drizzle-orm'
+import { candidates, characters, jobs, ledgerEntries } from '../db/schema.js'
+import type { CostCheck } from '../core/costCheck.js'
+import { modelLabel } from '../costs/quotes.js'
 import type { Ctx, Deps } from '../context.js'
 import { effectiveBudgets } from '../costs/budgets.js'
 import { heldMicros, monthWindow, spendByStage, spentMicros } from '../costs/ledger.js'
@@ -43,6 +45,9 @@ export async function accountUsage(deps: Deps, ctx: Ctx) {
     .where(and(eq(ledgerEntries.accountId, ctx.accountId), eq(ledgerEntries.entryType, 'charge'), sql`${ledgerEntries.createdAt} >= ${since.toISOString()}::timestamptz`))
     .groupBy(ledgerEntries.provider, ledgerEntries.model)
   const recent = await deps.db.select().from(ledgerEntries).where(eq(ledgerEntries.accountId, ctx.accountId)).orderBy(desc(ledgerEntries.createdAt)).limit(50)
+  // The real cost of recent runs next to their quotes (owner, 2026-10-14).
+  const checked = await deps.db.select({ id: jobs.id, provider: jobs.provider, model: jobs.model, request: jobs.request, costCheck: jobs.costCheck, completedAt: jobs.completedAt })
+    .from(jobs).where(and(eq(jobs.accountId, ctx.accountId), isNotNull(jobs.costCheck))).orderBy(desc(jobs.completedAt)).limit(40)
   return {
     month: { since: since.toISOString(), spentMicros: monthSpent, spent: formatUsd(monthSpent), capMicros: budgets.monthCapMicros, cap: formatUsd(budgets.monthCapMicros), warnPct: budgets.warnPct },
     heldMicros: held, held: formatUsd(held),
@@ -53,5 +58,11 @@ export async function accountUsage(deps: Deps, ctx: Ctx) {
     byCharacter: byCharacter.map(r => ({ characterId: r.characterId, name: r.name ?? 'Account', micros: Number(r.total), amount: formatUsd(Number(r.total)) })),
     byModel: byModel.map(r => ({ model: `${r.provider}/${r.model}`, runs: Number(r.runs), micros: Number(r.total), amount: formatUsd(Number(r.total)) })),
     recent: recent.map(r => ({ id: r.id, at: r.createdAt.toISOString(), type: r.entryType, amount: formatUsd(r.amountMicros), micros: r.amountMicros, stage: r.stage, model: `${r.provider}/${r.model}`, note: r.note, source: r.source })),
+    costChecks: checked.map(j => {
+      const c = j.costCheck as CostCheck
+      const ref = (j.request as { modelRef?: string; model?: string }).modelRef ?? (j.request as { model?: string }).model ?? `${j.provider}/${j.model}`
+      return { jobId: j.id, at: (j.completedAt ?? new Date(c.at)).toISOString(), model: modelLabel(deps, ref), offPct: c.offPct, flagged: c.flagged, note: c.note, source: c.actual.source }
+    }),
+    flaggedChecks: checked.filter(j => (j.costCheck as CostCheck).flagged).length,
   }
 }

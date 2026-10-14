@@ -204,7 +204,10 @@ describe('reference picker by angle (SPEC 5.2 rule 14)', () => {
   })
 
   it('always has the chest-up face ref, then the closest angle, the body and the expression', () => {
-    expect(pickSceneRefs(sheet.shots, views, allApproved, market, scenes).map(r => r.refId)).toEqual(['REF-00', 'REF-01', 'REF-07', 'REF-10'])
+    // Waist-up gets face refs only: a full-body sheet shot drags the sheet
+    // outfit into a closer shot (the owner's first real run, 2026-10-14).
+    expect(pickSceneRefs(sheet.shots, views, allApproved, market, scenes).map(r => r.refId)).toEqual(['REF-00', 'REF-01', 'REF-10'])
+    expect(pickSceneRefs(sheet.shots, views, allApproved, { ...market, framing: 'knees_up' }, scenes).map(r => r.refId)).toEqual(['REF-00', 'REF-01', 'REF-07', 'REF-10'])
     expect(pickSceneRefs(sheet.shots, views, allApproved, { view: 'front', framing: 'chest_up', expression: 'neutral' }, scenes).map(r => r.refId)).toEqual(['REF-00'])
     expect(pickSceneRefs(sheet.shots, views, allApproved, { view: 'back', framing: 'full_body', expression: 'neutral' }, scenes).map(r => r.refId)).toEqual(['REF-00', 'REF-05', 'REF-08'])
     expect(pickSceneRefs(sheet.shots, views, allApproved, { view: 'front', framing: 'full_body', expression: 'open_smile' }, scenes).map(r => r.refId)).toEqual(['REF-00', 'REF-06', 'REF-09'])
@@ -277,8 +280,9 @@ describe('the planner', () => {
     expect(prompt).toContain('friend_phone (Friend shot)')
     expect(prompt).not.toContain(EM)
     const schema = scenePlanJsonSchema(scenes, views) as { required: string[] }
-    // The planner fills every creative field; brands and refs are the owner's.
-    expect(new Set([...schema.required, 'brands', 'refs'])).toEqual(new Set(Object.keys(sceneFieldsSchema.shape)))
+    // The planner fills every creative field; brands, refs and sending a
+    // pasted prompt as written are the owner's.
+    expect(new Set([...schema.required, 'brands', 'refs', 'asWritten'])).toEqual(new Set(Object.keys(sceneFieldsSchema.shape)))
     expect(prompt).toContain('Signature jewelry (optional; add it to jewelry only when it fits, on its')
   })
 })

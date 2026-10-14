@@ -547,3 +547,60 @@ page or sidebar item.
 
 **Clicks, a hook in a character's voice into a post:** Library > Hooks (1),
 Write variants, Run (2), Use in a new post (1).
+
+## 15. Fixes from the first real run, and Recreate from a real clip (owner, 2026-10-14)
+
+Placed before building. No new page or sidebar item.
+
+**The Idea step (video post).** One box by default.
+
+| Piece | Where it lives | Clicks |
+|---|---|---|
+| The box | **Describe the shot or paste a prompt** (the post's idea), with the post's character named above it (Change opens More control) | 0 |
+| What the Studio read | Chips under the box, read for free from your words as you type: Camera (Selfie, Mirror selfie, Friend shot...), Front or rear camera, Framing, Outfit, Makeup, Place. Each chip opens to edit (a pick list or a short field) and has an x to go back to the default. What you set wins over what was read; nothing you wrote is rewritten | 1 per chip |
+| A pasted prompt | When the box holds a full prompt (long, or written like one), a switch shows: **Send my prompt as written** (on by itself for a pasted prompt, off for a short idea). As written, the stills get your text unchanged plus only the fixed blocks: the reference line, the 21+ line and the REALISM and AVOID blocks. No prompt writer, no template camera, light or outfit lines. Banned skin words are still taken out (rule zero), with a note | 1 to switch |
+| Punch it up | Under the box, as before. Picking an option keeps who shoots it (a selfie stays a selfie) | 2 |
+| **More control** | Collapsed by default: Character, Account, Format, Places, and the scene details moved here from the Stills step (the moment, what the character wears, camera; Plan the details; Use for other characters) | 1 to open |
+
+**The Stills step.** The Details card becomes one summary line with
+"Change in the Idea step". The Generate card starts at **Nano Banana 2.1,
+4 stills, Standard quality, 9:16** (by destination), with a Standard or
+High switch; the price is on the button ("Generate 4 stills · 3 credits"
+on the plan, dollars on the API).
+
+**What was sent.** Under every still, a **What was sent** link opens the
+still with its run: the final prompt (hard-wrapped, one-click copy), the
+sheet refs attached (thumbnails with their REF ids), the model, the path
+(your Higgsfield plan or the API), quality, resolution and aspect, and the
+price quoted next to the real cost. 1 click.
+
+**Prices.** Every finished run records its real cost next to its quote: on
+the plan, the credits Higgsfield actually took (read from the account's
+transactions, free); on the API, what the provider reported, or the quote
+when it reports nothing. A real cost more than 20% off its quote is
+flagged in What was sent and in Settings > Costs ("Quote off by 35%"),
+with the price book entry to fix. Plan runs show credits everywhere,
+never dollars.
+
+**Recreate from a real clip** (the clone flow in the Video step). "What to
+do" has two choices: **Recreate from a real clip** and **Replace the
+person (keep the scene)**. Recreate replaces "Copy the moves into a new
+scene" (the same idea with the owner's proven recipe). It is the default
+for a dark clip or one with a lot of motion (clubs, dark venues, real
+dancing), measured free when the clip is prepared, with the reason shown
+("Suggested: a dark clip with a lot of movement"); Replace stays the
+default otherwise. Either can be picked.
+
+| Step | What you see | Clicks |
+|---|---|---|
+| a. The frame | The clip's frame about 0.2 s in, with the person to replace (tap another) | 0 |
+| b. Four stills | "Not like the person in the clip" field (hair color, eye color, piercings, makeup such as winged liner; **Read them for me** fills it, priced, Claude). **Make 4 stills** (Nano Banana 2.1, 9:16, the frame plus the character's element on the plan, or REF-00 and a three-quarter view on the API; price on the button). The prompt uses the frame only for place, light, angle, framing, pose and outfit, replaces the person completely, lists the character's face and hair, the traits she must not have, keeps the head angle and gaze, and removes caption text, the TikTok logo and the username | 2 |
+| c. Pick | Pick one, or **You pick** (best face match to REF-00 that is least like the person in the clip). Then **Fix the face** (2 takes, priced): only the face changes to match the character, everything else stays pixel for pixel. Optional; recommended when the face drifts | 1 + 2 |
+| d. Checks | Free on every still: face match to REF-00 and likeness to the person in the clip. A still that looks like that person cannot go on (fixed rule); face drift is a strong warning | 0 |
+| e. Copy the moves | **Copy the moves** (priced): the chosen still plus the ORIGINAL clip (as uploaded; its burned-in text does not carry over). Plan: Genjutsu motion control (hf_mult_motion_control), 720p, about 7 credits a second. API: Kling 3.0 Motion Control through Vercel AI Gateway (or the Higgsfield API). The motion model is the remembered pick in the same panel; it starts on whichever path has keys | 2 |
+| f. Trim | Each result has **Trim** (start and end, free on the worker) before Use this clip, for a cut to a wide shot where background people melt | 1 to 3 |
+
+**Clicks, a rave clip to a usable clone:** choose the clip (2), Make 4
+stills, Run (2), pick one (1), Fix the face, Run (2, optional), Copy the
+moves, Run (2), Trim (optional), Use this clip (1). About 76 credits on
+the plan for a 10 s clip.

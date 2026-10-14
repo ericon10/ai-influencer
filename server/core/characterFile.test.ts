@@ -126,7 +126,8 @@ describe("Callie's character file", () => {
     expect(soul!.promptBlock).toContain('but still clearly blonde.')
     expect(soul!.followUp).toMatchObject({ name: 'Drift lock', model: 'higgsfield/nano-banana-2.1' })
     expect(soul!.followUp!.text).toMatch(/face-only pass/)
-    expect(element).toMatchObject({ kind: 'element', name: 'Callie-1', externalId: '1602db94-79e3-4e5a-bbe5-de3537cd0b83', status: 'ready' })
+    // The owner's file of 2026-10-14 names the "Callie" element first.
+    expect(element).toMatchObject({ kind: 'element', name: 'Callie', externalId: '705d2b7d-596d-468e-bd2c-b171799cd7a6', status: 'ready' })
     expect(element!.model).toBeUndefined()
     expect(r.warnings.join(' ')).toMatch(/Soul 2.0 character "Callie", with its prompt block and with a drift lock pass/)
   })
@@ -137,7 +138,8 @@ describe("Callie's character file", () => {
       scene_still_alt: 'higgsfield/gpt-image-2.5-flare',
       edit: 'higgsfield/nano-banana-2.1',
       video_final: 'higgsfield/seedance-2.5',
-      video_test: 'higgsfield/kling-3.0-turbo',
+      // "Video, cheap default: Kling 3.0 Pro" (2026-10-14).
+      video_test: 'higgsfield/kling-3.0-pro',
       sheet: 'higgsfield/gpt-image-2.5',
     })
     expect(c.avoidModels).toEqual([])
@@ -145,8 +147,8 @@ describe("Callie's character file", () => {
 
   it('keeps every section it does not model, word for word', () => {
     expect(c.sections.map(s => s.title)).toEqual([
-      'Realism principle (most important rule)', 'Style (evolves over time, never a uniform)', 'Persona', 'Reference sheet', 'Fixed blocks', 'Models', 'Scene rules learned',
-      'Proven recipe: the candid "caught you" shot', 'Video rules', 'Combo log (last 10)',
+      'Realism principle (most important rule)', 'Style (evolves over time, never a uniform)', 'Voice', 'Persona', 'Reference sheet', 'Fixed blocks', 'Models', 'Scene rules learned',
+      'Proven recipe: the candid "caught you" shot', 'Proven recipe: recreate from a real clip (Oct 14, rave)', 'Video rules', 'Combo log (last 10)',
     ])
     const original = splitSections(md).sections
     for (const kept of c.sections) expect(kept.body).toBe(original.find(s => s.title === kept.title)!.body)

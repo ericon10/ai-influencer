@@ -7,8 +7,22 @@ version: 1
 # Pronoun placeholders: {subj} she, {obj} her, {poss} her, {noun} woman.
 
 settings:
+  # Edits, crops and the face fixes keep the higher setting.
   quality: high
   resolution: 2k
+  # Scene stills (owner, 2026-10-14): Standard by default, High one click
+  # away on the Generate card. Each level maps to the model's own settings.
+  still_level: standard
+  still_levels:
+    standard: { label: Standard, quality: medium, resolution: 1k }
+    high: { label: High, quality: high, resolution: 2k }
+  # Stills per model a new run starts with.
+  default_variations: 4
+  # A body ref (REF-06 to REF-08) is attached only at these framings: a
+  # full-body sheet shot drags the sheet outfit into a closer shot (the
+  # owner's first real run, 2026-10-14). Chest-up and waist-up get face
+  # refs only.
+  body_ref_framings: [knees_up, full_body]
   # SPEC 5.2 rule 21: no repeat of a moment type and camera combo from the
   # character's last N entries.
   combo_window: 10
@@ -97,6 +111,8 @@ framings:
   - { id: wide_small, label: "Wide, small in frame", text: "wide shot, {subj} is small in the frame", identity: skip, skin: none }
 
 lights:
+  # The owner's own words describe the light: no light line is added.
+  - { id: as_written, label: "From your words", text: "" }
   - { id: natural, label: "Natural light", text: "Natural available light that fits the place and the time of day" }
   - { id: golden_hour, label: "Golden hour", text: "Warm golden-hour sun low in the sky, soft long shadows" }
   - { id: morning, label: "Morning light", text: "Clean, soft morning daylight" }

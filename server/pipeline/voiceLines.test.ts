@@ -91,6 +91,10 @@ describe('voice lines', () => {
   })
 
   it('asks for the character\'s ElevenLabs voice before anything is priced', async () => {
+    // Her file (2026-10-14) names her voice; the spare voice is never taken.
+    const ch = toData(await getCharacter(h.deps, h.ctx, characterId))
+    expect(ch.persona.voice?.elevenlabsId).toBe('v3PqSRD51socDi8mEJ5f')
+    await updateCharacter(h.deps, h.ctx, characterId, { persona: { ...ch.persona, voice: {} } }, 'no voice yet')
     await expect(estimateAction(h.deps, h.ctx, { type: 'voice_convert', soundIds: [lineId] })).rejects.toThrow(/ElevenLabs voice ID first/)
   })
 

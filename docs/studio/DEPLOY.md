@@ -32,6 +32,7 @@ node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"     
 | `STUDIO_OWNER_PASSPHRASE` | yes | yes | no | The owner's sign-in passphrase |
 | `HF_CREDENTIALS` | yes | yes | optional | Higgsfield API key, `KEY_ID:KEY_SECRET` |
 | `ELEVENLABS_API_KEY` | yes | yes | optional | ElevenLabs API key for voice lines (speech to speech and speech to text). Owner's account only; without it the deployment refuses Convert with a plain reason (local dev uses the mock voice) |
+| `AI_GATEWAY_API_KEY` | yes | yes | optional | Vercel AI Gateway key for Kling 3.0 Motion Control ("Recreate from a real clip" off the Higgsfield plan). Owner's account only (a customer adds a Gateway key in Settings). The worker runs on Railway, outside Vercel, so OIDC does not reach it; it needs the key. Without it the Gateway models say how to add it |
 | `STORAGE_DRIVER` | set (`s3`) | yes, `s3` | no | |
 | `S3_REGION` | set (`auto`) | yes, `auto` | no | |
 | `STUDIO_OWNER_EMAIL` | set | yes | no | `eric@erichelsel.com` |

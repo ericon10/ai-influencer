@@ -7,7 +7,7 @@ import { identityForModel } from '../core/identity.js'
 import { pronounVars } from '../core/prompts.js'
 import type { RealismWarning } from '../core/realism.js'
 import {
-  aspectFor, assembleStillPrompt, buildEditPrompt, buildScenePrompt, comboConflict, comboEntryFor, mockSceneIdeas, oneChangeProblem, plannerRules,
+  aspectFor, assembleAsWritten, assembleStillPrompt, buildEditPrompt, buildScenePrompt, comboConflict, comboEntryFor, mockSceneIdeas, oneChangeProblem, plannerRules,
   sceneIdeasJsonSchema, scenePlanJsonSchema, scenePlanPrompt, skinFor, videoWriterFacts, writerFacts, type ReferenceMode, type SceneFields,
 } from '../core/scenes.js'
 import { assembleVideoPrompt, mockDirectorNotes, mockWrittenPrompt, promptWriterSchema, scenePrompts, type PromptTarget } from '../core/promptWriter.js'
@@ -165,7 +165,7 @@ function mockPlan(deps: Deps, ch: Ch, brief: string): SceneFields {
     light: 'morning',
     destination: 'vertical',
     brands: false,
-    refs: [],
+    refs: [], asWritten: false,
   }
 }
 
@@ -315,7 +315,7 @@ export async function writtenStillPrompt(deps: Deps, ctx: Ctx, row: CharacterRow
   return assembleStillPrompt(templates, sc, views, f, ch, mode, text, { identityBlock: identity?.promptBlock, warnings: [], addendum, rules: sceneRules, flawDose: sw.on('realism-flaw-dose') })
 }
 
-export async function buildSceneRun(deps: Deps, ctx: Ctx, row: CharacterRow, input: { sceneId: string; models: string[]; variations: number; reason?: string; withQa: boolean; allowRepeat?: boolean; write?: boolean }): Promise<SceneBuilt> {
+export async function buildSceneRun(deps: Deps, ctx: Ctx, row: CharacterRow, input: { sceneId: string; models: string[]; variations: number; reason?: string; withQa: boolean; allowRepeat?: boolean; write?: boolean; level?: string }): Promise<SceneBuilt> {
   const scene = await getScene(deps, ctx, input.sceneId)
   if (scene.characterId !== row.id) throw new AppError('bad_request', 'That scene belongs to another character.')
   const ch = toData(row)
@@ -349,15 +349,20 @@ export async function buildSceneRun(deps: Deps, ctx: Ctx, row: CharacterRow, inp
   // Default rule scene-prompt-writer: the written prompt (Claude's, or the
   // owner's edit) is the scene text; the Studio adds its own lines and the
   // REALISM block per model. Without one, the template builds it.
-  const written = sw.on('scene-prompt-writer') && !input.write ? scenePrompts(scene.prompts).still : undefined
+  // A pasted prompt goes as written (owner, 2026-10-14): no writer, no
+  // template lines, only the fixed blocks around the owner's text.
+  const asWritten = f.asWritten ? (scene.brief.trim() || f.moment) : null
+  const written = sw.on('scene-prompt-writer') && !input.write && !asWritten ? scenePrompts(scene.prompts).still : undefined
   // "Write and generate": the writer runs first; every still waits for it
   // and takes its text (until then each holds the template prompt, which is
   // what the quote and the checks below see).
   // Notes the owner set on the still prompt are followed by the writer.
   const ownNotes = scenePrompts(scene.prompts).still
-  const writer = input.write ? (await buildScenePromptWrite(deps, ctx, row, { sceneId: scene.id, target: 'still', ...(ownNotes?.notesBy === 'owner' && ownNotes.notes ? { notes: ownNotes.notes } : {}) })).specs[0]! : null
+  const writer = input.write && !asWritten ? (await buildScenePromptWrite(deps, ctx, row, { sceneId: scene.id, target: 'still', ...(ownNotes?.notesBy === 'owner' && ownNotes.notes ? { notes: ownNotes.notes } : {}) })).specs[0]! : null
   if (writer) specs.push(writer)
-  if (sw.on('scene-prompt-writer') && !written && !input.write) {
+  // Standard by default (scenes.yaml still_levels), High on request.
+  const level = sc.settings.still_levels[input.level ?? sc.settings.still_level] ?? { quality: sc.settings.quality, resolution: sc.settings.resolution }
+  if (sw.on('scene-prompt-writer') && !written && !input.write && !asWritten) {
     warnings.push({ ruleId: 'scene-prompt-writer', spec: '9', title: 'No written prompt yet', severity: 'warning', message: 'This run uses the template prompt. Write the prompt above Generate to use natural sentences instead.' })
   }
   for (const model of models) {
@@ -367,14 +372,15 @@ export async function buildSceneRun(deps: Deps, ctx: Ctx, row: CharacterRow, inp
     // trained one, the full card otherwise.
     const mode: ReferenceMode = entry.max_refs > 0 ? 'refs' : identity ? 'trained' : 'text'
     const o = { identityBlock: identity?.promptBlock, warnings: realism, addendum, rules: sceneRules, flawDose: sw.on('realism-flaw-dose') }
-    const prompt = written ? assembleStillPrompt(templates, sc, views, f, ch, mode, written.text, o) : buildScenePrompt(templates, sc, views, f, ch, mode, o)
+    const prompt = asWritten ? assembleAsWritten(templates, sc, f, ch, mode, asWritten, o)
+      : written ? assembleStillPrompt(templates, sc, views, f, ch, mode, written.text, o) : buildScenePrompt(templates, sc, views, f, ch, mode, o)
     const kind: GenRequest['kind'] = mode === 'refs' ? 'image_edit' : 'image'
     const run = await runModel(deps, ctx, model, kind)
     const attached = mode === 'refs' ? refs.slice(0, Math.max(1, entry.max_refs)) : []
     prompts.push({ label: `${entry.label} prompt`, text: prompt, wrapped: hardWrap(prompt) })
     for (let v = 0; v < input.variations; v++) {
       const request: GenRequest = {
-        kind, model: run.model, prompt, aspect, quality: sc.settings.quality, resolution: sc.settings.resolution, seed: v + 1,
+        kind, model: run.model, modelRef: model, prompt, aspect, quality: level.quality, resolution: level.resolution, seed: v + 1,
         ...(attached.length ? { refs: attached.map(r => ({ assetId: r.assetId })) } : {}),
         ...(mode === 'trained' && identity ? { identityId: identity.externalId } : {}),
         ...(run.billing ? { billing: run.billing } : {}),

@@ -4,6 +4,7 @@ import type { RulesConfig, ScenesConfig, SheetShot, TemplatesConfig, ViewsConfig
 import type { CharacterData } from './character.js'
 import { cardPhrase, finishPrompt, markLines, pronounVars, type BuildOptions } from './prompts.js'
 import { capitalize, fill, normalizePrompt } from './text.js'
+import { looksLikePrompt, readShot } from './shotParse.js'
 
 // Scenes (Stage 7) and one-change edits (Stage 8). A scene is a set of
 // fields: the owner's words or the planner fill them. The prompt writer
@@ -48,6 +49,9 @@ export const sceneFieldsSchema = z.object({
   brands: z.boolean().default(false),
   // The sheet refs to attach, chosen by the owner; empty picks by angle.
   refs: z.array(z.string().regex(/^REF-\d{2}$/)).max(8).default([]),
+  // A pasted prompt goes as written (owner, 2026-10-14): the owner's text
+  // plus only the fixed blocks (reference line, 21+, REALISM and AVOID).
+  asWritten: z.boolean().default(false),
 })
 
 export type SceneFields = z.infer<typeof sceneFieldsSchema>
@@ -115,8 +119,10 @@ export function pickSceneRefs(shots: SheetShot[], views: ViewsConfig, approved: 
     ? shots.find(s => s.framing === 'chest_up' && calm(s) && views.views[s.view]?.turn === view.turn && s.id !== face?.id && approved.has(s.id))
     : undefined
   add(sameView && approved.has(sameView.id) ? sameView : sameSide, 'angle')
-  // A body ref when more than the head and shoulders shows.
-  if (f.framing !== 'chest_up') {
+  // A body ref only for a framing that shows the body (scenes.yaml
+  // body_ref_framings): a full-body sheet shot drags the sheet outfit into
+  // a closer shot, so chest-up and waist-up get face refs only.
+  if (sc.settings.body_ref_framings.includes(f.framing)) {
     const full = shots.filter(s => s.framing === 'full_body' && approved.has(s.id))
     const facing = (s: SheetShot) => views.views[s.view]
     const body = full.find(s => s.view === f.view)
@@ -183,8 +189,12 @@ export function sceneParts(t: TemplatesConfig, sc: ScenesConfig, views: ViewsCon
     marks: markLines(t, view, faceMarks, ch.pronouns),
     colors,
     brand_line: rules.brandFree && !f.brands ? fill(t.scene.brand_free, pv) : '',
-    // The scene's outfit replaces the sheet outfit in the reference images.
+    // The scene's outfit replaces the sheet outfit in the reference images;
+    // with no outfit named, the sheet clothes are still dropped.
     override: mode === 'refs' && rules.outfitOverride && !!f.outfit,
+    dropSheet: mode === 'refs' && rules.outfitOverride && !f.outfit,
+    // Fixed: characters are 21 or older.
+    adult: fill(t.scene.adult, pv),
   }
 }
 
@@ -195,7 +205,9 @@ type Parts = ReturnType<typeof sceneParts>
 function wearingLine(t: TemplatesConfig, f: SceneFields, p: Parts, o: { jewelry: boolean; override: boolean }): string {
   const items = [sentence(f.outfit), f.footwear ? (f.outfit ? `with ${sentence(f.footwear)}` : sentence(f.footwear)) : '', o.jewelry ? sentence(f.jewelry) : ''].filter(Boolean)
   const override = o.override && p.override ? fill(t.scene.outfit_override, { sheet_outfit: t.scene.sheet_outfit }) : ''
-  return !items.length ? '' : fill(f.outfit ? t.scene.wearing : t.scene.wearing_only, { ...p.pv, items: items.join(', '), outfit_override: override })
+  const free = o.override && p.dropSheet ? fill(t.scene.outfit_free, { ...p.pv, sheet_outfit: t.scene.sheet_outfit }) : ''
+  const wearing = !items.length ? '' : fill(f.outfit ? t.scene.wearing : t.scene.wearing_only, { ...p.pv, items: items.join(', '), outfit_override: override })
+  return [wearing, free].filter(Boolean).join(' ')
 }
 
 // "Busy choosing a pastry. A bicycle bell catches her attention." (both optional).
@@ -214,6 +226,7 @@ function fillSceneBase(t: TemplatesConfig, f: SceneFields, p: Parts, o: { scaffo
   return fill(t.scene.base, {
     ...p.pv,
     reference: o.scaffold ? p.reference : '',
+    adult: o.scaffold ? p.adult : '',
     moment: sentence(f.moment),
     task_line: taskLine(f, p.pv),
     setting: sentence(f.setting),
@@ -309,8 +322,40 @@ export function assembleStillPrompt(t: TemplatesConfig, sc: ScenesConfig, views:
   // side, and the sheet outfit replaced): Callie's rule "always write the
   // full outfit" holds whatever the writing says.
   const wearing = wearingLine(t, f, p, { jewelry: true, override: true })
-  const text = [p.reference, cleanWritten(body), wearing, p.marks, p.colors, p.brand_line, o.addendum ?? ''].filter(Boolean).join('\n')
+  const text = [p.reference, p.adult, cleanWritten(body), wearing, p.marks, p.colors, p.brand_line, o.addendum ?? ''].filter(Boolean).join('\n')
   return finishPrompt(normalizePrompt(text), 'scene', ch, { ...o, makeup: f.makeup, skin: skinFor(sc, f.framing) })
+}
+
+// A pasted prompt sent as written (owner, 2026-10-14): the owner's text
+// unchanged, plus only the fixed blocks: the reference line (refs for the
+// face only), the 21+ line, then REALISM and AVOID (finishPrompt, which also
+// takes out banned skin words and says so). No camera, light or outfit line.
+export function assembleAsWritten(t: TemplatesConfig, sc: ScenesConfig, f: SceneFields, ch: SceneCharacter, mode: ReferenceMode, text: string, o: BuildOptions = {}): string {
+  const pv = pronounVars(ch.pronouns)
+  const reference = mode === 'refs' ? fill(t.scene.reference.as_written, pv)
+    : mode === 'trained' ? fill(t.scene.reference.trained, { name: ch.name })
+    : fill(t.scene.reference.text, { card: cardPhrase(ch.card, ch.pronouns.noun) })
+  const body = [reference, fill(t.scene.adult, pv), cleanWritten(text)].filter(Boolean).join('\n')
+  return finishPrompt(normalizePrompt(body), 'scene', ch, { ...o, makeup: f.makeup, skin: skinFor(sc, f.framing) })
+}
+
+// What the owner's words already say about the shot (shotParse.ts), as
+// scene fields: layered over the defaults and under the owner's own
+// choices, so a selfie in a black tank stays one.
+export function fieldsFromWords(sc: ScenesConfig, words: string): Partial<SceneFields> {
+  const r = readShot(words)
+  const out: Partial<SceneFields> = {}
+  const has = (list: Array<{ id: string }>, id?: string) => !!id && list.some(x => x.id === id)
+  if (has(sc.cameras, r.camera)) out.camera = r.camera!
+  if (has(sc.moments, r.camera)) out.momentType = r.camera!
+  if (r.phone) out.phone = r.phone
+  if (has(sc.framings, r.framing)) out.framing = r.framing!
+  if (r.outfit) out.outfit = r.outfit.slice(0, 300)
+  if (r.makeup) out.makeup = r.makeup
+  if (r.place) out.location = r.place.slice(0, 60)
+  if (r.ownLight && has(sc.lights, 'as_written')) out.light = 'as_written'
+  if (looksLikePrompt(words)) out.asWritten = true
+  return out
 }
 
 // ── One-change edits (SPEC 5.3) ─────────────────────────────────────

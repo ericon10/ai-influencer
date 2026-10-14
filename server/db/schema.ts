@@ -249,6 +249,8 @@ export const scenes = pgTable('scenes', {
   // The owner's own words, kept as written.
   brief: text('brief').notNull().default(''),
   fields: jsonb('fields').notNull().default({}),
+  // The fields the last run used (defaults and what was read included).
+  ranFields: jsonb('ran_fields'),
   // The written prompts (prompt writer or the owner's own edit), by target:
   // { still?: WrittenPrompt, video?: WrittenPrompt }.
   prompts: jsonb('prompts').notNull().default({}),
@@ -383,6 +385,10 @@ export const jobs = pgTable('jobs', {
   // sent | provider_queued | generating | checking | done, and since when.
   phase: text('phase'),
   phaseAt: timestamp('phase_at', { withTimezone: true }),
+  // The real cost next to the quote (owner, 2026-10-14): on the plan the
+  // credits Higgsfield actually took, read from its transactions; the
+  // measured tokens for Claude. Flagged when more than 20% off the quote.
+  costCheck: jsonb('cost_check'),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 }, t => [

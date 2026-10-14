@@ -134,26 +134,39 @@ describe('Clone: "Copy the moves into a new scene" never gets a bare sheet image
 
   it('the scene still edits the first frame with her face images; the first good one is kept; the run uses only it', async () => {
     const approved = await approvedAssets(h.deps, h.ctx, callie)
+    // Recreate from a real clip (owner, 2026-10-14): 4 stills from the frame
+    // as uploaded, used only for place, light, angle, framing, pose and
+    // outfit; the person replaced completely; text and logos removed.
     const { preview } = await run({ type: 'clone_still', contentId: postId, characterId: callie })
-    expect(preview.prompts[0]!.text).toMatch(/In the first image, replace only the main person/)
-    expect(preview.prompts[0]!.text).toMatch(/REALISM/)
+    const text = preview.prompts[0]!.text
+    expect(text).toMatch(/^Use the first image only for the place, the light, the camera angle, the framing, the pose and the outfit\. Replace the main person \(the largest person, closest to the camera\) in it completely with Callie \(the person in the other reference images\)/)
+    expect(text).toMatch(/Her hair is long honey-blonde\./)
+    expect(text).toMatch(/Keep the head angle and the gaze of the first image\. Remove all caption text, the TikTok logo and the username/)
+    expect(text).toContain('She is an adult, 21 or older.')
+    expect(text).toMatch(/REALISM/)
     const c = await cloneOf()
-    const [stillReq] = await requests(`clone_still:${postId}:`)
-    expect(stillReq!.refs!.map(r => r.assetId)).toEqual([c.firstFrameId, approved.get('REF-00'), approved.get('REF-01')])
+    const stillReqs = await requests(`clone_still:${postId}:`)
+    expect(stillReqs).toHaveLength(4)
+    expect(stillReqs.map(r => r.aspect)).toEqual(['9:16', '9:16', '9:16', '9:16'])
+    expect(stillReqs[0]!.refs!.map(r => r.assetId)).toEqual([c.rawFrameId, approved.get('REF-00'), approved.get('REF-01')])
     const stills = await cloneStills(h.deps, h.ctx, postId)
-    expect(stills).toHaveLength(1)
-    expect(stills[0]).toMatchObject({ kept: true, characterName: 'Callie' })
-    expect(c.stills[callie]).toBe(stills[0]!.id)
+    expect(stills).toHaveLength(4)
+    expect(stills.filter(x => x.kept)).toHaveLength(1)
+    expect(stills.every(x => x.pass === 'still' && x.characterName === 'Callie')).toBe(true)
+    const keptId = stills.find(x => x.kept)!.id
+    expect(c.stills[callie]).toBe(keptId)
 
     await run({ type: 'clone', contentId: postId, characterIds: [callie], model: 'higgsfield/genjutsu-motion-transfer', looks: {}, keepSound: false })
     const motion = (await requests(`clone:${postId}:`)).find(r => r.cloneBackground === 'image')!
     const { candidates } = await import('../db/schema.js')
-    const [still] = await h.deps.db.select().from(candidates).where(eq(candidates.id, stills[0]!.id))
+    const [still] = await h.deps.db.select().from(candidates).where(eq(candidates.id, keptId))
     expect(motion.refs!.map(r => r.assetId)).toEqual([still!.assetId])
+    // The motion comes from the clip as uploaded, never the filled-in copy.
+    expect(motion.sourceVideo!.assetId).toBe(c.motionAssetId ?? c.originalAssetId)
     expect(motion.cloneBackground).toBe('image')
     for (const id of ['REF-00', 'REF-01', 'REF-06']) expect(motion.refs!.map(r => r.assetId)).not.toContain(approved.get(id))
     // "Use this still" checks the still belongs to this post.
-    await expect(useCloneStill(h.deps, h.ctx, postId, stills[0]!.id)).resolves.toEqual({ ok: true })
+    await expect(useCloneStill(h.deps, h.ctx, postId, keptId)).resolves.toEqual({ ok: true })
   }, 120_000)
 
   it('a new tap drops the kept scene stills, since they show the old pick', async () => {

@@ -47,6 +47,7 @@ const DEFAULTS: Record<string, LlmResponder> = {
   content_captions: req => req.meta?.mockCaptions ?? { captions: [] },
   hook_variants: req => req.meta?.mockVariants ?? { variants: [] },
   clone_caption: req => ({ caption: (req.meta?.mockCaption as string | undefined) ?? 'when the drop finally hits' }),
+  clone_traits: () => ({ traits: 'dark brown hair, brown eyes, a nose ring, winged liner' }),
   qa_perception: req => req.meta?.mockObservation ?? {
     pose: 'frontal', nose: 'toward_camera', confidence: 0.9,
     framing: 'chest_up', standing: true, ears: [], skin_marks: [], other_jewelry: [],

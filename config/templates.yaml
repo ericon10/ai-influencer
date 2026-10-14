@@ -92,7 +92,7 @@ scene:
   # {wearing} is built from the outfit, footwear and jewelry fields (each
   # optional); {brand_line} is present while the scene is brand-free.
   base: |
-    {reference} {moment}. {task_line} {setting}.
+    {reference} {adult} {moment}. {task_line} {setting}.
     {wearing}
     {makeup}. Hair: {hair}. {pose}, {expression}.
     {marks}
@@ -106,13 +106,22 @@ scene:
     refs: "Using the attached reference images, keep this {noun}'s face, hair, and features exactly the same."
     trained: "{name}, the saved character."
     text: "Photo of {card}."
+    # A pasted prompt sent as written (owner, 2026-10-14): the refs give
+    # the face only, so the owner's clothes, place and light stand.
+    as_written: "Using the attached reference images only for this {noun}'s face, hair and features, kept exactly the same, instead of copying the clothes, the place or the light from the reference images."
+  # Fixed (characters are 21 or older): in every still prompt.
+  adult: "{Subj} is an adult, 21 or older."
   # The sheet outfit named so it is dropped (Callie's scene rules).
   sheet_outfit: "the white t-shirt, jeans and sneakers"
   outfit_override: ", wearing this outfit instead of {sheet_outfit} in the reference images"
+  # No outfit named: the sheet clothes still must not carry over (the
+  # owner's first real run came back in the sheet tee and jeans).
+  outfit_free: "{Subj} is dressed for this moment instead of {sheet_outfit} in the reference images."
   colors: "{Poss} hair stays {hair_color} and {poss} skin tone is unchanged, even here."
   makeup:
     bare: "No makeup, bare skin"
-    natural: "Makeup: {natural}"
+    # Image models add lip gloss on their own (Callie's notes on Flare).
+    natural: "Makeup: {natural}; lips natural and matte, no gloss"
     soft_glam: "Makeup: {glam}, with real skin texture still visible underneath"
 
 # One change per edit pass (SPEC 10, still edit; SPEC 5.3).
@@ -143,10 +152,33 @@ clone:
   # The scene still for "Copy the moves" (G28): the clip's first frame (the
   # first image) with only that person replaced.
   scene_still: "In the first image, replace only {target} with the person in the other reference images: {poss} face, hair, skin and body exactly as in those references. Keep every other person, the place, the lighting, the pose, the framing and the camera of the first image exactly the same. {outfit} The replaced person must be the reference person, never the person from the first image"
+  # Recreate from a real clip (owner's proven recipe, 2026-10-14). The
+  # first image is the clip's frame; {element} is the character's
+  # Higgsfield element on the plan, or the reference images otherwise.
+  recreate_still: "Use the first image only for the place, the light, the camera angle, the framing, the pose and the outfit. Replace {target} in it completely with {name}{element}: {face}. {Poss} hair is {hair_color}.{not_like} Keep the head angle and the gaze of the first image. Remove all caption text, the TikTok logo and the username, leaving no text or watermark anywhere in the image. {outfit}"
+  recreate_not_like: " {Subj} must not have that person's {traits}."
+  recreate_element_api: " (the person in the other reference images)"
+  # The face-only pass on a chosen still: nothing else moves.
+  face_pass: "Change only {poss} face to match {name}{element}: {face}. Keep everything else in the image exactly the same, pixel for pixel: the hair, the outfit, the pose, the hands, the light, the background and the framing."
   outfit_source: "Keep the clothes, shoes and accessories that person wears in the source exactly the same."
   outfit_hers: "Dress {obj} in the outfit from the outfit reference image (the last reference image), not the clothes in the source."
   target_main: "the main person (the largest person, closest to the camera)"
   target_at: "the person {where} of the frame{depth}"
+# "Read them for me" (Recreate from a real clip): Claude reads the person
+# in the clip's frame for the traits the character must not take.
+clone_traits:
+  system: |
+    You look at one frame from a video and describe the person the owner
+    picked, so an image model can give a different, original character
+    their own look instead. Return only short visible traits, comma
+    separated, plain words: hair color and length, eye color if visible,
+    piercings, makeup (for example winged liner, glossy lips), tattoos.
+    Never guess identity, age, ethnicity or anything not visible. Never
+    describe the body. No full sentences.
+  prompt: |
+    The person to describe: {target}.
+    Write the traits.
+
 # The prompt writer (owner, 2026-10-13, default rule scene-prompt-writer):
 # Claude turns the scene details into the final prompt as natural sentences.
 # The Studio then adds what must not depend on the writing: the reference
@@ -198,6 +230,11 @@ prompt_writer:
       needs them. Hair styling (a claw clip, a low ponytail) is fine.
     - Never use words like flawless, perfect skin, smooth skin,
       airbrushed, retouched or porcelain. Real skin is the look.
+    - Never add mood words like glowing, cinematic, soft light, beautiful,
+      stunning or dreamy unless a detail uses them. Say plainly where the
+      light comes from instead.
+    - Keep the camera, the outfit and the light exactly as the details
+      give them: a selfie stays a selfie, a named outfit stays that outfit.
     - {name} is an adult. Never nudity or sexual content.
     - No brand names, logos or readable text unless a detail names them.
   still_prompt: |
@@ -403,6 +440,12 @@ scene_ideas:
     - one small real-life detail (a receipt in a hand, a dog leash, a
       half-eaten pastry, sand on a knee).
     Make the three options clearly different from each other.
+    Keep everything the rough idea already says (owner, 2026-10-14): a
+    selfie or front-camera shot stays one the character takes; a named
+    outfit, place, light or framing stays as named. The moment text itself
+    says who takes the photo, so it reads complete on its own.
+    Never add mood words like glowing, cinematic, soft light, beautiful or
+    dreamy unless the rough idea uses them.
     If another person is in the moment, give them a clearly different look
     from {name}: state their hair color and cut, different from {name}'s,
     so they never come out as a copy of {name}. {name}'s look, for that

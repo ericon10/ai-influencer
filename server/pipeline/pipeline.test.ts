@@ -212,7 +212,7 @@ describe('character creation, stages 1 to 5 (demo mode)', () => {
     const row = await getCharacter(h.deps, h.ctx, imported.characterId)
     const data = toData(row)
     expect(data.name).toBe('Callie')
-    expect(data.identities.map(i => [i.kind, i.name])).toEqual([['trained', 'Callie'], ['element', 'Callie-1']])
+    expect(data.identities.map(i => [i.kind, i.name])).toEqual([['trained', 'Callie'], ['element', 'Callie']])
     expect(data.sections.map(s => s.title)).toContain('Video rules')
     // Her sheet stays on the model it was built with, even in demo mode.
     expect((row.sheetLock as { model: string }).model).toBe('higgsfield/gpt-image-2.5')

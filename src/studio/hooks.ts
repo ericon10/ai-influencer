@@ -213,11 +213,12 @@ export function useClones(contentId: string) {
   return useQuery({ queryKey: ['clones', contentId], queryFn: () => api.clones(contentId), refetchInterval: busy ? 3000 : false })
 }
 
-// A post's scene stills for "Copy the moves": looks again when one ends.
+// A post's stills for "Recreate from a real clip" (and their face passes,
+// and the trait reader): looks again when one ends.
 export function useCloneStills(contentId: string) {
   const qc = useQueryClient()
   const active = useActiveJobs()
-  const busy = (active.data?.jobs ?? []).some(j => j.purpose.startsWith(`clone_still:${contentId}:`))
+  const busy = (active.data?.jobs ?? []).some(j => j.purpose.startsWith(`clone_still:${contentId}:`) || j.purpose.startsWith(`clone_face:${contentId}:`) || j.purpose === `clone_traits:${contentId}`)
   const wasBusy = useRef(false)
   useEffect(() => {
     if (wasBusy.current && !busy) { qc.invalidateQueries({ queryKey: ['clone-stills', contentId] }); qc.invalidateQueries({ queryKey: keys.content }) }

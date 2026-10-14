@@ -30,14 +30,22 @@ export interface FakeHiggsfield {
   hangOn: string | null
   refuseRefresh: boolean
   sessions: number
+  // The account's spends, newest last (the `transactions` tool). Each
+  // submitted job spends its price times `chargeFactor` at `now()`.
+  spends: Array<{ display_name: string; credits: number; action: string; created_at: string }>
+  chargeFactor: number
+  now(): Date
   tool(name: string): Array<{ tool: string; args: Json; token: string }>
 }
+
+const DISPLAY: Record<string, string> = { nano_banana_2_1: 'Nano Banana 2.1', gpt_image_2_5: 'GPT Image 2.5', seedance_2_5: 'Seedance 2.5', kling3_0: 'Kling 3.0', hf_mult_motion_control: 'Higgsfield Genjutsu - Motion Transfer' }
 
 const COST: Record<string, (p: Json) => number> = {
   nano_banana_2_1: () => 1.5,
   gpt_image_2_5: () => 3,
   seedance_2_5: p => 7 * (p.duration ?? 5),
   kling3_0: p => (p.mode === 'pro' ? 1.5 : 1) * (p.duration ?? 5),
+  hf_mult_motion_control: p => 7 * (p.duration ?? 10),
 }
 
 function sseBody(obj: unknown): string {
@@ -50,6 +58,7 @@ export function createFakeHiggsfield(): FakeHiggsfield {
     calls: [], tokenRequests: [], registrations: [], uploads: new Map(), jobs: new Map(),
     validTokens: new Set(['at-1']),
     presetNoticeOnce: false, presetRecommend: null, presetAsError: true, sse: false, hangOn: null, refuseRefresh: false, sessions: 0,
+    spends: [], chargeFactor: 1, now: () => new Date(),
     tool: name => f.calls.filter(c => c.tool === name),
     fetch: async (input, init) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url
@@ -140,6 +149,7 @@ export function createFakeHiggsfield(): FakeHiggsfield {
             return answer('A matching preset was found. To generate without it, call again with declined_preset_id: 11111111-2222-4333-8444-555555555555')
           }
           const type = tool.startsWith('generate_video') ? 'video' : tool.startsWith('generate_audio') ? 'audio' : 'image'
+          f.spends.push({ display_name: DISPLAY[p.model] ?? String(p.model), credits: -((COST[p.model] ?? (() => 2))(p) * f.chargeFactor), action: 'spend', created_at: f.now().toISOString() })
           return answer({ jobs: [{ index: 0, job_id: newJob(type), status: 'queued' }] })
         }
         case 'upscale_image':
@@ -168,6 +178,8 @@ export function createFakeHiggsfield(): FakeHiggsfield {
           return answer({ media_id: args.media_id, url: `${CDN}${args.media_id}.png` })
         case 'balance':
           return answer({ credits: 1078.45, subscription_plan_type: 'ultra' })
+        case 'transactions':
+          return answer({ items: [...f.spends].reverse().slice(0, Number(args.size ?? 10)), next_cursor: null })
         default:
           return answer(`Unknown tool ${tool}`, true)
       }
