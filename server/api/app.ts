@@ -23,7 +23,7 @@ import { cancelContinue, continueShot, keepTwoShots, useChainTake } from '../pip
 import { postCutView, postEditorProject } from '../pipeline/cutView.js'
 import { makeCloseup } from '../pipeline/closeup.js'
 import { addSound, archiveSound, listSounds, soundView, updateSound } from '../pipeline/sounds.js'
-import { editorManifest, saveFromEditor } from '../pipeline/openreel.js'
+import { deleteStyle, editorManifest, listStyles, saveFromEditor, saveStyle } from '../pipeline/openreel.js'
 import { addCloneSource, cloneOptions, cloneStills, keepClone, postClones, postFromClone, saveCloneModel, setCloneTarget, useCloneStill } from '../pipeline/clone.js'
 import { jobViews } from '../jobs/jobView.js'
 import { POST_STEPS, addBroll, archiveBroll, archiveContent, contentView, createContent, duplicateContent, postScene, retryFailedBatch, startRender, updateBroll, updateContent } from '../pipeline/content.js'
@@ -578,6 +578,17 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
   // project back).
   app.get('/content/:id/editor', async c => c.json(await editorManifest(deps, c.get('ctx'), c.req.param('id'))))
   app.post('/content/:id/editor', async c => c.json(await saveFromEditor(deps, c.get('ctx'), c.req.param('id'), await json(c))))
+  app.get('/editor/styles', async c => c.json({ styles: await listStyles(deps, c.get('ctx')) }))
+  app.post('/editor/styles', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    return c.json(await saveStyle(deps, ctx, await json(c)), 201)
+  })
+  app.delete('/editor/styles/:sid', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    return c.json(await deleteStyle(deps, ctx, c.req.param('sid')))
+  })
   app.get('/content/:id/clone-stills', async c => c.json({ stills: await cloneStills(deps, c.get('ctx'), c.req.param('id')) }))
   app.post('/content/:id/clone-stills/:cid/use', async c => c.json(await useCloneStill(deps, c.get('ctx'), c.req.param('id'), c.req.param('cid'))))
   app.post('/clones/:id/keep', async c => {

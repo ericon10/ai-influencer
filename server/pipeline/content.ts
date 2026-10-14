@@ -17,6 +17,7 @@ import { transcodeBroll } from '../media/meme.js'
 import { renderTimeline, type TimelineCaption, type TimelineShot } from '../media/timeline.js'
 import { applySoundBed, type SoundBedResult } from '../media/sound.js'
 import { cutProblems, cutSchema, effectiveCut, type Cut } from '../core/cut.js'
+import { stackSchema } from '../core/editorStyle.js'
 import { soundFile } from './sounds.js'
 import { EDIT_IDS } from '../config/pipeline.js'
 import { applyEdit, DEFAULT_FACE, detectBeats, mapTime, overlayBehind, type EditStyle } from '../media/edits.js'
@@ -197,7 +198,9 @@ const memeSpec = z.object({
   stillB: id.nullable().default(null),
   captionStyle,
   // The OpenReel editor's project for this post (G29), saved by Done.
-  editor: z.object({ projectAssetId: id.nullable().default(null), savedAt: z.string().max(40).nullable().default(null) }).nullable().default(null),
+  // stack: its presets with relative places (editor phase C), which "Make
+  // another like this" carries to the next post.
+  editor: z.object({ projectAssetId: id.nullable().default(null), savedAt: z.string().max(40).nullable().default(null), stack: stackSchema.nullable().default(null) }).nullable().default(null),
 })
 const slideshowSpec = z.object({
   stillIds: z.array(id).max(20).default([]),
@@ -369,9 +372,13 @@ export async function updateContent(deps: Deps, ctx: Ctx, itemId: string, patch:
 // rendered is copied.
 export async function duplicateContent(deps: Deps, ctx: Ctx, itemId: string): Promise<ContentRow> {
   const row = await getContent(deps, ctx, itemId)
+  // The editor's stack comes along (its places are relative), not the
+  // timeline itself, which names this post's media.
+  const spec = row.spec as { editor?: { stack?: unknown } | null } | null
+  const copied = spec?.editor ? { ...spec, editor: { projectAssetId: null, savedAt: null, stack: spec.editor.stack ?? null } } : row.spec
   const [out] = await deps.db.insert(contentItems).values({
     id: newId('cnt'), accountId: ctx.accountId, characterId: row.characterId, kind: row.kind,
-    title: row.title, idea: row.idea, accountTag: row.accountTag, sceneId: row.sceneId, spec: row.spec,
+    title: row.title, idea: row.idea, accountTag: row.accountTag, sceneId: row.sceneId, spec: copied,
     step: 'text', createdBy: ctx.userId,
   }).returning()
   return out!

@@ -1332,3 +1332,51 @@ new pages or sidebar items; one new Library tab (Sounds).
   cut, match cut, push in, pull out, rewind, caption slam, the two caption
   looks, picture in picture). Their own thumbnails come from the worker's
   preset renderer in phase D, rendered from the same keys.
+
+### G31. Editor phase C: beat sync, editing basics, saved styles (overnight run, 2026-10-14)
+
+- **Beat sync, in the Presets tab's Beat card:**
+  - The post's music (the Sound row's uploaded track) now comes onto the
+    timeline as a music track, and the editor finds its beat when it
+    opens (OpenReel's own beat detection, mapped to where the music
+    plays). "Add music" puts another track on and finds its beat.
+  - Or tap the tempo (4 taps or more; a 2 s pause starts over), or type a
+    BPM, and the grid is laid through the playhead across the timeline.
+  - Beats show on the timeline (OpenReel's beat overlay, downbeats
+    brighter). Clips, captions and preset blocks snap to beats and to
+    markers; a preset clicked with the playhead just off a beat (a quarter
+    beat at most, 0.15 s at most) lands on the beat.
+  - "Music in the export" (on by default) mutes the music tracks in the
+    export when switched off, for posts that get the TikTok sound in the
+    app. Beats, the music list and the switch are kept with the timeline.
+- **Editing basics:** OpenReel already has split, cut, copy and paste,
+  duplicate, delete, ripple delete, trim to the playhead, select all and
+  multi-select, snapping on and off, zoom, markers, undo and redo, and
+  shortcut maps (OpenReel, CapCut, Premiere, Final Cut, DaVinci). The
+  embed adds:
+  - Ripple trim (a switch in the Studio bar, on): trim a shot shorter and
+    the shots after it slide over, so no gap opens. Trimming longer is
+    left as is.
+  - Beat and marker snapping for clips (above).
+  - Undo and redo verified on preset blocks in the browser test (place,
+    Ctrl+Z, Ctrl+Shift+Z).
+- **Saved styles, in the Presets tab's Styles card:** "Save as a style"
+  keeps the timeline's presets as a stack with places relative to the
+  video: at the payoff (the marker, else the Studio's spot), on a cut, on
+  a beat, or so far from the start or the end; camera blocks keep a
+  changed length and edited keyframes. Styles are saved per account
+  (`account_settings`, key `editor_styles`, at most 50; a name used again
+  replaces the old style). One click places a saved style on the open
+  timeline. The math is pure and the same in the fork
+  (`packages/core/src/studio/style.ts`) and the Studio
+  (`server/core/editorStyle.ts`, for the worker in phase D), with the
+  same test vectors.
+- **Make another like this:** Done saves the post's stack with its
+  timeline. The copy gets the stack, not the timeline (which names the
+  first post's media); its first open places the stack, which wins over
+  the Idea step's Format. Verified in the browser: the copy opened with
+  all of the first post's presets at its payoff.
+- **Measured (browser test, local, mock data):** type 120 and Set (13
+  beats), Payoff spot, Impact shake, undo and redo, Save as a style, name,
+  Save, Done, then the copy opened with the stack and the saved style
+  placed in one click: 7 clicks, no page errors.

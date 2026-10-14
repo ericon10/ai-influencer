@@ -282,7 +282,7 @@ export const GUIDE: GuideSection[] = [
     intro: 'The Timeline lays the post out from the steps above: its shots, B-roll and captions. Open the editor to place edits exactly where you want them on that timeline (OpenReel, full screen): drop a preset at the playhead, drag it, trim it, set Subtle, Normal or Strong. Done in the editor exports the video, saves it here with the timeline, and brings you back. Without the editor, Export MP4 renders the timeline on the Studio\'s own worker, for free. A slideshow exports JPEG slides; a batch exports every video and a zip.',
     steps: [
       'Check the Timeline: the shots and captions the Studio laid out for you.',
-      'Open the editor (best on a computer): click a suggested spot (the payoff) or move the playhead, then click a preset (a crash zoom, a speed ramp, karaoke captions and more). Drag or trim its block; click it for Subtle, Normal or Strong and its keyframes. Press Done: it exports, saves to the post and comes back here.',
+      'Open the editor (best on a computer): click a suggested spot (the payoff) or move the playhead, then click a preset (a crash zoom, a speed ramp, karaoke captions and more). Drag or trim its block; click it for Subtle, Normal or Strong and its keyframes. The Beat card finds the beat of your music (or tap the tempo) so cuts and presets snap to it; the Styles card saves your presets as a style for the next post. Press Done: it exports, saves to the post and comes back here.',
       'Pick the sound: Room tone (the default), a recording you uploaded, or None; add a music track you uploaded if you like. Music dips under the clip\'s own sound.',
       'Or press Export MP4 (it shows what is still missing if anything is). On a phone: Trim start and end, then Export MP4.',
       'Download MP4.',
@@ -356,6 +356,8 @@ export const GLOSSARY: Array<[string, string]> = [
   ['Continue this shot', 'Make the next take from the last frame of a clip, then join them into one longer clip.'],
   ['Shot B', 'The second shot of a two-shot edit (crash zoom cut, whip pan, hand over the lens, zoom-rotate spin), right after the clip; for split screen it plays beside or below it.'],
   ['Person mask', 'Her outline in every frame, made free on the worker, for text behind her, the green screen and the dolly zoom.'],
+  ['Saved style', 'The presets on a timeline, saved with places like "at the payoff" or "on beat 4", so one click puts them on another post. Make another like this carries the post\'s own.'],
+  ['Beat sync', 'Beats of the music (found by the editor, tapped or typed) shown on the timeline; clips and presets snap to them. The music can stay in the export or not.'],
   ['Payoff', 'The moment the video builds to. The editor can suggest it as a marker; you place presets on it with one click.'],
   ['Room tone', 'The quiet sound of a room, made by code. The default ambience; a silent video sounds dead.'],
   ['LUFS', 'How loud a video sounds overall. Posts are normalized to -14, like TikTok, Reels and Shorts play them.'],

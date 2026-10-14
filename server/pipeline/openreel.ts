@@ -13,6 +13,10 @@ import { enqueueLocalJob } from '../jobs/runner.js'
 import { getAsset, readAsset, saveAsset } from '../storage/assets.js'
 import { uploadKey } from '../storage/uploads.js'
 import { candidateAsset, getBroll, getContent, setOutputs, specSchemas, updateContent, type ContentOutputs, type MemeSpec } from './content.js'
+import { getSound } from './sounds.js'
+import { getSetting, setSetting } from './settings.js'
+import { newId } from '../lib/ids.js'
+import { editorStyleSchema, stackSchema, type EditorStyle } from '../core/editorStyle.js'
 
 // The OpenReel editor (owner, 2026-10-14, G29): the Studio's editor is the
 // owner's OpenReel fork, served at /editor/ and opened from a post. The
@@ -51,6 +55,14 @@ export async function editorManifest(deps: Deps, ctx: Ctx, contentId: string) {
     at += Math.max(0.1, end - shot.in)
   }
   const duration = Math.round(at * 1000) / 1000
+  // The sound bed's uploads go on their own tracks: music (the editor finds
+  // its beat) and a recorded ambience. Room tone is made on the worker.
+  for (const [role, soundId] of [['music', s.sound.music], ['ambience', s.sound.ambience && !['none', 'room'].includes(s.sound.ambience) ? s.sound.ambience : null]] as const) {
+    if (!soundId) continue
+    const sound = await getSound(deps, ctx, soundId).catch(() => null)
+    if (!sound?.assetId || sound.status !== 'ready') continue
+    media.push({ id: sound.assetId, name: sound.title || (role === 'music' ? 'Music' : 'Ambience'), kind: 'audio', url: assetUrl(sound.assetId), role, start: 0, in: 0, out: null })
+  }
   const captions = cut.captions.map(c => ({ text: (c.text ?? s.caption).trim(), start: c.start, end: c.end })).filter(c => c.text)
   let project: unknown = null
   if (s.editor?.projectAssetId) {
@@ -74,11 +86,14 @@ export async function editorManifest(deps: Deps, ctx: Ctx, contentId: string) {
   const payoff = Math.max(0, Math.min(duration, s.edit.payoff ?? duration - edits.payoff_from_end))
   const suggestions = duration > 1 ? [{ label: 'Payoff', time: Math.round(payoff * 100) / 100, why: 'The moment the video builds to. Good for a speed ramp, a freeze or a snap zoom.' }] : []
   const style = edits.styles.find(x => x.id === s.edit.style)
-  const format = !project && style?.preset ? { preset: style.preset, strength: s.edit.strength } : null
-  return { post: { id: post.id, title: post.title || s.caption.slice(0, 60) || 'Video post' }, canvas: CANVAS, media, captions, duration, project, suggestions, format }
+  // A stack carried from "Make another like this" wins over the Format
+  // (it already holds the Format's preset where the owner moved it).
+  const stack = !project && s.editor?.stack?.length ? s.editor.stack : null
+  const format = !project && !stack && style?.preset ? { preset: style.preset, strength: s.edit.strength } : null
+  return { post: { id: post.id, title: post.title || s.caption.slice(0, 60) || 'Video post' }, canvas: CANVAS, media, captions, duration, project, suggestions, format, stack, styles: await listStyles(deps, ctx) }
 }
 
-const saveBody = z.object({ uploadId: z.string().regex(/^upl_[a-z0-9]{20}$/), project: z.record(z.string(), z.unknown()) })
+const saveBody = z.object({ uploadId: z.string().regex(/^upl_[a-z0-9]{20}$/), project: z.record(z.string(), z.unknown()), stack: stackSchema.optional() })
 
 // Done: the project is kept (a small JSON file), and the worker turns the
 // uploaded MP4 into the post's video. The post shows "Saving your edit"
@@ -91,7 +106,7 @@ export async function saveFromEditor(deps: Deps, ctx: Ctx, contentId: string, ra
   if (json.length > 4 * 1024 * 1024) throw new AppError('bad_request', 'The edit is too large to save. Remove some layers and try again.')
   if (!(await deps.store.exists(uploadKey(ctx.accountId, body.uploadId)))) throw new AppError('bad_request', 'The exported video did not finish uploading. Press Done again.')
   const asset = await saveAsset(deps, ctx, { data: json, mime: 'application/json', origin: 'derived', label: `Editor project for ${post.title || 'a video post'}` })
-  await updateContent(deps, ctx, post.id, { spec: { editor: { ...(s.editor ?? {}), projectAssetId: asset.id, savedAt: deps.clock.now().toISOString() } } })
+  await updateContent(deps, ctx, post.id, { spec: { editor: { ...(s.editor ?? {}), projectAssetId: asset.id, savedAt: deps.clock.now().toISOString(), stack: body.stack ?? s.editor?.stack ?? null } } })
   await setOutputs(deps, post.id, (post.outputs ?? {}) as ContentOutputs, 'rendering')
   await enqueueLocalJob(deps, ctx, { stage: 'content', purpose: `editor_save:${post.id}`, label: 'Save the edit to the post', characterId: post.characterId, request: { uploadId: body.uploadId } })
   return { ok: true }
@@ -130,4 +145,33 @@ export function registerOpenReel(): void {
   if (registered) return
   registered = true
   registerLocalJob('editor_save', runEditorSave)
+}
+
+// Saved styles (editor phase C): stacks of presets with relative places,
+// kept per account. The editor lists them in its Presets tab; applying
+// one places its presets on the open timeline.
+const STYLES_KEY = 'editor_styles'
+const MAX_STYLES = 50
+
+export async function listStyles(deps: Deps, ctx: Ctx): Promise<EditorStyle[]> {
+  const raw = await getSetting<unknown[]>(deps.db, ctx.accountId, STYLES_KEY, [])
+  return (Array.isArray(raw) ? raw : []).flatMap(x => { const r = editorStyleSchema.safeParse(x); return r.success ? [r.data] : [] })
+}
+
+const newStyle = z.object({ name: z.string().trim().min(1, 'Give the style a name.').max(60), items: stackSchema.min(1, 'Place at least one preset first.') })
+
+export async function saveStyle(deps: Deps, ctx: Ctx, raw: unknown): Promise<EditorStyle> {
+  const body = newStyle.parse(raw)
+  const list = await listStyles(deps, ctx)
+  if (list.length >= MAX_STYLES) throw new AppError('bad_request', `You have ${MAX_STYLES} saved styles. Delete one first.`)
+  const style: EditorStyle = { id: newId('sty'), name: body.name, items: body.items, createdAt: deps.clock.now().toISOString() }
+  await setSetting(deps, ctx, STYLES_KEY, [...list.filter(x => x.name.toLowerCase() !== body.name.toLowerCase()), style])
+  return style
+}
+
+export async function deleteStyle(deps: Deps, ctx: Ctx, styleId: string): Promise<{ ok: true }> {
+  const list = await listStyles(deps, ctx)
+  if (!list.some(x => x.id === styleId)) throw new AppError('not_found', 'That style is already gone.')
+  await setSetting(deps, ctx, STYLES_KEY, list.filter(x => x.id !== styleId))
+  return { ok: true }
 }

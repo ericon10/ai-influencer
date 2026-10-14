@@ -6,9 +6,10 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createHarness, drain, type Harness } from '../testing/harness.js'
 import { registerPipelineHooks } from './hooks.js'
 import { importCharacter } from './files.js'
-import { createContent, getContent, updateContent, type ContentOutputs, type MemeSpec } from './content.js'
+import { createContent, duplicateContent, getContent, updateContent, type ContentOutputs, type MemeSpec } from './content.js'
+import { addSound } from './sounds.js'
 import { addClip } from './clips.js'
-import { editorManifest, saveFromEditor } from './openreel.js'
+import { deleteStyle, editorManifest, listStyles, saveFromEditor, saveStyle } from './openreel.js'
 import { renderPlaceholderPortrait } from '../providers/mock.js'
 import { makeClip } from '../media/testClips.js'
 import { ffmpeg, probeFile } from '../media/ffmpeg.js'
@@ -115,8 +116,55 @@ describe('Done from the editor', () => {
     expect(again.project).toMatchObject({ id: 'p1', studioMedia: project.studioMedia })
   }, 120_000)
 
+  it('keeps the stack, and Make another like this carries it (not the timeline) to the next post', async () => {
+    const webm = join(dir, 'export2.webm')
+    await ffmpeg(['-f', 'lavfi', '-i', 'testsrc2=size=1080x1920:rate=30:duration=1', '-c:v', 'libvpx-vp9', '-deadline', 'realtime', '-cpu-used', '8', '-b:v', '1M', webm])
+    const stack = [{ preset: 'snap_zoom', strength: 'strong', at: { on: 'payoff', ratio: 0.7 }, duration: 1.2 }, { preset: 'glitch', at: { on: 'cut', index: 0, offset: 0, ratio: 0.4 } }]
+    await saveFromEditor(h.deps, h.ctx, postId, { uploadId: await put(webm, 'video/webm'), project: { id: 'p2', timeline: { tracks: [] }, mediaLibrary: { items: [] } }, stack })
+    await drain(h, 30)
+    expect((await getContent(h.deps, h.ctx, postId)).spec).toMatchObject({ editor: { stack: [{ preset: 'snap_zoom', strength: 'strong' }, { preset: 'glitch', strength: 'normal' }] } })
+    // The original reopens its own timeline; the copy starts fresh with the stack.
+    expect((await editorManifest(h.deps, h.ctx, postId)).stack).toBeNull()
+    const copy = await duplicateContent(h.deps, h.ctx, postId)
+    const m = await editorManifest(h.deps, h.ctx, copy.id)
+    expect(m.project).toBeNull()
+    expect(m.format).toBeNull()
+    expect(m.stack?.map(x => x.preset)).toEqual(['snap_zoom', 'glitch'])
+  }, 120_000)
+
   it('refuses a save whose video never finished uploading', async () => {
     await expect(saveFromEditor(h.deps, h.ctx, postId, { uploadId: 'upl_' + 'z'.repeat(20), project: {} })).rejects.toThrow(/did not finish uploading/)
     await expect(saveFromEditor(h.deps, h.ctx, postId, { uploadId: 'nope', project: {} })).rejects.toThrow()
+  })
+})
+
+describe('the sound bed in the editor', () => {
+  it('puts the post\'s uploaded music on the timeline, where the editor finds its beat', async () => {
+    const wav = join(dir, 'beat.wav')
+    await ffmpeg(['-f', 'lavfi', '-i', 'sine=frequency=220:duration=3', wav])
+    const sound = await addSound(h.deps, h.ctx, { uploadId: await put(wav, 'audio/wav'), name: 'beat.wav', kind: 'music' })
+    await drain(h, 20)
+    const post = (await createContent(h.deps, h.ctx, { kind: 'meme', characterId, spec: { clipId, caption: 'music', sound: { music: sound.id } } })).id
+    const m = await editorManifest(h.deps, h.ctx, post)
+    const music = m.media.find(x => x.role === 'music')
+    expect(music).toMatchObject({ kind: 'audio', start: 0 })
+    expect(m.media.filter(x => x.role === 'clip')).toHaveLength(1)
+  }, 120_000)
+})
+
+describe('saved styles', () => {
+  it('saves, lists, replaces by name and deletes; the manifest lists them', async () => {
+    const items = [{ preset: 'snap_zoom', at: { on: 'payoff', ratio: 0.7 } }]
+    await expect(saveStyle(h.deps, h.ctx, { name: 'Payoff zoom', items: [] })).rejects.toThrow(/at least one preset/)
+    await expect(saveStyle(h.deps, h.ctx, { name: '', items })).rejects.toThrow(/name/)
+    const one = await saveStyle(h.deps, h.ctx, { name: 'Payoff zoom', items })
+    expect(one.id).toMatch(/^sty_/)
+    const two = await saveStyle(h.deps, h.ctx, { name: 'payoff zoom', items: [...items, { preset: 'shake', strength: 'subtle', at: { on: 'end', offset: 0.5, ratio: 0.9 } }] })
+    const list = await listStyles(h.deps, h.ctx)
+    expect(list.map(x => x.id)).toEqual([two.id])
+    expect((await editorManifest(h.deps, h.ctx, postId)).styles.map(x => x.name)).toEqual(['payoff zoom'])
+    await deleteStyle(h.deps, h.ctx, two.id)
+    expect(await listStyles(h.deps, h.ctx)).toEqual([])
+    await expect(deleteStyle(h.deps, h.ctx, two.id)).rejects.toThrow(/already gone/)
   })
 })

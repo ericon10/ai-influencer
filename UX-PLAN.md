@@ -442,14 +442,21 @@ owner. The Idea step's Format stays as a template that pre-places presets
 for the owner to adjust. Two-shot presets keep shot B in the Video step,
 with "Make the close-up".
 
-**Beat sync.** In the editor: add a track or tap the tempo; beat markers
-show on the timeline and cuts and presets snap to them. Done asks nothing
-extra; "Include the music in the export" is a switch in the Studio bar,
-off when the owner adds the TikTok sound in the app.
+**Beat sync.** The Presets tab's Beat card: the post's music comes onto the
+timeline and its beat is found when the editor opens (0 clicks); "Add
+music" adds another track; Tap (4 taps or more) or a typed BPM lays a grid
+from the playhead. Beat markers show on the timeline and clips, captions
+and presets snap to them. Done asks nothing extra; "Music in the export"
+(in the Beat card, on by default) leaves the music out when the owner adds
+the TikTok sound in the app.
 
-**Saved styles.** "Save as a style" in the Presets panel keeps the stack
-with relative places ("at the payoff", "on beat 4"). "Make another like
-this" carries the style into the new post's timeline.
+**Saved styles.** The Presets tab's Styles card: "Save as a style" keeps the
+stack with relative places ("at the payoff", "on cut 1", "on beat 4");
+one click places a saved style on the open timeline. "Make another like
+this" carries the post's stack into the copy, placed on its first open.
+
+**Ripple trim.** A switch in the Studio bar, on by default: trim a shot
+shorter and the shots after it slide over.
 
 **Phone.** Editing is desktop first. On a phone the Finish step shows the
 preview, Trim start and end, and Export (the worker renders the same
@@ -464,9 +471,10 @@ JSON, with each video's clip and caption swapped in.
 | Place a preset | Editor, Presets panel: click (at the playhead) or drag onto the timeline | 1 to 2 |
 | Accept a suggested spot | Editor, a marker on the timeline | 1 |
 | Strength, trim, keyframes | Editor, the block and its panel | 1 each |
-| Beat sync | Editor, add a track or tap tempo | 2 |
+| Beat sync | Editor, Beat card: automatic with the post's music; type a BPM and Set; or Tap 4 times and Use | 0, 2 or 5 |
 | Done (export, save, return) | Studio bar | 1 |
-| Save a style | Editor, Presets panel | 2 |
+| Save a style | Editor, Styles card: Save as a style, name, Save | 3 |
+| Place a saved style | Editor, Styles card | 1 |
 
 The video-post flow stays at **8** clicks to an exported MP4 without the
 editor (the Studio's own render of the timeline). With the editor and one
