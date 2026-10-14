@@ -106,6 +106,15 @@ the Studio; they are not creative limits on a character.
   code comments. `npm run check` fails on them in Studio paths.
 - **Prompts shown in the UI are hard-wrapped**, never one long line,
   and each has a one-click copy.
+- **Every new feature ships with its guide and help (owner,
+  2026-10-14).** In the same change: UX-PLAN.md first, then the Guide
+  (`src/studio/guide/content.ts`: the page or step section and the
+  glossary; fresh annotated screenshots in `public/studio-guide/`,
+  hotspots in `shots.json`), then the help throughout the Studio: a
+  `HowTo` on each new screen, step and panel, linked to its Guide
+  section, and every existing help text the feature changes. A feature
+  is not done, and is not pushed, until its guide and help match the
+  screen.
 - **Audio is per request.** Video requests are silent by default
   (`audio` false) and the runner strips the track unless the request
   asked for audio. Voice and sound come later (ElevenLabs).
