@@ -1,4 +1,4 @@
-import type { ActionPreview, CharacterSummary, CharacterView, HiggsfieldAccount, JobView, Me, QuoteView, RulesView, SceneFields, ScenesData, SettingsView, StudioAction, Usage, VideoPrice, BrollClip, ContentData, ContentKind, LibraryData, PostStep, WorkerStatus, CloneOptions, CloneResult, CloneSource, CloneStill, CutView, SoundItem, EditorStyle } from './types'
+import type { ActionPreview, CharacterSummary, CharacterView, HiggsfieldAccount, JobView, Me, QuoteView, RulesView, SceneFields, ScenesData, SettingsView, StudioAction, Usage, VideoPrice, BrollClip, ContentData, ContentKind, LibraryData, PostStep, WorkerStatus, CloneOptions, CloneResult, CloneSource, CloneStill, CutView, SoundItem, EditorStyle, ImportPreview } from './types'
 import { sheetRefOf, typeOf, uploadFiles } from './files'
 
 // Thin client for /api/v1. Every write sends the CSRF header the server
@@ -115,6 +115,9 @@ export const api = {
   useCloneStill: (contentId: string, id: string) => request<{ ok: true }>('POST', `/content/${contentId}/clone-stills/${id}/use`),
   archiveContent: (id: string) => request<{ ok: true }>('DELETE', `/content/${id}`),
   renderContent: (id: string) => request<{ id: string; status: string }>('POST', `/content/${id}/render`, {}),
+  cloneCleanup: (id: string, on: boolean) => request<CloneSource>('POST', `/content/${id}/clone-source/cleanup`, { on }),
+  importPreview: (id: string, csv: string) => request<ImportPreview>('POST', `/content/${id}/import/preview`, { csv }),
+  importRun: (id: string, csv: string, exportFree: boolean) => request<{ created: Array<{ line: number; id: string; status: 'reuse' | 'generate' }>; exporting: number; skipped: number; notExported: Array<{ line: number; id: string; reason: string }> }>('POST', `/content/${id}/import`, { csv, exportFree }),
   retryFailed: (id: string) => request<{ id: string; status: string }>('POST', `/content/${id}/render/retry-failed`, {}),
   // Phase 3: the rough cut and sound bed, "Continue this shot", the sound library.
   cut: (id: string) => request<CutView>('GET', `/content/${id}/cut`),

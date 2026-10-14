@@ -1440,3 +1440,50 @@ new pages or sidebar items; one new Library tab (Sounds).
   and the editor's first layout uses them.
 - **Library:** the editor's Done already lands the MP4 in Library >
   Posts (the post's video), as the worker's export does.
+
+### G33. Item 3: batch upgrades (overnight run, 2026-10-14)
+
+- **Spreadsheet import, inside a batch** (Idea step, "Import a
+  spreadsheet"): paste rows or upload a CSV, one row per post. Columns in
+  any order, forgiving names: character, account, clip (an existing
+  clip's name to reuse, or "still: your prompt"), still, video (optional),
+  caption (required), style (optional, the Format by name). The separator
+  is whichever of comma, semicolon or tab the header uses, so a caption
+  with a semicolon stays whole.
+  - Preview (free): every row's status (reuses a clip: free; a new still
+    and take: priced; a problem: named, and skipped) and the total. The
+    price is the Studio's default still model plus a 5 s take on the
+    default video model, per new row, from the price book, before reruns.
+  - Make N posts: one video post per good row, tagged with its account (or
+    the batch's). Rows that reuse a clip open at Finish and export at once
+    (free) unless the owner switches that off; a row whose Format still
+    needs something (shot B for a crash zoom) says what and waits. Rows
+    with a still prompt open at their Stills step with the prompt (and
+    "In the video: ...") as the idea.
+  - Call: nothing paid runs from the import. A still and a take are
+    generated in each post with its own price, as always (price before any
+    paid run is fixed). The total in the preview is an estimate for those.
+- **Caption styles**: Outline (TikTok Classic) next to the white box and
+  the upper third as the default place were already in (earlier tonight);
+  the editor now starts captions in the same look and place (G32).
+- **Clone source cleanup** (automatic while the clip is prepared; a
+  default, `clone.cleanup` in content.yaml, and "Use the cleaned clip" per
+  clip in the Clone panel):
+  - TikTok's end card: a mostly black stretch (82 percent of pixels near
+    black) that runs to the end and starts in the last 6 s is cut off.
+  - Burned-in captions and the bouncing handle watermark: text that stays
+    sharp and still for 2 s while the picture moves (light against dark,
+    an outline or TikTok's white box), found in overlapping 2 s windows on
+    small grey frames, grown into words and lines, split into text bands
+    when a cluster is taller than a caption, boxed with its time, then
+    filled in from around it (ffmpeg delogo) only while it shows. The
+    handle that jumps corners halfway is found in both places.
+  - A still picture (nothing moves) is left alone: there is no way to tell
+    text from the scene. Detection is a heuristic, tested on a synthetic
+    TikTok (panning picture, caption box, jumping handle, end card); real
+    clips may need tuning (LATER).
+  - The clip as uploaded is kept; switching "Use the cleaned clip" off
+    clones that instead.
+- **Read its caption** (Clone panel, Claude, priced on the button): reads
+  the caption from a frame of the clip as uploaded (the cleaned copy has
+  it filled in) and puts it in the post's caption, editable.

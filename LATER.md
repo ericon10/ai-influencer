@@ -75,3 +75,6 @@ rule.
 - More than one time, text or layout preset per video on the worker
   (today the first one renders, the rest are listed).
 - Run scripts/editor-parity.mjs in CI with a Chromium that has H.264.
+- Tune the clone cleanup on real saved TikToks (the end card and the
+  handle positions); a per-clip "these spots" picker on the frame.
+- CSV import: a "Generate all new rows" button with one combined price.

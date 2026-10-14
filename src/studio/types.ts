@@ -172,6 +172,7 @@ export type StudioAction =
   | { type: 'scene_qa'; characterId: string; candidateId: string }
   | { type: 'content_slides'; characterId: string; contentId: string }
   | { type: 'content_captions'; characterId: string; contentId: string }
+  | { type: 'clone_caption'; characterId: string; contentId: string }
   | { type: 'clone'; contentId: string; characterIds: string[]; model?: string; mode?: CloneMode; background?: 'video' | 'image'; outfit?: 'source' | 'hers'; looks: Record<string, string>; keepSound: boolean }
   | { type: 'clone_still'; contentId: string; characterId: string; outfit?: 'source' | 'hers'; look?: string }
 
@@ -280,6 +281,8 @@ export interface CloneSource {
   status: 'preparing' | 'ready' | 'failed'; name: string; uploadId: string | null; assetId: string | null
   durationSec: number | null; hasAudio: boolean; trimmed: boolean; error: string | null
   firstFrameId?: string | null; people?: PersonBox[]; target?: { x: number; y: number } | null; stills?: Record<string, string>
+  originalAssetId?: string | null; cleanAssetId?: string | null; cleanup?: { endCardSec: number | null; spots: number; on: boolean } | null
+  textFrameId?: string | null; sourceCaption?: string | null
 }
 export interface CloneStill {
   id: string; characterId: string; characterName: string; assetId: string | null; status: string; kept: boolean; error: string | null
@@ -340,3 +343,11 @@ export interface LibraryData { stills: LibraryStill[]; clips: LibraryClip[] }
 export interface StyleAnchor { on: 'payoff' | 'cut' | 'beat' | 'start' | 'end'; index: number; offset: number; ratio: number }
 export interface StyleItem { preset: string; strength: 'subtle' | 'normal' | 'strong'; at: StyleAnchor; duration: number | null; keys: Array<Record<string, number | string>> | null }
 export interface EditorStyle { id: string; name: string; items: StyleItem[]; createdAt: string }
+
+// Spreadsheet import inside a batch (overnight item 3).
+export interface ImportRow {
+  line: number; characterId: string | null; characterName: string; accountTag: string; clipId: string | null; clipTitle: string | null
+  stillPrompt: string | null; videoPrompt: string | null; caption: string; style: string | null
+  status: 'reuse' | 'generate' | 'problem'; problems: string[]; priceUsd: number
+}
+export interface ImportPreview { rows: ImportRow[]; problems: string[]; totals: { rows: number; reuse: number; generate: number; problem: number; usd: number }; priceNote: string }

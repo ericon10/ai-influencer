@@ -334,6 +334,14 @@ function SourceBox({ ctx, source, maxMb }: { ctx: PostCtx; source: CloneSource |
           <div className="st-col" style={{ gap: 6, minWidth: 0 }}>
             <b>{source.name}</b>
             <span className="st-hint">{source.durationSec} s · {source.hasAudio ? 'has sound' : 'no sound'}{source.trimmed ? ' · cut to the first 30 s' : ''}</span>
+            {source.cleanup && <CleanupNote ctx={ctx} source={source} />}
+            {source.textFrameId && ctx.item.characterId && (
+              <div className="st-row" style={{ gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                <PriceButton action={{ type: 'clone_caption', characterId: ctx.item.characterId, contentId: ctx.item.id }} label="Read its caption" variant="secondary" size="sm" onStarted={() => void qc.invalidateQueries({ queryKey: ['jobs'] })} />
+                <span className="st-hint">{source.sourceCaption != null ? (source.sourceCaption ? `Read: "${source.sourceCaption}". It is the post's caption now; change it in the Caption step.` : 'No caption was found on the clip.') : 'Claude reads the caption on the clip and puts it in the post\'s caption, to edit.'}</span>
+              </div>
+            )}
+            <RunStatus match={j => j.purpose === `clone_caption:${ctx.item.id}`} />
             {choose('Use a different video', 'sm ghost')}
           </div>
         </div>
@@ -350,6 +358,24 @@ function SourceBox({ ctx, source, maxMb }: { ctx: PostCtx; source: CloneSource |
       )}
       {busy && <span className="st-hint">{busy}</span>}
     </div>
+  )
+}
+
+// What the cleanup did, and "Use the cleaned clip" (on) to undo it.
+function CleanupNote({ ctx, source }: { ctx: PostCtx; source: CloneSource }) {
+  const qc = useQueryClient()
+  const toast = useToast()
+  const [busy, setBusy] = useState(false)
+  const c = source.cleanup!
+  const did = [c.endCardSec ? `TikTok's end card trimmed (${c.endCardSec} s)` : '', c.spots ? `${c.spots} text spot${c.spots === 1 ? '' : 's'} (captions, the handle) filled in` : ''].filter(Boolean).join(' · ')
+  return (
+    <label className="st-row" style={{ gap: 8, cursor: busy ? 'progress' : 'pointer', alignItems: 'flex-start' }}>
+      <button type="button" role="switch" aria-checked={c.on} disabled={busy} className={`st-switch ${c.on ? 'on' : ''}`} onClick={async () => {
+        setBusy(true)
+        try { await api.cloneCleanup(ctx.item.id, !c.on); await qc.invalidateQueries({ queryKey: keys.content }) } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) } finally { setBusy(false) }
+      }}><span /></button>
+      <span className="st-col" style={{ gap: 0 }}><b>{busy ? 'Switching...' : 'Use the cleaned clip'}</b><span className="st-hint">{did}. Off uses the clip as uploaded.</span></span>
+    </label>
   )
 }
 

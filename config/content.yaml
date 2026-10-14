@@ -86,6 +86,11 @@ clone:
   # The outfit: the one in the clip (default) or one of the character's
   # stills.
   outfit: source
+  # Before cloning, the clip is cleaned (free, on the worker): TikTok's end
+  # card is trimmed and burned-in captions and the bouncing handle
+  # watermark are filled in from around them. A default: the Clone panel
+  # can undo it per clip, and this switches it off for the account.
+  cleanup: true
   # The face images a replace gets: REF-00 and the first approved
   # three-quarter view, never the rest of the sheet (G28).
   face_refs: [REF-00, REF-01, REF-02]

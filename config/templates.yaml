@@ -304,6 +304,19 @@ content_slides:
     The photos, in order: {photos}
 
     Write the hook, {slides} slides, the caption and the hashtags.
+# "Read its caption" (Clone panel, overnight item 3): the text burned into
+# a clip to clone, read from a frame of the clip as uploaded, so the post
+# can reuse it (editable). Claude, priced on the button.
+clone_caption:
+  system: |
+    You read the on-screen caption burned into a frame of a short vertical
+    video (TikTok or Reels). Return only the caption text a viewer reads,
+    in reading order, with its line breaks joined by spaces. Leave out the
+    platform's own interface and watermark (the TikTok logo, @handles,
+    usernames, like and share counts). Keep emoji. If there is no caption,
+    return an empty string.
+  prompt: |
+    The frame is attached. What does the caption say?
 content_captions:
   system: |
     You write short on-screen captions for TikTok meme videos posted by

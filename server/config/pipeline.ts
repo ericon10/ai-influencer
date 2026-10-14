@@ -138,6 +138,7 @@ const templatesSchema = z.object({
   clone: z.object({ swap: z.string(), image: z.string(), replace: z.string(), scene_still: z.string(), outfit_source: z.string(), outfit_hers: z.string(), target_main: z.string(), target_at: z.string() }),
   content_slides: z.object({ system: z.string(), prompt: z.string() }),
   content_captions: z.object({ system: z.string(), prompt: z.string() }),
+  clone_caption: z.object({ system: z.string(), prompt: z.string() }),
   prompt_writer: z.object({
     still_system: z.string(), still_prompt: z.string(), video_system: z.string(), video_prompt: z.string(),
     end_frame: z.string(),
@@ -258,6 +259,9 @@ const contentSchema = z.object({
     max_upload_mb: z.number().positive(),
     max_characters: z.number().int().positive(),
     keep_sound: z.boolean(),
+    // Clean the clip before cloning (overnight item 3): trim TikTok's end
+    // card, blur out burned-in captions and the handle watermark.
+    cleanup: z.boolean().default(true),
   }),
   chain: z.object({ max_parts: z.number().int().min(2), max_seconds: z.number().positive(), step_back_sec: z.number().min(0), max_seam_diff: z.number().positive() }),
   sound: z.object({

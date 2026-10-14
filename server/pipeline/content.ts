@@ -137,6 +137,15 @@ const cloneSource = z.object({
   target: z.object({ x: z.number().min(0).max(1), y: z.number().min(0).max(1) }).nullable().default(null),
   // "Copy the moves": the scene still kept per character (candidate ids).
   stills: z.record(id, id).default({}),
+  // The cleanup before cloning (overnight item 3): the clip as uploaded and
+  // as cleaned, what was done, and whether the clean one is used.
+  originalAssetId: id.nullable().default(null),
+  cleanAssetId: id.nullable().default(null),
+  cleanup: z.object({ endCardSec: z.number().nullable().default(null), spots: z.number().int().min(0).default(0), on: z.boolean().default(true) }).nullable().default(null),
+  // A frame of the clip as uploaded (its caption still on), for "Read its
+  // caption", and what was read.
+  textFrameId: id.nullable().default(null),
+  sourceCaption: z.string().max(400).nullable().default(null),
 })
 export type CloneSource = z.infer<typeof cloneSource>
 // The sound bed (Phase 3; SPEC 5.5): ambience ("none", "room" for the

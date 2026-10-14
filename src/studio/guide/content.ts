@@ -178,6 +178,7 @@ export const GUIDE: GuideSection[] = [
       'Punch it up (optional) writes three sharper, more specific versions to pick from.',
       'Check the character, and set the account tag (which TikTok or Instagram it is for).',
       'Format (optional, default Single take): pick an edit for the post now. A two-shot format (crash zoom cut, whip pan, hand over the lens) plans shot A and shot B in the Video step, each with its direction already in the prompt.',
+      'A batch can Import a spreadsheet: one row per post (character, account, a clip to reuse or "still: your prompt", video, caption, style). Preview shows each row and the total price; Make N posts creates them and exports the ones that reuse a clip, free.',
     ],
     tips: ['Specific beats general: "stirs her coffee at a window seat when a friend says her name" works better than "drinks coffee".'],
     cost: 'Punch it up is a small Claude call (under a cent).',
@@ -241,7 +242,8 @@ export const GUIDE: GuideSection[] = [
     where: 'A video post or batch > Video > Clone a TikTok or Reel',
     intro: 'Save a TikTok or Reel to your device, then choose the file here. The Studio keeps a copy with its sound and finds the people on its first frame. "Replace the person (keep the scene)" is the default: only the person you pick changes, and the clip\'s place, light, crowd and outfit stay. "Copy the moves into a new scene" first makes a still of your character in the clip\'s place, shows it, then copies the moves onto it. Each clone is checked for free (the face, the skin, and that it is not the person in the original) and kept in Library > Clips.',
     steps: [
-      'Choose the video (3 to 30 seconds; longer is cut to 30).',
+      'Choose the video (3 to 30 seconds; longer is cut to 30). It is cleaned first, free: TikTok\'s end card is cut off and burned-in captions and the bouncing handle are filled in, so the clone does not copy them. Use the cleaned clip (on) can be switched off.',
+      'Read its caption (optional, Claude, priced on the button) puts the clip\'s caption in the post\'s caption, to edit.',
       'Pick what to do: Replace the person (default) or Copy the moves.',
       'Who to replace: the largest person is picked. Tap someone else on the frame to replace them instead; everyone else stays as they are.',
       'Outfit: the clothes in the clip by default, or your character\'s outfit from this post\'s still.',

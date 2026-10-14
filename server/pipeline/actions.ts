@@ -25,7 +25,7 @@ import { skinFor } from '../core/scenes.js'
 import { buildSceneEndFrame, buildSceneIdeas, buildScenePlan, buildScenePromptWrite, buildSceneRecheck, buildSceneRun, buildSceneEdit, buildSceneUpscale, buildSceneVideo, buildVideoUpscale, type SceneBuilt } from './sceneActions.js'
 import { markSceneBusy, saveVideoModel } from './scenes.js'
 import { buildContentCaptions, buildContentSlides } from './content.js'
-import { buildClone, buildCloneStill, saveCloneModel } from './clone.js'
+import { buildClone, buildCloneCaption, buildCloneStill, saveCloneModel } from './clone.js'
 import { ruleSwitches } from './rules.js'
 import { readBilling } from '../providers/billing.js'
 import { effectiveModel, readModelOverrides } from '../providers/modelOverrides.js'
@@ -100,6 +100,7 @@ export const actionSchema = z.discriminatedUnion('type', [
   // The content builder: Claude writes slideshow text, or batch captions.
   z.object({ type: z.literal('content_slides'), characterId: z.string(), contentId: z.string() }),
   z.object({ type: z.literal('content_captions'), characterId: z.string(), contentId: z.string() }),
+  z.object({ type: z.literal('clone_caption'), characterId: z.string(), contentId: z.string() }),
   // Clone Video (SPEC 13.1 R1): the post's source clip rebuilt for one or
   // more characters, one quote with a line each.
   z.object({
@@ -221,6 +222,7 @@ export async function buildAction(deps: Deps, ctx: Ctx, action: StudioAction): P
     case 'scene_prompt': return scene(await buildScenePromptWrite(deps, ctx, row, action))
     case 'content_slides': return scene(await buildContentSlides(deps, ctx, row, action.contentId))
     case 'content_captions': return scene(await buildContentCaptions(deps, ctx, row, action.contentId))
+    case 'clone_caption': return scene(await buildCloneCaption(deps, ctx, row, action.contentId))
     case 'scene_video': return scene(await buildSceneVideo(deps, ctx, row, action))
     case 'scene_video_upscale': return scene(await buildVideoUpscale(deps, ctx, row, action.candidateId))
     case 'scene_end_frame': return scene(await buildSceneEndFrame(deps, ctx, row, { ...action, withQa: action.withQa ?? autoQa }))

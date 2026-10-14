@@ -17,6 +17,7 @@ import { lintPrompt, type RuleViolation } from '../core/rules.js'
 import { assembleVideoPrompt } from '../core/promptWriter.js'
 import { finalize, type QaReport } from '../core/qa/marks.js'
 import { transcodeSource } from '../media/meme.js'
+import { cleanClip, detectEndCard, detectOverlays } from '../media/cleanup.js'
 import { muxSound } from '../media/edit.js'
 import { ffmpeg, probeFile, withTempDir } from '../media/ffmpeg.js'
 import { compareTexture } from '../qa/texture.js'
@@ -30,12 +31,12 @@ import { uploadKey } from '../storage/uploads.js'
 import { approvedAssets, getCandidate, getCharacter, toData } from './characters.js'
 import { pronounVars } from '../core/prompts.js'
 import { createContent, getContent, specSchemas, updateContent, type CloneSource, type ContentKind } from './content.js'
-import { lintOrThrow, runModel } from './sceneActions.js'
+import { lintOrThrow, runModel, type SceneBuilt } from './sceneActions.js'
 import { freeChecksOnly } from './sceneHooks.js'
 import { clipFrames } from './videoAssets.js'
 import { scorePerformer, scoreSceneIdentity } from './identity.js'
 import { ruleSwitches } from './rules.js'
-import { getSetting, setSetting } from './settings.js'
+import { getSetting, resolveRoute, setSetting } from './settings.js'
 
 // Clone Video (SPEC 13.1 R1; UX-PLAN.md: "Clone a TikTok or Reel" in a
 // post's Video step). The owner brings a saved TikTok or Reel; the worker
@@ -82,7 +83,7 @@ export async function addCloneSource(deps: Deps, ctx: Ctx, input: { contentId: s
   if (!/^upl_[a-z0-9]{20}$/.test(input.uploadId)) throw new AppError('bad_request', 'That upload id is not valid.')
   if (!(await deps.store.exists(uploadKey(ctx.accountId, input.uploadId)))) throw new AppError('bad_request', `${input.name} did not finish uploading. Try again.`)
   const name = input.name.replace(/\.[a-z0-9]+$/i, '').trim().slice(0, 120) || 'Clip to clone'
-  const clone: CloneSource = { status: 'preparing', name, uploadId: input.uploadId, assetId: null, durationSec: null, hasAudio: false, trimmed: false, error: null, firstFrameId: null, people: [], target: null, stills: {} }
+  const clone: CloneSource = { status: 'preparing', name, uploadId: input.uploadId, assetId: null, durationSec: null, hasAudio: false, trimmed: false, error: null, firstFrameId: null, people: [], target: null, stills: {}, originalAssetId: null, cleanAssetId: null, cleanup: null, textFrameId: null, sourceCaption: null }
   await updateContent(deps, ctx, post.id, { spec: { clone } })
   await enqueueLocalJob(deps, ctx, { stage: 'content', purpose: `clone_source:${post.id}`, label: `Prepare the clip to clone: ${name}`, characterId: post.characterId, request: { uploadId: input.uploadId, name } })
   return { ok: true }
@@ -108,21 +109,93 @@ async function runCloneSource(deps: Deps, ctx: Ctx, job: JobRow): Promise<unknow
       const original = await probeFile(input)
       const { hasAudio } = await transcodeSource(input, out, { maxSeconds: cfg.max_seconds })
       const asset = await saveAsset(deps, ctx, { data: await readFile(out), mime: 'video/mp4', origin: 'upload', label: `Clip to clone: ${name}`, sourceJobId: job.id })
-      const frame = await firstFrame(deps, ctx, out, name, job.id).catch(() => null)
-      return { asset, hasAudio, trimmed: (original.durationSec ?? 0) > cfg.max_seconds + 0.25, frame }
+      // The cleanup (overnight item 3): TikTok's end card off, burned-in
+      // text filled in, so the clone does not copy them. The clip as
+      // uploaded is kept for "Undo the cleanup".
+      let clean: { asset: Awaited<ReturnType<typeof saveAsset>>; endCardSec: number | null; spots: number } | null = null
+      if (cfg.cleanup) {
+        const endAt = await detectEndCard(out).catch(() => null)
+        const boxes = await detectOverlays(out, { until: endAt }).catch(() => [])
+        if (endAt != null || boxes.length) {
+          const cleaned = join(dir, 'clean.mp4')
+          await cleanClip(out, cleaned, { endAt, boxes })
+          const info = await probeFile(out)
+          clean = {
+            asset: await saveAsset(deps, ctx, { data: await readFile(cleaned), mime: 'video/mp4', origin: 'derived', label: `Clip to clone (cleaned): ${name}`, sourceJobId: job.id }),
+            endCardSec: endAt != null ? Math.round(((info.durationSec ?? endAt) - endAt) * 10) / 10 : null,
+            spots: boxes.length,
+          }
+        }
+      }
+      const frame = await firstFrame(deps, ctx, clean ? join(dir, 'clean.mp4') : out, name, job.id).catch(() => null)
+      // A frame with the caption still on, for "Read its caption".
+      const textFrame = await textFrameOf(deps, ctx, out, name, job.id).catch(() => null)
+      return { asset, clean, hasAudio, trimmed: (original.durationSec ?? 0) > cfg.max_seconds + 0.25, frame, textFrame }
     })
-    const seconds = Math.round((made.asset.durationMs ?? 0) / 100) / 10
+    const used = made.clean?.asset ?? made.asset
+    const seconds = Math.round((used.durationMs ?? 0) / 100) / 10
     await deps.store.delete(key).catch(() => undefined)
     if (seconds < cfg.min_seconds) {
       await write({ status: 'failed', error: `This clip is ${seconds} s long. A clone needs at least ${cfg.min_seconds} s of video.` })
       return { seconds }
     }
-    await write({ status: 'ready', assetId: made.asset.id, durationSec: seconds, hasAudio: made.hasAudio, trimmed: made.trimmed, error: null, firstFrameId: made.frame?.assetId ?? null, people: made.frame?.people ?? [], target: null, stills: {} })
-    return { assetId: made.asset.id, seconds }
+    await write({
+      status: 'ready', assetId: used.id, durationSec: seconds, hasAudio: made.hasAudio, trimmed: made.trimmed, error: null, firstFrameId: made.frame?.assetId ?? null, people: made.frame?.people ?? [], target: null, stills: {},
+      originalAssetId: made.asset.id, cleanAssetId: made.clean?.asset.id ?? null, textFrameId: made.textFrame, sourceCaption: null,
+      cleanup: made.clean ? { endCardSec: made.clean.endCardSec, spots: made.clean.spots, on: true } : null,
+    })
+    return { assetId: used.id, seconds, cleanup: made.clean ? { endCardSec: made.clean.endCardSec, spots: made.clean.spots } : null }
   } catch (e) {
     await write({ status: 'failed', error: `This file could not be read as a video (${(e as Error).message.slice(0, 200)}).` })
     throw e
   }
+}
+
+async function textFrameOf(deps: Deps, ctx: Ctx, video: string, name: string, jobId: string): Promise<string> {
+  return withTempDir(async dir => {
+    const info = await probeFile(video)
+    const png = join(dir, 'text.png')
+    await ffmpeg(['-ss', String(Math.min(1.5, (info.durationSec ?? 2) / 2)), '-i', video, '-frames:v', '1', '-vf', 'scale=720:-2', png], 60_000)
+    return (await saveAsset(deps, ctx, { data: await readFile(png), mime: 'image/png', origin: 'derived', label: `Caption frame of ${name}`, sourceJobId: jobId })).id
+  })
+}
+
+// "Read its caption" (overnight item 3): Claude reads the caption burned
+// into the clip; the post's caption takes it (editable). Priced on the button.
+export async function buildCloneCaption(deps: Deps, ctx: Ctx, row: { id: string }, contentId: string): Promise<SceneBuilt> {
+  const post = await getContent(deps, ctx, contentId)
+  const src = cloneOf(post)
+  if (post.characterId !== row.id) throw new AppError('bad_request', 'Pick a post of this character.')
+  if (!src || src.status !== 'ready' || !src.textFrameId) throw new AppError('bad_request', 'Add the clip to clone first, then read its caption.')
+  const t = deps.config.pipeline.templates.clone_caption
+  const route = await resolveRoute(deps, ctx, 'content_writer')
+  const purpose = `clone_caption:${post.id}`
+  return {
+    purpose,
+    preview: { title: 'Read its caption', prompts: [{ label: 'Caption reader', text: `${t.system}\n${t.prompt}`, wrapped: hardWrap(`${t.system}\n${t.prompt}`) }], warnings: [], invalidates: [] },
+    specs: [{ type: 'llm', stage: 'content', purpose, label: 'Read the clip\'s caption', request: { model: route.model, system: t.system, prompt: t.prompt, schema: { type: 'object', properties: { caption: { type: 'string' } }, required: ['caption'], additionalProperties: false }, schemaName: 'clone_caption', maxTokens: 300, effort: 'low', imageAssetIds: [src.textFrameId], meta: { itemId: post.id } } } satisfies JobSpec],
+  }
+}
+
+async function onCloneCaption(deps: Deps, ctx: Ctx, job: JobRow, out: JobOutcome): Promise<void> {
+  if (out.status !== 'completed') return
+  const text = typeof (out.data as { caption?: unknown } | null)?.caption === 'string' ? ((out.data as { caption: string }).caption).trim().slice(0, 400) : ''
+  const post = await getContent(deps, ctx, job.purpose.split(':')[1]!)
+  const src = cloneOf(post)
+  if (!src) return
+  await updateContent(deps, ctx, post.id, { spec: { clone: { ...src, sourceCaption: text }, ...(text && post.kind === 'meme' ? { caption: text } : {}) } })
+}
+
+// "Undo the cleanup" (and back): which copy of the clip the clone uses.
+export async function setCloneCleanup(deps: Deps, ctx: Ctx, contentId: string, on: boolean): Promise<CloneSource> {
+  const post = await getContent(deps, ctx, contentId)
+  const src = cloneOf(post)
+  if (!src || src.status !== 'ready' || !src.originalAssetId || !src.cleanAssetId || !src.cleanup) throw new AppError('bad_request', 'This clip was not cleaned, so there is nothing to undo.')
+  const assetId = on ? src.cleanAssetId : src.originalAssetId
+  const asset = await getAsset(deps, ctx, assetId)
+  const next = { ...src, assetId, durationSec: Math.round((asset.durationMs ?? 0) / 100) / 10, cleanup: { ...src.cleanup, on } }
+  await updateContent(deps, ctx, post.id, { spec: { clone: next } })
+  return next
 }
 
 // The clip's first frame and the faces on it (largest first). A frame the
@@ -649,6 +722,7 @@ export function registerClone(): void {
   if (registered) return
   registered = true
   registerLocalJob('clone_source', runCloneSource)
+  registerJobHook('clone_caption', onCloneCaption)
   registerLocalJob('clone_frame', runCloneFrame)
   registerJobHook('clone', onClone)
   registerJobHook('clone_still', onCloneStill)

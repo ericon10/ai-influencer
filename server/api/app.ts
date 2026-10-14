@@ -24,7 +24,8 @@ import { postCutView, postEditorProject } from '../pipeline/cutView.js'
 import { makeCloseup } from '../pipeline/closeup.js'
 import { addSound, archiveSound, listSounds, soundView, updateSound } from '../pipeline/sounds.js'
 import { deleteStyle, editorManifest, listStyles, saveFromEditor, saveStyle } from '../pipeline/openreel.js'
-import { addCloneSource, cloneOptions, cloneStills, keepClone, postClones, postFromClone, saveCloneModel, setCloneTarget, useCloneStill } from '../pipeline/clone.js'
+import { previewImport, runImport } from '../pipeline/csvImport.js'
+import { addCloneSource, cloneOptions, cloneStills, keepClone, postClones, postFromClone, saveCloneModel, setCloneCleanup, setCloneTarget, useCloneStill } from '../pipeline/clone.js'
 import { jobViews } from '../jobs/jobView.js'
 import { POST_STEPS, addBroll, archiveBroll, archiveContent, contentView, createContent, duplicateContent, postScene, retryFailedBatch, startRender, updateBroll, updateContent } from '../pipeline/content.js'
 import { rulesView, setRuleSwitch } from '../pipeline/rules.js'
@@ -589,6 +590,10 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
     requireRole(ctx, 'member')
     return c.json(await deleteStyle(deps, ctx, c.req.param('sid')))
   })
+  app.post('/content/:id/clone-source/cleanup', async c => {
+    const body = parse(z.object({ on: z.boolean() }), await json(c))
+    return c.json(await setCloneCleanup(deps, c.get('ctx'), c.req.param('id'), body.on))
+  })
   app.get('/content/:id/clone-stills', async c => c.json({ stills: await cloneStills(deps, c.get('ctx'), c.req.param('id')) }))
   app.post('/content/:id/clone-stills/:cid/use', async c => c.json(await useCloneStill(deps, c.get('ctx'), c.req.param('id'), c.req.param('cid'))))
   app.post('/clones/:id/keep', async c => {
@@ -649,6 +654,16 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
     return c.json({ id: row.id })
   })
   // "Make another like this": a filled-in copy that opens at the Text step.
+  // Spreadsheet import inside a batch: the preview (free), then the posts.
+  app.post('/content/:id/import/preview', async c => {
+    const body = parse(z.object({ csv: z.string().max(200_000) }), await json(c))
+    return c.json(await previewImport(deps, c.get('ctx'), c.req.param('id'), body.csv))
+  })
+  app.post('/content/:id/import', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    return c.json(await runImport(deps, ctx, c.req.param('id'), await json(c)), 201)
+  })
   app.post('/content/:id/duplicate', async c => {
     const ctx = c.get('ctx')
     requireRole(ctx, 'member')
