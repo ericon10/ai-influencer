@@ -13,6 +13,10 @@ import { VideoStep, videoSummary } from './post/VideoStep'
 import { TextStep, textSummary } from './post/TextStep'
 import { FinishStep } from './post/FinishStep'
 import type { PostCtx } from './post/ctx'
+import { HowTo } from '../guide/Guide'
+import type { GuideId } from '../guide/content'
+
+const STEP_GUIDE: Record<PostStep, GuideId> = { idea: 'post-idea', stills: 'post-stills', video: 'post-video', text: 'post-text', finish: 'post-finish' }
 
 // One post, idea to export, on one page (UX-PLAN.md rule 1). The steps flow
 // top to bottom: the ones done fold into a line with Change, the current one
@@ -121,6 +125,7 @@ function Workspace({ item, data }: { item: ContentItem; data: ContentData }) {
                   <div className="st-h3">{label}</div>
                   {state === 'done' && summary[k] && <div className="st-hint st-poststep-sum">{summary[k]}</div>}
                 </div>
+                {state !== 'done' && <HowTo id={STEP_GUIDE[k]} />}
                 {state === 'done' && <button className="st-btn sm ghost" onClick={() => jump(k, state)}>Change</button>}
                 {state === 'current' && <span className="st-badge accent">Now</span>}
               </header>

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link, NavLink, useLocation } from 'react-router-dom'
-import { Activity, FolderOpen, LayoutGrid, Loader2, Moon, Plus, Settings2, Sparkle, Sun, Users } from 'lucide-react'
+import { Activity, BookOpen, FolderOpen, LayoutGrid, Loader2, Moon, Plus, Settings2, Sparkle, Sun, Users } from 'lucide-react'
 import { useTheme } from '../context/theme'
 import { api } from './api'
 import { isActiveJob, useActiveJobs, useLiveJobs, useMe, useRefresh, useUsage, useWorker } from './hooks'
@@ -8,6 +8,7 @@ import { RunRow } from './runs'
 import { Drawer, Meter, errorMessage, useToast } from './ui'
 import type { JobView } from './types'
 import { NEW_POST, useNewPost } from './pages/post/parts'
+import { HowTo } from './guide/Guide'
 
 export function Shell({ children }: { children: ReactNode }) {
   const me = useMe()
@@ -34,6 +35,7 @@ export function Shell({ children }: { children: ReactNode }) {
           <NavLink to="/studio/characters" className={({ isActive }) => `st-nav-item ${isActive ? 'active' : ''}`}><Users size={17} />Characters</NavLink>
           <NavLink to="/studio/library" className={({ isActive }) => `st-nav-item ${isActive ? 'active' : ''}`}><FolderOpen size={17} />Library</NavLink>
           <NavLink to="/studio/settings" className={({ isActive }) => `st-nav-item ${isActive ? 'active' : ''}`}><Settings2 size={17} />Settings</NavLink>
+          <NavLink to="/studio/guide" className={({ isActive }) => `st-nav-item ${isActive ? 'active' : ''}`}><BookOpen size={17} />Guide</NavLink>
         </nav>
         <div className="st-side-foot">
           <button className="st-nav-item" onClick={() => setActivity(true)}>
@@ -62,6 +64,7 @@ export function Shell({ children }: { children: ReactNode }) {
       <Drawer open={activity} onClose={() => setActivity(false)} title="Activity">
         <ActivityList jobs={live.data?.jobs ?? []} />
         {(live.data?.jobs.length ?? 0) === 0 && <p className="st-muted">Nothing is running, and nothing finished in the last 15 minutes. Finished work shows in its post and in the Library.</p>}
+        <div style={{ marginTop: 16 }}><HowTo id="feedback" label="How prices and live status work" /></div>
       </Drawer>
     </div>
   )

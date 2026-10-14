@@ -6,6 +6,7 @@ import { useCharacters, useRefresh } from '../hooks'
 import { Callout, Field, Img, Modal, STAGES, Todo, errorMessage, useToast } from '../ui'
 import { REALISM_LINE } from '../copy'
 import { filesFromDrop, sheetRefOf, typeOf } from '../files'
+import { HowTo } from '../guide/Guide'
 
 export default function Characters() {
   const list = useCharacters()
@@ -25,7 +26,7 @@ export default function Characters() {
     <div className="st-page wide">
       <div className="st-pagehead">
         <div className="grow">
-          <div className="st-kicker">Setup</div>
+          <div className="st-kicker st-row" style={{ gap: 10 }}>Setup<HowTo id="characters" /></div>
           <h1 className="st-h1">Your characters</h1>
           <p className="st-sub">Set each one up once: inspiration, face, a 12-shot reference sheet and a character file. Posts use them after that.</p>
         </div>

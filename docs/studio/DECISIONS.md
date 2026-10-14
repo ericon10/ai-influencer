@@ -820,3 +820,28 @@ changes what the Studio suggests and checks, never what the owner types.
   edit can fix (plastic face, staged performance, hands or objects morph,
   background synchronized, low light synthetic, overprocessed). The full
   table sits under the video prompt as "If a take looks off".
+
+### G21. The Guide: a visual manual inside the Studio (owner, 2026-10-13)
+
+The owner found the Studio confusing and asked for a colorful Quick start
+and a visual manual, stored in the tool so each section opens where it is
+used.
+
+- `/studio/guide` (sidebar, under Settings): a Quick start in 7 steps, the
+  big picture (Characters, Posts, Library), one section per page and post
+  step, and a glossary. Each section says what the part is for, where it
+  is, what to do, tips, and what costs money.
+- Screenshots are of the real screens in demo mode (free mock results, no
+  paid call), stored as WebP in `public/studio-guide/`. Numbered hotspots
+  are percentages in `src/studio/guide/shots.json`, so they scale with the
+  image; hovering a number outlines that part and names it.
+- The text is data (`src/studio/guide/content.ts`), not page code, so a
+  change in the Studio is a change in one file.
+- "How this works" (UX-PLAN.md pattern 12): a small colored button in the
+  header of every page, character setup step and post step, plus the clone
+  panel and Activity. It opens that section in a drawer, with "Open the
+  full guide".
+- Posts home shows a Quick start banner until it is closed. Closing is
+  remembered in that browser only; if the browser blocks storage, the
+  banner just shows again.
+

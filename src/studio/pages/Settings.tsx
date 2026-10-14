@@ -9,6 +9,7 @@ import { PriceButton } from '../PriceButton'
 import type { SettingsView } from '../types'
 import { RulesPanel } from './Rules'
 import { UsagePanel } from './Usage'
+import { HowTo } from '../guide/Guide'
 
 // Settings (UX-PLAN.md): General, Models, Rules, Budgets and usage, Notices.
 type Tab = 'general' | 'models' | 'rules' | 'usage' | 'notices'
@@ -26,7 +27,7 @@ export default function Settings() {
   }
   return (
     <div className="st-page">
-      <div className="st-pagehead"><div className="grow"><div className="st-kicker">Settings</div><h1 className="st-h1">Studio settings</h1></div></div>
+      <div className="st-pagehead"><div className="grow"><div className="st-kicker st-row" style={{ gap: 10 }}>Settings<HowTo id="settings" /></div><h1 className="st-h1">Studio settings</h1></div></div>
       <div className="st-seg st-tabs" role="tablist" style={{ marginBottom: 20 }}>
         {TABS.map(([k, label]) => <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => open(k)}>{label}</button>)}
       </div>

@@ -10,6 +10,8 @@ import { SheetTab } from './character/SheetTab'
 import { FileTab } from './character/FileTab'
 import { useNewPost } from './post/parts'
 import type { CharacterView } from '../types'
+import { HowTo } from '../guide/Guide'
+import type { GuideId } from '../guide/content'
 
 // Character setup (UX-PLAN.md), once per character, as a stepper:
 // inspiration, face, reference sheet, character file. Making stills and
@@ -17,6 +19,7 @@ import type { CharacterView } from '../types'
 
 type Tab = 'start' | 'hero' | 'sheet' | 'file'
 const TABS: Tab[] = ['start', 'hero', 'sheet', 'file']
+const TAB_GUIDE: Record<Tab, GuideId> = { start: 'setup-start', hero: 'setup-face', sheet: 'setup-sheet', file: 'setup-file' }
 
 function defaultTab(v: CharacterView): Tab {
   if (v.stage <= 2) return 'start'
@@ -49,7 +52,7 @@ export default function Character() {
       <Link to="/studio/characters" className="st-btn ghost sm" style={{ marginBottom: 14 }}><ArrowLeft size={14} />Characters</Link>
       <div className="st-pagehead" style={{ marginBottom: 18 }}>
         <div className="grow">
-          <div className="st-kicker">Set up · revision {v.revision}</div>
+          <div className="st-kicker st-row" style={{ gap: 10 }}>Set up · revision {v.revision}<HowTo key={current} id={TAB_GUIDE[current]} /></div>
           <h1 className="st-h1">{v.data.name}</h1>
         </div>
         {ready && <button className="st-btn primary" disabled={!!newPost.busy} onClick={() => void newPost.create('meme', { characterId: v.id })}><Film size={16} />Make a post with {v.data.name}</button>}

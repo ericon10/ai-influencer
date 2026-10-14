@@ -8,6 +8,7 @@ import { Callout, Img, errorMessage, useToast } from '../ui'
 import { REALISM_LINE } from '../copy'
 import type { BatchSpec, ContentItem, LibraryData, MemeSpec, SlideshowSpec } from '../types'
 import { KIND_LABEL, NEW_POST, STEPS, postName, useDuplicate, useNewPost } from './post/parts'
+import { HowTo, QuickStartBanner } from '../guide/Guide'
 
 // Home (UX-PLAN.md): every post, newest work first, filtered by account
 // and character. One click opens a post where it was left.
@@ -38,7 +39,7 @@ export default function Posts() {
     <div className="st-page wide">
       <div className="st-pagehead">
         <div className="grow">
-          <div className="st-kicker">Posts</div>
+          <div className="st-kicker st-row" style={{ gap: 10 }}>Posts<HowTo id="posts" /></div>
           <h1 className="st-h1">Your posts</h1>
           <p className="st-sub">Each post goes from an idea to an exported video or slideshow on one page.</p>
         </div>
@@ -49,6 +50,8 @@ export default function Posts() {
           })}
         </div>
       </div>
+
+      <QuickStartBanner />
 
       {(tags.length > 0 || used.size > 1) && (
         <div className="st-col" style={{ gap: 8, marginBottom: 18 }}>

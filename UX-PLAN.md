@@ -116,6 +116,7 @@ top; Activity, the month's spend and Demo/Live sit at the bottom.
 | Sheet review | `/studio/characters/:id/review/:ref` | Full-screen review of sheet results (setup only) | An approved sheet shot |
 | **Library** | `/studio/library` | Browse everything made: tabs Stills, Clips, B-roll, Posts; filter by character and product; download; "Use in a new post"; upload B-roll and clips | My library |
 | **Settings** | `/studio/settings` | Tabs: General (mode, keys, Higgsfield billing), Models (Claude, Higgsfield), Rules, Budgets and usage, Notices | A Studio set up the way I want |
+| **Guide** | `/studio/guide` | The visual manual (owner, 2026-10-13): Quick start, the big picture, every page and step with an annotated screenshot, and a glossary. In the sidebar under Settings | "How do I use this?" answered with pictures |
 
 **Not pages** (they open as drawers inside whatever page I'm on):
 
@@ -203,9 +204,15 @@ top; Activity, the month's spend and Demo/Live sit at the bottom.
     with a one-click fix where there is one. Fixed rules block, with the
     reason.
 11. **Phone.**
-    - The sidebar becomes a bottom bar: Posts, New, Library, Characters,
-      Settings.
+    - The sidebar becomes a bottom bar: New, Posts, Characters, Library,
+      Settings, Guide.
     - Steps stack, and drawers become bottom sheets.
+12. **How this works** (owner, 2026-10-13). Every page and every post step
+    has a small "How this works" button in its header. It opens that
+    section of the Guide in a drawer: what it is, what to do, tips, what
+    costs money, and an annotated screenshot of the real screen. "Open the
+    full guide" goes to `/studio/guide`. New users see a one-line Quick
+    start banner on Posts home until they close it.
 
 ---
 

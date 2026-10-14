@@ -154,6 +154,7 @@ the Studio; they are not creative limits on a character.
 | `config/scenes.yaml`, `server/core/scenes.ts` | Stage 7 and 8 presets, scene and edit prompts, ref picker by angle, combo log |
 | `UX-PLAN.md` | The Studio's layout (approved): Posts home, one workspace per post, drawers, Library, Settings tabs. New features fit it or update it first |
 | `src/studio/pages/Post.tsx`, `src/studio/pages/post/` | The post workspace: Idea, Stills, Video, Text, Finish on one page (video post, slideshow, batch) |
+| `src/studio/pages/Guide.tsx`, `src/studio/guide/` | The Guide (DECISIONS G21): Quick start, every page and step with annotated screenshots (`public/studio-guide/`, hotspots in `shots.json`), glossary; `HowTo` opens a section in a drawer from each page and step. Update its text and screenshots when a screen changes |
 | `src/studio/pages/Posts.tsx`, `Library.tsx`, `src/studio/library.tsx` | Posts home (account and character filters, Make another like this); the Library and its drawer |
 | `config/content.yaml`, `server/pipeline/content.ts`, `server/core/overlay.ts`, `server/media/meme.ts` | Posts on the server: idea, scene, account tag, step; B-roll; video posts, slideshows, batches (clips rotate); TikTok caption box (bundled fonts); renders free on the worker |
 | `server/pipeline/clips.ts` | Uploaded clips (kept clips of a character) and the Library view |

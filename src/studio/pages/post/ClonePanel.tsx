@@ -9,6 +9,7 @@ import { RunStatus } from '../../runs'
 import { AsyncButton, Callout, Field, errorMessage, isFresh, useToast, type TodoItem } from '../../ui'
 import type { CloneModel, CloneResult, CloneSource, MemeSpec } from '../../types'
 import type { PostCtx } from './ctx'
+import { HowTo } from '../../guide/Guide'
 
 // "Clone a TikTok or Reel" (SPEC 13.1 R1; UX-PLAN.md), inline in the Video
 // step. Choose the saved video; the post's character is picked (add others
@@ -60,6 +61,7 @@ export function ClonePanel({ ctx, onUse, usedIds, batch = false }: { ctx: PostCt
 
   return (
     <div className="st-col st-clone" style={{ gap: 16 }}>
+      <div className="st-row" style={{ gap: 10 }}><span className="st-hint" style={{ flex: 1, minWidth: 200 }}>Same motion and camera as the saved video, with your character in it.</span><HowTo id="post-clone" label="How cloning works" /></div>
       <Field id="clone-source" label="The TikTok or Reel" required done={ready} group hint={`Save it from TikTok or Instagram, then choose the file. ${o?.minSeconds ?? 3} to ${o?.maxSeconds ?? 30} s; a longer one is cut to ${o?.maxSeconds ?? 30} s.`}>
         <SourceBox ctx={ctx} source={source} maxMb={o?.maxUploadMb ?? 200} />
       </Field>

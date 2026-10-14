@@ -9,6 +9,7 @@ import { ClipGrid, ClipUpload, StillGrid } from '../library'
 import { RunStatus } from '../runs'
 import type { BrollClip, ContentData, ScenesData } from '../types'
 import { KIND_LABEL, fileSlug, postName, useNewPost } from './post/parts'
+import { HowTo } from '../guide/Guide'
 
 // The Library (UX-PLAN.md): browse everything made, across characters.
 // Stills and clips start a new post in one click; B-roll is uploaded and
@@ -44,7 +45,7 @@ export default function Library() {
   return (
     <div className="st-page wide">
       <div className="st-pagehead">
-        <div className="grow"><div className="st-kicker">Library</div><h1 className="st-h1">Everything you made</h1><p className="st-sub">Stills, clips, B-roll and exported posts. Start a new post from any still or clip.</p></div>
+        <div className="grow"><div className="st-kicker st-row" style={{ gap: 10 }}>Library<HowTo id="library" /></div><h1 className="st-h1">Everything you made</h1><p className="st-sub">Stills, clips, B-roll and exported posts. Start a new post from any still or clip.</p></div>
       </div>
       <div className="st-row" style={{ gap: 12, flexWrap: 'wrap', marginBottom: 18 }}>
         <div className="st-seg" role="tablist">
