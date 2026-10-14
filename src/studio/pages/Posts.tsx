@@ -8,6 +8,7 @@ import { Callout, Img, errorMessage, useToast } from '../ui'
 import { REALISM_LINE } from '../copy'
 import type { BatchSpec, ContentItem, LibraryData, MemeSpec, SlideshowSpec } from '../types'
 import { KIND_LABEL, NEW_POST, STEPS, postName, useDuplicate, useNewPost } from './post/parts'
+import { batchProgress } from './post/batchProgress'
 import { HowTo, QuickStartBanner } from '../guide/Guide'
 
 // Home (UX-PLAN.md): every post, newest work first, filtered by account
@@ -145,6 +146,7 @@ function PostCard({ item, lib, characterName }: { item: ContentItem; lib: Librar
         <div className="st-casting-meta">
           <span>{[KIND_LABEL[item.kind], characterName, item.accountTag].filter(Boolean).join(' · ')}</span>
         </div>
+        {item.kind === 'batch' && <BatchProgress item={item} />}
         <div className="st-row" style={{ gap: 4 }}>
           <span className="st-hint">{new Date(item.updatedAt).toLocaleDateString([], { month: 'short', day: 'numeric' })}</span>
           <span className="st-spacer" />
@@ -152,6 +154,18 @@ function PostCard({ item, lib, characterName }: { item: ContentItem; lib: Librar
           <button className="st-btn sm ghost icon" onClick={archive} title="Archive" aria-label="Archive"><Archive size={14} /></button>
         </div>
       </div>
+    </div>
+  )
+}
+
+// A batch's progress on its card, live while it renders.
+function BatchProgress({ item }: { item: ContentItem }) {
+  const p = batchProgress(item.outputs)
+  if (!p) return null
+  return (
+    <div className="st-col" style={{ gap: 4 }} aria-live="polite">
+      <span className="st-hint">{item.status === 'rendering' ? 'Rendering: ' : ''}{p.text}</span>
+      {item.status === 'rendering' && <div className="st-meter" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(p.share * 100)}><span style={{ width: `${Math.round(p.share * 100)}%` }} /></div>}
     </div>
   )
 }

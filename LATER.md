@@ -25,9 +25,6 @@ rule.
 
 ## Phase 4 (Fine-tune, batch at scale)
 
-- The owner's call on the OpenCut engine (DECISIONS G23): a classic fork
-  in an iframe at /editor, the rewrite's Editor API when it ships, or the
-  Studio editor as it is.
 - Snap to shot edges and to the playhead when dragging in Fine-tune.
 - A waveform under the Sound lane in Fine-tune, and the clip's own sound
   as a lane when a clone keeps it.

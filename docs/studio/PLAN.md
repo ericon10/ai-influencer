@@ -372,8 +372,8 @@ OpenCut as a page in the Studio, project from R2, Done saves back.
 
 - [x] Fine-tune over the workspace: layers, preview, split, trim, move,
       undo; Done saves the cut, renders the MP4 back to the post (G23)
-- [ ] The OpenCut engine inside Fine-tune (blocked: rewrite not released,
-      classic does not build and has no embed API; owner decides, G23)
+- [x] The OpenCut engine: not needed (owner, G25). Fine-tune stays the
+      Studio's own editor; the OpenCut project format is kept for later
 - [x] Batch at scale: 50 videos, idempotent slots, retry failed, zip parts
 - [x] OpenCut's license notice in the app (Settings > Notices)
 - [ ] Written permission from the ai-influencer author (owner)

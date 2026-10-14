@@ -395,3 +395,12 @@ nowhere else:
 No edit adds a page, a drawer or a sidebar item. A post with no edit
 exports exactly as before.
 
+
+## 11. Overnight run (2026-10-14)
+
+Each piece is placed here before it is built. Rule 1 holds: one post
+workspace, drawers and inline steps; no new page or sidebar item.
+
+| Piece | Where it lives | Clicks |
+|---|---|---|
+| Batch progress | Posts home, on a batch's card: "12 of 50 done", a thin bar while it renders | 0 |

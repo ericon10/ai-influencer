@@ -137,8 +137,10 @@ the Studio; they are not creative limits on a character.
 - **Never crossfade a seam.** Cut, grade, or mark the seam failed. Prefer
   one take with start and end frames (SPEC 4.3).
 - Fine-tune (Phase 4, DECISIONS G13 and G23) is the Studio's own layer
-  editor over the workspace, on OpenCut's project layout; the OpenCut
-  engine itself waits for the owner's call (G23). Keep posts' parts as
+  editor over the workspace, on OpenCut's project layout. The owner
+  decided (G25): keep our own editor, keep the OpenCut project format so
+  their engine can drop in if it ships, and spend no time on the classic
+  OpenCut build. Keep posts' parts as
   data (clips, B-roll, caption text, sound) so any editor can load them
   as layers, and keep OpenCut's license notice in Settings > Notices.
 

@@ -1042,3 +1042,26 @@ new pages or sidebar items; one new Library tab (Sounds).
   a UI tile. Run the script again after an edit changes.
 - No paid run was made. The live checks this phase needs are queued for
   the owner's approval (the evening report lists them).
+
+### G25. Overnight run decisions (owner, 2026-10-14)
+
+- **OpenCut, decided:** the Studio keeps its own Fine-tune editor. The
+  post is still kept as an OpenCut project (`server/core/opencut.ts`,
+  `GET /content/:id/editor`), so their engine can drop in if it ships. No
+  time goes into the classic OpenCut build. G23's open question is closed.
+- **The approved paid tests did not run tonight.** The owner approved tests
+  1 to 6 under a 150-credit cap. They test the Studio itself (its stored
+  start frame, its adapter, its chain, close-up, clone and upscale steps),
+  so they have to run inside the production Studio. This build session
+  cannot reach it: the Studio's domain, R2 and Higgsfield's CDN are
+  blocked by the network policy of the container it runs in, and its keys
+  stay server-side (fixed rule). A worker-side run started from the
+  database was considered and dropped: the session's safety check treats a
+  paid run started that way, without the owner's click, as an autonomous
+  transaction. Running the Higgsfield tools directly from the session would
+  not test the Studio, so that was not done either. Nothing was spent.
+  The tests wait for the owner (the report lists the clicks), at the same
+  cap.
+- **Batch progress on Posts home:** a batch's card reads "12 of 50 done"
+  (failures counted apart) with a thin bar while it renders; the card
+  refreshes every 2 seconds while anything renders.
