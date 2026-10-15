@@ -5,6 +5,7 @@ import { useLiveJobs } from './hooks'
 import { useToast } from './ui'
 import { PriceButton } from './PriceButton'
 import { SentButton } from './pages/character/SentPanel'
+import { HowTo } from './guide/Guide'
 import type { JobView } from './types'
 
 // Feedback everywhere (owner, 2026-10-13; UX-PLAN.md shared patterns): every
@@ -36,7 +37,7 @@ const usual = (sec: number) => (sec < 90 ? `about ${Math.max(5, Math.round(sec /
 // Each finished run is announced once, even when two lists show it.
 const announced = new Set<string>()
 
-export function RunStatus({ ids = [], match, pending = false, className = '' }: {
+export function RunStatus({ ids = [], match, pending = false, className = '', hideEarlier = false }: {
   // Runs started from here (shown even before the list catches up).
   ids?: string[]
   // Runs that belong here, started from anywhere (they survive a reload).
@@ -44,6 +45,8 @@ export function RunStatus({ ids = [], match, pending = false, className = '' }: 
   // The click is being sent ("Submitting...").
   pending?: boolean
   className?: string
+  // Earlier failures are folded elsewhere on screen (a stills grid).
+  hideEarlier?: boolean
 }) {
   const live = useLiveJobs()
   const toast = useToast()
@@ -58,7 +61,7 @@ export function RunStatus({ ids = [], match, pending = false, className = '' }: 
   const newestAt = Math.max(0, ...list.map(j => Date.parse(j.createdAt)))
   const fresh = (j: JobView) => ids.includes(j.id) || newestAt - Date.parse(j.createdAt) < 5000
   const failedOld = (j: JobView) => (j.phase === 'failed' || j.phase === 'canceled') && !fresh(j)
-  const old = list.filter(j => failedOld(j) && !cleared.has(j.id))
+  const old = hideEarlier ? [] : list.filter(j => failedOld(j) && !cleared.has(j.id))
   const current = list.filter(j => !failedOld(j))
   const missing = ids.filter(id => !all.some(j => j.id === id))
   const seen = useRef(new Map<string, string>())
@@ -90,7 +93,7 @@ export function RunStatus({ ids = [], match, pending = false, className = '' }: 
         : g.map(j => <RunRow key={j.id} j={j} onDismiss={() => setDismissed(d => [...d, j.id])} />)))}
       {old.length > 0 && (
         <FailureLine
-          text={`Earlier: ${failureLine(old.map(j => ({ kind: jobFailureKind(j), charged: j.charged })))}`}
+          text={`Earlier: ${failureLine(old.map(j => ({ kind: jobFailureKind(j), facePass: /^Face pass/.test(j.label), charged: j.charged })))}`}
           open={showOld}
           onToggle={() => setShowOld(v => !v)}
           onClear={() => { clearRuns(old.map(j => j.id)); setCleared(clearedRuns()); setShowOld(false) }}
@@ -99,6 +102,17 @@ export function RunStatus({ ids = [], match, pending = false, className = '' }: 
       {showOld && old.map(j => <RunRow key={j.id} j={j} />)}
     </div>
   )
+}
+
+// After a refusal by the provider's filter (owner, 2026-10-15; G46): the
+// likely trigger words in what was sent, and the same run with only those
+// words reworded by code. The rewording is free; the run is priced.
+export function Triggers({ words }: { words: string[] }) {
+  return <span className="st-triggers" data-field="trigger-words">Likely trigger words: {words.join(', ')}. <HowTo id="feedback" label="Why" /></span>
+}
+
+export function SaferRetry({ jobId, onStarted }: { jobId: string; onStarted?: (ids: string[]) => void }) {
+  return <PriceButton action={{ type: 'retry_safer', jobId }} label="Retry with safer wording" size="sm" variant="secondary" icon={false} compact onStarted={onStarted} />
 }
 
 export function RunRow({ j, onDismiss, showLabel = true }: { j: JobView; onDismiss?: () => void; showLabel?: boolean }) {
@@ -114,11 +128,16 @@ export function RunRow({ j, onDismiss, showLabel = true }: { j: JobView; onDismi
           <b>{showLabel ? `${j.label}: ` : ''}{j.phase === 'canceled' ? 'canceled' : attention ? 'needs you' : 'failed'}.</b>{' '}
           {j.error}{' '}
           {j.charged === 'no' ? 'Nothing was charged.' : j.charged === 'maybe' ? 'The provider may have charged it; the amount stays reserved until you check (Activity).' : ''}
+          {j.triggers?.length > 0 && <Triggers words={j.triggers} />}
           {j.detail && <details className="st-run-details"><summary>Details</summary><pre>{j.detail}</pre></details>}
+          {/* The actions sit under the words, so the words keep the width. */}
+          <div className="st-run-actions">
+            {/* What was sent, failed runs included (owner, 2026-10-15). */}
+            {j.kind !== 'llm' && j.kind !== 'local' && <SentButton jobId={j.id} size="xs" />}
+            {j.safer && <SaferRetry jobId={j.id} />}
+            {j.retry && <PriceButton action={{ type: 'retry', jobId: j.id }} label="Retry" size="sm" variant="secondary" icon={false} compact />}
+          </div>
         </div>
-        {/* What was sent, failed runs included (owner, 2026-10-15). */}
-        {j.kind !== 'llm' && j.kind !== 'local' && <SentButton jobId={j.id} size="xs" />}
-        {j.retry && <PriceButton action={{ type: 'retry', jobId: j.id }} label="Retry" size="sm" variant="secondary" icon={false} compact />}
         {onDismiss && <button type="button" className="st-btn icon ghost sm" aria-label="Hide" onClick={onDismiss}><X size={13} /></button>}
       </div>
     )
@@ -156,6 +175,7 @@ export function FailureLine({ text, open, onToggle, onClear }: { text: string; o
       <span className="grow">{text}</span>
       <button type="button" className="st-btn xs ghost" onClick={onToggle} aria-expanded={open}>{open ? 'Hide them' : 'Show'}</button>
       <button type="button" className="st-btn xs ghost" onClick={onClear}>Clear</button>
+      <HowTo id="feedback" label="About failed runs" />
     </div>
   )
 }

@@ -2021,3 +2021,68 @@ pipeline worked, the gates did not.
   held. Use these video numbers stores them for the account
   (`recreate_video_gate`); Keep the current video numbers closes the check
   until the next 10. Until then a take uses the still numbers.
+
+### G45. Usability fixes from the editor audit (owner, 2026-10-15)
+
+The owner picked six fixes from the audit's usability notes (UX-PLAN.md
+section 19).
+
+- **Earlier failures in one gray line.** Only the run just started can be
+  red. Failures from earlier runs fold into one gray line counted by
+  reason ("4 blocked by the filter, refunded; 2 face passes not run.
+  Nothing charged.") with Show and Clear, in the Recreate stills grid and
+  in every run list (`src/studio/failures.ts`). One click is one run: the
+  stills group by their quote. The stills grid's Clear is kept with the
+  post (`spec.failuresClearedAt`); a run list's Clear is kept in the
+  browser. Under the stills button the run list leaves them out, so the
+  same failures are not counted twice.
+- **The face strip uses the video rule's number.** Drift is a face under
+  the video gate's `face_min` (0.45, or the number approved in a gate
+  check), on new and old reviews alike (`driftSpans` in
+  `server/core/takeGate.ts`).
+- **Editor (fork).** Four small corner dots just outside a caption (the
+  hit area stays finger-sized) and no Locked button on text; a caption
+  never grows taller than the frame (`capScaleToFrame`); freeze and speed
+  ramp get a marker on the Presets track that opens the Speed panel; the
+  preview starts bigger (a shorter timeline, no header bar); a click on
+  empty space clears the selection; the Studio names its tracks (Shots,
+  B-roll, Voice, Music, Ambience); a shot shows its speed (2x, Ramp,
+  Freeze). Each has a Playwright test (`e2e/editor/usability.spec.ts`,
+  `phone.spec.ts`, `failures.spec.ts`).
+
+### G46. Catalog wording in every prompt writer (owner, 2026-10-15)
+
+A bare "top" read from a clip was drawn as a plain tee, and fit and body
+words next to a real person's photo get refused. Outfits are now said the
+way a shop catalog says them, and nothing in a prompt describes her body
+or makes her pose (UX-PLAN.md section 20).
+
+- **What changes:** only the words, never what she wears. Fit words come
+  out where they stand ("fitted", "tight", "low-cut", "sheer", "toned",
+  "curvy"); the phrase naming a body word goes ("fitted at the waist",
+  "showing off her legs"), but "waist-up" framing, "waist height",
+  "waist-length" hair and table legs stay; underwear-sounding names become
+  the everyday garment ("boy shorts" to "bike shorts", "sports bra" to
+  "athletic crop top"); "posing in" becomes "wearing". The lists are data
+  (`config/wording.yaml`), the code is `server/core/wording.ts`.
+- **Where:** Claude's words are cleaned before the owner sees them (the
+  planner's fields, Punch it up, the clip reader's outfit, chips and motion
+  line) and the writer's still and video prompts are cleaned when they
+  land, next to the mood-word cleaning. The system prompts ask for catalog
+  terms and a moment, never a pose. The Recreate, scene-still and
+  face-pass templates say "the person's position" where they said "the
+  pose". `plainOutfit` (which cut sleeves and straps and left a bare
+  "top") is gone.
+- **The owner's words go as typed.** A word in the owner's own text
+  (the brief, a field they set, a typed outfit or chip) is never touched.
+  When the final prompt still has a risky word, the price says so under
+  the button: "May be blocked by the provider's filter: tight. Your words
+  go as typed." (default rule `wording-risky`, a warning, never a block;
+  the cleaning is the default rule `prompt-catalog-wording`). Both are
+  defaults, on, switchable in Settings > Rules.
+- **After a refusal:** a run or still refused by the filter names its
+  likely trigger words (read from what was sent) and offers Retry with
+  safer wording (`retry_safer`): the same request with those words
+  reworded by code, no Claude call. The rewording is free; the run is
+  priced like the refused one, shown first, and counts against a Recreate
+  post's spend cap like any retry (plain retries now do too).

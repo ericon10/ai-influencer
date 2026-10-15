@@ -47,6 +47,15 @@ const viewsSchema = z.object({
   })),
 })
 
+// Catalog wording (config/wording.yaml, DECISIONS G46).
+const wordingPair = z.object({ from: z.string().min(1), to: z.string() })
+const wordingSchema = z.object({
+  fit: z.array(z.string().min(1)).default([]),
+  body: z.array(z.string().min(1)).default([]),
+  swaps: z.array(wordingPair).default([]),
+  pose: z.array(wordingPair).default([]),
+})
+
 const ruleCheck = z.discriminatedUnion('type', [
   z.object({ type: z.literal('forbid_pattern'), pattern: z.string(), flags: z.string().default(''), exclude_after: z.string().optional() }),
   z.object({ type: z.literal('require_phrase'), phrase: z.string() }),
@@ -61,6 +70,9 @@ const ruleCheck = z.discriminatedUnion('type', [
   z.object({ type: z.literal('max_words'), field: z.string(), max: z.number().int() }),
   z.object({ type: z.literal('require_pattern'), pattern: z.string(), flags: z.string().default(''), ignore: z.string().optional() }),
   z.object({ type: z.literal('reference_slot') }),
+  // Words the provider's filter often blocks (config/wording.yaml, filled
+  // in when the config loads).
+  z.object({ type: z.literal('risky_wording'), wording: wordingSchema.optional() }),
   // Read by the code that does the thing (a fallback, a pre-filled field, a
   // QA hint), not by the prompt lint.
   z.object({ type: z.literal('behavior') }),
@@ -366,6 +378,7 @@ export const pipelineSchemas = {
   content: contentSchema,
   edits: editsSchema,
   presets: presetsSchema,
+  wording: wordingSchema,
 }
 
 export type SheetConfig = z.infer<typeof sheetSchema>
@@ -382,6 +395,7 @@ export type EditsConfig = z.infer<typeof editsSchema>
 export type EditId = (typeof EDIT_IDS)[number]
 export type PresetsConfig = z.infer<typeof presetsSchema>
 export type PresetConfig = PresetsConfig['presets'][number]
+export type WordingConfig = z.infer<typeof wordingSchema>
 
 export interface PipelineConfig {
   sheet: SheetConfig
@@ -393,4 +407,5 @@ export interface PipelineConfig {
   content: ContentConfig
   edits: EditsConfig
   presets: PresetsConfig
+  wording: WordingConfig
 }

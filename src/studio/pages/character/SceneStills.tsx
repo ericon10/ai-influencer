@@ -18,7 +18,7 @@ import { SentButton } from './SentPanel'
 
 const FIELD_LABEL: Record<string, string> = {
   momentType: 'Moment type', moment: 'The moment', setting: 'Setting', location: 'Place', outfit: 'Outfit', footwear: 'Footwear',
-  jewelry: 'Extra jewelry', makeup: 'Makeup', hair: 'Hair', pose: 'Pose and gaze', view: 'Angle', expression: 'Expression',
+  jewelry: 'Extra jewelry', makeup: 'Makeup', hair: 'Hair', pose: 'Position and gaze', view: 'Angle', expression: 'Expression',
   camera: 'Camera', foreground: 'Foreground', framing: 'Framing', light: 'Light', destination: 'Where it goes', title: 'Title',
   height: 'Camera height', brands: 'Brands and logos', refs: 'Sheet refs',
   task: 'Task', trigger: 'What catches the eye', distance: 'Camera distance', phone: 'Front or rear camera',

@@ -164,7 +164,7 @@ export function PromptBox({ id, characterId, sceneId, target, written, writeActi
         />
       )}
       {changedNote && <span className="st-hint st-warntext"><Info size={12} style={{ verticalAlign: -2 }} /> {changedNote}</span>}
-      {written?.removed?.length ? <span className="st-hint"><Info size={12} style={{ verticalAlign: -2 }} /> Taken out because your words did not use them: {written.removed.join(', ')}. Type them back in if you want them (Settings, Rules: the writer adds no mood words you did not use).</span> : null}
+      {written?.removed?.length ? <span className="st-hint"><Info size={12} style={{ verticalAlign: -2 }} /> Taken out or reworded because your words did not use them: {written.removed.join(', ')}. Type them back in if you want them (Settings, Rules: no mood words, and outfits in catalog terms with no fit or body words).</span> : null}
       {has && !inRange && <span className="st-hint">Aim for {words[0]} to {words[1]} words. Longer or shorter still runs.</span>}
       <div className="st-row" style={{ gap: 8, flexWrap: 'wrap', alignItems: 'flex-start' }}>
         <PriceButton

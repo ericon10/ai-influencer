@@ -1351,92 +1351,124 @@
  },
  "recreate-step2": {
   "w": 1030,
-  "h": 621,
+  "h": 821,
   "spots": [
    {
     "n": 1,
-    "x": 11.5,
-    "y": 9.9,
+    "x": 1.2,
+    "y": 28.9,
     "w": 25.5,
-    "h": 4.5,
+    "h": 3.4,
     "label": "Scene to keep: the place, light and props"
    },
    {
     "n": 2,
-    "x": 11.5,
-    "y": 31.5,
+    "x": 1.2,
+    "y": 45.3,
     "w": 13,
-    "h": 4.5,
+    "h": 3.4,
     "label": "Source traits to drop: hair, eyes, piercings, makeup"
    },
    {
     "n": 3,
-    "x": 11.5,
-    "y": 53.2,
+    "x": 1.2,
+    "y": 61.7,
     "w": 15.7,
-    "h": 4.5,
+    "h": 3.4,
     "label": "The outfit: keep the clip's, or pick hers"
    },
    {
     "n": 4,
-    "x": 11.5,
-    "y": 80.3,
+    "x": 1.2,
+    "y": 65.8,
+    "w": 97.1,
+    "h": 5.2,
+    "label": "Said like a catalog: garment, color, fabric, a style word; no fit or body words"
+   },
+   {
+    "n": 5,
+    "x": 1.2,
+    "y": 71.8,
+    "w": 97.1,
+    "h": 2.2,
+    "label": "Your own words go as typed"
+   },
+   {
+    "n": 6,
+    "x": 1.2,
+    "y": 85.1,
     "w": 22.5,
-    "h": 4.8,
+    "h": 3.7,
     "label": "Read them for me: Claude fills the chips (priced)"
    }
   ]
  },
  "recreate-stills": {
   "w": 1030,
-  "h": 1458,
+  "h": 1644,
   "spots": [
    {
     "n": 1,
-    "x": 21,
-    "y": 2.5,
+    "x": 40.8,
+    "y": 2.2,
     "w": 18.4,
-    "h": 32.9,
+    "h": 32.5,
     "label": "The face pass on the best still, made with the stills"
    },
    {
     "n": 2,
-    "x": 2.4,
-    "y": 26.3,
+    "x": 22.2,
+    "y": 23.3,
     "w": 15.9,
-    "h": 1.6,
+    "h": 1.4,
     "label": "The gate: face 0.45+, margin 0.12+, likeness under 0.45"
    },
    {
     "n": 3,
-    "x": 22,
-    "y": 28.4,
+    "x": 41.8,
+    "y": 27.1,
     "w": 17.1,
-    "h": 2.1,
+    "h": 1.8,
     "label": "Make the video: only on a still that passes"
    },
    {
     "n": 4,
-    "x": 1.2,
-    "y": 72.8,
-    "w": 97.7,
-    "h": 6.2,
-    "label": "The stills model: Nano Banana 2.1 (plan) or GPT Image 2.5 (API); same prompts, face pass, gates"
+    "x": 2.4,
+    "y": 25.1,
+    "w": 15.9,
+    "h": 2.8,
+    "label": "Refused by the filter: the likely trigger words in what was sent"
    },
    {
     "n": 5,
-    "x": 1.2,
-    "y": 82.4,
-    "w": 54.8,
-    "h": 2.6,
-    "label": "One price: 4 stills and the face pass; it names an untested model"
+    "x": 2.2,
+    "y": 30.3,
+    "w": 16.3,
+    "h": 1.8,
+    "label": "Retry with safer wording: only those words change (free); the run is priced"
    },
    {
     "n": 6,
     "x": 1.2,
-    "y": 79.8,
+    "y": 69.8,
+    "w": 62.1,
+    "h": 3.1,
+    "label": "Earlier failures in one gray line: Show them, or Clear for good"
+   },
+   {
+    "n": 7,
+    "x": 1.2,
+    "y": 73.7,
     "w": 97.7,
-    "h": 1.8,
+    "h": 5.5,
+    "label": "The stills model: Nano Banana 2.1 (plan) or GPT Image 2.5 (API)"
+   },
+   {
+    "n": 8,
+    "x": 1.2,
+    "y": 79.9,
+    "w": 97.7,
+    "h": 1.6,
     "label": "Switch off to skip the face pass"
    }
   ]
@@ -1465,46 +1497,46 @@
  },
  "recreate-review": {
   "w": 1030,
-  "h": 992,
+  "h": 1074,
   "spots": [
    {
     "n": 1,
-    "x": 0.1,
-    "y": 3.5,
-    "w": 99.8,
-    "h": 6.4,
+    "x": 1.3,
+    "y": 4.4,
+    "w": 97.5,
+    "h": 4,
     "label": "The video rule: the scores and what missed; a warning, never a reject"
    },
    {
     "n": 2,
-    "x": 0.1,
-    "y": 11.1,
-    "w": 43.9,
-    "h": 41.7,
+    "x": 1.3,
+    "y": 9.5,
+    "w": 97.5,
+    "h": 38.5,
     "label": "The take and the source, playing in sync"
    },
    {
     "n": 3,
-    "x": 0.1,
-    "y": 57.4,
-    "w": 99.8,
-    "h": 2.2,
-    "label": "The face check every 0.5 s; red marks are drift"
+    "x": 1.3,
+    "y": 52.3,
+    "w": 97.5,
+    "h": 2,
+    "label": "The face check every 0.5 s; red marks are drift: a face under 0.45, the same number as the video rule"
    },
    {
     "n": 4,
-    "x": 0.1,
-    "y": 64.9,
-    "w": 26.2,
-    "h": 26.9,
+    "x": 1.3,
+    "y": 59.2,
+    "w": 12.8,
+    "h": 24.8,
     "label": "Text found, each on its own frame with the words boxed"
    },
    {
     "n": 5,
-    "x": 0.1,
-    "y": 96.1,
-    "w": 26.2,
-    "h": 3.8,
+    "x": 1.3,
+    "y": 89.7,
+    "w": 97.5,
+    "h": 3.5,
     "label": "Your call: Keep this take, or Try again (nothing spends until you make the video)"
    }
   ]
@@ -1643,35 +1675,125 @@
   "spots": [
    {
     "n": 1,
-    "x": 49.7,
-    "y": 26.5,
-    "w": 6.6,
-    "h": 1.8,
+    "x": 46.9,
+    "y": 24.7,
+    "w": 12.2,
+    "h": 3.7,
     "label": "Drag the caption to move it. One drag is one undo step"
    },
    {
     "n": 2,
-    "x": 56,
-    "y": 27.6,
-    "w": 1.4,
-    "h": 2.2,
-    "label": "Drag a handle to make it bigger or smaller; it wraps to stay in the frame. On a phone, drag with a finger"
+    "x": 59.2,
+    "y": 28.5,
+    "w": 1.7,
+    "h": 2.7,
+    "label": "Drag a small corner dot to make it bigger or smaller; it wraps and never grows taller than the frame. On a phone, drag with a finger"
    },
    {
     "n": 3,
     "x": 15.9,
-    "y": 66.7,
+    "y": 82.7,
     "w": 17.4,
     "h": 5.9,
-    "label": "Drag its block on the timeline to show it later or sooner"
+    "label": "Drag its block on the timeline to show it later or sooner; drag its end to show it for less time"
+   }
+  ]
+ },
+ "price-wording": {
+  "w": 514,
+  "h": 88,
+  "spots": [
+   {
+    "n": 1,
+    "x": 2.3,
+    "y": 65.9,
+    "w": 76.1,
+    "h": 20.5,
+    "label": "A word you typed that the filter often blocks: named here, sent as typed"
+   }
+  ]
+ },
+ "run-failures": {
+  "w": 664,
+  "h": 260,
+  "spots": [
+   {
+    "n": 1,
+    "x": 1.8,
+    "y": 4.6,
+    "w": 96.4,
+    "h": 68.8,
+    "label": "Only the run you just started can be red"
+   },
+   {
+    "n": 2,
+    "x": 6.9,
+    "y": 23.2,
+    "w": 83.9,
+    "h": 10.8,
+    "label": "Refused by the filter: the likely trigger words in what was sent"
+   },
+   {
+    "n": 3,
+    "x": 25.3,
+    "y": 44.5,
+    "w": 35,
+    "h": 11.6,
+    "label": "The same run with only those words reworded (free rewording, priced run)"
    },
    {
     "n": 4,
-    "x": 32.4,
-    "y": 66.4,
-    "w": 1.3,
-    "h": 6.3,
-    "label": "Drag its end to show it for less time. A caption that ends with the last shot keeps ending with it"
+    "x": 1.8,
+    "y": 75.7,
+    "w": 96.4,
+    "h": 19.6,
+    "label": "Earlier failures in one gray line, with what was charged (nothing)"
+   },
+   {
+    "n": 5,
+    "x": 66.1,
+    "y": 80.9,
+    "w": 7.2,
+    "h": 9.2,
+    "label": "Show them, or Clear them for good"
+   }
+  ]
+ },
+ "editor-speed": {
+  "w": 1440,
+  "h": 1180,
+  "spots": [
+   {
+    "n": 1,
+    "x": 19.3,
+    "y": 85.9,
+    "w": 4,
+    "h": 4.5,
+    "label": "Freeze and speed ramp get a marker on the Presets track: click it to open the Speed panel"
+   },
+   {
+    "n": 2,
+    "x": 27.4,
+    "y": 92,
+    "w": 5.3,
+    "h": 1.3,
+    "label": "The shot shows its speed: 2x, Ramp or Freeze"
+   },
+   {
+    "n": 3,
+    "x": 5.2,
+    "y": 92.5,
+    "w": 6.2,
+    "h": 1.7,
+    "label": "Tracks named by what they hold: Captions, Shots, B-roll, Voice, Music"
+   },
+   {
+    "n": 4,
+    "x": 40.9,
+    "y": 11.1,
+    "w": 24.4,
+    "h": 52.9,
+    "label": "A bigger preview; click anywhere empty to clear the selection"
    }
   ]
  }

@@ -128,15 +128,6 @@ export function cardForPhotoEdit(card: string): string {
     .join(' ')
 }
 
-// An outfit read from a real person's photo, said plainly for a Recreate
-// prompt: the color and the garment, no sleeve, fit, length or cut details
-// ("dark green sleeveless fitted top" becomes "dark green top"). The owner's
-// own words are never changed (owner, 2026-10-15).
-const OUTFIT_DETAIL = /\b(?:sleeveless|strapless|backless|halter(?:-?neck)?|(?:short|long|cap|puff|three-quarter)[- ]sleeved?|spaghetti[- ]straps?|thin[- ]straps?|one[- ]shoulder|off[- ]the[- ]shoulders?|off[- ]shoulder|fitted|form[- ]fitting|figure[- ]hugging|skin[- ]?tight|tight|snug|bodycon|clingy|low[- ]cut|plunging|deep[- ]v|cropped|crop|mini|micro|sheer|see[- ]through|revealing)\b/gi
-export function plainOutfit(text: string): string {
-  return text.replace(OUTFIT_DETAIL, '').replace(/\s*,\s*(?=,|$)/g, '').replace(/\s{2,}/g, ' ').replace(/^[\s,]+|[\s,]+$/g, '').trim()
-}
-
 // Fixed rule adult-21 before a run, instead of age words in the prompt.
 export function adultProblem(age: number | null | undefined, minAge = DEFAULT_MIN_AGE): string | null {
   if (age == null) return 'Set an age first. Characters must be adults, 21 or older.'

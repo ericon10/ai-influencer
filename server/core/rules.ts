@@ -3,6 +3,7 @@ import type { GenRequest } from '../providers/types.js'
 import type { Mark } from './marks.js'
 import { BARE_FACE_LINE, findBannedTerms, findMakeupTerms, hasRealismBlock, isBareFaceStage } from './realism.js'
 import { EXPLICIT_MESSAGE, findExplicitTerms } from './safety.js'
+import { findRiskyWords } from './wording.js'
 
 // The rules engine (SPEC 5). Rules are data (config/rules.yaml); this file
 // only knows how to evaluate each check type against a prompt and request.
@@ -105,6 +106,10 @@ function check(rule: Rule, prompt: string, ctx: RuleContext): string | null | un
       if (ctx.identityBlock && !prompt.includes('the saved character')) return 'a saved character must be named as "the saved character"'
       return null
     }
+    case 'risky_wording': {
+      const words = c.wording ? findRiskyWords(prompt, c.wording) : []
+      return words.length ? words.join(', ') : null
+    }
     case 'max_words':
     case 'behavior':
     case 'code':
@@ -121,7 +126,9 @@ export function lintPrompt(rules: RulesConfig, prompt: string, ctx: RuleContext)
     const hit = check(rule, prompt, ctx)
     // A default is a warning at most, whatever the file says.
     const severity = rule.bucket === 'fixed' ? rule.severity : 'warning'
-    if (hit) out.push({ ruleId: rule.id, spec: rule.spec, title: rule.title, severity, message: rule.message, match: hit })
+    // Risky words name themselves: "tight, low-cut. Your words go as typed."
+    const message = rule.check.type === 'risky_wording' && hit ? `${hit}. Your words go as typed.` : rule.message
+    if (hit) out.push({ ruleId: rule.id, spec: rule.spec, title: rule.title, severity, message, match: hit })
   }
   return [...out, ...realismViolations(prompt, ctx), ...safetyViolations(prompt)]
 }

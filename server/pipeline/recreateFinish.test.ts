@@ -24,7 +24,7 @@ import { setSetting } from './settings.js'
 import { makeClip } from '../media/testClips.js'
 import { uploadKey } from '../storage/uploads.js'
 import type { GenRequest } from '../providers/types.js'
-import { adultProblem, cardForPhotoEdit, plainOutfit } from '../core/character.js'
+import { adultProblem, cardForPhotoEdit } from '../core/character.js'
 import { whatWasSentForJob } from './sent.js'
 
 // Recreate, finished (owner, 2026-10-14; UX-PLAN.md 16): the motion model
@@ -121,7 +121,9 @@ describe('step 2, the stills and the gates', () => {
     const c = (await spec(postId)).clone!
     expect(c.keep).toEqual(['a marble kitchen counter with flowers', 'warm ceiling light', 'handheld phone at chest height', 'one hand on the counter'])
     expect(c.notLike).toBe('dark brown hair, brown eyes, a nose ring, winged liner')
-    expect(c.outfit.text).toBe('dark green sleeveless dress')
+    // Catalog terms (G46): the garment, color, straps and style word stay;
+    // the fit phrase Claude added goes before the owner sees it.
+    expect(c.outfit.text).toBe('dark green ribbed tank top with thin straps, going-out look')
     expect(c.motion).toMatch(/skeptical squint/)
     await setCloneChoices(h.deps, h.ctx, postId, { keep: [...c.keep.slice(0, 3)] })
     const { preview } = await run({ type: 'clone_still', contentId: postId, characterId: callie })
@@ -130,12 +132,13 @@ describe('step 2, the stills and the gates', () => {
     expect(text).toContain("She must not have that person's dark brown hair, brown eyes, a nose ring, winged liner.")
     // Owner, 2026-10-15 (the provider's filter blocked every still that
     // stacked these next to a real person's photo): face and hair only, no
-    // age line, a plain outfit from Claude's words, the short REALISM line.
+    // age line, the outfit in catalog terms, the short REALISM line.
     expect(text).toContain('Long honey-blonde hair, loose beachy waves, deep side part. Warm hazel-brown eyes, soft oval face, full light-brown brows, full lips.')
     expect(text).not.toMatch(/years old|21 or older|\badult\b/i)
     expect(text).not.toMatch(/\b(?:toned|curvy|waist|hips|legs|athletic|build)\b/i)
-    expect(text).toContain('Dark green dress, same as in the photo.')
-    expect(text).not.toMatch(/sleeveless|fitted/i)
+    expect(text).toContain('Dark green ribbed tank top with thin straps, going-out look, same as in the photo.')
+    expect(text).not.toMatch(/fitted|\bwaist\b|\bpose\b/i)
+    expect(preview.warnings.some(w => w.ruleId === 'wording-risky')).toBe(false)
     expect(text.trim().endsWith('REALISM: Natural skin texture, not retouched.')).toBe(true)
     expect(text).not.toContain('AVOID:')
     // The owner's own words go as typed, sleeves and all.
@@ -143,6 +146,11 @@ describe('step 2, the stills and the gates', () => {
     const typed = (await run({ type: 'clone_still', contentId: postId, characterId: callie })).preview.prompts[0]!.text
     expect(typed).toContain('Dark green sleeveless slip dress, same as in the photo.')
     expect(typed).toContain('Keep from it: a marble kitchen counter with flowers, warm ceiling light, thin straps.')
+    // A word the filter often blocks goes as typed, with a warning on the price.
+    await setCloneChoices(h.deps, h.ctx, postId, { outfit: { text: 'tight dark green slip dress' } })
+    const risky = (await run({ type: 'clone_still', contentId: postId, characterId: callie })).preview
+    expect(risky.prompts[0]!.text).toContain('Tight dark green slip dress, same as in the photo.')
+    expect(risky.warnings.find(w => w.ruleId === 'wording-risky')).toMatchObject({ title: 'May be blocked by the provider\'s filter', message: 'tight. Your words go as typed.' })
     // The face pass follows the same rules.
     const still = (await cloneStills(h.deps, h.ctx, postId)).find(x => x.assetId && x.pass === 'still')
     if (still) {
@@ -174,8 +182,6 @@ describe('step 2, the stills and the gates', () => {
     expect(adultProblem(null)).toMatch(/Set an age/)
     expect(cardForPhotoEdit('Callie, 24 years old. Long red hair. Fit, athletic build, toned legs, defined waist, naturally curvy hips. Green eyes, freckles.')).toBe('Long red hair. Green eyes, freckles.')
     expect(cardForPhotoEdit('Distinguishing mark: small mole above her left brow. Style: a regular girl whose style evolves; natural glow.')).toBe('Distinguishing mark: small mole above her left brow.')
-    expect(plainOutfit('dark green sleeveless fitted top')).toBe('dark green top')
-    expect(plainOutfit('black off-the-shoulder mini dress')).toBe('black dress')
   })
 
   it('the stills stay on Nano Banana 2.1 on the plan whenever it is connected, even with the API as the billing default', async () => {
@@ -568,6 +574,29 @@ describe('earlier failures fold into one gray line (owner, 2026-10-15)', () => {
     } finally {
       for (const r of rows) await h.deps.db.update(candidates).set({ status: r.status, assetId: r.assetId, rejectNote: r.rejectNote }).where(eq(candidates.id, r.id))
       for (const j of jobRows) await h.deps.db.update(jobs).set({ status: j.status }).where(eq(jobs.id, j.id))
+    }
+  })
+
+  it('a refused still names the likely trigger words in what was sent and offers Retry with safer wording (G46)', async () => {
+    const a = (await cloneStills(h.deps, h.ctx, postId)).find(x => x.assetId && x.pass === 'still')!
+    const [row] = await h.deps.db.select().from(candidates).where(eq(candidates.id, a.id))
+    const [job] = await h.deps.db.select().from(jobs).where(eq(jobs.id, row!.jobId!))
+    const req = job!.request as GenRequest
+    try {
+      await h.deps.db.update(candidates).set({ status: 'failed', assetId: null, rejectNote: 'The provider content filter blocked this result.' }).where(eq(candidates.id, a.id))
+      await h.deps.db.update(jobs).set({ status: 'failed', error: { message: 'The provider content filter blocked this result.' }, request: { ...req, prompt: req.prompt.replace('same as in the photo', 'tight, same as in the photo') } }).where(eq(jobs.id, job!.id))
+      const v = (await cloneStills(h.deps, h.ctx, postId)).find(x => x.id === a.id)!
+      expect(v).toMatchObject({ failure: 'blocked', jobId: job!.id, triggers: ['tight'], safer: true })
+      const { preview } = await estimateAction(h.deps, h.ctx, { type: 'retry_safer', jobId: job!.id })
+      expect(preview.prompts[0]!.text).not.toMatch(/\btight\b/)
+      expect(preview.prompts[0]!.text).toContain('same as in the photo')
+      // A plain failure names no trigger words.
+      await h.deps.db.update(jobs).set({ error: { message: 'The provider timed out.' } }).where(eq(jobs.id, job!.id))
+      await h.deps.db.update(candidates).set({ rejectNote: 'The provider timed out.' }).where(eq(candidates.id, a.id))
+      expect((await cloneStills(h.deps, h.ctx, postId)).find(x => x.id === a.id)).toMatchObject({ failure: 'failed', triggers: [], safer: false })
+    } finally {
+      await h.deps.db.update(candidates).set({ status: row!.status, assetId: row!.assetId, rejectNote: row!.rejectNote }).where(eq(candidates.id, a.id))
+      await h.deps.db.update(jobs).set({ status: job!.status, error: job!.error, request: job!.request }).where(eq(jobs.id, job!.id))
     }
   })
 

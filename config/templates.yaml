@@ -151,11 +151,11 @@ clone:
   replace: "Replace only {target} in the source video with the person in the reference images: {poss} face, hair, skin and body exactly as in the references. Every other person in the video stays exactly as they are, with their own faces. Keep the place, the lighting, the crowd, the motion, the timing, the gestures, the camera movement and the framing of the source video exactly the same. {outfit} The replaced person must be the reference person, never the person from the source video."
   # The scene still for "Copy the moves" (G28): the clip's first frame (the
   # first image) with only that person replaced.
-  scene_still: "In the first image, replace only {target} with the person in the other reference images: {poss} face, hair, skin and body exactly as in those references. Keep every other person, the place, the lighting, the pose, the framing and the camera of the first image exactly the same. {outfit} The replaced person must be the reference person, never the person from the first image"
+  scene_still: "In the first image, replace only {target} with the person in the other reference images: {poss} face, hair, skin and body exactly as in those references. Keep every other person, the place, the lighting, the person's position, the framing and the camera of the first image exactly the same. {outfit} The replaced person must be the reference person, never the person from the first image"
   # Recreate from a real clip (owner's proven recipe, 2026-10-14). The
   # first image is the clip's frame; {element} is the character's
   # Higgsfield element on the plan, or the reference images otherwise.
-  recreate_still: "Use the first image only for the place, the light, the camera angle, the framing, the pose and the outfit. Replace {target} in it completely with {name}{element}: {face}. {Poss} hair is {hair_color}.{not_like} Keep the head angle and the gaze of the first image. Remove all caption text, the TikTok logo and the username, leaving no text or watermark anywhere in the image. {outfit}"
+  recreate_still: "Use the first image only for the place, the light, the camera angle, the framing, the person's position and the outfit. Replace {target} in it completely with {name}{element}: {face}. {Poss} hair is {hair_color}.{not_like} Keep the head angle and the gaze of the first image. Remove all caption text, the TikTok logo and the username, leaving no text or watermark anywhere in the image. {outfit}"
   recreate_not_like: " {Subj} must not have that person's {traits}."
   recreate_element_api: " (the person in the other reference images)"
   # The short REALISM line for Recreate stills and the face pass (owner,
@@ -164,12 +164,13 @@ clone:
   # The face-only pass on a chosen still: nothing else moves.
   # Owner, 2026-10-15: the still is the image being edited (the first
   # image); the element and REF-00 are face references only.
-  face_pass: "Edit the first image. Change only {poss} face to match {name}{element}: {face}. Use the other images only for the face. Keep everything else in the first image exactly the same, pixel for pixel: the hair, the outfit, the pose, the hands, the light, the background and the framing."
+  face_pass: "Edit the first image. Change only {poss} face to match {name}{element}: {face}. Use the other images only for the face. Keep everything else in the first image exactly the same, pixel for pixel: the hair, the outfit, {poss} position, the hands, the light, the background and the framing."
   face_pass_refs: " (the face in the other images)"
   # Step 2 chips (owner, 2026-10-14): what to keep from the frame, named.
   recreate_keep: " Keep from it: {keep}."
-  # Owner, 2026-10-15: the outfit stays plain ("dark green dress, same as in
-  # the photo"); Claude's words lose sleeve and fit details, the owner's stay.
+  # Owner, 2026-10-15: the outfit in catalog terms ("dark green ribbed tank
+  # top with thin straps, same as in the photo"); Claude's words lose fit and
+  # body words (config/wording.yaml), the owner's stay as typed (G46).
   outfit_keep_named: "{outfit}, same as in the photo."
   outfit_hers_named: "Dress {obj} in {outfit} instead of the clothes in the first image."
   # The motion step (owner's proven motion prompt, the kitchen clip on Wan
@@ -195,13 +196,19 @@ clone_traits:
     winged liner, glossy lips), tattoos. Never guess identity, age,
     ethnicity or anything not visible. Never describe the body.
     keep: what to keep from the first frame, as 3 to 6 short items: the
-    place, the light, the camera angle and framing, the pose, the outfit
-    (the color and the garment only, for example "dark green dress").
-    outfit: the outfit, the color and the garment only, for example "dark
-    green dress". No sleeve, fit, length or neckline details.
+    place, the light, the camera angle and framing, where the person is
+    and what they are doing, the outfit (in the same catalog terms as
+    below).
+    outfit: the outfit the way a shop catalog says it: the garment type,
+    its color and fabric, plus a style word when it is clear, for example
+    "dark green ribbed tank top with thin straps, going-out look". Always
+    name the garment (tank top, cami, halter top, slip dress, bodysuit,
+    t-shirt), never just "top". Never use fit or body words (fitted,
+    tight, low-cut, sheer, toned, curvy, hips, waist, legs) or names that
+    sound like underwear (say bike shorts, not boy shorts).
     motion: one sentence of what the person does through the clip, in
     order (looks into the lens, turns away, glances back...). Plain words,
-    no mood or camera words.
+    no mood, camera or body words; a moment, never "posing".
   prompt: |
     The person: {target}. The first image is the first frame; the others
     follow in order.
@@ -258,6 +265,12 @@ prompt_writer:
       needs them. Hair styling (a claw clip, a low ponytail) is fine.
     - Never use words like flawless, perfect skin, smooth skin,
       airbrushed, retouched or porcelain. Real skin is the look.
+    - Say clothes the way a shop catalog does: garment, color, fabric,
+      a style word when it is clear. Never fit or body words (fitted,
+      tight, low-cut, sheer, toned, curvy, hips, waist, legs), never names
+      that sound like underwear, and never "posing": say what {subj} is
+      doing ("refilling {poss} water bottle"). The reference images carry
+      {poss} build.
     - Never add mood words like glowing, cinematic, soft light, beautiful,
       stunning or dreamy unless a detail uses them. Say plainly where the
       light comes from instead.
@@ -304,6 +317,9 @@ prompt_writer:
       them: {directions}
     - Never describe {name}'s face, eyes, hair color or skin, and never
       use words like flawless, smooth skin or airbrushed.
+    - Never fit or body words (fitted, tight, low-cut, sheer, toned,
+      curvy, hips, waist, legs), never names that sound like underwear,
+      and never "posing": say what {subj} is doing.
     - {name} is an adult. Never nudity or sexual content.
   video_prompt: |
     The idea for this clip:

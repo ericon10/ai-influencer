@@ -49,7 +49,7 @@ test('the stills grid: earlier failures fold into one gray line with Show and Cl
   const blocked = 'The provider content filter blocked this result.'
   const stills = [
     still('ok1', { characterId, assetId: 'ast_ok', status: 'approved' }),
-    still('fresh-bad', { characterId, error: blocked, failure: 'blocked' }),
+    still('fresh-bad', { characterId, error: blocked, failure: 'blocked', jobId: 'job_fresh', triggers: ['tight', 'boy shorts'], safer: true }),
     ...[1, 2, 3, 4].map(i => still(`old-b${i}`, { characterId, error: blocked, failure: 'blocked', runId: 'q1', createdAt: hourAgo })),
     ...[1, 2].map(i => still(`old-f${i}`, { characterId, pass: 'face', error: 'No still came out usable, so the face pass did not run.', failure: 'not_run', runId: 'q1', createdAt: hourAgo })),
   ]
@@ -60,6 +60,10 @@ test('the stills grid: earlier failures fold into one gray line with Show and Cl
   // The run just started keeps its failure as a tile; the earlier six are folded.
   const grid = page.locator('.st-grid.scenes').first()
   await expect(grid.locator('.st-tile')).toHaveCount(2)
+  // A refusal names the likely trigger words and offers the safer retry.
+  const bad = grid.locator('.st-tile').filter({ hasText: 'Likely trigger words' })
+  await expect(bad.locator('[data-field="trigger-words"]')).toHaveText(/^Likely trigger words: tight, boy shorts\./)
+  await expect(bad.getByRole('button', { name: /Retry with safer wording/ })).toBeVisible()
   await snap(page, info, 'one gray line')
   await line.getByRole('button', { name: 'Show' }).click()
   await expect(page.locator('[data-field="earlier-failures"] .st-tile')).toHaveCount(6)
@@ -76,20 +80,24 @@ test('the run rows: only the run just started is red; earlier failures are one g
   const now = Date.now()
   const job = (n: number, at: number, o: Record<string, unknown>) => ({
     id: `job_t${n}`, label: 'Hook variants', purpose: `hook_variants:t${n}`, stage: 'content', status: 'failed', kind: 'llm', model: 'claude', modelName: 'Claude', characterId: null,
-    estimate: '$0.01', actual: '$0.00', phase: 'failed', phaseLabel: 'Failed', since: new Date(at).toISOString(), typicalSec: 10, error: 'It failed.', detail: null, charged: 'no', retry: false,
+    estimate: '$0.01', actual: '$0.00', phase: 'failed', phaseLabel: 'Failed', since: new Date(at).toISOString(), typicalSec: 10, error: 'It failed.', detail: null, charged: 'no', retry: false, triggers: [], safer: false,
     createdAt: new Date(at).toISOString(), completedAt: new Date(at + 1000).toISOString(), ...o,
   })
   const jobs = [
     job(1, now - 600_000, { error: 'The provider content filter blocked this result.' }),
     job(2, now - 500_000, { error: 'The provider content filter blocked this result.' }),
     job(3, now - 400_000, { status: 'canceled', phase: 'canceled', error: 'Canceled.' }),
-    job(4, now - 1000, { error: 'Claude did not answer in time.' }),
+    job(4, now - 1000, { kind: 'image', model: 'higgsfield/nano-banana-2.1', modelName: 'Nano Banana 2.1', error: 'The provider\'s content filter blocked this result.', retry: true, triggers: ['tight', 'boy shorts'], safer: true }),
   ]
   await page.route(/\/api\/v1\/jobs(\?|$)/, r => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ jobs }) }))
   await page.goto('/studio/library?tab=hooks')
   const rows = page.locator('.st-runs').filter({ hasText: 'Earlier:' }).first()
   await expect(rows.locator('.st-run.bad')).toHaveCount(1)
   await expect(rows.locator('[data-field="failure-line"]')).toHaveText(/Earlier: 2 blocked by the filter, refunded; 1 not run\. Nothing charged\./)
+  // The run just refused: its likely trigger words and the safer retry.
+  const fresh = rows.locator('.st-run.bad')
+  await expect(fresh.locator('[data-field="trigger-words"]')).toHaveText(/^Likely trigger words: tight, boy shorts\./)
+  await expect(fresh.getByRole('button', { name: /Retry with safer wording/ })).toBeVisible()
   await snap(page, info, 'one red row, one gray line')
   await rows.getByRole('button', { name: 'Show' }).click()
   await expect(rows.locator('.st-run.bad')).toHaveCount(4)

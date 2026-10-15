@@ -807,6 +807,8 @@ button.st-chip:hover { color: var(--st-text); border-color: var(--st-text-3); }
 .st-run.warn { border-color: rgba(243, 194, 79, 0.45); background: var(--st-warn-soft); color: var(--st-text); }
 .st-run.warn > svg { color: var(--st-warn); }
 .st-run-text { flex: 1; min-width: 0; }
+.st-run-actions { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 6px; margin-top: 6px; }
+.st-run-actions:empty { display: none; }
 .st-run-text b { color: var(--st-text); font-weight: 600; }
 .st-run .st-col { gap: 4px; }
 .st-run-details { margin-top: 4px; }
@@ -1252,3 +1254,9 @@ button.st-chip:hover { color: var(--st-text); border-color: var(--st-text-3); }
 .st-failline { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-radius: 10px; border: 1px solid var(--st-line); background: var(--st-surface-2); color: var(--st-text-3); font-size: 12.5px; line-height: 1.4; max-width: 640px; }
 .st-failline > svg { flex: none; color: var(--st-text-3); }
 .st-earlier { opacity: 0.8; }
+
+/* After a refusal (G46): the likely trigger words, then the safer retry. */
+.st-triggers { display: block; margin-top: 3px; color: var(--st-text-2); font-size: 12.5px; }
+/* The safer retry in a narrow still tile wraps instead of spilling. */
+.st-safer .st-btn { max-width: 100%; white-space: normal; text-align: left; }
+.st-safer .st-price-error { max-width: 100%; }

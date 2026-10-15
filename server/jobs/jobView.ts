@@ -3,6 +3,7 @@ import { jobs } from '../db/schema.js'
 import type { Deps } from '../context.js'
 import { formatUsd } from '../costs/money.js'
 import { modelLabel } from '../costs/quotes.js'
+import { findRiskyWords } from '../core/wording.js'
 
 // The live status of a run (owner, 2026-10-13: feedback everywhere): what it
 // is doing now from the runner's real state, how long it has been at it and
@@ -21,8 +22,15 @@ export interface JobViewRow {
   // Failed runs: plain words, the provider's own message, and the money.
   error: string | null; detail: string | null; charged: 'no' | 'yes' | 'maybe' | null
   retry: boolean
+  // A refusal by the provider's filter: the likely trigger words in what
+  // was sent, and whether "Retry with safer wording" can run (G46).
+  triggers: string[]; safer: boolean
   createdAt: string; completedAt: string | null
 }
+
+// The provider's content filter refused it (the same words explainFailure
+// turns into "The provider's content filter blocked this result.").
+export const FILTER_REFUSAL = /nsfw|content filter|safety|moderation|policy/i
 
 type JobRow = typeof jobs.$inferSelect
 const LOCAL = 'local'
@@ -121,6 +129,10 @@ export async function jobViews(deps: Deps, accountId: string, rows: JobRow[], la
     const why = failed ? explainFailure((j.error as { message?: string } | null)?.message, { local: j.provider === LOCAL }) : null
     const since = (['sent', 'provider_queued', 'generating', 'checking'].includes(phase) ? j.phaseAt : null) ?? j.submittedAt ?? j.createdAt
     const parent = !!(j.request as { parentJobId?: string } | null)?.parentJobId
+    const sent = (j.request as { prompt?: unknown } | null)?.prompt
+    const refused = (phase === 'failed' || phase === 'canceled') && j.kind !== 'llm' && typeof sent === 'string' && FILTER_REFUSAL.test((j.error as { message?: string } | null)?.message ?? '')
+    const triggers = refused ? findRiskyWords(sent as string, deps.config.pipeline.wording) : []
+    const retry = (phase === 'failed' || phase === 'canceled') && j.provider !== LOCAL && !parent
     return {
       id: j.id, label: labels.get(j.id) || j.purpose, purpose: j.purpose, stage: j.stage, status: j.status, kind: j.kind,
       model: ref, modelName: name, characterId: j.characterId,
@@ -133,7 +145,8 @@ export async function jobViews(deps: Deps, accountId: string, rows: JobRow[], la
       charged: phase === 'failed' || phase === 'canceled' ? 'no' : phase === 'needs_attention' ? 'maybe' : j.status === 'completed' ? ((j.actualMicros ?? 0) > 0 ? 'yes' : 'no') : null,
       // A paid run can be retried on its own (with a new price); a run that
       // waited on another step is retried from that step.
-      retry: (phase === 'failed' || phase === 'canceled') && j.provider !== LOCAL && !parent,
+      retry,
+      triggers, safer: retry && triggers.length > 0,
       createdAt: j.createdAt.toISOString(), completedAt: j.completedAt?.toISOString() ?? null,
     }
   })

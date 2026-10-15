@@ -24,6 +24,7 @@ import { ruleSwitches } from './rules.js'
 import { writtenStillPrompt } from './sceneActions.js'
 import { realismBlockers, stripBannedTerms } from '../core/realism.js'
 import { EXPLICIT_MESSAGE, findExplicitTerms } from '../core/safety.js'
+import { catalogWording } from '../core/wording.js'
 
 // What each finished scene job does (Stage 7 and 8). Failed QA never
 // reaches the review queue (SPEC 6); a still waits with its reasons and a
@@ -66,7 +67,15 @@ async function onScenePlan(deps: Deps, ctx: Ctx, job: JobRow, out: JobOutcome): 
   const raw = (out.data ?? {}) as Record<string, unknown>
   const own = draftFields(scene)
   const merged: Record<string, unknown> = { ...own }
-  for (const key of Object.keys(sceneFieldsSchema.shape)) if (typeof raw[key] === 'string') merged[key] = raw[key]
+  // The planner's words in catalog terms (default rule prompt-catalog-wording,
+  // G46): no fit or body words, a moment and not a pose. The owner's words
+  // (the brief, a field already set) keep theirs.
+  const catalog = job.characterId && (await ruleSwitches(deps, ctx, job.characterId)).on('prompt-catalog-wording')
+  const ownWords = [scene.brief, ...Object.values(own).filter((v): v is string => typeof v === 'string')].join(' ')
+  for (const key of Object.keys(sceneFieldsSchema.shape)) {
+    if (typeof raw[key] !== 'string') continue
+    merged[key] = catalog ? catalogWording(raw[key] as string, deps.config.pipeline.wording, ownWords).text : raw[key]
+  }
   // What the owner's words say (a selfie, a black tank) is never planned
   // away; a field the owner set stays as set.
   const words = fieldsFromWords(deps.config.pipeline.scenes, scene.brief)
@@ -75,6 +84,19 @@ async function onScenePlan(deps: Deps, ctx: Ctx, job: JobRow, out: JobOutcome): 
   const parsed = sceneFieldsSchema.safeParse(merged)
   if (parsed.success) for (const issue of checkSceneFields(deps.config.pipeline.scenes, deps.config.pipeline.views, parsed.data)) delete merged[issue.field]
   await updateScene(deps, ctx, scene.id, { fields: merged as Partial<SceneFields>, title: scene.title || (typeof raw.title === 'string' ? raw.title : undefined) })
+}
+
+// "Punch it up": Claude's three moments in catalog terms before the owner
+// picks one (G46). The owner's rough idea keeps its words.
+async function onSceneIdeas(deps: Deps, ctx: Ctx, job: JobRow, out: JobOutcome): Promise<void> {
+  const data = out.data as { options?: Array<Record<string, unknown>> } | undefined
+  if (out.status !== 'completed' || !Array.isArray(data?.options)) return
+  if (!(await ruleSwitches(deps, ctx, job.characterId)).on('prompt-catalog-wording')) return
+  const own = (job.request as { prompt?: string }).prompt ?? ''
+  const w = deps.config.pipeline.wording
+  const options = data.options.map(o => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, typeof v === 'string' ? catalogWording(v, w, own).text : v])))
+  const [row] = await deps.db.select({ meta: jobs.resultMeta }).from(jobs).where(eq(jobs.id, job.id))
+  await deps.db.update(jobs).set({ resultMeta: { ...((row?.meta as Record<string, unknown> | null) ?? {}), data: { ...data, options } } }).where(eq(jobs.id, job.id))
 }
 
 // The prompt writer's answer goes into the scene's prompt box, cleaned (no
@@ -95,12 +117,23 @@ async function onScenePrompt(deps: Deps, ctx: Ctx, job: JobRow, out: JobOutcome)
   // Default rule prompt-no-flourish: mood words the owner never used come
   // out (glowing, cinematic, soft light, beautiful), and the box says so.
   let removed: string[] = []
-  if (job.characterId && (await ruleSwitches(deps, ctx, job.characterId)).on('prompt-no-flourish')) {
+  const sw = job.characterId ? await ruleSwitches(deps, ctx, job.characterId) : null
+  if (sw && (sw.on('prompt-no-flourish') || sw.on('prompt-catalog-wording'))) {
     const scene = await getScene(deps, ctx, sceneIdOf(job))
-    const own = [scene.brief, ...Object.values(draftFields(scene)).filter((v): v is string => typeof v === 'string'), meta.motion ?? '', meta.notes ?? ''].join(' ')
-    const out = stripFlourishes(text, own)
-    text = out.text
-    removed = out.removed
+    const own = [scene.brief, ...Object.values(draftFields(scene)).filter((v): v is string => typeof v === 'string'), meta.motion ?? '', meta.notes ?? '', meta.directions ?? ''].join(' ')
+    if (sw.on('prompt-no-flourish')) {
+      const out = stripFlourishes(text, own)
+      text = out.text
+      removed = out.removed
+    }
+    // Default rule prompt-catalog-wording (G46): the writer's outfit words
+    // in catalog terms, no fit or body words, no "posing". The owner's own
+    // words stay as typed.
+    if (sw.on('prompt-catalog-wording')) {
+      const out = catalogWording(text, deps.config.pipeline.wording, own)
+      text = out.text
+      removed = [...removed, ...out.changed]
+    }
   }
   // The director's notes: the owner's, kept as set, or the writer's.
   const notes = meta.notes ? meta.notes : typeof raw.notes === 'string' ? normalizePrompt(stripBannedTerms(raw.notes).prompt).slice(0, 600) : ''
@@ -382,6 +415,7 @@ export function registerSceneHooks(): void {
   if (registered) return
   registered = true
   registerJobHook('scene_plan', onScenePlan)
+  registerJobHook('scene_ideas', onSceneIdeas)
   registerJobHook('scene_prompt', onScenePrompt)
   registerJobHook('scene', onScene)
   registerJobHook('drift_lock', onDriftLock)

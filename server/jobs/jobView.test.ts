@@ -55,6 +55,35 @@ describe('live status', () => {
     await expect(estimateAction(h.deps, h.ctx, { type: 'retry', jobId: retried.id })).rejects.toThrow(/Only a failed run/)
   })
 
+  it('a refusal names the likely trigger words and offers Retry with safer wording (free rewording, priced run)', async () => {
+    const row = await start(still('in a tight black tank top and boy shorts [mock:fail]'))
+    await drain(h, 20)
+    // Not a filter refusal: no trigger words, no safer retry.
+    expect(await view(row.id)).toMatchObject({ triggers: [], safer: false })
+    await h.deps.db.update(jobs).set({ error: { message: 'The provider content filter blocked this result.' } }).where(eq(jobs.id, row.id))
+    const v = await view(row.id)
+    expect(v).toMatchObject({ error: 'The provider\'s content filter blocked this result.', safer: true, retry: true })
+    expect([...v.triggers].sort()).toEqual(['boy shorts', 'tight'])
+    const { quote, preview } = await estimateAction(h.deps, h.ctx, { type: 'retry_safer', jobId: row.id })
+    expect(quote.status).toBe('open')
+    expect(preview.title).toBe('Retry with safer wording: Test still')
+    expect(preview.prompts[0]!.text).toContain('in a black tank top and bike shorts')
+    expect(preview.warnings.find(w => w.ruleId === 'wording-safer')?.message).toMatch(/^Changed: (tight, boy shorts|boy shorts, tight)\. Only the words change, never the outfit\./)
+    const { jobs: again } = await runAction(h.deps, h.ctx, { type: 'retry_safer', jobId: row.id }, quote.id, true)
+    const retried = await getJob(h.deps, h.ctx, again[0]!.id)
+    const sent = (retried.request as { prompt: string }).prompt
+    expect(sent).toContain('A woman on a bench in a black tank top and bike shorts')
+    expect(sent).not.toMatch(/\btight\b|boy shorts/)
+    // The REALISM block stays (rule zero).
+    expect(sent).toMatch(/REALISM:/)
+    // Nothing to reword: the plain Retry is the way.
+    const plain = await start(still('[mock:fail]'))
+    await drain(h, 20)
+    await h.deps.db.update(jobs).set({ error: { message: 'The provider content filter blocked this result.' } }).where(eq(jobs.id, plain.id))
+    expect(await view(plain.id)).toMatchObject({ triggers: [], safer: false, retry: true })
+    await expect(estimateAction(h.deps, h.ctx, { type: 'retry_safer', jobId: plain.id })).rejects.toThrow(/No likely trigger words/)
+  })
+
   it("uses the account's own median once there is history for a model", async () => {
     for (let i = 0; i < 3; i++) await start(still(`run ${i}`))
     await drain(h, 30)

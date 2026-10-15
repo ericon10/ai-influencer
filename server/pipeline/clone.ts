@@ -1,6 +1,6 @@
 import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { and, desc, eq, inArray, like, or } from 'drizzle-orm'
+import { and, desc, eq, inArray, like, or, sql } from 'drizzle-orm'
 import { candidates, characters, jobs } from '../db/schema.js'
 import type { Ctx, Deps } from '../context.js'
 import { AppError } from '../lib/errors.js'
@@ -11,7 +11,8 @@ import { displayPrice } from '../costs/quotes.js'
 import { isVideoOp } from '../core/clips.js'
 import { capitalize, fill, hardWrap } from '../core/text.js'
 import { buildEditPrompt, hairColorFrom } from '../core/scenes.js'
-import { adultProblem, cardForPhotoEdit, plainOutfit } from '../core/character.js'
+import { adultProblem, cardForPhotoEdit } from '../core/character.js'
+import { catalogWording, findRiskyWords } from '../core/wording.js'
 import { pickPerson, targetWords, type Point } from '../core/cloneTarget.js'
 import type { RealismWarning } from '../core/realism.js'
 import { lintPrompt, type RuleViolation } from '../core/rules.js'
@@ -881,9 +882,12 @@ export async function buildCloneStill(deps: Deps, ctx: Ctx, input: CloneStillInp
   let outfit = ''
   const choice = input.outfit ?? source.outfit.choice ?? cfg.outfit
   const look = input.look ?? source.outfit.lookId
-  // Claude's outfit words go plain (color and garment); the owner's as typed.
+  // Claude's outfit words in catalog terms (garment, color, fabric, a style
+  // word; no fit or body words); the owner's as typed (G46).
+  const wording = deps.config.pipeline.wording
+  const catalog = (text: string) => catalogWording(text, wording).text
   const rawNamed = source.outfit.text.trim().replace(/[.\s]+$/, '')
-  const named = source.typed.outfit ? rawNamed : plainOutfit(rawNamed)
+  const named = source.typed.outfit ? rawNamed : catalog(rawNamed)
   if (choice === 'hers') {
     if (look) {
       refs.push(await lookStill(deps, ctx, row.id, row.name, ch.pronouns.poss, look))
@@ -896,7 +900,7 @@ export async function buildCloneStill(deps: Deps, ctx: Ctx, input: CloneStillInp
   } else if (named) {
     outfit = capitalize(fill(t.clone.outfit_keep_named, { ...pv, outfit: named }))
   }
-  const keep = source.keep.map(k => (source.typed.keep.includes(k) ? k : plainOutfit(k)).trim()).filter(Boolean)
+  const keep = source.keep.map(k => (source.typed.keep.includes(k) ? k : catalog(k)).trim()).filter(Boolean)
   if (!element && ch.identities.some(i => i.kind === 'element')) warnings.push(warn('clone-element', 'No element off the plan', `${row.name}'s Higgsfield element works on your plan only; here REF-00 and one three-quarter view carry ${ch.pronouns.poss} face.`))
   const frame = await getAsset(deps, ctx, frameId)
   const portrait = (frame.height ?? 16) >= (frame.width ?? 9)
@@ -1032,10 +1036,14 @@ async function onCloneTraits(deps: Deps, ctx: Ctx, job: JobRow, out: JobOutcome)
   const post = await getContent(deps, ctx, job.purpose.split(':')[1]!)
   const src = cloneOf(post)
   if (!src) return
-  const traits = oneLine(d.traits, 300)
-  const keep = chipList(d.keep)
-  const outfit = oneLine(d.outfit, 160)
-  const motion = oneLine(d.motion, 400)
+  // Claude's words in catalog terms before the owner sees them (G46): what
+  // is in the boxes after this is Claude's, cleaned, or the owner's own.
+  const wording = deps.config.pipeline.wording
+  const catalog = (text: string) => catalogWording(text, wording).text
+  const traits = catalog(oneLine(d.traits, 300))
+  const keep = chipList(chipList(d.keep).map(catalog))
+  const outfit = catalog(oneLine(d.outfit, 160))
+  const motion = catalog(oneLine(d.motion, 400))
   await updateContent(deps, ctx, post.id, { spec: { clone: {
     ...src, ...(traits ? { notLike: traits } : {}), ...(keep.length ? { keep } : {}), ...(motion ? { motion } : {}),
     ...(outfit && !src.outfit.text ? { outfit: { ...src.outfit, text: outfit } } : {}),
@@ -1091,7 +1099,7 @@ async function onCloneStill(deps: Deps, ctx: Ctx, job: JobRow, out: JobOutcome):
   const base = { accountId: job.accountId, characterId, jobId: job.id, createdBy: job.userId, prompt: req.prompt ?? '', target: 'clone_still', op: 'clone_still', label: `${face ? 'Face pass' : 'Still'}: ${source?.name ?? 'a clip'}`, ...(face && parentId ? { parentId } : {}) }
   const asset = out.assets?.find(a => a.kind === 'image') ?? out.assets?.[0]
   if (out.status !== 'completed' || !asset) {
-    await deps.db.insert(candidates).values({ ...base, id: newId('cand'), status: 'failed', rejectNote: out.error || 'The scene still did not finish.' })
+    await deps.db.insert(candidates).values({ ...base, id: newId('cand'), status: 'failed', rejectNote: out.error || 'The scene still did not finish.', meta: { pass: face ? 'face' : 'still' } })
     if (!face) await startAutoFace(deps, ctx, job, postId, characterId)
     return
   }
@@ -1198,12 +1206,20 @@ export interface CloneStillView {
   // The run it came from (one click, one quote) and, for a failure, what kind.
   runId: string
   failure: FailureKind | null
+  // A refusal: the run, the likely trigger words in what was sent, and
+  // whether "Retry with safer wording" can run on it (G46).
+  jobId: string | null
+  triggers: string[]
+  safer: boolean
 }
 
 export async function cloneStills(deps: Deps, ctx: Ctx, contentId: string): Promise<CloneStillView[]> {
   const post = await getContent(deps, ctx, contentId)
   const source = cloneOf(post)
-  const jobRows = await deps.db.select({ id: jobs.id, provider: jobs.provider, quoteId: jobs.quoteId, status: jobs.status, error: jobs.error }).from(jobs).where(and(eq(jobs.accountId, ctx.accountId), or(like(jobs.purpose, `clone_still:${contentId}:%`), like(jobs.purpose, `clone_face:${contentId}:%`))))
+  const jobRows = await deps.db.select({
+    id: jobs.id, provider: jobs.provider, quoteId: jobs.quoteId, status: jobs.status, error: jobs.error,
+    prompt: sql<string | null>`${jobs.request}->>'prompt'`, parentJobId: sql<string | null>`${jobs.request}->>'parentJobId'`,
+  }).from(jobs).where(and(eq(jobs.accountId, ctx.accountId), or(like(jobs.purpose, `clone_still:${contentId}:%`), like(jobs.purpose, `clone_face:${contentId}:%`))))
   if (!jobRows.length) return []
   const mock = new Set(jobRows.filter(j => j.provider === 'mock').map(j => j.id))
   const byJob = new Map(jobRows.map(j => [j.id, j]))
@@ -1220,16 +1236,22 @@ export async function cloneStills(deps: Deps, ctx: Ctx, contentId: string): Prom
     const unchecked = meta.pass === 'face' && !demo && c.status !== 'failed' && meta.sceneChecked === undefined
     const job = c.jobId ? byJob.get(c.jobId) : undefined
     const error = skipped ? null : c.status === 'failed' || c.status === 'qa_failed' ? c.rejectNote || 'The still failed.' : null
+    const failure = c.status === 'failed' && !skipped ? failureKind(job?.status ?? null, `${c.rejectNote ?? ''} ${errorText(job?.error)}`) : null
+    // A refusal: the likely trigger words in what was sent, and "Retry with
+    // safer wording" for a still (a face pass reruns from its still) (G46).
+    const triggers = failure === 'blocked' && job?.prompt ? findRiskyWords(job.prompt, deps.config.pipeline.wording) : []
     return {
       // One click is one run (its quote); a failure says what kind it was,
       // for the gray line of earlier failures (owner, 2026-10-15).
       runId: job?.quoteId ?? c.jobId ?? c.id,
-      failure: c.status === 'failed' && !skipped ? failureKind(job?.status ?? null, `${c.rejectNote ?? ''} ${errorText(job?.error)}`) : null,
+      failure,
+      jobId: c.jobId ?? null, triggers, safer: triggers.length > 0 && !!job && !job.parentJobId && job.provider !== 'local' && ['failed', 'canceled'].includes(job.status),
       id: c.id, characterId: c.characterId, characterName: names.get(c.characterId) ?? '', assetId: c.assetId, status: skipped ? 'skipped' : c.status, kept: source?.stills[c.characterId] === c.id,
       error,
       note: skipped ? c.rejectNote : null,
       findings: ((c.qaReport as QaReport | null)?.findings ?? []).map(f => ({ code: f.code, severity: f.severity, message: f.message })), createdAt: c.createdAt.toISOString(),
-      parentId: c.parentId, pass: meta.pass ?? 'still', faceScore: meta.faceScore ?? null, sourceScore: meta.sourceScore ?? null,
+      // A failed face pass recorded before it kept its pass says so in its label.
+      parentId: c.parentId, pass: meta.pass ?? ((c.label ?? '').startsWith('Face pass') ? 'face' : 'still'), faceScore: meta.faceScore ?? null, sourceScore: meta.sourceScore ?? null,
       gate: gateFor(g, { status: c.status, faceScore: meta.faceScore ?? null, sourceScore: meta.sourceScore ?? null, demo, blocked: c.rejectNote || null, unchecked }),
     }
   })

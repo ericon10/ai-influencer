@@ -140,7 +140,7 @@ describe('Clone: "Copy the moves into a new scene" never gets a bare sheet image
     // face pass that rides with the stills is covered in cloneRecreate.
     const { preview } = await run({ type: 'clone_still', contentId: postId, characterId: callie, facePass: false })
     const text = preview.prompts[0]!.text
-    expect(text).toMatch(/^Use the first image only for the place, the light, the camera angle, the framing, the pose and the outfit\. Replace the main person \(the largest person, closest to the camera\) in it completely with Callie \(the person in the other reference images\)/)
+    expect(text).toMatch(/^Use the first image only for the place, the light, the camera angle, the framing, the person's position and the outfit\. Replace the main person \(the largest person, closest to the camera\) in it completely with Callie \(the person in the other reference images\)/)
     expect(text).toMatch(/Her hair is long honey-blonde\./)
     expect(text).toMatch(/Keep the head angle and the gaze of the first image\. Remove all caption text, the TikTok logo and the username/)
     // 21 or older is checked before the run, never written next to a real

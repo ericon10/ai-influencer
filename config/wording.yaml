@@ -1,0 +1,81 @@
+# Catalog wording (owner, 2026-10-15; UX-PLAN section 20, DECISIONS G46).
+#
+# Outfits are said the way a shop catalog says them (garment, color,
+# fabric, a style word when it is clear) and nothing in a prompt describes
+# her body or makes her pose. The reference images carry her build.
+#
+# Only the wording changes, never what she wears. Claude's words (the
+# planner, the prompt writer, the clip reader) and the Studio's own lines
+# are cleaned with these lists; the owner's typed words go as typed, with a
+# warning on the price when one may be blocked (rule wording-risky). After
+# a refusal, "Retry with safer wording" runs the same request with these
+# lists applied to every word that was sent (code only, no Claude call).
+#
+# Terms match whole words, case-insensitive; a space or a hyphen inside a
+# term matches either ("low-cut" also finds "low cut").
+
+# Fit words: taken out where they stand ("a fitted black tank top" becomes
+# "a black tank top").
+fit:
+  - skin-tight
+  - tight-fitting
+  - close-fitting
+  - form-fitting
+  - figure-hugging
+  - body-hugging
+  - body-skimming
+  - fitted
+  - tight
+  - snug
+  - clingy
+  - bodycon
+  - low-cut
+  - plunging
+  - deep v-neck
+  - deep v neckline
+  - deep v
+  - sheer
+  - see-through
+  - skimpy
+  - toned
+  - curvy
+  - shapely
+
+# Body words: the phrase that names one goes ("showing off her toned legs",
+# "fitted at the waist"). "Waist-up" framing, "waist height" and
+# "waist-length" hair stay; so do table and chair legs.
+body:
+  - hips
+  - waist
+  - waistline
+  - legs
+  - thighs
+  - bust
+  - cleavage
+  - curves
+  - midriff
+  - physique
+  - butt
+  - glutes
+  - abs
+
+# Names that sound like underwear: the everyday garment instead.
+swaps:
+  - { from: "boy shorts", to: "bike shorts" }
+  - { from: "boyshorts", to: "bike shorts" }
+  - { from: "booty shorts", to: "short shorts" }
+  - { from: "sports bra", to: "athletic crop top" }
+  - { from: "bralette", to: "crop top" }
+  - { from: "bra top", to: "crop top" }
+
+# A moment, not a pose ("refilling her water bottle", never "posing in").
+pose:
+  - { from: "posing in", to: "wearing" }
+  - { from: "poses in", to: "wears" }
+  - { from: "posing for the camera", to: "caught mid-moment" }
+  - { from: "poses for the camera", to: "is caught mid-moment" }
+  - { from: "posing for a photo", to: "caught mid-moment" }
+  - { from: "poses for a photo", to: "is caught mid-moment" }
+  - { from: "striking a pose", to: "caught mid-moment" }
+  - { from: "strikes a pose", to: "is caught mid-moment" }
+  - { from: "posing", to: "standing" }

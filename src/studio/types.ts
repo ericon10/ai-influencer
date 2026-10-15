@@ -179,6 +179,7 @@ export type StudioAction =
   | { type: 'model_test'; model: string }
   | { type: 'model_suite' }
   | { type: 'retry'; jobId: string }
+  | { type: 'retry_safer'; jobId: string }
   | { type: 'scene_plan'; characterId: string; sceneId: string }
   | { type: 'scene_ideas'; characterId: string; idea: string }
   | { type: 'scene_prompt'; characterId: string; sceneId: string; target: 'still' | 'video'; motion?: string; directions?: string; startCandidateId?: string; endCandidateId?: string; notes?: string; durationSec?: number; audio?: boolean; aspect?: string }
@@ -207,6 +208,9 @@ export interface JobView {
   estimate: string; actual: string | null
   phase: JobPhase; phaseLabel: string; since: string; typicalSec: number | null
   error: string | null; detail: string | null; charged: 'no' | 'yes' | 'maybe' | null; retry: boolean
+  // A refusal by the provider's filter: the likely trigger words in what was
+  // sent, and whether "Retry with safer wording" can run (G46).
+  triggers: string[]; safer: boolean
   createdAt: string; completedAt: string | null
 }
 
@@ -371,6 +375,9 @@ export interface CloneStill {
   // by the provider's filter, never run, or failed. None of them is charged.
   runId: string
   failure: 'blocked' | 'not_run' | 'failed' | null
+  jobId: string | null
+  triggers: string[]
+  safer: boolean
 }
 export interface CloneModel {
   ref: string; label: string; mode: CloneMode; resolution: string | null; background: Array<'video' | 'image'>; minSec: number; maxSec: number

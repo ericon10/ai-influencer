@@ -249,8 +249,11 @@ export function loadConfig(dir = resolve(process.cwd(), 'config')): StudioConfig
       content: readConfigFile(dir, 'content.yaml', pipelineSchemas.content),
       edits: readConfigFile(dir, 'edits.yaml', pipelineSchemas.edits),
       presets: readConfigFile(dir, 'presets.yaml', pipelineSchemas.presets),
+      wording: readConfigFile(dir, 'wording.yaml', pipelineSchemas.wording),
     },
   }
+  // The risky-wording check reads the same lists the cleaning uses.
+  for (const r of cfg.pipeline.rules.rules) if (r.check.type === 'risky_wording') r.check.wording = cfg.pipeline.wording
   validateCrossRefs(cfg)
   if (dir === resolve(process.cwd(), 'config')) cached = cfg
   return cfg

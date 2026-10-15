@@ -32,6 +32,9 @@ interface Props {
   // Runs that belong to this button even when started elsewhere or before
   // a reload; their live status shows under it (feedback everywhere).
   watch?: (j: JobView) => boolean
+  // Earlier failures are already folded where the results show (a stills
+  // grid): the run list under the button leaves them out.
+  hideEarlier?: boolean
   // No live status here (another place shows it).
   noStatus?: boolean
   // A small button inside a status line (Retry): no details or notes.
@@ -56,7 +59,7 @@ async function estimateWithin(action: StudioAction, outer?: AbortSignal) {
   }
 }
 
-export function PriceButton({ action, label, variant = 'primary', size = 'normal', todo = [], disabledReason, waiting, onStarted, icon = true, watch, noStatus = false, compact = false }: Props) {
+export function PriceButton({ action, label, variant = 'primary', size = 'normal', todo = [], disabledReason, waiting, onStarted, icon = true, watch, noStatus = false, compact = false, hideEarlier = false }: Props) {
   const qc = useQueryClient()
   const refresh = useRefresh()
   const toast = useToast()
@@ -81,8 +84,10 @@ export function PriceButton({ action, label, variant = 'primary', size = 'normal
 
   const quote = est.data?.quote
   // Realism warnings (smoothing or makeup words removed) are shown right
-  // under the button, not only in the details.
+  // under the button, not only in the details; so is a word of yours the
+  // provider's filter often blocks (it goes as typed, G46).
   const realism = (est.data?.preview.warnings ?? []).filter(w => (w as { ruleId?: string }).ruleId?.startsWith('realism'))
+  const risky = (est.data?.preview.warnings ?? []).filter(w => (w as { ruleId?: string }).ruleId === 'wording-risky')
   const blocked = quote?.status === 'blocked'
   const estimateError = est.error ? errorMessage(est.error) : null
   const disabled = held || !action || est.isLoading || !!estimateError || blocked || running
@@ -163,8 +168,9 @@ export function PriceButton({ action, label, variant = 'primary', size = 'normal
         <span className="st-hint"><Receipt size={12} style={{ verticalAlign: -2 }} /> Then: {est.data.preview.followUp.label}: <b>{est.data.preview.followUp.display}</b> on {est.data.preview.followUp.models.join(' + ')}{est.data.preview.followUp.verified ? '' : ' (not confirmed yet)'}</span>
       )}
       {blocked && <span className="st-hint" style={{ color: 'var(--st-bad)' }}>This run would go over a budget cap. Adjust caps in Settings.</span>}
-      {!noStatus && !compact && <RunStatus ids={started} match={watch} pending={running} />}
+      {!noStatus && !compact && <RunStatus ids={started} match={watch} pending={running} hideEarlier={hideEarlier} />}
       {realism.map((w, i) => <span key={i} className="st-hint" style={{ color: 'var(--st-warn)' }}><AlertTriangle size={12} style={{ verticalAlign: -2 }} /> {w.message}</span>)}
+      {risky.map((w, i) => <span key={`r${i}`} className="st-hint" data-field="wording-risky" style={{ color: 'var(--st-warn)' }}><AlertTriangle size={12} style={{ verticalAlign: -2 }} /> {w.title}: {w.message}</span>)}
       {quote && !quote.verified && !blocked && !compact && <span className="st-hint"><Info size={12} style={{ verticalAlign: -2 }} /> Uses a price that is not confirmed with the provider yet.</span>}
       {(est.data?.preview.invalidates.length ?? 0) > 0 && (
         <span className="st-hint" style={{ color: 'var(--st-warn)' }}><AlertTriangle size={12} style={{ verticalAlign: -2 }} /> Will mark {est.data!.preview.invalidates.join(' and ')} for re-check.</span>

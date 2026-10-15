@@ -6,7 +6,7 @@ import { api, ApiError, assetUrl } from '../../api'
 import { uploadFiles } from '../../files'
 import { keys, useClones, useCloneStills } from '../../hooks'
 import { PriceButton } from '../../PriceButton'
-import { FailureLine, RunStatus } from '../../runs'
+import { FailureLine, RunStatus, SaferRetry, Triggers } from '../../runs'
 import { failureLine, FRESH_MS } from '../../failures'
 import { AsyncButton, Callout, Field, errorMessage, isFresh, useToast, type TodoItem } from '../../ui'
 import type { CloneModel, CloneOptions, CloneResult, CloneSource, CloneStill, TakeGate } from '../../types'
@@ -134,7 +134,7 @@ function StepTwo({ ctx, source }: { ctx: PostCtx; source: CloneSource }) {
     <div className="st-row" style={{ gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' }}>
       {frame && <img className="st-clonepreview-still" src={assetUrl(frame)} alt="The clip's frame the stills are made from" />}
       <div className="st-col grow" style={{ gap: 12, minWidth: 260 }}>
-        <ChipList label="Scene to keep" items={keep} placeholder="Add: the place, the light, the angle, the pose" onChange={next => save({ keep: next })} tone="keep" />
+        <ChipList label="Scene to keep" items={keep} placeholder="Add: the place, the light, the angle, where she stands" onChange={next => save({ keep: next })} tone="keep" />
         <ChipList label="Source traits to drop" items={drop} placeholder="Add: hair color, eye color, piercings, winged liner" onChange={next => save({ notLike: next.join(', ') })} tone="drop" />
         <div className="st-col" style={{ gap: 6 }}>
           <span className="st-label">Outfit</span>
@@ -143,7 +143,8 @@ function StepTwo({ ctx, source }: { ctx: PostCtx; source: CloneSource }) {
             <button type="button" className={`st-chip ${outfit.choice === 'hers' ? 'on' : ''}`} aria-pressed={outfit.choice === 'hers'} onClick={() => save({ outfit: { choice: 'hers' } })}>{outfit.choice === 'hers' && <Check size={12} />}Pick {name}'s</button>
           </div>
           <input className="st-input" value={outfitText} maxLength={160} onChange={e => setOutfitText(e.target.value)} onBlur={() => { if (outfitText.trim() !== outfit.text) void save({ outfit: { text: outfitText.trim() } }) }}
-            placeholder={outfit.choice === 'source' ? "Name it (optional), e.g. dark green sleeveless dress" : `What ${name} wears instead, e.g. black ribbed tank and jeans`} aria-label="The outfit" />
+            placeholder={outfit.choice === 'source' ? "Name it (optional), e.g. dark green ribbed tank top with thin straps" : `What ${name} wears instead, e.g. black ribbed tank and jeans`} aria-label="The outfit" />
+          <span className="st-hint" data-field="outfit-wording">Claude names it like a shop catalog (garment, color, fabric, a style word), never with fit or body words. What you type goes as typed; a word the filter often blocks is named on the price.</span>
           {outfit.choice === 'hers' && stillId && (
             <label className="st-row" style={{ gap: 8, cursor: 'pointer' }}>
               <input type="checkbox" checked={outfit.lookId === stillId} onChange={e => void save({ outfit: { lookId: e.target.checked ? stillId : null } })} />
@@ -243,8 +244,12 @@ function StillsStep({ ctx, list: all, kept, takes, picked, opts }: { ctx: PostCt
                 {x.gate.margin != null && <span className={`st-badge ${x.gate.margin >= (gateMargin ?? 0) ? 'plain' : 'bad'}`} title="How much more it looks like her than the person in the clip (face minus clip)">Margin {pct(x.gate.margin)}</span>}
               </div>
               {x.error ? <span className="st-hint" style={{ color: 'var(--st-bad)', padding: '0 4px' }}>{x.error}</span> : <GatePill gate={x.gate} />}
+              {/* A refusal: the likely trigger words and the same still with
+                  only those words reworded (free rewording, priced run). */}
+              {x.triggers?.length > 0 && <span style={{ padding: '0 4px' }}><Triggers words={x.triggers} /></span>}
               {/* The prompt, attachments and model, failed stills included. */}
               <SentButton candidateId={x.id} size="xs" />
+              {x.safer && x.jobId && <span className="st-tile-action st-safer"><SaferRetry jobId={x.jobId} onStarted={() => void qc.invalidateQueries({ queryKey: ['clone-stills', ctx.item.id] })} /></span>}
               {x.assetId && !x.error && (
                 <div className="st-tile-action st-col" style={{ gap: 6, alignItems: 'flex-start' }}>
                   {/* The video starts from a face pass, or from the picked still. */}
@@ -290,7 +295,7 @@ function StillsStep({ ctx, list: all, kept, takes, picked, opts }: { ctx: PostCt
         <span className="st-hint">Face pass on the best still{facePass ? '' : ' (skipped)'}</span>
       </span>
       <div className="st-row" style={{ gap: 8, flexWrap: 'wrap', alignItems: 'flex-start' }}>
-        <PriceButton label={stillsLabel} variant={list.length ? 'secondary' : 'primary'} todo={chosen?.problem ? [{ label: chosen.problem, target: 'recreate-stillmodel' }] : undefined} action={chosen?.problem ? null : { type: 'clone_still', contentId: ctx.item.id, characterId: cid, takes: takes.still, facePass, ...(chosen ? { stillModel: chosen.ref } : {}) }} watch={j => j.purpose === `clone_still:${ctx.item.id}:${cid}` || j.purpose === `clone_face:${ctx.item.id}:${cid}:auto`} />
+        <PriceButton label={stillsLabel} variant={list.length ? 'secondary' : 'primary'} todo={chosen?.problem ? [{ label: chosen.problem, target: 'recreate-stillmodel' }] : undefined} action={chosen?.problem ? null : { type: 'clone_still', contentId: ctx.item.id, characterId: cid, takes: takes.still, facePass, ...(chosen ? { stillModel: chosen.ref } : {}) }} watch={j => j.purpose === `clone_still:${ctx.item.id}:${cid}` || j.purpose === `clone_face:${ctx.item.id}:${cid}:auto`} hideEarlier />
         {usable.length > 1 && <AsyncButton className="st-btn sm ghost" onClick={youPick} icon={<Sparkles size={14} />}>You pick</AsyncButton>}
       </div>
     </div>

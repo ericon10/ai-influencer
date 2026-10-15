@@ -483,6 +483,22 @@ Decisions: `DECISIONS.md` G37 and G38. UX: `UX-PLAN.md` section 15.
 - [x] Video numbers in the gate check after every 10 real takes (kept vs tried again)
 - [ ] The owner keeps today's take on production (the click is the owner's)
 
+### Usability fixes (G45, UX-PLAN.md section 19)
+
+- [x] Earlier failures in one gray line with Show and Clear (stills grid and run lists); only the run just started is red
+- [x] Face strip drift under 0.45, the video rule's number
+- [x] Editor: small corner dots, no Locked on text, caption no taller than the frame
+- [x] Editor: freeze and speed ramp markers that open the Speed panel
+- [x] Editor: bigger preview, click away to deselect, named tracks, speed on the shot
+
+### Catalog wording (G46, UX-PLAN.md section 20)
+
+- [x] `config/wording.yaml` and `server/core/wording.ts`: fit words out, body phrases out, underwear-sounding names swapped, a moment not a pose
+- [x] Clip reader, planner, Punch it up and the writer (stills and video) cleaned; system prompts ask for catalog terms
+- [x] Recreate, scene-still and face-pass templates: "the person's position"
+- [x] The owner's words go as typed, with a warning under the price (`wording-risky`)
+- [x] Likely trigger words on a refusal and Retry with safer wording (`retry_safer`), priced, free rewording
+
 ## Roadmap after Phase 4 (owner, 2026-10-13; not started)
 
 SPEC 13.1, R1 to R7: Clone Video (first after Phase 3), Inspo board

@@ -32,6 +32,7 @@ import { readBilling } from '../providers/billing.js'
 import { effectiveModel, readModelOverrides } from '../providers/modelOverrides.js'
 import { buildVoiceConvert, markConverting } from './voiceLines.js'
 import { buildHookVariants } from './scaleKit.js'
+import { saferPrompt } from '../core/wording.js'
 
 // Every paid step is an action. The same builder produces the job specs for
 // the estimate and for the run, so the run's fingerprint must match its
@@ -56,6 +57,9 @@ export const actionSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('model_test'), model: z.string() }),
   // Retry a failed run on its own, with a new price (feedback everywhere).
   z.object({ type: z.literal('retry'), jobId: z.string() }),
+  // After a refusal: the same request with the likely trigger words
+  // reworded by code (catalog wording, G46). The rewording is free.
+  z.object({ type: z.literal('retry_safer'), jobId: z.string() }),
   // Every real model path once, in one quoted run under a cap (Settings).
   z.object({ type: z.literal('model_suite') }),
   // Scenes (Stage 7): plan the fields from the owner's words, then stills on
@@ -224,6 +228,7 @@ export async function buildAction(deps: Deps, ctx: Ctx, action: StudioAction): P
   if (action.type === 'model_test') return buildModelTest(deps, ctx, action.model)
   if (action.type === 'model_suite') return buildModelSuite(deps, ctx)
   if (action.type === 'retry') return buildRetry(deps, ctx, action.jobId)
+  if (action.type === 'retry_safer') return buildRetry(deps, ctx, action.jobId, { safer: true })
   if (action.type === 'clone') return buildClone(deps, ctx, action)
   if (action.type === 'clone_still') return buildCloneStill(deps, ctx, action)
   if (action.type === 'clone_face') return buildCloneFace(deps, ctx, action)
@@ -405,7 +410,7 @@ export async function buildAction(deps: Deps, ctx: Ctx, action: StudioAction): P
 // The same request as a failed run, quoted again. Only a run that failed or
 // was canceled on its own (not one waiting on another step, not a model
 // test, not free worker steps) can be retried this way.
-async function buildRetry(deps: Deps, ctx: Ctx, jobId: string): Promise<BuiltAction> {
+async function buildRetry(deps: Deps, ctx: Ctx, jobId: string, o: { safer?: boolean } = {}): Promise<BuiltAction> {
   const job = await getJob(deps, ctx, jobId)
   const req = job.request as Record<string, unknown>
   if (!['failed', 'canceled'].includes(job.status)) throw new AppError('bad_request', 'Only a failed run can be retried.')
@@ -413,10 +418,31 @@ async function buildRetry(deps: Deps, ctx: Ctx, jobId: string): Promise<BuiltAct
   const [created] = await deps.db.select().from(jobEvents).where(and(eq(jobEvents.jobId, job.id), eq(jobEvents.type, 'created')))
   const label = (created?.data as { label?: string } | undefined)?.label || job.purpose
   const { parentJobId: _p, quotedCredits: _q, promptFrom: _f, ...request } = req
+  const prompts: BuiltAction['preview']['prompts'] = []
+  const warnings: RuleViolation[] = []
+  // "Retry with safer wording": the same request, only the likely trigger
+  // words reworded by code (catalog wording, G46). No Claude call.
+  if (o.safer) {
+    if (job.kind === 'llm' || typeof request.prompt !== 'string') throw new AppError('bad_request', 'Only an image or video run can be reworded.')
+    const safer = saferPrompt(request.prompt, deps.config.pipeline.wording)
+    if (!safer.changed.length) throw new AppError('bad_request', 'No likely trigger words were found in what was sent. Use Retry, or change the words yourself.')
+    request.prompt = safer.text
+    prompts.push({ label: 'Reworded prompt', text: safer.text, wrapped: hardWrap(safer.text) })
+    warnings.push(warn('wording-safer', 'Reworded by the Studio', `Changed: ${safer.changed.join(', ')}. Only the words change, never the outfit. The rewording is free; the run is priced like the one that was refused.`))
+  }
   const spec = (job.kind === 'llm'
     ? { type: 'llm', stage: job.stage, purpose: job.purpose, label, request }
     : { type: 'gen', stage: job.stage, purpose: job.purpose, label, request }) as unknown as JobSpec
-  return { purpose: job.purpose, characterId: job.characterId, specs: [spec], preview: { title: `Retry: ${label}`, prompts: [], warnings: [], invalidates: [] } }
+  return { purpose: job.purpose, characterId: job.characterId, specs: [spec], preview: { title: `${o.safer ? 'Retry with safer wording' : 'Retry'}: ${label}`, prompts, warnings, invalidates: [] } }
+}
+
+// A retry of a Recreate run counts against the post's credit cap like the
+// run it repeats.
+async function capActionFor(deps: Deps, ctx: Ctx, action: StudioAction): Promise<{ type: string; contentId?: string }> {
+  if (action.type !== 'retry' && action.type !== 'retry_safer') return action as { type: string; contentId?: string }
+  const job = await getJob(deps, ctx, action.jobId)
+  const [kind, contentId] = job.purpose.split(':')
+  return kind === 'clone_still' || kind === 'clone_face' || kind === 'clone' ? { type: kind, contentId } : { type: action.type }
 }
 
 export async function estimateAction(deps: Deps, ctx: Ctx, action: StudioAction): Promise<{ quote: QuoteView; preview: ActionPreview }> {
@@ -424,7 +450,7 @@ export async function estimateAction(deps: Deps, ctx: Ctx, action: StudioAction)
   const quote = await quoteJobs(deps, ctx, { purpose: built.purpose, characterId: built.characterId, specs: built.specs })
   if (action.type === 'model_suite') assertSuiteCap(deps, quote.totalMicros)
   // A post's credit cap (Recreate): refused before any spend.
-  await checkCloneCap(deps, ctx, action as { type: string; contentId?: string }, quote.items)
+  await checkCloneCap(deps, ctx, await capActionFor(deps, ctx, action), quote.items)
   const untested = action.type === 'model_test' || action.type === 'model_suite' ? [] : await untestedModels(deps, ctx, built)
   // A later step's price (for example "Upscale this take"), quoted for show.
   let followUp: ActionPreview['followUp']
@@ -466,11 +492,12 @@ export async function runAction(deps: Deps, ctx: Ctx, action: StudioAction, quot
   }
   const built = await buildAction(deps, ctx, action)
   // The post's credit cap, checked again against the quote being run.
-  const [capQuote] = quoteId && (action.type === 'clone' || action.type === 'clone_still' || action.type === 'clone_face') ? await deps.db.select({ items: quotes.items }).from(quotes).where(and(eq(quotes.accountId, ctx.accountId), eq(quotes.id, quoteId))) : []
+  const capAction = await capActionFor(deps, ctx, action)
+  const [capQuote] = quoteId && (capAction.type === 'clone' || capAction.type === 'clone_still' || capAction.type === 'clone_face') ? await deps.db.select({ items: quotes.items }).from(quotes).where(and(eq(quotes.accountId, ctx.accountId), eq(quotes.id, quoteId))) : []
   const capItems = ((capQuote?.items ?? []) as Array<{ credits?: number | null; amountMicros: number }>).map(i => ({ credits: i.credits ?? null, amountMicros: i.amountMicros }))
-  if (capQuote) await checkCloneCap(deps, ctx, action as { type: string; contentId?: string }, capItems)
+  if (capQuote) await checkCloneCap(deps, ctx, capAction, capItems)
   const jobs = await runJobs(deps, ctx, { quoteId, confirmed, purpose: built.purpose, characterId: built.characterId, specs: built.specs })
-  if (capQuote) await addCloneSpend(deps, ctx, action as { type: string; contentId?: string }, capItems)
+  if (capQuote) await addCloneSpend(deps, ctx, capAction, capItems)
   if (action.type === 'model_test') await startModelTest(deps, ctx, action.model, jobs[0]!.id)
   else if (action.type === 'model_suite') await startModelSuite(deps, ctx, jobs)
   else await afterStart(deps, ctx, action, built, jobs)

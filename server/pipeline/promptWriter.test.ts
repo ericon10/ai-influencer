@@ -311,3 +311,51 @@ describe('Write and generate (one price)', () => {
     }
   })
 })
+
+// Catalog wording (owner, 2026-10-15; G46): the planner's and the writer's
+// words in catalog terms, no fit or body words, a moment and not a pose.
+// What she wears never changes, and the owner's own words go as typed.
+describe('catalog wording in the planner and the writer', () => {
+  async function started(action: StudioAction) {
+    const { quote } = await estimateAction(h.deps, h.ctx, action)
+    const { jobs } = await runAction(h.deps, h.ctx, action, quote.id, true)
+    return getJob(h.deps, h.ctx, jobs[0]!.id)
+  }
+  async function answer(jobId: string, meta: Record<string, unknown>) {
+    const job = await getJob(h.deps, h.ctx, jobId)
+    const req = job.request as { meta: Record<string, unknown> }
+    await h.deps.db.update(jobsTable).set({ request: { ...req, meta: { ...req.meta, ...meta } } }).where(eq(jobsTable.id, jobId))
+    await drain(h, 60)
+  }
+
+  it('the writer\'s words are reworded; the owner\'s typed outfit word stays and is warned about on the price', async () => {
+    const sceneId = (await createScene(h.deps, h.ctx, characterId, { brief: 'Callie refills her water bottle at the gym', fields: { outfit: 'a tight black tank top and grey joggers' } })).id
+    const writer = await started({ type: 'scene_prompt', characterId, sceneId, target: 'still' })
+    await answer(writer.id, { mockPrompt: 'Callie posing in a fitted grey sports bra and boy shorts, showing off her toned legs, refilling her water bottle at the fountain. Her tight black tank top hangs on the bench.' })
+    const written = (await view(sceneId)).prompts.still!
+    expect(written.text).toBe('Callie wearing a grey athletic crop top and bike shorts, refilling her water bottle at the fountain. Her tight black tank top hangs on the bench.')
+    expect([...(written.removed ?? [])].sort()).toEqual(['boy shorts', 'fitted', 'legs', 'posing in', 'sports bra'])
+    // The owner's "tight" goes as typed, with a warning that never blocks.
+    const { preview } = await estimateAction(h.deps, h.ctx, generate(sceneId))
+    expect(preview.prompts[0]!.text).toContain('She is wearing a tight black tank top and grey joggers')
+    expect(preview.warnings.find(w => (w as { ruleId?: string }).ruleId === 'wording-risky')).toMatchObject({ severity: 'warning', message: 'tight. Your words go as typed.' })
+  })
+
+  it('the planner\'s outfit and position come back in catalog terms; switched off, they come back as written', async () => {
+    const plan = (outfit: string, pose: string) => ({ title: 'Gym refill', momentType: 'caught_mid_action', moment: 'Callie refills her water bottle between sets.', outfit, pose, camera: 'friend_phone', light: 'natural', framing: 'waist_up' })
+    const sceneId = (await createScene(h.deps, h.ctx, characterId, { brief: 'Callie at the gym' })).id
+    const job = await started({ type: 'scene_plan', characterId, sceneId })
+    await answer(job.id, { mockPlan: plan('dark green fitted ribbed tank top with thin straps, black boy shorts', 'posing by the fountain, eyes on the bottle') })
+    const fields = (await view(sceneId)).fields
+    expect(fields.outfit).toBe('dark green ribbed tank top with thin straps, black bike shorts')
+    expect(fields.pose).toBe('standing by the fountain, eyes on the bottle')
+    await setRuleSwitch(h.deps, h.ctx, { ruleId: 'prompt-catalog-wording', on: false })
+    try {
+      const again = await started({ type: 'scene_plan', characterId, sceneId })
+      await answer(again.id, { mockPlan: plan('dark green fitted ribbed tank top', 'posing by the fountain') })
+      expect((await view(sceneId)).fields.outfit).toBe('dark green fitted ribbed tank top')
+    } finally {
+      await setRuleSwitch(h.deps, h.ctx, { ruleId: 'prompt-catalog-wording', on: null })
+    }
+  })
+})
