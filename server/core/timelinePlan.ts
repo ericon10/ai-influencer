@@ -54,7 +54,7 @@ export function planFromStack(stack: StyleItem[], places: Places, presets: Prese
 
 interface ProjectClip { id: string; mediaId: string; startTime: number; duration: number; inPoint: number; outPoint: number; reversed?: boolean; speed?: number; transform?: { position?: { x: number; y: number }; scale?: { x: number; y: number }; rotation?: number; crop?: unknown }; effects?: unknown[] }
 interface ProjectTrack { id: string; type: string; name?: string; role?: string; hidden?: boolean; muted?: boolean; clips: ProjectClip[]; transitions?: unknown[] }
-interface ProjectText { id: string; trackId: string; startTime: number; duration: number; text: string; behindSubject?: boolean; animation?: { preset?: string } | null; style?: { backgroundColor?: string; color?: string; strokeWidth?: number }; transform?: { position?: { x: number; y: number } } }
+interface ProjectText { id: string; trackId: string; startTime: number; duration: number; text: string; behindSubject?: boolean; animation?: { preset?: string } | null; style?: { backgroundColor?: string; color?: string; strokeWidth?: number; highlightColor?: string }; transform?: { position?: { x: number; y: number } } }
 interface ProjectLayer { trackId?: string; startTime: number; duration: number; enabled?: boolean; effects?: unknown[]; studio?: { preset: string; strength: PresetStrength; keys: CameraKey[] } }
 export interface StudioProject {
   timeline: { tracks: ProjectTrack[]; subtitles?: unknown[]; markers?: Array<{ time: number; label?: string }> }
@@ -125,6 +125,7 @@ export function planFromProject(p: StudioProject): ProjectPlan {
     if (!captionTracks.has(t.trackId) || !t.text.trim()) continue
     if (t.behindSubject) notes.add('Text behind her')
     if (t.animation?.preset && t.animation.preset !== 'none') notes.add('Caption animations (word by word, slam)')
+    if (t.style?.highlightColor) notes.add('Karaoke captions')
     captions.push({ text: t.text.trim(), start: r3(t.startTime), end: r3(t.startTime + t.duration), look: lightBackground(t.style?.backgroundColor) ? 'box' : 'outline', y: t.transform?.position?.y ?? 0.26 })
   }
   const trackIds = new Set(p.timeline.tracks.map(t => t.id))

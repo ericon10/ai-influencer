@@ -727,3 +727,32 @@ what it would cost and what is left.
 face pass (1), Make the video (1), Use this take (1): **3**. From
 Library > Clips: Use this clip, then the same: **4**. From the Idea step:
 the choice and the file, then the same: **5**.
+
+## 17. Editor fixes from the QA audit (owner, 2026-10-15)
+
+The owner's audit: the editor passed its tests but failed in real use
+(captions could not be selected or edited once added). Driven like a user
+(Playwright: click, drag, double-click, type; desktop and phone), the
+broken pieces are fixed in the fork and each has a Playwright test
+(`e2e/editor/`). No new page, panel or button; these are how the existing
+ones behave now.
+
+| Piece | Where | How it works now | Clicks |
+|---|---|---|---|
+| Select a caption | The preview | Click the words. The box sits on the caption as drawn (wrapped lines), with the handles | 1 |
+| Edit a caption | The preview, or its block on the timeline | Double-click (double-tap on a phone): a box over the caption with the words selected. Enter saves, Shift+Enter starts a new line, Esc cancels, clicking away saves. One undo step | 2 plus typing |
+| Move a caption | The preview | Drag the box (not only the small center handle) | 1 drag |
+| Long captions | Preview and export | Wrap inside the frame (90% of its width), the same lines in both | 0 |
+| Karaoke | Presets, Text, "Karaoke captions" | The caption's own words light up in turn, timed across the caption (the Studio's yellow; on a white box the word's box lights up). It keeps its place, look and text, and stays editable. Apply it again to turn it off | 1 |
+| Reorder shots | The timeline | Drag a shot onto another on the same track: it goes in front of the shot it lands on and the shots close up. One undo puts them back | 1 drag |
+| Open a post with music | Finish, Open the editor | Uploaded music (M4A) opens. A file that does not load is named in the bar ("Opened without: ...") and the rest of the post opens. Music and other sound end where the post ends | 0 |
+| Ducking | Opens with the post | The music is ducked under the voice line (or under the clip's own sound when there is no voice). The music clip's Audio Ducking panel shows "Ducking Applied" and can change or remove it | 0 |
+| First frame | Opening the editor | The preview shows the first frame without pressing Play | 0 |
+| Phone | The editor at phone width | The editor fits under the Studio bar, so the bottom tabs are on screen: Timeline, Media (the Presets panel), Edit (the inspector for what is selected), AI | 1 per tab |
+
+Editing a caption went from select the block, find the Text section in the
+inspector and type (4 or more clicks, most of them hunting) to
+double-click, type, Enter. The usability notes from the audit (a small
+preview, handles that cover a small caption, no click-away deselect in the
+preview, the voice track named "Track 2", and others) are in the audit
+report for the owner to pick; none is built yet.

@@ -100,4 +100,10 @@ describe('a timeline saved by the editor', () => {
     })
     expect(p.notes).toEqual(expect.arrayContaining(['A second video track (a layout, picture in picture or overlay)', 'The person cutout', 'Karaoke captions', 'Text behind her']))
   })
+
+  it('names karaoke set on a caption (the editor lights its words)', () => {
+    const cap = project.textClips![0]!
+    const p = planFromProject({ ...project, textClips: [{ ...cap, style: { ...cap.style, highlightColor: '#ffd60a' } }] })
+    expect(p.notes).toEqual(['Karaoke captions'])
+  })
 })

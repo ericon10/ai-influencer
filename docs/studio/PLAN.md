@@ -458,6 +458,16 @@ Decisions: `DECISIONS.md` G37 and G38. UX: `UX-PLAN.md` section 15.
 - [x] Recreate prompts: face and hair only, no age line (21+ checked before the run), plain outfit, short realism line
 - [x] Proved with single test stills: fixed prompt passes on the Studio's frame (3 credits net, blocked runs refunded)
 
+### Editor QA audit (G43)
+
+- [x] Test matrix and a Playwright drive like a user (desktop and phone) on the pinned editor
+- [x] Captions: select by click in the preview, edit in place by double-click (preview and timeline), move by drag, wrap in the frame
+- [x] Karaoke on the caption itself (place, look and editing kept), preview and export
+- [x] Reorder shots by drag on the same track; M4A music opens; sound ends with the post; ducking under the voice
+- [x] First frame on open; phone tabs on screen
+- [x] `e2e/editor/` suite (`npm run e2e:editor`), before and after runs in the report
+- [ ] Usability fixes from the report (the owner picks)
+
 ## Roadmap after Phase 4 (owner, 2026-10-13; not started)
 
 SPEC 13.1, R1 to R7: Clone Video (first after Phase 3), Inspo board

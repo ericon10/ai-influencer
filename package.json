@@ -16,11 +16,12 @@
     "build:worker": "esbuild server/worker.ts --bundle --platform=node --format=esm --target=node22 --packages=external --sourcemap --outfile=dist-worker/worker.mjs",
     "start:worker": "node --enable-source-maps --max-old-space-size=384 dist-worker/worker.mjs",
     "models": "node scripts/fetch-models.mjs",
-    "typecheck": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json && tsc -p e2e/tsconfig.json",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint:text": "tsx scripts/check-no-emdash.ts",
     "check": "npm run typecheck && npm run lint:text && npm run test",
+    "e2e:editor": "playwright test -c e2e/playwright.config.ts",
     "db:generate": "drizzle-kit generate",
     "build:app": "vite build",
     "build:editor": "node scripts/build-editor.mjs",
@@ -56,6 +57,7 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@playwright/test": "^1.56.1",
     "@types/node": "^26.6.5",
     "@types/opentype.js": "^1.3.10",
     "@types/pg": "^8.23.1",

@@ -83,7 +83,7 @@ export function EditorCard({ ctx }: { ctx: PostCtx }) {
           <div className="st-hint">
             {edited
               ? `Edited in the editor ${ago(edited)}. Done there saves the video here.`
-              : 'Your clips, B-roll and captions, laid out for you. Open the editor to place edits exactly where you want them.'}
+              : 'Your clips, B-roll and captions, laid out for you. Open the editor to place edits exactly where you want them; double-click a caption there to change its words.'}
           </div>
         </div>
       </div>
@@ -99,7 +99,7 @@ export function EditorCard({ ctx }: { ctx: PostCtx }) {
           <button type="button" className={`st-btn ${narrow ? '' : 'primary'}`} disabled={opening || !cut.shots.length} onClick={() => void open()} aria-busy={opening}>
             <Clapperboard size={15} />{opening ? 'Opening the editor...' : edited ? 'Open the editor again' : 'Open the editor'}
           </button>
-          {narrow && <span className="st-hint"><Monitor size={12} style={{ verticalAlign: -2 }} /> The editor works best on a computer.</span>}
+          {narrow && <span className="st-hint"><Monitor size={12} style={{ verticalAlign: -2 }} /> The editor works best on a computer. On a phone, the tabs at its bottom switch between the timeline, the presets and what you selected.</span>}
           {!cut.shots.length && <span className="st-hint">Pick a clip in the Video step first.</span>}
         </div>
         {narrow && !edited && first && last && (

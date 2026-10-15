@@ -1598,5 +1598,43 @@
     "label": "Use these numbers or keep the current ones; nothing changes until you click"
    }
   ]
+ },
+ "editor-captions": {
+  "w": 1440,
+  "h": 900,
+  "spots": [
+   {
+    "n": 1,
+    "x": 46.5,
+    "y": 24.5,
+    "w": 13.1,
+    "h": 5.8,
+    "label": "Double-click a caption to change its words right here. Enter saves, Esc cancels"
+   },
+   {
+    "n": 2,
+    "x": 15.6,
+    "y": 66.2,
+    "w": 17.9,
+    "h": 6.8,
+    "label": "Or double-click its block on the timeline. Drag a shot onto another to reorder"
+   },
+   {
+    "n": 3,
+    "x": 11,
+    "y": 18.3,
+    "w": 14.6,
+    "h": 6.4,
+    "label": "Presets: one click places one at the playhead (Karaoke captions lights the caption's words)"
+   },
+   {
+    "n": 4,
+    "x": 94.7,
+    "y": 0.2,
+    "w": 4.8,
+    "h": 4,
+    "label": "Done: exports, saves to the post and comes back"
+   }
+  ]
  }
 }

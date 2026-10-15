@@ -100,7 +100,10 @@ export async function editorManifest(deps: Deps, ctx: Ctx, contentId: string) {
   // The caption's look and place to start from (the post's, else the
   // Studio's default: the white box in the upper third).
   const captionLook = { style: s.captionStyle ?? deps.config.pipeline.content.caption.style, position: deps.config.pipeline.content.caption.position }
-  return { post: { id: post.id, title: post.title || s.caption.slice(0, 60) || 'Video post' }, canvas: CANVAS, media, captions, captionLook, duration, project, suggestions, format, stack, styles: await listStyles(deps, ctx) }
+  // The sound bed's ducking, so the editor's export matches the Studio's
+  // render (editor QA, 2026-10-15).
+  const soundBed = { duck: s.sound.duck, clipSound: s.sound.clipSound }
+  return { post: { id: post.id, title: post.title || s.caption.slice(0, 60) || 'Video post' }, canvas: CANVAS, media, captions, captionLook, duration, project, suggestions, format, stack, styles: await listStyles(deps, ctx), sound: soundBed }
 }
 
 const saveBody = z.object({ uploadId: z.string().regex(/^upl_[a-z0-9]{20}$/), project: z.record(z.string(), z.unknown()), stack: stackSchema.optional() })

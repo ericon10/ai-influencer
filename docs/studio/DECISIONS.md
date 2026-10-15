@@ -1904,3 +1904,45 @@ person" in the clone panel.
   still (failed or not) has What was sent: the prompt, the images, the
   Higgsfield element named in the prompt, the model, the path, the
   settings, why it failed and the provider's id (`GET /jobs/:id/sent`).
+
+### G43. Editor QA: tested like a user, fixed in the fork (owner, 2026-10-15)
+
+- **Why.** The editor passed its tests but failed in real use: captions
+  could not be selected or edited once added. The old tests called the
+  editor's functions; nothing clicked, dragged or typed.
+- **How it was tested.** Playwright in Chromium, desktop (1440 x 900) and
+  phone (390 x 844, touch), clicking, dragging, double-clicking and typing
+  on the built editor at the pinned fork commit, against a local Studio in
+  demo mode (mock providers, nothing paid). The production site needs the
+  owner's login, so the live `/editor/` bundle was checked to load and to
+  match the pinned build; the drive itself ran locally. This Chromium has
+  no H.264 decoder, so the test serves clips as VP9.
+- **Fixed in the fork** (`studio-embed`, hooks listed in its STUDIO.md):
+  - Captions: a click in the preview selects (hit test on the wrapped
+    lines, topmost track first); double-click in the preview or on the
+    timeline block edits in place (Enter, Shift+Enter, Esc, click away);
+    the selection box is measured, not guessed from the character count,
+    and drags the caption.
+  - Long captions wrap at 90% of the frame in `TitleEngine.renderText`,
+    measured and drawn with the same lines, so the preview and the export
+    match.
+  - Karaoke is `TextStyle.highlightColor` on the caption itself, drawn by
+    the shared text renderer (preview and export): words share the
+    caption by length and light up in turn. Upstream's route made a
+    subtitle that lost the place, the look and the editing.
+  - Reorder: a shot dropped onto another on the same track goes in front
+    of it and the shots close up (one undo step), instead of stacking on a
+    new track.
+  - M4A audio imports (the Studio stores uploaded music that way); a file
+    that does not load is named and the rest of the post opens. Sound ends
+    with the post. The music is ducked under the voice (or the clip's
+    sound) with OpenReel's own ducker when the post opens.
+  - The first frame is drawn without pressing Play; the editor fits under
+    the Studio bar, so the phone tabs (Timeline, Media, Edit, AI) are on
+    screen.
+- **Kept as tests.** `e2e/editor/` (`npm run e2e:editor`, needs `npm run
+  studio` and a built editor): captions, clips, sound, phone. Not in
+  `npm run check` (it needs a browser and the dev servers).
+- **Not built (owner picks).** The usability notes in the audit report:
+  the small preview, handles over a small caption, no click-away deselect
+  in the preview, track names, the Tap button's second click, and the rest.

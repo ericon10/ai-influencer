@@ -12,3 +12,4 @@ coverage/
 .vercel
 dist-worker/
 dist-editor/
+e2e/.out/
