@@ -466,7 +466,11 @@ Decisions: `DECISIONS.md` G37 and G38. UX: `UX-PLAN.md` section 15.
 - [x] Reorder shots by drag on the same track; M4A music opens; sound ends with the post; ducking under the voice
 - [x] First frame on open; phone tabs on screen
 - [x] `e2e/editor/` suite (`npm run e2e:editor`), before and after runs in the report
-- [ ] Usability fixes from the report (the owner picks)
+- [x] Second pass, the owner's full matrix: caption resize follows the handle (handles outside the box), one undo per drag, retime and redo, Pick a hook into the editor
+- [x] A finger drags and resizes a caption at phone width
+- [x] The post ends with its last shot: captions and music that ended with it follow it (no black tail after a speed-up)
+- [x] Render check per feature with a timer clip: caption edits, clip edits (split, 2x, reorder), Pack 1 presets
+- [ ] Usability fixes from the report (the owner picks), the sea of red included
 
 ### Recreate gates (G44)
 

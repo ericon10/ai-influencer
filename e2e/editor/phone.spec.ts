@@ -38,3 +38,36 @@ test('phone: tabs on screen, presets and inspector reachable, captions tap to se
   await expect(captionBlock(page, CAPTION)).toHaveCount(0)
   await snap(page, info, 'phone: caption edited')
 })
+
+// A finger drag, sent as real touch events (Playwright's touchscreen only taps).
+async function touchDrag(page: import('@playwright/test').Page, from: { x: number; y: number }, to: { x: number; y: number }) {
+  const cdp = await page.context().newCDPSession(page)
+  const pt = (x: number, y: number) => [{ x, y, id: 1, radiusX: 4, radiusY: 4, force: 1 }]
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: pt(from.x, from.y) })
+  for (let i = 1; i <= 10; i++) await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: pt(from.x + ((to.x - from.x) * i) / 10, from.y + ((to.y - from.y) * i) / 10) })
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
+}
+
+test('phone: drag a caption with a finger to move it, and resize it', async ({ page }, info) => {
+  await openEditor(page, await seedPost())
+  const p = await framePoint(page, 0.5, 0.26)
+  await page.touchscreen.tap(p.x, p.y)
+  const box = page.locator('[data-studio="text-box"]')
+  await expect(box).toBeVisible()
+  const b = (await box.boundingBox())!
+  // The middle of the caption (its move dot): the handles sit outside it.
+  const from = { x: b.x + b.width / 2, y: b.y + b.height / 2 }
+  await touchDrag(page, from, { x: from.x, y: from.y + 60 })
+  await page.waitForTimeout(400)
+  const a = (await box.boundingBox())!
+  expect(a.y - b.y).toBeGreaterThan(35)
+  await snap(page, info, 'phone: caption dragged down')
+  // And bigger from its corner handle (just outside the box).
+  await touchDrag(page, { x: a.x + a.width + 8, y: a.y + a.height + 8 }, { x: a.x + a.width + 20, y: a.y + a.height + 12 })
+  await page.waitForTimeout(400)
+  const c = (await box.boundingBox())!
+  // At phone width it already fills the frame's width, so bigger text wraps
+  // taller: the box's area grows.
+  expect(c.width * c.height).toBeGreaterThan(a.width * a.height * 1.3)
+  await snap(page, info, 'phone: caption made bigger')
+})

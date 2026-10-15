@@ -322,7 +322,8 @@ export const GUIDE: GuideSection[] = [
     steps: [
       'Check the Timeline: the shots and captions the Studio laid out for you.',
       'Open the editor (best on a computer): click a suggested spot (the payoff) or move the playhead, then click a preset (a crash zoom, a speed ramp, karaoke captions and more). Drag or trim its block; click it for Subtle, Normal or Strong and its keyframes. The Beat card finds the beat of your music (or tap the tempo) so cuts and presets snap to it; the Styles card saves your presets as a style for the next post. Press Done: it exports, saves to the post and comes back here.',
-      'Captions in the editor: click the words in the preview to select a caption, drag it to move it. Double-click it (or its block on the timeline; double-tap on a phone) to change the words right there: Enter saves, Shift+Enter starts a new line, Esc cancels. Long captions wrap inside the frame. Karaoke captions light up the caption\'s own words in turn and keep its place and look; click the preset again to turn it off.',
+      'Captions in the editor: click the words in the preview to select a caption, drag it to move it. Double-click it (or its block on the timeline; double-tap on a phone) to change the words right there: Enter saves, Shift+Enter starts a new line, Esc cancels. Long captions wrap inside the frame. Drag a handle (just outside the caption) to make it bigger or smaller: it wraps to stay in the frame, and one drag is one undo step. On a phone, drag a caption or its handles with a finger. Drag its block on the timeline to show it later or sooner, or its end to show it for less time. Karaoke captions light up the caption\'s own words in turn and keep its place and look; click the preset again to turn it off.',
+      'The post ends with its last shot: a caption or music that ended with the last shot keeps ending with it when you speed a shot up, trim it or delete one, so the export never runs on over black. One you retimed to end elsewhere stays where you put it.',
       'Shots in the editor: S splits at the playhead, drag an edge to trim, and drag a shot onto another to put it in front (the shots close up). Ctrl+Z undoes any of it.',
       'Pick the sound: Room tone (the default), a recording you uploaded, or None; add a music track you uploaded if you like. Music dips under the clip\'s own sound.',
       'Voiceover (optional): pick one of the character\'s converted voice lines, where it starts and how loud. Captions from the voice line are on by default: the words show a few at a time, each timed, so Karaoke captions light each word as it is said. Music and ambience dip under the voice.',
@@ -333,7 +334,7 @@ export const GUIDE: GuideSection[] = [
     ],
     tips: ['Edits are placed on the timeline where you choose them, never guessed for the whole video.', 'Open the editor again to change an edit: the timeline is kept with the post.', 'The editor opens with your music ducked under the voice line (or the clip\'s own sound); the music clip\'s Audio Ducking panel changes or removes it. If a file cannot open, the bar names it and the rest of the post opens.', 'On a phone the tabs at the bottom of the editor switch between Timeline, Media (the presets) and Edit (whatever is selected).', 'There is no AI music. Upload tracks you have the rights to (Library > Sounds holds them all).', 'Cuts between shots are hard cuts, never a crossfade.'],
     cost: 'Free.',
-    shots: [{ id: 'post-finish', caption: 'Finish' }, { id: 'editor-captions', caption: 'The editor: a caption edited in place' }],
+    shots: [{ id: 'post-finish', caption: 'Finish' }, { id: 'editor-captions', caption: 'The editor: a caption edited in place' }, { id: 'editor-resize', caption: 'The editor: resize, move and retime a caption' }],
   },
   {
     id: 'voice', group: 'Grow your accounts', title: 'Voice and voice lines', color: 'pink',
@@ -470,6 +471,7 @@ export const GLOSSARY: Array<[string, string]> = [
   ['Edit in place', 'In the editor, double-click a caption (in the preview or on the timeline) to change its words where it sits. Enter saves, Esc cancels.'],
   ['Karaoke captions', 'A preset that lights up a caption\'s words one after another across the caption, in the Studio\'s yellow. The caption keeps its place, look and words.'],
   ['Ducking', 'The music dips under the voice line (or the clip\'s own sound) so the words stay clear. The editor applies it when a post opens.'],
+  ['Ends with the last shot', 'In the editor, a caption or music that ended with the last shot keeps ending with it when the shots change length (speed, trim, delete), so the export stops with the video, not on black.'],
   ['Video rule', 'How a Recreate take is read: the stills\' numbers over the whole take (middle face match, middle margin, highest likeness). A take that misses is a warning with Keep this take and Try again, never thrown away.'],
   ['Preset', 'An edit you drop on the timeline at the playhead (a crash zoom, a speed ramp, karaoke captions): drag it, trim it, set its strength, change its keyframes.'],
   ['Continue this shot', 'Make the next take from the last frame of a clip, then join them into one longer clip.'],

@@ -741,21 +741,26 @@ ones behave now.
 |---|---|---|---|
 | Select a caption | The preview | Click the words. The box sits on the caption as drawn (wrapped lines), with the handles | 1 |
 | Edit a caption | The preview, or its block on the timeline | Double-click (double-tap on a phone): a box over the caption with the words selected. Enter saves, Shift+Enter starts a new line, Esc cancels, clicking away saves. One undo step | 2 plus typing |
-| Move a caption | The preview | Drag the box (not only the small center handle) | 1 drag |
+| Move a caption | The preview | Drag the box (not only the small center handle). One drag is one undo step | 1 drag |
+| Resize a caption | The preview | Drag a handle; the handles sit just outside the caption, so a small caption can still be dragged by its box. The handle stays under the cursor; past the frame's width the words wrap instead. One drag is one undo step | 1 drag |
+| Retime a caption | The timeline | Drag its block to show it later or sooner, or its end to show it for less time | 1 drag |
 | Long captions | Preview and export | Wrap inside the frame (90% of its width), the same lines in both | 0 |
 | Karaoke | Presets, Text, "Karaoke captions" | The caption's own words light up in turn, timed across the caption (the Studio's yellow; on a white box the word's box lights up). It keeps its place, look and text, and stays editable. Apply it again to turn it off | 1 |
 | Reorder shots | The timeline | Drag a shot onto another on the same track: it goes in front of the shot it lands on and the shots close up. One undo puts them back | 1 drag |
 | Open a post with music | Finish, Open the editor | Uploaded music (M4A) opens. A file that does not load is named in the bar ("Opened without: ...") and the rest of the post opens. Music and other sound end where the post ends | 0 |
 | Ducking | Opens with the post | The music is ducked under the voice line (or under the clip's own sound when there is no voice). The music clip's Audio Ducking panel shows "Ducking Applied" and can change or remove it | 0 |
 | First frame | Opening the editor | The preview shows the first frame without pressing Play | 0 |
-| Phone | The editor at phone width | The editor fits under the Studio bar, so the bottom tabs are on screen: Timeline, Media (the Presets panel), Edit (the inspector for what is selected), AI | 1 per tab |
+| Phone | The editor at phone width | The editor fits under the Studio bar, so the bottom tabs are on screen: Timeline, Media (the Presets panel), Edit (the inspector for what is selected), AI. A finger drags a caption or its handles | 1 per tab |
+| Ends with the last shot | The timeline and the export | A caption or music that ended with the last shot keeps ending with it when the shots change length (speed, trim, delete), so the export stops with the video instead of running on over black. One retimed to end elsewhere stays put. Undoing the shot's change brings it back too | 0 |
 
 Editing a caption went from select the block, find the Text section in the
 inspector and type (4 or more clicks, most of them hunting) to
 double-click, type, Enter. The usability notes from the audit (a small
 preview, handles that cover a small caption, no click-away deselect in the
 preview, the voice track named "Track 2", and others) are in the audit
-report for the owner to pick; none is built yet.
+report for the owner to pick; none is built yet. A second pass (the
+owner's full matrix) added the resize, undo, phone and last-shot rows and a
+render check for each feature.
 
 ## 18. Recreate: no paid take is rejected; the face pass edits the still (owner, 2026-10-15)
 

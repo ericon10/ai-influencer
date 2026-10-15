@@ -164,6 +164,8 @@ const PROJECT = { width: 1080, height: 1920 }
 
 // The frame inside the preview canvas (the canvas is letterboxed).
 export async function frame(page: Page): Promise<{ x: number; y: number; width: number; height: number }> {
+  // At phone width the preview can mount a moment after the post opens.
+  await page.locator('.editor-stage canvas').first().waitFor({ state: 'visible', timeout: 15_000 })
   const boxes = await page.locator('.editor-stage canvas').evaluateAll(cs => cs.map(c => { const r = c.getBoundingClientRect(); return { x: r.x, y: r.y, width: r.width, height: r.height } }))
   const c = boxes.sort((a, b) => b.width * b.height - a.width * a.height)[0]!
   const aspect = PROJECT.width / PROJECT.height
@@ -213,3 +215,82 @@ export async function countColor(page: Page, rect: { x: number; y: number; width
 
 // The Studio panel's preset card, by its one-line description.
 export const presetCard = (page: Page, line: string) => page.locator(`button[title="${line}"]`).first()
+
+// A post whose clip shows time: a 6 s 9:16 clip with a red bar that moves
+// across and the frame number in large type, so a timing slip (speed,
+// split, freeze) shows in a frame. Uploaded as the post's own clip.
+export async function seedTimerPost(opts: { caption?: string } = {}): Promise<string> {
+  const post = await seedPost({ caption: opts.caption })
+  const file = join(CACHE, 'timer-6s.mp4')
+  if (!existsSync(file)) {
+    const font = '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf'
+    execFileSync('ffmpeg', ['-y', '-loglevel', 'error',
+      '-f', 'lavfi', '-i', 'color=c=0x223344:s=1080x1920:r=30:d=6',
+      '-f', 'lavfi', '-i', 'color=c=red:s=140x1920:r=30:d=6',
+      '-filter_complex', `[0][1]overlay=x='t*156':y=0,drawtext=fontfile=${font}:text='%{n}':fontsize=260:fontcolor=white:x=(w-text_w)/2:y=h*0.62,format=yuv420p`,
+      '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20', file])
+  }
+  const before = await api<{ media: { id: string }[] }>('GET', `/content/${post}/editor`)
+  const { items } = await api<{ items: { id: string; characterId: string | null }[] }>('GET', '/content')
+  const characterId = items.find(i => i.id === post)!.characterId!
+  const uploadId = await uploadFile(file, 'e2e-timer-6s.mp4', 'video/mp4')
+  await api('POST', `/characters/${characterId}/clips`, { uploadId, name: 'e2e-timer-6s.mp4', contentId: post })
+  for (let i = 0; i < 90; i++) {
+    const m = await api<{ media: { id: string; kind: string }[] }>('GET', `/content/${post}/editor`).catch(() => null)
+    const v = m?.media.filter(x => x.kind === 'video') ?? []
+    if (v.length === 1 && v[0]!.id !== before.media[0]?.id) return post
+    await new Promise(r => setTimeout(r, 1000))
+  }
+  throw new Error('The timer clip did not become the post clip.')
+}
+
+// ── The render check ──
+
+export const RENDER_OUT = join(HERE, '..', '.out', 'render')
+mkdirSync(RENDER_OUT, { recursive: true })
+
+// The frame of the preview, saved as a PNG.
+export async function previewPng(page: Page, name: string): Promise<string> {
+  const f = await frame(page)
+  const file = join(RENDER_OUT, `${name}.png`)
+  writeFileSync(file, await page.screenshot({ clip: f }))
+  return file
+}
+
+// Mean difference (0 to 255) of two images scaled to 108 x 192, gray.
+export function imageDiff(a: string, b: string): number {
+  const gray = (f: string) => execFileSync('ffmpeg', ['-v', 'error', '-i', f, '-vf', 'scale=108:192,format=gray', '-f', 'rawvideo', '-'])
+  const x = gray(a), y = gray(b)
+  let s = 0
+  for (let i = 0; i < x.length; i++) s += Math.abs(x[i]! - y[i]!)
+  return s / x.length
+}
+
+// Done in the editor, then the worker's MP4 for this post, saved locally.
+export async function exportWithDone(page: Page, post: string, name: string): Promise<string> {
+  const started = Date.now()
+  await page.getByRole('button', { name: 'Done', exact: true }).click()
+  await page.waitForURL(u => !u.pathname.startsWith('/editor/'), { timeout: 240_000 })
+  for (let i = 0; i < 120; i++) {
+    const { items } = await api<{ items: { id: string; status: string; outputs?: { videoAssetId?: string; fromEditor?: boolean; renderedAt?: string } | null }[] }>('GET', '/content')
+    const p = items.find(x => x.id === post)
+    if (p?.status === 'ready' && p.outputs?.fromEditor && p.outputs.videoAssetId && Date.parse(p.outputs.renderedAt ?? '') > started) {
+      const mp4 = join(RENDER_OUT, `${name}.mp4`)
+      const res = await fetch(`${API}/assets/${p.outputs.videoAssetId}/content`, { headers: { 'x-studio-request': '1' } })
+      writeFileSync(mp4, Buffer.from(await res.arrayBuffer()))
+      return mp4
+    }
+    await new Promise(r => setTimeout(r, 2000))
+  }
+  throw new Error('The worker did not save the export.')
+}
+
+export function exportFrame(mp4: string, t: number, name: string): string {
+  const png = join(RENDER_OUT, `${name}.png`)
+  execFileSync('ffmpeg', ['-v', 'error', '-y', '-ss', String(t), '-i', mp4, '-frames:v', '1', png])
+  return png
+}
+
+export function duration(mp4: string): number {
+  return Number(execFileSync('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', mp4], { encoding: 'utf8' }))
+}

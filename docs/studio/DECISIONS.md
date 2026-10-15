@@ -1946,6 +1946,26 @@ person" in the clone panel.
 - **Not built (owner picks).** The usability notes in the audit report:
   the small preview, handles over a small caption, no click-away deselect
   in the preview, track names, the Tap button's second click, and the rest.
+- **Second pass (owner's full matrix, same day).** Driven again for what the
+  first pass skipped (resize, retime, redo, Pick a hook, phone dragging, a
+  render check per feature with a clip that shows time). Fixed in the fork:
+  - A caption's handle grew it about 1x per 100 project pixels, so at the
+    embed's small preview a 40 px drag made it about 4x and one word a
+    line. The scale now follows the handle (the box grows from its center
+    by the distance moved), clamped 0.1x to 10x.
+  - A caption drag (move or resize) was one undo step per frame, so Ctrl+Z
+    took back a few pixels. It is one history group now, and the last
+    position is committed on release.
+  - A finger could tap and double-tap a caption but not drag it. Touch
+    pointers go through the same handlers, the page does not scroll under
+    the finger, and the caption's handles sit just outside its box (on a
+    phone the box is a few pixels tall and the handles covered it).
+  - Speeding up the only shot left the Studio's whole-post caption (and the
+    music) running 2 s past it over black, in the preview and the export.
+    The post ends with its last shot: a caption or sound clip that ended
+    with the last shot keeps ending with it when the shots change length
+    (`apps/web/src/studio/follow.ts`). It is not its own undo step; undoing
+    the shot's change brings it back with it.
 
 ### G44. Recreate: no paid take is rejected; the face pass edits the still (owner, 2026-10-15)
 
