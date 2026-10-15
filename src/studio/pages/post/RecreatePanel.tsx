@@ -11,6 +11,7 @@ import { AsyncButton, Callout, Field, errorMessage, isFresh, useToast, type Todo
 import type { CloneModel, CloneOptions, CloneResult, CloneSource, CloneStill } from '../../types'
 import type { PostCtx } from './ctx'
 import { HowTo } from '../../guide/Guide'
+import { SentButton } from '../character/SentPanel'
 
 // Recreate from a real clip (owner, 2026-10-14; UX-PLAN.md sections 15 and
 // 16), in the Video step. Step 2: what to keep from the frame and the traits
@@ -232,6 +233,8 @@ function StillsStep({ ctx, list, kept, takes, picked, opts }: { ctx: PostCtx; li
                 {x.gate.margin != null && <span className={`st-badge ${x.gate.margin >= (gateMargin ?? 0) ? 'plain' : 'bad'}`} title="How much more it looks like her than the person in the clip (face minus clip)">Margin {pct(x.gate.margin)}</span>}
               </div>
               {x.error ? <span className="st-hint" style={{ color: 'var(--st-bad)', padding: '0 4px' }}>{x.error}</span> : <GatePill gate={x.gate} />}
+              {/* The prompt, attachments and model, failed stills included. */}
+              <SentButton candidateId={x.id} size="xs" />
               {x.assetId && !x.error && (
                 <div className="st-tile-action st-col" style={{ gap: 6, alignItems: 'flex-start' }}>
                   {/* The video starts from a face pass, or from the picked still. */}

@@ -162,6 +162,10 @@ const cloneSource = z.object({
   keep: z.array(z.string().max(80)).max(12).default([]),
   outfit: z.object({ choice: z.enum(['source', 'hers']).default('source'), text: z.string().max(160).default(''), lookId: id.nullable().default(null) }).prefault({}),
   motion: z.string().max(400).default(''),
+  // What the owner typed (not read by Claude): the outfit text and the keep
+  // chips they added. Claude's words go into a Recreate prompt plain (color
+  // and garment, no sleeve or fit details); the owner's go as typed.
+  typed: z.object({ outfit: z.boolean().default(false), keep: z.array(z.string().max(80)).max(12).default([]) }).prefault({}),
   // A spend cap for this post in credits (the Recreate link's cap), and
   // what its priced steps have started so far.
   capCredits: z.number().positive().max(100000).nullable().default(null),

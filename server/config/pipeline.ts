@@ -137,7 +137,7 @@ const templatesSchema = z.object({
   scene_plan: z.object({ system: z.string(), prompt: z.string() }),
   scene_ideas: z.object({ system: z.string(), prompt: z.string() }),
   video: z.object({ base: z.string(), silent: z.string(), end_frame: z.string(), continue: z.string() }),
-  clone: z.object({ swap: z.string(), image: z.string(), replace: z.string(), scene_still: z.string(), recreate_still: z.string(), recreate_not_like: z.string(), recreate_element_api: z.string(), face_pass: z.string(), recreate_keep: z.string(), outfit_keep_named: z.string(), outfit_hers_named: z.string(), motion: z.string(), motion_scene: z.string(), motion_what: z.string(), outfit_source: z.string(), outfit_hers: z.string(), target_main: z.string(), target_at: z.string() }),
+  clone: z.object({ swap: z.string(), image: z.string(), replace: z.string(), scene_still: z.string(), recreate_still: z.string(), recreate_not_like: z.string(), recreate_element_api: z.string(), recreate_realism: z.string(), face_pass: z.string(), recreate_keep: z.string(), outfit_keep_named: z.string(), outfit_hers_named: z.string(), motion: z.string(), motion_scene: z.string(), motion_what: z.string(), outfit_source: z.string(), outfit_hers: z.string(), target_main: z.string(), target_at: z.string() }),
   clone_traits: z.object({ system: z.string(), prompt: z.string() }),
   content_slides: z.object({ system: z.string(), prompt: z.string() }),
   content_captions: z.object({ system: z.string(), prompt: z.string() }),

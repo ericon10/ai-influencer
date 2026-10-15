@@ -74,6 +74,10 @@ export interface BuildOptions {
   makeup?: string
   // How much skin detail the REALISM block names at this framing.
   skin?: SkinDetail
+  // A short REALISM line in place of the full REALISM and AVOID blocks
+  // (Recreate, owner 2026-10-15: the full blocks stacked next to a real
+  // person's photo tripped the provider's filter). Still a REALISM block.
+  realismLine?: string
 }
 
 export const DEFAULT_BACKGROUND = 'Plain light gray background, soft even daylight'
@@ -92,7 +96,7 @@ export function finishPrompt(prompt: string, stage: string, ch: RealismSource & 
   const body = block && !prompt.includes(block) ? `${prompt} ${block}` : prompt
   // Flaw words the character really has (card, marks, realism notes) stay.
   const allowedFlaws = [ch.card ?? '', ...(ch.marks ?? []).map(m => m.description), ...(ch.realism?.notes ?? [])].join(' ')
-  const done = finalizeImagePrompt(body, { stage, realism: ch.realism?.block, avoid: ch.realism?.avoid, allowedFlaws, flawDose: o.flawDose, plainBackground: o.background !== null, makeup: o.makeup, skin: o.skin })
+  const done = finalizeImagePrompt(body, { stage, realism: ch.realism?.block, avoid: ch.realism?.avoid, allowedFlaws, flawDose: o.flawDose, plainBackground: o.background !== null, makeup: o.makeup, skin: o.skin, realismLine: o.realismLine })
   o.warnings?.push(...done.warnings)
   return done.prompt
 }

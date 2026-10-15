@@ -83,12 +83,13 @@ export interface WrittenPrompt {
 
 // "What was sent" under a still or a take.
 export interface SentView {
-  candidateId: string; prompt: string; wrapped: string
+  candidateId: string | null; jobId: string; prompt: string; wrapped: string
   images: Array<{ assetId: string; role: 'ref' | 'start' | 'end' | 'source'; refId: string | null }>
+  elements: Array<{ id: string; name: string }>
   model: string; ranOn: string; path: 'plan' | 'api' | 'demo'; pathLabel: string
   settings: Array<{ label: string; value: string }>
   quoted: string; actual: string | null; costNote: string | null; flagged: boolean; offPct: number | null
-  status: string; at: string | null
+  status: string; error: string | null; providerJobId: string | null; at: string | null
 }
 
 export interface ScenePreset { id: string; label: string; hint?: string }

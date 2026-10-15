@@ -9,8 +9,9 @@ import { registerJobHook, registerLocalJob, type JobOutcome, type JobRow } from 
 import { activateChildren, cancelChildren, childJobs, enqueueLocalJob, quoteItemsFor, type JobSpec } from '../jobs/runner.js'
 import { displayPrice } from '../costs/quotes.js'
 import { isVideoOp } from '../core/clips.js'
-import { fill, hardWrap } from '../core/text.js'
+import { capitalize, fill, hardWrap } from '../core/text.js'
 import { buildEditPrompt, hairColorFrom } from '../core/scenes.js'
+import { adultProblem, cardForPhotoEdit, plainOutfit } from '../core/character.js'
 import { pickPerson, targetWords, type Point } from '../core/cloneTarget.js'
 import type { RealismWarning } from '../core/realism.js'
 import { lintPrompt, type RuleViolation } from '../core/rules.js'
@@ -88,7 +89,7 @@ export type ClipFrom = { uploadId: string } | { assetId: string } | { link: stri
 const blankSource = (name: string, from: string): CloneSource => ({
   status: 'preparing', name, uploadId: null, assetId: null, durationSec: null, hasAudio: false, trimmed: false, error: null, firstFrameId: null, people: [], target: null, stills: {},
   originalAssetId: null, cleanAssetId: null, cleanup: null, textFrameId: null, sourceCaption: null, rawFrameId: null, motionAssetId: null, notLike: '', look: null,
-  keep: [], outfit: { choice: 'source', text: '', lookId: null }, motion: '', capCredits: null, spentCredits: 0, from, prep: '', motionFrameIds: [],
+  keep: [], outfit: { choice: 'source', text: '', lookId: null }, typed: { outfit: false, keep: [] }, motion: '', capCredits: null, spentCredits: 0, from, prep: '', motionFrameIds: [],
 })
 
 const MEDIA_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -777,8 +778,9 @@ function planElement(ch: ReturnType<typeof toData>) {
 
 // The face the stills must give her: the card (the face traits), and the
 // hair color named on its own.
+// The card for a Recreate prompt: face and hair only (see cardForPhotoEdit).
 function faceWords(ch: ReturnType<typeof toData>): { face: string; hair: string } {
-  return { face: ch.card.trim().replace(/[.\s]+$/, ''), hair: hairColorFrom(ch.card) ?? 'exactly as in the references' }
+  return { face: cardForPhotoEdit(ch.card).trim().replace(/[.\s]+$/, ''), hair: hairColorFrom(ch.card) ?? 'exactly as in the references' }
 }
 
 const STILL_MODEL_KEY = 'recreate_still_model'
@@ -816,6 +818,10 @@ async function stillRun(deps: Deps, ctx: Ctx, characterId: string, want?: string
   const ch = toData(row)
   const approved = await approvedAssets(deps, ctx, row.id)
   if (!approved.get('REF-00')) throw new AppError('bad_request', `${row.name} has no face yet. Set up ${ch.pronouns.poss} face (REF-00) first.`)
+  // Fixed rule adult-21, checked here rather than written into the prompt:
+  // age words next to a real person's photo trip the provider's filter.
+  const tooYoung = adultProblem(ch.age)
+  if (tooYoung) throw new AppError('bad_request', `${row.name}: ${tooYoung}`)
   const { choices, pick } = await recreateStillChoices(deps, ctx)
   const choice = choices.find(c => c.ref === want) ?? choices.find(c => c.ref === pick)!
   if (choice.problem) throw new AppError('bad_request', `${choice.label}: ${choice.problem}`)
@@ -854,7 +860,9 @@ export async function buildCloneStill(deps: Deps, ctx: Ctx, input: CloneStillInp
   let outfit = ''
   const choice = input.outfit ?? source.outfit.choice ?? cfg.outfit
   const look = input.look ?? source.outfit.lookId
-  const named = source.outfit.text.trim().replace(/[.\s]+$/, '')
+  // Claude's outfit words go plain (color and garment); the owner's as typed.
+  const rawNamed = source.outfit.text.trim().replace(/[.\s]+$/, '')
+  const named = source.typed.outfit ? rawNamed : plainOutfit(rawNamed)
   if (choice === 'hers') {
     if (look) {
       refs.push(await lookStill(deps, ctx, row.id, row.name, ch.pronouns.poss, look))
@@ -865,9 +873,9 @@ export async function buildCloneStill(deps: Deps, ctx: Ctx, input: CloneStillInp
       warnings.push(warn('clone-outfit', 'The outfit stays', `Pick one of ${row.name}'s stills or type an outfit; until then ${ch.pronouns.subj} wears the clothes in the clip.`))
     }
   } else if (named) {
-    outfit = fill(t.clone.outfit_keep_named, { ...pv, outfit: named })
+    outfit = capitalize(fill(t.clone.outfit_keep_named, { ...pv, outfit: named }))
   }
-  const keep = source.keep.map(k => k.trim()).filter(Boolean)
+  const keep = source.keep.map(k => (source.typed.keep.includes(k) ? k : plainOutfit(k)).trim()).filter(Boolean)
   if (!element && ch.identities.some(i => i.kind === 'element')) warnings.push(warn('clone-element', 'No element off the plan', `${row.name}'s Higgsfield element works on your plan only; here REF-00 and one three-quarter view carry ${ch.pronouns.poss} face.`))
   const frame = await getAsset(deps, ctx, frameId)
   const portrait = (frame.height ?? 16) >= (frame.width ?? 9)
@@ -881,7 +889,7 @@ export async function buildCloneStill(deps: Deps, ctx: Ctx, input: CloneStillInp
     not_like: `${notLike ? fill(t.clone.recreate_not_like, { ...pv, traits: notLike }) : ''}${keep.length ? fill(t.clone.recreate_keep, { keep: keep.join(', ') }) : ''}`,
     outfit,
   })
-  const prompt = buildEditPrompt(t, `${change} ${fill(t.scene.adult, pv)}`, ch, false, { warnings: realism, flawDose: sw.on('realism-flaw-dose') })
+  const prompt = buildEditPrompt(t, change, ch, false, { warnings: realism, flawDose: sw.on('realism-flaw-dose'), realismLine: t.clone.recreate_realism })
   const request: GenRequest = {
     kind: 'image_edit', model: run.model, modelRef: model, prompt, aspect: portrait ? '9:16' : '16:9', quality: level.quality, resolution: level.resolution,
     refs: refs.slice(0, entry.max_refs).map(assetId => ({ assetId })),
@@ -949,7 +957,7 @@ async function facePassRun(deps: Deps, ctx: Ctx, o: { postId: string; characterI
   const sw = await ruleSwitches(deps, ctx, row.id)
   const realism: RealismWarning[] = []
   const change = fill(t.clone.face_pass, { ...pv, name: ch.name, face, element: element ? ` <<<${element.externalId}>>>` : t.clone.recreate_element_api })
-  const prompt = buildEditPrompt(t, `${change} ${fill(t.scene.adult, pv)}`, ch, false, { warnings: realism, flawDose: sw.on('realism-flaw-dose') })
+  const prompt = buildEditPrompt(t, change, ch, false, { warnings: realism, flawDose: sw.on('realism-flaw-dose'), realismLine: t.clone.recreate_realism })
   const request: GenRequest = {
     kind: 'image_edit', model: run.model, modelRef: model, prompt, aspect: o.aspect, quality: level.quality, resolution: level.resolution,
     refs: refs.slice(0, entry.max_refs).map(assetId => ({ assetId })),
@@ -1004,6 +1012,8 @@ async function onCloneTraits(deps: Deps, ctx: Ctx, job: JobRow, out: JobOutcome)
   await updateContent(deps, ctx, post.id, { spec: { clone: {
     ...src, ...(traits ? { notLike: traits } : {}), ...(keep.length ? { keep } : {}), ...(motion ? { motion } : {}),
     ...(outfit && !src.outfit.text ? { outfit: { ...src.outfit, text: outfit } } : {}),
+    // Claude's chips replace the list, so none of them is typed.
+    typed: { outfit: src.typed.outfit && !!src.outfit.text, keep: keep.length ? [] : src.typed.keep },
   } } })
 }
 
@@ -1014,11 +1024,19 @@ export async function setCloneChoices(deps: Deps, ctx: Ctx, contentId: string, i
   const src = cloneOf(post)
   if (!src) throw new AppError('bad_request', 'Add the clip first.')
   if (input.outfit?.lookId) await lookStill(deps, ctx, post.characterId ?? '', 'the character', 'the', input.outfit.lookId)
+  // What the owner typed goes into the prompt as typed (owner, 2026-10-15).
+  const keepList = input.keep ? chipList(input.keep, 12) : src.keep
+  const outfitText = input.outfit?.text != null ? oneLine(input.outfit.text, 160) : src.outfit.text
+  const typed = {
+    outfit: !outfitText ? false : outfitText !== src.outfit.text ? true : src.typed.outfit,
+    keep: keepList.filter(k => src.typed.keep.includes(k) || !src.keep.includes(k)),
+  }
   const next: CloneSource = {
     ...src,
     ...(input.keep ? { keep: chipList(input.keep, 12) } : {}),
     ...(input.notLike != null ? { notLike: oneLine(input.notLike, 300) } : {}),
-    ...(input.outfit ? { outfit: { choice: input.outfit.choice ?? src.outfit.choice, text: input.outfit.text != null ? oneLine(input.outfit.text, 160) : src.outfit.text, lookId: input.outfit.lookId !== undefined ? input.outfit.lookId : src.outfit.lookId } } : {}),
+    ...(input.outfit ? { outfit: { choice: input.outfit.choice ?? src.outfit.choice, text: outfitText, lookId: input.outfit.lookId !== undefined ? input.outfit.lookId : src.outfit.lookId } } : {}),
+    typed,
     ...(input.motion != null ? { motion: oneLine(input.motion, 400) } : {}),
     ...(input.capCredits !== undefined ? { capCredits: input.capCredits } : {}),
   }

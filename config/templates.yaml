@@ -158,11 +158,16 @@ clone:
   recreate_still: "Use the first image only for the place, the light, the camera angle, the framing, the pose and the outfit. Replace {target} in it completely with {name}{element}: {face}. {Poss} hair is {hair_color}.{not_like} Keep the head angle and the gaze of the first image. Remove all caption text, the TikTok logo and the username, leaving no text or watermark anywhere in the image. {outfit}"
   recreate_not_like: " {Subj} must not have that person's {traits}."
   recreate_element_api: " (the person in the other reference images)"
+  # The short REALISM line for Recreate stills and the face pass (owner,
+  # 2026-10-15), in place of the full REALISM and AVOID blocks.
+  recreate_realism: "Natural skin texture, not retouched."
   # The face-only pass on a chosen still: nothing else moves.
   face_pass: "Change only {poss} face to match {name}{element}: {face}. Keep everything else in the image exactly the same, pixel for pixel: the hair, the outfit, the pose, the hands, the light, the background and the framing."
   # Step 2 chips (owner, 2026-10-14): what to keep from the frame, named.
   recreate_keep: " Keep from it: {keep}."
-  outfit_keep_named: "{Subj} wears the outfit of the first image: {outfit}."
+  # Owner, 2026-10-15: the outfit stays plain ("dark green dress, same as in
+  # the photo"); Claude's words lose sleeve and fit details, the owner's stay.
+  outfit_keep_named: "{outfit}, same as in the photo."
   outfit_hers_named: "Dress {obj} in {outfit} instead of the clothes in the first image."
   # The motion step (owner's proven motion prompt, the kitchen clip on Wan
   # 3.0, 2026-10-14), for every motion model on both paths. @Image1 is the
@@ -188,8 +193,9 @@ clone_traits:
     ethnicity or anything not visible. Never describe the body.
     keep: what to keep from the first frame, as 3 to 6 short items: the
     place, the light, the camera angle and framing, the pose, the outfit
-    (named plainly, for example "dark green sleeveless dress").
-    outfit: the outfit the person wears, in a few words.
+    (the color and the garment only, for example "dark green dress").
+    outfit: the outfit, the color and the garment only, for example "dark
+    green dress". No sleeve, fit, length or neckline details.
     motion: one sentence of what the person does through the clip, in
     order (looks into the lens, turns away, glances back...). Plain words,
     no mood or camera words.

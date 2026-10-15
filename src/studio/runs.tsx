@@ -3,6 +3,7 @@ import { AlertTriangle, CheckCircle2, Circle, Loader2, X, XCircle } from 'lucide
 import { useLiveJobs } from './hooks'
 import { useToast } from './ui'
 import { PriceButton } from './PriceButton'
+import { SentButton } from './pages/character/SentPanel'
 import type { JobView } from './types'
 
 // Feedback everywhere (owner, 2026-10-13; UX-PLAN.md shared patterns): every
@@ -96,6 +97,8 @@ export function RunRow({ j, onDismiss, showLabel = true }: { j: JobView; onDismi
           {j.charged === 'no' ? 'Nothing was charged.' : j.charged === 'maybe' ? 'The provider may have charged it; the amount stays reserved until you check (Activity).' : ''}
           {j.detail && <details className="st-run-details"><summary>Details</summary><pre>{j.detail}</pre></details>}
         </div>
+        {/* What was sent, failed runs included (owner, 2026-10-15). */}
+        {j.kind !== 'llm' && j.kind !== 'local' && <SentButton jobId={j.id} size="xs" />}
         {j.retry && <PriceButton action={{ type: 'retry', jobId: j.id }} label="Retry" size="sm" variant="secondary" icon={false} compact />}
         {onDismiss && <button type="button" className="st-btn icon ghost sm" aria-label="Hide" onClick={onDismiss}><X size={13} /></button>}
       </div>

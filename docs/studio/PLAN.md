@@ -452,6 +452,12 @@ Decisions: `DECISIONS.md` G37 and G38. UX: `UX-PLAN.md` section 15.
 - [ ] First GPT Image 2.5 recreate (waits for the owner's approve click)
 - [ ] E2E through the Studio: kitchen clip, Callie, Genjutsu, 50-credit cap (waits for the owner's approve click)
 
+### Round 19: the blocked Recreate stills (G42)
+
+- [x] What was sent on failed runs and on every Recreate still
+- [x] Recreate prompts: face and hair only, no age line (21+ checked before the run), plain outfit, short realism line
+- [x] Proved with single test stills: fixed prompt passes on the Studio's frame (3 credits net, blocked runs refunded)
+
 ## Roadmap after Phase 4 (owner, 2026-10-13; not started)
 
 SPEC 13.1, R1 to R7: Clone Video (first after Phase 3), Inspo board

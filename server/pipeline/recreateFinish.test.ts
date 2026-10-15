@@ -9,7 +9,7 @@ import { registerPipelineHooks } from './hooks.js'
 import { estimateAction, runAction, type StudioAction } from './actions.js'
 import { importCharacter } from './files.js'
 import { createContent, getContent, type MemeSpec } from './content.js'
-import { addCloneSource, buildCloneStill, checkCloneCap, cloneOptions, recreateGate, saveRecreateStillModel, setRecreateGate, cloneStills, gateFor, postClones, setCloneChoices } from './clone.js'
+import { addCloneSource, buildCloneFace, buildCloneStill, checkCloneCap, cloneOptions, recreateGate, saveRecreateStillModel, setRecreateGate, cloneStills, gateFor, postClones, setCloneChoices } from './clone.js'
 import { addRecreateRow, recreateBatch, recreateFor, setRecreateRows, startRecreate, useCloneTake } from './recreate.js'
 import { createScene } from './scenes.js'
 import { candidates, jobs } from '../db/schema.js'
@@ -24,6 +24,8 @@ import { setSetting } from './settings.js'
 import { makeClip } from '../media/testClips.js'
 import { uploadKey } from '../storage/uploads.js'
 import type { GenRequest } from '../providers/types.js'
+import { adultProblem, cardForPhotoEdit, plainOutfit } from '../core/character.js'
+import { whatWasSentForJob } from './sent.js'
 
 // Recreate, finished (owner, 2026-10-14; UX-PLAN.md 16): the motion model
 // picker on the plan or the API, the gates before any video spend, step 2's
@@ -125,9 +127,56 @@ describe('step 2, the stills and the gates', () => {
     const { preview } = await run({ type: 'clone_still', contentId: postId, characterId: callie })
     const text = preview.prompts[0]!.text
     expect(text).toContain('Keep from it: a marble kitchen counter with flowers, warm ceiling light, handheld phone at chest height.')
-    expect(text).toContain('She wears the outfit of the first image: dark green sleeveless dress.')
     expect(text).toContain("She must not have that person's dark brown hair, brown eyes, a nose ring, winged liner.")
+    // Owner, 2026-10-15 (the provider's filter blocked every still that
+    // stacked these next to a real person's photo): face and hair only, no
+    // age line, a plain outfit from Claude's words, the short REALISM line.
+    expect(text).toContain('Long honey-blonde hair, loose beachy waves, deep side part. Warm hazel-brown eyes, soft oval face, full light-brown brows, full lips.')
+    expect(text).not.toMatch(/years old|21 or older|\badult\b/i)
+    expect(text).not.toMatch(/\b(?:toned|curvy|waist|hips|legs|athletic|build)\b/i)
+    expect(text).toContain('Dark green dress, same as in the photo.')
+    expect(text).not.toMatch(/sleeveless|fitted/i)
+    expect(text.trim().endsWith('REALISM: Natural skin texture, not retouched.')).toBe(true)
+    expect(text).not.toContain('AVOID:')
+    // The owner's own words go as typed, sleeves and all.
+    await setCloneChoices(h.deps, h.ctx, postId, { outfit: { text: 'dark green sleeveless slip dress' }, keep: [...c.keep.slice(0, 2), 'thin straps'] })
+    const typed = (await run({ type: 'clone_still', contentId: postId, characterId: callie })).preview.prompts[0]!.text
+    expect(typed).toContain('Dark green sleeveless slip dress, same as in the photo.')
+    expect(typed).toContain('Keep from it: a marble kitchen counter with flowers, warm ceiling light, thin straps.')
+    // The face pass follows the same rules.
+    const still = (await cloneStills(h.deps, h.ctx, postId)).find(x => x.assetId && x.pass === 'still')
+    if (still) {
+      const face = (await buildCloneFace(h.deps, h.ctx, { contentId: postId, characterId: callie, candidateId: still.id })).preview.prompts[0]!.text
+      expect(face).not.toMatch(/years old|21 or older|toned|curvy/i)
+      expect(face.trim().endsWith('REALISM: Natural skin texture, not retouched.')).toBe(true)
+    }
+    await setCloneChoices(h.deps, h.ctx, postId, { outfit: { text: '' }, keep: c.keep.slice(0, 3) })
   }, 120_000)
+
+  it('What was sent shows on a failed run too: the prompt, the frame, the element, the model and why it failed', async () => {
+    const [job] = await h.deps.db.select().from(jobs).where(like(jobs.purpose, `clone_still:${postId}:%`)).limit(1)
+    await h.deps.db.update(jobs).set({ status: 'failed', error: { message: 'The provider content filter blocked this result.' } }).where(eq(jobs.id, job!.id))
+    try {
+      const sent = await whatWasSentForJob(h.deps, h.ctx, job!.id)
+      expect(sent).toMatchObject({ jobId: job!.id, candidateId: null, status: 'failed', error: 'The provider content filter blocked this result.' })
+      expect(sent.prompt).toContain('Replace the main person')
+      expect(sent.images.length).toBeGreaterThan(0)
+      expect(sent.model).toBeTruthy()
+      expect(sent.costNote).toBeNull()
+    } finally {
+      await h.deps.db.update(jobs).set({ status: job!.status, error: job!.error }).where(eq(jobs.id, job!.id))
+    }
+  })
+
+  it('21 or older is a check before the run, not words in the prompt', () => {
+    expect(adultProblem(24)).toBeNull()
+    expect(adultProblem(20)).toBe('Characters are 21 or older.')
+    expect(adultProblem(null)).toMatch(/Set an age/)
+    expect(cardForPhotoEdit('Callie, 24 years old. Long red hair. Fit, athletic build, toned legs, defined waist, naturally curvy hips. Green eyes, freckles.')).toBe('Long red hair. Green eyes, freckles.')
+    expect(cardForPhotoEdit('Distinguishing mark: small mole above her left brow. Style: a regular girl whose style evolves; natural glow.')).toBe('Distinguishing mark: small mole above her left brow.')
+    expect(plainOutfit('dark green sleeveless fitted top')).toBe('dark green top')
+    expect(plainOutfit('black off-the-shoulder mini dress')).toBe('black dress')
+  })
 
   it('the stills stay on Nano Banana 2.1 on the plan whenever it is connected, even with the API as the billing default', async () => {
     await saveBilling(h.deps, h.ctx, { default: 'api', creditUsd: 0 })

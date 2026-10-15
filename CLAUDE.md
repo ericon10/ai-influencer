@@ -16,7 +16,10 @@ lint, the job runner, the adapters and QA), not only in this file:
 2. **The REALISM block is in every image prompt.** The builder adds
    the character's own block (or the Studio default); the lint and
    the job runner refuse any image prompt without it. There is no
-   setting to turn it off.
+   setting to turn it off. Recreate stills and the face pass use the
+   short form, "REALISM: Natural skin texture, not retouched." (owner,
+   2026-10-15: the full blocks stacked next to a real person's photo
+   tripped the provider's filter).
 3. **Banned words:** flawless, perfect skin, smooth skin, airbrushed,
    retouched, porcelain, beautify, glamour retouch, skin smoothing,
    beauty filter, enhance face. The builder strips them and tells the
@@ -48,7 +51,8 @@ restrictions. Every rule is in exactly one of two buckets
 - **FIXED, and only these:** the Realism principle (rule zero: real
   skin, the REALISM block, banned words, beautify off, the texture
   check, the natural baseline); bare face on hero and sheet;
-  characters are 21 or older; no nudity or explicit content; a new
+  characters are 21 or older (checked on the record and before a
+  Recreate run, never written into a Recreate prompt); no nudity or explicit content; a new
   person, never a copy of the inspiration face (with Recreate's face
   checks before the motion: face 0.45 or more against REF-00, beating
   the likeness to the clip's person by 0.12 or more, likeness under

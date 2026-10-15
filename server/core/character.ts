@@ -87,6 +87,63 @@ export const MIN_AGE = 21
 export const DEFAULT_MIN_AGE = 21
 export const CARD_MAX_WORDS = 40
 
+// The age in a card ("24 years old.", "a 24-year-old"), taken out of edit
+// prompts that carry a real person's photo (Recreate): the provider's filter
+// blocked every still that had age words next to that photo (2026-10-15).
+// The age itself stays enforced on the record and before each run.
+const YEARS = String.raw`\d{1,3}\s*-?\s*(?:years?|yrs?)(?:\s*-?\s*old)?`
+const AGE_WORDS = [
+  new RegExp(String.raw`\b(?:who\s+is|is|was)\s+${YEARS}(?:\s*,?\s*and\b)?`, 'gi'),
+  /\baged?\s+\d{1,3}\b/gi,
+  new RegExp(String.raw`\b${YEARS}\b`, 'gi'),
+]
+export function cardWithoutAge(card: string): string {
+  return card.split(/(?<=[.!?])\s+/)
+    .map(s => AGE_WORDS.reduce((acc, re) => acc.replace(re, ''), s)
+      .replace(/\s{2,}/g, ' ').replace(/\s+([,.;:!?])/g, '$1').replace(/^[\s,;:]+/, '').replace(/[\s,;:]+([.!?]?)$/, '$1').trim())
+    .filter(s => s.replace(/\b(?:a|an|the)\b/gi, '').split(/\s+/).filter(w => /[a-z]{2,}/i.test(w)).length >= 2)
+    .map(s => s.charAt(0).toUpperCase() + s.slice(1))
+    .join(' ')
+}
+
+// The card for an edit of a real person's photo (Recreate): the face and the
+// hair only. Age, body, style and mood words are left out: the provider's filter blocked
+// every Recreate still that described her age and body next to the photo of
+// the person she replaces (2026-10-15). The photo already gives the pose and
+// the frame; the element and REF-00 carry her face.
+const FACE_HAIR_WORDS = /\b(?:hair|bangs|fringe|bob|curls?|waves?|braids?|ponytail|eyes?|brows?|eyebrows?|lashes|lips?|mouth|smile|teeth|nose|cheeks?|cheekbones?|chin|jaw(?:line)?|face|forehead|freckles?|moles?|dimples?|scars?|birthmarks?|skin|complexion|ears?|piercings?)\b/i
+const BODY_WORDS = /\b(?:fit|build|body|figure|physique|legs?|thighs?|waist|hips?|curv\w*|bust|chest|breasts?|butt|glutes?|abs|toned|athletic|slim|slender|petite|tall|height|weight|muscular|hourglass)\b/i
+export function cardForPhotoEdit(card: string): string {
+  return cardWithoutAge(card).split(/(?<=[.!?])\s+/)
+    // Face and hair only (owner, 2026-10-15): style, mood and body go.
+    .filter(s => FACE_HAIR_WORDS.test(s))
+    .map(s => {
+      const end = /[.!?]$/.test(s) ? s.slice(-1) : '.'
+      const parts = s.replace(/[.!?]$/, '').split(/\s*,\s*/).filter(p => !BODY_WORDS.test(p))
+      if (!parts.length) return ''
+      const out = parts.join(', ')
+      return `${out.charAt(0).toUpperCase()}${out.slice(1)}${end}`
+    })
+    .filter(Boolean)
+    .join(' ')
+}
+
+// An outfit read from a real person's photo, said plainly for a Recreate
+// prompt: the color and the garment, no sleeve, fit, length or cut details
+// ("dark green sleeveless fitted top" becomes "dark green top"). The owner's
+// own words are never changed (owner, 2026-10-15).
+const OUTFIT_DETAIL = /\b(?:sleeveless|strapless|backless|halter(?:-?neck)?|(?:short|long|cap|puff|three-quarter)[- ]sleeved?|spaghetti[- ]straps?|thin[- ]straps?|one[- ]shoulder|off[- ]the[- ]shoulders?|off[- ]shoulder|fitted|form[- ]fitting|figure[- ]hugging|skin[- ]?tight|tight|snug|bodycon|clingy|low[- ]cut|plunging|deep[- ]v|cropped|crop|mini|micro|sheer|see[- ]through|revealing)\b/gi
+export function plainOutfit(text: string): string {
+  return text.replace(OUTFIT_DETAIL, '').replace(/\s*,\s*(?=,|$)/g, '').replace(/\s{2,}/g, ' ').replace(/^[\s,]+|[\s,]+$/g, '').trim()
+}
+
+// Fixed rule adult-21 before a run, instead of age words in the prompt.
+export function adultProblem(age: number | null | undefined, minAge = DEFAULT_MIN_AGE): string | null {
+  if (age == null) return 'Set an age first. Characters must be adults, 21 or older.'
+  if (age < Math.max(MIN_AGE, minAge)) return 'Characters are 21 or older.'
+  return null
+}
+
 // Body terms the models exaggerate (SPEC 5.1 rule 9).
 const SIZE_TERMS = /\b(?:[A-H]|AA|DD|DDD)[- ]?cups?\b|cup size|bust size|measurements|\b\d{2}-\d{2}-\d{2}\b/i
 

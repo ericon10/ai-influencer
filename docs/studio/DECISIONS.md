@@ -1865,3 +1865,42 @@ person" in the clone panel.
   account (`recreate_gate`, with the time approved); **Keep the current
   numbers** closes the check until the next 10. The gate itself stays a
   fixed rule; only its numbers move, and only on the owner's click.
+
+### G42. Recreate prompts: face and hair only, short realism (owner, 2026-10-15)
+
+- **What happened.** The first real Recreate (kitchen clip, Callie, Nano
+  Banana 2.1 on the plan) had all 4 stills blocked by the provider's
+  filter (Higgsfield status "nsfw"; refunded). The owner's hand runs with
+  the same model, element and kind of frame passed.
+- **Diagnosis** (single test stills, owner-approved, cap 6 credits; blocked
+  runs are refunded, so only passes cost):
+
+  | Test | Change from the blocked Studio prompt | Result |
+  |---|---|---|
+  | 1 | Age words out ("24 years old.", "She is an adult, 21 or older.") | blocked |
+  | 2 | Also the body sentence out | blocked |
+  | 3 | The owner's hand-run prompt, word for word, on the Studio's own frame | passed (1.5) |
+  | 4 | The fixed Studio prompt below | passed (1.5) |
+
+  The frame is fine (test 3); the words were the trigger, a stack of them
+  next to a real person's photo, not any one word: age and body out alone
+  were not enough (tests 1 and 2). Net spend 3 credits.
+- **The fix, Recreate stills and the face pass only:**
+  - **Face and hair only** from the card (`cardForPhotoEdit`): sentences
+    about face or hair; age, body, build, style and mood words never go.
+    Her body is in the element and the sheet.
+  - **No age line**; 21 or older is checked before the run
+    (`adultProblem`, on top of the record's own check).
+  - **Plain outfit**: "{outfit}, same as in the photo." Claude's words lose
+    sleeve, fit, length and cut details (`plainOutfit`; "dark green
+    sleeveless fitted top" becomes "Dark green top"); words the owner typed
+    (outfit text or keep chips, recorded in `typed`) go as typed. "Read
+    them for me" now asks for color and garment only.
+  - **Short realism**: "REALISM: Natural skin texture, not retouched." in
+    place of the full REALISM and AVOID blocks (`templates.yaml
+    clone.recreate_realism`). Still a REALISM block, so the lint and the
+    runner keep requiring it.
+- **What was sent on failed runs.** Every failed run row and every Recreate
+  still (failed or not) has What was sent: the prompt, the images, the
+  Higgsfield element named in the prompt, the model, the path, the
+  settings, why it failed and the provider's id (`GET /jobs/:id/sent`).

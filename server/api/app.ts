@@ -18,7 +18,7 @@ import { createCharacter, getCandidate, getCharacter, linkInspiration, listChara
 import { cleanVoiceCard } from '../core/voiceCard.js'
 import type { CharacterData } from '../core/character.js'
 import { approveSceneCandidate, archiveScene, copyScene, createScene, cropCandidate, saveVideoModel, updateScene } from '../pipeline/scenes.js'
-import { whatWasSent } from '../pipeline/sent.js'
+import { whatWasSent, whatWasSentForJob } from '../pipeline/sent.js'
 import { videoPrices } from '../pipeline/sceneActions.js'
 import { expectedVersion, readWorkerStatus } from '../jobs/workerStatus.js'
 import { addClip, libraryView } from '../pipeline/clips.js'
@@ -406,6 +406,7 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
   app.post('/candidates/:id/mirror', async c => { const ctx = c.get('ctx'); requireRole(ctx, 'member'); return c.json(await mirrorCandidate(deps, ctx, c.req.param('id'))) })
   // "What was sent": the final prompt, the images, the model and the cost.
   app.get('/candidates/:id/sent', async c => c.json(await whatWasSent(deps, c.get('ctx'), c.req.param('id'))))
+  app.get('/jobs/:id/sent', async c => c.json(await whatWasSentForJob(deps, c.get('ctx'), c.req.param('id'))))
   app.post('/candidates/:id/favorite', async c => {
     const body = parse(z.object({ favorite: z.boolean() }), await json(c))
     await setFavorite(deps, c.get('ctx'), c.req.param('id'), body.favorite)

@@ -143,7 +143,10 @@ describe('Clone: "Copy the moves into a new scene" never gets a bare sheet image
     expect(text).toMatch(/^Use the first image only for the place, the light, the camera angle, the framing, the pose and the outfit\. Replace the main person \(the largest person, closest to the camera\) in it completely with Callie \(the person in the other reference images\)/)
     expect(text).toMatch(/Her hair is long honey-blonde\./)
     expect(text).toMatch(/Keep the head angle and the gaze of the first image\. Remove all caption text, the TikTok logo and the username/)
-    expect(text).toContain('She is an adult, 21 or older.')
+    // 21 or older is checked before the run, never written next to a real
+    // person's photo (owner, 2026-10-15); the short REALISM line ends it.
+    expect(text).not.toMatch(/years old|21 or older/)
+    expect(text.trim().endsWith('REALISM: Natural skin texture, not retouched.')).toBe(true)
     expect(text).toMatch(/REALISM/)
     const c = await cloneOf()
     const stillReqs = await requests(`clone_still:${postId}:`)

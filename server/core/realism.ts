@@ -260,7 +260,7 @@ export interface FinalPrompt {
 // out heavier flaw words the character does not have. `plainBackground`
 // (default rule sheet-background) drops a REALISM background clause from
 // hero and sheet prompts, which use their own background.
-export function finalizeImagePrompt(prompt: string, opts: { stage?: string; realism?: string | null; avoid?: string | null; allowedFlaws?: string; flawDose?: boolean; plainBackground?: boolean; makeup?: string; skin?: SkinDetail } = {}): FinalPrompt {
+export function finalizeImagePrompt(prompt: string, opts: { stage?: string; realism?: string | null; avoid?: string | null; allowedFlaws?: string; flawDose?: boolean; plainBackground?: boolean; makeup?: string; skin?: SkinDetail; realismLine?: string } = {}): FinalPrompt {
   const warnings: RealismWarning[] = []
   const stripped = stripBannedTerms(prompt)
   let out = stripped.prompt
@@ -291,6 +291,13 @@ export function finalizeImagePrompt(prompt: string, opts: { stage?: string; real
       })
     }
     if (!out.includes(BARE_FACE_LINE)) out = `${out} ${BARE_FACE_LINE}`
+  }
+  // The short form (Recreate): one REALISM line, no AVOID block.
+  const line = opts.realismLine?.trim()
+  if (line && !isBareFaceStage(opts.stage)) {
+    const short = realismBlock(line)
+    if (!hasRealismBlock(out)) out = `${out}\n${hasRealismBlock(short) ? short : DEFAULT_REALISM_BLOCK}`
+    return { prompt: out.trim(), warnings }
   }
   const block = realismBlock(opts.realism)
   const realism = realismForFraming(!isBareFaceStage(opts.stage) ? realismForMakeup(block, opts.makeup)

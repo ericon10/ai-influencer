@@ -76,6 +76,7 @@ export const api = {
   copyScene: (id: string, characterIds: string[]) => request<{ copies: Array<{ characterId: string; sceneId: string; name: string }> }>('POST', `/scenes/${id}/copy`, { characterIds }),
   createScene: (characterId: string, body: { brief?: string; title?: string; fields?: Partial<SceneFields> }) => request<{ id: string }>('POST', `/characters/${characterId}/scenes`, body),
   candidateSent: (id: string) => request<SentView>('GET', `/candidates/${id}/sent`),
+  jobSent: (id: string) => request<SentView>('GET', `/jobs/${id}/sent`),
   updateScene: (sceneId: string, body: { brief?: string; title?: string; fields?: Partial<Record<keyof SceneFields, unknown>>; prompts?: { still?: string; video?: string }; fromTemplate?: boolean; notes?: { still?: string; video?: string } }) => request<{ id: string }>('PATCH', `/scenes/${sceneId}`, body),
   videoPrices: (characterId: string, duration: number, aspect: string) => request<{ prices: VideoPrice[] }>('GET', `/characters/${characterId}/video-prices?duration=${duration}&aspect=${encodeURIComponent(aspect)}`),
   setVideoModel: (model: string) => request<{ model: string }>('PUT', '/settings/video-model', { model }),

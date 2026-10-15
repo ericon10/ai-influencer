@@ -572,7 +572,10 @@ on the plan, dollars on the API).
 still with its run: the final prompt (hard-wrapped, one-click copy), the
 sheet refs attached (thumbnails with their REF ids), the model, the path
 (your Higgsfield plan or the API), quality, resolution and aspect, and the
-price quoted next to the real cost. 1 click.
+price quoted next to the real cost. 1 click. **Failed runs too** (owner,
+2026-10-15): every failed run row and every failed Recreate still has
+**What was sent**, with why it failed and the provider's id, the frame and
+the Higgsfield element it carried.
 
 **Prices.** Every finished run records its real cost next to its quote: on
 the plan, the credits Higgsfield actually took (read from the account's
@@ -694,6 +697,16 @@ its own motion model picker, plus **Set all**; each row shows its price
 and the batch shows the total. Rows run step by step together (stills,
 with the face pass, then the video); a row whose gates fail waits for you
 with the same way on, and the others carry on.
+
+**Recreate prompt words (owner, 2026-10-15).** The first real Recreate was
+blocked by the provider's filter (all 4 stills) while the hand runs passed:
+word stacking next to a real person's photo. Recreate stills and the face
+pass now send the character's **face and hair only** (never age, body,
+build or style words; her body is in the element and the sheet), **no age
+line** (21 or older is checked before the run), a **plain outfit** ("Dark
+green dress, same as in the photo."; Claude's words lose sleeve and fit
+details, the owner's typed words go as typed), and the **short realism
+line** "REALISM: Natural skin texture, not retouched." with no AVOID block.
 
 **Gate check (owner, round 18).** After every 10 real recreates (a video
 made from a still on a real model, not the demo), Settings > Rules shows a
