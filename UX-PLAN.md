@@ -917,3 +917,15 @@ the character page's File step.
 | Template check on the character | Character page > File step | The same check over the character's current file, so a character imported before v1.6 shows what to add | 0 |
 | Winning stack in every post | Prompt writer and planner (Write and generate, Plan the details) | The winning stack goes with the facts: every post carries it for 30 days, inside the fixed rules. Default rule `brand-winning-stack` | 0 |
 | Brand check | Punch it up's three moments | Each moment is checked against the brand statement; one that does not fit says so in a small "Off brand" note with the reason. Advice only. Default rule `brand-check` | 0 |
+
+## 25. Editor polish: hook variants, safe zones, cover, export presets (owner, 2026-10-15, long run part 4)
+
+All four live in the post workspace's Finish step and the editor. No new
+page. Everything here is free: it runs on the worker or in the browser.
+
+| Piece | Where | How it works | Clicks |
+|---|---|---|---|
+| Export for | Finish step, above Export (video posts and batches) | Chips: TikTok, Reels, Shorts. Each is a preset with a length cap, a video bitrate cap and the loudness the sound ends at, shown on the chip ("up to 180 s, 12 Mbps, -14 LUFS"). It applies to Export, to the editor's Done and to hook variants. The post remembers it; TikTok is the default. The numbers are data (`config/content.yaml`) and starting points | 1 |
+| Hook variants | Finish step > Hook variants card (video posts) | Up to 3 hooks, each a line for the first 2 seconds: typed, or picked from the character's saved hooks. Export 3 versions renders the post's timeline once per hook on the worker; each hook sits over 0 to 2 s in place of a caption there, and the rest of the video is the same. Each version plays and downloads (A, B, C) | 1 plus typing |
+| Safe zones | Editor top bar: Safe zones (Off, TikTok, Reels) | The app's top bar, buttons and caption area drawn over the preview in red, with names. Preview only, never exported. Remembered in this browser | 1 |
+| Cover | Finish step > Cover card, once the video is exported | Scrub the video to a frame, type cover text (optional), Make the cover: a 1080 x 1920 JPEG of that frame with the text in the caption look. Download it for the app's cover upload | 2 |

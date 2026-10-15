@@ -161,7 +161,7 @@ function Captions({ ctx }: { ctx: PostCtx }) {
 
 // Library drawer > Hooks (UX-PLAN.md section 14): a hook, or a variant
 // written in this character's voice, becomes the caption.
-function HookPicker({ open, onClose, characterId, onPick }: { open: boolean; onClose: () => void; characterId: string | null; onPick: (text: string) => void }) {
+export function HookPicker({ open, onClose, characterId, onPick }: { open: boolean; onClose: () => void; characterId: string | null; onPick: (text: string) => void }) {
   const products = useProducts()
   const list = products.data?.products ?? []
   const [productId, setProductId] = useState<string | null>(null)

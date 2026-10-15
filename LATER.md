@@ -170,3 +170,8 @@ first.
   template's blank text, so the Brand card has every field to fill.
 - A monthly reminder on Posts home for the growth review (template step 13),
   with the top 5 reels by follows once TikTok stats come in.
+- Hook variants could also swap the opening shot (a different first 2
+  seconds of picture, not only words), from the post's other takes.
+- A cover chosen in the editor, on its own timeline frame, with the safe
+  zones on.
+- Safe zones for YouTube Shorts.

@@ -2374,3 +2374,45 @@ builds a character in the Claude project. UX-PLAN.md section 24.
   refs, the combo log and identities; brand edits come back on export; the
   writers carry the stack and the check, and drop them when switched off),
   Playwright desktop and phone (`e2e/editor/charfile.spec.ts`).
+
+### G53. Long run, part 4: export presets, hook variants, the cover, safe zones (owner away, 2026-10-15)
+
+UX-PLAN.md section 25. Everything here is free: it runs on the worker or
+in the browser, never a provider.
+
+- **Export for (presets as data, `config/content.yaml`, `export_presets`).**
+  TikTok (up to 90 s, 12 Mbps, -14 LUFS), Reels (90 s, 10 Mbps, -14 LUFS)
+  and Shorts (60 s, 10 Mbps, -14 LUFS), true peak -1 dBTP. Calls: the
+  numbers are starting points chosen inside the Studio's own 90 s cut cap,
+  not platform rules (the apps accept longer videos; the owner edits the
+  file to change them); TikTok is the default. A preset applies to every
+  export of the post: the worker's Export (length cap in the render, the
+  loudness target in the sound bed, then a bitrate cap that encodes again
+  only when the file is over it), the editor's Done (length and bitrate
+  caps in the one normalize encode, then a loudness pass) and the hook
+  variants. Batches take the preset too.
+- **Hook variants.** Up to 3 hooks per video post (`hookVariants`), typed or
+  picked with the existing hook picker. Export renders the post's timeline
+  once per hook on the worker; each hook sits over 0 to 2 s (`hook_variants`
+  in config) in place of a caption there: a caption that ends inside those
+  seconds goes, one that runs past them starts at 2 s, the rest is
+  identical. Calls: the variants live beside the post's own export
+  (`outputs.variants`), never replace it; a hook is a caption over the
+  same picture rather than a different opening shot (one timeline, three
+  hooks, as asked); an editor-only effect is listed as for any worker
+  render.
+- **Cover.** After an export: scrub to a frame, add optional cover text,
+  Make the cover. The worker takes that frame of the exported video and
+  draws the text in the caption look, centered, as a 1080 x 1920 JPEG
+  (`outputs.cover`), to upload as the app's cover. Call: a cover is never
+  burned into the video itself.
+- **Safe zones (editor fork, `apps/web/src/studio/safezones/`).** A Safe
+  zones choice in the editor's top bar (Off, TikTok, Reels) draws each
+  app's top bar, button column and caption area over the preview, named,
+  in red; preview only, never exported; remembered in the browser. The
+  bands are approximate fractions of the 9:16 frame kept as data in the
+  fork, with a test.
+- **Tests:** unit (presets, hook captions, the bitrate reading), media (the
+  bitrate cap and the loudness pass), pipeline (Shorts, three hooks from one
+  timeline with different first seconds and the same rest, the cover), the
+  fork's zone test, and Playwright desktop and phone.

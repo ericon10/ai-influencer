@@ -296,6 +296,8 @@ export interface MemeSpec extends BrollTiming {
   edit?: Partial<EditSpec>; clipB?: string | null; stillB?: string | null; captionStyle?: CaptionStyle | null
   // No caption on this post (owner, 2026-10-15); the words are kept.
   captionOff?: boolean
+  // Long run part 4: Export for, hook variants, the cover.
+  exportPreset?: string; hookVariants?: string[]; cover?: { at: number; text: string } | null
   // The OpenReel editor's saved timeline (G29).
   editor?: { projectAssetId: string | null; savedAt: string | null } | null
 }
@@ -337,7 +339,7 @@ export interface CutView {
 }
 export interface SlideshowSpec { stillIds: string[]; topic: string; hook: string; slides: string[]; caption: string; hashtags: string[] }
 // A batch rotates its clips and B-roll across the captions.
-export interface BatchSpec extends BrollTiming { clipIds: string[]; brollIds: string[]; topic: string; count: number; captions: string[]; clone: CloneSource | null; sound?: Partial<SoundSpec>; edit?: Partial<EditSpec>; captionStyle?: CaptionStyle | null; captionOff?: boolean; stack?: StyleItem[] | null; styleName?: string | null }
+export interface BatchSpec extends BrollTiming { clipIds: string[]; brollIds: string[]; topic: string; count: number; captions: string[]; clone: CloneSource | null; sound?: Partial<SoundSpec>; edit?: Partial<EditSpec>; captionStyle?: CaptionStyle | null; captionOff?: boolean; stack?: StyleItem[] | null; styleName?: string | null; exportPreset?: string }
 
 // Clone Video (SPEC 13.1 R1): the post's saved TikTok or Reel, the models
 // with their prices, and the results.
@@ -445,6 +447,10 @@ export interface ContentOutputs {
   durationSec?: number; sound?: { layers: Array<'clip' | 'ambience' | 'music'>; targetLufs: number | null; ducked: boolean }
   errors?: Record<string, string>; zipParts?: Array<{ assetId: string; from: number; to: number }>; editNote?: string | null
   fromEditor?: boolean; fromTimeline?: boolean; editorOnly?: string[]
+  // Long run part 4: the export preset, hook variants and the cover.
+  preset?: string; capped?: boolean
+  variants?: Array<{ hook: string; assetId: string; durationSec: number }>; variantsRunning?: boolean; variantsError?: string | null
+  cover?: { assetId: string; at: number; text: string }; coverRunning?: boolean
 }
 export interface ContentItem {
   id: string; kind: ContentKind; characterId: string | null; title: string; spec: Record<string, unknown>
@@ -456,6 +462,8 @@ export interface ContentData {
   options: {
     caption: { size: number; safe: { top: number; bottom: number; left: number; right: number }; position: 'top' | 'upper_third' | 'middle' | 'bottom'; maxChars: number; box: { fill: string; text: string; radius: number; pad_x: number; pad_y: number }; style?: CaptionStyle | 'plain'; outline?: { text: string; stroke: string; width: number }; karaoke?: { fill: string; text: string; color: string } }
     canvas: { width: number; height: number; fps: number }
+    exportPresets?: Array<{ id: string; label: string; max_seconds: number; video_kbps: number; lufs: number; true_peak: number }>
+    hookVariants?: { max: number; seconds: number }
     meme: { max_clip_seconds: number; broll_seconds: number; max_broll_seconds: number; order: 'clip_first' | 'broll_first' }
     slideshow: { slides: [number, number]; maxStills: number }
     batch: { max: number; default_count: number }

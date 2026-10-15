@@ -21,7 +21,7 @@ export interface Normalized {
   droppedSound: boolean
 }
 
-export async function normalizeForRender(input: string, out: string, o: { canvas: Canvas; keepSound: boolean; maxSeconds?: number }): Promise<Normalized> {
+export async function normalizeForRender(input: string, out: string, o: { canvas: Canvas; keepSound: boolean; maxSeconds?: number; videoKbps?: number }): Promise<Normalized> {
   const c = o.canvas
   if (c.width % 2 || c.height % 2) throw new MediaError('The frame size must be even.')
   const p = await probeFile(input)
@@ -37,7 +37,10 @@ export async function normalizeForRender(input: string, out: string, o: { canvas
     '-map', '0:v:0', '-vf', vf,
     // The sound is padded to the picture and stops with it.
     ...(withSound ? ['-map', '0:a:0', '-af', 'aresample=48000:async=1:first_pts=0,apad', '-ac', '2', '-ar', '48000', '-c:a', 'aac', '-b:a', '192k', '-shortest'] : ['-an']),
-    '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '16', '-pix_fmt', 'yuv420p', '-r', String(c.fps), '-fps_mode', 'cfr',
+    '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '16',
+    // An export preset's bitrate cap (long run part 4), on top of the quality.
+    ...(o.videoKbps ? ['-maxrate', `${o.videoKbps}k`, '-bufsize', `${o.videoKbps * 2}k`] : []),
+    '-pix_fmt', 'yuv420p', '-r', String(c.fps), '-fps_mode', 'cfr',
     '-color_range', 'tv', '-movflags', '+faststart', out,
   ], 600_000)
   const wantSound = o.keepSound && p.hasAudio

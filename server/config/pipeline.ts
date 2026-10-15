@@ -316,6 +316,9 @@ const contentSchema = z.object({
     }),
   }),
   cut: z.object({ max_seconds: z.number().positive(), max_shots: z.number().int().positive(), max_captions: z.number().int().positive() }),
+  export_presets: z.array(z.object({ id: z.string(), label: z.string(), max_seconds: z.number().positive(), video_kbps: z.number().int().positive(), lufs: z.number().max(0), true_peak: z.number().max(0) })).min(1).default([{ id: 'tiktok', label: 'TikTok', max_seconds: 90, video_kbps: 12000, lufs: -14, true_peak: -1 }]),
+  hook_variants: z.object({ max: z.number().int().min(1).max(5), seconds: z.number().positive().max(10) }).default({ max: 3, seconds: 2 }),
+  cover: z.object({ quality: z.number().int().min(50).max(100) }).default({ quality: 90 }),
 })
 
 // Amazing Edits (Phase 5; config/edits.yaml): code-rendered edits.

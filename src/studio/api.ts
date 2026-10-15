@@ -67,6 +67,9 @@ export const api = {
   // The file checked against character template v1.6 (free).
   importCheck: (markdown: string) => request<{ report: TemplateReport; name: string; match: { id: string; name: string } | null }>('POST', '/characters/import/check', { markdown }),
   updateBrand: (id: string, patch: Partial<BrandLayer>) => request<{ brand: BrandLayer }>('PUT', `/characters/${id}/brand`, patch),
+  // Long run part 4: hook variants and the cover (free, on the worker).
+  postVariants: (id: string) => request<{ jobId: string }>('POST', `/content/${id}/variants`, {}),
+  postCover: (id: string, body: { at: number; text: string }) => request<{ jobId: string }>('POST', `/content/${id}/cover`, body),
   exportUrl: (id: string) => `/api/v1/characters/${id}/export`,
   applyFile: async (id: string, files: File[], onProgress?: (done: number, total: number) => void) => {
     const md = files.find(f => f.name.toLowerCase().endsWith('.md'))

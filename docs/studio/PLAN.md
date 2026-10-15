@@ -545,6 +545,13 @@ Decisions: `DECISIONS.md` G37 and G38. UX: `UX-PLAN.md` section 15.
 - [x] Winning stack in the prompt writer, planner and Punch it up; brand check in Punch it up (defaults)
 - [x] Tested with Callie's current file and a full v1.6 file; unit, pipeline and Playwright tests
 
+### Long run, part 4: editor polish (G53, UX-PLAN.md section 25)
+
+- [x] Export for TikTok, Reels, Shorts: length cap, bitrate cap, loudness; Export, the editor's Done, hook variants, batches
+- [x] Hook variants: up to 3 hooks, one timeline, a different first 2 seconds each, on the worker
+- [x] Cover frame picker with cover text, a 1080 x 1920 JPEG
+- [x] Safe zones (TikTok, Reels) over the editor's preview
+
 ## Roadmap after Phase 4 (owner, 2026-10-13; not started)
 
 SPEC 13.1, R1 to R7: Clone Video (first after Phase 3), Inspo board

@@ -208,3 +208,22 @@ cut:
   max_seconds: 90
   max_shots: 12
   max_captions: 8
+
+# Export for (long run part 4, owner 2026-10-15): one preset per app, picked
+# in the Finish step and remembered by the post. Each sets the length cap
+# (never longer than cut.max_seconds), a cap on the video bitrate (a file
+# over it is encoded again at the cap, so uploads stay small and are not
+# squeezed twice) and the loudness the sound ends at. Starting points, not
+# platform rules: change them here.
+export_presets:
+  - { id: tiktok, label: "TikTok", max_seconds: 90, video_kbps: 12000, lufs: -14, true_peak: -1 }
+  - { id: reels, label: "Reels", max_seconds: 90, video_kbps: 10000, lufs: -14, true_peak: -1 }
+  - { id: shorts, label: "Shorts", max_seconds: 60, video_kbps: 10000, lufs: -14, true_peak: -1 }
+
+# Hook variants (long run part 4): the same timeline exported once per
+# hook, each hook over the first `seconds` in place of a caption there.
+hook_variants: { max: 3, seconds: 2 }
+
+# The cover (long run part 4): a frame of the exported video with the
+# cover text in the caption look, as a JPEG for the app's cover upload.
+cover: { quality: 90 }

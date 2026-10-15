@@ -9,6 +9,8 @@ import { effectiveCut } from '../core/cut.js'
 import { registerLocalJob, type JobRow } from '../jobs/hooks.js'
 import { withTempDir } from '../media/ffmpeg.js'
 import { normalizeForRender } from '../media/normalize.js'
+import { normalizeLoudness } from '../media/sound.js'
+import { presetFor } from '../core/exportPresets.js'
 import { enqueueLocalJob } from '../jobs/runner.js'
 import { getAsset, readAsset, saveAsset } from '../storage/assets.js'
 import { uploadKey } from '../storage/uploads.js'
@@ -152,17 +154,21 @@ async function runEditorSave(deps: Deps, ctx: Ctx, job: JobRow): Promise<unknown
     // The browser's export (MP4 with H.264, or WebM with VP9 where the
     // browser has no H.264 encoder) is made plain like every input: the
     // canvas size, 30 fps, H.264, 48 kHz stereo AAC (G27).
-    const { canvas } = deps.config.pipeline.content
+    const { canvas, export_presets } = deps.config.pipeline.content
+    // The post's export preset (long run part 4): its length cap and bitrate
+    // cap here, then its loudness.
+    const preset = presetFor(export_presets, (post.spec as { exportPreset?: string } | null)?.exportPreset)
     const data = await withTempDir(async dir => {
-      const input = join(dir, 'export.bin'), out = join(dir, 'post.mp4')
+      const input = join(dir, 'export.bin'), plain = join(dir, 'plain.mp4'), out = join(dir, 'post.mp4')
       await writeFile(input, await deps.store.get(key))
-      await normalizeForRender(input, out, { canvas, keepSound: true })
+      await normalizeForRender(input, plain, { canvas, keepSound: true, maxSeconds: Math.min(deps.config.pipeline.content.cut.max_seconds, preset.max_seconds), videoKbps: preset.video_kbps })
+      await normalizeLoudness(plain, out, preset.lufs, preset.true_peak)
       return readFile(out)
     })
     const asset = await saveAsset(deps, ctx, { data, mime: 'video/mp4', origin: 'derived', label: `Video post (edited): ${post.title || 'untitled'}`, sourceJobId: job.id })
     if (asset.kind !== 'video' || !asset.durationMs) throw new AppError('bad_request', 'The exported file is not a video the Studio can read. Export again from the editor.')
     await deps.store.delete(key).catch(() => undefined)
-    const outputs: ContentOutputs = { videoAssetId: asset.id, durationSec: Math.round(asset.durationMs / 100) / 10, renderedAt: deps.clock.now().toISOString(), fromEditor: true, dropped: [] }
+    const outputs: ContentOutputs = { videoAssetId: asset.id, durationSec: Math.round(asset.durationMs / 100) / 10, renderedAt: deps.clock.now().toISOString(), fromEditor: true, dropped: [], preset: preset.id }
     await setOutputs(deps, postId, outputs, 'ready')
     return outputs
   } catch (e) {

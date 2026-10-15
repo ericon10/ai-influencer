@@ -2,6 +2,7 @@ import { writeFile, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { and, desc, eq, inArray, isNull } from 'drizzle-orm'
 import { zipSync } from 'fflate'
+import sharp from 'sharp'
 import { z } from 'zod'
 import { brollClips, candidates, contentItems, scenes } from '../db/schema.js'
 import { isVideoOp } from '../core/clips.js'
@@ -31,6 +32,8 @@ import { normalizeForRender, NORMALIZE_VERSION } from '../media/normalize.js'
 import { makeScratch } from '../media/sound.js'
 import { extractFrameAt } from '../media/frames.js'
 import { withTempDir } from '../media/ffmpeg.js'
+import { capBitrate } from '../media/bitrate.js'
+import { hookCaptions, presetFor, type ExportPreset } from '../core/exportPresets.js'
 import { getAsset, readAsset, saveAsset } from '../storage/assets.js'
 import { uploadKey } from '../storage/uploads.js'
 import { getCharacter, toData, type CharacterRow } from './characters.js'
@@ -264,6 +267,14 @@ const memeSpec = z.object({
   // Earlier failures cleared from the gray line (owner, 2026-10-15): the
   // ones made before this time stay out of sight; the records stay.
   failuresClearedAt: z.string().max(40).nullable().default(null),
+  // Export for TikTok, Reels or Shorts (long run part 4): the preset's
+  // length cap, bitrate cap and loudness, for every export of this post.
+  exportPreset: z.string().max(20).default('tiktok'),
+  // Hook variants: up to 3 lines, each over the first seconds of its own
+  // version of the same timeline.
+  hookVariants: z.array(z.string().max(200)).max(5).default([]),
+  // The cover: a frame of the export and its text.
+  cover: z.object({ at: z.number().min(0).max(600), text: z.string().max(200).default('') }).nullable().default(null),
 })
 const slideshowSpec = z.object({
   stillIds: z.array(id).max(20).default([]),
@@ -277,6 +288,8 @@ const slideshowSpec = z.object({
 // 2026-10-13): video i uses clip i mod n and B-roll i mod m. Older drafts
 // with one clipId and brollId read as lists of one.
 const batchObject = z.object({
+  // Export for TikTok, Reels or Shorts (long run part 4).
+  exportPreset: z.string().max(20).default('tiktok'),
   clipIds: z.array(id).max(20).default([]),
   brollIds: z.array(id).max(20).default([]),
   order: z.enum(['clip_first', 'broll_first']).default('clip_first'),
@@ -350,6 +363,16 @@ export interface ContentOutputs {
   // only the editor's own export draws.
   fromTimeline?: boolean
   editorOnly?: string[]
+  // The export preset it was made for, and whether the bitrate was capped.
+  preset?: string
+  capped?: boolean
+  // Hook variants (long run part 4): one video per hook, same timeline.
+  variants?: Array<{ hook: string; assetId: string; durationSec: number }>
+  variantsRunning?: boolean
+  variantsError?: string | null
+  // The cover image and the frame and text it was made from.
+  cover?: { assetId: string; at: number; text: string }
+  coverRunning?: boolean
 }
 
 function parseSpec(kind: string, raw: unknown) {
@@ -573,8 +596,10 @@ export interface RenderPlan {
 }
 type CaptionPosition = 'top' | 'upper_third' | 'middle' | 'bottom'
 
-async function renderCut(deps: Deps, ctx: Ctx, job: JobRow, fullCut: Cut, input: { characterId: string; caption: string; sound: SoundSpec; label: string; edit?: EditSpec; captionStyle?: 'box' | 'outline' | null; plan?: RenderPlan }) {
-  const base = deps.config.pipeline.content
+async function renderCut(deps: Deps, ctx: Ctx, job: JobRow, fullCut: Cut, input: { characterId: string; caption: string; sound: SoundSpec; label: string; edit?: EditSpec; captionStyle?: 'box' | 'outline' | null; plan?: RenderPlan; preset?: ExportPreset; hook?: string }) {
+  const base0 = deps.config.pipeline.content
+  // The export preset's length cap (never past the Studio's own).
+  const base = input.preset ? { ...base0, cut: { ...base0.cut, max_seconds: Math.min(base0.cut.max_seconds, input.preset.max_seconds) } } : base0
   const plan = input.plan
   // A plan's edit and caption look win; without a plan the post's Format
   // and caption look stand (the cut as before).
@@ -620,7 +645,9 @@ async function renderCut(deps: Deps, ctx: Ctx, job: JobRow, fullCut: Cut, input:
     }
     const captions: TimelineCaption[] = []
     const dropped: string[] = []
-    const captionList = plan?.prepared ? plan.prepared.captions : cut.captions.map(c => ({ text: c.text ?? input.caption, start: c.start, end: c.end, position: undefined as CaptionPosition | undefined }))
+    const baseCaptions = plan?.prepared ? plan.prepared.captions : cut.captions.map(c => ({ text: c.text ?? input.caption, start: c.start, end: c.end, position: undefined as CaptionPosition | undefined }))
+    // A hook variant: the hook over the first seconds, in place of a caption there.
+    const captionList = input.hook ? hookCaptions(baseCaptions, input.hook, base.hook_variants.seconds, (text, start, end) => ({ text, start, end, position: undefined as CaptionPosition | undefined })) : baseCaptions
     for (const [j, c] of captionList.entries()) {
       const text = (c.text ?? input.caption).trim()
       if (!text) continue
@@ -671,9 +698,11 @@ async function renderCut(deps: Deps, ctx: Ctx, job: JobRow, fullCut: Cut, input:
         accents.push({ path, at: a.at, db: -2 })
       }
     }
-    const bed = await layBed(deps, ctx, finalPicture, out, dir, input.sound, accents)
-    const asset = await saveAsset(deps, ctx, { data: await readFile(out), mime: 'video/mp4', origin: 'derived', label: input.label, sourceJobId: job.id })
-    return { assetId: asset.id, dropped, durationSec, editNote, sound: { layers: bed.layers, targetLufs: bed.targetLufs, ducked: bed.ducked } }
+    const bed = await layBed(deps, ctx, finalPicture, out, dir, input.sound, accents, input.preset)
+    // The preset's bitrate cap: encoded again only when the file is over it.
+    const capped = input.preset ? await capBitrate(out, join(dir, 'capped.mp4'), input.preset.video_kbps) : null
+    const asset = await saveAsset(deps, ctx, { data: await readFile(capped ? join(dir, 'capped.mp4') : out), mime: 'video/mp4', origin: 'derived', label: input.label, sourceJobId: job.id })
+    return { assetId: asset.id, dropped, durationSec, editNote, capped: !!capped?.capped, sound: { layers: bed.layers, targetLufs: bed.targetLufs, ducked: bed.ducked } }
   })
 }
 
@@ -878,8 +907,10 @@ export function voicePhrases(deps: Deps) {
 }
 
 // The sound bed under a finished picture (SPEC 5.5).
-async function layBed(deps: Deps, ctx: Ctx, picture: string, out: string, dir: string, s: SoundSpec, accents: Array<{ path: string; at: number; db?: number }> = []): Promise<SoundBedResult> {
-  const cfg = deps.config.pipeline.content.sound
+async function layBed(deps: Deps, ctx: Ctx, picture: string, out: string, dir: string, s: SoundSpec, accents: Array<{ path: string; at: number; db?: number }> = [], preset?: ExportPreset): Promise<SoundBedResult> {
+  const sound = deps.config.pipeline.content.sound
+  // The export preset's loudness and true peak for the finished mix.
+  const cfg = preset ? { ...sound, target_lufs: preset.lufs, true_peak: preset.true_peak } : sound
   const ambienceId = s.ambience ?? cfg.default_ambience
   const ambience = ambienceId === 'none' ? null : ambienceId === 'room' ? { builtin: 'room' as const } : { path: await soundFile(deps, ctx, ambienceId, dir, 'ambience.m4a') }
   const music = s.music ? { path: await soundFile(deps, ctx, s.music, dir, 'music.m4a') } : null
@@ -904,14 +935,15 @@ async function runContentRender(deps: Deps, ctx: Ctx, job: JobRow): Promise<unkn
       const vo = parsed.sound.voice
       const s = vo ? { ...parsed, sound: { ...parsed.sound, voice: { ...vo, words: (await voiceForPost(deps, ctx, vo.id, row.characterId)).words } } } : parsed
       const cut = effectiveCut(s, deps.config.pipeline.content.meme.max_broll_seconds, voicePhrases(deps))
+      const preset = presetFor(deps.config.pipeline.content.export_presets, s.exportPreset)
       // The post's timeline (editor phase D): the saved one, a carried
       // stack, or the Format's preset, else the cut as before.
       const { v, notes, timeline } = await withTempDir(async dir => {
         const tl = await workerTimeline(deps, ctx, { characterId: row.characterId!, cut, sound: s.sound, edit: s.edit, editor: s.editor ? { projectAssetId: s.editor.projectAssetId, stack: s.editor.stack } : null, captionOff: s.captionOff, dir })
-        const v = await renderCut(deps, ctx, job, tl.cut, { characterId: row.characterId!, caption: s.caption, sound: tl.sound, edit: s.edit, captionStyle: s.captionStyle, label: `Video post: ${s.caption.slice(0, 60)}`, plan: tl.plan })
+        const v = await renderCut(deps, ctx, job, tl.cut, { characterId: row.characterId!, caption: s.caption, sound: tl.sound, edit: s.edit, captionStyle: s.captionStyle, label: `Video post: ${s.caption.slice(0, 60)}`, plan: tl.plan, preset })
         return { v, notes: tl.notes, timeline: !!tl.plan }
       })
-      const outputs: ContentOutputs = { videoAssetId: v.assetId, dropped: v.dropped, durationSec: v.durationSec, sound: v.sound, editNote: v.editNote, renderedAt: deps.clock.now().toISOString(), ...(timeline ? { fromTimeline: true } : {}), ...(notes.length ? { editorOnly: notes } : {}) }
+      const outputs: ContentOutputs = { videoAssetId: v.assetId, dropped: v.dropped, durationSec: v.durationSec, sound: v.sound, editNote: v.editNote, renderedAt: deps.clock.now().toISOString(), preset: preset.id, ...(v.capped ? { capped: true } : {}), ...(timeline ? { fromTimeline: true } : {}), ...(notes.length ? { editorOnly: notes } : {}) }
       await setOutputs(deps, itemId, outputs, 'ready')
       return outputs
     }
@@ -945,6 +977,94 @@ async function runContentRender(deps: Deps, ctx: Ctx, job: JobRow): Promise<unkn
   }
 }
 
+// Hook variants (long run part 4): the post's timeline rendered once per
+// hook, each hook over the first seconds in place of a caption there.
+// Free, on the worker; the post's own export is left as it is.
+export async function startVariants(deps: Deps, ctx: Ctx, itemId: string): Promise<{ jobId: string }> {
+  const row = await getContent(deps, ctx, itemId)
+  if (row.kind !== 'meme') throw new AppError('bad_request', 'Hook variants are for video posts.')
+  const s = memeSpec.parse(row.spec)
+  const hooks = s.hookVariants.map(h => h.trim()).filter(Boolean).slice(0, deps.config.pipeline.content.hook_variants.max)
+  if (!hooks.length) throw new AppError('bad_request', 'Write at least one hook first.')
+  const problems = renderProblems(deps, row)
+  if (problems.length) throw new AppError('bad_request', `${problems.join('; ')}.`)
+  const outputs = (row.outputs ?? {}) as ContentOutputs
+  if (outputs.variantsRunning) throw new AppError('bad_request', 'The hook variants are already being made.')
+  await setOutputs(deps, row.id, { ...outputs, variants: [], variantsRunning: true, variantsError: null })
+  const job = await enqueueLocalJob(deps, ctx, { stage: 'content', purpose: `content_variants:${row.id}`, label: `Export ${hooks.length} hook variant${hooks.length === 1 ? '' : 's'}`, characterId: row.characterId, request: { hooks } })
+  return { jobId: job.id }
+}
+
+async function runContentVariants(deps: Deps, ctx: Ctx, job: JobRow): Promise<unknown> {
+  const itemId = job.purpose.split(':')[1]!
+  const { hooks } = job.request as { hooks: string[] }
+  const merge = async (patch: Partial<ContentOutputs>) => {
+    const fresh = await getContent(deps, ctx, itemId)
+    await setOutputs(deps, itemId, { ...((fresh.outputs ?? {}) as ContentOutputs), ...patch })
+  }
+  try {
+    const row = await getContent(deps, ctx, itemId)
+    const parsed = memeSpec.parse(row.spec)
+    const vo = parsed.sound.voice
+    const s = vo ? { ...parsed, sound: { ...parsed.sound, voice: { ...vo, words: (await voiceForPost(deps, ctx, vo.id, row.characterId)).words } } } : parsed
+    const cut = effectiveCut(s, deps.config.pipeline.content.meme.max_broll_seconds, voicePhrases(deps))
+    const preset = presetFor(deps.config.pipeline.content.export_presets, s.exportPreset)
+    const variants: NonNullable<ContentOutputs['variants']> = []
+    for (const [i, hook] of hooks.entries()) {
+      const v = await withTempDir(async dir => {
+        const tl = await workerTimeline(deps, ctx, { characterId: row.characterId!, cut, sound: s.sound, edit: s.edit, editor: s.editor ? { projectAssetId: s.editor.projectAssetId, stack: s.editor.stack } : null, captionOff: s.captionOff, dir })
+        return renderCut(deps, ctx, job, tl.cut, { characterId: row.characterId!, caption: s.caption, sound: tl.sound, edit: s.edit, captionStyle: s.captionStyle, label: `Hook ${String.fromCharCode(65 + i)}: ${hook.slice(0, 60)}`, plan: tl.plan, preset, hook })
+      })
+      variants.push({ hook, assetId: v.assetId, durationSec: v.durationSec })
+      await merge({ variants: [...variants] })
+    }
+    await merge({ variants, variantsRunning: false, variantsError: null })
+    return { variants: variants.length }
+  } catch (e) {
+    await merge({ variantsRunning: false, variantsError: (e as Error).message.slice(0, 400) })
+    throw e
+  }
+}
+
+// The cover (long run part 4): a frame of the exported video with the
+// cover text in the caption look, as a JPEG. Free, on the worker.
+export async function startCover(deps: Deps, ctx: Ctx, itemId: string, input: { at: number; text: string }): Promise<{ jobId: string }> {
+  const row = await getContent(deps, ctx, itemId)
+  if (row.kind !== 'meme') throw new AppError('bad_request', 'A cover is for video posts.')
+  const outputs = (row.outputs ?? {}) as ContentOutputs
+  if (!outputs.videoAssetId) throw new AppError('bad_request', 'Export the video first; the cover is a frame of it.')
+  const at = Math.max(0, Math.min(input.at, Math.max(0, (outputs.durationSec ?? 600) - 0.05)))
+  const text = input.text.trim().slice(0, 200)
+  await updateContent(deps, ctx, row.id, { spec: { cover: { at, text } } })
+  await setOutputs(deps, row.id, { ...((await getContent(deps, ctx, row.id)).outputs as ContentOutputs ?? {}), coverRunning: true })
+  const job = await enqueueLocalJob(deps, ctx, { stage: 'content', purpose: `content_cover:${row.id}`, label: 'Make the cover', characterId: row.characterId, request: { at, text, videoAssetId: outputs.videoAssetId } })
+  return { jobId: job.id }
+}
+
+async function runContentCover(deps: Deps, ctx: Ctx, job: JobRow): Promise<unknown> {
+  const itemId = job.purpose.split(':')[1]!
+  const { at, text, videoAssetId } = job.request as { at: number; text: string; videoAssetId: string }
+  const cfg = deps.config.pipeline.content
+  try {
+    const jpg = await withTempDir(async dir => {
+      const video = join(dir, 'video.mp4'), frame = join(dir, 'frame.png')
+      await writeFile(video, (await readAsset(deps, ctx, videoAssetId)).data)
+      await extractFrameAt(video, at, frame)
+      const base = sharp(frame).resize(cfg.canvas.width, cfg.canvas.height, { fit: 'cover', position: 'centre' })
+      const layers = text ? [{ input: (await captionPng(text, { ...cfg, caption: { ...cfg.caption, position: 'middle' } })).png, top: 0, left: 0 }] : []
+      return base.composite(layers).jpeg({ quality: cfg.cover.quality, mozjpeg: true }).toBuffer()
+    })
+    const asset = await saveAsset(deps, ctx, { data: jpg, mime: 'image/jpeg', origin: 'derived', label: text ? `Cover: ${text.slice(0, 60)}` : 'Cover', sourceJobId: job.id })
+    const fresh = await getContent(deps, ctx, itemId)
+    await setOutputs(deps, itemId, { ...((fresh.outputs ?? {}) as ContentOutputs), cover: { assetId: asset.id, at, text }, coverRunning: false })
+    return { assetId: asset.id }
+  } catch (e) {
+    const fresh = await getContent(deps, ctx, itemId)
+    await setOutputs(deps, itemId, { ...((fresh.outputs ?? {}) as ContentOutputs), coverRunning: false })
+    throw e
+  }
+}
+
 // One video of a batch (Phase 4: batch at scale). Each video is its own
 // short job and owns one slot of the outputs, so a job that runs again
 // after a crash or during a deploy overwrites its own slot instead of being
@@ -973,7 +1093,7 @@ async function renderBatchVideo(deps: Deps, ctx: Ctx, job: JobRow, row: ContentR
         const tl = s.stack?.length
           ? { cut, sound: s.sound, ...(await stackPlan(deps, ctx, { characterId: row.characterId!, cut, stack: s.stack, edit: s.edit, sound: s.sound, dir })) }
           : await workerTimeline(deps, ctx, { characterId: row.characterId!, cut, sound: s.sound, edit: s.edit, editor: null, captionOff: s.captionOff, dir })
-        return renderCut(deps, ctx, job, tl.cut, { characterId: row.characterId!, caption: s.captionOff ? '' : caption, sound: tl.sound, edit: s.edit, captionStyle: s.captionStyle, label: `Batch ${name} ${index + 1}${caption ? `: ${caption.slice(0, 50)}` : ''}`, plan: tl.plan })
+        return renderCut(deps, ctx, job, tl.cut, { characterId: row.characterId!, caption: s.captionOff ? '' : caption, sound: tl.sound, edit: s.edit, captionStyle: s.captionStyle, label: `Batch ${name} ${index + 1}${caption ? `: ${caption.slice(0, 50)}` : ''}`, plan: tl.plan, preset: presetFor(deps.config.pipeline.content.export_presets, parsed.exportPreset) })
       })
       result = { caption, assetId: v.assetId, clipId: src.clipId!, brollId: src.brollId }
     } catch (e) {
@@ -1193,6 +1313,8 @@ export async function contentView(deps: Deps, ctx: Ctx) {
       cut: cfg.cut,
       sound: { defaultAmbience: cfg.sound.default_ambience, targetLufs: cfg.sound.target_lufs, maxUploadMb: cfg.sound.max_upload_mb },
       chain: { maxParts: cfg.chain.max_parts },
+      // Export for (long run part 4) and hook variants.
+      exportPresets: cfg.export_presets, hookVariants: cfg.hook_variants,
       edits: { styles: deps.config.pipeline.edits.styles.map(e => ({ id: e.id, label: e.label, line: e.line, shots: e.shots, anchor: e.anchor, slots: e.slots ?? null, params: e.params, stage: e.stage, needs: e.needs, variants: e.variants ?? null, text: e.text ?? null })), payoffFromEnd: deps.config.pipeline.edits.payoff_from_end },
     },
   }
@@ -1204,6 +1326,8 @@ export function registerContent(): void {
   registered = true
   registerLocalJob('broll_ingest', runBrollIngest)
   registerLocalJob('content_render', runContentRender)
+  registerLocalJob('content_variants', runContentVariants)
+  registerLocalJob('content_cover', runContentCover)
   registerJobHook('content_slides', onContentSlides)
   registerJobHook('content_captions', onContentCaptions)
 }

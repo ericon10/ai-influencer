@@ -8,6 +8,7 @@ import { SoundRow, autoCut } from './SoundRow'
 import { editOf } from './EditStyles'
 import { EditorCard } from './EditorCard'
 import { BatchStyle } from './BatchStyle'
+import { CoverCard, ExportFor, HookVariants } from './ExportExtras'
 import { keys, useSounds } from '../../hooks'
 import { useQueryClient } from '@tanstack/react-query'
 
@@ -62,6 +63,7 @@ export function FinishStep({ ctx }: { ctx: PostCtx }) {
       {item.kind === 'meme' && <EditorCard ctx={ctx} />}
       {item.kind !== 'slideshow' && <SoundRow ctx={ctx} />}
       {item.kind === 'batch' && <BatchStyle ctx={ctx} />}
+      {item.kind !== 'slideshow' && <ExportFor ctx={ctx} />}
       <ExportPanel item={item} todo={todo} saving={draft.saving} flush={draft.flush} label={label} onStart={() => void ctx.advance('finish')}>
         {item.kind === 'meme' && item.status === 'ready' && o.videoAssetId && (
           <div className="st-row" style={{ gap: 14, alignItems: 'flex-start', flexWrap: 'wrap' }}>
@@ -70,6 +72,7 @@ export function FinishStep({ ctx }: { ctx: PostCtx }) {
               <DownloadLink assetId={o.videoAssetId} name={`${name}.mp4`}>Download MP4</DownloadLink>
               {o.fromEditor && <span className="st-hint">Exported from the editor.</span>}
               {o.fromTimeline && <span className="st-hint">Rendered from your timeline on the worker.</span>}
+              {o.preset && <span className="st-hint" data-field="export-made-for">Made for {(ctx.data.options.exportPresets ?? []).find(p => p.id === o.preset)?.label ?? o.preset}{o.capped ? ', the bitrate capped' : ''}.</span>}
               {!!o.editorOnly?.length && <span className="st-hint st-warntext">Only the editor's export has: {o.editorOnly.join('; ')}. Open the editor and press Done for them.</span>}
               {o.editNote && <span className="st-hint">Edit: {o.editNote}</span>}
             </div>
@@ -107,6 +110,8 @@ export function FinishStep({ ctx }: { ctx: PostCtx }) {
           </div>
         )}
       </ExportPanel>
+      {item.kind === 'meme' && <CoverCard ctx={ctx} />}
+      {item.kind === 'meme' && <HookVariants ctx={ctx} />}
       <div className="st-row" style={{ gap: 8, flexWrap: 'wrap' }}>
         <button type="button" className="st-btn" onClick={() => void duplicate(item.id)}><CopyPlus size={15} />Make another like this</button>
       </div>

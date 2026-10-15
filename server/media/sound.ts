@@ -27,6 +27,21 @@ export async function measureLoudness(path: string, filter = ''): Promise<Loudne
   return { i: num(d.input_i, SILENT), tp: num(d.input_tp, SILENT), lra: num(d.input_lra, 0), thresh: num(d.input_thresh, SILENT - 10), offset: num(d.target_offset, 0) }
 }
 
+// A finished video's sound brought to a loudness (the export preset, long
+// run part 4): measured, then one linear gain with a true-peak ceiling. A
+// silent file is copied as it is.
+export async function normalizeLoudness(input: string, out: string, lufs: number, truePeak: number): Promise<{ lufs: number | null }> {
+  const p = await probeFile(input)
+  const m = p.hasAudio ? await measureLoudness(input) : null
+  if (!m || m.i <= SILENT + 1) {
+    await ffmpeg(['-i', input, '-c', 'copy', '-movflags', '+faststart', out])
+    return { lufs: null }
+  }
+  const norm = `loudnorm=I=${lufs}:TP=${truePeak}:LRA=11:measured_I=${m.i}:measured_TP=${m.tp}:measured_LRA=${m.lra}:measured_thresh=${m.thresh}:offset=${m.offset}:linear=true,aresample=48000`
+  await ffmpeg(['-i', input, '-map', '0:v:0', '-map', '0:a:0', '-af', norm, '-c:v', 'copy', '-c:a', 'aac', '-b:a', '192k', '-ar', '48000', '-movflags', '+faststart', out], 600_000)
+  return { lufs }
+}
+
 // Room tone: a quiet room, made by code (brown noise kept to the low hum of
 // a room). Deterministic, so the same post always sounds the same.
 export async function makeRoomTone(out: string, seconds: number): Promise<void> {

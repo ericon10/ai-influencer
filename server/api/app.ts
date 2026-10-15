@@ -36,7 +36,7 @@ import { addCloneSource, cloneOptions, cloneStills, keepClone, pickCloneStill, p
 import { editorLibrary } from '../pipeline/editorMedia.js'
 import { addRecreateRow, recreateBatch, recreateFor, reviewTakeAgain, setRecreateRows, startRecreate, useCloneTake } from '../pipeline/recreate.js'
 import { jobViews } from '../jobs/jobView.js'
-import { POST_STEPS, addBroll, archiveBroll, archiveContent, contentItemView, contentView, createContent, duplicateContent, postScene, retryFailedBatch, startRender, updateBroll, updateContent } from '../pipeline/content.js'
+import { POST_STEPS, addBroll, archiveBroll, archiveContent, contentItemView, contentView, createContent, duplicateContent, postScene, retryFailedBatch, startCover, startRender, startVariants, updateBroll, updateContent } from '../pipeline/content.js'
 import { rulesView, setRuleSwitch } from '../pipeline/rules.js'
 import { chooseConcept } from '../pipeline/concepts.js'
 import { approveCandidate, keepStale, pickHero, rejectCandidate, reopenCandidate, setFavorite, mirrorCandidate } from '../pipeline/review.js'
@@ -872,6 +872,21 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
     const row = await postScene(deps, ctx, c.req.param('id'))
     return c.json({ id: row.id, sceneId: row.sceneId })
   })
+  // Hook variants (long run part 4): the timeline once per hook (free).
+  app.post('/content/:id/variants', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    return c.json(await startVariants(deps, ctx, c.req.param('id')), 202)
+  })
+
+  // The cover: a frame of the export with its text (free).
+  app.post('/content/:id/cover', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    const body = parse(z.object({ at: z.number().min(0).max(600), text: z.string().max(200).default('') }), await json(c))
+    return c.json(await startCover(deps, ctx, c.req.param('id'), body), 202)
+  })
+
   app.delete('/content/:id', async c => {
     const ctx = c.get('ctx')
     requireRole(ctx, 'member')
