@@ -185,11 +185,13 @@ export const GUIDE: GuideSection[] = [
       'Pasted a whole prompt? "Send my prompt as written" switches on by itself: your text goes unchanged with only the reference line, the 21+ line and the REALISM block added. Switch it off to have the prompt writer write from it instead.',
       'Punch it up (optional) writes three sharper versions to pick from; what your words already say stays (a selfie stays a selfie).',
       'More control: the character, the account tag, Format, places from the persona, and the full details (her task, outfit, camera, light and the rest), with Plan the details and Use for other characters.',
+      'Two details are filled in for you, both yours to change. Makeup by setting: no makeup at home, the gym, an early beach or waking up, soft everyday makeup out in public (light coverage that still shows skin texture, a matte nude lip, the same lip shape, nose and jaw as the references); soft glam stays for nights out. Hair styling, rotated: each new post starts with the next styling from the bank (behind both shoulders, a claw clip, a low ponytail and the rest), never one of the last 5, so the feed does not repeat. Name a styling in your idea ("in a messy bun") or type one, and yours wins.',
       'A batch can Import a spreadsheet: one row per post (character, account, a clip to reuse or "still: your prompt", video, caption, style). Preview shows each row and the total price; Make N posts creates them and exports the ones that reuse a clip, free.',
     ],
     tips: [
       'Specific beats general: "front-camera selfie in a black tank at a packed rave, phone a little above her" works better than "at a rave".',
       'Close (chest-up) and waist-up shots attach face refs only, so the sheet outfit never comes along; a knees-up or full-body shot adds a body ref.',
+      'Hair color and texture never change; only where the hair sits does. The combo log in Library > Stills records each styling.',
     ],
     cost: 'Reading your words is free. Punch it up is a small Claude call (under a cent).',
     shots: [
@@ -450,6 +452,7 @@ export const GUIDE: GuideSection[] = [
     tips: [
       'Fixed rules: real skin, 21 or older, nothing explicit, a new person (never a copy), the AI label, the price first, budget caps, keys on the server.',
       'Defaults include the Director\'s pass, the prompt writer, automatic Claude checks and the variety note.',
+      'Two scene defaults from the character template: Rotate hair styling per scene and Makeup by setting. Both are on; switch either off for all characters or one.',
       'Two wording defaults: Outfits in catalog terms (Claude\'s words lose fit and body words and "posing", and "boy shorts" becomes "bike shorts"; the lists are in config/wording.yaml) and May be blocked by the provider\'s filter (a warning under the price when your own words use one of them). Both are on; switch either off.',
     ],
     shots: [
@@ -504,8 +507,10 @@ export const GLOSSARY: Array<[string, string]> = [
   ['Spend cap', 'The most a recreate post may spend, in credits. A step that would pass it is refused with what is left.'],
   ['Drift marks', 'Red marks on the review strip where the face in the take drops under 0.45 against REF-00, the same number as the video rule.'],
   ['Earlier failures line', 'One gray line in place of a pile of red: how many runs before this one were blocked by the filter (refunded), never ran, or failed, and that nothing was charged. Show lists them; Clear hides them for good. Only the run you just started can be red.'],
-  ['Catalog wording', 'Outfits said the way a shop catalog does: garment, color, fabric, a style word ("dark green ribbed tank top with thin straps, going-out look"). No fit or body words, "bike shorts" for "boy shorts" (every other garment name stays), a moment instead of a pose. Only the words change, never what she wears; your own words go as typed. The lists are config/wording.yaml.'],
-  ['Likely trigger words', 'After a refusal by the provider\'s filter: the words in what was sent that filters often block (fit or body words, "boy shorts").'],
+  ['Catalog wording', 'Outfits said the way a shop catalog does: garment, color, fabric, a style word ("dark green ribbed tank top with thin straps, going-out look"). No fit or body words (busty and cup sizes included), "bike shorts" for "boy shorts" (every other garment name stays), a moment instead of a pose. Only the words change, never what she wears; your own words go as typed. The lists are config/wording.yaml.'],
+  ['Likely trigger words', 'After a refusal by the provider\'s filter: the words in what was sent that filters often block (fit or body words, cup sizes, "boy shorts").'],
+  ['Makeup by setting', 'A default: no makeup at home, the gym, an early beach or waking up; soft everyday makeup out in public; soft glam for nights out and events. A character\'s own everyday makeup line replaces the soft everyday wording. Men get groomed brows and beard, never makeup words. Your choice or your words win.'],
+  ['Hair rotation', 'A default: each new scene starts with the next hair styling from the bank, never one used in the character\'s last 5 combo log entries or scenes. Color and texture stay the character\'s. A styling you type or name in the idea wins. The bank is config/scenes.yaml.'],
   ['Retry with safer wording', 'The refused run again with only its trigger words reworded by code ("tight" out, "boy shorts" to "bike shorts"). The rewording is free; the run is priced like the one that was refused.'],
   ['No caption', 'A choice next to White box and Outline: no caption track in the editor and none in the export. Kept with the post; switch back any time and the words return. A caption is never required anyway: an empty one means no caption.'],
   ['Studio picker', 'What Add media opens in the editor: this post\'s takes and stills, the character\'s clips and stills, then the Library. Tap adds at the playhead; drag puts it on a track. From computer is its second tab.'],

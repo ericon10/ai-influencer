@@ -54,6 +54,9 @@ const wordingSchema = z.object({
   body: z.array(z.string().min(1)).default([]),
   swaps: z.array(wordingPair).default([]),
   pose: z.array(wordingPair).default([]),
+  // Cup sizes and the like: case-sensitive regular expressions, taken out
+  // like a fit word.
+  patterns: z.array(z.string().min(1).refine(p => { try { new RegExp(p); return true } catch { return false } }, 'Not a valid pattern')).default([]),
 })
 
 const ruleCheck = z.discriminatedUnion('type', [
@@ -143,7 +146,7 @@ const templatesSchema = z.object({
     wearing: z.string(),
     wearing_only: z.string(),
     colors: z.string(),
-    makeup: z.object({ bare: z.string(), natural: z.string(), soft_glam: z.string() }),
+    makeup: z.object({ bare: z.string(), natural: z.string(), everyday: z.string().default('soft everyday makeup'), soft_glam: z.string(), groomed: z.string().default('Groomed brows and beard') }),
   }),
   edit: z.object({ base: z.string(), face_ref: z.string() }),
   scene_plan: z.object({ system: z.string(), prompt: z.string() }),
@@ -176,6 +179,7 @@ const scenesSchema = z.object({
     default_variations: z.number().int().min(1).max(8).default(2),
     body_ref_framings: z.array(z.string()).default(['knees_up', 'full_body']),
     combo_window: z.number().int().positive(),
+    hair_window: z.number().int().positive().default(5),
     max_refs: z.number().int().min(2).max(8),
     max_variations: z.number().int().min(1).max(8),
     max_models: z.number().int().min(1).max(4),
@@ -193,6 +197,8 @@ const scenesSchema = z.object({
   lights: z.array(preset.extend({ text: z.string() })).min(1),
   expressions: z.array(preset.extend({ text: z.string(), ref_expression: z.string().optional() })).min(1),
   makeup: z.array(preset).min(1),
+  makeup_by_setting: z.object({ bare: z.array(z.string().min(1)).default([]) }).default({ bare: [] }),
+  hair_bank: z.array(z.string().min(1)).default([]),
   destinations: z.array(preset.extend({ aspect: z.string() })).min(1),
   color_triggers: z.string(),
   edits: z.object({

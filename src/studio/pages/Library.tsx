@@ -258,7 +258,7 @@ function ComboLog({ characterId }: { characterId: string }) {
       <div className="st-card-head"><History size={16} /><div className="grow"><div className="st-h3">Combo log</div><div className="st-hint">The last {data.combos.length} picked scenes, as a history. Repeats are fine.</div></div></div>
       <div className="st-card-body st-col" style={{ gap: 6 }}>
         {[...data.combos].reverse().map((c, i) => (
-          <div key={i} className="st-combo"><span className="st-mono st-muted">{c.date}</span><b>{c.moment}</b><span>{c.camera}</span><span className="st-muted">{c.light}</span><span className="st-muted">{c.location}</span></div>
+          <div key={i} className="st-combo"><span className="st-mono st-muted">{c.date}</span><b>{c.moment}</b><span>{c.camera}</span><span className="st-muted">{c.light}</span><span className="st-muted">{c.location}</span>{c.hair && <span className="st-muted" data-field="combo-hair">{c.hair}</span>}</div>
         ))}
       </div>
     </section>

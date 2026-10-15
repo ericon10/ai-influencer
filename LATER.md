@@ -133,3 +133,29 @@ rule.
   `GET /content/:id`; ETag or a `since` cursor so a poll that changed
   nothing sends nothing; poll only the running jobs.
 
+
+## Long run (owner away, 2026-10-15)
+
+### Paid tests queued for the owner
+
+No paid run was made in the long run; each of these needs a quote shown
+first.
+
+- **Soft everyday makeup on a real still:** one public scene for Callie
+  on Flare (her own everyday line plus "the same lip shape, nose and jaw
+  as the references"). Check the lips and nose hold against REF-00 and no
+  gloss creeps in. About 1 still.
+- **Hair styling line:** two scenes with different rotated stylings (for
+  example "half-up claw clip" and "low loose ponytail") on Flare and Nano
+  Banana 2.1. Check the styling follows and the color and texture stay
+  REF-00's. About 4 stills.
+- **No makeup in a gym scene:** one gym scene, to check "No makeup, bare
+  skin" reads as bare and not as a sheet look. About 1 still.
+
+### Small ideas (not built)
+
+- Hair rotation could prefer stylings that fit the moment (damp and
+  air-dried after a swim, sunglasses as a headband outdoors). Today it is
+  bank order, never one of the last 5.
+- A "Makeup: by setting" chip in the Idea step's chips row, so the setting
+  choice shows without opening More control.

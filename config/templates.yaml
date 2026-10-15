@@ -121,8 +121,15 @@ scene:
   makeup:
     bare: "No makeup, bare skin"
     # Image models add lip gloss on their own (Callie's notes on Flare).
-    natural: "Makeup: {natural}; lips natural and matte, no gloss"
+    # "The same lip shape, nose and jaw" keeps makeup from reshaping the
+    # face (character template v1.6).
+    natural: "Makeup: {natural}; lips natural and matte, no gloss; the same lip shape, nose and jaw as the references"
+    # Soft everyday makeup out in public (template v1.6), when the character
+    # file has no everyday makeup line of its own.
+    everyday: "soft everyday makeup, light coverage that still shows skin texture, groomed brows, mascara, warm bronzer, a matte nude lip"
     soft_glam: "Makeup: {glam}, with real skin texture still visible underneath"
+    # Men: no makeup words (template v1.6).
+    groomed: "Groomed brows and beard"
 
 # One change per edit pass (SPEC 10, still edit; SPEC 5.3).
 edit:

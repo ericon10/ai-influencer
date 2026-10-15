@@ -324,7 +324,7 @@ function SceneForm({ v, data, draft, set, checks }: { v: CharacterView; data: Sc
       </section>
 
       <section className="st-card">
-        {head(`What ${v.data.pronouns.subj} wears`, SECTIONS.wear, 'Anything goes, and every field is optional. Nothing from the sheet or the style notes is put in for you.')}
+        {head(`What ${v.data.pronouns.subj} wears`, SECTIONS.wear, 'Anything goes, and every field is optional. Two starting points are filled in, both yours to change: makeup by setting, and a hair styling rotated so the feed does not repeat. Nothing from the sheet or the style notes is put in for you.')}
         <div className="st-card-body st-form">
           <div className="wide">{text('outfit', { rows: 2, placeholder: 'e.g. A cream linen button-up with the sleeves rolled, light-wash straight jeans' })}</div>
           {text('footwear', { placeholder: 'e.g. White leather sandals, or barefoot' })}
@@ -332,9 +332,12 @@ function SceneForm({ v, data, draft, set, checks }: { v: CharacterView; data: Sc
             {text('jewelry', { placeholder: 'e.g. A thin gold chain necklace' })}
             {cuff.length > 0 && <div className="st-row" style={{ gap: 6, flexWrap: 'wrap' }}><span className="st-hint">Signature pieces (optional):</span>{cuff.map(c => <button key={c} type="button" className="st-chip" onClick={() => set('jewelry', [draft.jewelry, c].filter(Boolean).join(', '))}>{c}</button>)}</div>}
           </div>
-          {chips('makeup', o.makeup)}
           <div className="st-col" style={{ gap: 6 }}>
-            {text('hair', { placeholder: 'e.g. Loose beachy waves with a deep side part' })}
+            {chips('makeup', o.makeup)}
+            <span className="st-hint" data-field="makeup-by-setting">{/^(?:he)$/i.test(v.data.pronouns.subj) ? 'Groomed brows and beard; no makeup words are sent.' : 'By setting: no makeup at home, the gym, an early beach or waking up; soft everyday makeup out in public. Your choice wins.'}</span>
+          </div>
+          <div className="st-col" style={{ gap: 6 }}>
+            {text('hair', { placeholder: 'e.g. Loose beachy waves with a deep side part', hint: 'Rotated per scene from the styling bank, never one of the last 5. Color and texture stay the same. Type your own, or name it in your idea, to keep it.' })}
             {hairIdeas.length > 0 && <div className="st-row" style={{ gap: 6, flexWrap: 'wrap' }}>{hairIdeas.map(h => <button key={h} type="button" className="st-chip" onClick={() => set('hair', h)}>{h}</button>)}</div>}
           </div>
         </div>
@@ -502,7 +505,7 @@ function GenerateCard({ v, data, scene, todo, saving, setRefs, onStarted }: { v:
           watch={j => new RegExp(`^(scene|drift_lock|scene_qa|scene_edit|scene_upscale|scene_end_frame):${scene.id}(:|$)`).test(j.purpose) && !/^scene_qa:.*:video/.test(j.purpose)}
         />
         {needsPrompt && <span className="st-hint">Claude writes the prompt from your idea and the details, then the stills run on it. One price for both; the prompt shows here after, editable for the next run.</span>}
-        {scene.combo && <span className="st-hint">Logged on your first pick as: {[scene.combo.moment, scene.combo.camera, scene.combo.light, scene.combo.location].filter(Boolean).join(' / ')}</span>}
+        {scene.combo && <span className="st-hint">Logged on your first pick as: {[scene.combo.moment, scene.combo.camera, scene.combo.light, scene.combo.location, scene.combo.hair].filter(Boolean).join(' / ')}</span>}
       </div>
     </section>
   )

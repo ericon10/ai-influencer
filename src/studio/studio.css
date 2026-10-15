@@ -546,7 +546,7 @@ button.st-chip:hover { color: var(--st-text); border-color: var(--st-text-3); }
 .st-refchoice { display: grid; gap: 4px; padding: 4px; border-radius: 10px; border: 1px solid var(--st-line); background: var(--st-surface-2); cursor: pointer; font: inherit; font-size: 10.5px; color: var(--st-text-3); }
 .st-refchoice .st-img { aspect-ratio: 3 / 4; border-radius: 7px; }
 .st-refchoice.on { border-color: rgba(255, 106, 61, 0.7); box-shadow: 0 0 0 2px var(--st-accent-soft); color: var(--st-text); }
-.st-combo { display: grid; grid-template-columns: 92px 1.2fr 1.4fr 1fr 1fr; gap: 10px; font-size: 13px; align-items: baseline; }
+.st-combo { display: grid; grid-template-columns: 92px 1.2fr 1.4fr 1fr 1fr 1fr; gap: 10px; font-size: 13px; align-items: baseline; }
 .st-drawer.wide { width: min(760px, 100vw); }
 .st-crop { width: min(760px, calc(100vw - 32px)); }
 .st-crop-stage { position: relative; align-self: center; max-width: 100%; overflow: hidden; border-radius: var(--st-r); user-select: none; touch-action: none; line-height: 0; }

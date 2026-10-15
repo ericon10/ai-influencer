@@ -2260,3 +2260,59 @@ against the code and filled the gaps rather than building them again.
   real take.
 - **Decision:** no change to UX-PLAN.md (no new behavior); the phone grid
   fix is a layout bug.
+
+### G51. Long run, part 2: hair rotation, makeup by setting, the rest of catalog wording (owner away, 2026-10-15)
+
+From character template v1.6 (`docs/character-template.md`, Scene rules)
+and the owner's part 2 list. Catalog wording itself shipped in G46; this
+part audited it in every writer and added what the template asks for.
+UX-PLAN.md section 23.
+
+- **Audited, already live (G46):** outfits in catalog terms, no fit or body
+  words, "bike shorts" for "boy shorts", a moment not a pose, the owner's
+  words as typed with a warning on the price, trigger words and Retry
+  with safer wording after a refusal. The planner, Punch it up, the prompt
+  writer, the clip reader and the Recreate and face pass prompts all go
+  through `catalogWording`; their tests still pass.
+- **Never-send list:** busty, buxom and voluptuous join the fit words, and
+  cup sizes ("a D cup", "36DD") are taken out by case-sensitive patterns
+  (`config/wording.yaml`, `patterns`). Call: case-sensitive and single
+  letters B to H only, so "a cup of coffee", "A cup", "30A" (the beach
+  road) and "32GB" stay. The [BUILD] line on full-body sheet refs is a
+  sheet prompt, not a scene prompt, so it is untouched.
+- **Hair rotation (default rule `hair-rotation`):** a new scene starts with
+  the next styling from the template bank (`config/scenes.yaml`,
+  `hair_bank`), never one used in the character's last 5 combo log
+  entries or last 5 scenes (`settings.hair_window`). Calls: the pick is
+  written into the scene's Hair field at creation so it shows in the form
+  and survives the planner (the planner's own hair choice is replaced by
+  the rotated one); a styling named in the owner's words ("in a messy
+  bun") is read for free and wins, even when the words change later; a
+  styling the owner types wins; a copy for another character drops a
+  rotated styling so that character rotates their own; a rotated styling
+  does not make a fresh scene read as "planned". "Other part" in the
+  template is written "parted on the other side" so it reads as a prompt
+  phrase.
+- **Combo log:** the hair styling is a fifth part ("/ low loose ponytail"),
+  read back by the rotation. Older four-part lines still read; a line
+  wrapped onto the next one, as the template writes it, is joined.
+- **Makeup by setting (default rule `makeup-by-setting`):** no makeup at
+  home, the gym, an early beach or waking up (the place words are
+  `config/scenes.yaml`, `makeup_by_setting`); soft everyday makeup
+  anywhere else. Calls: it sits under the owner's choice and the owner's
+  makeup words; after a planner run the setting decides unless the planner
+  picked soft glam for a night out; the "Natural" choice is now labeled
+  "Soft everyday" (same id). The soft everyday wording is the template's
+  (light coverage that still shows skin texture, groomed brows, mascara,
+  warm bronzer, a matte nude lip) and a character's own everyday line
+  (Callie's "natural (light skin, groomed brows, tinted lip)") replaces
+  it; both end with "the same lip shape, nose and jaw as the references".
+  Men (he, or a man) get "Groomed brows and beard" and never a makeup
+  word. Hero and sheet stay bare-faced (fixed, unchanged).
+- **Tests:** unit (bank, rotation order, wrapped combo lines, setting
+  words, the makeup lines, cup sizes kept and removed) and pipeline
+  (rotation across scenes, words and typed hair win, copies, the combo log
+  read back, makeup by setting with the switch off and after the
+  planner); Playwright desktop and phone (`e2e/editor/scenerules.spec.ts`).
+- **No paid runs.** Whether the soft everyday line and the styling line
+  hold on a real still is in the paid test queue.

@@ -111,13 +111,18 @@ export function catalogWording(text: string, w: WordingConfig, own = ''): Wordin
     if (ownHas(wordRe(term, 'i'))) continue
     out = out.replace(wordRe(term), () => { changed.add(term); return M })
   }
+  // Cup sizes ("a D cup", "36DD"): case-sensitive patterns, out like a fit word.
+  for (const p of w.patterns ?? []) {
+    if (ownHas(new RegExp(p))) continue
+    out = out.replace(new RegExp(p, 'g'), m => { changed.add(m.trim()); return M })
+  }
   if (!changed.size) return { text, changed: [] }
   const cleaned = tidy(out, head)
   return { text: avoid ? `${cleaned}${/\n\s*$/.test(head) ? '\n' : ' '}${avoid}` : cleaned, changed: [...changed] }
 }
 
-// Words in a prompt that the provider's filter often blocks (fit, body and
-// "boy shorts"), outside the AVOID block, each named once.
+// Words in a prompt that the provider's filter often blocks (fit, body, cup
+// sizes and "boy shorts"), outside the AVOID block, each named once.
 export function findRiskyWords(text: string, w: WordingConfig): string[] {
   const [head] = splitAvoid(text)
   const found: string[] = []
@@ -125,6 +130,7 @@ export function findRiskyWords(text: string, w: WordingConfig): string[] {
   for (const s of [...w.swaps].sort((a, b) => b.from.length - a.from.length)) if (wordRe(s.from, 'i').test(head) && !seen(s.from)) found.push(s.from)
   for (const term of longestFirst(w.fit)) if (wordRe(term, 'i').test(head) && !seen(term)) found.push(term)
   for (const term of longestFirst(w.body)) if (bodyWordRe(term, 'i').test(head) && !seen(term)) found.push(term)
+  for (const p of w.patterns ?? []) for (const m of head.match(new RegExp(p, 'g')) ?? []) if (!seen(m.trim())) found.push(m.trim())
   return found
 }
 

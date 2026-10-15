@@ -149,6 +149,67 @@ const sentence = (s: string) => s.trim().replace(/[.\s]+$/, '')
 
 type SceneCharacter = Pick<CharacterData, 'name' | 'card' | 'marks' | 'pronouns' | 'makeup' | 'realism'>
 
+// Men get no makeup words, only grooming (character template v1.6).
+export const isMan = (p: CharacterData['pronouns']) => /^(?:man|guy|boy)$/i.test(p.noun.trim()) || p.subj.trim().toLowerCase() === 'he'
+
+// The makeup line. Out in public it is soft everyday makeup: the
+// character's own everyday line when the file has one, or the template's
+// (light coverage that still shows skin texture, a matte nude lip), always
+// with "the same lip shape, nose and jaw as the references" so makeup never
+// reshapes the face.
+export function makeupLine(t: TemplatesConfig, makeup: string, ch: Pick<CharacterData, 'makeup' | 'pronouns'>): string {
+  if (isMan(ch.pronouns)) return t.scene.makeup.groomed
+  if (makeup === 'bare') return t.scene.makeup.bare
+  if (makeup === 'soft_glam') return fill(t.scene.makeup.soft_glam, { glam: ch.makeup.glam?.trim() || 'soft glam' })
+  const own = ch.makeup.default?.trim() ?? ''
+  return fill(t.scene.makeup.natural, { natural: own && !/^(?:natural|light|minimal|soft|everyday|none)$/i.test(own) ? own : t.scene.makeup.everyday })
+}
+
+// ── Makeup by setting and hair rotation (character template v1.6) ──
+
+const phraseRe = (list: string[]) => (list.length ? new RegExp(`\\b(?:${[...list].sort((a, b) => b.length - a.length).map(w => w.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+')).join('|')})\\b`, 'i') : null)
+
+// Default rule makeup-by-setting: no makeup at home, the gym, an early beach
+// or waking up; soft everyday makeup anywhere else. Null when the words say
+// nothing about the place.
+export function makeupForSetting(sc: ScenesConfig, words: string): 'bare' | 'natural' | null {
+  if (!words.trim()) return null
+  return phraseRe(sc.makeup_by_setting.bare)?.test(words) ? 'bare' : 'natural'
+}
+
+const HAIR_STYLE = /\b(?:(?:messy|high|low|sleek|loose|top|half[- ]up|side|french|fishtail|twin|space|slick(?:ed)?(?:[- ]back)?)\s+){0,2}(?:bun|buns|ponytail|pony|braid|braids|plait|plaits|pigtails|updo|claw clip|hair clip|scrunchie|headband|bandana)\b|\bhair\s+(?:up|down|back|tucked|pulled|loose|wet|damp|blowing|in\s+a\s+\w+(?:\s+\w+)?)\b(?:\s+(?:behind|off|over|into)\s+(?:her|his|their|one|both)?\s*\w+)?|\b(?:wet|damp|slicked[- ]back|air[- ]dried)\s+hair\b|\btucked\s+behind\s+(?:her|his|their|one)\s+ear\b/i
+
+// A hair styling the owner's words name ("a messy bun", "hair tucked behind
+// her ear"), so the rotation leaves it alone.
+export function hairFromWords(words: string): string | null {
+  const m = words.match(HAIR_STYLE)
+  return m ? m[0].trim().slice(0, 80) : null
+}
+
+const hairKey = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
+
+// A styling straight from the bank (the rotation's own pick).
+export function isBankHair(sc: ScenesConfig, hair: string | undefined | null): boolean {
+  return !!hair && sc.hair_bank.some(b => hairKey(b) === hairKey(hair))
+}
+
+// The next styling in the bank, never one in `recent` (newest last). After
+// the newest bank styling used, in bank order; when every one was used,
+// the one used longest ago.
+export function nextHair(bank: string[], recent: string[]): string | null {
+  if (!bank.length) return null
+  const used = recent.map(hairKey)
+  const lastAt = (() => { for (let i = used.length - 1; i >= 0; i--) { const at = bank.findIndex(b => hairKey(b) === used[i]); if (at >= 0) return at } return -1 })()
+  for (let k = 1; k <= bank.length; k++) {
+    const b = bank[(lastAt + k + bank.length) % bank.length]!
+    if (!used.includes(hairKey(b))) return b
+  }
+  // Every one used: the one used longest ago.
+  let best = bank[0]!, bestAt = Infinity
+  for (const b of bank) { const at = used.lastIndexOf(hairKey(b)); if (at < bestAt) { best = b; bestAt = at } }
+  return best
+}
+
 // Which default rules shape the scene prompt (owner ruling G1). All on
 // unless switched off; a scene that allows brands drops the brand-free line.
 export interface SceneRuleOptions { outfitOverride?: boolean; brandFree?: boolean; colors?: boolean; referenceLine?: boolean }
@@ -169,9 +230,7 @@ export function sceneParts(t: TemplatesConfig, sc: ScenesConfig, views: ViewsCon
   const reference = mode === 'refs' ? (rules.referenceLine ? fill(t.scene.reference.refs, pv) : '')
     : mode === 'trained' ? fill(t.scene.reference.trained, { name: ch.name })
     : fill(t.scene.reference.text, { card: cardPhrase(ch.card, ch.pronouns.noun) })
-  const makeup = f.makeup === 'bare' ? t.scene.makeup.bare
-    : f.makeup === 'soft_glam' ? fill(t.scene.makeup.soft_glam, { glam: ch.makeup.glam?.trim() || 'soft glam' })
-    : fill(t.scene.makeup.natural, { natural: ch.makeup.default?.trim() || 'natural' })
+  const makeup = makeupLine(t, f.makeup, ch)
   const hairColor = hairColorFrom(ch.card)
   const triggers = new RegExp(sc.color_triggers, 'i')
   const colors = rules.colors && hairColor && triggers.test([f.moment, f.setting, f.hair, f.pose, light.text].join(' '))
@@ -354,6 +413,8 @@ export function fieldsFromWords(sc: ScenesConfig, words: string): Partial<SceneF
   if (r.outfit) out.outfit = r.outfit.slice(0, 300)
   if (r.makeup) out.makeup = r.makeup
   if (r.place) out.location = r.place.slice(0, 60)
+  const hair = hairFromWords(words)
+  if (hair) out.hair = hair
   if (r.ownLight && has(sc.lights, 'as_written')) out.light = 'as_written'
   if (looksLikePrompt(words)) out.asWritten = true
   return out
@@ -385,24 +446,32 @@ export function buildEditPrompt(t: TemplatesConfig, change: string, ch: Pick<Cha
 
 // ── Combo log (SPEC 5.2 rule 21) ────────────────────────────────────
 
-export interface ComboEntry { date: string; moment: string; camera: string; light: string; location: string }
+export interface ComboEntry { date: string; moment: string; camera: string; light: string; location: string; hair?: string }
 
 export const COMBO_TITLE = 'Combo log (last 10)'
 export const isComboSection = (title: string) => /^combo log\b/i.test(title.trim())
 
-// Lines like "- 2026-10-12 Caught you / Friend shot / Golden hour / Rooftop".
+// Lines like "- 2026-10-12 Caught you / Friend shot / Golden hour / Rooftop
+// / low loose ponytail" (the hair styling is the fifth part, template
+// v1.6; older lines have four). A line wrapped onto the next one, as the
+// template writes it, is read as one.
 export function parseComboLog(body: string): ComboEntry[] {
   const out: ComboEntry[] = []
+  const lines: string[] = []
   for (const line of body.split('\n')) {
+    if (/^\s*[-*]\s*\d{4}-\d{2}-\d{2}\s/.test(line)) lines.push(line)
+    else if (lines.length && /^\s{2,}\S/.test(line) && !/^\s*[-*]\s/.test(line)) lines[lines.length - 1] += ` ${line.trim()}`
+  }
+  for (const line of lines) {
     const m = line.match(/^\s*[-*]\s*(\d{4}-\d{2}-\d{2})\s+(.+)$/)
     if (!m) continue
-    const [moment = '', camera = '', light = '', location = ''] = m[2]!.split('/').map(p => p.trim())
-    out.push({ date: m[1]!, moment, camera, light, location })
+    const [moment = '', camera = '', light = '', location = '', hair = ''] = m[2]!.split('/').map(p => p.trim())
+    out.push({ date: m[1]!, moment, camera, light, location, ...(hair ? { hair } : {}) })
   }
   return out
 }
 
-export const formatComboEntry = (e: ComboEntry) => `- ${e.date} ${[e.moment, e.camera, e.light, e.location].map(p => p.replace(/\//g, '-').trim()).join(' / ')}`
+export const formatComboEntry = (e: ComboEntry) => `- ${e.date} ${[e.moment, e.camera, e.light, e.location, ...(e.hair?.trim() ? [e.hair] : [])].map(p => p.replace(/\//g, '-').trim()).join(' / ')}`
 
 const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
 
@@ -413,9 +482,14 @@ export function comboConflict(entries: ComboEntry[], moment: string, camera: str
 
 // Adds an entry and keeps the newest `window` (oldest first, as written).
 export function appendCombo(body: string, entry: ComboEntry, window: number): string {
-  const lines = body.split('\n')
-  const entries = lines.filter(l => /^\s*[-*]\s*\d{4}-\d{2}-\d{2}\s/.test(l))
-  const others = lines.filter(l => !entries.includes(l) && l.trim())
+  const entries: string[] = []
+  const others: string[] = []
+  for (const l of body.split('\n')) {
+    if (/^\s*[-*]\s*\d{4}-\d{2}-\d{2}\s/.test(l)) entries.push(l)
+    // A wrapped entry ("  / low loose ponytail") is joined into one line.
+    else if (entries.length && /^\s{2,}\S/.test(l) && !/^\s*[-*]\s/.test(l)) entries[entries.length - 1] += ` ${l.trim()}`
+    else if (l.trim()) others.push(l)
+  }
   const kept = [...entries, formatComboEntry(entry)].slice(-window)
   return [...others, ...kept].join('\n')
 }
@@ -427,6 +501,7 @@ export function comboEntryFor(sc: ScenesConfig, f: SceneFields, date: string): C
     camera: byId(sc.cameras, f.camera, 'camera').label,
     light: byId(sc.lights, f.light, 'light').label,
     location: f.location || f.setting.split(/[,.]/)[0]!.trim().slice(0, 40),
+    ...(f.hair.trim() ? { hair: sentence(f.hair).slice(0, 60) } : {}),
   }
 }
 

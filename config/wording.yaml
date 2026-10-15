@@ -40,6 +40,9 @@ fit:
   - toned
   - curvy
   - shapely
+  - busty
+  - buxom
+  - voluptuous
 
 # Body words: the phrase that names one goes ("showing off her toned legs",
 # "fitted at the waist"). "Waist-up" framing, "waist height" and
@@ -77,3 +80,11 @@ pose:
   - { from: "striking a pose", to: "caught mid-moment" }
   - { from: "strikes a pose", to: "is caught mid-moment" }
   - { from: "posing", to: "standing" }
+
+# Cup sizes ("a D cup", "36DD"): taken out like a fit word. Regular
+# expressions, case-sensitive so "a cup of coffee", "A cup", "30A" (the
+# beach road) and "32GB" stay; never sent in Claude's or the Studio's
+# words, and named on the price when typed.
+patterns:
+  - "\\b(?:[B-H]|DD|DDD)[- ]?cups?\\b(?!\\s+of\\b)"
+  - "\\b(?:2[89]|3[0-9]|4[0-6])(?:AA|DDD|DD|[B-H])\\b"

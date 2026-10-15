@@ -24,7 +24,7 @@ import { listCredentials } from '../providers/credentials.js'
 import { ACCOUNT_PROVIDER } from '../providers/higgsfieldOAuth.js'
 import { forMode, providerMode, resolveRoute } from './settings.js'
 import { approvedAssets, getCandidate, toData, type CharacterRow } from './characters.js'
-import { comboEntries, comboProblem, getScene, sceneFields, sceneRefs, videoModel, type SceneRef } from './scenes.js'
+import { comboEntries, comboProblem, getScene, sceneFields, sceneFieldsFor, sceneRefs, videoModel, type SceneRef } from './scenes.js'
 import { assertFace } from './videoAssets.js'
 import { getAsset } from '../storage/assets.js'
 import { assets } from '../db/schema.js'
@@ -255,7 +255,7 @@ export async function buildScenePromptWrite(deps: Deps, ctx: Ctx, row: Character
   const scene = await getScene(deps, ctx, input.sceneId)
   if (scene.characterId !== row.id) throw new AppError('bad_request', 'That scene belongs to another character.')
   const ch = toData(row)
-  const f = sceneFields(deps, scene)
+  const f = await sceneFieldsFor(deps, ctx, scene)
   const { templates: t, scenes: sc, views } = deps.config.pipeline
   const route = await resolveRoute(deps, ctx, 'prompt_writer')
   const pv = pronounVars(ch.pronouns)
@@ -324,7 +324,7 @@ export async function buildScenePromptWrite(deps: Deps, ctx: Ctx, row: Character
 export async function writtenStillPrompt(deps: Deps, ctx: Ctx, row: CharacterRow, sceneId: string, sceneModel: string, text: string, reason?: string): Promise<string> {
   const scene = await getScene(deps, ctx, sceneId)
   const ch = toData(row)
-  const f = sceneFields(deps, scene)
+  const f = await sceneFieldsFor(deps, ctx, scene)
   const { templates, scenes: sc, views, review } = deps.config.pipeline
   const sw = await ruleSwitches(deps, ctx, row.id)
   const entry = modelEntry(deps, sceneModel)
@@ -340,7 +340,7 @@ export async function buildSceneRun(deps: Deps, ctx: Ctx, row: CharacterRow, inp
   const scene = await getScene(deps, ctx, input.sceneId)
   if (scene.characterId !== row.id) throw new AppError('bad_request', 'That scene belongs to another character.')
   const ch = toData(row)
-  const f = sceneFields(deps, scene)
+  const f = await sceneFieldsFor(deps, ctx, scene)
   const { templates, scenes: sc, views, rules, review } = deps.config.pipeline
   const sw = await ruleSwitches(deps, ctx, row.id)
   let warnings: RuleViolation[] = []
@@ -483,7 +483,7 @@ export async function buildSceneEdit(deps: Deps, ctx: Ctx, row: CharacterRow, in
   const problem = sw.on('edit-one-change') ? oneChangeProblem(input.change) : null
   if (problem) advice.push({ ruleId: 'edit-one-change', spec: '5.3.24', title: 'More than one change', severity: 'warning', message: `${problem} Running anyway.` })
   const scene = await getScene(deps, ctx, cand.sceneId)
-  const f = sceneFields(deps, scene)
+  const f = await sceneFieldsFor(deps, ctx, scene)
   const ch = toData(row)
   const { templates, scenes: sc, rules } = deps.config.pipeline
   const model = input.model ?? (sc.settings.edit_models.includes(ch.preferredModels.edit ?? '') ? ch.preferredModels.edit! : sc.settings.edit_models[0]!)
@@ -650,7 +650,7 @@ export async function buildSceneEndFrame(deps: Deps, ctx: Ctx, row: CharacterRow
   const change = input.change.trim().replace(/[.\s]+$/, '')
   if (change.length < 3) throw new AppError('invalid_request', 'Say how the head or face changes.')
   const scene = await getScene(deps, ctx, cand.sceneId)
-  const f = sceneFields(deps, scene)
+  const f = await sceneFieldsFor(deps, ctx, scene)
   const ch = toData(row)
   const { templates: t, scenes: sc, rules } = deps.config.pipeline
   const sw = await ruleSwitches(deps, ctx, row.id)
@@ -683,7 +683,7 @@ export async function buildSceneRecheck(deps: Deps, ctx: Ctx, row: CharacterRow,
   const cand = await getCandidate(deps, ctx, candidateId)
   if (cand.characterId !== row.id || !cand.sceneId || !cand.assetId) throw new AppError('bad_request', 'Pick a scene still to check.')
   const scene = await getScene(deps, ctx, cand.sceneId)
-  const f = sceneFields(deps, scene)
+  const f = await sceneFieldsFor(deps, ctx, scene)
   // A video take is checked on its last frame (saved when the take arrived).
   let image = cand.assetId
   if (isVideoCandidate(cand)) {

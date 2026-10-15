@@ -879,3 +879,21 @@ Trash older than 7 days, Auto-clean, and the storage measure. Every piece
 is a default in the sense of rule one: the 7 days of Trash and the
 Auto-clean days are shown and editable (Auto-clean can be Off); nothing
 is deleted for good without 7 days in Trash first.
+
+## 23. Hair rotation, makeup by setting, the rest of catalog wording (owner, 2026-10-15, long run part 2)
+
+From character template v1.6 (`docs/character-template.md`, Scene rules).
+Catalog wording itself is section 20; this adds the two scene defaults the
+template asks for and closes two gaps in the never-send list. No new page
+or step: both show as filled fields in the scene form, editable as before.
+
+| Piece | Where | How it works | Clicks |
+|---|---|---|---|
+| Hair styling, rotated | The scene form's Hair styling field (Stills step, More control) | Each new scene starts with the next styling from the template's bank (behind both shoulders; tucked behind one ear; blowing back off the face; half-up claw clip; low loose ponytail; high sleek ponytail; messy top bun; sunglasses as a headband; damp and air-dried; other part), never one used in the character's last 5 combo entries or last 5 scenes. Color and texture stay the character's (identity); only the placement rotates. Your own words win: a styling you type, or one the owner set, is kept | 0 |
+| Combo log with hair | Library > Stills, Combo log; the character file | Each logged scene now records its hair styling as a fifth column, so the rotation can read it back after a re-import | 0 |
+| Makeup by setting | The scene form's Makeup field | Out in public: soft everyday makeup (light coverage that still shows skin texture, groomed brows, mascara, warm bronzer, matte nude lip, no gloss, the same lip shape, nose and jaw as the references). At home, the gym, an early beach or waking up: no makeup. Soft glam stays for the nights out and events the character file names. A character's own everyday makeup line replaces the default wording. For men: groomed brows and beard, no makeup words. A makeup word in your idea, or a choice you made, wins | 0 |
+| Never-send list | Every prompt the Studio writes (section 20) | Adds "busty" (and buxom, voluptuous) and cup sizes ("D cup", "36DD") to the words that are never sent, and warns under the price when you typed one. The full-body sheet refs keep their one catalog-fit build line (template Step 4, [BUILD]); hero and sheet prompts are not scene prompts | 0 |
+
+Both scene behaviors are defaults in Settings > Rules: "Rotate hair styling
+per scene" (`hair-rotation`) and "Makeup by setting" (`makeup-by-setting`),
+each switchable for all characters or one.

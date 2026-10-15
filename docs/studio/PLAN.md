@@ -524,6 +524,18 @@ Decisions: `DECISIONS.md` G37 and G38. UX: `UX-PLAN.md` section 15.
 - [x] A post outside the newest 200 opens by its own address
 - [x] Tests: trash, auto-clean, daily clean, temp sweep, API routes; Playwright desktop and phone; before and after transfer for a normal session
 
+### Long run, part 1: usability fixes audited (G50)
+
+- [x] All six already live (G45); phone stills grid fixed; phone tests and the face strip test
+
+### Long run, part 2: hair rotation, makeup by setting (G51, UX-PLAN.md section 23)
+
+- [x] Never-send list: busty, buxom, voluptuous, cup sizes; warned on the price when typed
+- [x] Hair styling rotated per scene from the template bank, never one of the last 5 combo entries or scenes; the owner's words and typed styling win
+- [x] Combo log records the hair styling (fifth part); wrapped lines read
+- [x] Makeup by setting: bare at home, the gym, an early beach, waking up; soft everyday makeup in public; men groomed, no makeup words
+- [x] Rules hair-rotation and makeup-by-setting (defaults); guide and help; unit, pipeline and Playwright tests
+
 ## Roadmap after Phase 4 (owner, 2026-10-13; not started)
 
 SPEC 13.1, R1 to R7: Clone Video (first after Phase 3), Inspo board

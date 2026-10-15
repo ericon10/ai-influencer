@@ -309,3 +309,74 @@ describe('live mode', () => {
     }
   })
 })
+
+// Character template v1.6 scene rules (long run part 2): the hair styling
+// rotated per scene from the bank, and makeup by setting. Both defaults.
+describe('hair rotation and makeup by setting (template v1.6)', () => {
+  it('each new scene gets the next styling, never one of the last five; a styling in the words or typed wins', async () => {
+    const nia = await createCharacter(h.deps, h.ctx, { name: 'Nia', data: { age: 27, card: '27, long dark brown hair, loose waves' } })
+    const bank = h.deps.config.pipeline.scenes.hair_bank
+    const picks: string[] = []
+    for (let i = 0; i < 6; i++) picks.push(((await createScene(h.deps, h.ctx, nia.id, { brief: `Moment ${i} at the market` })).fields as { hair?: string }).hair!)
+    expect(picks.slice(0, 5)).toEqual(bank.slice(0, 5))
+    expect(new Set(picks.slice(1, 6)).size).toBe(5)
+    // The owner's words name a styling: no rotation, and the words are the hair.
+    const bun = await createScene(h.deps, h.ctx, nia.id, { brief: 'Making coffee in a messy bun' })
+    expect((bun.fields as { hair?: string }).hair).toBeUndefined()
+    expect((await scenesView(h.deps, h.ctx, nia.id)).scenes.find(s => s.id === bun.id)!.fields.hair).toBe('messy bun')
+    // A styling the owner typed stays as typed.
+    const own = await createScene(h.deps, h.ctx, nia.id, { brief: 'At the park', fields: { hair: 'two French braids' } })
+    expect((own.fields as { hair?: string }).hair).toBe('two French braids')
+    // Edited words that name a styling later win over the rotated one.
+    const later = await createScene(h.deps, h.ctx, nia.id, { brief: 'At the beach bar' })
+    expect(bank).toContain((later.fields as { hair?: string }).hair)
+    await updateScene(h.deps, h.ctx, later.id, { brief: 'At the beach bar with wet hair' })
+    expect((await scenesView(h.deps, h.ctx, nia.id)).scenes.find(s => s.id === later.id)!.fields.hair).toBe('wet hair')
+    // A rotated styling is not "planned": the scene still reads as a fresh draft.
+    const fresh = await createScene(h.deps, h.ctx, nia.id, { brief: 'On the train' })
+    expect((await scenesView(h.deps, h.ctx, nia.id)).scenes.find(s => s.id === fresh.id)!.planned).toBe(false)
+    // Switched off (a default): no styling is filled in.
+    await setRuleSwitch(h.deps, h.ctx, { ruleId: 'hair-rotation', characterId: nia.id, on: false })
+    expect(((await createScene(h.deps, h.ctx, nia.id, { brief: 'At the bakery' })).fields as { hair?: string }).hair).toBeUndefined()
+    await setRuleSwitch(h.deps, h.ctx, { ruleId: 'hair-rotation', characterId: nia.id, on: null })
+  })
+
+  it('a copy for another character gets that character\'s next styling, not the rotated one', async () => {
+    const zoe = await createCharacter(h.deps, h.ctx, { name: 'Zoe', data: { age: 25, card: '25, short black bob' } })
+    const kai = await createCharacter(h.deps, h.ctx, { name: 'Kai', data: { age: 30, card: '30, auburn hair' } })
+    for (let i = 0; i < 3; i++) await createScene(h.deps, h.ctx, zoe.id, { brief: `Zoe moment ${i}` })
+    const src = await createScene(h.deps, h.ctx, zoe.id, { brief: 'Zoe reads on the porch' })
+    expect((src.fields as { hair?: string }).hair).toBe(h.deps.config.pipeline.scenes.hair_bank[3])
+    const [copy] = await copyScene(h.deps, h.ctx, src.id, [kai.id])
+    expect(((await getScene(h.deps, h.ctx, copy!.sceneId)).fields as { hair?: string }).hair).toBe(h.deps.config.pipeline.scenes.hair_bank[0])
+  })
+
+  it('the combo log records the styling, and the rotation reads it back', async () => {
+    const ivy = await createCharacter(h.deps, h.ctx, { name: 'Ivy', data: { age: 28, card: '28, long blonde hair' } })
+    const { updateCharacter } = await import('./characters.js')
+    await updateCharacter(h.deps, h.ctx, ivy.id, { sections: [{ title: 'Combo log (last 10)', body: ['- 2026-10-14 Caught you / Friend shot / Golden hour / Rooftop', '  / behind both shoulders', '- 2026-10-15 POV / Selfie / Window light / Kitchen / tucked behind one ear'].join('\n') }] }, 'combo log')
+    const s = await createScene(h.deps, h.ctx, ivy.id, { brief: 'Ivy at the flower market' })
+    expect((s.fields as { hair?: string }).hair).toBe('blowing back off the face')
+  })
+
+  it('makeup by setting: none at home or the gym, soft everyday makeup out in public; the owner\'s choice wins', async () => {
+    const mae = await createCharacter(h.deps, h.ctx, { name: 'Mae', data: { age: 26, card: '26, wavy chestnut hair' } })
+    const fieldsOf = async (id: string) => (await scenesView(h.deps, h.ctx, mae.id)).scenes.find(s => s.id === id)!.fields
+    const home = await createScene(h.deps, h.ctx, mae.id, { brief: 'Mae making pancakes in her kitchen at home' })
+    const gym = await createScene(h.deps, h.ctx, mae.id, { brief: 'Mae refilling her water bottle between sets at the gym' })
+    const market = await createScene(h.deps, h.ctx, mae.id, { brief: 'Mae picks out peaches at the farmers market' })
+    const chose = await createScene(h.deps, h.ctx, mae.id, { brief: 'Mae on her couch at home', fields: { makeup: 'soft_glam' } })
+    expect((await fieldsOf(home.id)).makeup).toBe('bare')
+    expect((await fieldsOf(gym.id)).makeup).toBe('bare')
+    expect((await fieldsOf(market.id)).makeup).toBe('natural')
+    expect((await fieldsOf(chose.id)).makeup).toBe('soft_glam')
+    // Switched off: the plain default (soft everyday makeup) everywhere.
+    await setRuleSwitch(h.deps, h.ctx, { ruleId: 'makeup-by-setting', characterId: mae.id, on: false })
+    expect((await fieldsOf(home.id)).makeup).toBe('natural')
+    await setRuleSwitch(h.deps, h.ctx, { ruleId: 'makeup-by-setting', characterId: mae.id, on: null })
+    // The planner's makeup is replaced by the setting's, unless it chose soft glam.
+    const planned = await createScene(h.deps, h.ctx, mae.id, { brief: 'Mae stretching on the yoga mat in her living room' })
+    await run({ type: 'scene_plan', characterId: mae.id, sceneId: planned.id })
+    expect((await fieldsOf(planned.id)).makeup).toBe('bare')
+  })
+})

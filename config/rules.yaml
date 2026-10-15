@@ -376,7 +376,28 @@ rules:
     title: Outfits in catalog terms, no fit or body words
     check: { type: behavior }
     planner: Say outfits the way a shop catalog does (garment, color, fabric, a style word when it is clear), never fit or body words, and give a moment instead of a pose.
-    message: Claude's words (the planner, the prompt writer, the clip reader) say outfits in catalog terms (garment, color, fabric, a style word) and never use fit or body words (fitted, tight, low-cut, sheer, toned, curvy, hips, waist, legs), "boy shorts" (it becomes "bike shorts"; every other garment name, "sports bra" included, stays as it is) or "posing". What she wears never changes, and your own words go as typed.
+    message: Claude's words (the planner, the prompt writer, the clip reader) say outfits in catalog terms (garment, color, fabric, a style word) and never use fit or body words (fitted, tight, low-cut, sheer, toned, curvy, busty, hips, waist, legs, cup sizes), "boy shorts" (it becomes "bike shorts"; every other garment name, "sports bra" included, stays as it is) or "posing". What she wears never changes, and your own words go as typed.
+  - id: hair-rotation
+    bucket: default
+    area: scene
+    spec: "9"
+    # Character template v1.6 (owner, 2026-10-15): the sheet holds one
+    # styling, so without a styling line every post copies it. The bank is
+    # config/scenes.yaml (hair_bank); the window is settings.hair_window.
+    title: Rotate hair styling per scene
+    check: { type: behavior }
+    planner: Keep the hair styling already given for this scene; never repeat a styling from the combo log.
+    message: Each new scene starts with the next hair styling from the bank (behind both shoulders, a claw clip, a low ponytail and the rest), never one from the character's last 5 combo log entries or scenes. Color and texture stay the character's. A styling you type, or name in your idea, wins, and the combo log records it.
+  - id: makeup-by-setting
+    bucket: default
+    area: scene
+    spec: "9"
+    # Character template v1.6 (owner, 2026-10-15): the sheet is bare-faced,
+    # so with no makeup line a character goes out bare-faced. The places are
+    # config/scenes.yaml (makeup_by_setting).
+    title: Makeup by setting
+    check: { type: behavior }
+    message: Out in public, soft everyday makeup (light coverage that still shows skin texture, groomed brows, mascara, warm bronzer, a matte nude lip, the same lip shape, nose and jaw as the references). At home, the gym, an early beach or waking up, no makeup. Soft glam stays for nights out and events. Men get groomed brows and beard, never makeup words. A makeup choice or makeup words of your own win.
   - id: wording-risky
     bucket: default
     area: scene
@@ -386,7 +407,7 @@ rules:
     title: May be blocked by the provider's filter
     when: { stage: [scene, edit, video] }
     check: { type: risky_wording }
-    message: A word you typed that the provider's filter often blocks (a fit or body word, or "boy shorts") is named on the price. Your words go as typed.
+    message: A word you typed that the provider's filter often blocks (a fit or body word, a cup size, or "boy shorts") is named on the price. Your words go as typed.
   - id: scene-directors-pass
     bucket: default
     area: scene

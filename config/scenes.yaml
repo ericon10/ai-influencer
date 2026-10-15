@@ -31,6 +31,9 @@ settings:
   # SPEC 5.2 rule 21: no repeat of a moment type and camera combo from the
   # character's last N entries.
   combo_window: 10
+  # Hair styling rotation: no styling from the last 5 combo log entries or
+  # scenes (character template v1.6).
+  hair_window: 5
   # SPEC 5.2 rule 14: 2 to 4 sheet refs, always one chest-up face ref.
   max_refs: 4
   # Stills per model in one run, and how many models a run may compare.
@@ -137,9 +140,69 @@ expressions:
   - { id: knowing_look, label: "Knowing look at the lens", text: "looking into the lens with a soft, knowing half-smile, mouth closed" }
 
 makeup:
-  - { id: natural, label: "Natural" }
+  - { id: natural, label: "Soft everyday", hint: "Out in public" }
   - { id: soft_glam, label: "Soft glam", hint: "Nights out and events" }
-  - { id: bare, label: "No makeup" }
+  - { id: bare, label: "No makeup", hint: "Home, the gym, an early beach, waking up" }
+
+# Makeup by setting (default rule makeup-by-setting, character template
+# v1.6). The sheet is bare-faced, so with no makeup line a character goes
+# out bare-faced. Out in public: soft everyday makeup. These places and
+# moments get no makeup. Words match whole words in the moment, the setting
+# and the place; the owner's own choice or makeup words win, and so does
+# soft glam the planner picked for a night out.
+makeup_by_setting:
+  bare:
+    - at home
+    - home
+    - apartment
+    - bedroom
+    - in bed
+    - bed
+    - couch
+    - sofa
+    - living room
+    - bathroom
+    - kitchen
+    - balcony
+    - pajamas
+    - pyjamas
+    - waking up
+    - wakes up
+    - woke up
+    - just woke
+    - morning routine
+    - gym
+    - workout
+    - working out
+    - treadmill
+    - weights
+    - between sets
+    - locker room
+    - yoga
+    - pilates
+    - spin class
+    - early beach
+    - beach at dawn
+    - beach at sunrise
+    - sunrise on the beach
+
+# Hair styling, rotated per scene (default rule hair-rotation, character
+# template v1.6). The sheet holds one styling, so without a styling line
+# every post copies it and the feed looks alike. Color and texture are the
+# character's identity; only the placement rotates. A new scene starts with
+# the next styling here not used in the last `hair_window` combo log entries
+# or scenes. A styling the owner types (or names in the idea) wins.
+hair_bank:
+  - behind both shoulders
+  - tucked behind one ear
+  - blowing back off the face
+  - half-up claw clip
+  - low loose ponytail
+  - high sleek ponytail
+  - messy top bun
+  - sunglasses as a headband
+  - damp and air-dried
+  - parted on the other side
 
 # Aspect by destination (SPEC 5.2 rule 22).
 destinations:

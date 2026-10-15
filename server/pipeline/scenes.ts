@@ -8,8 +8,8 @@ import { audit } from '../lib/audit.js'
 import { newId } from '../lib/ids.js'
 import { readAsset, saveAsset } from '../storage/assets.js'
 import {
-  COMBO_TITLE, appendCombo, aspectFor, checkSceneFields, comboConflict, comboEntryFor, fieldsFromWords, isComboSection, parseComboLog,
-  pickSceneRefs, sceneFieldsSchema, type ComboEntry, type RefPick, type SceneFields,
+  COMBO_TITLE, appendCombo, aspectFor, checkSceneFields, comboConflict, comboEntryFor, fieldsFromWords, hairFromWords, isBankHair, isComboSection,
+  makeupForSetting, nextHair, parseComboLog, pickSceneRefs, sceneFieldsSchema, type ComboEntry, type RefPick, type SceneFields,
 } from '../core/scenes.js'
 import { getCandidate, getCharacter, toData, updateCharacter, approvedAssets, sheetState } from './characters.js'
 import { ruleSwitches } from './rules.js'
@@ -56,10 +56,31 @@ const PRESET_DEFAULTS: Partial<SceneFields> = (() => {
 // makeup, place and light, shotParse.ts), then every field the owner or the
 // planner set. A run records what it used in `ranFields`; it never freezes
 // the fields, so editing the words later still counts (owner, 2026-10-14).
-export function effectiveFields(deps: Deps, row: SceneRow): Partial<SceneFields> {
+//
+// Two defaults from the character template (v1.6) sit under the owner's
+// words and choices: makeup by setting (default rule makeup-by-setting: no
+// makeup at home, the gym, an early beach or waking up; soft everyday
+// makeup out in public) and the rotated hair styling, which yields to a
+// styling the owner's words name.
+export interface FieldOptions { makeupBySetting?: boolean }
+
+export function effectiveFields(deps: Deps, row: SceneRow, o: FieldOptions = {}): Partial<SceneFields> {
   const brief = (row.brief ?? '').trim()
   const sc = deps.config.pipeline.scenes
-  return { ...PRESET_DEFAULTS, ...sc.settings.defaults, ...(brief.length >= 3 ? { moment: brief.slice(0, 400), ...fieldsFromWords(sc, brief) } : {}), ...draftFields(row) }
+  const words = brief.length >= 3 ? fieldsFromWords(sc, brief) : {}
+  const draft = { ...draftFields(row) }
+  if (words.hair && isBankHair(sc, draft.hair)) delete draft.hair
+  const out: Partial<SceneFields> = { ...PRESET_DEFAULTS, ...sc.settings.defaults, ...(brief.length >= 3 ? { moment: brief.slice(0, 400), ...words } : {}), ...draft }
+  if (o.makeupBySetting !== false && !('makeup' in draft) && !words.makeup) {
+    const bySetting = makeupForSetting(sc, [out.moment, out.setting, out.location].filter(Boolean).join(' '))
+    if (bySetting) out.makeup = bySetting
+  }
+  return out
+}
+
+// The switches the fields depend on, for the character's scenes.
+export async function fieldOptions(deps: Deps, ctx: Ctx, characterId: string): Promise<FieldOptions> {
+  return { makeupBySetting: (await ruleSwitches(deps, ctx, characterId)).on('makeup-by-setting') }
 }
 
 // What the owner's words gave, for the Idea step's chips: each field read
@@ -69,8 +90,8 @@ export function wordFields(deps: Deps, row: SceneRow): { read: Partial<SceneFiel
   return { read: brief.length >= 3 ? fieldsFromWords(deps.config.pipeline.scenes, brief) : {}, ownerSet: Object.keys(draftFields(row)) }
 }
 
-export function sceneFields(deps: Deps, row: SceneRow): SceneFields {
-  const parsed = sceneFieldsSchema.safeParse(effectiveFields(deps, row))
+export function sceneFields(deps: Deps, row: SceneRow, o: FieldOptions = {}): SceneFields {
+  const parsed = sceneFieldsSchema.safeParse(effectiveFields(deps, row, o))
   if (!parsed.success) {
     const first = parsed.error.issues[0]
     throw new AppError('invalid_request', `Finish the scene first: ${first?.path.join('.') || 'fields'} ${first?.message ?? 'is missing'}.`)
@@ -80,12 +101,39 @@ export function sceneFields(deps: Deps, row: SceneRow): SceneFields {
   return parsed.data
 }
 
+// Async, for the call sites: the fields with the character's switches.
+export async function sceneFieldsFor(deps: Deps, ctx: Ctx, row: SceneRow): Promise<SceneFields> {
+  return sceneFields(deps, row, await fieldOptions(deps, ctx, row.characterId))
+}
+
+// Default rule hair-rotation (character template v1.6): a new scene starts
+// with the next styling from the bank, never one used in the character's
+// last `hair_window` combo log entries or scenes. Color and texture are the
+// character's; only the placement rotates. A styling the owner set or named
+// in the idea is kept.
+export async function rotatedHair(deps: Deps, ctx: Ctx, characterId: string): Promise<string | null> {
+  const sc = deps.config.pipeline.scenes
+  const n = sc.settings.hair_window
+  const ch = toData(await getCharacter(deps, ctx, characterId))
+  const fromLog = comboEntries(ch).slice(-n).map(e => e.hair ?? '').filter(Boolean)
+  const rows = await deps.db.select({ fields: scenes.fields, ranFields: scenes.ranFields }).from(scenes)
+    .where(and(eq(scenes.accountId, ctx.accountId), eq(scenes.characterId, characterId), isNull(scenes.archivedAt)))
+    .orderBy(desc(scenes.createdAt)).limit(n)
+  const fromScenes = rows.map(r => ((r.fields as { hair?: string }).hair || (r.ranFields as { hair?: string } | null)?.hair || '')).filter(Boolean).reverse()
+  return nextHair(sc.hair_bank, [...fromLog, ...fromScenes])
+}
+
 export async function createScene(deps: Deps, ctx: Ctx, characterId: string, input: { brief?: string; title?: string; fields?: Partial<SceneFields> }): Promise<SceneRow> {
   await getCharacter(deps, ctx, characterId)
+  const fields = cleanFields(input.fields ?? {})
+  if (!fields.hair?.trim() && !hairFromWords(input.brief ?? '') && (await ruleSwitches(deps, ctx, characterId)).on('hair-rotation')) {
+    const hair = await rotatedHair(deps, ctx, characterId)
+    if (hair) fields.hair = hair
+  }
   const [row] = await deps.db.insert(scenes).values({
     id: newId('scn'), accountId: ctx.accountId, characterId, createdBy: ctx.userId,
     brief: (input.brief ?? '').slice(0, 2000), title: (input.title ?? input.fields?.title ?? '').slice(0, 80),
-    fields: cleanFields(input.fields ?? {}),
+    fields,
   }).returning()
   await audit(deps.db, ctx, 'scene.created', { type: 'scene', id: row!.id })
   return row!
@@ -107,6 +155,9 @@ export async function copyScene(deps: Deps, ctx: Ctx, sceneId: string, character
     const fields: Record<string, unknown> = {}
     for (const [k, v] of Object.entries(draftFields(src))) {
       if (k === 'refs') continue
+      // A styling the rotation picked belongs to this character's feed; the
+      // copy gets the next one for its character.
+      if (k === 'hair' && isBankHair(deps.config.pipeline.scenes, v as string)) continue
       let value = typeof v === 'string' ? swap(v) : v
       if (k === 'jewelry' && typeof value === 'string') {
         for (const piece of signature) value = (value as string).split(piece).join('')
@@ -209,7 +260,7 @@ async function logCombo(deps: Deps, ctx: Ctx, scene: SceneRow): Promise<void> {
   if (scene.comboLoggedAt) return
   const ch = toData(await getCharacter(deps, ctx, scene.characterId))
   const sc = deps.config.pipeline.scenes
-  const entry = comboEntryFor(sc, sceneFields(deps, scene), deps.clock.now().toISOString().slice(0, 10))
+  const entry = comboEntryFor(sc, await sceneFieldsFor(deps, ctx, scene), deps.clock.now().toISOString().slice(0, 10))
   const existing = ch.sections.find(s => isComboSection(s.title))
   const sections = existing
     ? ch.sections.map(s => (s === existing ? { ...s, body: appendCombo(s.body, entry, sc.settings.combo_window) } : s))
@@ -253,7 +304,8 @@ export async function sceneBusy(deps: Deps, ctx: Ctx, sceneId: string): Promise<
 // from the words included) in `ranFields`, so the scene shows exactly what
 // was generated without freezing the fields for the next run.
 export async function markSceneBusy(deps: Deps, ctx: Ctx, sceneId: string): Promise<void> {
-  const ranFields = effectiveFields(deps, await getScene(deps, ctx, sceneId))
+  const ran = await getScene(deps, ctx, sceneId)
+  const ranFields = effectiveFields(deps, ran, await fieldOptions(deps, ctx, ran.characterId))
   await deps.db.update(scenes).set({ status: 'generating', ranFields, updatedAt: deps.clock.now() }).where(and(eq(scenes.accountId, ctx.accountId), eq(scenes.id, sceneId)))
 }
 

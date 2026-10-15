@@ -58,7 +58,7 @@ export interface SceneStill extends Candidate {
 export interface SceneView {
   id: string; title: string; brief: string; fields: Partial<SceneFields>; planned: boolean; status: 'draft' | 'generating' | 'in_review' | 'approved'; busy: boolean
   createdAt: string; comboLogged: boolean; aspect: string; complete: boolean; missing: string[]
-  combo: { moment: string; camera: string; light: string; location: string } | null
+  combo: { moment: string; camera: string; light: string; location: string; hair?: string } | null
   comboProblem: string | null
   refs: Array<{ refId: string; role: 'face' | 'angle' | 'body' | 'expression'; assetId: string }>
   refsChosen: boolean
@@ -98,7 +98,7 @@ export interface SceneModel { ref: string; label: string; path: 'api' | 'account
 export interface ScenesData {
   scenes: SceneView[]
   sheetRefs: Array<{ refId: string; label: string; assetId: string }>
-  combos: Array<{ date: string; moment: string; camera: string; light: string; location: string }>
+  combos: Array<{ date: string; moment: string; camera: string; light: string; location: string; hair?: string }>
   reasons: Array<{ id: string; label: string }>
   options: {
     moments: ScenePreset[]; cameras: ScenePreset[]; lights: ScenePreset[]; framings: ScenePreset[]; expressions: ScenePreset[]; heights: ScenePreset[]

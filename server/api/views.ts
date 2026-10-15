@@ -15,7 +15,7 @@ import { effectiveModel, readModelOverrides } from '../providers/modelOverrides.
 import { readBilling } from '../providers/billing.js'
 import { serverKeyFor } from '../providers/serverKeys.js'
 import { identityForModel } from '../core/identity.js'
-import { checkSceneFields, sceneFieldsSchema, templateBody } from '../core/scenes.js'
+import { checkSceneFields, isBankHair, sceneFieldsSchema, templateBody } from '../core/scenes.js'
 import { scenePrompts } from '../core/promptWriter.js'
 import { realismBlock } from '../core/realism.js'
 import { modelLabel } from '../costs/quotes.js'
@@ -212,13 +212,13 @@ export async function scenesView(deps: Deps, ctx: Ctx, characterId: string) {
   const scenes = []
   for (const s of list) {
     const raw = draftFields(s)
-    const f = effectiveFields(deps, s)
+    const f = effectiveFields(deps, s, { makeupBySetting: sw.on('makeup-by-setting') })
     const parsed = sceneFieldsSchema.safeParse(f)
     const issues = parsed.success ? checkSceneFields(sc, views, parsed.data) : []
     const missing = parsed.success ? issues.map(i => i.field) : [...new Set(parsed.error.issues.map(i => String(i.path[0])))]
     const complete = parsed.success && !issues.length
     scenes.push({
-      id: s.id, title: s.title, brief: s.brief, fields: f, planned: Object.keys(raw).some(k => k !== 'title' && k !== 'refs' && k !== 'brands'), status: busy.has(s.id) ? 'generating' : s.status, busy: busy.has(s.id),
+      id: s.id, title: s.title, brief: s.brief, fields: f, planned: Object.entries(raw).some(([k, v]) => k !== 'title' && k !== 'refs' && k !== 'brands' && !(k === 'hair' && isBankHair(sc, v as string))), status: busy.has(s.id) ? 'generating' : s.status, busy: busy.has(s.id),
       createdAt: s.createdAt.toISOString(), comboLogged: !!s.comboLoggedAt, aspect: sceneAspect(deps, f), complete, missing,
       combo: complete ? comboPreview(deps, parsed.data) : null,
       // A small note, only when the owner switched the variety note on.

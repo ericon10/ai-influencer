@@ -67,6 +67,23 @@ describe('catalog wording', () => {
   })
 })
 
+describe('busty and cup sizes are never sent (long run part 2)', () => {
+  it('takes them out like a fit word', () => {
+    expect(clean('a busty brunette in a black tank top')).toBe('a brunette in a black tank top')
+    expect(clean('a voluptuous figure in a red dress')).toBe('a figure in a red dress')
+    expect(clean('a D cup black lace bralette')).toBe('a black lace bralette')
+    expect(clean('a 36DD sports bra in navy')).toBe('a sports bra in navy')
+    expect(catalogWording('a 34C white tee', w).changed).toEqual(['34C'])
+  })
+  it('keeps a cup of coffee, the A cup at a sentence start, 30A and 32GB', () => {
+    for (const t of ['She holds a cup of coffee.', 'A cup of tea steams on the table.', 'A cup sits on the sill.', 'Sunset on 30A, the beach road.', 'Her phone shows 32GB free.', 'A DD cup of coffee']) expect(clean(t)).toBe(t)
+  })
+  it('names a typed cup size on the price', () => {
+    expect(findRiskyWords('Callie in a 36DD black bra, busty', w).sort()).toEqual(['36DD', 'busty'])
+    expect(clean('a D cup bralette', 'my D cup bralette')).toBe('a D cup bralette')
+  })
+})
+
 describe('risky words and the safer retry', () => {
   it('names each risky word once, outside the AVOID block', () => {
     expect(findRiskyWords('A skin-tight black top with a deep v-neck and boy shorts, toned legs. AVOID: sheer', w).sort()).toEqual(['boy shorts', 'deep v-neck', 'legs', 'skin-tight', 'toned'])

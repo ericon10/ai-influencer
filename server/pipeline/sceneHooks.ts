@@ -4,7 +4,7 @@ import type { Ctx, Deps } from '../context.js'
 import { newId } from '../lib/ids.js'
 import { registerJobHook, type JobOutcome, type JobRow } from '../jobs/hooks.js'
 import { activateChildren, cancelChildren, childJobs } from '../jobs/runner.js'
-import { checkSceneFields, fieldsFromWords, sceneFieldsSchema, type SceneFields } from '../core/scenes.js'
+import { checkSceneFields, fieldsFromWords, isBankHair, makeupForSetting, sceneFieldsSchema, type SceneFields } from '../core/scenes.js'
 import { finalize, type QaReport } from '../core/qa/marks.js'
 import { evaluateScene, sceneMirrorFix } from '../core/qa/scene.js'
 import { parseObservation } from '../core/qa/perception.js'
@@ -14,7 +14,7 @@ import { clipFrames } from './videoAssets.js'
 import { readAsset, saveAsset } from '../storage/assets.js'
 import { compareTexture } from '../qa/texture.js'
 import { scoreSceneIdentity } from './identity.js'
-import { draftFields, getScene, refreshSceneStatus, sceneFields, setScenePrompt, updateScene } from './scenes.js'
+import { draftFields, getScene, refreshSceneStatus, sceneFieldsFor, setScenePrompt, updateScene } from './scenes.js'
 import { cleanWriterOutput, enforceVideoLines, isLabeled, type PromptTarget } from '../core/promptWriter.js'
 import { normalizePrompt } from '../core/text.js'
 import { stripFlourishes } from '../core/shotParse.js'
@@ -78,8 +78,21 @@ async function onScenePlan(deps: Deps, ctx: Ctx, job: JobRow, out: JobOutcome): 
   }
   // What the owner's words say (a selfie, a black tank) is never planned
   // away; a field the owner set stays as set.
-  const words = fieldsFromWords(deps.config.pipeline.scenes, scene.brief)
+  const sc = deps.config.pipeline.scenes
+  const words = fieldsFromWords(sc, scene.brief)
   for (const [key, value] of Object.entries(words)) merged[key] = (own as Record<string, unknown>)[key] ?? value
+  // The rotated hair styling (default rule hair-rotation) stays over the
+  // planner's, so the feed does not repeat; a styling named in the words
+  // wins over the rotation.
+  if (isBankHair(sc, own.hair)) merged.hair = words.hair ?? own.hair
+  // Makeup by setting (default rule makeup-by-setting): unless the owner
+  // chose or named makeup, the place decides (no makeup at home, the gym,
+  // an early beach or waking up; soft everyday makeup out in public). Soft
+  // glam the planner picked for a night out stays.
+  if (!own.makeup && !words.makeup && job.characterId && (await ruleSwitches(deps, ctx, job.characterId)).on('makeup-by-setting')) {
+    const bySetting = makeupForSetting(sc, [merged.moment, merged.setting, merged.location].filter((v): v is string => typeof v === 'string').join(' '))
+    if (bySetting === 'bare' || (bySetting === 'natural' && merged.makeup !== 'soft_glam')) merged.makeup = bySetting
+  }
   // A preset the planner made up is dropped, so the form asks for it.
   const parsed = sceneFieldsSchema.safeParse(merged)
   if (parsed.success) for (const issue of checkSceneFields(deps.config.pipeline.scenes, deps.config.pipeline.views, parsed.data)) delete merged[issue.field]
@@ -176,7 +189,7 @@ async function localStillChecks(deps: Deps, ctx: Ctx, job: JobRow, assetId: stri
   const findings: QaReport['findings'] = [...extra]
   try {
     const scene = await getScene(deps, ctx, sceneIdOf(job))
-    const f = sceneFields(deps, scene)
+    const f = await sceneFieldsFor(deps, ctx, scene)
     const { views, scenes: sc } = deps.config.pipeline
     const framing = sc.framings.find(x => x.id === f.framing)
     const view = views.views[f.view]
@@ -364,7 +377,7 @@ async function onSceneQa(deps: Deps, ctx: Ctx, job: JobRow, _out: JobOutcome): P
     .where(and(eq(candidates.accountId, job.accountId), eq(candidates.id, meta.candidateId)))
   if (!cand) return
   const scene = await getScene(deps, ctx, sceneIdOf(job))
-  const f = sceneFields(deps, scene)
+  const f = await sceneFieldsFor(deps, ctx, scene)
   const ch = toData(await getCharacter(deps, ctx, job.characterId!))
   const { views, scenes: sc } = deps.config.pipeline
 

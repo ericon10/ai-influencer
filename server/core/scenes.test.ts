@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { loadConfig } from '../config/load.js'
 import { blocking, lintPrompt } from './rules.js'
 import {
-  appendCombo, buildEditPrompt, buildScenePrompt, checkSceneFields, comboConflict, comboEntryFor, hairColorFrom,
-  oneChangeProblem, parseComboLog, pickSceneRefs, plannerRules, sceneFieldsSchema, scenePlanJsonSchema, scenePlanPrompt, writerFacts, type SceneFields,
+  appendCombo, buildEditPrompt, buildScenePrompt, checkSceneFields, comboConflict, comboEntryFor, fieldsFromWords, hairColorFrom, hairFromWords,
+  isBankHair, makeupForSetting, makeupLine, nextHair, oneChangeProblem, parseComboLog, pickSceneRefs, plannerRules, sceneFieldsSchema, scenePlanJsonSchema, scenePlanPrompt, writerFacts, type SceneFields,
 } from './scenes.js'
 import type { CharacterData } from './character.js'
 
@@ -247,13 +247,98 @@ describe('combo log (SPEC 5.2 rule 21)', () => {
 
   it('appends in the same format and keeps the last 10', () => {
     const entry = comboEntryFor(scenes, market, '2026-10-13')
-    expect(entry).toEqual({ date: '2026-10-13', moment: 'Candid laugh', camera: 'Friend shot', light: 'Morning light', location: 'Farmers market' })
+    expect(entry).toEqual({ date: '2026-10-13', moment: 'Candid laugh', camera: 'Friend shot', light: 'Morning light', location: 'Farmers market', hair: 'loose beachy waves with a deep side part' })
     let b = body
     for (let i = 0; i < 12; i++) b = appendCombo(b, { ...entry, date: `2026-10-${String(13 + i).padStart(2, '0')}` }, 10)
     const out = parseComboLog(b)
     expect(out).toHaveLength(10)
     expect(out.at(-1)!.date).toBe('2026-10-24')
-    expect(b.split('\n').at(-1)).toBe('- 2026-10-24 Candid laugh / Friend shot / Morning light / Farmers market')
+    expect(out.at(-1)!.hair).toBe('loose beachy waves with a deep side part')
+    expect(b.split('\n').at(-1)).toBe('- 2026-10-24 Candid laugh / Friend shot / Morning light / Farmers market / loose beachy waves with a deep side part')
+  })
+
+  it('reads the hair styling as the fifth part, wrapped onto the next line as the template writes it (template v1.6)', () => {
+    const wrapped = [
+      '- 2026-10-14 Caught you / Friend shot / Golden hour / Rooftop',
+      '  / low loose ponytail',
+      '- 2026-10-15 POV / Selfie / Window light / Kitchen / messy top bun',
+    ].join('\n')
+    const e = parseComboLog(wrapped)
+    expect(e.map(x => x.hair)).toEqual(['low loose ponytail', 'messy top bun'])
+    expect(e[0]!.location).toBe('Rooftop')
+    // Appending keeps the wrapped entry whole, on one line.
+    const next = appendCombo(wrapped, { date: '2026-10-16', moment: 'Candid laugh', camera: 'Friend shot', light: 'Morning light', location: 'Market', hair: 'half-up claw clip' }, 10)
+    expect(next.split('\n')).toEqual([
+      '- 2026-10-14 Caught you / Friend shot / Golden hour / Rooftop / low loose ponytail',
+      '- 2026-10-15 POV / Selfie / Window light / Kitchen / messy top bun',
+      '- 2026-10-16 Candid laugh / Friend shot / Morning light / Market / half-up claw clip',
+    ])
+    // A scene with no hair styling writes the four parts, as before.
+    expect(comboEntryFor(scenes, { ...market, hair: '' }, '2026-10-16')).not.toHaveProperty('hair')
+  })
+})
+
+describe('hair styling rotated per scene (default rule hair-rotation, template v1.6)', () => {
+  const bank = scenes.hair_bank
+  it('has the template bank', () => {
+    expect(bank).toEqual(['behind both shoulders', 'tucked behind one ear', 'blowing back off the face', 'half-up claw clip', 'low loose ponytail', 'high sleek ponytail', 'messy top bun', 'sunglasses as a headband', 'damp and air-dried', 'parted on the other side'])
+    expect(scenes.settings.hair_window).toBe(5)
+  })
+  it('picks the next styling after the newest one used, never one of the last five', () => {
+    expect(nextHair(bank, [])).toBe('behind both shoulders')
+    expect(nextHair(bank, ['half-up claw clip'])).toBe('low loose ponytail')
+    const recent = ['low loose ponytail', 'high sleek ponytail', 'messy top bun', 'sunglasses as a headband', 'behind both shoulders']
+    const pick = nextHair(bank, recent)!
+    expect(recent).not.toContain(pick)
+    expect(pick).toBe('tucked behind one ear')
+    // Five scenes in a row: five different stylings.
+    const seen: string[] = []
+    for (let i = 0; i < 5; i++) seen.push(nextHair(bank, seen.slice(-5))!)
+    expect(new Set(seen).size).toBe(5)
+    // Case and punctuation do not matter; stylings outside the bank are skipped.
+    expect(nextHair(bank, ['Behind Both Shoulders.', 'a French braid'])).toBe('tucked behind one ear')
+  })
+  it('with every styling used, takes the one used longest ago', () => {
+    const small = ['a', 'b', 'c']
+    expect(nextHair(small, ['b', 'a', 'c'])).toBe('b')
+    expect(nextHair([], ['x'])).toBeNull()
+  })
+  it('reads a styling the owner names, so the rotation leaves it alone', () => {
+    expect(hairFromWords('Callie in a messy bun making coffee')).toBe('messy bun')
+    expect(hairFromWords('hair tucked behind her ear, laughing')).toBe('hair tucked behind her ear')
+    expect(hairFromWords('a high ponytail at the gym')).toBe('high ponytail')
+    expect(hairFromWords('wet hair after a swim')).toBe('wet hair')
+    expect(hairFromWords('Callie picks out peaches at the market')).toBeNull()
+    expect(fieldsFromWords(scenes, 'mirror selfie with a claw clip')).toMatchObject({ hair: 'claw clip' })
+    expect(isBankHair(scenes, 'Half-up claw clip')).toBe(true)
+    expect(isBankHair(scenes, 'loose beachy waves with a deep side part')).toBe(false)
+  })
+})
+
+describe('makeup by setting (default rule makeup-by-setting, template v1.6)', () => {
+  it('no makeup at home, the gym, an early beach or waking up; soft everyday makeup out in public', () => {
+    expect(makeupForSetting(scenes, 'Making coffee in her kitchen at home')).toBe('bare')
+    expect(makeupForSetting(scenes, 'refilling her water bottle between sets at the gym')).toBe('bare')
+    expect(makeupForSetting(scenes, 'just woke up, still in bed')).toBe('bare')
+    expect(makeupForSetting(scenes, 'a walk on the beach at sunrise')).toBe('bare')
+    expect(makeupForSetting(scenes, 'picks out peaches at a farmers market stall')).toBe('natural')
+    expect(makeupForSetting(scenes, 'a rooftop bar at golden hour')).toBe('natural')
+    // "homemade" is not home.
+    expect(makeupForSetting(scenes, 'a homemade pie at a cafe')).toBe('natural')
+    expect(makeupForSetting(scenes, '')).toBeNull()
+  })
+  it('the soft everyday line, the character\'s own line, soft glam, bare, and grooming for men', () => {
+    const t = templates
+    const plain = { makeup: { default: 'natural', glam_when: [] }, pronouns: callie.pronouns }
+    expect(makeupLine(t, 'natural', plain)).toBe('Makeup: soft everyday makeup, light coverage that still shows skin texture, groomed brows, mascara, warm bronzer, a matte nude lip; lips natural and matte, no gloss; the same lip shape, nose and jaw as the references')
+    expect(makeupLine(t, 'natural', callie)).toBe('Makeup: natural (light skin, groomed brows, tinted lip); lips natural and matte, no gloss; the same lip shape, nose and jaw as the references')
+    expect(makeupLine(t, 'soft_glam', callie)).toContain('soft glam (bronzer, warm blush, glossy nude-pink lip)')
+    expect(makeupLine(t, 'bare', callie)).toBe('No makeup, bare skin')
+    const man = { makeup: { default: 'natural', glam_when: [] }, pronouns: { subj: 'he', obj: 'him', poss: 'his', noun: 'man' } }
+    for (const m of ['natural', 'soft_glam', 'bare']) expect(makeupLine(t, m, man)).toBe('Groomed brows and beard')
+    const p = buildScenePrompt(templates, scenes, views, market, { ...callie, pronouns: man.pronouns, name: 'Theo' }, 'refs')
+    expect(p).toContain('Groomed brows and beard')
+    expect(p).not.toMatch(/\bMakeup:/)
   })
 })
 
