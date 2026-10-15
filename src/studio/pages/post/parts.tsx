@@ -182,12 +182,20 @@ export function CaptionPreview({ text, data, video, image, width = 240, look }: 
 }
 
 // Box or Outline for one post's captions (the account default first).
-export function CaptionStylePick({ value, onChange, data }: { value: CaptionStyle | null | undefined; onChange: (v: CaptionStyle) => void; data: ContentData }) {
-  const current = value ?? (data.options.caption.style === 'outline' ? 'outline' : 'box')
+// White box, Outline, or No caption (owner, 2026-10-15): No caption keeps
+// the post's words for switching back and the style it had.
+export function CaptionStylePick({ value, onChange, data, off = false, onOff }: { value: CaptionStyle | null | undefined; onChange: (v: CaptionStyle) => void; data: ContentData; off?: boolean; onOff?: (off: boolean) => void }) {
+  const style = value ?? (data.options.caption.style === 'outline' ? 'outline' : 'box')
+  const current = off ? 'none' : style
+  const pick = (id: CaptionStyle | 'none') => {
+    if (id === 'none') return onOff?.(true)
+    if (off) onOff?.(false)
+    onChange(id)
+  }
   return (
-    <div className="st-seg sm" role="radiogroup" aria-label="Caption style">
-      {([['box', 'White box'], ['outline', 'Outline']] as const).map(([id, label]) => (
-        <button key={id} type="button" role="radio" aria-checked={current === id} className={current === id ? 'on' : ''} onClick={() => onChange(id)}>{label}</button>
+    <div className="st-seg sm" role="radiogroup" aria-label="Caption style" data-field="caption-choice">
+      {([['box', 'White box'], ['outline', 'Outline'], ...(onOff ? [['none', 'No caption']] as const : [])] as const).map(([id, label]) => (
+        <button key={id} type="button" role="radio" aria-checked={current === id} className={current === id ? 'on' : ''} onClick={() => pick(id)}>{label}</button>
       ))}
     </div>
   )

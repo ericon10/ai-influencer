@@ -31,7 +31,7 @@ export async function createUploadSlots(deps: Deps, ctx: Ctx, files: UploadReque
   const slots: UploadSlot[] = []
   let direct = false
   for (const f of files) {
-    if (!ALLOWED.test(f.type)) throw new AppError('bad_request', `${f.name} is not a supported image, video or audio file.`)
+    if (!ALLOWED.test(f.type)) throw new AppError('bad_request', /^image\/hei[cf]$/.test(f.type) ? `${f.name} is a HEIC photo. Upload it as JPEG or PNG (on an iPhone, Settings > Camera > Formats > Most Compatible, or share it as JPEG).` : `${f.name} is not a supported image, video or audio file.`)
     const max = maxBytes(deps, f.type)
     if (f.size > max) throw new AppError('bad_request', `${f.name} is larger than ${Math.round(max / 1024 / 1024)} MB.`)
     const uploadId = `upl_${randomBytes(15).toString('hex').slice(0, 20)}`

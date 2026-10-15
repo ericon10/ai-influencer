@@ -819,8 +819,8 @@ prices and failures already show.
 |---|---|---|---|
 | Catalog outfit | Every outfit line the Studio writes (the planner, the writer, the outfit read from a clip) | Garment type, color and fabric, plus a style word when it is clear: "dark green ribbed tank top with thin straps, going-out look". Garment names stay (tank, cami, halter, slip dress, bodysuit). A bare "top" is never sent: the read asks for the garment | 0 |
 | No fit or body words | Every prompt | Never sent: fitted, tight, low-cut, sheer, toned, curvy, hips, waist, legs (and their close cousins: skin-tight, form-fitting, plunging, see-through, figure-hugging). The refs carry her build | 0 |
-| Underwear-sounding names | Every prompt | Swapped for the everyday garment: "boy shorts" to "bike shorts", "sports bra" to "athletic crop top", "bralette" to "crop top", "bra top" to "crop top". The list is data (`config/wording.yaml`) | 0 |
-| A moment, not a pose | The writer, the planner, the templates | What she is doing ("refilling her water bottle"), never "posing in". Templates say "her position" where they meant the pose | 0 |
+| Underwear-sounding names | Every prompt | Only "boy shorts" is swapped, to "bike shorts" (section 21: "sports bra" and every other garment name stay). The list is data (`config/wording.yaml`) | 0 |
+| A moment, not a pose | The writer, the planner, the templates | What she is doing ("refilling her water bottle"), never "posing in". The proven Recreate, scene-still and face-pass templates keep "the pose" (reverted, section 21) | 0 |
 | Your words stay yours | Anything you type (idea, outfit, a pasted prompt) | Sent as typed. When a word is likely to be blocked, the price shows a warning under it: "May be blocked by the provider's filter: tight, low-cut. Your words go as typed." | 0 |
 | A refusal | The failed run's row, the failed still's tile | "Likely trigger words: tight, boy shorts" (read from what was sent), and **Retry with safer wording**: the same request with only those words reworded by code (no Claude call, the rewording is free), priced like the run that was blocked and refunded. What was sent shows both | 1 |
 
@@ -829,3 +829,27 @@ no fit or body words" (`prompt-catalog-wording`, the cleaning of Claude's
 words) and "May be blocked by the provider's filter" (`wording-risky`, the
 warning under the price). The Recreate outfit box has one help line under
 it, and every refusal links to the Guide's section on failed runs.
+
+## 21. No caption, the editor opens with the take, Studio media first (owner, 2026-10-15)
+
+Three fixes to the Text step and the editor, an optional caption
+everywhere, a pulsing run row, image uploads, and two reverts. No new page
+or step.
+
+| Piece | Where | How it works | Clicks |
+|---|---|---|---|
+| No caption | The Text step of every video post (Recreate included) and every batch, next to White box and Outline | A third choice, **No caption**. It is kept with the post: the editor opens with no caption track, and neither the editor's Done nor Export MP4 puts a caption on the video. The words you typed are kept, dimmed, and come back when you pick White box or Outline again. A post exported before the switch keeps its old video until you export again (a line says so) | 1 |
+| The editor opens with the take | Open the editor, from every path: a Recreate post after Use this take, a finished post, a post made from Library > Use in a new post, and Make another like this | The take or clip the post uses lands on the Shots track, trimmed as reviewed (the trimmed take, or the post's in and out), with its caption when one is on. On the live site the take was missing and the caption was there: the post page had just played the take, the browser kept that copy (without the permission the editor needs), and the editor got the kept copy and was refused. Each file now comes from a fresh storage link, never from the browser's kept copy, and if storage refuses, from the Studio itself in small parts. A file that still cannot load is named in the bar | 0 |
+| Add media, Studio first | The editor's Media tab: Add media and Import media | Opens the Studio picker beside the timeline. **Studio** (first): this post's takes and stills, this character's clips and stills, then the Library (B-roll, sounds, other characters' clips). **From computer** is the second tab (your files, as before). One tap adds the item at the playhead; drag it onto a track to put it exactly there. Items added this way open again with the post | 1 (tap) |
+| A caption is never required | Every output: a video post, a Recreate, a batch, a slideshow, a spreadsheet import | The caption (and a slideshow's words) is optional everywhere. An empty caption means a video with no caption; text can be added in the editor instead. The Words field is marked optional, the Finish step no longer asks for it, and Export never refuses for it. A batch with no lines makes How many videos; a slideshow with no words exports the stills as they are | 0 |
+| A run that is working pulses | Every live run row, anywhere an image, a video, a render or a Claude run is going ("Video take: Generating · 47 s") | The row pulses in the accent color until the run ends, so it is obvious at a glance that it is working. Done turns it green, a failure turns it red; with reduced motion on, it holds a steady accent border instead | 0 |
+| Upload images | The slideshow's Stills step (beside Pick from Library) and Library > Stills | **Upload**: several files at once, drag and drop on a computer, the camera roll on a phone (the file picker offers it). You pick the character they belong to (the post's character is picked for you in a slideshow). Each image is kept exactly as uploaded: the same file, full resolution, never downscaled, recompressed or converted (a thumbnail is made only for the grid). Uploads show in Library > Stills, in the slideshow's picker, and in the editor's Studio picker | 1 to 2 |
+
+Two reverts (owner, 2026-10-15):
+
+- **"Sports bra" stays "sports bra".** It is a normal catalog garment.
+  Only "boy shorts" (and "boyshorts") is swapped, to "bike shorts". The
+  garment itself is never changed.
+- **"The pose" is back** in the Recreate stills, the scene still and the
+  face pass prompts, word for word as proven. They change only when a
+  real run shows a reason.

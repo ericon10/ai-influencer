@@ -5,7 +5,7 @@ import { Archive, AudioLines, Clapperboard, Download, Film, History, Images, Lay
 import { api, assetUrl, downloadUrl } from '../api'
 import { keys, useCharacters, useContent, useLibrary, useScenes, useSounds, useWorkerGate } from '../hooks'
 import { Callout, Img, errorMessage, useToast } from '../ui'
-import { ClipGrid, ClipUpload, StillGrid } from '../library'
+import { ClipGrid, ClipUpload, StillGrid, StillUpload } from '../library'
 import { RunStatus } from '../runs'
 import type { BrollClip, ContentData, LibraryClip, ScenesData, SoundItem } from '../types'
 import { KIND_LABEL, fileSlug, postName, useNewPost } from './post/parts'
@@ -67,8 +67,9 @@ export default function Library() {
       {tab === 'stills' && (
         !lib.data ? <Skel /> : (
           <div className="st-col" style={{ gap: 20 }}>
+            {characters.length > 0 && <StillUpload characters={characters} characterId={characterId} />}
             {scene && <Callout tone="info">Showing one scene's stills. <button className="st-todo-link" onClick={() => set({ scene: null })}>Show all stills</button></Callout>}
-            {!stills.length ? <Callout tone="info">No stills yet. Make them in a post's Stills step. <button className="st-todo-link" onClick={() => void newPost.create('meme')}>Start a video post</button></Callout> : (
+            {!stills.length ? <Callout tone="info">No stills yet. Make them in a post's Stills step, or upload images above. <button className="st-todo-link" onClick={() => void newPost.create('meme')}>Start a video post</button></Callout> : (
               <StillGrid stills={stills} showCharacter={!characterId} action={s => (
                 <button type="button" className="st-btn sm" disabled={!!newPost.busy} onClick={() => void newPost.create('meme', { characterId: s.characterId, sceneId: s.sceneId, spec: { stillId: s.id }, step: 'video' })}><Plus size={13} />Use in a new post</button>
               )} />

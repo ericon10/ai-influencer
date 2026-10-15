@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { beforeAll, afterAll, describe, expect, it } from 'vitest'
 import { eq } from 'drizzle-orm'
+import sharp from 'sharp'
 import { createHarness, drain, type Harness } from '../testing/harness.js'
 import { createApp } from './app.js'
 import { createPassphraseAuth } from '../auth/provider.js'
@@ -116,6 +117,42 @@ describe('Studio API', () => {
     expect(own.headers.get('content-type')).toBe('image/webp')
     const other = await app.request(`/api/v1/assets/${assetId}/content`, { headers: { cookie: cookieB } })
     expect(other.status).toBe(404)
+  })
+
+  it('the editor fetches a file from storage directly, or from the Studio in parts of at most 4 MB; large originals are never shrunk', async () => {
+    const id = (await call('POST', '/characters', { body: { name: 'Proxy test' }, cookie: cookieA })).json.id
+    // Noise compresses badly: a PNG over 4 MB.
+    const noise = Buffer.alloc(1400 * 1300 * 3)
+    for (let i = 0; i < noise.length; i++) noise[i] = (i * 2654435761) >>> 24
+    const png = await sharp(noise, { raw: { width: 1400, height: 1300, channels: 3 } }).png({ compressionLevel: 0 }).toBuffer()
+    expect(png.length).toBeGreaterThan(4 * 1024 * 1024)
+    const form = new FormData()
+    form.append('file', new Blob([new Uint8Array(png)], { type: 'image/png' }), 'big.png')
+    const assetId = (await call('POST', `/characters/${id}/inspirations`, { cookie: cookieA, form })).json.assetId
+    const mem = h.deps.store
+    ;(h.deps as { store: typeof mem }).store = { ...mem, driver: 's3', presignGet: async (key: string) => `https://r2.test/${key}?sig=1` }
+    try {
+      const get = (q: string, range?: string) => app.request(`/api/v1/assets/${assetId}/content${q}`, { headers: { cookie: cookieA, ...(range ? { range } : {}) } })
+      // Over 4 MB: the original comes straight from storage (a Vercel
+      // response is capped at 4.5 MB), never a smaller copy.
+      const direct = await get('')
+      expect(direct.status).toBe(302)
+      expect(direct.headers.get('location')).toMatch(/^https:\/\/r2\.test\/acct\//)
+      // The fallback: same origin, parts of at most 4 MB, the whole file.
+      const first = await get('?proxy=1', 'bytes=0-')
+      expect(first.status).toBe(206)
+      const firstBytes = Buffer.from(await first.arrayBuffer())
+      expect(firstBytes.length).toBe(4 * 1024 * 1024)
+      expect(first.headers.get('content-range')).toBe(`bytes 0-${4 * 1024 * 1024 - 1}/${png.length}`)
+      const rest = await get('?proxy=1', `bytes=${4 * 1024 * 1024}-${8 * 1024 * 1024 - 1}`)
+      expect(rest.status).toBe(206)
+      expect(Buffer.concat([firstBytes, Buffer.from(await rest.arrayBuffer())]).equals(png)).toBe(true)
+      expect((await get('?proxy=1', `bytes=${png.length}-`)).status).toBe(416)
+      // Another account gets nothing.
+      expect((await app.request(`/api/v1/assets/${assetId}/content?proxy=1`, { headers: { cookie: cookieB, range: 'bytes=0-' } })).status).toBe(404)
+    } finally {
+      ;(h.deps as { store: typeof mem }).store = mem
+    }
   })
 
   it("imports Callie's file, then adds her sheet images to the same character", async () => {

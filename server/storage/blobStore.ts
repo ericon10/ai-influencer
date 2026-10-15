@@ -7,6 +7,9 @@ export interface BlobStore {
   readonly driver: 'local' | 's3' | 'memory'
   put(key: string, data: Buffer, contentType: string): Promise<void>
   get(key: string): Promise<Buffer>
+  // Part of a file and its full size, for the editor's same-origin
+  // fallback (a Vercel function answers up to 4.5 MB).
+  getRange(key: string, start: number, end: number): Promise<{ data: Buffer; total: number }>
   exists(key: string): Promise<boolean>
   delete(key: string): Promise<void>
   // A short-lived direct URL when the driver supports it; otherwise null and
@@ -51,6 +54,10 @@ export function createLocalStore(rootDir: string): BlobStore {
       await writeFile(p, data)
     },
     async get(key) { return readFile(pathFor(key)) },
+    async getRange(key, start, end) {
+      const all = await readFile(pathFor(key))
+      return { data: all.subarray(start, Math.min(end, all.length - 1) + 1), total: all.length }
+    },
     async exists(key) {
       try { await stat(pathFor(key)); return true } catch { return false }
     },
@@ -69,6 +76,11 @@ export function createMemoryStore(): BlobStore {
       const f = files.get(key)
       if (!f) throw new Error(`No such blob: ${key}`)
       return f
+    },
+    async getRange(key, start, end) {
+      const f = files.get(key)
+      if (!f) throw new Error(`No such blob: ${key}`)
+      return { data: f.subarray(start, Math.min(end, f.length - 1) + 1), total: f.length }
     },
     async exists(key) { return files.has(key) },
     async delete(key) { files.delete(key) },
@@ -103,6 +115,11 @@ export async function createS3Store(o: S3Options): Promise<BlobStore> {
       const r = await client.send(new GetObjectCommand({ Bucket: o.bucket, Key: key }))
       return Buffer.from(await r.Body!.transformToByteArray())
     },
+    async getRange(key, start, end) {
+      const r = await client.send(new GetObjectCommand({ Bucket: o.bucket, Key: key, Range: `bytes=${start}-${end}` }))
+      const total = Number(/\/(\d+)$/.exec(r.ContentRange ?? '')?.[1] ?? r.ContentLength ?? 0)
+      return { data: Buffer.from(await r.Body!.transformToByteArray()), total }
+    },
     async exists(key) {
       try { await client.send(new HeadObjectCommand({ Bucket: o.bucket, Key: key })); return true } catch { return false }
     },
@@ -120,7 +137,8 @@ export async function createS3Store(o: S3Options): Promise<BlobStore> {
       try {
         const current = await client.send(new GetBucketCorsCommand({ Bucket: o.bucket })).catch(() => null)
         const have = current?.CORSRules ?? []
-        const covered = origins.every(origin => have.some(r => (r.AllowedOrigins ?? []).includes(origin) && (r.AllowedMethods ?? []).includes('PUT')))
+        // The editor reads files straight from storage too (GET), so both.
+        const covered = origins.every(origin => have.some(r => (r.AllowedOrigins ?? []).includes(origin) && ['PUT', 'GET'].every(m => (r.AllowedMethods ?? []).includes(m))))
         if (covered) return { ok: true, message: 'Direct uploads are allowed for this Studio.' }
         await client.send(new PutBucketCorsCommand({ Bucket: o.bucket, CORSConfiguration: { CORSRules: want } }))
         return { ok: true, message: 'Set the bucket CORS rules for direct uploads.' }

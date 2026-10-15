@@ -121,6 +121,8 @@ describe('the stills, the face pass and the pick', () => {
     // The still is the image being edited; the other images carry only the face.
     expect(preview.prompts[0]!.text).toMatch(/^Edit the first image\. Change only her face to match Callie \(the face in the other images\)/)
     expect(preview.prompts[0]!.text).toMatch(/Use the other images only for the face\. Keep everything else in the first image exactly the same, pixel for pixel/)
+    // The proven wording, word for word (owner, 2026-10-15).
+    expect(preview.prompts[0]!.text).toContain('pixel for pixel: the hair, the outfit, the pose, the hands, the light, the background and the framing.')
     const face = (await cloneStills(h.deps, h.ctx, postId)).filter(x => x.pass === 'face' && x.parentId === chosen.id)
     expect(face).toHaveLength(2)
     expect(face.every(x => !x.kept)).toBe(true)

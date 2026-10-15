@@ -137,7 +137,9 @@ describe('step 2, the stills and the gates', () => {
     expect(text).not.toMatch(/years old|21 or older|\badult\b/i)
     expect(text).not.toMatch(/\b(?:toned|curvy|waist|hips|legs|athletic|build)\b/i)
     expect(text).toContain('Dark green ribbed tank top with thin straps, going-out look, same as in the photo.')
-    expect(text).not.toMatch(/fitted|\bwaist\b|\bpose\b/i)
+    expect(text).not.toMatch(/fitted|\bwaist\b/i)
+    // The proven recipe's own words stay (owner, 2026-10-15: "the pose").
+    expect(text).toMatch(/^Use the first image only for the place, the light, the camera angle, the framing, the pose and the outfit\./)
     expect(preview.warnings.some(w => w.ruleId === 'wording-risky')).toBe(false)
     expect(text.trim().endsWith('REALISM: Natural skin texture, not retouched.')).toBe(true)
     expect(text).not.toContain('AVOID:')

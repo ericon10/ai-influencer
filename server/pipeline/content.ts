@@ -254,6 +254,9 @@ const memeSpec = z.object({
   clipB: id.nullable().default(null),
   stillB: id.nullable().default(null),
   captionStyle,
+  // No caption (owner, 2026-10-15): none in the editor or any export; the
+  // caption's words stay for switching back.
+  captionOff: z.boolean().default(false),
   // The OpenReel editor's project for this post (G29), saved by Done.
   // stack: its presets with relative places (editor phase C), which "Make
   // another like this" carries to the next post.
@@ -287,6 +290,8 @@ const batchObject = z.object({
   // A batch takes the one-shot edits (each video has one clip).
   edit: editSpec,
   captionStyle,
+  // No caption on any video of the batch (owner, 2026-10-15).
+  captionOff: z.boolean().default(false),
   // A saved style from the editor (editor phase D): its presets placed on
   // every video at that video's own payoff, cuts and beats.
   stack: stackSchema.nullable().default(null),
@@ -503,7 +508,7 @@ function renderProblems(deps: Deps, row: ContentRow): string[] {
     const s = memeSpec.parse(row.spec)
     const cfg = deps.config.pipeline.content
     const cut = effectiveCut(s, cfg.meme.max_broll_seconds, voicePhrases(deps))
-    out.push(...cutProblems(cut, s.caption, { maxShots: cfg.cut.max_shots, maxCaptions: cfg.cut.max_captions }))
+    out.push(...cutProblems(cut, { maxShots: cfg.cut.max_shots, maxCaptions: cfg.cut.max_captions }))
     // A timeline saved by the editor decides its own shots (editor phase D).
     const style = s.editor?.projectAssetId ? undefined : deps.config.pipeline.edits.styles.find(x => x.id === s.edit.style)
     if (style?.shots === 2 && cut.shots.filter(x => x.kind === 'clip').length < 2) out.push(`Add shot B for the ${style.label.toLowerCase()} (Video step)`)
@@ -514,11 +519,9 @@ function renderProblems(deps: Deps, row: ContentRow): string[] {
     const bs = deps.config.pipeline.edits.styles.find(x => x.id === s.edit.style)
     if (bs?.shots === 2) out.push('A batch takes one-shot edits only; pick another edit style')
     if (bs?.needs.includes('background')) out.push(`A batch cannot use the ${bs.label.toLowerCase()} yet; pick another edit style`)
-    if (!s.captions.some(c => c.trim())) out.push('Add captions (paste them or write them with Claude)')
   } else {
     const s = slideshowSpec.parse(row.spec)
     if (!s.stillIds.length) out.push('Pick stills')
-    if (!s.hook.trim() && !s.slides.some(x => x.trim())) out.push('Write the slides (or type them)')
   }
   return out
 }
@@ -541,7 +544,14 @@ export async function startRender(deps: Deps, ctx: Ctx, itemId: string): Promise
   return out!
 }
 
-const batchCaptions = (deps: Deps, s: BatchSpec) => s.captions.map(c => c.trim()).filter(Boolean).slice(0, deps.config.pipeline.content.batch.max)
+// One video per caption line. Captions are optional (owner, 2026-10-15):
+// with no lines, How many counts the videos; with No caption, the lines
+// still count them and none is drawn.
+const batchCaptions = (deps: Deps, s: BatchSpec) => {
+  const max = deps.config.pipeline.content.batch.max
+  const lines = s.captions.map(c => c.trim()).filter(Boolean).slice(0, max)
+  return lines.length ? lines : Array.from({ length: Math.min(s.count, max) }, () => '')
+}
 
 const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'content'
 
@@ -897,7 +907,7 @@ async function runContentRender(deps: Deps, ctx: Ctx, job: JobRow): Promise<unkn
       // The post's timeline (editor phase D): the saved one, a carried
       // stack, or the Format's preset, else the cut as before.
       const { v, notes, timeline } = await withTempDir(async dir => {
-        const tl = await workerTimeline(deps, ctx, { characterId: row.characterId!, cut, sound: s.sound, edit: s.edit, editor: s.editor ? { projectAssetId: s.editor.projectAssetId, stack: s.editor.stack } : null, dir })
+        const tl = await workerTimeline(deps, ctx, { characterId: row.characterId!, cut, sound: s.sound, edit: s.edit, editor: s.editor ? { projectAssetId: s.editor.projectAssetId, stack: s.editor.stack } : null, captionOff: s.captionOff, dir })
         const v = await renderCut(deps, ctx, job, tl.cut, { characterId: row.characterId!, caption: s.caption, sound: tl.sound, edit: s.edit, captionStyle: s.captionStyle, label: `Video post: ${s.caption.slice(0, 60)}`, plan: tl.plan })
         return { v, notes: tl.notes, timeline: !!tl.plan }
       })
@@ -907,16 +917,18 @@ async function runContentRender(deps: Deps, ctx: Ctx, job: JobRow): Promise<unkn
     }
     if (row.kind === 'batch') return await renderBatchVideo(deps, ctx, job, row, name)
     // Slideshow: the hook on the first image, then one slide per image. With
-    // fewer stills than slides, the stills repeat in order.
+    // fewer stills than slides, the stills repeat in order. The words are
+    // optional (owner, 2026-10-15): with none, each still goes out as it is.
     const s = slideshowSpec.parse(row.spec)
-    const texts = [s.hook, ...s.slides].map(t => t.trim()).filter(Boolean)
     const stills = await Promise.all(s.stillIds.map(sid => candidateAsset(deps, ctx, sid, row.characterId!, 'image')))
+    const words = [s.hook, ...s.slides].map(t => t.trim()).filter(Boolean)
+    const texts = words.length ? words : stills.map(() => '')
     const images: string[] = []
     const files: Record<string, Uint8Array> = {}
     for (const [i, text] of texts.entries()) {
       const still = (await readAsset(deps, ctx, stills[i % stills.length]!)).data
       const jpg = await slideImage(still, text, deps.config.pipeline.content)
-      const asset = await saveAsset(deps, ctx, { data: jpg, mime: 'image/jpeg', origin: 'derived', label: `Slide ${i + 1}: ${text.slice(0, 60)}`, sourceJobId: job.id })
+      const asset = await saveAsset(deps, ctx, { data: jpg, mime: 'image/jpeg', origin: 'derived', label: text ? `Slide ${i + 1}: ${text.slice(0, 60)}` : `Slide ${i + 1}`, sourceJobId: job.id })
       images.push(asset.id)
       files[`${String(i + 1).padStart(2, '0')}-${name}.jpg`] = jpg
     }
@@ -950,7 +962,7 @@ async function renderBatchVideo(deps: Deps, ctx: Ctx, job: JobRow, row: ContentR
   const caption = captions[index]
   let result: BatchVideo | null = null
   let error: string | null = null
-  if (!caption) error = `Video ${index + 1} has no caption any more.`
+  if (caption === undefined) error = `Video ${index + 1} is not in this batch any more.`
   else {
     try {
       const src = batchSources(s, index)
@@ -960,8 +972,8 @@ async function renderBatchVideo(deps: Deps, ctx: Ctx, job: JobRow, row: ContentR
       const v = await withTempDir(async dir => {
         const tl = s.stack?.length
           ? { cut, sound: s.sound, ...(await stackPlan(deps, ctx, { characterId: row.characterId!, cut, stack: s.stack, edit: s.edit, sound: s.sound, dir })) }
-          : await workerTimeline(deps, ctx, { characterId: row.characterId!, cut, sound: s.sound, edit: s.edit, editor: null, dir })
-        return renderCut(deps, ctx, job, tl.cut, { characterId: row.characterId!, caption, sound: tl.sound, edit: s.edit, captionStyle: s.captionStyle, label: `Batch ${name} ${index + 1}: ${caption.slice(0, 50)}`, plan: tl.plan })
+          : await workerTimeline(deps, ctx, { characterId: row.characterId!, cut, sound: s.sound, edit: s.edit, editor: null, captionOff: s.captionOff, dir })
+        return renderCut(deps, ctx, job, tl.cut, { characterId: row.characterId!, caption: s.captionOff ? '' : caption, sound: tl.sound, edit: s.edit, captionStyle: s.captionStyle, label: `Batch ${name} ${index + 1}${caption ? `: ${caption.slice(0, 50)}` : ''}`, plan: tl.plan })
       })
       result = { caption, assetId: v.assetId, clipId: src.clipId!, brollId: src.brollId }
     } catch (e) {

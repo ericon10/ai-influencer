@@ -101,6 +101,17 @@ export const api = {
     const [up] = await uploadFiles([file], onProgress)
     return request<{ id: string }>('POST', `/characters/${characterId}/clips`, { uploadId: up!.uploadId, name: file.name, ...(contentId ? { contentId } : {}), ...(slot ? { slot } : {}) })
   },
+  // Images become kept stills of the character, exactly as uploaded (the
+  // file goes to storage untouched), in groups so each request stays short.
+  addStills: async (characterId: string, files: File[], contentId?: string, onProgress?: (done: number, total: number) => void) => {
+    const ups = await uploadFiles(files, onProgress)
+    const stills: Array<{ id: string; assetId: string; name: string }> = []
+    for (let i = 0; i < ups.length; i += 6) {
+      const r = await request<{ stills: typeof stills }>('POST', `/characters/${characterId}/stills`, { uploads: ups.slice(i, i + 6), ...(contentId ? { contentId } : {}) })
+      stills.push(...r.stills)
+    }
+    return { stills }
+  },
   // Clone Video: the saved TikTok or Reel goes up, the worker keeps a lean
   // copy with its sound; then the models with prices, and the results.
   addCloneSource: async (contentId: string, file: File, onProgress?: (done: number, total: number) => void) => {

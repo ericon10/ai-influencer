@@ -370,12 +370,13 @@ rules:
     area: scene
     spec: "9"
     # Owner, 2026-10-15: outfits in catalog terms, never fit or body words,
-    # never underwear-sounding names, a moment not a pose. The word lists
+    # "bike shorts" for "boy shorts" (every other garment name stays), a
+    # moment not a pose. The word lists
     # are config/wording.yaml. Only the wording changes, never the outfit.
     title: Outfits in catalog terms, no fit or body words
     check: { type: behavior }
     planner: Say outfits the way a shop catalog does (garment, color, fabric, a style word when it is clear), never fit or body words, and give a moment instead of a pose.
-    message: Claude's words (the planner, the prompt writer, the clip reader) say outfits in catalog terms (garment, color, fabric, a style word) and never use fit or body words (fitted, tight, low-cut, sheer, toned, curvy, hips, waist, legs), underwear-sounding names ("boy shorts" becomes "bike shorts") or "posing". What she wears never changes, and your own words go as typed.
+    message: Claude's words (the planner, the prompt writer, the clip reader) say outfits in catalog terms (garment, color, fabric, a style word) and never use fit or body words (fitted, tight, low-cut, sheer, toned, curvy, hips, waist, legs), "boy shorts" (it becomes "bike shorts"; every other garment name, "sports bra" included, stays as it is) or "posing". What she wears never changes, and your own words go as typed.
   - id: wording-risky
     bucket: default
     area: scene
@@ -385,7 +386,7 @@ rules:
     title: May be blocked by the provider's filter
     when: { stage: [scene, edit, video] }
     check: { type: risky_wording }
-    message: A word you typed that the provider's filter often blocks (a fit or body word, or an underwear-sounding name) is named on the price. Your words go as typed.
+    message: A word you typed that the provider's filter often blocks (a fit or body word, or "boy shorts") is named on the price. Your words go as typed.
   - id: scene-directors-pass
     bucket: default
     area: scene

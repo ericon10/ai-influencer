@@ -33,7 +33,7 @@ describe('the spreadsheet import', () => {
     expect(plan[0]).toMatchObject({ status: 'reuse', characterId: 'chr_1', accountTag: 'callie.jobs', clipId: 'cand_1', style: 'crash_zoom' })
     expect(plan[1]).toMatchObject({ status: 'generate', stillPrompt: 'at her desk, laptop open', videoPrompt: 'she sighs and looks up', clipId: null })
     expect(plan[2]).toMatchObject({ status: 'problem', problems: ['No character named "Mara"'] })
-    expect(plan[3]!.problems).toEqual(['No clip named "nope" for Callie', 'Write the caption', 'No edit style called "glitter"'])
+    expect(plan[3]!.problems).toEqual(['No clip named "nope" for Callie', 'No edit style called "glitter"'])
   })
 
   it('two characters with one name: the batch\'s own wins, else the row asks', () => {

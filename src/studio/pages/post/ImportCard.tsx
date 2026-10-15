@@ -39,7 +39,7 @@ export function ImportCard({ ctx }: { ctx: PostCtx }) {
 
   return (
     <section className="st-card" data-field="batch-import">
-      <div className="st-card-head"><FileSpreadsheet size={16} /><div className="grow"><div className="st-h3">Import a spreadsheet</div><div className="st-hint">One row per post: character, account, clip (a clip to reuse, or "still: your prompt"), video (optional), caption, style (optional). Each row becomes its own video post.</div></div></div>
+      <div className="st-card-head"><FileSpreadsheet size={16} /><div className="grow"><div className="st-h3">Import a spreadsheet</div><div className="st-hint">One row per post: character, account, clip (a clip to reuse, or "still: your prompt"), video (optional), caption (optional), style (optional). Each row becomes its own video post.</div></div></div>
       <div className="st-card-body st-col" style={{ gap: 10 }}>
         <textarea className="st-textarea" rows={4} value={csv} onChange={e => { setCsv(e.target.value); setPreview(null); setDone(null) }} placeholder="Paste the rows (with the header line), or upload a CSV" aria-label="Spreadsheet rows" />
         <input ref={file} type="file" accept=".csv,text/csv,text/plain" hidden onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; void load(f) }} />
@@ -63,7 +63,7 @@ export function ImportCard({ ctx }: { ctx: PostCtx }) {
                       <td>{r.characterName || '?'}</td>
                       <td>{r.accountTag || <span className="st-hint">the batch's</span>}</td>
                       <td>{r.clipTitle ?? (r.stillPrompt ? `New still: ${r.stillPrompt.slice(0, 60)}` : '')}</td>
-                      <td>{r.caption.slice(0, 80)}</td>
+                      <td>{r.caption ? r.caption.slice(0, 80) : <span className="st-hint">No caption</span>}</td>
                       <td>{r.style?.replace(/_/g, ' ') ?? ''}</td>
                       <td>{r.status === 'reuse' ? 'Reuses the clip, free' : r.status === 'generate' ? `New still and take, about ${usd(r.priceUsd)}` : <span className="st-warntext">Skipped: {r.problems.join('; ')}</span>}</td>
                     </tr>

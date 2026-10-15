@@ -87,7 +87,7 @@ export function RunStatus({ ids = [], match, pending = false, className = '', hi
   for (const j of current) groups.set(j.purpose, [...(groups.get(j.purpose) ?? []), j])
   return (
     <div className={`st-runs ${className}`} ref={box} aria-live="polite">
-      {(pending || missing.length > 0) && !list.length && <div className="st-run"><Loader2 size={15} className="st-spin" /><span className="st-run-text"><b>Submitting...</b></span></div>}
+      {(pending || missing.length > 0) && !list.length && <div className="st-run live" data-live="true"><Loader2 size={15} className="st-spin" /><span className="st-run-text"><b>Submitting...</b></span></div>}
       {[...groups.values()].map(g => (g.length > 3
         ? <RunGroup key={g[0]!.purpose} jobs={g} onDismiss={() => setDismissed(d => [...d, ...g.map(x => x.id)])} />
         : g.map(j => <RunRow key={j.id} j={j} onDismiss={() => setDismissed(d => [...d, j.id])} />)))}
@@ -155,7 +155,7 @@ export function RunRow({ j, onDismiss, showLabel = true }: { j: JobView; onDismi
   const timed = TIMED.includes(j.phase)
   const showUsual = j.typicalSec != null && ['sent', 'provider_queued', 'generating', 'working', 'submitting'].includes(j.phase)
   return (
-    <div className="st-run">
+    <div className="st-run live" data-live="true">
       {j.phase === 'waiting' ? <Circle size={15} /> : <Loader2 size={15} className="st-spin" />}
       <span className="st-run-text">
         {showLabel && <b>{j.label}: </b>}
@@ -188,7 +188,7 @@ function RunGroup({ jobs, onDismiss }: { jobs: JobView[]; onDismiss: () => void 
   const lead = running.find(j => j.phase === 'generating') ?? running[0]
   return (
     <div className="st-col" style={{ gap: 6 }}>
-      <div className={`st-run ${running.length ? '' : failed.length ? 'bad' : 'ok'}`}>
+      <div className={`st-run ${running.length ? 'live' : failed.length ? 'bad' : 'ok'}`} data-live={running.length ? 'true' : undefined}>
         {running.length ? <Loader2 size={15} className="st-spin" /> : failed.length ? <XCircle size={15} /> : <CheckCircle2 size={15} />}
         <span className="st-run-text"><b>{label}: </b>{done} of {jobs.length} done{failed.length ? `, ${failed.length} failed` : ''}{lead ? `; ${lead.phaseLabel.toLowerCase()}` : ''}.</span>
         {!running.length && <button type="button" className="st-btn icon ghost sm" aria-label="Hide" onClick={onDismiss}><X size={13} /></button>}

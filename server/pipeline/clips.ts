@@ -11,7 +11,7 @@ import { VIDEO_OPS, isVideoOp } from '../core/clips.js'
 import { transcodeBroll } from '../media/meme.js'
 import { withTempDir } from '../media/ffmpeg.js'
 import { getAsset, saveAsset } from '../storage/assets.js'
-import { uploadKey } from '../storage/uploads.js'
+import { takeUploads, uploadKey } from '../storage/uploads.js'
 import { getCharacter } from './characters.js'
 import { getContent, updateContent, type BatchSpec } from './content.js'
 
@@ -37,6 +37,32 @@ export async function addClip(deps: Deps, ctx: Ctx, input: { characterId: string
   if (post?.kind === 'meme') await updateContent(deps, ctx, post.id, { spec: input.slot === 'b' ? { clipB: id } : { clipId: id } })
   if (post?.kind === 'batch') await updateContent(deps, ctx, post.id, { spec: { clipIds: [...(post.spec as BatchSpec).clipIds ?? [], id].slice(-20) } })
   return { id }
+}
+
+// Uploaded images (owner, 2026-10-15): several at once, into Library >
+// Stills for the character picked, and from there into a slideshow and the
+// editor's Studio picker. Each is kept exactly as uploaded: the same bytes,
+// full resolution, never downscaled, recompressed or converted (thumbnails
+// for the grid are made separately on request). A slideshow's Stills step
+// adds them to the slideshow itself.
+export async function addStills(deps: Deps, ctx: Ctx, input: { characterId: string; uploads: Array<{ uploadId: string; name: string; type?: string }>; contentId?: string }): Promise<{ stills: Array<{ id: string; assetId: string; name: string }> }> {
+  await getCharacter(deps, ctx, input.characterId)
+  const post = input.contentId ? await getContent(deps, ctx, input.contentId) : null
+  if (post && post.characterId !== input.characterId) throw new AppError('bad_request', 'That post belongs to another character.')
+  const files = await takeUploads(deps, ctx, input.uploads)
+  const stills: Array<{ id: string; assetId: string; name: string }> = []
+  for (const f of files) {
+    if (!f.mime.startsWith('image/')) throw new AppError('bad_request', `${f.name} is not an image. Upload videos in Library > Clips.`)
+    const title = f.name.replace(/\.[a-z0-9]+$/i, '').slice(0, 120) || 'Uploaded image'
+    const asset = await saveAsset(deps, ctx, { data: f.data, mime: f.mime, origin: 'upload', label: `Upload: ${title}` })
+    const id = newId('cand')
+    await deps.db.insert(candidates).values({
+      id, accountId: ctx.accountId, characterId: input.characterId, target: 'scene', op: 'upload_image', status: 'approved',
+      assetId: asset.id, prompt: '', label: title, createdBy: ctx.userId,
+    })
+    stills.push({ id, assetId: asset.id, name: title })
+  }
+  return { stills }
 }
 
 async function runClipIngest(deps: Deps, ctx: Ctx, job: JobRow): Promise<unknown> {
@@ -67,7 +93,7 @@ export interface LibraryStill { id: string; assetId: string; characterId: string
 export interface LibraryClip extends LibraryStill { posterId: string | null; durationSec: number | null; title: string; error: string | null }
 
 const STILL_STATUSES = ['in_review', 'approved']
-const IMAGE_OPS = ['generate', 'edit', 'crop', 'upscale', 'mirror', 'drift_lock', 'end_frame']
+const IMAGE_OPS = ['generate', 'edit', 'crop', 'upscale', 'mirror', 'drift_lock', 'end_frame', 'upload_image']
 
 export async function libraryView(deps: Deps, ctx: Ctx, opts: { characterId?: string | null } = {}): Promise<{ stills: LibraryStill[]; clips: LibraryClip[] }> {
   const charRows = await deps.db.select({ id: characters.id, name: characters.name }).from(characters).where(eq(characters.accountId, ctx.accountId))
@@ -100,7 +126,7 @@ export async function libraryView(deps: Deps, ctx: Ctx, opts: { characterId?: st
   }
   const base = (c: (typeof stillRows)[number]) => ({
     id: c.id, assetId: c.assetId!, characterId: c.characterId, characterName: names.get(c.characterId) ?? '',
-    sceneId: c.sceneId, sceneTitle: c.sceneId ? sceneTitle.get(c.sceneId) ?? 'Scene' : '', status: c.status, op: c.op, createdAt: c.createdAt.toISOString(),
+    sceneId: c.sceneId, sceneTitle: c.op === 'upload_image' ? c.label || 'Uploaded image' : c.sceneId ? sceneTitle.get(c.sceneId) ?? 'Scene' : '', status: c.status, op: c.op, createdAt: c.createdAt.toISOString(),
   })
   const clips: LibraryClip[] = []
   for (const c of clipsShown) {

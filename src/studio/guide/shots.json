@@ -578,16 +578,16 @@
   ]
  },
  "live-status": {
-  "w": 382,
-  "h": 88,
+  "w": 1030,
+  "h": 152,
   "spots": [
    {
     "n": 1,
-    "x": 5.2,
-    "y": 22.7,
-    "w": 89.5,
-    "h": 54.5,
-    "label": "Live status: Submitting, Queued, Generating with the time, Done"
+    "x": 1.2,
+    "y": 50,
+    "w": 62.1,
+    "h": 23.7,
+    "label": "The live line: what is happening now, and it pulses while it works"
    }
   ]
  },
@@ -619,27 +619,43 @@
   "spots": [
    {
     "n": 1,
-    "x": 2.9,
-    "y": 21,
-    "w": 67.8,
-    "h": 15.6,
-    "label": "The caption, in TikTok's white box"
+    "x": 3.3,
+    "y": 21.4,
+    "w": 7.3,
+    "h": 5.1,
+    "label": "TikTok's white box, or Outline (TikTok Classic)"
    },
    {
     "n": 2,
-    "x": 13.8,
-    "y": 14.9,
+    "x": 16.8,
+    "y": 21.4,
+    "w": 7.7,
+    "h": 5.1,
+    "label": "No caption: none in the editor or the export; kept with this post"
+   },
+   {
+    "n": 3,
+    "x": 2.9,
+    "y": 42.7,
+    "w": 67.8,
+    "h": 15.6,
+    "label": "The words, optional: leave it empty for no caption"
+   },
+   {
+    "n": 4,
+    "x": 12.1,
+    "y": 36.6,
     "w": 10.7,
     "h": 5.1,
     "label": "Pick a hook from the vault"
    },
    {
-    "n": 3,
+    "n": 5,
     "x": 72.8,
-    "y": 88.6,
+    "y": 14.9,
     "w": 24.3,
-    "h": 6.1,
-    "label": "Live preview with the same font and safe zones"
+    "h": 79.8,
+    "label": "The preview, as the export draws it"
    }
   ]
  },
@@ -1794,6 +1810,188 @@
     "w": 24.4,
     "h": 52.9,
     "label": "A bigger preview; click anywhere empty to clear the selection"
+   }
+  ]
+ },
+ "post-caption-off": {
+  "w": 1068,
+  "h": 572,
+  "spots": [
+   {
+    "n": 1,
+    "x": 16.8,
+    "y": 22,
+    "w": 7.7,
+    "h": 5.2,
+    "label": "No caption, picked"
+   },
+   {
+    "n": 2,
+    "x": 2.9,
+    "y": 37.8,
+    "w": 67.8,
+    "h": 6.3,
+    "label": "No caption track in the editor, none in the export"
+   },
+   {
+    "n": 3,
+    "x": 2.9,
+    "y": 45.1,
+    "w": 67.8,
+    "h": 16.1,
+    "label": "Your words are kept, dimmed: pick White box or Outline to put them back"
+   },
+   {
+    "n": 4,
+    "x": 72.8,
+    "y": 15.4,
+    "w": 24.3,
+    "h": 79.2,
+    "label": "The preview shows no caption"
+   }
+  ]
+ },
+ "library-upload": {
+  "w": 1360,
+  "h": 900,
+  "spots": [
+   {
+    "n": 1,
+    "x": 49.5,
+    "y": 30.2,
+    "w": 11.1,
+    "h": 4.2,
+    "label": "Upload images: several at once; drop them here on a computer, the camera roll on a phone"
+   },
+   {
+    "n": 2,
+    "x": 27.6,
+    "y": 36.3,
+    "w": 62.8,
+    "h": 2,
+    "label": "Kept exactly as uploaded, at full resolution, as stills of this character"
+   },
+   {
+    "n": 3,
+    "x": 51.7,
+    "y": 46.4,
+    "w": 14.5,
+    "h": 47,
+    "label": "In Stills under the file name, ready for a post, a slideshow or the editor"
+   }
+  ]
+ },
+ "slideshow-upload": {
+  "w": 1068,
+  "h": 620,
+  "spots": [
+   {
+    "n": 1,
+    "x": 2.9,
+    "y": 18.5,
+    "w": 94.2,
+    "h": 35.9,
+    "label": "Uploaded straight into the slideshow, in order"
+   },
+   {
+    "n": 2,
+    "x": 42.9,
+    "y": 68.5,
+    "w": 14.1,
+    "h": 6.1,
+    "label": "Upload images: several at once, or drop them on the box"
+   },
+   {
+    "n": 3,
+    "x": 2.9,
+    "y": 57,
+    "w": 21,
+    "h": 6.1,
+    "label": "Or pick stills from the Library"
+   }
+  ]
+ },
+ "editor-take": {
+  "w": 1360,
+  "h": 900,
+  "spots": [
+   {
+    "n": 1,
+    "x": 16.8,
+    "y": 89.9,
+    "w": 18.4,
+    "h": 5.3,
+    "label": "The take you picked, on the Shots track, trimmed as you reviewed it"
+   },
+   {
+    "n": 2,
+    "x": 16.8,
+    "y": 82.7,
+    "w": 18.4,
+    "h": 5.9,
+    "label": "Its caption, when one is on"
+   },
+   {
+    "n": 3,
+    "x": 44.6,
+    "y": 14.6,
+    "w": 17.2,
+    "h": 46.3,
+    "label": "The take in the player"
+   },
+   {
+    "n": 4,
+    "x": 94.6,
+    "y": 0.6,
+    "w": 4.5,
+    "h": 3.1,
+    "label": "Done exports and saves to the post"
+   }
+  ]
+ },
+ "editor-picker": {
+  "w": 1360,
+  "h": 900,
+  "spots": [
+   {
+    "n": 1,
+    "x": 8.2,
+    "y": 7.2,
+    "w": 4.5,
+    "h": 4.9,
+    "label": "Studio first"
+   },
+   {
+    "n": 2,
+    "x": 2.1,
+    "y": 17.1,
+    "w": 27.5,
+    "h": 28.5,
+    "label": "This post's takes and stills"
+   },
+   {
+    "n": 3,
+    "x": 2.1,
+    "y": 46.9,
+    "w": 27.5,
+    "h": 1.7,
+    "label": "This character's clips and stills, then the Library"
+   },
+   {
+    "n": 4,
+    "x": 13,
+    "y": 7.2,
+    "w": 7.2,
+    "h": 4.9,
+    "label": "From computer: files on this computer or phone"
+   },
+   {
+    "n": 5,
+    "x": 16.8,
+    "y": 89.9,
+    "w": 18.4,
+    "h": 5.3,
+    "label": "Tap adds at the playhead; or drag one onto a track"
    }
   ]
  }

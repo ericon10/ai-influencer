@@ -495,9 +495,20 @@ Decisions: `DECISIONS.md` G37 and G38. UX: `UX-PLAN.md` section 15.
 
 - [x] `config/wording.yaml` and `server/core/wording.ts`: fit words out, body phrases out, underwear-sounding names swapped, a moment not a pose
 - [x] Clip reader, planner, Punch it up and the writer (stills and video) cleaned; system prompts ask for catalog terms
-- [x] Recreate, scene-still and face-pass templates: "the person's position"
+- [x] Recreate, scene-still and face-pass templates: "the person's position" (reverted the same day: "the pose" stays, G47)
 - [x] The owner's words go as typed, with a warning under the price (`wording-risky`)
 - [x] Likely trigger words on a refusal and Retry with safer wording (`retry_safer`), priced, free rewording
+
+### Editor, caption and upload fixes, two reverts (G47, G48, UX-PLAN.md section 21)
+
+- [x] Reverts: "sports bra" stays (only "boy shorts" is swapped); "the pose" back in the Recreate stills, scene still and face pass prompts (G47)
+- [x] No caption: a third choice next to White box and Outline on every video post and batch, kept with the post; no caption track in the editor (assemble and reopen), none in Done or Export MP4; switched back, the words return
+- [x] A caption is never required for any output: video posts, batches (How many counts the videos), slideshows (no words: the stills as they are), spreadsheet imports
+- [x] The editor opens with the take on the live site: fresh storage links (`src`), never the browser's cache, then the Studio's address, then 4 MB parts (`?proxy=1`); the Studio's redirect is no longer cacheable; a saved timeline without its shots gets them back
+- [x] Add media in the editor: the Studio picker first (this post, the character, the Library), From computer second; tap adds at the playhead, drag drops on a track; picked media opens again after Done (`GET /content/:id/editor/media`)
+- [x] Upload images in Library > Stills and a slideshow's Stills step: several at once, drag and drop, the camera roll; for the character picked; kept byte for byte (`POST /characters/:id/stills`); in the editor picker; originals over 4 MB come straight from storage
+- [x] A working run row pulses everywhere (images, videos, renders, Claude)
+- [x] Playwright like a user, desktop and phone: the live failure reproduced behind a proxy with the browser cache on (`e2e/editor/r2.ts`), every way into the editor, the picker (tap, drag, From computer, after Done), No caption (editor and export pixels), uploads (picked, dropped, byte for byte, slideshow)
 
 ## Roadmap after Phase 4 (owner, 2026-10-13; not started)
 

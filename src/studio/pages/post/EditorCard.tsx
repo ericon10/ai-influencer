@@ -47,7 +47,8 @@ export function EditorCard({ ctx }: { ctx: PostCtx }) {
     return { key: x.id, label: x.kind === 'clip' ? `Shot ${i + 1}` : 'B-roll', dur, kind: x.kind }
   })
   const total = shots.every(x => x.dur != null) ? r1(shots.reduce((a, x) => a + (x.dur ?? 0), 0)) : null
-  const captions = cut.captions.filter(c => (c.text ?? s.caption ?? '').trim()).length
+  // No caption on this post: none goes to the editor (owner, 2026-10-15).
+  const captions = s.captionOff ? 0 : cut.captions.filter(c => (c.text ?? s.caption ?? '').trim()).length
   // A voiceover's words are the captions when its switch is on.
   const voiced = !!(s.sound?.voice?.captions && s.sound.voice.words?.length)
 
@@ -90,9 +91,11 @@ export function EditorCard({ ctx }: { ctx: PostCtx }) {
       <div className="st-card-body st-col" style={{ gap: 12 }}>
         <div className="st-row st-timeline-sum" style={{ gap: 6, flexWrap: 'wrap' }}>
           {shots.map(x => <span key={x.key} className="st-chip static">{x.kind === 'clip' ? <Film size={12} /> : <Clapperboard size={12} />}{x.label}{x.dur != null ? ` · ${x.dur} s` : ''}</span>)}
-          {voiced
-            ? <span className="st-chip static"><Type size={12} />Captions from the voiceover</span>
-            : captions > 0 && <span className="st-chip static"><Type size={12} />{captions === 1 ? '1 caption' : `${captions} captions`}</span>}
+          {s.captionOff
+            ? <span className="st-chip static" data-field="timeline-no-caption"><Type size={12} />No caption</span>
+            : voiced
+              ? <span className="st-chip static"><Type size={12} />Captions from the voiceover</span>
+              : captions > 0 && <span className="st-chip static"><Type size={12} />{captions === 1 ? '1 caption' : `${captions} captions`}</span>}
           {total != null && <span className="st-hint">{total} s in all</span>}
         </div>
         <div className="st-row" style={{ gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>

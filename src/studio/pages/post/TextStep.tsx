@@ -13,13 +13,19 @@ import type { PostCtx } from './ctx'
 // or written by Claude from the idea, priced).
 
 export function textSummary(ctx: PostCtx) {
-  if (ctx.item.kind === 'meme') return (ctx.draft.spec as unknown as MemeSpec).caption?.trim().slice(0, 100) || 'No caption yet'
+  if (ctx.item.kind === 'meme') {
+    const s = ctx.draft.spec as unknown as MemeSpec
+    if (s.captionOff) return 'No caption'
+    return s.caption?.trim().slice(0, 100) || 'No caption (optional)'
+  }
   if (ctx.item.kind === 'slideshow') {
     const s = ctx.draft.spec as unknown as SlideshowSpec
-    return s.hook?.trim() ? `Hook: ${s.hook.trim().slice(0, 80)} (+${s.slides.filter(x => x.trim()).length} slides)` : 'No slides yet'
+    return s.hook?.trim() ? `Hook: ${s.hook.trim().slice(0, 80)} (+${s.slides.filter(x => x.trim()).length} slides)` : 'No words on the slides (optional)'
   }
-  const n = ((ctx.draft.spec as unknown as BatchSpec).captions ?? []).filter(c => c.trim()).length
-  return `${n} caption${n === 1 ? '' : 's'}`
+  const bs = ctx.draft.spec as unknown as BatchSpec
+  const n = (bs.captions ?? []).filter(c => c.trim()).length
+  if (bs.captionOff) return n ? `No caption on the videos (${n} lines)` : `No caption, ${bs.count} videos`
+  return n ? `${n} caption${n === 1 ? '' : 's'}` : `No captions (optional), ${bs.count} videos`
 }
 
 export function TextStep({ ctx }: { ctx: PostCtx }) {
@@ -29,23 +35,30 @@ export function TextStep({ ctx }: { ctx: PostCtx }) {
 }
 
 function Caption({ ctx }: { ctx: PostCtx }) {
-  const { data, draft, lib } = ctx
+  const { data, draft, lib, item } = ctx
   const spec = draft.spec as unknown as MemeSpec
   const clip = lib?.clips.find(c => c.id === spec.clipId && c.status === 'approved')
   const [hooks, setHooks] = useState(false)
   return (
     <div className="st-content-grid">
       <div className="st-col" style={{ gap: 14 }}>
-        <Field id="post-caption" group label="Caption" required done={!!spec.caption?.trim()} hint={`In the upper third, kept clear of her mouth and hands and of TikTok's buttons. Up to ${data.options.caption.maxChars} characters; emoji work.`}
-          extra={<button type="button" className="st-btn sm ghost" onClick={() => setHooks(true)}><Sparkles size={13} />Pick a hook</button>}>
-          <textarea className="st-textarea" rows={3} aria-label="Caption" maxLength={data.options.caption.maxChars} value={spec.caption ?? ''} onChange={e => draft.setSpec({ caption: e.target.value })} placeholder="e.g. me when the code finally works and I have no idea why 💀" />
+        <Field id="post-caption-style" label="Caption" hint="TikTok's white box, white text with a black outline (TikTok Classic), or No caption: none in the editor or the export. It is kept with this post." extra={<HowTo id="post-text" label="About captions" />}>
+          <CaptionStylePick value={spec.captionStyle} data={data} off={!!spec.captionOff} onOff={v => draft.setSpec({ captionOff: v } as never)} onChange={v => draft.setSpec({ captionStyle: v } as never)} />
         </Field>
+        {spec.captionOff ? (
+          <div className="st-col" style={{ gap: 6 }} data-field="caption-off">
+            <span className="st-hint">No caption on this post: the editor opens without a caption track and the export has none. Your words are kept; pick White box or Outline to put them back.{item.outputs?.videoAssetId ? ' A video exported before this keeps its caption until you export again.' : ''}</span>
+            {spec.caption?.trim() && <textarea className="st-textarea st-dim" rows={2} aria-label="Caption (off)" value={spec.caption} readOnly />}
+          </div>
+        ) : (
+          <Field id="post-caption" group label="Words (optional)" hint={`Leave it empty for a video with no caption; you can add text in the editor. In the upper third, kept clear of her mouth and hands and of TikTok's buttons. Up to ${data.options.caption.maxChars} characters; emoji work.`}
+            extra={<button type="button" className="st-btn sm ghost" onClick={() => setHooks(true)}><Sparkles size={13} />Pick a hook</button>}>
+            <textarea className="st-textarea" rows={3} aria-label="Caption" maxLength={data.options.caption.maxChars} value={spec.caption ?? ''} onChange={e => draft.setSpec({ caption: e.target.value })} placeholder="e.g. me when the code finally works and I have no idea why 💀" />
+          </Field>
+        )}
         <HookPicker open={hooks} onClose={() => setHooks(false)} characterId={ctx.item.characterId} onPick={t => { draft.setSpec({ caption: t.slice(0, data.options.caption.maxChars) }); setHooks(false) }} />
-        <Field id="post-caption-style" label="Caption style" hint="TikTok's white box, or white text with a black outline (TikTok Classic).">
-          <CaptionStylePick value={spec.captionStyle} data={data} onChange={v => draft.setSpec({ captionStyle: v } as never)} />
-        </Field>
       </div>
-      <div className="st-content-side"><CaptionPreview text={spec.caption ?? ''} data={data} video={clip?.assetId} look={spec.captionStyle} /><span className="st-hint">Preview. The export uses the same font, style and safe zones.</span></div>
+      <div className="st-content-side"><CaptionPreview text={spec.captionOff ? '' : spec.caption ?? ''} data={data} video={clip?.assetId} look={spec.captionStyle} /><span className="st-hint">{spec.captionOff ? 'Preview: no caption.' : 'Preview. The export uses the same font, style and safe zones.'}</span></div>
     </div>
   )
 }
@@ -76,7 +89,7 @@ function Slides({ ctx }: { ctx: PostCtx }) {
         watch={j => j.purpose === `content_slides:${item.id}`}
         onStarted={() => void ctx.advance('text')}
       />
-      <span className="st-hint">Claude writes a hook and {data.options.slideshow.slides[0]} to {data.options.slideshow.slides[1]} slides about "{topic || 'your idea'}", plus a caption and hashtags. Edit anything after.</span>
+      <span className="st-hint">Claude writes a hook and {data.options.slideshow.slides[0]} to {data.options.slideshow.slides[1]} slides about "{topic || 'your idea'}", plus a caption and hashtags. Edit anything after. Words are optional: with none, the stills go out as they are.</span>
       <div className="st-col" data-field="slides-text" style={{ gap: 10 }}>
         <Field label="Hook (slide 1)"><input className="st-input" maxLength={200} value={spec.hook} onChange={e => draft.setSpec({ hook: e.target.value })} placeholder="e.g. POV: you finally found apps that actually help" /></Field>
         {spec.slides.map((t, i) => (
@@ -130,18 +143,18 @@ function Captions({ ctx }: { ctx: PostCtx }) {
           />
         </div>
         <span className="st-hint">About "{topic || 'your idea'}". Or paste your own below.</span>
-        <Field id="batch-captions" label={`Captions, one per line (${captions.length}${captions.length > max ? `, the first ${max} are used` : ''})`} required done={captions.length > 0} hint="Each line becomes one video.">
+        <Field id="batch-captions" label={`Captions, one per line, optional (${captions.length}${captions.length > max ? `, the first ${max} are used` : ''})`} hint={spec.captionOff ? 'No caption is drawn on the videos. Lines here still count them; with none, How many does.' : 'Each line becomes one video. With none, How many counts the videos and they have no caption.'}>
           <textarea className="st-textarea" rows={8} value={text}
             onFocus={() => { editing.current = true }}
             onBlur={() => { editing.current = false }}
             onChange={e => { setText(e.target.value); draft.setSpec({ captions: e.target.value.split('\n').map(c => c.trim()).filter(Boolean).slice(0, 50) }) }}
             placeholder={'e.g. me pretending I read the syllabus\nPOV: the group chat at 2am before the exam'} />
         </Field>
-        <Field id="batch-caption-style" label="Caption style" hint="TikTok's white box, or white text with a black outline (TikTok Classic).">
-          <CaptionStylePick value={(draft.spec as { captionStyle?: CaptionStyle | null }).captionStyle} data={data} onChange={v => draft.setSpec({ captionStyle: v } as never)} />
+        <Field id="batch-caption-style" label="Caption style" hint="TikTok's white box, white text with a black outline (TikTok Classic), or No caption on any video (the lines, or How many, still count the videos).">
+          <CaptionStylePick value={(draft.spec as { captionStyle?: CaptionStyle | null }).captionStyle} data={data} off={!!spec.captionOff} onOff={v => draft.setSpec({ captionOff: v } as never)} onChange={v => draft.setSpec({ captionStyle: v } as never)} />
         </Field>
       </div>
-      <div className="st-content-side"><CaptionPreview text={captions[0] ?? ''} data={data} video={first?.assetId} look={(draft.spec as { captionStyle?: CaptionStyle | null }).captionStyle} /><span className="st-hint">The first caption, as a preview.</span></div>
+      <div className="st-content-side"><CaptionPreview text={spec.captionOff ? '' : captions[0] ?? ''} data={data} video={first?.assetId} look={(draft.spec as { captionStyle?: CaptionStyle | null }).captionStyle} /><span className="st-hint">{spec.captionOff ? 'Preview: no caption.' : 'The first caption, as a preview.'}</span></div>
     </div>
   )
 }

@@ -203,7 +203,7 @@ export const GUIDE: GuideSection[] = [
     id: 'post-stills', group: 'Make a post', title: 'Step 2: Stills', color: 'amber',
     tagline: 'Photos of the moment. The best one starts the video.',
     where: 'A video post or slideshow > Stills',
-    intro: 'Write and generate does two things for one price: Claude writes the prompt from your idea (with Director\'s notes on what makes it memorable), then the stills run on it. The prompt stays in the box, editable, for the next run. The writer keeps your camera, outfit and light, and adds no mood words you did not use (glowing, cinematic, soft light). It says outfits the way a shop catalog does (garment, color, fabric, a style word: "dark green ribbed tank top with thin straps, going-out look"), never with fit or body words (fitted, tight, low-cut, sheer, toned, curvy, hips, waist, legs), never with names that sound like underwear ("bike shorts", not "boy shorts"), and gives a moment, not a pose ("refilling her water bottle", never "posing in"). Only the words change, never what she wears; the box says what it took out or reworded. Your own words go as typed. The details are one line here; change them in the Idea step under More control.',
+    intro: 'Write and generate does two things for one price: Claude writes the prompt from your idea (with Director\'s notes on what makes it memorable), then the stills run on it. The prompt stays in the box, editable, for the next run. The writer keeps your camera, outfit and light, and adds no mood words you did not use (glowing, cinematic, soft light). It says outfits the way a shop catalog does (garment, color, fabric, a style word: "dark green ribbed tank top with thin straps, going-out look"), never with fit or body words (fitted, tight, low-cut, sheer, toned, curvy, hips, waist, legs), says "bike shorts", not "boy shorts" (every other garment name, "sports bra" included, stays as it is), and gives a moment, not a pose ("refilling her water bottle", never "posing in"). Only the words change, never what she wears; the box says what it took out or reworded. Your own words go as typed. The details are one line here; change them in the Idea step under More control.',
     steps: [
       'Pick a model (up to 2 to compare) and how many stills per model. It starts at GPT Image 2.5 Flare, 4 stills, Standard quality, 9:16; Nano Banana 2.1 and High quality are one click each. Flare prompts always add "Bare natural lips, no gloss." The price is on the button: credits on your Higgsfield plan, dollars on the API.',
       'Press Write and generate. Each still shows the free checks when it lands. A pasted prompt sent as written skips the writer.',
@@ -213,6 +213,7 @@ export const GUIDE: GuideSection[] = [
       'Edit the Director\'s notes or the prompt if you like, then Rewrite or Generate again.',
       'Open a still to look closely: Check this (Claude), Fix one thing, crop closer, upscale.',
       'Press Use this still on the best one. It moves you to the Video step and Claude writes the video prompt from it.',
+      'Slideshow: Upload images (beside Pick stills from the Library) takes several at once: drop them on the box on a computer, or pick them from the camera roll on a phone. Each one joins the slideshow and Library > Stills for this character, kept exactly as uploaded (the same file, full resolution; PNG, JPEG or WebP).',
     ],
     tips: [
       'Fix one thing makes one change and keeps the rest of the still. Diagnose and revise has one-click fixes: plastic face, staged pose, morphing hands, synchronized background, fake low light, overprocessed.',
@@ -226,6 +227,7 @@ export const GUIDE: GuideSection[] = [
       { id: 'still-sent', caption: 'What was sent: prompt, refs, model and cost' },
       { id: 'still-drawer', caption: 'A still opened: the free checks' },
       { id: 'still-fix', caption: 'Fix one thing and Diagnose and revise' },
+      { id: 'slideshow-upload', caption: 'A slideshow: Upload images, several at once, into the slideshow' },
     ],
   },
   {
@@ -265,7 +267,7 @@ export const GUIDE: GuideSection[] = [
       'What to keep, what to drop: "Scene to keep" chips (the place, the light, the angle, props) and "Source traits to drop" chips (hair color, eye color, piercings, makeup such as winged liner). Read them for me fills both from four frames of the clip (Claude, priced). Click x to take a chip out, type to add one.',
       'The outfit: keep the clip\'s outfit (described in words), or pick theirs (one of the character\'s looks, or your own words). Read them for me names it like a shop catalog: the garment, its color and fabric, and a style word when it is clear ("dark green ribbed tank top with thin straps, going-out look"), never a bare "top" and never fit or body words. What you type goes as typed; a word the filter often blocks is named under the price. "What happens in the clip" is the motion line for the video prompt.',
       'The stills model: Nano Banana 2.1 (your Higgsfield plan; what the proven runs used) or GPT Image 2.5 (the Higgsfield API; untested for recreates). Same prompts, same face pass, same gates either way, and the face pass runs on the model the stills used. Nano Banana 2.1 is picked when the plan is connected, GPT Image 2.5 when it is not (the API does not offer Nano Banana 2.1). A choice with no plan or no key is grey with one line why. Your last pick is remembered, and a batch uses it too.',
-      'Press Make 4 stills + face pass (9:16): the 4 stills, then the face pass (2 takes) on the best one, in one price. The face pass edits that still (it is the first image; the element and REF-00 only carry the face), so the kitchen, the outfit, her position and the framing stay. It is skipped, and its part of the price is not charged, when the best still already beats the clip\'s person by 0.30 or more (a line says so). The switch beside the button skips it for the lower price. With GPT Image 2.5 the button says "GPT Image 2.5, untested for recreates".',
+      'Press Make 4 stills + face pass (9:16): the 4 stills, then the face pass (2 takes) on the best one, in one price. The face pass edits that still (it is the first image; the element and REF-00 only carry the face), so the kitchen, the outfit, the pose and the framing stay. It is skipped, and its part of the price is not charged, when the best still already beats the clip\'s person by 0.30 or more (a line says so). The switch beside the button skips it for the lower price. With GPT Image 2.5 the button says "GPT Image 2.5, untested for recreates".',
       'Each still and face pass shows Face (match to REF-00), Clip (likeness to the person in the clip) and Margin (Face minus Clip). A face pass must still match its still outside the face; one that changed the scene says "Face pass changed the scene, not usable" and has no Make the video. Fix this face redoes only the face (2 takes) on any other still. You pick chooses the best face match that looks least like the person in the clip.',
       'A still the provider\'s filter refused shows its likely trigger words and Retry with safer wording (only those words change, free; the still is priced like the refused one). Failures from earlier runs fold into one gray line under the stills ("4 blocked by the filter, refunded; 2 face passes not run. Nothing charged.") with Show and Clear (cleared for good on this post); only the run you just started shows its failures as tiles.',
       'The gates (fixed): Make the video shows only on a still with Face 0.45 or more, a Margin of 0.12 or more, and Clip under 0.45. Calibrated on the two proven stills (kitchen: 0.71, 0.26, margin 0.45; rave: 0.54, 0.37, margin 0.17). A still that fails says why and offers Fix the face again or Make 4 new stills.',
@@ -300,11 +302,12 @@ export const GUIDE: GuideSection[] = [
     id: 'post-text', group: 'Make a post', title: 'Step 4: Caption, slides or captions', color: 'teal',
     tagline: 'The words on the post, with a live TikTok preview.',
     where: 'Any post > Caption (Slides for a slideshow, Captions for a batch)',
-    intro: 'A video post has one caption in TikTok\'s white box. A slideshow has a hook on slide 1, slides, a post caption and hashtags; Claude can write them. A batch has one caption per line, one video each; Claude can write as many as you ask for.',
+    intro: 'A caption is never required: leave it empty for a video with no caption, and add text in the editor if you like. A video post has one caption in TikTok\'s white box, or No caption. A slideshow has a hook on slide 1, slides, a post caption and hashtags (all optional; Claude can write them). A batch has one caption per line, one video each, or no captions (then How many counts the videos).',
     steps: [
       'Video post: type the caption and watch the preview, or press Pick a hook to use one from the vault (this character\'s own variants come first). Pick White box or Outline (white text with a black stroke, TikTok Classic). It sits in the upper third, off her mouth and hands.',
-      'Slideshow: press Write the slides (or type them), add or remove slides, then the caption and hashtags.',
-      'Batch: set How many, press Write, and edit the list. The clips rotate across the captions.',
+      'No caption (next to White box and Outline, on every video post, Recreate included, and every batch): the editor opens with no caption track and the export has none. It is kept with the post; the words you typed stay, dimmed, and come back when you pick White box or Outline again. A video exported before the switch keeps its caption until you export again.',
+      'Slideshow: press Write the slides (or type them), add or remove slides, then the caption and hashtags. With no words, the stills go out as they are.',
+      'Batch: set How many, press Write, and edit the list. The clips rotate across the captions. With no captions, How many videos are made with none.',
     ],
     tips: [
       'The preview uses the same font, box and safe zones as the export, so what you see is what you get.',
@@ -313,7 +316,8 @@ export const GUIDE: GuideSection[] = [
     ],
     cost: 'Writing slides or captions is a small Claude call. Typing them is free.',
     shots: [
-      { id: 'post-caption', caption: 'Video post: the caption' },
+      { id: 'post-caption', caption: 'Video post: the caption (optional), with No caption beside the styles' },
+      { id: 'post-caption-off', caption: 'No caption: kept with the post, the words dimmed until you switch back' },
       { id: 'post-slideshow', caption: 'Slideshow: the hook and slides' },
       { id: 'post-batch', caption: 'Batch: one caption per video' },
     ],
@@ -322,9 +326,11 @@ export const GUIDE: GuideSection[] = [
     id: 'post-finish', group: 'Make a post', title: 'Step 5: Finish', color: 'green',
     tagline: 'Timeline, editor, sound, export, download, post. Free.',
     where: 'Any post > Finish',
-    intro: 'The Timeline lays the post out from the steps above: its shots, B-roll and captions. Open the editor to place edits exactly where you want them on that timeline (OpenReel, full screen): drop a preset at the playhead, drag it, trim it, set Subtle, Normal or Strong. Done in the editor exports the video, saves it here with the timeline, and brings you back. Without the editor, Export MP4 renders the timeline on the Studio\'s own worker, for free. A slideshow exports JPEG slides; a batch exports every video and a zip.',
+    intro: 'The Timeline lays the post out from the steps above: its shots, B-roll and captions (or No caption). Open the editor to place edits exactly where you want them on that timeline (OpenReel, full screen): drop a preset at the playhead, drag it, trim it, set Subtle, Normal or Strong. Done in the editor exports the video, saves it here with the timeline, and brings you back. Without the editor, Export MP4 renders the timeline on the Studio\'s own worker, for free. A slideshow exports JPEG slides; a batch exports every video and a zip.',
     steps: [
-      'Check the Timeline: the shots and captions the Studio laid out for you.',
+      'Check the Timeline: the shots and captions the Studio laid out for you. Nothing here asks for a caption: a post with none exports with none.',
+      'The editor opens with your take: the take or clip the post uses lands on the Shots track, trimmed as you reviewed it, with its caption when one is on. This works from every way in: a Recreate after Use this take, a finished post, a post made from the Library, and Make another like this.',
+      'Add media in the editor (the Media tab) opens the Studio first: this post\'s takes and stills, this character\'s clips and stills, then the Library (B-roll, sounds, other characters\' clips). Tap one to add it at the playhead on its own track, or drag it onto a track to put it exactly there. From computer is the second tab, for files on your computer or phone. What you add from the Studio opens again with the post after Done.',
       'Open the editor (best on a computer): click a suggested spot (the payoff) or move the playhead, then click a preset (a crash zoom, a speed ramp, karaoke captions and more). Drag or trim its block; click it for Subtle, Normal or Strong and its keyframes. The Beat card finds the beat of your music (or tap the tempo) so cuts and presets snap to it; the Styles card saves your presets as a style for the next post. Press Done: it exports, saves to the post and comes back here.',
       'Captions in the editor: click the words in the preview to select a caption, drag it to move it. Double-click it (or its block on the timeline; double-tap on a phone) to change the words right there: Enter saves, Shift+Enter starts a new line, Esc cancels. Long captions wrap inside the frame. Drag one of the four small dots just outside its corners to make it bigger or smaller: it wraps to stay in the frame, never grows taller than the frame, and one drag is one undo step. Click anywhere empty (beside the frame, or a spot on it with nothing there) to clear the selection. On a phone, drag a caption or its handles with a finger. Drag its block on the timeline to show it later or sooner, or its end to show it for less time. Karaoke captions light up the caption\'s own words in turn and keep its place and look; click the preset again to turn it off.',
       'Freeze and speed ramp get a marker on the Presets track: click it to open the Speed panel for that shot (on a phone, the Edit tab). A shot shows its speed on its block (2x, Ramp, Freeze). The tracks are named by what they hold: Captions, Shots, B-roll, Voice, Music, Presets.',
@@ -339,7 +345,7 @@ export const GUIDE: GuideSection[] = [
     ],
     tips: ['Edits are placed on the timeline where you choose them, never guessed for the whole video.', 'Open the editor again to change an edit: the timeline is kept with the post.', 'The preview opens bigger; drag the edge above the timeline to give the tracks more room.', 'The editor opens with your music ducked under the voice line (or the clip\'s own sound); the music clip\'s Audio Ducking panel changes or removes it. If a file cannot open, the bar names it and the rest of the post opens.', 'On a phone the tabs at the bottom of the editor switch between Timeline, Media (the presets) and Edit (whatever is selected).', 'There is no AI music. Upload tracks you have the rights to (Library > Sounds holds them all).', 'Cuts between shots are hard cuts, never a crossfade.'],
     cost: 'Free.',
-    shots: [{ id: 'post-finish', caption: 'Finish' }, { id: 'editor-captions', caption: 'The editor: a caption edited in place' }, { id: 'editor-resize', caption: 'The editor: small corner dots to resize, move and retime a caption' }, { id: 'editor-speed', caption: 'The editor: freeze and ramp markers, named tracks, the speed on the shot, a bigger preview' }],
+    shots: [{ id: 'post-finish', caption: 'Finish' }, { id: 'editor-take', caption: 'The editor opens with the take on the Shots track' }, { id: 'editor-picker', caption: 'Add media: the Studio first (this post, the character, the Library), From computer second' }, { id: 'editor-captions', caption: 'The editor: a caption edited in place' }, { id: 'editor-resize', caption: 'The editor: small corner dots to resize, move and retime a caption' }, { id: 'editor-speed', caption: 'The editor: freeze and ramp markers, named tracks, the speed on the shot, a bigger preview' }],
   },
   {
     id: 'voice', group: 'Grow your accounts', title: 'Voice and voice lines', color: 'pink',
@@ -395,10 +401,11 @@ export const GUIDE: GuideSection[] = [
     id: 'library', group: 'Everything else', title: 'Library', color: 'teal',
     tagline: 'Everything you made, ready to reuse.',
     where: 'Sidebar > Library',
-    intro: 'Stills, Clips (kept takes, uploads and clones), B-roll, Sounds, Voice lines and finished Posts, across all characters. Open anything to see it, download it, or start a new post from it. Upload B-roll, clips, sounds and voice takes here too.',
+    intro: 'Stills, Clips (kept takes, uploads and clones), B-roll, Sounds, Voice lines and finished Posts, across all characters. Open anything to see it, download it, or start a new post from it. Upload images, B-roll, clips, sounds and voice takes here too.',
     steps: [
       'Pick a tab: Stills, Clips, B-roll, Sounds, Voice lines or Posts.',
       'Filter by character.',
+      'Stills: Upload images, several at once (drop them on the box, or the camera roll on a phone), for the character you pick under For. Each is kept exactly as uploaded: the same file at full resolution, never shrunk, recompressed or converted (a small copy is made only for the grid). They show in Stills, in a slideshow\'s picker and in the editor\'s Add media.',
       'Open an item, then Use in a new post.',
       'Clips: Use this clip starts Recreate with that clip and its character, straight to What to keep (5 clicks to a finished video).',
       'Voice lines: your performed takes, turned into the character\'s voice. See Voice and voice lines.',
@@ -407,7 +414,7 @@ export const GUIDE: GuideSection[] = [
     tips: [
       'Inside a post, the same Library opens as a drawer: pick, and it drops into the step.',
     ],
-    shots: [{ id: 'library', caption: 'The Library' }, { id: 'library-clips', caption: 'Clips: Use this clip' }],
+    shots: [{ id: 'library', caption: 'The Library' }, { id: 'library-upload', caption: 'Stills: Upload images for a character, kept as uploaded' }, { id: 'library-clips', caption: 'Clips: Use this clip' }],
   },
   {
     id: 'settings', group: 'Everything else', title: 'Settings', color: 'blue',
@@ -424,7 +431,7 @@ export const GUIDE: GuideSection[] = [
     tips: [
       'Fixed rules: real skin, 21 or older, nothing explicit, a new person (never a copy), the AI label, the price first, budget caps, keys on the server.',
       'Defaults include the Director\'s pass, the prompt writer, automatic Claude checks and the variety note.',
-      'Two wording defaults: Outfits in catalog terms (Claude\'s words lose fit and body words, underwear-sounding names and "posing"; the lists are in config/wording.yaml) and May be blocked by the provider\'s filter (a warning under the price when your own words use one of them). Both are on; switch either off.',
+      'Two wording defaults: Outfits in catalog terms (Claude\'s words lose fit and body words and "posing", and "boy shorts" becomes "bike shorts"; the lists are in config/wording.yaml) and May be blocked by the provider\'s filter (a warning under the price when your own words use one of them). Both are on; switch either off.',
     ],
     shots: [
       { id: 'settings-general', caption: 'General' },
@@ -437,7 +444,7 @@ export const GUIDE: GuideSection[] = [
     id: 'feedback', group: 'Everything else', title: 'Prices, live status and Activity', color: 'amber',
     tagline: 'Every run shows its price first, then its live status.',
     where: 'Every button that starts work, and Activity in the sidebar',
-    intro: 'A price button shows the price and the model before anything runs (Details shows the exact prompts). Over the confirm threshold it asks you to Confirm. Once it runs, a live line under it says Submitting, Queued, Generating (with the time and the usual time), Downloading, Checking, then Done. A failure says what happened in plain words, whether anything was charged, and offers Retry. Only the run you just started can be red: earlier failures fold into one gray line ("Earlier: 4 blocked by the filter, refunded; 1 not run. Nothing charged.") with Show and Clear. A run the provider\'s filter refused also names its likely trigger words and offers Retry with safer wording.',
+    intro: 'A price button shows the price and the model before anything runs (Details shows the exact prompts). Over the confirm threshold it asks you to Confirm. Once it runs, a live line under it says Submitting, Queued, Generating (with the time and the usual time), Downloading, Checking, then Done; while it works the line pulses, everywhere an image, a video or a render is being made. A failure says what happened in plain words, whether anything was charged, and offers Retry. Only the run you just started can be red: earlier failures fold into one gray line ("Earlier: 4 blocked by the filter, refunded; 1 not run. Nothing charged.") with Show and Clear. A run the provider\'s filter refused also names its likely trigger words and offers Retry with safer wording.',
     steps: [
       'Read the price and the model on the button.',
       'Press it (and Confirm if asked). Watch the live line under it.',
@@ -452,7 +459,7 @@ export const GUIDE: GuideSection[] = [
       'Each finished run logs its real cost next to its quote: the credits in your Higgsfield transactions on the plan, the measured tokens for Claude. More than 20% off is flagged under the still (What was sent) and in Settings > Budgets and usage.',
     ],
     shots: [
-      { id: 'live-status', caption: 'A live status line' },
+      { id: 'live-status', caption: 'A live status line, pulsing while it works' },
       { id: 'run-failures', caption: 'The run just refused, its trigger words and Retry with safer wording; earlier failures in one gray line' },
       { id: 'activity', caption: 'Activity' },
     ],
@@ -476,9 +483,12 @@ export const GLOSSARY: Array<[string, string]> = [
   ['Spend cap', 'The most a recreate post may spend, in credits. A step that would pass it is refused with what is left.'],
   ['Drift marks', 'Red marks on the review strip where the face in the take drops under 0.45 against REF-00, the same number as the video rule.'],
   ['Earlier failures line', 'One gray line in place of a pile of red: how many runs before this one were blocked by the filter (refunded), never ran, or failed, and that nothing was charged. Show lists them; Clear hides them for good. Only the run you just started can be red.'],
-  ['Catalog wording', 'Outfits said the way a shop catalog does: garment, color, fabric, a style word ("dark green ribbed tank top with thin straps, going-out look"). No fit or body words, no underwear-sounding names, a moment instead of a pose. Only the words change, never what she wears; your own words go as typed. The lists are config/wording.yaml.'],
-  ['Likely trigger words', 'After a refusal by the provider\'s filter: the words in what was sent that filters often block (fit or body words, underwear-sounding names).'],
+  ['Catalog wording', 'Outfits said the way a shop catalog does: garment, color, fabric, a style word ("dark green ribbed tank top with thin straps, going-out look"). No fit or body words, "bike shorts" for "boy shorts" (every other garment name stays), a moment instead of a pose. Only the words change, never what she wears; your own words go as typed. The lists are config/wording.yaml.'],
+  ['Likely trigger words', 'After a refusal by the provider\'s filter: the words in what was sent that filters often block (fit or body words, "boy shorts").'],
   ['Retry with safer wording', 'The refused run again with only its trigger words reworded by code ("tight" out, "boy shorts" to "bike shorts"). The rewording is free; the run is priced like the one that was refused.'],
+  ['No caption', 'A choice next to White box and Outline: no caption track in the editor and none in the export. Kept with the post; switch back any time and the words return. A caption is never required anyway: an empty one means no caption.'],
+  ['Studio picker', 'What Add media opens in the editor: this post\'s takes and stills, the character\'s clips and stills, then the Library. Tap adds at the playhead; drag puts it on a track. From computer is its second tab.'],
+  ['Kept as uploaded', 'An uploaded image is stored as the very same file: full resolution, never downscaled, recompressed or converted. Only the small copy for the grid is made from it.'],
   ['Speed marker', 'In the editor, a marker on the Presets track for a freeze or a speed ramp. Click it to open the Speed panel for that shot.'],
   ['Timeline', 'The post as one timeline: its shots, B-roll, captions, presets and sound. The Studio lays it out; the editor changes it.'],
   ['The editor', 'OpenReel, full screen over a post: place presets on the timeline, trim, move, retime. Done exports, saves to the post and returns.'],

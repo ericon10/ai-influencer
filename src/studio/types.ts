@@ -276,6 +276,8 @@ export interface MemeSpec extends BrollTiming {
   clipId: string | null; stillId: string | null; brollId: string | null; caption: string; clone: CloneSource | null
   sound?: Partial<SoundSpec>; cut?: Cut | null; continueFrom?: ContinueFrom | null
   edit?: Partial<EditSpec>; clipB?: string | null; stillB?: string | null; captionStyle?: CaptionStyle | null
+  // No caption on this post (owner, 2026-10-15); the words are kept.
+  captionOff?: boolean
   // The OpenReel editor's saved timeline (G29).
   editor?: { projectAssetId: string | null; savedAt: string | null } | null
 }
@@ -317,7 +319,7 @@ export interface CutView {
 }
 export interface SlideshowSpec { stillIds: string[]; topic: string; hook: string; slides: string[]; caption: string; hashtags: string[] }
 // A batch rotates its clips and B-roll across the captions.
-export interface BatchSpec extends BrollTiming { clipIds: string[]; brollIds: string[]; topic: string; count: number; captions: string[]; clone: CloneSource | null; sound?: Partial<SoundSpec>; edit?: Partial<EditSpec>; captionStyle?: CaptionStyle | null; stack?: StyleItem[] | null; styleName?: string | null }
+export interface BatchSpec extends BrollTiming { clipIds: string[]; brollIds: string[]; topic: string; count: number; captions: string[]; clone: CloneSource | null; sound?: Partial<SoundSpec>; edit?: Partial<EditSpec>; captionStyle?: CaptionStyle | null; captionOff?: boolean; stack?: StyleItem[] | null; styleName?: string | null }
 
 // Clone Video (SPEC 13.1 R1): the post's saved TikTok or Reel, the models
 // with their prices, and the results.

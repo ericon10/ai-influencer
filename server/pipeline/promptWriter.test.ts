@@ -333,8 +333,9 @@ describe('catalog wording in the planner and the writer', () => {
     const writer = await started({ type: 'scene_prompt', characterId, sceneId, target: 'still' })
     await answer(writer.id, { mockPrompt: 'Callie posing in a fitted grey sports bra and boy shorts, showing off her toned legs, refilling her water bottle at the fountain. Her tight black tank top hangs on the bench.' })
     const written = (await view(sceneId)).prompts.still!
-    expect(written.text).toBe('Callie wearing a grey athletic crop top and bike shorts, refilling her water bottle at the fountain. Her tight black tank top hangs on the bench.')
-    expect([...(written.removed ?? [])].sort()).toEqual(['boy shorts', 'fitted', 'legs', 'posing in', 'sports bra'])
+    // The garment stays a sports bra (owner, 2026-10-15); only boy shorts is swapped.
+    expect(written.text).toBe('Callie wearing a grey sports bra and bike shorts, refilling her water bottle at the fountain. Her tight black tank top hangs on the bench.')
+    expect([...(written.removed ?? [])].sort()).toEqual(['boy shorts', 'fitted', 'legs', 'posing in'])
     // The owner's "tight" goes as typed, with a warning that never blocks.
     const { preview } = await estimateAction(h.deps, h.ctx, generate(sceneId))
     expect(preview.prompts[0]!.text).toContain('She is wearing a tight black tank top and grey joggers')

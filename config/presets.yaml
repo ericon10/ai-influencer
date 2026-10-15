@@ -2,7 +2,7 @@
 # The worker renders camera presets with these keys (editor phase D, G32).
 source:
   repo: https://github.com/ericon10/openreel-video
-  commit: feefe39c996a75dfa354bb9014859641a26c3f75
+  commit: da6b4c165eb10d8fee6f9cda1cc3aafe4cdfbc98
 presets:
   - id: crash_zoom
     label: Crash zoom cut

@@ -5,7 +5,7 @@ import { ArrowLeft, ArrowRight, CheckCircle2, Images, Minus, Plus, SkipForward, 
 import { api, ApiError } from '../../api'
 import { keys, useRefresh } from '../../hooks'
 import { PriceButton } from '../../PriceButton'
-import { LibraryDrawer } from '../../library'
+import { LibraryDrawer, StillUpload } from '../../library'
 import { AsyncButton, Callout, Img, errorMessage, useToast } from '../../ui'
 import type { SceneStill, SlideshowSpec } from '../../types'
 import { SceneStills } from '../character/SceneStills'
@@ -102,6 +102,10 @@ export function StillsStep({ ctx }: { ctx: PostCtx }) {
         {!slideshow && <button type="button" className="st-btn ghost" onClick={() => void ctx.advance('video')}><SkipForward size={15} />Skip: I have a clip</button>}
         {slideshow && stillIds.length > 0 && ctx.current === 'stills' && <button type="button" className="st-btn ghost" onClick={() => void ctx.advance('text')}>Continue to the slides<ArrowRight size={15} /></button>}
       </div>
+      {slideshow && item.characterId && (
+        <StillUpload characters={v ? [{ id: v.id, name: v.data.name }] : []} characterId={item.characterId} contentId={item.id}
+          onUploaded={ids => draft.setSpec({ stillIds: [...stillIds, ...ids.filter(id => !stillIds.includes(id))].slice(0, ctx.data.options.slideshow.maxStills) })} />
+      )}
 
       {!ready ? (
         v && <Callout tone="info">To make new stills of {name}, set up {v.data.pronouns.poss} face and reference sheet first (<Link to={`/studio/characters/${v.id}`}>set up {name}</Link>). Stills already in the Library work now.</Callout>

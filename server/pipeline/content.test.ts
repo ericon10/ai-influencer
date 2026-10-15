@@ -97,7 +97,6 @@ describe('content builder (demo mode)', () => {
 
   it('meme video: the kept clip, a hard cut to B-roll, the caption on top; 9:16, Room tone under it', async () => {
     const item = await createContent(h.deps, h.ctx, { kind: 'meme', characterId, spec: { clipId } })
-    await expect(startRender(h.deps, h.ctx, item.id)).rejects.toThrow(/Write the caption/)
     await updateContent(h.deps, h.ctx, item.id, { spec: { brollId, brollSeconds: 2, caption: 'me when the AI finally fixes my code 💀' } })
     await startRender(h.deps, h.ctx, item.id)
     await drain(h, 20)
@@ -142,6 +141,15 @@ describe('content builder (demo mode)', () => {
     const caption = Buffer.from(zip['caption.txt']!).toString()
     expect(caption).toContain('#fyp')
     expect(caption).toContain('AI-generated content label')
+  })
+
+  it('slideshow with no words: each still goes out as it is (words are optional)', async () => {
+    const item = await createContent(h.deps, h.ctx, { kind: 'slideshow', characterId, spec: { stillIds: stillIds.slice(0, 2) } })
+    await startRender(h.deps, h.ctx, item.id)
+    await drain(h, 20)
+    const done = await getContent(h.deps, h.ctx, item.id)
+    expect(done.status).toBe('ready')
+    expect((done.outputs as ContentOutputs).imageAssetIds).toHaveLength(2)
   })
 
   it('batch: captions from a topic (priced), then one video per caption and a zip of all', async () => {

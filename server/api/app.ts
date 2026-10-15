@@ -21,7 +21,7 @@ import { approveSceneCandidate, archiveScene, copyScene, createScene, cropCandid
 import { whatWasSent, whatWasSentForJob } from '../pipeline/sent.js'
 import { videoPrices } from '../pipeline/sceneActions.js'
 import { expectedVersion, readWorkerStatus } from '../jobs/workerStatus.js'
-import { addClip, libraryView } from '../pipeline/clips.js'
+import { addClip, addStills, libraryView } from '../pipeline/clips.js'
 import { cancelContinue, continueShot, keepTwoShots, useChainTake } from '../pipeline/chain.js'
 import { postCutView, postEditorProject } from '../pipeline/cutView.js'
 import { makeCloseup } from '../pipeline/closeup.js'
@@ -32,6 +32,7 @@ import { deleteStyle, editorManifest, listStyles, saveFromEditor, saveStyle } fr
 import { previewImport, runImport } from '../pipeline/csvImport.js'
 import { answerGateCheck, gateCheck } from '../pipeline/gateCheck.js'
 import { addCloneSource, cloneOptions, cloneStills, keepClone, pickCloneStill, postClones, postFromClone, saveCloneModel, saveRecreateStillModel, setCloneChoices, setCloneCleanup, setCloneNotLike, setCloneTarget, trimClone, tryCloneAgain, useCloneStill } from '../pipeline/clone.js'
+import { editorLibrary } from '../pipeline/editorMedia.js'
 import { addRecreateRow, recreateBatch, recreateFor, reviewTakeAgain, setRecreateRows, startRecreate, useCloneTake } from '../pipeline/recreate.js'
 import { jobViews } from '../jobs/jobView.js'
 import { POST_STEPS, addBroll, archiveBroll, archiveContent, contentView, createContent, duplicateContent, postScene, retryFailedBatch, startRender, updateBroll, updateContent } from '../pipeline/content.js'
@@ -537,15 +538,34 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
         return new Response(new Uint8Array(thumb), { headers: { 'content-type': 'image/webp', 'cache-control': 'private, max-age=31536000, immutable' } })
       }
     }
+    // The editor's fallback (owner, 2026-10-15): a part of the file from the
+    // Studio's own address, at most 4 MB, when storage will not answer the
+    // browser. Same origin, so no CORS and no redirect.
+    if (c.req.query('proxy') && deps.store.driver === 's3') {
+      const asset = await getAsset(deps, ctx, c.req.param('id'))
+      const PART = 4 * 1024 * 1024
+      const m = /^bytes=(\d+)-(\d*)$/.exec(c.req.header('range') ?? '')
+      const start = m ? Number(m[1]) : 0
+      const end = Math.min(m?.[2] ? Number(m[2]) : start + PART - 1, start + PART - 1)
+      const part = await deps.store.getRange(asset.storageKey, start, end)
+      if (!part.total || start >= part.total) return new Response(null, { status: 416, headers: { 'content-range': `bytes */${part.total}` } })
+      const last = start + part.data.length - 1
+      return new Response(new Uint8Array(part.data), { status: 206, headers: { 'content-type': asset.mime, 'content-range': `bytes ${start}-${last}/${part.total}`, 'content-length': String(part.data.length), 'cache-control': 'private, max-age=600' } })
+    }
     // Videos and download bundles come straight from storage (a short-lived
     // link): a function response is capped at 4.5 MB on Vercel.
     const download = c.req.query('download') ? (c.req.query('name') || `${c.req.param('id')}`) : null
     if (deps.store.driver === 's3') {
       const asset = await getAsset(deps, ctx, c.req.param('id'))
-      if (asset.kind === 'video' || asset.kind === 'file' || download) {
+      // A full-resolution upload (an image or a sound over 4 MB) too: the
+      // original is never shrunk to fit (owner, 2026-10-15).
+      if (asset.kind === 'video' || asset.kind === 'file' || download || asset.bytes > 4 * 1024 * 1024) {
         const ext = asset.storageKey.split('.').pop() ?? 'bin'
         const url = await deps.store.presignGet(asset.storageKey, 3600, download ? { downloadName: download.endsWith(`.${ext}`) ? download : `${download}.${ext}` } : undefined)
-        if (url) return new Response(null, { status: 302, headers: { location: url, 'cache-control': 'private, max-age=600' } })
+        // Not kept by the browser (owner, 2026-10-15): a kept redirect led
+        // the editor to storage's answer for a <video>, which has no CORS
+        // header, and the take never reached the timeline.
+        if (url) return new Response(null, { status: 302, headers: { location: url, 'cache-control': 'no-store' } })
       }
     }
     const { row, data } = await readAsset(deps, ctx, c.req.param('id'))
@@ -575,6 +595,14 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
     requireRole(ctx, 'member')
     const body = parse(z.object({ uploadId: z.string().max(40), name: z.string().max(300), contentId: z.string().max(60).optional(), slot: z.enum(['a', 'b']).optional() }), await json(c))
     return c.json(await addClip(deps, ctx, { characterId: c.req.param('id'), ...body }), 201)
+  })
+  // Uploaded images become kept stills of the character, exactly as
+  // uploaded (picked in the slideshow they were uploaded from).
+  app.post('/characters/:id/stills', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    const body = parse(z.object({ uploads: uploadRefs.unwrap().min(1).max(10), contentId: z.string().max(60).optional() }), await json(c))
+    return c.json(await addStills(deps, ctx, { characterId: c.req.param('id'), ...body }), 201)
   })
   // Clone Video (SPEC 13.1 R1): the post's clip to clone, the models with
   // their prices, the results, and what to do with one.
@@ -655,6 +683,8 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
   // The OpenReel editor (G29): the post to load, and Done (the MP4 and the
   // project back).
   app.get('/content/:id/editor', async c => c.json(await editorManifest(deps, c.get('ctx'), c.req.param('id'))))
+  // The editor's Add media, Studio first (owner, 2026-10-15).
+  app.get('/content/:id/editor/media', async c => c.json(await editorLibrary(deps, c.get('ctx'), c.req.param('id'))))
   app.post('/content/:id/editor', async c => c.json(await saveFromEditor(deps, c.get('ctx'), c.req.param('id'), await json(c))))
   app.get('/editor/styles', async c => c.json({ styles: await listStyles(deps, c.get('ctx')) }))
   app.post('/editor/styles', async c => {

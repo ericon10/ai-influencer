@@ -257,8 +257,25 @@ describe('sound bed and rough cut', () => {
   it('a cut with problems is refused before it is queued, in plain words', async () => {
     const post = (await createContent(h.deps, h.ctx, { kind: 'meme', characterId, spec: { clipId, caption: '' } })).id
     await updateContent(h.deps, h.ctx, post, { spec: { cut: { auto: false, shots: [{ id: 'c', kind: 'clip', ref: clipId, in: 2, out: 2.1 }], captions: [{ id: 'x', text: null, start: 3, end: 1 }] } } })
-    await expect(startRender(h.deps, h.ctx, post)).rejects.toThrow(/Shot 1 is shorter than 0.2 s; Caption 1 ends before it starts; Write the caption/)
+    await expect(startRender(h.deps, h.ctx, post)).rejects.toThrow(/^Shot 1 is shorter than 0\.2 s; Caption 1 ends before it starts\.$/)
   })
+
+  it('a caption is never required: a post and a batch with none render, the batch counting How many', async () => {
+    const post = (await createContent(h.deps, h.ctx, { kind: 'meme', characterId, spec: { clipId, caption: '' } })).id
+    await startRender(h.deps, h.ctx, post)
+    await drain(h, 30)
+    expect((await getContent(h.deps, h.ctx, post)).status).toBe('ready')
+    const batch = (await createContent(h.deps, h.ctx, { kind: 'batch', characterId, spec: { clipIds: [clipId], captions: [], count: 2 } })).id
+    await startRender(h.deps, h.ctx, batch)
+    await drain(h, 40)
+    const out = (await getContent(h.deps, h.ctx, batch)).outputs as ContentOutputs
+    expect({ total: out.total, done: out.done, failed: out.failed }).toEqual({ total: 2, done: 2, failed: 0 })
+    // No caption with lines: the lines still count the videos, none drawn.
+    const off = (await createContent(h.deps, h.ctx, { kind: 'batch', characterId, spec: { clipIds: [clipId], captions: ['a', 'b', 'c'], captionOff: true, count: 9 } })).id
+    await startRender(h.deps, h.ctx, off)
+    await drain(h, 50)
+    expect(((await getContent(h.deps, h.ctx, off)).outputs as ContentOutputs).done).toBe(3)
+  }, 240_000)
 
   it('a batch gets the sound bed too', async () => {
     const post = (await createContent(h.deps, h.ctx, { kind: 'batch', characterId, spec: { clipIds: [clipId], captions: ['one', 'two'], sound: { ambience: 'room' } } })).id

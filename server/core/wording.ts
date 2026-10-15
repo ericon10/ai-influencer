@@ -3,9 +3,10 @@ import type { WordingConfig } from '../config/pipeline.js'
 // Catalog wording (owner, 2026-10-15; UX-PLAN section 20, DECISIONS G46).
 // Outfits are said the way a shop catalog says them and nothing in a prompt
 // describes her body or makes her pose: fit words come out where they
-// stand, the phrase naming a body word goes, underwear-sounding names become
-// the everyday garment, and "posing in" becomes "wearing". Only the words
-// change, never what she wears. The lists are data (config/wording.yaml).
+// stand, the phrase naming a body word goes, "boy shorts" becomes "bike
+// shorts" (every other garment name stays, "sports bra" included: owner,
+// 2026-10-15), and "posing in" becomes "wearing". Only the words change,
+// never what she wears. The lists are data (config/wording.yaml).
 //
 // Claude's words and the Studio's own lines are cleaned; a word the owner
 // typed (`own`) is never touched. "Retry with safer wording" cleans every
@@ -116,7 +117,7 @@ export function catalogWording(text: string, w: WordingConfig, own = ''): Wordin
 }
 
 // Words in a prompt that the provider's filter often blocks (fit, body and
-// underwear-sounding names), outside the AVOID block, each named once.
+// "boy shorts"), outside the AVOID block, each named once.
 export function findRiskyWords(text: string, w: WordingConfig): string[] {
   const [head] = splitAvoid(text)
   const found: string[] = []

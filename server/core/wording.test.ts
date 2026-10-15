@@ -37,9 +37,11 @@ describe('catalog wording', () => {
     expect(findRiskyWords(text, w)).toEqual([])
   })
 
-  it('swaps names that sound like underwear for the everyday garment', () => {
-    expect(clean('grey boy shorts and a white sports bra')).toBe('grey bike shorts and a white athletic crop top')
-    expect(clean('Bralette in black lace')).toBe('Crop top in black lace')
+  it('swaps only "boy shorts"; every other garment name stays (owner, 2026-10-15)', () => {
+    expect(clean('grey boy shorts and a sage ribbed sports bra')).toBe('grey bike shorts and a sage ribbed sports bra')
+    expect(clean('Boyshorts in black cotton')).toBe('Bike shorts in black cotton')
+    expect(clean('a black lace bralette under an open shirt')).toBe('a black lace bralette under an open shirt')
+    expect(findRiskyWords('a sage ribbed sports bra and leggings', w)).toEqual([])
   })
 
   it('a moment, not a pose', () => {

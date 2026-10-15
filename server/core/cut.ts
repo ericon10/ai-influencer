@@ -53,6 +53,9 @@ export interface CutSource {
   // A voiceover (a converted voice line) with "Captions from the voice
   // line" on: its phrases are the captions, timed by its words.
   sound?: { voice?: { at: number; captions: boolean; words: Word[] } | null }
+  // No caption on this post (owner, 2026-10-15): no caption in the cut, the
+  // editor or any export. The typed words are kept for switching back.
+  captionOff?: boolean
 }
 
 // The automatic cut: the clip (in full), the B-roll cut in hard before or
@@ -71,6 +74,7 @@ export function autoCut(s: Omit<CutSource, 'cut'>, maxBrollSeconds = 20): Cut {
 // with a voiceover's captions in place of the text captions when asked.
 export function effectiveCut(s: CutSource, maxBrollSeconds = 20, phrases?: PhraseOptions & { holdSec?: number }): Cut {
   const base = s.cut && !s.cut.auto && s.cut.shots.length ? s.cut : autoCut(s, maxBrollSeconds)
+  if (s.captionOff) return { ...base, captions: [] }
   const v = s.sound?.voice
   if (!v?.captions || !v.words.length) return base
   return { ...base, captions: voiceCaptions(v.words, v.at, phrases) }
@@ -90,13 +94,14 @@ export const cutClipIds = (c: Cut): string[] => c.shots.filter(x => x.kind === '
 export const cutBrollIds = (c: Cut): string[] => c.shots.filter(x => x.kind === 'broll').map(x => x.ref)
 
 // What is wrong with a cut before it is rendered, in plain words.
-export function cutProblems(c: Cut, caption: string, limits: { maxShots: number; maxCaptions: number }): string[] {
+// A caption is never required (owner, 2026-10-15): with no words the video
+// has no caption, and the owner can add text in the editor.
+export function cutProblems(c: Cut, limits: { maxShots: number; maxCaptions: number }): string[] {
   const out: string[] = []
   if (!c.shots.length) out.push('Pick a clip')
   if (c.shots.length > limits.maxShots) out.push(`Use at most ${limits.maxShots} shots`)
   if (c.captions.length > limits.maxCaptions) out.push(`Use at most ${limits.maxCaptions} captions`)
   for (const [i, s] of c.shots.entries()) if (s.out != null && s.out - s.in < 0.2) out.push(`Shot ${i + 1} is shorter than 0.2 s`)
   for (const [i, x] of c.captions.entries()) if (x.end != null && x.end <= x.start) out.push(`Caption ${i + 1} ends before it starts`)
-  if (!c.captions.some(x => (x.text ?? caption).trim())) out.push('Write the caption')
   return out
 }

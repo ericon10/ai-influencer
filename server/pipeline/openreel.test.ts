@@ -82,6 +82,34 @@ describe('the editor manifest', () => {
     for (const st of h.deps.config.pipeline.edits.styles) if (st.preset) expect(known, st.id).toContain(st.preset)
   })
 
+  it('gives each file its direct storage link, so the take loads on the live site (no redirect)', async () => {
+    // Local storage: no link, the editor fetches the Studio's own address.
+    expect((await editorManifest(h.deps, h.ctx, postId)).media.every(m => m.src === null)).toBe(true)
+    const mem = h.deps.store
+    ;(h.deps as { store: typeof mem }).store = { ...mem, driver: 's3', presignGet: async (key: string) => `https://r2.test/${key}?sig=1` }
+    try {
+      const m = await editorManifest(h.deps, h.ctx, postId)
+      expect(m.media[0]).toMatchObject({ role: 'clip', kind: 'video' })
+      expect(m.media.every(x => x.src?.startsWith('https://r2.test/acct/') && x.url.startsWith('/api/v1/assets/'))).toBe(true)
+    } finally {
+      ;(h.deps as { store: typeof mem }).store = mem
+    }
+  })
+
+  it('No caption: no captions for the editor, kept with the post; switched back, they return', async () => {
+    const post = (await createContent(h.deps, h.ctx, { kind: 'meme', characterId, spec: { clipId, caption: 'kept words' } })).id
+    await updateContent(h.deps, h.ctx, post, { spec: { captionOff: true } })
+    const off = await editorManifest(h.deps, h.ctx, post)
+    expect(off).toMatchObject({ captionOff: true, captions: [] })
+    expect(off.media.map(m => m.role)).toEqual(['clip'])
+    expect((await getContent(h.deps, h.ctx, post)).spec).toMatchObject({ caption: 'kept words', captionOff: true })
+    await updateContent(h.deps, h.ctx, post, { spec: { captionOff: false } })
+    expect(await editorManifest(h.deps, h.ctx, post)).toMatchObject({ captionOff: false, captions: [{ text: 'kept words', start: 0, end: null }] })
+    // An empty caption is fine too (a caption is never required): no captions.
+    const bare = (await createContent(h.deps, h.ctx, { kind: 'meme', characterId, spec: { clipId } })).id
+    expect((await editorManifest(h.deps, h.ctx, bare)).captions).toEqual([])
+  })
+
   it('opens video posts only, and says so', async () => {
     const show = (await createContent(h.deps, h.ctx, { kind: 'slideshow', characterId })).id
     await expect(editorManifest(h.deps, h.ctx, show)).rejects.toThrow(/video posts/)

@@ -267,6 +267,7 @@ button.st-chip:hover { color: var(--st-text); border-color: var(--st-text-3); }
   display: grid; place-items: center; text-align: center; gap: 8px; color: var(--st-text-2);
   cursor: pointer; transition: border-color 0.15s, background 0.15s;
 }
+.st-still-drop { display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; padding: 16px; cursor: default; }
 .st-drop:hover, .st-drop.over { border-color: rgba(255, 106, 61, 0.6); background: var(--st-accent-soft); color: var(--st-text); }
 
 /* ── Images and grids ─────────────────────────────────── */
@@ -806,6 +807,14 @@ button.st-chip:hover { color: var(--st-text); border-color: var(--st-text-3); }
 .st-run.bad > svg { color: var(--st-bad); }
 .st-run.warn { border-color: rgba(243, 194, 79, 0.45); background: var(--st-warn-soft); color: var(--st-text); }
 .st-run.warn > svg { color: var(--st-warn); }
+/* A run that is working pulses (owner, 2026-10-15): any image, video, render
+   or Claude run, so it is obvious at a glance that something is happening.
+   With reduced motion it holds a steady accent border instead. */
+@keyframes st-run-pulse {
+  0%, 100% { border-color: color-mix(in srgb, var(--st-accent) 30%, transparent); box-shadow: 0 0 0 0 color-mix(in srgb, var(--st-accent) 0%, transparent); background: var(--st-surface-2); }
+  50% { border-color: color-mix(in srgb, var(--st-accent) 90%, transparent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--st-accent) 22%, transparent); background: var(--st-accent-soft); }
+}
+.st-run.live { color: var(--st-text); border-color: color-mix(in srgb, var(--st-accent) 70%, transparent); animation: st-run-pulse 1.6s ease-in-out infinite; }
 .st-run-text { flex: 1; min-width: 0; }
 .st-run-actions { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 6px; margin-top: 6px; }
 .st-run-actions:empty { display: none; }
@@ -1260,3 +1269,5 @@ button.st-chip:hover { color: var(--st-text); border-color: var(--st-text-3); }
 /* The safer retry in a narrow still tile wraps instead of spilling. */
 .st-safer .st-btn { max-width: 100%; white-space: normal; text-align: left; }
 .st-safer .st-price-error { max-width: 100%; }
+/* Words kept while No caption is on (owner, 2026-10-15). */
+.st-textarea.st-dim { opacity: 0.55; }

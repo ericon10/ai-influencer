@@ -2062,16 +2062,17 @@ or makes her pose (UX-PLAN.md section 20).
   "curvy"); the phrase naming a body word goes ("fitted at the waist",
   "showing off her legs"), but "waist-up" framing, "waist height",
   "waist-length" hair and table legs stay; underwear-sounding names become
-  the everyday garment ("boy shorts" to "bike shorts", "sports bra" to
-  "athletic crop top"); "posing in" becomes "wearing". The lists are data
+  the everyday garment ("boy shorts" to "bike shorts"; the swap of
+  "sports bra" was reverted the same day, see G47); "posing in" becomes
+  "wearing". The lists are data
   (`config/wording.yaml`), the code is `server/core/wording.ts`.
 - **Where:** Claude's words are cleaned before the owner sees them (the
   planner's fields, Punch it up, the clip reader's outfit, chips and motion
   line) and the writer's still and video prompts are cleaned when they
   land, next to the mood-word cleaning. The system prompts ask for catalog
   terms and a moment, never a pose. The Recreate, scene-still and
-  face-pass templates say "the person's position" where they said "the
-  pose". `plainOutfit` (which cut sleeves and straps and left a bare
+  face-pass templates said "the person's position" for "the pose" for a
+  few hours; reverted (G47). `plainOutfit` (which cut sleeves and straps and left a bare
   "top") is gone.
 - **The owner's words go as typed.** A word in the owner's own text
   (the brief, a field they set, a typed outfit or chip) is never touched.
@@ -2086,3 +2087,74 @@ or makes her pose (UX-PLAN.md section 20).
   reworded by code, no Claude call. The rewording is free; the run is
   priced like the refused one, shown first, and counts against a Recreate
   post's spend cap like any retry (plain retries now do too).
+
+### G47. Two reverts: "sports bra" and "the pose" stay (owner, 2026-10-15)
+
+- **"Sports bra" stays "sports bra".** It is a normal catalog garment (the
+  templates use "sage ribbed sports bra" as their own example). Only "boy
+  shorts" (and "boyshorts") is swapped, to "bike shorts". The garment is
+  never changed. `config/wording.yaml` keeps the one swap; the writer's
+  rules, the clone reader's outfit line and the Guide say the same.
+- **"The pose" is back**, word for word, in the Recreate stills ("the
+  framing, the pose and the outfit"), the scene still ("the lighting, the
+  pose, the framing") and the face pass ("the hair, the outfit, the pose,
+  the hands"). That recipe is proven on real runs; its wording changes only
+  when a real run shows a reason. Tests pin the exact sentences.
+
+### G48. No caption, the editor opens with the take, Studio media first, image uploads (owner, 2026-10-15)
+
+- **No caption** (UX-PLAN.md section 21): a third choice next to White box
+  and Outline, on every video post (Recreate included) and every batch,
+  kept with the post (`captionOff`). The cut has no captions, so the
+  editor opens without a caption track (a saved project's caption track is
+  left out, and comes back when the caption is switched on again), and
+  neither Done nor Export MP4 nor the worker's timeline render draws one.
+  The typed words are kept for switching back.
+- **A caption is never required for any output** (owner, same day: "some
+  people will want to add that stuff in the editor"). An empty caption is a
+  video with no caption; nothing in the Finish step or the render checks
+  asks for one. A batch with no lines makes How many videos; a slideshow
+  with no words exports its stills as they are (still cropped to 9:16); a
+  spreadsheet row may leave the caption empty.
+- **The editor opens with the take.** On the live site the caption loaded
+  and the take did not. The cause, reproduced in a test: the post page had
+  just played the take through its Studio address, which redirected to a
+  presigned R2 link; the browser kept that redirect (cacheable 10 minutes)
+  and storage's answer, which has no CORS header because a plain <video>
+  asks without an origin (R2 does not vary on Origin). The editor's fetch
+  of the same address got the kept answer and was refused. An earlier
+  guess ("Origin: null" after a redirect) was wrong: one redirect keeps the
+  page's origin. Now each editor file carries a fresh direct link (`src`)
+  fetched without the cache, then the Studio's address (also without the
+  cache), then the Studio in parts of at most 4 MB (`?proxy=1`, a Vercel
+  response is capped at 4.5 MB); the Studio's redirect is `no-store`. A
+  timeline saved while its shots never loaded gets them back at their
+  places when it opens. Every way in was tested by clicks: a Recreate after
+  Use this take, a finished post, Library > Make a video post, Make
+  another like this.
+- **Add media, Studio first.** In the editor, Add media and Import media
+  open the Studio picker (`apps/web/src/studio/media/` in the fork;
+  `GET /content/:id/editor/media`): this post's takes and stills, the
+  character's clips and stills, then the Library (B-roll, sounds, other
+  characters' clips). One tap adds at the playhead on a new track; a drag
+  puts it on a track where it is dropped. Picked items join the post's
+  media map, so they open again after Done. From computer is the second
+  tab: the Media tab's own file input, as before. Video thumbnails load
+  only when their tile scrolls into view.
+- **Upload images** in Library > Stills (for the character picked under
+  For) and a slideshow's Stills step (added to the slideshow): several at
+  once, dropped on a computer or picked from the camera roll on a phone.
+  Each is kept exactly as uploaded: the same bytes (checksum kept), full
+  resolution, the original type (PNG, JPEG, WebP); HEIC is refused with how
+  to share it as JPEG. They are kept stills (`op: upload_image`), shown in
+  Stills, the slideshow picker and the editor picker. An original over
+  4 MB is served by a redirect to storage, never shrunk to fit.
+- **A working run pulses.** Every live run row (images, videos, renders,
+  Claude) pulses in the accent color until it ends; with reduced motion it
+  holds a steady accent border.
+- **Tests like a user**, desktop and phone (`e2e/editor/take.spec.ts`,
+  `picker.spec.ts`, `caption.spec.ts`, `uploads.spec.ts`): the Studio runs
+  behind a proxy that serves media as the live site does, with the browser
+  cache on (Playwright's routing turns the cache off and hid the bug).
+  The full flows run locally; the live site needs the owner's login.
+

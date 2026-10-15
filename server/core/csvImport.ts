@@ -5,7 +5,7 @@
 //   clip        an existing clip's name (reused, free), or "still: <prompt>"
 //   still       a new still prompt (instead of "still:" in the clip column)
 //   video       an optional video prompt (motion for the new still)
-//   caption     the post's caption (required)
+//   caption     the post's caption (optional: none means no caption)
 //   style       an optional edit style (the Idea step's Format), by name
 // Pure: the parser, the header map and the row check. Prices come from the
 // caller (the price book).
@@ -120,7 +120,6 @@ export function planRows(rows: CsvRow[], ctx: { characters: ImportCharacter[]; c
     }
     if (!clipCell && !stillPrompt) problems.push('Name a clip to reuse, or write "still: your prompt"')
     const caption = (c.caption ?? '').trim()
-    if (!caption) problems.push('Write the caption')
     if (caption.length > 400) problems.push('The caption is over 400 characters')
     const styleCell = (c.style ?? '').trim()
     const style = styleCell ? ctx.styles.find(x => norm(x.label) === norm(styleCell) || norm(x.id) === norm(styleCell)) : undefined

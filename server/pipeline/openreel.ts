@@ -29,7 +29,21 @@ import { editorStyleSchema, stackSchema, type EditorStyle } from '../core/editor
 const CANVAS = { width: 1080, height: 1920, fps: 30 }
 const assetUrl = (id: string) => `/api/v1/assets/${id}/content`
 
-export interface EditorMedia { id: string; name: string; kind: 'video' | 'audio' | 'image'; url: string; role: 'clip' | 'broll' | 'music' | 'ambience' | 'voice'; start: number; in: number; out: number | null }
+// `src` is a fresh direct link to the file in storage (R2). The take never
+// reached the timeline on the live site (owner, 2026-10-15): the post page
+// had just played it through `url`, the browser kept that redirect and
+// storage's answer (no CORS header, as a plain <video> needs none), and the
+// editor's fetch of the same address got the kept copy and was refused. A
+// new link, fetched without the cache, always asks storage again.
+export interface EditorMedia { id: string; name: string; kind: 'video' | 'audio' | 'image'; url: string; src: string | null; role: 'clip' | 'broll' | 'music' | 'ambience' | 'voice'; start: number; in: number; out: number | null }
+
+// A direct storage link for the editor (null on local disk, where the
+// Studio serves the file itself).
+export async function directLink(deps: Deps, ctx: Ctx, assetId: string): Promise<string | null> {
+  if (deps.store.driver !== 's3') return null
+  const asset = await getAsset(deps, ctx, assetId).catch(() => null)
+  return asset ? deps.store.presignGet(asset.storageKey, 6 * 3600) : null
+}
 
 function memeOf(post: { kind: string; spec: unknown }): MemeSpec {
   if (post.kind !== 'meme') throw new AppError('bad_request', 'The editor opens video posts for now.')
@@ -52,7 +66,7 @@ export async function editorManifest(deps: Deps, ctx: Ctx, contentId: string) {
     const asset = await getAsset(deps, ctx, assetId)
     const length = (asset.durationMs ?? 0) / 1000
     const end = shot.out ?? length
-    media.push({ id: assetId, name: shot.kind === 'clip' ? `Shot ${i + 1}` : `B-roll ${i + 1}`, kind: 'video', url: assetUrl(assetId), role: shot.kind, start: Math.round(at * 1000) / 1000, in: shot.in, out: shot.out })
+    media.push({ id: assetId, name: shot.kind === 'clip' ? `Shot ${i + 1}` : `B-roll ${i + 1}`, kind: 'video', url: assetUrl(assetId), src: null, role: shot.kind, start: Math.round(at * 1000) / 1000, in: shot.in, out: shot.out })
     at += Math.max(0.1, end - shot.in)
   }
   const duration = Math.round(at * 1000) / 1000
@@ -62,14 +76,16 @@ export async function editorManifest(deps: Deps, ctx: Ctx, contentId: string) {
     if (!soundId) continue
     const sound = await getSound(deps, ctx, soundId).catch(() => null)
     if (!sound?.assetId || sound.status !== 'ready') continue
-    media.push({ id: sound.assetId, name: sound.title || (role === 'music' ? 'Music' : 'Ambience'), kind: 'audio', url: assetUrl(sound.assetId), role, start: 0, in: 0, out: null })
+    media.push({ id: sound.assetId, name: sound.title || (role === 'music' ? 'Music' : 'Ambience'), kind: 'audio', url: assetUrl(sound.assetId), src: null, role, start: 0, in: 0, out: null })
   }
   // The voiceover (a converted voice line) at its place; its phrases are
   // the captions when "Captions from the voice line" is on.
   if (s.sound.voice) {
     const line = await getVoiceLine(deps, ctx, s.sound.voice.id).catch(() => null)
-    if (line?.assetId && line.status === 'ready') media.push({ id: line.assetId, name: `Voice: ${line.title}`, kind: 'audio', url: assetUrl(line.assetId), role: 'voice', start: s.sound.voice.at, in: 0, out: null })
+    if (line?.assetId && line.status === 'ready') media.push({ id: line.assetId, name: `Voice: ${line.title}`, kind: 'audio', url: assetUrl(line.assetId), src: null, role: 'voice', start: s.sound.voice.at, in: 0, out: null })
   }
+  // No caption (owner, 2026-10-15): the cut has none, and a saved project's
+  // caption track is left out when it opens (captionOff).
   const captions = cut.captions.map(c => ({ text: (c.text ?? s.caption).trim(), start: c.start, end: c.end })).filter(c => c.text)
   let project: unknown = null
   if (s.editor?.projectAssetId) {
@@ -84,8 +100,10 @@ export async function editorManifest(deps: Deps, ctx: Ctx, contentId: string) {
     const asset = await getAsset(deps, ctx, assetId).catch(() => null)
     if (!asset) continue
     known.add(assetId)
-    media.push({ id: assetId, name: asset.label || assetId, kind: asset.kind === 'audio' ? 'audio' : asset.kind === 'image' ? 'image' : 'video', url: assetUrl(assetId), role: 'broll', start: 0, in: 0, out: null })
+    media.push({ id: assetId, name: asset.label || assetId, kind: asset.kind === 'audio' ? 'audio' : asset.kind === 'image' ? 'image' : 'video', url: assetUrl(assetId), src: null, role: 'broll', start: 0, in: 0, out: null })
   }
+  // Each file's direct storage link (see EditorMedia).
+  for (const m of media) m.src = await directLink(deps, ctx, m.id)
   // The payoff the video builds to (the post's own, else a little before
   // the end) as a suggested spot, and the Idea step's Format as the preset
   // placed on first open.
@@ -103,7 +121,7 @@ export async function editorManifest(deps: Deps, ctx: Ctx, contentId: string) {
   // The sound bed's ducking, so the editor's export matches the Studio's
   // render (editor QA, 2026-10-15).
   const soundBed = { duck: s.sound.duck, clipSound: s.sound.clipSound }
-  return { post: { id: post.id, title: post.title || s.caption.slice(0, 60) || 'Video post' }, canvas: CANVAS, media, captions, captionLook, duration, project, suggestions, format, stack, styles: await listStyles(deps, ctx), sound: soundBed }
+  return { post: { id: post.id, title: post.title || s.caption.slice(0, 60) || 'Video post' }, canvas: CANVAS, media, captions, captionOff: s.captionOff, captionLook, duration, project, suggestions, format, stack, styles: await listStyles(deps, ctx), sound: soundBed }
 }
 
 const saveBody = z.object({ uploadId: z.string().regex(/^upl_[a-z0-9]{20}$/), project: z.record(z.string(), z.unknown()), stack: stackSchema.optional() })

@@ -31,8 +31,8 @@ export function FinishStep({ ctx }: { ctx: PostCtx }) {
     const s = draft.spec as unknown as MemeSpec
     // The rough cut decides what is in the video (Phase 3).
     const cut = s.cut && !s.cut.auto && s.cut.shots.length ? s.cut : autoCut(s, ctx.data.options.meme.max_broll_seconds)
-    const captioned = cut.captions.some(c => (c.text ?? s.caption ?? '').trim())
-    todo = [...(!cut.shots.length ? [{ label: 'Pick a clip', target: 'step-video' }] : []), ...(!captioned ? [{ label: 'Write the caption', onGo: inStep('text', 'post-caption') }] : [])]
+    // A caption is optional (owner, 2026-10-15): none means no caption.
+    todo = !cut.shots.length ? [{ label: 'Pick a clip', target: 'step-video' }] : []
     const waiting = cut.shots.filter(x => x.kind === 'clip').map(x => lib?.clips.find(c => c.id === x.ref)).some(c => c && c.status !== 'approved')
     if (waiting) todo.push({ label: 'Wait for the clip to be prepared' })
     if (s.continueFrom?.status === 'joining') todo.push({ label: 'Wait for the takes to be joined', target: 'continue-shot' })
@@ -44,13 +44,15 @@ export function FinishStep({ ctx }: { ctx: PostCtx }) {
     if (style?.needs?.includes('background') && !cut.shots.some(x => x.kind === 'broll')) todo.push({ label: `Pick B-roll or a screenshot for the ${style.label.toLowerCase()} background`, onGo: inStep('video', 'post-broll') })
   } else if (item.kind === 'slideshow') {
     const s = draft.spec as unknown as SlideshowSpec
-    todo = [...(!s.stillIds.length ? [{ label: 'Pick stills', target: 'step-stills' }] : []), ...(![s.hook, ...s.slides].some(t => t.trim()) ? [{ label: 'Write the slides (or type them)', target: 'slides-text' }] : [])]
+    todo = !s.stillIds.length ? [{ label: 'Pick stills', target: 'step-stills' }] : []
     label = 'Export images'
   } else {
     const s = draft.spec as unknown as BatchSpec
-    const n = Math.min((s.captions ?? []).filter(c => c.trim()).length, ctx.data.options.batch.max)
-    todo = [...(!s.clipIds?.length ? [{ label: 'Pick a clip', target: 'batch-clips' }] : []), ...(!n ? [{ label: 'Add captions', target: 'batch-captions' }] : [])]
-    label = n ? `Make ${n} videos` : 'Make the videos'
+    const lines = Math.min((s.captions ?? []).filter(c => c.trim()).length, ctx.data.options.batch.max)
+    // Captions are optional: the lines count the videos, else How many does.
+    const n = lines || Math.min(s.count, ctx.data.options.batch.max)
+    todo = !s.clipIds?.length ? [{ label: 'Pick a clip', target: 'batch-clips' }] : []
+    label = `Make ${n} videos`
   }
   // A sound picked while it is still being prepared.
   const sp = (draft.spec as { sound?: { ambience?: string; music?: string | null } }).sound

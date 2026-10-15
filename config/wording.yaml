@@ -59,14 +59,12 @@ body:
   - glutes
   - abs
 
-# Names that sound like underwear: the everyday garment instead.
+# The one name that reads as underwear: "boy shorts" becomes "bike shorts"
+# (owner, 2026-10-15). Every other garment name stays as it is: "sports
+# bra", "bralette" and the rest are catalog garments, never changed.
 swaps:
   - { from: "boy shorts", to: "bike shorts" }
   - { from: "boyshorts", to: "bike shorts" }
-  - { from: "booty shorts", to: "short shorts" }
-  - { from: "sports bra", to: "athletic crop top" }
-  - { from: "bralette", to: "crop top" }
-  - { from: "bra top", to: "crop top" }
 
 # A moment, not a pose ("refilling her water bottle", never "posing in").
 pose:

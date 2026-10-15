@@ -4,6 +4,7 @@ import { api, assetUrl } from './api'
 import { useLibrary, useRefresh, useWorkerGate } from './hooks'
 import { Callout, Drawer, Img, errorMessage, isFresh, useToast } from './ui'
 import { RunStatus } from './runs'
+import { HowTo } from './guide/Guide'
 import type { LibraryClip, LibraryStill } from './types'
 
 // The Library's grids (UX-PLAN.md): stills and clips across characters. The
@@ -65,6 +66,65 @@ export function ClipGrid({ clips, picked = [], onPick, action, showCharacter = f
           </div>
         )
       })}
+    </div>
+  )
+}
+
+// Upload images (owner, 2026-10-15): several at once, dropped on a computer
+// or picked from the camera roll on a phone (the file picker offers it).
+// They land in Library > Stills for the character picked, kept exactly as
+// uploaded: the same file at full resolution, never downscaled, recompressed
+// or converted. From a slideshow they are added to it too.
+const IMAGE_TYPES = /^image\/(png|jpeg|webp)$/
+export function StillUpload({ characters, characterId, contentId, onUploaded }: { characters: Array<{ id: string; name: string }>; characterId: string | null; contentId?: string; onUploaded?: (ids: string[]) => void }) {
+  const toast = useToast()
+  const refresh = useRefresh()
+  const input = useRef<HTMLInputElement | null>(null)
+  const [busy, setBusy] = useState<string | null>(null)
+  const [over, setOver] = useState(false)
+  const [chosen, setChosen] = useState<string | null>(null)
+  // Fixed in a slideshow (the post's character); picked in the Library.
+  const forId = contentId ? characterId : chosen ?? characterId ?? characters[0]?.id ?? null
+  const forName = characters.find(c => c.id === forId)?.name ?? 'this character'
+  async function upload(files: File[]) {
+    if (!forId || !files.length) return
+    const images = files.filter(f => IMAGE_TYPES.test(f.type))
+    const skipped = files.filter(f => !IMAGE_TYPES.test(f.type))
+    if (skipped.length) toast({ tone: 'bad', text: `${skipped.map(f => f.name).join(', ')}: not a PNG, JPEG or WebP image${/hei[cf]/i.test(skipped.map(f => f.type || f.name).join(' ')) ? '. On an iPhone, share HEIC photos as JPEG (Settings > Camera > Formats > Most Compatible)' : ''}.` })
+    if (!images.length) return
+    setBusy(`Uploading ${images.length} image${images.length === 1 ? '' : 's'}...`)
+    try {
+      const { stills } = await api.addStills(forId, images, contentId, (done, total) => setBusy(`Uploading ${done} of ${total}...`))
+      toast({ tone: 'ok', text: `Added ${stills.length} image${stills.length === 1 ? '' : 's'} to Library > Stills for ${forName}${contentId ? ' and to this slideshow' : ''}, exactly as uploaded.` })
+      onUploaded?.(stills.map(x => x.id))
+    } catch (e) {
+      toast({ tone: 'bad', text: errorMessage(e) })
+    } finally {
+      setBusy(null)
+      refresh(forId)
+    }
+  }
+  return (
+    <div className={`st-drop st-still-drop ${over ? 'over' : ''}`} data-field="still-upload"
+      onDragOver={e => { if (Array.from(e.dataTransfer.types).includes('Files')) { e.preventDefault(); setOver(true) } }}
+      onDragLeave={() => setOver(false)}
+      onDrop={e => { e.preventDefault(); setOver(false); void upload(Array.from(e.dataTransfer.files)) }}>
+      <input ref={input} type="file" accept="image/png,image/jpeg,image/webp" multiple hidden aria-label="Upload images" onChange={e => { const f = Array.from(e.target.files ?? []); e.target.value = ''; void upload(f) }} />
+      <div className="st-row" style={{ gap: 10, flexWrap: 'wrap', justifyContent: 'center' }}>
+        <button type="button" className="st-btn" disabled={!!busy || !forId} onClick={() => input.current?.click()}>
+          {busy ? <Loader2 size={15} className="st-spin" /> : <Upload size={15} />}Upload images
+        </button>
+        {!contentId && characters.length > 1 && (
+          <label className="st-row" style={{ gap: 6 }}>
+            <span className="st-hint">For</span>
+            <select className="st-input sm" aria-label="Upload for" value={forId ?? ''} onChange={e => setChosen(e.target.value)} disabled={!!busy}>
+              {characters.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </label>
+        )}
+      </div>
+      <span className="st-hint">{busy ?? `Several at once: drop them here, or pick them (the camera roll on a phone). PNG, JPEG or WebP. Kept exactly as uploaded, at full resolution, as stills of ${forName}.`}</span>
+      <HowTo id={contentId ? 'post-stills' : 'library'} label="About uploads" />
     </div>
   )
 }

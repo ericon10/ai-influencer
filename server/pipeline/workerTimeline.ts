@@ -64,13 +64,15 @@ export async function stackPlan(deps: Deps, ctx: Ctx, a: { characterId: string; 
   return { plan: toRenderPlan(p), notes: p.notes }
 }
 
-export async function workerTimeline(deps: Deps, ctx: Ctx, a: { characterId: string; cut: Cut; sound: SoundSpec; edit: EditSpec; editor: { projectAssetId: string | null; stack: StyleItem[] | null } | null; dir: string }): Promise<WorkerTimeline> {
+export async function workerTimeline(deps: Deps, ctx: Ctx, a: { characterId: string; cut: Cut; sound: SoundSpec; edit: EditSpec; editor: { projectAssetId: string | null; stack: StyleItem[] | null } | null; captionOff?: boolean; dir: string }): Promise<WorkerTimeline> {
   const { presets, styles } = library(deps)
   if (a.editor?.projectAssetId) {
     const saved = await readAsset(deps, ctx, a.editor.projectAssetId).catch(() => null)
     if (saved) {
       const project = JSON.parse(saved.data.toString('utf8')) as StudioProject & { studioApplied?: Array<{ preset: string; strength: EditSpec['strength']; at: number }> }
-      const p = planFromProject(project)
+      const planned = planFromProject(project)
+      // No caption (owner, 2026-10-15): a saved timeline's captions stay out.
+      const p = a.captionOff ? { ...planned, captions: [] } : planned
       if (p.shots.length) return projectTimeline(deps, ctx, a, project, p, presets, styles)
     }
   }
