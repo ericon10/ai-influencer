@@ -87,7 +87,9 @@ export async function fieldOptions(deps: Deps, ctx: Ctx, characterId: string): P
 // from the words, and the fields the owner set (which win).
 export function wordFields(deps: Deps, row: SceneRow): { read: Partial<SceneFields>; ownerSet: string[] } {
   const brief = (row.brief ?? '').trim()
-  return { read: brief.length >= 3 ? fieldsFromWords(deps.config.pipeline.scenes, brief) : {}, ownerSet: Object.keys(draftFields(row)) }
+  // A hair styling the rotation filled in is not the owner's (G51).
+  const sc = deps.config.pipeline.scenes
+  return { read: brief.length >= 3 ? fieldsFromWords(sc, brief) : {}, ownerSet: Object.entries(draftFields(row)).filter(([k, v]) => !(k === 'hair' && isBankHair(sc, v as string))).map(([k]) => k) }
 }
 
 export function sceneFields(deps: Deps, row: SceneRow, o: FieldOptions = {}): SceneFields {
