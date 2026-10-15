@@ -644,10 +644,15 @@ face match to REF-00, its likeness to the person in the clip, and the
 margin between them. **Fix this face** on any other still (price on it)
 still runs a face pass on that one. **You pick** chooses for you.
 
-When the plan is not connected, the stills run on GPT Image 2.5 on the API
-(Nano Banana 2.1 is plan-only; the Higgsfield API does not offer it). The
-button then says so: **Make 4 stills (GPT Image 2.5, untested for
-recreates)**.
+**Stills model (owner, round 18).** Two choices above the button, each
+with its path: **Nano Banana 2.1** (your plan; what the proven runs used)
+and **GPT Image 2.5** (the Higgsfield API; untested for recreates). Same
+prompts, same face pass, same gates either way; the face pass runs on the
+model the stills used. Nano Banana 2.1 is picked when the plan is
+connected, GPT Image 2.5 when it is not (the API does not offer Nano Banana
+2.1); a choice with no plan or no key is grey with one line why. Your last
+pick is remembered. With GPT Image 2.5 the button says so: **Make 4 stills
++ face pass (GPT Image 2.5, untested for recreates)**.
 
 **Step 4: the gates (fixed, owner 2026-10-14; margin added in round 17).**
 Before any video spend the chosen still must pass three free checks: the
@@ -689,6 +694,17 @@ its own motion model picker, plus **Set all**; each row shows its price
 and the batch shows the total. Rows run step by step together (stills,
 with the face pass, then the video); a row whose gates fail waits for you
 with the same way on, and the others carry on.
+
+**Gate check (owner, round 18).** After every 10 real recreates (a video
+made from a still on a real model, not the demo), Settings > Rules shows a
+**Recreate gate check** card, and the Recreate panel a one-line notice
+linking to it. The card lists the face match and the margin of the stills
+you made the videos from next to the stills you passed over, the gate
+numbers now, and suggested numbers (just under the lowest picked face and
+margin, just over the highest picked likeness, never below the standard
+0.363 face match), with what each would have held. **Use these numbers**
+applies them to your account; **Keep the current numbers** closes it until
+the next 10. Nothing changes without your click.
 
 **Spend cap.** A post can carry a credit cap (the link's `cap`, or set in
 Recreate). A step that would pass it is refused before any spend, with

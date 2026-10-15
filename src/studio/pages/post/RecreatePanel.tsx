@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { AlertTriangle, Check, CheckCircle2, Copy, Pause, Play, Plus, Scissors, ShieldAlert, ShieldCheck, Sparkles, Users, X } from 'lucide-react'
 import { api, ApiError, assetUrl } from '../../api'
@@ -52,10 +52,11 @@ export function RecreatePanel({ ctx, source, o, takes }: { ctx: PostCtx; source:
         <div className="grow"><CapLine ctx={ctx} source={source} /></div>
         <HowTo id="post-clone" label="How Recreate works" />
       </div>
+      <GateCheckNotice />
       <Field id="recreate-keep" label="2. What to keep, what to drop" group hint="Read from the frame; every chip is yours to change.">
         <StepTwo ctx={ctx} source={source} />
       </Field>
-      <Field id="recreate-stills" label={`3. ${takes.still} stills of ${name} and the face pass`} group done={!!keptStill?.gate.ok} hint="One price for the stills and the face pass on the best one (switch it off to skip). Each shows its face match to REF-00, its likeness to the person in the clip, and the margin between them. Fix this face redoes only the face on any other still.">
+      <Field id="recreate-stills" label={`3. ${takes.still} stills of ${name} and the face pass`} group done={!!keptStill?.gate.ok} hint="Pick the stills model: Nano Banana 2.1 on your plan or GPT Image 2.5 on the API, with the same prompts, face pass and gates. One price for the stills and the face pass on the best one (switch it off to skip). Each shows its face match to REF-00, its likeness to the person in the clip, and the margin between them. Fix this face redoes only the face on any other still.">
         <StillsStep ctx={ctx} list={list} kept={kept} takes={takes} picked={picked} opts={o} />
       </Field>
       <Field id="recreate-model" label="5. The motion model" group hint={`The still as the image, the cleaned clip as the motion, 720p, 9:16, audio off. Price for this ${source.durationSec ?? ''} s clip; your last pick is selected.`}>
@@ -192,7 +193,16 @@ function StillsStep({ ctx, list, kept, takes, picked, opts }: { ctx: PostCtx; li
   // The face pass on the best still rides with the stills, in one price
   // (owner, round 17); the switch skips it.
   const [facePass, setFacePass] = useState<boolean>(opts?.facePass ?? true)
-  const untested = opts?.stillModel && !opts.stillModel.onPlan ? `${opts.stillModel.label}, ${opts.stillModel.note ?? 'untested for recreates'}` : null
+  // The stills model (owner, round 18): Nano Banana 2.1 on the plan or GPT
+  // Image 2.5 on the API; same prompts, face pass and gates. Last pick kept.
+  const [stillModel, setStillModel] = useState<string | null>(null)
+  const choices = opts?.stillModels ?? []
+  const chosen = choices.find(c => c.ref === (stillModel ?? opts?.stillModel.ref)) ?? null
+  function pickStill(ref: string) {
+    setStillModel(ref)
+    api.setRecreateStillModel(ref).catch(() => undefined)
+  }
+  const untested = chosen?.path === 'api' ? `${chosen.label}, ${chosen.note ?? 'untested for recreates'}` : null
   const stillsLabel = `${list.length ? `Make ${takes.still} new stills` : `Make ${takes.still} stills`}${facePass ? ' + face pass' : ''}${untested ? ` (${untested})` : ''}`
   const cid = ctx.item.characterId ?? ''
   const usable = list.filter(x => x.assetId && !x.error)
@@ -237,16 +247,38 @@ function StillsStep({ ctx, list, kept, takes, picked, opts }: { ctx: PostCtx; li
           ))}
         </div>
       )}
-      <div className="st-row" style={{ gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-        <span className="st-row" style={{ gap: 8, alignItems: 'center' }} data-field="recreate-facepass" title={`Runs the face pass (${takes.face} takes) on the best still, in the same price. Both proven hand runs needed it.`}>
-          <button type="button" role="switch" aria-checked={facePass} aria-label="Face pass on the best still" className={`st-switch ${facePass ? 'on' : ''}`} onClick={() => setFacePass(f => !f)}><span /></button>
-          <span className="st-hint">Face pass on the best still{facePass ? '' : ' (skipped)'}</span>
-        </span>
-        <PriceButton label={stillsLabel} variant={list.length ? 'secondary' : 'primary'} action={{ type: 'clone_still', contentId: ctx.item.id, characterId: cid, takes: takes.still, facePass }} watch={j => j.purpose === `clone_still:${ctx.item.id}:${cid}` || j.purpose === `clone_face:${ctx.item.id}:${cid}:auto`} />
+      {choices.length > 1 && (
+        <div className="st-videomodels" role="radiogroup" aria-label="Stills model" data-field="recreate-stillmodel">
+          {choices.map(c => {
+            const on = c.ref === chosen?.ref
+            return (
+              <button key={c.ref} type="button" role="radio" aria-checked={on} className={`st-choice ${on ? 'on' : ''}`} onClick={() => pickStill(c.ref)} disabled={!!c.problem}>
+                <span className="st-row" style={{ gap: 8 }}><b>{c.label}</b><span className="st-spacer" />{on && <Check size={14} />}</span>
+                <span className="st-hint">{c.pathLabel}{c.note ? `, ${c.note}` : ''}</span>
+                {c.problem && <span className="st-hint" style={{ color: 'var(--st-bad)' }}>{c.problem}</span>}
+              </button>
+            )
+          })}
+        </div>
+      )}
+      <span className="st-row" style={{ gap: 8, alignItems: 'center' }} data-field="recreate-facepass" title={`Runs the face pass (${takes.face} takes) on the best still, in the same price. Both proven hand runs needed it.`}>
+        <button type="button" role="switch" aria-checked={facePass} aria-label="Face pass on the best still" className={`st-switch ${facePass ? 'on' : ''}`} onClick={() => setFacePass(f => !f)}><span /></button>
+        <span className="st-hint">Face pass on the best still{facePass ? '' : ' (skipped)'}</span>
+      </span>
+      <div className="st-row" style={{ gap: 8, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+        <PriceButton label={stillsLabel} variant={list.length ? 'secondary' : 'primary'} todo={chosen?.problem ? [{ label: chosen.problem, target: 'recreate-stillmodel' }] : undefined} action={chosen?.problem ? null : { type: 'clone_still', contentId: ctx.item.id, characterId: cid, takes: takes.still, facePass, ...(chosen ? { stillModel: chosen.ref } : {}) }} watch={j => j.purpose === `clone_still:${ctx.item.id}:${cid}` || j.purpose === `clone_face:${ctx.item.id}:${cid}:auto`} />
         {usable.length > 1 && <AsyncButton className="st-btn sm ghost" onClick={youPick} icon={<Sparkles size={14} />}>You pick</AsyncButton>}
       </div>
     </div>
   )
+}
+
+// After every 10 real recreates: a one-line notice linking to the gate
+// check in Settings > Rules (owner, round 18).
+function GateCheckNotice() {
+  const q = useQuery({ queryKey: ['gate-check'], queryFn: api.gateCheck, staleTime: 5 * 60_000, retry: false })
+  if (!q.data?.due) return null
+  return <Callout tone="info">{q.data.count} real recreates since the gate numbers were last checked. <Link to="/studio/settings?tab=rules#gate-check">See the face and margin scores and the suggested numbers</Link>; nothing changes until you approve.</Callout>
 }
 
 // The gates (fixed): ready for the video, or why not.

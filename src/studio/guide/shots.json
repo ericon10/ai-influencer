@@ -1389,54 +1389,54 @@
  },
  "recreate-stills": {
   "w": 1030,
-  "h": 1355,
+  "h": 1458,
   "spots": [
    {
     "n": 1,
     "x": 21,
-    "y": 2.7,
+    "y": 2.5,
     "w": 18.4,
-    "h": 35.4,
+    "h": 32.9,
     "label": "The face pass on the best still, made with the stills"
    },
    {
     "n": 2,
     "x": 2.4,
-    "y": 28.3,
+    "y": 26.3,
     "w": 15.9,
-    "h": 1.7,
+    "h": 1.6,
     "label": "The gate: face 0.45+, margin 0.12+, likeness under 0.45"
    },
    {
     "n": 3,
     "x": 22,
-    "y": 30.5,
+    "y": 28.4,
     "w": 17.1,
-    "h": 2.2,
+    "h": 2.1,
     "label": "Make the video: only on a still that passes"
    },
    {
     "n": 4,
-    "x": 2.2,
-    "y": 30.5,
-    "w": 17.2,
-    "h": 2.2,
-    "label": "Fix this face on any other still (priced)"
+    "x": 1.2,
+    "y": 72.8,
+    "w": 97.7,
+    "h": 6.2,
+    "label": "The stills model: Nano Banana 2.1 (plan) or GPT Image 2.5 (API); same prompts, face pass, gates"
    },
    {
     "n": 5,
-    "x": 20.9,
-    "y": 78.3,
+    "x": 1.2,
+    "y": 82.4,
     "w": 54.8,
-    "h": 2.8,
-    "label": "One price: 4 stills and the face pass"
+    "h": 2.6,
+    "label": "One price: 4 stills and the face pass; it names an untested model"
    },
    {
     "n": 6,
     "x": 1.2,
-    "y": 84.8,
-    "w": 18.9,
-    "h": 1.9,
+    "y": 79.8,
+    "w": 97.7,
+    "h": 1.8,
     "label": "Switch off to skip the face pass"
    }
   ]
@@ -1558,6 +1558,44 @@
     "w": 15.4,
     "h": 3.3,
     "label": "Use this clip: Recreate it with this clip's character"
+   }
+  ]
+ },
+ "gate-check": {
+  "w": 1068,
+  "h": 1334,
+  "spots": [
+   {
+    "n": 1,
+    "x": 3.1,
+    "y": 9.6,
+    "w": 93.8,
+    "h": 1.6,
+    "label": "After every 10 real recreates, a check is ready"
+   },
+   {
+    "n": 2,
+    "x": 3.1,
+    "y": 17.7,
+    "w": 93.8,
+    "h": 66.5,
+    "label": "Face, likeness and margin: stills you picked, stills you passed over"
+   },
+   {
+    "n": 3,
+    "x": 3.1,
+    "y": 85,
+    "w": 93.8,
+    "h": 9.6,
+    "label": "Suggested numbers, what they would hold, and why"
+   },
+   {
+    "n": 4,
+    "x": 3.1,
+    "y": 95.3,
+    "w": 13,
+    "h": 2.2,
+    "label": "Use these numbers or keep the current ones; nothing changes until you click"
    }
   ]
  }

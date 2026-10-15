@@ -193,7 +193,7 @@ export type StudioAction =
   | { type: 'clone_caption'; characterId: string; contentId: string }
   | { type: 'clone'; contentId: string; characterIds: string[]; model?: string; mode?: CloneMode; background?: 'video' | 'image'; outfit?: 'source' | 'hers'; looks: Record<string, string>; keepSound: boolean; stills?: Record<string, string> }
   | { type: 'recreate_batch'; contentId: string; step: 'stills' | 'face' | 'video'; facePass?: boolean }
-  | { type: 'clone_still'; contentId: string; characterId: string; outfit?: 'source' | 'hers'; look?: string; takes?: number; facePass?: boolean }
+  | { type: 'clone_still'; contentId: string; characterId: string; outfit?: 'source' | 'hers'; look?: string; takes?: number; facePass?: boolean; stillModel?: string }
   | { type: 'clone_face'; contentId: string; characterId: string; candidateId: string; takes?: number }
   | { type: 'clone_traits'; contentId: string; characterId: string }
   | { type: 'voice_convert'; soundIds: string[] }
@@ -334,6 +334,16 @@ export interface CloneSource {
   keep?: string[]; outfit?: { choice: 'source' | 'hers'; text: string; lookId: string | null }; motion?: string
   capCredits?: number | null; spentCredits?: number; from?: string
 }
+// Recreate's stills model: Nano Banana 2.1 on the plan or GPT Image 2.5 on the API.
+export interface StillChoice { ref: string; label: string; path: 'account' | 'api'; pathLabel: string; problem: string | null; note: string | null }
+export type GateNumbers = { face_min: number; margin: number; source_max: number }
+export interface GateSample { postId: string; candidateId: string; assetId: string | null; pass: 'still' | 'face'; face: number | null; likeness: number | null; margin: number | null; model: string | null; at: string }
+export interface GateCheckView {
+  count: number; every: number; reviewedAt: number; due: boolean; nextAt: number
+  current: GateNumbers; suggested: GateNumbers | null; picked: GateSample[]; passedOver: GateSample[]
+  effect: { current: { pickedPass: number; passedOverHeld: number }; suggested: { pickedPass: number; passedOverHeld: number } | null }
+  why: string[]
+}
 export interface StillGate { ok: boolean; face: number | null; likeness: number | null; margin: number | null; reasons: string[]; note: string | null }
 export interface CloneStill {
   id: string; characterId: string; characterName: string; assetId: string | null; status: string; kept: boolean; error: string | null
@@ -349,7 +359,7 @@ export interface CloneModel {
   path: 'account' | 'api'; pathLabel: string; note: string; display: string | null; verified: boolean; problem: string | null; takesPrompt: boolean
 }
 export interface CloneOptions {
-  suggest: { mode: CloneMode; why: string } | null; takes: { still: number; face: number }; gate: { face_min: number; margin: number; source_max: number }; facePass: boolean; stillModel: { ref: string; label: string; onPlan: boolean; note: string | null }; cap: { credits: number | null; spent: number } | null
+  suggest: { mode: CloneMode; why: string } | null; takes: { still: number; face: number }; gate: { face_min: number; margin: number; source_max: number }; facePass: boolean; stillModel: { ref: string; label: string; onPlan: boolean; note: string | null }; stillModels: StillChoice[]; cap: { credits: number | null; spent: number } | null
   mode: CloneMode; outfit: 'source' | 'hers'; defaults: Record<CloneMode, string>; target: string; model: string; models: CloneModel[]; seconds: number; maxCharacters: number; keepSound: boolean; minSeconds: number; maxSeconds: number; maxUploadMb: number
 }
 // The review of a take (free, on the worker): the face every half second,

@@ -1834,3 +1834,34 @@ person" in the clone panel.
   kitchen, 6 s: 4 stills 6 credits, face pass 3, Genjutsu 42, total 51;
   Wan 3.0 10.5 and Wan 3.0 Prime 18 on the same still and clip. Rave,
   10 s: 4 stills 6, face pass 3, Genjutsu 70 (plus 3 for 2 earlier takes).
+
+### G41. Recreate stills model choice and the gate check (owner, round 18)
+
+- **Stills model, the owner's choice.** Even with the plan connected the
+  Recreate stills step offers two choices: **Nano Banana 2.1** (Your
+  Higgsfield plan; what the proven runs used) and **GPT Image 2.5** (the
+  Higgsfield API; "untested for recreates"). Same prompts, same face pass,
+  same gates. The face pass runs on the model its still was made with (it
+  reads the still job's model). The API choice runs on the API even when
+  the account's default billing is the plan; the plan choice keeps the
+  plan's element for her face, the API choice sends REF-00 and one
+  three-quarter view. Default: Nano Banana 2.1 when the plan is connected,
+  GPT Image 2.5 when it is not (the API does not offer Nano Banana 2.1). A
+  choice with no plan or no key is grey with one line why. The last pick
+  is remembered per account (`recreate_still_model`) and a batch uses it.
+  The GPT Image 2.5 quote carries the untested warning.
+- **Gate check, suggest only.** After every 10 real recreates (completed
+  motion videos on a real model; the demo never counts) Settings > Rules
+  shows the Recreate gate check, and the Recreate panel a one-line notice
+  linking to it. Picked: the still each video was made from; passed over:
+  the other stills of that post and character (a still picked once counts
+  as picked; failed stills are left out). Suggested numbers: face just
+  under the lowest picked face (minus 0.03, never below SFace's 0.363),
+  margin just under the smallest picked margin (minus 0.03, never below
+  0.05), likeness cap just over the highest picked likeness (plus 0.03,
+  between 0.30 and 0.50), with what each set would have passed and held.
+  **Use these numbers** (owner role only; the server works the suggestion
+  out again and never takes numbers from the page) stores them for the
+  account (`recreate_gate`, with the time approved); **Keep the current
+  numbers** closes the check until the next 10. The gate itself stays a
+  fixed rule; only its numbers move, and only on the owner's click.

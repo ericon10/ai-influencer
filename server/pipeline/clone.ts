@@ -497,13 +497,13 @@ export async function cloneOptions(deps: Deps, ctx: Ctx, contentId: string) {
   const suggest = source?.look?.why ? { mode: source.look.suggest, why: source.look.why } : null
   const mode: CloneMode = suggest?.mode ?? cfg.mode
   return {
-    suggest, takes: { still: cfg.recreate.takes, face: cfg.recreate.face_takes }, gate: cfg.recreate.gate, facePass: cfg.recreate.face_pass,
+    suggest, takes: { still: cfg.recreate.takes, face: cfg.recreate.face_takes }, gate: await recreateGate(deps, ctx), facePass: cfg.recreate.face_pass,
     // The Recreate stills' model: Nano Banana 2.1 on the plan, or the API
     // model (untested for recreates) without the plan.
-    stillModel: await (async () => {
-      const onPlan = (await listCredentials(deps.db, ctx.accountId)).some(c => c.provider === ACCOUNT_PROVIDER)
-      const ref = onPlan ? cfg.scene_still.model : cfg.scene_still.api_model
-      return { ref, label: deps.config.models.models.find(m => m.ref === ref)?.label ?? ref, onPlan, note: onPlan ? null : cfg.scene_still.api_note || null }
+    ...await (async () => {
+      const { choices, pick } = await recreateStillChoices(deps, ctx)
+      const c = choices.find(x => x.ref === pick)!
+      return { stillModels: choices, stillModel: { ref: c.ref, label: c.label, onPlan: c.path === 'account', note: c.note } }
     })(),
     cap: source ? { credits: source.capCredits, spent: Math.round(source.spentCredits * 100) / 100 } : null,
     mode, outfit: cfg.outfit, defaults, model: defaults[mode], models, seconds,
@@ -617,10 +617,27 @@ export function gateFor(g: { face_min: number; margin: number; source_max: numbe
   return { ok: !reasons.length, face, likeness, margin, reasons, note }
 }
 
+const GATE_KEY = 'recreate_gate'
+export type GateNumbers = { face_min: number; margin: number; source_max: number }
+
+// The gate numbers for this account: the calibrated defaults, or numbers the
+// owner approved from a gate check (owner, round 18: suggest only, the owner
+// approves).
+export async function recreateGate(deps: Deps, ctx: Ctx): Promise<GateNumbers> {
+  const base = deps.config.pipeline.content.clone.recreate.gate
+  const own = await getSetting<Partial<GateNumbers> | null>(deps.db, ctx.accountId, GATE_KEY, null)
+  const ok = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= 1
+  return own && ok(own.face_min) && ok(own.margin) && ok(own.source_max) ? { face_min: own.face_min, margin: own.margin, source_max: own.source_max } : base
+}
+
+export async function setRecreateGate(deps: Deps, ctx: Ctx, g: GateNumbers): Promise<void> {
+  await setSetting(deps, ctx, GATE_KEY, { ...g, approvedAt: deps.clock.now().toISOString() })
+}
+
 async function stillGate(deps: Deps, ctx: Ctx, still: { status: string; jobId: string | null; meta: unknown }): Promise<StillGate> {
   const meta = (still.meta ?? {}) as { faceScore?: number | null; sourceScore?: number | null }
   const [job] = still.jobId ? await deps.db.select({ provider: jobs.provider }).from(jobs).where(eq(jobs.id, still.jobId)) : []
-  return gateFor(deps.config.pipeline.content.clone.recreate.gate, { status: still.status, faceScore: meta.faceScore ?? null, sourceScore: meta.sourceScore ?? null, demo: job?.provider === 'mock' })
+  return gateFor(await recreateGate(deps, ctx), { status: still.status, faceScore: meta.faceScore ?? null, sourceScore: meta.sourceScore ?? null, demo: job?.provider === 'mock' })
 }
 
 export async function buildClone(deps: Deps, ctx: Ctx, input: CloneInput) {
@@ -750,7 +767,7 @@ export async function buildClone(deps: Deps, ctx: Ctx, input: CloneInput) {
 
 // ── Recreate from a real clip: the stills (owner, 2026-10-14) ───────
 
-export interface CloneStillInput { contentId: string; characterId: string; outfit?: 'source' | 'hers'; look?: string; takes?: number; facePass?: boolean; facePassTakes?: number }
+export interface CloneStillInput { contentId: string; characterId: string; outfit?: 'source' | 'hers'; look?: string; takes?: number; facePass?: boolean; facePassTakes?: number; stillModel?: string }
 
 // The character's element on the plan (a Higgsfield element named in the
 // character file), used through its placeholder in the prompt.
@@ -764,23 +781,53 @@ function faceWords(ch: ReturnType<typeof toData>): { face: string; hair: string 
   return { face: ch.card.trim().replace(/[.\s]+$/, ''), hair: hairColorFrom(ch.card) ?? 'exactly as in the references' }
 }
 
-async function stillRun(deps: Deps, ctx: Ctx, characterId: string) {
-  const cfg = deps.config.pipeline.content.clone
-  const sc = deps.config.pipeline.scenes
+const STILL_MODEL_KEY = 'recreate_still_model'
+
+export interface StillChoice { ref: string; label: string; path: 'account' | 'api'; pathLabel: string; problem: string | null; note: string | null }
+
+// The Recreate stills' model (owner, round 18): Nano Banana 2.1 on the plan
+// (what the proven runs used; the API does not offer it) or GPT Image 2.5 on
+// the API (untested for recreates). Same prompts, face pass and gates. The
+// last pick is kept; Nano Banana 2.1 when the plan is connected, else GPT
+// Image 2.5. A choice that cannot run is grey with one line why.
+export async function recreateStillChoices(deps: Deps, ctx: Ctx): Promise<{ choices: StillChoice[]; pick: string }> {
+  const cfg = deps.config.pipeline.content.clone.scene_still
+  const live = (await providerMode(deps.db, ctx.accountId)) === 'live'
+  const plan = (await listCredentials(deps.db, ctx.accountId)).some(c => c.provider === ACCOUNT_PROVIDER)
+  const api = !live || await apiKeyReady(deps, ctx)
+  const label = (ref: string) => deps.config.models.models.find(m => m.ref === ref)?.label ?? ref
+  const choices: StillChoice[] = [
+    { ref: cfg.model, label: label(cfg.model), path: 'account', pathLabel: 'Your Higgsfield plan', problem: !live || plan ? null : 'Runs only on your Higgsfield plan (the API does not offer it): connect it in Settings > Connected accounts.', note: null },
+    { ref: cfg.api_model, label: label(cfg.api_model), path: 'api', pathLabel: 'Higgsfield API', problem: api ? null : 'Needs your Higgsfield API key: Settings > Connected accounts.', note: cfg.api_note || null },
+  ]
+  const saved = await getSetting<string | null>(deps.db, ctx.accountId, STILL_MODEL_KEY, null)
+  const pick = choices.find(c => c.ref === saved && !c.problem)?.ref ?? (plan ? cfg.model : cfg.api_model)
+  return { choices, pick }
+}
+
+export async function saveRecreateStillModel(deps: Deps, ctx: Ctx, ref: string): Promise<void> {
+  const cfg = deps.config.pipeline.content.clone.scene_still
+  if (ref !== cfg.model && ref !== cfg.api_model) throw new AppError('invalid_request', `"${ref}" is not one of the Recreate stills models.`)
+  await setSetting(deps, ctx, STILL_MODEL_KEY, ref)
+}
+
+async function stillRun(deps: Deps, ctx: Ctx, characterId: string, want?: string | null) {
   const row = await getCharacter(deps, ctx, characterId)
   const ch = toData(row)
   const approved = await approvedAssets(deps, ctx, row.id)
   if (!approved.get('REF-00')) throw new AppError('bad_request', `${row.name} has no face yet. Set up ${ch.pronouns.poss} face (REF-00) first.`)
-  // Recreate's stills and face pass stay on Nano Banana 2.1 (owner,
-  // 2026-10-14), a plan-only model: on the plan whenever it is connected,
-  // whatever the billing default; the API model only when there is no plan.
-  const account = (await listCredentials(deps.db, ctx.accountId)).some(c => c.provider === ACCOUNT_PROVIDER)
-  const model = account ? cfg.scene_still.model : cfg.scene_still.api_model
-  const run = await runModel(deps, ctx, model, 'image_edit')
+  const { choices, pick } = await recreateStillChoices(deps, ctx)
+  const choice = choices.find(c => c.ref === want) ?? choices.find(c => c.ref === pick)!
+  if (choice.problem) throw new AppError('bad_request', `${choice.label}: ${choice.problem}`)
+  const model = choice.ref
+  const onPlan = choice.path === 'account'
+  const base = await runModel(deps, ctx, model, 'image_edit')
+  // The API choice runs on the API even when the plan is the default path.
+  const run = !onPlan && base.model.startsWith('higgsfield/') ? { ...base, billing: 'api' as const } : base
   const entry = deps.config.models.models.find(m => m.ref === model)!
   // On the plan the element carries her face; elsewhere REF-00 and one
   // three-quarter view do (never the rest of the sheet).
-  const element = account ? planElement(ch) : null
+  const element = onPlan ? planElement(ch) : null
   const level = stillLevelFor(deps, model)
   return { row, ch, approved, model, run, entry, element, level }
 }
@@ -797,7 +844,7 @@ export async function buildCloneStill(deps: Deps, ctx: Ctx, input: CloneStillInp
   if (!frameId) throw new AppError('bad_request', 'The frame of the clip is still being prepared. Try again in a moment.')
   const cfg = deps.config.pipeline.content.clone
   const { templates: t, rules } = deps.config.pipeline
-  const { row, ch, approved, model, run, entry, element, level } = await stillRun(deps, ctx, input.characterId)
+  const { row, ch, approved, model, run, entry, element, level } = await stillRun(deps, ctx, input.characterId, input.stillModel)
   const takes = Math.min(Math.max(1, Math.round(input.takes ?? cfg.recreate.takes)), 4)
   const refs = [frameId, ...(element ? [] : replaceRefs(deps, approved))]
   const warnings: RuleViolation[] = []
@@ -843,7 +890,7 @@ export async function buildCloneStill(deps: Deps, ctx: Ctx, input: CloneStillInp
   warnings.push(...lintOrThrow(lintPrompt(rules, prompt, { stage: 'edit', kind: 'image_edit', request: { ...request, model }, switches: sw }), 'Recreate still'))
   for (const w of realism) warnings.push(w)
   if (!notLike) warnings.push(warn('clone-not-like', 'Nothing named to keep away', `Naming the person's traits (hair color, eye color, piercings, makeup) keeps ${row.name}'s face from drifting toward theirs. Optional.`))
-  if (cfg.scene_still.api_note && model === cfg.scene_still.api_model) warnings.push(warn('clone-still-untested', `${entry.label}, ${cfg.scene_still.api_note}`, `Nano Banana 2.1 made the proven recreates and runs only on your Higgsfield plan (the API does not offer it). Without the plan these stills run on ${entry.label}, which has not been proven for a recreate yet. Connect the plan in Settings > Connected accounts to use Nano Banana 2.1.`))
+  if (cfg.scene_still.api_note && model === cfg.scene_still.api_model) warnings.push(warn('clone-still-untested', `${entry.label}, ${cfg.scene_still.api_note}`, `Nano Banana 2.1 made the proven recreates and runs only on your Higgsfield plan (the API does not offer it). These stills run on ${entry.label} on the Higgsfield API, which has not been proven for a recreate yet: same prompts, same face pass, same gates. Pick Nano Banana 2.1 above the button to use the plan.`))
   const specs: JobSpec[] = Array.from({ length: takes }, (_, v) => ({ type: 'gen' as const, stage: 'edit', purpose: `clone_still:${post.id}:${row.id}`, label: `Still ${v + 1} of ${takes} for ${row.name}`, request: { ...request, seed: v + 1 }, characterId: row.id }))
   const prompts = [{ label: 'Still prompt', text: prompt, wrapped: hardWrap(prompt) }]
   // The face pass on the best still, in the same price (owner, round 17):
@@ -851,7 +898,7 @@ export async function buildCloneStill(deps: Deps, ctx: Ctx, input: CloneStillInp
   // the stills are in, or canceled (hold released) if none is usable.
   const withFace = input.facePass ?? cfg.recreate.face_pass
   if (withFace) {
-    const fp = await facePassRun(deps, ctx, { postId: post.id, characterId: row.id, still: 'auto', assetId: frameId, aspect: request.aspect!, takes: input.facePassTakes })
+    const fp = await facePassRun(deps, ctx, { postId: post.id, characterId: row.id, still: 'auto', assetId: frameId, aspect: request.aspect!, takes: input.facePassTakes, model })
     for (const sp of fp.specs) specs.push({ ...sp, parentIndex: 0 })
     prompts.push(...fp.prompts)
     warnings.push(...fp.warnings)
@@ -876,7 +923,10 @@ export async function buildCloneFace(deps: Deps, ctx: Ctx, input: { contentId: s
   if (still.op !== 'clone_still' || !still.assetId || still.characterId !== input.characterId) throw new AppError('bad_request', 'Pick a finished still of this character.')
   if (still.status === 'qa_failed') throw new AppError('bad_request', 'This still looks like the person in the clip; make new stills instead.')
   const asset = await getAsset(deps, ctx, still.assetId)
-  const fp = await facePassRun(deps, ctx, { postId: post.id, characterId: input.characterId, still: still.id, assetId: still.assetId, aspect: (asset.height ?? 16) >= (asset.width ?? 9) ? '9:16' : '16:9', takes: input.takes })
+  // The face pass runs on the model that made the still.
+  const [made] = still.jobId ? await deps.db.select({ request: jobs.request }).from(jobs).where(eq(jobs.id, still.jobId)) : []
+  const model = (made?.request as GenRequest | undefined)?.modelRef ?? null
+  const fp = await facePassRun(deps, ctx, { postId: post.id, characterId: input.characterId, still: still.id, assetId: still.assetId, aspect: (asset.height ?? 16) >= (asset.width ?? 9) ? '9:16' : '16:9', takes: input.takes, model })
   return {
     purpose: `clone_face:${post.id}`,
     characterId: input.characterId,
@@ -888,10 +938,10 @@ export async function buildCloneFace(deps: Deps, ctx: Ctx, input: { contentId: s
 // The face pass request (shared by "Fix this face" and the face pass that
 // follows "Make 4 stills"). `still: 'auto'` is the one after the stills: its
 // image is a placeholder until the best still is known.
-async function facePassRun(deps: Deps, ctx: Ctx, o: { postId: string; characterId: string; still: string; assetId: string; aspect: string; takes?: number }) {
+async function facePassRun(deps: Deps, ctx: Ctx, o: { postId: string; characterId: string; still: string; assetId: string; aspect: string; takes?: number; model?: string | null }) {
   const cfg = deps.config.pipeline.content.clone
   const { templates: t, rules } = deps.config.pipeline
-  const { row, ch, approved, model, run, entry, element, level } = await stillRun(deps, ctx, o.characterId)
+  const { row, ch, approved, model, run, entry, element, level } = await stillRun(deps, ctx, o.characterId, o.model)
   const takes = Math.min(Math.max(1, Math.round(o.takes ?? cfg.recreate.face_takes)), 4)
   const refs = [o.assetId, ...(element ? [] : replaceRefs(deps, approved))]
   const pv = pronounVars(ch.pronouns)
@@ -1077,7 +1127,7 @@ export async function cloneStills(deps: Deps, ctx: Ctx, contentId: string): Prom
   const jobRows = await deps.db.select({ id: jobs.id, provider: jobs.provider }).from(jobs).where(and(eq(jobs.accountId, ctx.accountId), or(like(jobs.purpose, `clone_still:${contentId}:%`), like(jobs.purpose, `clone_face:${contentId}:%`))))
   if (!jobRows.length) return []
   const mock = new Set(jobRows.filter(j => j.provider === 'mock').map(j => j.id))
-  const g = deps.config.pipeline.content.clone.recreate.gate
+  const g = await recreateGate(deps, ctx)
   const rows = await deps.db.select().from(candidates)
     .where(and(eq(candidates.accountId, ctx.accountId), eq(candidates.op, 'clone_still'), inArray(candidates.jobId, jobRows.map(j => j.id))))
     .orderBy(desc(candidates.createdAt))

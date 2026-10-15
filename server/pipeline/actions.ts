@@ -121,7 +121,7 @@ export const actionSchema = z.discriminatedUnion('type', [
   // frame (4 by default), shown before the motion run; then a face-only pass
   // on a chosen still (2 by default); and the traits the character must not
   // take from the person in the clip, read by Claude.
-  z.object({ type: z.literal('clone_still'), contentId: z.string(), characterId: z.string().max(60), outfit: z.enum(['source', 'hers']).optional(), look: z.string().max(60).optional(), takes: z.number().int().min(1).max(4).optional(), facePass: z.boolean().optional() }),
+  z.object({ type: z.literal('clone_still'), contentId: z.string(), characterId: z.string().max(60), outfit: z.enum(['source', 'hers']).optional(), look: z.string().max(60).optional(), takes: z.number().int().min(1).max(4).optional(), facePass: z.boolean().optional(), stillModel: z.string().max(80).optional() }),
   z.object({ type: z.literal('clone_face'), contentId: z.string(), characterId: z.string().max(60), candidateId: z.string().max(60), takes: z.number().int().min(1).max(4).optional() }),
   z.object({ type: z.literal('clone_traits'), characterId: z.string(), contentId: z.string() }),
   // A batch of recreates: one priced run for every row at the step.

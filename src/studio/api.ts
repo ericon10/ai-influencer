@@ -1,4 +1,4 @@
-import type { ActionPreview, CharacterSummary, CharacterView, HiggsfieldAccount, JobView, Me, QuoteView, RulesView, SceneFields, ScenesData, SettingsView, StudioAction, Usage, VideoPrice, BrollClip, ContentData, ContentKind, LibraryData, PostStep, WorkerStatus, CloneOptions, CloneResult, CloneSource, CloneStill, CutView, SoundItem, EditorStyle, ImportPreview, VoiceLine, ProductSummary, ProductView, ProductClaims, KitGroup, SocialAccount, SentView, RecreateBatchView } from './types'
+import type { ActionPreview, CharacterSummary, CharacterView, HiggsfieldAccount, JobView, Me, QuoteView, RulesView, SceneFields, ScenesData, SettingsView, StudioAction, Usage, VideoPrice, BrollClip, ContentData, ContentKind, LibraryData, PostStep, WorkerStatus, CloneOptions, CloneResult, CloneSource, CloneStill, CutView, SoundItem, EditorStyle, ImportPreview, VoiceLine, ProductSummary, ProductView, ProductClaims, KitGroup, SocialAccount, SentView, RecreateBatchView, GateCheckView } from './types'
 import { sheetRefOf, typeOf, uploadFiles } from './files'
 
 // Thin client for /api/v1. Every write sends the CSRF header the server
@@ -122,6 +122,9 @@ export const api = {
   keepClone: (id: string, acknowledge = false) => request<{ ok: true }>('POST', `/clones/${id}/keep`, { acknowledge }),
   postFromClone: (contentId: string, cloneId: string, acknowledge = false) => request<{ id: string }>('POST', `/content/${contentId}/clones/${cloneId}/post`, { acknowledge }),
   setCloneModel: (model: string) => request<{ model: string }>('PUT', '/settings/clone-model', { model }),
+  setRecreateStillModel: (model: string) => request<{ model: string }>('PUT', '/settings/recreate-still-model', { model }),
+  gateCheck: () => request<GateCheckView>('GET', '/recreate/gate-check'),
+  answerGateCheck: (use: boolean) => request<GateCheckView>('POST', '/recreate/gate-check', { use }),
   setCloneTarget: (contentId: string, at: { x: number; y: number } | null) => request<{ clone: CloneSource }>('PUT', `/content/${contentId}/clone-target`, { at }),
   cloneStills: (contentId: string) => request<{ stills: CloneStill[] }>('GET', `/content/${contentId}/clone-stills`),
   useCloneStill: (contentId: string, id: string) => request<{ ok: true }>('POST', `/content/${contentId}/clone-stills/${id}/use`),

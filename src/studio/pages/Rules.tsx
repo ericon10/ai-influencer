@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
-import { useQueryClient } from '@tanstack/react-query'
-import { Lock, RotateCcw } from 'lucide-react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { Gauge, Lock, RotateCcw } from 'lucide-react'
 import { api } from '../api'
 import { useCharacters, useRules } from '../hooks'
 import { Callout, errorMessage, useToast } from '../ui'
-import type { RuleRow } from '../types'
+import type { GateNumbers, GateSample, RuleRow } from '../types'
+import { HowTo } from '../guide/Guide'
 
 // Settings, Rules (owner ruling G1, "defaults, not locks"). Every rule in the
 // Studio with its bucket. Fixed rules are always on. Defaults start on and can
@@ -44,6 +45,7 @@ export function RulesPanel() {
               {fixed.map(r => <RuleLine key={r.id} r={r} scope={scope} />)}
             </div>
           </section>
+          <GateCheckCard />
           {ORDER.filter(a => defaults.some(r => r.area === a)).map(area => (
             <section key={area} className="st-card">
               <div className="st-card-head"><div className="grow"><div className="st-h2">{q.data.areas[area] ?? area}</div><div className="st-hint">Defaults. Pre-filled and editable; a warning at most.</div></div></div>
@@ -103,5 +105,66 @@ function RuleLine({ r, scope }: { r: RuleRow; scope: string | null }) {
         <button role="switch" aria-checked={state.on} aria-label={r.title} className={`st-switch ${state.on ? 'on' : ''}`} disabled={busy} onClick={() => save({ on: !state.on })}><span /></button>
       )}
     </div>
+  )
+}
+
+// The Recreate gate check (owner, round 18): after every 10 real recreates,
+// the face match and margin of the stills the videos were made from next to
+// the stills passed over, and suggested numbers. Suggest only; the owner
+// approves.
+const n2 = (v: number | null) => (v == null ? 'none' : v.toFixed(2))
+const nums = (g: GateNumbers) => `face ${n2(g.face_min)} or more, margin ${n2(g.margin)} or more, likeness under ${n2(g.source_max)}`
+
+function GateCheckCard() {
+  const qc = useQueryClient()
+  const toast = useToast()
+  const q = useQuery({ queryKey: ['gate-check'], queryFn: api.gateCheck, retry: false })
+  const [busy, setBusy] = useState(false)
+  const v = q.data
+  if (!v) return null
+  async function answer(use: boolean) {
+    setBusy(true)
+    try { await api.answerGateCheck(use); await qc.invalidateQueries({ queryKey: ['gate-check'] }); toast({ tone: 'ok', text: use ? 'The new gate numbers are in use.' : 'Kept the current numbers until the next 10.' }) } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) } finally { setBusy(false) }
+  }
+  const stats = (list: GateSample[]) => {
+    const f = list.map(x => x.face).filter((x): x is number => x != null)
+    const m = list.map(x => x.margin).filter((x): x is number => x != null)
+    const range = (a: number[]) => (a.length ? `${Math.min(...a).toFixed(2)} to ${Math.max(...a).toFixed(2)}` : 'no scores')
+    return `${list.length} still${list.length === 1 ? '' : 's'}; face ${range(f)}; margin ${range(m)}`
+  }
+  return (
+    <section className="st-card" id="gate-check" data-field="gate-check">
+      <div className="st-card-head"><Gauge size={16} /><div className="grow"><div className="st-h2">Recreate gate check</div><div className="st-hint">Every {v.every} real recreates: the stills you made videos from next to the ones you passed over, and suggested numbers. Nothing changes until you approve.</div></div><HowTo id="post-clone" label="How the gates work" /></div>
+      <div className="st-card-body st-col" style={{ gap: 10 }}>
+        <span>{v.count} real recreate{v.count === 1 ? '' : 's'} so far. {v.due ? <b>A check is ready.</b> : <>The next check is at {v.nextAt}.</>}</span>
+        <span className="st-hint">Now: {nums(v.current)}.</span>
+        {v.picked.length > 0 && (
+          <div className="st-col" style={{ gap: 4 }}>
+            <span><b>Picked</b>: {stats(v.picked)}</span>
+            <span><b>Passed over</b>: {stats(v.passedOver)}</span>
+            <table className="st-table">
+              <thead><tr><th>Still</th><th>Face</th><th>Likeness</th><th>Margin</th><th>Model</th></tr></thead>
+              <tbody>
+                {[...v.picked.map(x => ({ ...x, picked: true })), ...v.passedOver.map(x => ({ ...x, picked: false }))].map(x => (
+                  <tr key={x.candidateId}><td>{x.picked ? 'Picked' : 'Passed over'}{x.pass === 'face' ? ' (face pass)' : ''}</td><td>{n2(x.face)}</td><td>{n2(x.likeness)}</td><td>{n2(x.margin)}</td><td className="st-muted">{x.model?.replace('higgsfield/', '') ?? ''}</td></tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        {v.suggested ? (
+          <Callout tone="info">
+            <b>Suggested: {nums(v.suggested)}.</b> With these, {v.effect.suggested!.pickedPass} of {v.picked.length} picked stills pass and {v.effect.suggested!.passedOverHeld} of {v.passedOver.length} passed-over stills are held (now: {v.effect.current.pickedPass} and {v.effect.current.passedOverHeld}).
+            <ul style={{ margin: '6px 0 0 18px' }}>{v.why.map(w => <li key={w}>{w}</li>)}</ul>
+          </Callout>
+        ) : <span className="st-hint">{v.why[0]}</span>}
+        {v.due && (
+          <div className="st-row" style={{ gap: 8 }}>
+            {v.suggested && <button type="button" className="st-btn primary sm" disabled={busy} onClick={() => void answer(true)}>Use these numbers</button>}
+            <button type="button" className="st-btn sm" disabled={busy} onClick={() => void answer(false)}>Keep the current numbers</button>
+          </div>
+        )}
+      </div>
+    </section>
   )
 }

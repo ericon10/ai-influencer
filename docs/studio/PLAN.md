@@ -445,6 +445,13 @@ Decisions: `DECISIONS.md` G37 and G38. UX: `UX-PLAN.md` section 15.
 - [x] Nano Banana 2.1 on the Higgsfield API: not offered (official Model API Reference)
 - [ ] E2E through the Studio: kitchen clip, Callie, Genjutsu, 50-credit cap (waits for the owner's approve click)
 
+### Round 18: stills model choice, gate check (G41)
+
+- [x] Recreate stills model choice even with the plan connected: Nano Banana 2.1 (plan) or GPT Image 2.5 (API); same prompts, face pass and gates; last pick remembered
+- [x] Gate check after every 10 real recreates: face and margin of the stills picked vs passed over, suggested numbers, owner approves (Settings > Rules)
+- [ ] First GPT Image 2.5 recreate (waits for the owner's approve click)
+- [ ] E2E through the Studio: kitchen clip, Callie, Genjutsu, 50-credit cap (waits for the owner's approve click)
+
 ## Roadmap after Phase 4 (owner, 2026-10-13; not started)
 
 SPEC 13.1, R1 to R7: Clone Video (first after Phase 3), Inspo board

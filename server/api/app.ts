@@ -30,7 +30,8 @@ import { addVoiceTakes, getVoiceLine, listVoiceLines, updateVoiceLine, voiceLine
 import { addHook, archiveHook, archiveProduct, archiveVariant, importKit, productSummaries, productView, saveSocialAccount, scoreboard, starterKit, updateHook, updateProduct, useKitVoice } from '../pipeline/scaleKit.js'
 import { deleteStyle, editorManifest, listStyles, saveFromEditor, saveStyle } from '../pipeline/openreel.js'
 import { previewImport, runImport } from '../pipeline/csvImport.js'
-import { addCloneSource, cloneOptions, cloneStills, keepClone, pickCloneStill, postClones, postFromClone, saveCloneModel, setCloneChoices, setCloneCleanup, setCloneNotLike, setCloneTarget, trimClone, useCloneStill } from '../pipeline/clone.js'
+import { answerGateCheck, gateCheck } from '../pipeline/gateCheck.js'
+import { addCloneSource, cloneOptions, cloneStills, keepClone, pickCloneStill, postClones, postFromClone, saveCloneModel, saveRecreateStillModel, setCloneChoices, setCloneCleanup, setCloneNotLike, setCloneTarget, trimClone, useCloneStill } from '../pipeline/clone.js'
 import { addRecreateRow, recreateBatch, recreateFor, setRecreateRows, startRecreate, useCloneTake } from '../pipeline/recreate.js'
 import { jobViews } from '../jobs/jobView.js'
 import { POST_STEPS, addBroll, archiveBroll, archiveContent, contentView, createContent, duplicateContent, postScene, retryFailedBatch, startRender, updateBroll, updateContent } from '../pipeline/content.js'
@@ -683,6 +684,20 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
     requireRole(ctx, 'member')
     const body = parse(z.object({ acknowledge: z.boolean().default(false) }), await json(c))
     return c.json(await postFromClone(deps, ctx, c.req.param('id'), c.req.param('cid'), body.acknowledge), 201)
+  })
+  app.get('/recreate/gate-check', async c => c.json(await gateCheck(deps, c.get('ctx'))))
+  app.post('/recreate/gate-check', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'owner')
+    const body = parse(z.object({ use: z.boolean() }), await json(c))
+    return c.json(await answerGateCheck(deps, ctx, body.use))
+  })
+  app.put('/settings/recreate-still-model', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    const body = parse(z.object({ model: z.string().max(80) }), await json(c))
+    await saveRecreateStillModel(deps, ctx, body.model)
+    return c.json({ model: body.model })
   })
   app.put('/settings/clone-model', async c => {
     const ctx = c.get('ctx')

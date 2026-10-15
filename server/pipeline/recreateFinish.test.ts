@@ -9,7 +9,7 @@ import { registerPipelineHooks } from './hooks.js'
 import { estimateAction, runAction, type StudioAction } from './actions.js'
 import { importCharacter } from './files.js'
 import { createContent, getContent, type MemeSpec } from './content.js'
-import { addCloneSource, buildCloneStill, checkCloneCap, cloneOptions, cloneStills, gateFor, postClones, setCloneChoices } from './clone.js'
+import { addCloneSource, buildCloneStill, checkCloneCap, cloneOptions, recreateGate, saveRecreateStillModel, setRecreateGate, cloneStills, gateFor, postClones, setCloneChoices } from './clone.js'
 import { addRecreateRow, recreateBatch, recreateFor, setRecreateRows, startRecreate, useCloneTake } from './recreate.js'
 import { createScene } from './scenes.js'
 import { candidates, jobs } from '../db/schema.js'
@@ -19,6 +19,7 @@ import { ACCOUNT_PROVIDER } from '../providers/higgsfieldOAuth.js'
 import { saveBilling } from '../providers/billing.js'
 import { mapInput, createHiggsfieldAdapter } from '../providers/higgsfield.js'
 import { classifyText } from '../qa/ocr.js'
+import { answerGateCheck, gateCheck, suggestGate } from './gateCheck.js'
 import { setSetting } from './settings.js'
 import { makeClip } from '../media/testClips.js'
 import { uploadKey } from '../storage/uploads.js'
@@ -209,6 +210,67 @@ describe('step 2, the stills and the gates', () => {
     expect(post.step).toBe('text')
     expect((post.spec as MemeSpec).clipId).toBe(take!.id)
     expect((post.spec as MemeSpec).sound.music).toBeNull()
+  })
+
+  it('the stills model is a choice even on the plan: GPT Image 2.5 on the API, with the same face pass and gates', async () => {
+    await storeSecret(h.deps, h.ctx, ACCOUNT_PROVIDER, JSON.stringify({ accessToken: 'at-1', refreshToken: 'rt-1', expiresAt: Date.now() + 3600_000, clientId: 'client-1' }), 'Higgsfield account', '')
+    try {
+      const o = await cloneOptions(h.deps, h.ctx, postId)
+      expect(o.stillModels.map(c => [c.label, c.path, c.problem])).toEqual([['Nano Banana 2.1', 'account', null], ['GPT Image 2.5', 'api', null]])
+      expect(o.stillModel.ref).toBe('higgsfield/nano-banana-2.1')
+      const api = await buildCloneStill(h.deps, h.ctx, { contentId: postId, characterId: callie, stillModel: 'higgsfield/gpt-image-2.5' })
+      // The stills and the face pass that follows both run on GPT Image 2.5.
+      expect(api.specs.map(sp => (sp.request as GenRequest).modelRef)).toEqual(Array(6).fill('higgsfield/gpt-image-2.5'))
+      expect(api.preview.warnings.some(w => w.ruleId === 'clone-still-untested')).toBe(true)
+      // The pick is remembered.
+      await saveRecreateStillModel(h.deps, h.ctx, 'higgsfield/gpt-image-2.5')
+      expect((await cloneOptions(h.deps, h.ctx, postId)).stillModel).toMatchObject({ ref: 'higgsfield/gpt-image-2.5', onPlan: false, note: 'untested for recreates' })
+      await expect(saveRecreateStillModel(h.deps, h.ctx, 'higgsfield/seedance-2.5')).rejects.toThrow(/not one of the Recreate stills models/)
+      await saveRecreateStillModel(h.deps, h.ctx, 'higgsfield/nano-banana-2.1')
+    } finally {
+      await revokeCredential(h.deps, h.ctx, ACCOUNT_PROVIDER)
+    }
+  })
+})
+
+describe('the gate check every 10 real recreates', () => {
+  it('suggests numbers just under the lowest picked face and margin, never below the standard face match', () => {
+    const g = { face_min: 0.45, margin: 0.12, source_max: 0.45 }
+    const at = new Date(0).toISOString()
+    const s = (face: number, likeness: number) => ({ postId: 'p', candidateId: `${face}-${likeness}`, assetId: null, pass: 'still' as const, face, likeness, margin: Math.round((face - likeness) * 1000) / 1000, model: null, at })
+    expect(suggestGate(g, [s(0.711, 0.263), s(0.537, 0.37)]).numbers).toEqual({ face_min: 0.5, margin: 0.13, source_max: 0.4 })
+    expect(suggestGate(g, [s(0.38, 0.1)]).numbers!.face_min).toBe(0.363)
+    expect(suggestGate(g, []).numbers).toBeNull()
+  })
+
+  it('after 10 real recreates: picked vs passed over, suggested numbers, and nothing changes until approved', async () => {
+    const [take] = await postClones(h.deps, h.ctx, postId)
+    const [motion] = await h.deps.db.select().from(jobs).where(and(eq(jobs.accountId, h.ctx.accountId), like(jobs.purpose, `clone:${postId}:%`)))
+    const stills = await cloneStills(h.deps, h.ctx, postId)
+    const pick = stills.find(x => x.assetId === (motion!.request as GenRequest).refs![0]!.assetId)!
+    expect(take).toBeTruthy()
+    // As if live: the scores the free checks keep, on a real model.
+    for (const x of stills) await h.deps.db.update(candidates).set({ meta: { pass: x.pass, faceScore: x.id === pick.id ? 0.61 : 0.42, sourceScore: x.id === pick.id ? 0.3 : 0.35 } }).where(eq(candidates.id, x.id))
+    await h.deps.db.update(jobs).set({ provider: 'higgsfield' }).where(eq(jobs.id, motion!.id))
+    let v = await gateCheck(h.deps, h.ctx)
+    expect(v).toMatchObject({ count: 1, due: false, nextAt: 10 })
+    expect(v.picked.map(p => [p.face, p.margin])).toEqual([[0.61, 0.31]])
+    expect(v.passedOver.length).toBeGreaterThan(0)
+    expect(v.passedOver.every(p => p.face === 0.42)).toBe(true)
+    // Nine more real recreates.
+    for (let i = 1; i <= 9; i++) await h.deps.db.insert(jobs).values({ ...motion!, id: `job_gatecheck${String(i).padStart(14, '0')}`, idempotencyKey: `${motion!.idempotencyKey}:gc${i}`, provider: 'higgsfield' })
+    v = await gateCheck(h.deps, h.ctx)
+    expect(v).toMatchObject({ count: 10, due: true, current: { face_min: 0.45, margin: 0.12, source_max: 0.45 }, suggested: { face_min: 0.58, margin: 0.28, source_max: 0.33 } })
+    expect(v.effect).toEqual({ current: { pickedPass: 1, passedOverHeld: v.passedOver.length }, suggested: { pickedPass: 1, passedOverHeld: v.passedOver.length } })
+    // Suggest only: the gate is unchanged until the owner approves.
+    expect(await recreateGate(h.deps, h.ctx)).toEqual({ face_min: 0.45, margin: 0.12, source_max: 0.45 })
+    v = await answerGateCheck(h.deps, h.ctx, true)
+    expect(await recreateGate(h.deps, h.ctx)).toEqual({ face_min: 0.58, margin: 0.28, source_max: 0.33 })
+    expect(v).toMatchObject({ due: false, nextAt: 20, suggested: null })
+    // Back to the calibrated numbers for the rest of the file.
+    await setRecreateGate(h.deps, h.ctx, { face_min: 0.45, margin: 0.12, source_max: 0.45 })
+    await h.deps.db.delete(jobs).where(like(jobs.id, 'job_gatecheck%'))
+    await h.deps.db.update(jobs).set({ provider: 'mock' }).where(eq(jobs.id, motion!.id))
   })
 })
 
