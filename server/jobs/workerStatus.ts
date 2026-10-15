@@ -1,4 +1,7 @@
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync, statfsSync } from 'node:fs'
+import { readdir, rm, stat } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { and, eq, isNull, lte, or, sql } from 'drizzle-orm'
 import { jobs, workerStatus } from '../db/schema.js'
 import type { Deps } from '../context.js'
@@ -20,6 +23,43 @@ export interface WorkerStatusView {
   startedAt: string | null
   lastSeenAt: string | null
   inProcess: boolean
+  // Free disk on the worker, in MB (owner, 2026-10-15), and when it was read.
+  freeDiskMb: number | null
+  diskCheckedAt: string | null
+}
+
+// Free space where the worker writes its temp files, in MB.
+export function freeDiskMb(dir = tmpdir()): number | null {
+  try {
+    const s = statfsSync(dir)
+    return Math.round((Number(s.bavail) * Number(s.bsize)) / 1024 / 1024)
+  } catch { return null }
+}
+
+// The temp folders the Studio makes (server/media/ffmpeg.ts withTempDir, the
+// runner's ingest, the mock video). A crash leaves them behind; the worker
+// deletes them when it starts (owner, 2026-10-15). Only folders older than
+// a few minutes, in case another worker shares the disk.
+const TEMP_PREFIXES = ['studio-media-', 'ingest-', 'mock-video-']
+export async function sweepTemp(dir = tmpdir(), olderThanMs = 5 * 60_000, now = Date.now()): Promise<{ removed: number; bytes: number }> {
+  let removed = 0, bytes = 0
+  const size = async (p: string): Promise<number> => {
+    const st = await stat(p).catch(() => null)
+    if (!st) return 0
+    if (!st.isDirectory()) return st.size
+    let n = 0
+    for (const e of await readdir(p).catch(() => [] as string[])) n += await size(join(p, e))
+    return n
+  }
+  for (const name of await readdir(dir).catch(() => [] as string[])) {
+    if (!TEMP_PREFIXES.some(x => name.startsWith(x))) continue
+    const p = join(dir, name)
+    const st = await stat(p).catch(() => null)
+    if (!st?.isDirectory() || now - st.mtimeMs < olderThanMs) continue
+    bytes += await size(p)
+    await rm(p, { recursive: true, force: true }).then(() => { removed++ }, () => undefined)
+  }
+  return { removed, bytes }
 }
 
 const ROW = 'main'
@@ -49,7 +89,7 @@ export function workerVersion(): string | null {
 
 export async function reportWorkerStart(deps: Pick<Deps, 'db' | 'clock'>, info: { version: string | null; commit: string | null }): Promise<void> {
   const now = deps.clock.now()
-  const values = { version: info.version, commit: info.commit, startedAt: now, lastSeenAt: now, wakeFailedAt: null, wakeError: null, updatedAt: now }
+  const values = { version: info.version, commit: info.commit, startedAt: now, lastSeenAt: now, wakeFailedAt: null, wakeError: null, freeDiskMb: freeDiskMb(), diskCheckedAt: now, updatedAt: now }
   await deps.db.insert(workerStatus).values({ id: ROW, ...values }).onConflictDoUpdate({ target: workerStatus.id, set: values })
 }
 
@@ -59,7 +99,7 @@ export async function touchWorker(deps: Pick<Deps, 'db' | 'clock'>): Promise<voi
   const now = deps.clock.now()
   if (now.getTime() - lastTouch < 20_000) return
   lastTouch = now.getTime()
-  await deps.db.update(workerStatus).set({ lastSeenAt: now, updatedAt: now }).where(eq(workerStatus.id, ROW))
+  await deps.db.update(workerStatus).set({ lastSeenAt: now, freeDiskMb: freeDiskMb(), diskCheckedAt: now, updatedAt: now }).where(eq(workerStatus.id, ROW))
 }
 
 export async function recordWakeFailure(deps: Pick<Deps, 'db' | 'clock'>, message: string): Promise<void> {
@@ -76,7 +116,7 @@ export async function readWorkerStatus(deps: Pick<Deps, 'db' | 'clock' | 'env'>)
   // Without a worker address the worker runs inside the API process (local
   // development): it is as ready as the API answering this.
   if (!workerBaseUrl(deps.env.STUDIO_WORKER_URL)) {
-    return { state: 'ready', message: 'The worker runs inside the Studio here.', version: expected, expected, commit: null, startedAt: null, lastSeenAt: null, inProcess: true }
+    return { state: 'ready', message: 'The worker runs inside the Studio here.', version: expected, expected, commit: null, startedAt: null, lastSeenAt: null, inProcess: true, freeDiskMb: freeDiskMb(), diskCheckedAt: deps.clock.now().toISOString() }
   }
   const now = deps.clock.now().getTime()
   const [row] = await deps.db.select().from(workerStatus).where(eq(workerStatus.id, ROW))
@@ -87,6 +127,7 @@ export async function readWorkerStatus(deps: Pick<Deps, 'db' | 'clock' | 'env'>)
   const base = {
     version: row?.version ?? null, expected, commit: row?.commit ?? null,
     startedAt: iso(row?.startedAt), lastSeenAt: iso(row?.lastSeenAt), inProcess: false,
+    freeDiskMb: row?.freeDiskMb ?? null, diskCheckedAt: iso(row?.diskCheckedAt),
   }
   const lastSeen = row?.lastSeenAt?.getTime() ?? 0
   const wakeFailed = row?.wakeFailedAt?.getTime() ?? 0

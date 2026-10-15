@@ -1,4 +1,5 @@
-import { and, asc, desc, eq, inArray, isNull } from 'drizzle-orm'
+import { and, asc, desc, eq, inArray, isNull, notInArray } from 'drizzle-orm'
+import { GONE_STATUSES } from '../core/clips.js'
 import { assets, candidates, characterInspirations, characterRevisions, characters, concepts, refImages } from '../db/schema.js'
 import type { Ctx, Deps } from '../context.js'
 import type { CharacterData, CharacterIdentity, CharacterMark, FileSection, Pronouns } from '../core/character.js'
@@ -149,7 +150,7 @@ export async function getRef(deps: Deps, ctx: Ctx, characterId: string, refId: s
 }
 
 export async function candidatesFor(deps: Deps, ctx: Ctx, characterId: string, filter: { target?: string; refId?: string; statuses?: string[] } = {}): Promise<CandidateRow[]> {
-  const conds = [eq(candidates.accountId, ctx.accountId), eq(candidates.characterId, characterId)]
+  const conds = [eq(candidates.accountId, ctx.accountId), eq(candidates.characterId, characterId), notInArray(candidates.status, GONE_STATUSES)]
   if (filter.target) conds.push(eq(candidates.target, filter.target))
   if (filter.refId) conds.push(eq(candidates.refId, filter.refId))
   if (filter.statuses) conds.push(inArray(candidates.status, filter.statuses))

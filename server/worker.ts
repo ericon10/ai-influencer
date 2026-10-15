@@ -3,7 +3,7 @@ import { timingSafeEqual } from 'node:crypto'
 import { buildDeps } from './bootstrap.js'
 import { startWorker } from './jobs/runner.js'
 import { wakeToken } from './jobs/wake.js'
-import { workerVersion } from './jobs/workerStatus.js'
+import { freeDiskMb, sweepTemp, workerVersion } from './jobs/workerStatus.js'
 
 // The job worker (Railway). Generation runs on the providers' side; this
 // process submits, polls, downloads, strips audio, and runs QA, seam joins
@@ -12,6 +12,9 @@ import { workerVersion } from './jobs/workerStatus.js'
 // so Neon can suspend and the Railway service can sleep.
 
 const { deps, handle } = await buildDeps()
+// Temp folders a crash left behind go first (owner, 2026-10-15).
+const swept = await sweepTemp()
+if (swept.removed) deps.log.info({ removed: swept.removed, mb: Math.round(swept.bytes / 1024 / 1024) }, 'removed leftover temp folders')
 const idle = deps.env.STUDIO_WORKER_IDLE
 const worker = startWorker(deps, { intervalMs: 1000, batch: 5, idle })
 
@@ -26,7 +29,7 @@ const server = port
   ? createServer((req, res) => {
       if (req.method === 'GET' && req.url === '/health') {
         // The commit it runs (Railway sets it), so a deploy can be confirmed.
-        res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ ok: true, commit: process.env.RAILWAY_GIT_COMMIT_SHA?.slice(0, 7) ?? null, version: workerVersion() }))
+        res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ ok: true, commit: process.env.RAILWAY_GIT_COMMIT_SHA?.slice(0, 7) ?? null, version: workerVersion(), freeDiskMb: freeDiskMb() }))
         return
       }
       if (req.method === 'POST' && req.url === '/wake') {

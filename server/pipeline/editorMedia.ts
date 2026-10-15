@@ -18,7 +18,9 @@ export interface PickerItem { id: string; name: string; kind: 'video' | 'image' 
 export interface PickerGroup { id: 'post' | 'clips' | 'stills' | 'library'; label: string; items: PickerItem[] }
 
 const assetUrl = (id: string) => `/api/v1/assets/${id}/content`
-const thumbUrl = (id: string) => `/api/v1/assets/${id}/content?w=320`
+// `cors=1`: the editor shows them with CORS (its page is cross-origin
+// isolated), so they get their own storage link (BlobStore.presignGet).
+const thumbUrl = (id: string) => `/api/v1/assets/${id}/content?w=320&cors=1`
 const LIVE = ['approved', 'in_review', 'qa_failed']
 
 export async function editorLibrary(deps: Deps, ctx: Ctx, contentId: string): Promise<{ groups: PickerGroup[] }> {

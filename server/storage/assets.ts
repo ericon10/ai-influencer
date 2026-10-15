@@ -105,6 +105,21 @@ export async function getAsset(deps: Deps, ctx: Ctx, id: string): Promise<AssetR
   return row
 }
 
+// Thumbnails: each size made once (the first time it is asked for) and kept
+// next to the original as WebP. The original is never changed.
+export const THUMB_WIDTHS = [160, 320, 480, 720, 960, 1600] as const
+export const thumbKeyOf = (storageKey: string, w: number) => `${storageKey.replace(/\.[a-z0-9]+$/, '')}.w${w}.webp`
+export async function thumbnail(deps: Deps, ctx: Ctx, asset: AssetRow, width: number): Promise<string> {
+  const w = THUMB_WIDTHS.find(x => x >= width) ?? 1600
+  const key = thumbKeyOf(asset.storageKey, w)
+  if (!(await deps.store.exists(key))) {
+    const { data } = await readAsset(deps, ctx, asset.id)
+    const thumb = await sharp(data).rotate().resize({ width: w, withoutEnlargement: true }).webp({ quality: 82 }).toBuffer()
+    await deps.store.put(key, thumb, 'image/webp')
+  }
+  return key
+}
+
 export async function readAsset(deps: Deps, ctx: Ctx, id: string): Promise<{ row: AssetRow; data: Buffer }> {
   const row = await getAsset(deps, ctx, id)
   return { row, data: await deps.store.get(row.storageKey) }

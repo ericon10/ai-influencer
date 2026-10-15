@@ -14,10 +14,6 @@
       "destination": "/api/studio?__path=$1"
     },
     {
-      "source": "/api/hf/(.*)",
-      "destination": "/api/hfproxy?__hfpath=$1"
-    },
-    {
       "source": "/editor",
       "destination": "/editor/index.html"
     },

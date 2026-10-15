@@ -1163,6 +1163,17 @@ async function onContentCaptions(deps: Deps, ctx: Ctx, job: JobRow, out: JobOutc
 
 // ── The view the Content page reads ──────────────────────────────────
 
+const itemView = (i: ContentRow) => ({
+  id: i.id, kind: i.kind as ContentKind, characterId: i.characterId, title: i.title, idea: i.idea, sceneId: i.sceneId, accountTag: i.accountTag, step: i.step,
+  spec: i.kind === 'batch' ? batchSpec.parse(i.spec) : i.spec, status: i.status, outputs: i.outputs as ContentOutputs, error: i.error, createdAt: i.createdAt.toISOString(), updatedAt: i.updatedAt.toISOString(),
+})
+
+// One post in the list's shape: a post page opens even when the post is
+// older than the newest 200 the list holds.
+export async function contentItemView(deps: Deps, ctx: Ctx, itemId: string) {
+  return { item: itemView(await getContent(deps, ctx, itemId)) }
+}
+
 export async function contentView(deps: Deps, ctx: Ctx) {
   const [broll, items] = await Promise.all([listBroll(deps, ctx), listContent(deps, ctx)])
   const assetIds = broll.map(b => b.assetId).filter((x): x is string => !!x)
@@ -1172,10 +1183,7 @@ export async function contentView(deps: Deps, ctx: Ctx) {
   return {
     broll: broll.map(b => ({ id: b.id, title: b.title, product: b.product, status: b.status, error: b.error, assetId: b.assetId, durationSec: b.assetId && durations.get(b.assetId) ? Math.round(durations.get(b.assetId)! / 100) / 10 : null, createdAt: b.createdAt.toISOString() })),
     products: [...new Set([...cfg.broll.products, ...broll.map(b => b.product).filter(Boolean)])].sort((a, b) => a.localeCompare(b)),
-    items: items.map(i => ({
-      id: i.id, kind: i.kind as ContentKind, characterId: i.characterId, title: i.title, idea: i.idea, sceneId: i.sceneId, accountTag: i.accountTag, step: i.step,
-      spec: i.kind === 'batch' ? batchSpec.parse(i.spec) : i.spec, status: i.status, outputs: i.outputs as ContentOutputs, error: i.error, createdAt: i.createdAt.toISOString(), updatedAt: i.updatedAt.toISOString(),
-    })),
+    items: items.map(itemView),
     // Account tags in use, most recent first (the Idea step suggests them).
     accountTags: [...new Set(items.map(i => i.accountTag).filter(Boolean))],
     options: {

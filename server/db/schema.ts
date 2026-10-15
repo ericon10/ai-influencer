@@ -279,8 +279,33 @@ export const workerStatus = pgTable('worker_status', {
   // when (a deploy that never arrives turns the light red).
   waitingFor: text('waiting_for'),
   waitingSince: timestamp('waiting_since', { withTimezone: true }),
+  // Free disk on the worker (owner, 2026-10-15), in MB, and when it was read.
+  freeDiskMb: integer('free_disk_mb'),
+  diskCheckedAt: timestamp('disk_checked_at', { withTimezone: true }),
   updatedAt: updatedAt(),
 })
+
+// The Trash (owner, 2026-10-15; UX-PLAN.md section 22): an item deleted in
+// the Library (a still, a take, a clip, an upload, B-roll, a sound or a
+// render) waits here 7 days, restorable, then the daily clean removes its
+// files from storage for good. `restore` holds what it was (its status, a
+// render's outputs); `reason` is owner or auto (Auto-clean).
+export const trashItems = pgTable('trash_items', {
+  id: text('id').primaryKey(),
+  accountId: text('account_id').notNull().references(() => accounts.id),
+  kind: text('kind').notNull(), // candidate | broll | sound | render
+  refId: text('ref_id').notNull(),
+  label: text('label').notNull().default(''),
+  characterId: text('character_id'),
+  assetIds: jsonb('asset_ids').notNull().default([]),
+  restore: jsonb('restore').notNull().default({}),
+  reason: text('reason').notNull().default('owner'),
+  deletedBy: text('deleted_by'),
+  deletedAt: timestamp('deleted_at', { withTimezone: true }).notNull().defaultNow(),
+  purgeAfter: timestamp('purge_after', { withTimezone: true }).notNull(),
+  restoredAt: timestamp('restored_at', { withTimezone: true }),
+  purgedAt: timestamp('purged_at', { withTimezone: true }),
+}, t => [index('trash_account_idx').on(t.accountId, t.deletedAt)])
 
 // ── Content builder (text overlays, owner 2026-10-13) ───────────────
 

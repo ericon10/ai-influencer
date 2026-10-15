@@ -853,3 +853,28 @@ Two reverts (owner, 2026-10-15):
 - **"The pose" is back** in the Recreate stills, the scene still and the
   face pass prompts, word for word as proven. They change only when a
   real run shows a reason.
+
+## 22. Storage, traffic and auto-clean (owner, 2026-10-15)
+
+Goal: Vercel moves only JSON; media always goes between the browser and R2
+directly; junk clears itself. One new Library tab (Trash), one Settings
+card grows (General > Storage), and a star on takes. No new page or step.
+
+| Piece | Where | How it works | Clicks |
+|---|---|---|---|
+| Images from R2 | Every image in the Studio, full size and thumbnails | Served the way videos are: the Studio answers with a redirect to a short-lived R2 link, never the image bytes. A thumbnail is made once (the first time a size is asked for) and kept in R2 next to the original. Grids ask for thumbnails, full size only where you look closely (the still drawer, crop). A 2K still over 4.5 MB loads like any other | 0 |
+| Old proxies removed | `/api/hf`, `/api/hfproxy` and `/api/img-proxy` | They came from the old ai-influencer app and proxied Higgsfield and images through Vercel. Nothing in the Studio uses them, so they are deleted. The old app at the site's root loses Higgsfield connect, generation and image downloads; the Studio at /studio is unchanged | 0 |
+| Worker temp sweep | The worker, on startup | Temp folders left by a crash are deleted when the worker starts. The worker reports its free disk, shown in Settings > General > Storage, in `/api/v1/worker` and in the worker's `/health` | 0 |
+| Upload slots cleaned | R2 `uploads/` | An upload that was never used (a closed tab, a failed form) is deleted after 1 day by the daily clean (and by an R2 lifecycle rule when the key may set one) | 0 |
+| Storage readout | Settings > General > Storage | This Studio's files in R2 (GB and file count, as of the last daily clean, with Measure now) and the estimated monthly cost at $0.015 per GB-month after the first 10 GB, which are free (R2's free tier is per Cloudflare account) | 0 to 1 |
+| Delete | Library: Stills, Clips (kept takes, uploads, clones), B-roll, Sounds, Posts (renders) | A trash icon on each item, and **Select** to pick many (a checkbox on each tile, Select all, then Delete). Before it moves, a short warning names what it touches: "Used in 2 posts" (with their names) or "REF-03 of Callie's sheet". Delete moves to Trash; nothing is gone yet | 1 to 2 |
+| Trash | Library > Trash | Everything deleted in the last 7 days, newest first, with how long until it goes for good ("removed for good in 5 days"), who or what put it there (you, or Auto-clean), and **Restore** (one or many). After 7 days the daily clean removes the files from R2 for good, thumbnails and plain copies included; a file another item still uses is kept | 1 |
+| Auto-clean | Settings > General > Storage: "Takes you never kept go to Trash 14 days after the post is finished" | A take you never kept (not Use this take, not Keep this take) moves to Trash 14 days after its post was finished (exported). The 14 days is a setting (3, 7, 14, 30 days, or Off). Starred takes are never auto-cleaned: each take card has a star. The post's own clip is never touched | 0 to 1 |
+| Star a take | Every take card (Video step, Recreate review) | A star toggles; starred takes stay out of Auto-clean | 1 |
+
+The daily clean runs on the worker once a day (when the Studio is opened
+after a day, it wakes the worker for it): upload slots older than a day,
+Trash older than 7 days, Auto-clean, and the storage measure. Every piece
+is a default in the sense of rule one: the 7 days of Trash and the
+Auto-clean days are shown and editable (Auto-clean can be Off); nothing
+is deleted for good without 7 days in Trash first.

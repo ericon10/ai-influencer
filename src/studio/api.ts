@@ -1,4 +1,4 @@
-import type { ActionPreview, CharacterSummary, CharacterView, HiggsfieldAccount, JobView, Me, QuoteView, RulesView, SceneFields, ScenesData, SettingsView, StudioAction, Usage, VideoPrice, BrollClip, ContentData, ContentKind, LibraryData, PostStep, WorkerStatus, CloneOptions, CloneResult, CloneSource, CloneStill, CutView, SoundItem, EditorStyle, ImportPreview, VoiceLine, ProductSummary, ProductView, ProductClaims, KitGroup, SocialAccount, SentView, RecreateBatchView, GateCheckView } from './types'
+import type { ActionPreview, CharacterSummary, CharacterView, HiggsfieldAccount, JobView, Me, QuoteView, RulesView, SceneFields, ScenesData, SettingsView, StudioAction, Usage, VideoPrice, BrollClip, ContentData, ContentKind, LibraryData, PostStep, WorkerStatus, CloneOptions, CloneResult, CloneSource, CloneStill, CutView, SoundItem, EditorStyle, ImportPreview, VoiceLine, ProductSummary, ProductView, ProductClaims, KitGroup, SocialAccount, SentView, RecreateBatchView, GateCheckView, StorageInfo, TrashRef, TrashItem, ContentItem } from './types'
 import { sheetRefOf, typeOf, uploadFiles } from './files'
 
 // Thin client for /api/v1. Every write sends the CSRF header the server
@@ -216,7 +216,15 @@ export const api = {
   setBilling: (b: { default?: 'api' | 'account'; creditUsd?: number }) => request<SettingsView>('PUT', '/settings/billing', b),
   setClaudeModel: (task: string, model: string) => request<SettingsView>('PUT', '/settings/claude', { task, model }),
   higgsfieldAccount: (fresh = false) => request<HiggsfieldAccount>('GET', `/settings/higgsfield-account${fresh ? '?fresh=1' : ''}`),
-  storage: () => request<{ driver: string; bucket: string | null; origins: string[]; corsRules: unknown[] }>('GET', '/settings/storage'),
+  storage: () => request<StorageInfo>('GET', '/settings/storage'),
+  setAutoClean: (days: number | null) => request<StorageInfo>('PUT', '/settings/storage/auto-clean', { days }),
+  measureStorage: () => request<{ queued: boolean }>('POST', '/settings/storage/measure', {}),
+  // Delete and the Trash (owner, 2026-10-15).
+  trashCheck: (items: TrashRef[]) => request<{ warnings: Array<{ id: string; kind: TrashRef['kind']; text: string }> }>('POST', '/trash/check', { items }),
+  trash: (items: TrashRef[]) => request<{ moved: number; ids: string[] }>('POST', '/trash', { items }),
+  trashList: () => request<{ items: TrashItem[]; days: number }>('GET', '/trash'),
+  restore: (ids: string[]) => request<{ restored: number }>('POST', '/trash/restore', { ids }),
+  contentItem: (id: string) => request<{ item: ContentItem }>('GET', `/content/${id}`),
   checkStorage: () => request<{ ok: boolean; message: string }>('POST', '/settings/storage/check', {}),
   // The shared MCP connection flow (Higgsfield account, Dzine AI soon).
   connect: (provider: string) => request<{ url: string }>('POST', `/oauth/${provider}/start`, {}),

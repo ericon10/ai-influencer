@@ -1,6 +1,6 @@
 import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { and, desc, eq, inArray, like, or, sql } from 'drizzle-orm'
+import { and, desc, eq, inArray, like, notInArray, or, sql } from 'drizzle-orm'
 import { candidates, characters, jobs } from '../db/schema.js'
 import type { Ctx, Deps } from '../context.js'
 import { AppError } from '../lib/errors.js'
@@ -8,7 +8,7 @@ import { newId } from '../lib/ids.js'
 import { registerJobHook, registerLocalJob, type JobOutcome, type JobRow } from '../jobs/hooks.js'
 import { activateChildren, cancelChildren, childJobs, enqueueLocalJob, quoteItemsFor, type JobSpec } from '../jobs/runner.js'
 import { displayPrice } from '../costs/quotes.js'
-import { isVideoOp } from '../core/clips.js'
+import { isVideoOp, GONE_STATUSES } from '../core/clips.js'
 import { capitalize, fill, hardWrap } from '../core/text.js'
 import { buildEditPrompt, hairColorFrom } from '../core/scenes.js'
 import { adultProblem, cardForPhotoEdit } from '../core/character.js'
@@ -1225,7 +1225,7 @@ export async function cloneStills(deps: Deps, ctx: Ctx, contentId: string): Prom
   const byJob = new Map(jobRows.map(j => [j.id, j]))
   const g = await recreateGate(deps, ctx)
   const rows = await deps.db.select().from(candidates)
-    .where(and(eq(candidates.accountId, ctx.accountId), eq(candidates.op, 'clone_still'), inArray(candidates.jobId, jobRows.map(j => j.id))))
+    .where(and(eq(candidates.accountId, ctx.accountId), eq(candidates.op, 'clone_still'), inArray(candidates.jobId, jobRows.map(j => j.id)), notInArray(candidates.status, GONE_STATUSES)))
     .orderBy(desc(candidates.createdAt))
   const names = new Map((await deps.db.select({ id: characters.id, name: characters.name }).from(characters).where(eq(characters.accountId, ctx.accountId))).map(c => [c.id, c.name]))
   return rows.map(c => {
@@ -1416,6 +1416,8 @@ export interface CloneView {
   // three frames checked when it landed), and the owner's call on it.
   gate: TakeGate | null
   decision: 'kept' | 'tried_again' | null
+  // Starred: never auto-cleaned (owner, 2026-10-15).
+  favorite: boolean
   // A take the old check marked "Not kept" (owner, 2026-10-15: never
   // reject a paid take), shown again for the owner to decide.
   oldReject: string | null
@@ -1431,7 +1433,7 @@ export async function postClones(deps: Deps, ctx: Ctx, contentId: string): Promi
   if (!jobRows.length) return []
   const runs = new Map(jobRows.map(j => [j.id, j]))
   const rows = await deps.db.select().from(candidates)
-    .where(and(eq(candidates.accountId, ctx.accountId), eq(candidates.op, 'clone'), inArray(candidates.jobId, jobRows.map(j => j.id))))
+    .where(and(eq(candidates.accountId, ctx.accountId), eq(candidates.op, 'clone'), inArray(candidates.jobId, jobRows.map(j => j.id)), notInArray(candidates.status, GONE_STATUSES)))
     .orderBy(desc(candidates.createdAt))
   const names = new Map((await deps.db.select({ id: characters.id, name: characters.name }).from(characters).where(eq(characters.accountId, ctx.accountId))).map(c => [c.id, c.name]))
   const out: CloneView[] = []
@@ -1459,7 +1461,7 @@ export async function postClones(deps: Deps, ctx: Ctx, contentId: string): Promi
       findings: (report?.findings ?? []).filter(f => !(oldReject && (f.code === 'too_similar' || f.code === 'face_drift'))).map(f => ({ code: f.code, severity: f.severity, message: f.message })), createdAt: c.createdAt.toISOString(),
       sourceAssetId: null, review, model: null, parentId: c.parentId,
       posters: { source: firstFrame, take: null },
-      gate, decision: meta.decision?.kind ?? null, oldReject,
+      gate, decision: meta.decision?.kind ?? null, favorite: c.favorite, oldReject,
       needsFrames: !!review && review.text.some(x => !x.frameAssetId),
     })
     const run = c.jobId ? runs.get(c.jobId) : undefined

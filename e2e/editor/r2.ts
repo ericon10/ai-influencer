@@ -17,7 +17,10 @@ import { API } from './helpers'
 // (routing turns the browser's cache off, which would hide the bug): a
 // small proxy plays the deployed Studio on its own port, and a fake R2 on
 // another plays storage. Videos are served as VP9 (Playwright's Chromium
-// has no H.264).
+// has no H.264). Since the storage batch (owner, 2026-10-15) every file is
+// a redirect, images and thumbnails too; `images: 'through'` plays the old
+// rules (image bytes through the Studio). `transfer` counts what the
+// Studio's API sends, as Vercel's origin transfer would.
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const CACHE = join(HERE, '..', '.out', 'cache')
@@ -31,17 +34,25 @@ export interface Live {
   refuse: boolean
   // The redirect is kept by the browser, as the live API did before the fix.
   keptRedirect: boolean
-  hits: { origin: string | null; cors: boolean; id: string }[]
+  hits: { origin: string | null; cors: boolean; id: string; w: number | null }[]
   proxied: number
+  // 'redirect' (now, as production) or 'through' (the old rules).
+  images: 'redirect' | 'through'
+  transfer: { json: number; media: number; requests: number; redirects: number; byPath: Record<string, number> }
   close: () => Promise<void>
 }
 
+export const emptyTransfer = () => ({ json: 0, media: 0, requests: 0, redirects: 0, byPath: {} as Record<string, number> })
+// "/api/v1/content/cnt_01.../editor?x=1" -> "GET /content/:id/editor"
+const route = (method: string | undefined, url: string) => `${method} ${url.split('?')[0]!.replace('/api/v1', '').replace(/\/[a-z]+_[0-9a-z]{10,}/g, '/:id')}`
+
 // The asset as the browser should get it: VP9 for video, MP3 for M4A sound.
-async function playable(id: string): Promise<{ body: Buffer; type: string }> {
-  const meta = join(CACHE, `${id}.type`)
-  const file = join(CACHE, `${id}.r2`)
+async function playable(id: string, w: number | null = null): Promise<{ body: Buffer; type: string }> {
+  const name = w ? `${id}.w${w}` : id
+  const meta = join(CACHE, `${name}.type`)
+  const file = join(CACHE, `${name}.r2`)
   if (existsSync(meta) && existsSync(file)) return { body: readFileSync(file), type: readFileSync(meta, 'utf8') }
-  const r = await fetch(`${API}/assets/${id}/content`, { headers: { 'x-studio-request': '1' } })
+  const r = await fetch(`${API}/assets/${id}/content${w ? `?w=${w}` : ''}`, { headers: { 'x-studio-request': '1' } })
   if (!r.ok) throw new Error(`asset ${id}: ${r.status}`)
   let type = r.headers.get('content-type') ?? 'application/octet-stream'
   let body = Buffer.from(await r.arrayBuffer())
@@ -66,7 +77,7 @@ async function playable(id: string): Promise<{ body: Buffer; type: string }> {
 const kindOf = async (id: string) => (await playable(id)).type
 
 let signed = 0
-const presigned = (id: string) => `${R2}/${id}?X-Amz-Date=${Date.now()}-${signed++}&X-Amz-Signature=test`
+const presigned = (id: string, w: number | null = null) => `${R2}/${id}?${w ? `w=${w}&` : ''}X-Amz-Date=${Date.now()}-${signed++}&X-Amz-Signature=test`
 
 function send(res: ServerResponse, status: number, headers: Record<string, string>, body?: Buffer | string) {
   res.writeHead(status, headers)
@@ -78,10 +89,18 @@ function send(res: ServerResponse, status: number, headers: Record<string, strin
 // mid-stream, which is normal and must not end the test run.
 const quiet = (...xs: Array<{ on: (e: 'error', f: () => void) => unknown }>) => { for (const x of xs) x.on('error', () => undefined) }
 
-function forward(req: IncomingMessage, res: ServerResponse, rewrite?: (json: any) => void) {
+function forward(req: IncomingMessage, res: ServerResponse, rewrite?: (json: any) => void, count?: Live['transfer']) {
   quiet(req, res)
   const up = httpRequest({ host: VITE.hostname, port: VITE.port, path: req.url, method: req.method, headers: { ...req.headers, host: VITE.host } }, upRes => {
     quiet(upRes)
+    // What the Studio's API sends (Vercel's origin transfer): JSON, or file
+    // bytes when the old rules sent images through it.
+    if (count && (req.url ?? '').startsWith('/api/v1/')) {
+      count.requests++
+      const json = (upRes.headers['content-type'] ?? '').includes('json')
+      const key = route(req.method, req.url ?? '')
+      upRes.on('data', (c: Buffer) => { if (json) count.json += c.length; else count.media += c.length; count.byPath[key] = (count.byPath[key] ?? 0) + c.length })
+    }
     if (!rewrite || !(upRes.headers['content-type'] ?? '').includes('json')) {
       res.writeHead(upRes.statusCode ?? 502, upRes.headers)
       return upRes.pipe(res)
@@ -102,19 +121,21 @@ function forward(req: IncomingMessage, res: ServerResponse, rewrite?: (json: any
 }
 
 export async function startLive(): Promise<Live> {
-  const live: Live = { refuse: false, keptRedirect: false, hits: [], proxied: 0, close: async () => undefined }
+  const live: Live = { refuse: false, keptRedirect: false, hits: [], proxied: 0, images: 'redirect', transfer: emptyTransfer(), close: async () => undefined }
 
   // Storage: the CORS header only for a request from the Studio's origin;
   // the answer may be kept by the browser (no Vary: Origin), as R2 does.
   const r2 = createServer((req, res) => {
     quiet(req, res)
     const origin = (req.headers.origin as string | undefined) ?? null
-    const id = (req.url ?? '/').slice(1).split('?')[0]!
+    const u = new URL(req.url ?? '/', R2)
+    const id = u.pathname.slice(1)
+    const w = u.searchParams.get('w') ? Number(u.searchParams.get('w')) : null
     const allowed = !live.refuse && origin === LIVE
     if (req.method === 'OPTIONS') return send(res, allowed ? 204 : 403, allowed ? { 'access-control-allow-origin': LIVE, 'access-control-allow-methods': 'GET, HEAD', 'access-control-allow-headers': '*' } : {})
-    live.hits.push({ origin, cors: allowed, id })
+    live.hits.push({ origin, cors: allowed, id, w })
     if (live.refuse) return send(res, 403, { 'content-type': 'text/plain' }, 'refused')
-    playable(id).then(({ body, type }) => {
+    playable(id, w).then(({ body, type }) => {
       const h: Record<string, string> = { 'content-type': type, 'content-length': String(body.length), 'cache-control': 'max-age=3600', 'last-modified': 'Wed, 14 Oct 2026 10:00:00 GMT', etag: `"${id}"`, 'accept-ranges': 'bytes', 'cross-origin-resource-policy': 'cross-origin' }
       if (allowed) h['access-control-allow-origin'] = LIVE
       send(res, 200, h, body)
@@ -126,22 +147,28 @@ export async function startLive(): Promise<Live> {
     quiet(req, res)
     const url = new URL(req.url ?? '/', LIVE)
     const asset = url.pathname.match(/^\/api\/v1\/assets\/([^/]+)\/content$/)
-    if (asset && req.method === 'GET' && !url.searchParams.get('w')) {
+    if (asset && req.method === 'GET' && !url.searchParams.get('download')) {
       const id = asset[1]!
+      const w = url.searchParams.get('w') ? Number(url.searchParams.get('w')) : null
       try {
         if (url.searchParams.get('proxy')) {
           live.proxied++
+          live.transfer.requests++
           const { body, type } = await playable(id)
           const PART = 4 * 1024 * 1024
           const m = /^bytes=(\d+)-(\d*)$/.exec((req.headers.range as string | undefined) ?? '')
           const start = m ? Number(m[1]) : 0
           if (start >= body.length) return send(res, 416, { 'content-range': `bytes */${body.length}` })
           const end = Math.min(m?.[2] ? Number(m[2]) : start + PART - 1, start + PART - 1, body.length - 1)
+          live.transfer.media += end - start + 1
           return send(res, 206, { 'content-type': type, 'content-range': `bytes ${start}-${end}/${body.length}` }, body.subarray(start, end + 1))
         }
         const type = await kindOf(id)
-        if (type.startsWith('video/') || type.startsWith('audio/')) {
-          return send(res, 302, { location: presigned(id), 'cache-control': live.keptRedirect ? 'private, max-age=600' : 'no-store' })
+        // Videos and sound were always redirects; images are now too.
+        if (type.startsWith('video/') || type.startsWith('audio/') || live.images === 'redirect') {
+          live.transfer.requests++
+          live.transfer.redirects++
+          return send(res, 302, { location: presigned(id, type.startsWith('image/') ? w : null), 'cache-control': live.keptRedirect ? 'private, max-age=600' : 'no-store' })
         }
       } catch (e) { return send(res, 500, {}, String(e)) }
     }
@@ -150,9 +177,9 @@ export async function startLive(): Promise<Live> {
       return forward(req, res, j => {
         for (const m of j?.media ?? []) m.src = presigned(m.id)
         for (const g of j?.groups ?? []) for (const m of g.items ?? []) m.src = presigned(m.id)
-      })
+      }, live.transfer)
     }
-    forward(req, res)
+    forward(req, res, undefined, live.transfer)
   })
   // Vite's live reload socket goes straight through.
   for (const srv of [r2, studio]) srv.on('clientError', (_e, socket) => socket.destroy())

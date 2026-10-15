@@ -1,11 +1,12 @@
-import { useMemo, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
-import { Archive, AudioLines, Clapperboard, Download, Film, History, Images, LayoutGrid, Loader2, Mic, Music, Plus, Sparkles, Upload, Wind } from 'lucide-react'
+import { AudioLines, Clapperboard, Download, Film, History, Images, LayoutGrid, Loader2, Mic, Music, Plus, Sparkles, Trash2, Upload, Wind } from 'lucide-react'
 import { api, assetUrl, downloadUrl } from '../api'
 import { keys, useCharacters, useContent, useLibrary, useScenes, useSounds, useWorkerGate } from '../hooks'
 import { Callout, Img, errorMessage, useToast } from '../ui'
 import { ClipGrid, ClipUpload, StillGrid, StillUpload } from '../library'
+import { DeleteButton, SelectBar, SelectToggle, TileCheck, TrashTab, useDelete, useSelection, type Deletable } from '../trash'
 import { RunStatus } from '../runs'
 import type { BrollClip, ContentData, LibraryClip, ScenesData, SoundItem } from '../types'
 import { KIND_LABEL, fileSlug, postName, useNewPost } from './post/parts'
@@ -15,9 +16,10 @@ import { HooksTab } from './library/Hooks'
 
 // The Library (UX-PLAN.md): browse everything made, across characters.
 // Stills and clips start a new post in one click; B-roll is uploaded and
-// tagged here; exported posts can be downloaded again.
+// tagged here; exported posts can be downloaded again. Any item can be
+// deleted, one or many (Select), into the Trash for 7 days (section 22).
 
-type Tab = 'stills' | 'clips' | 'broll' | 'sounds' | 'voice' | 'hooks' | 'posts'
+type Tab = 'stills' | 'clips' | 'broll' | 'sounds' | 'voice' | 'hooks' | 'posts' | 'trash'
 const TABS: Array<[Tab, string, ReactNode]> = [
   ['stills', 'Stills', <Images size={14} key="s" />],
   ['clips', 'Clips', <Film size={14} key="c" />],
@@ -26,7 +28,11 @@ const TABS: Array<[Tab, string, ReactNode]> = [
   ['voice', 'Voice lines', <Mic size={14} key="v" />],
   ['hooks', 'Hooks', <Sparkles size={14} key="h" />],
   ['posts', 'Posts', <LayoutGrid size={14} key="p" />],
+  ['trash', 'Trash', <Trash2 size={14} key="t" />],
 ]
+const SELECTABLE: Tab[] = ['stills', 'clips', 'broll', 'sounds', 'posts']
+type Sel = ReturnType<typeof useSelection<Deletable>>
+type Del = ReturnType<typeof useDelete>
 
 export default function Library() {
   const [params, setParams] = useSearchParams()
@@ -46,14 +52,22 @@ export default function Library() {
   const stills = (lib.data?.stills ?? []).filter(s => !scene || s.sceneId === scene)
   const clips = lib.data?.clips ?? []
   const uploadFor = characterId ?? (characters.length === 1 ? characters[0]!.id : null)
+  const del = useDelete()
+  const sel = useSelection<Deletable>()
+  // A new tab or character starts a new selection.
+  useEffect(() => { sel.stop() }, [tab, characterId]) // eslint-disable-line react-hooks/exhaustive-deps
+  const still = (s: { id: string; sceneTitle: string }): Deletable => ({ kind: 'candidate', id: s.id, label: s.sceneTitle || 'Still' })
+  const clip = (c: { id: string; title: string }): Deletable => ({ kind: 'candidate', id: c.id, label: c.title || 'Clip' })
+  const pick = <T,>(to: (x: T) => Deletable) => sel.on ? { has: sel.has, toggle: (x: T) => sel.toggle(to(x)) } : null
+  const everything: Deletable[] = tab === 'stills' ? stills.map(still) : tab === 'clips' ? clips.filter(c => c.status !== 'generating').map(clip) : []
 
   return (
     <div className="st-page wide">
       <div className="st-pagehead">
-        <div className="grow"><div className="st-kicker st-row" style={{ gap: 10 }}>Library<HowTo key={tab} id={tab === 'voice' ? 'voice' : tab === 'hooks' ? 'hooks' : 'library'} /></div><h1 className="st-h1">Everything you made</h1><p className="st-sub">Stills, clips, B-roll, sounds, voice lines, hooks and exported posts. Start a new post from any still, clip or hook.</p></div>
+        <div className="grow"><div className="st-kicker st-row" style={{ gap: 10 }}>Library<HowTo key={tab} id={tab === 'voice' ? 'voice' : tab === 'hooks' ? 'hooks' : 'library'} /></div><h1 className="st-h1">Everything you made</h1><p className="st-sub">Stills, clips, B-roll, sounds, voice lines, hooks and exported posts. Start a new post from any still, clip or hook. Deleted items wait 7 days in the Trash.</p></div>
       </div>
       <div className="st-row" style={{ gap: 12, flexWrap: 'wrap', marginBottom: 18 }}>
-        <div className="st-seg" role="tablist">
+        <div className="st-seg st-tabstrip" role="tablist">
           {TABS.map(([k, label, icon]) => <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => set({ tab: k, scene: null })}><span className="st-row" style={{ gap: 6 }}>{icon}{label}</span></button>)}
         </div>
         {tab !== 'broll' && tab !== 'hooks' && characters.length > 1 && (
@@ -62,7 +76,9 @@ export default function Library() {
             {characters.map(c => <button key={c.id} className={`st-chip ${characterId === c.id ? 'on' : ''}`} onClick={() => set({ c: c.id })}>{c.name}</button>)}
           </div>
         )}
+        {SELECTABLE.includes(tab) && <><span className="st-spacer" /><SelectToggle sel={sel} /></>}
       </div>
+      {del.dialog}
 
       {tab === 'stills' && (
         !lib.data ? <Skel /> : (
@@ -70,7 +86,7 @@ export default function Library() {
             {characters.length > 0 && <StillUpload characters={characters} characterId={characterId} />}
             {scene && <Callout tone="info">Showing one scene's stills. <button className="st-todo-link" onClick={() => set({ scene: null })}>Show all stills</button></Callout>}
             {!stills.length ? <Callout tone="info">No stills yet. Make them in a post's Stills step, or upload images above. <button className="st-todo-link" onClick={() => void newPost.create('meme')}>Start a video post</button></Callout> : (
-              <StillGrid stills={stills} showCharacter={!characterId} action={s => (
+              <StillGrid stills={stills} showCharacter={!characterId} select={pick(still)} onDelete={s => void del.ask([still(s)])} action={s => (
                 <button type="button" className="st-btn sm" disabled={!!newPost.busy} onClick={() => void newPost.create('meme', { characterId: s.characterId, sceneId: s.sceneId, spec: { stillId: s.id }, step: 'video' })}><Plus size={13} />Use in a new post</button>
               )} />
             )}
@@ -87,7 +103,7 @@ export default function Library() {
               <span className="st-hint">Kept takes, uploads and clones. Any video file becomes a clip.</span>
             </div>
             {!clips.length ? <Callout tone="info">No clips yet. Keep a take in a post's Video step, or upload a video.</Callout> : (
-              <ClipGrid clips={clips} showCharacter={!characterId} action={c => (
+              <ClipGrid clips={clips} showCharacter={!characterId} select={pick(clip)} onDelete={c => void del.ask([clip(c)])} action={c => (
                 <div className="st-row" style={{ gap: 6, flexWrap: 'wrap' }}>
                   <button type="button" className="st-btn sm" disabled={!!newPost.busy} onClick={() => void newPost.create('meme', { characterId: c.characterId, spec: { clipId: c.id }, step: 'text' })}><Plus size={13} />Make a video post</button>
                   {c.assetId && <UseThisClip clip={c} />}
@@ -98,16 +114,27 @@ export default function Library() {
         )
       )}
 
-      {tab === 'broll' && (!content.data ? <Skel /> : <BrollTab data={content.data} />)}
+      {tab === 'broll' && (!content.data ? <Skel /> : <BrollTab data={content.data} sel={sel} del={del} />)}
 
-      {tab === 'sounds' && <SoundsTab />}
+      {tab === 'sounds' && <SoundsTab sel={sel} del={del} />}
       {tab === 'voice' && <VoiceLinesTab characterId={characterId} characters={characters} />}
       {tab === 'hooks' && <HooksTab characters={characters} />}
 
       {tab === 'posts' && (
-        !content.data ? <Skel /> : <ExportedPosts data={content.data} characterId={characterId} />
+        !content.data ? <Skel /> : <ExportedPosts data={content.data} characterId={characterId} sel={sel} del={del} />
       )}
+      {tab === 'trash' && <TrashTab characterId={characterId} />}
+
+      {(tab === 'stills' || tab === 'clips') && <DeleteBar sel={sel} del={del} all={everything} />}
     </div>
+  )
+}
+
+function DeleteBar({ sel, del, all }: { sel: Sel; del: Del; all: Deletable[] }) {
+  return (
+    <SelectBar sel={sel} all={all}>
+      <button type="button" className="st-btn sm bad" disabled={del.busy || !sel.items.length} onClick={() => void del.ask(sel.items, sel.stop)}>{del.busy ? <Loader2 size={13} className="st-spin" /> : <Trash2 size={13} />}Delete {sel.items.length || ''}</button>
+    </SelectBar>
   )
 }
 
@@ -115,7 +142,7 @@ const Skel = () => <div className="st-skel" style={{ height: 240, borderRadius: 
 
 // Library > Sounds (Phase 3 sound bed): ambience recordings and music
 // tracks for the Finish step's Sound row. Room tone is built in. No AI music.
-function SoundsTab() {
+function SoundsTab({ sel, del }: { sel: Sel; del: Del }) {
   const toast = useToast()
   const qc = useQueryClient()
   const sounds = useSounds()
@@ -149,13 +176,16 @@ function SoundsTab() {
         <RunStatus match={j => added.some(id => j.purpose === `sound_ingest:${id}`)} />
       </div></section>
       {!sounds.data ? <Skel /> : !list.length ? <Callout tone="info">No sounds yet. Room tone is built in; upload a recording or a track to add more.</Callout> : (
-        <div className="st-soundlist">{list.map(x => <SoundCard key={x.id} s={x} />)}</div>
+        <div className="st-soundlist">{list.map(x => <SoundCard key={x.id} s={x} sel={sel} del={del} />)}</div>
       )}
+      <DeleteBar sel={sel} del={del} all={list.map(soundRef)} />
     </div>
   )
 }
 
-function SoundCard({ s }: { s: SoundItem }) {
+const soundRef = (s: SoundItem): Deletable => ({ kind: 'sound', id: s.id, label: s.title || 'Sound' })
+
+function SoundCard({ s, sel, del }: { s: SoundItem; sel: Sel; del: Del }) {
   const toast = useToast()
   const qc = useQueryClient()
   const [title, setTitle] = useState(s.title)
@@ -163,11 +193,10 @@ function SoundCard({ s }: { s: SoundItem }) {
   async function save(patch: { title?: string; tag?: string; kind?: 'ambience' | 'music' }) {
     try { await api.updateSound(s.id, patch); await qc.invalidateQueries({ queryKey: ['sounds'] }) } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) }
   }
-  async function archive() {
-    try { await api.archiveSound(s.id); await qc.invalidateQueries({ queryKey: ['sounds'] }) } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) }
-  }
+  const on = sel.has(s.id)
   return (
-    <div className="st-sounditem">
+    <div className={`st-sounditem ${on ? 'picked' : ''}`}>
+      {sel.on && <input type="checkbox" className="st-checkbox" checked={on} onChange={() => sel.toggle(soundRef(s))} aria-label={`Select ${s.title}`} />}
       {s.kind === 'music' ? <Music size={16} /> : <Wind size={16} />}
       <input className="st-input" style={{ maxWidth: 240 }} value={title} onChange={e => setTitle(e.target.value)} onBlur={() => title !== s.title && void save({ title })} aria-label="Title" />
       <input className="st-input" style={{ maxWidth: 160 }} value={tag} onChange={e => setTag(e.target.value)} onBlur={() => tag !== s.tag && void save({ tag })} placeholder="Tag, e.g. cafe" aria-label="Tag" />
@@ -177,21 +206,27 @@ function SoundCard({ s }: { s: SoundItem }) {
       <span className="st-hint">{s.status === 'processing' ? 'Being prepared...' : s.status === 'failed' ? s.error : [s.durationSec ? `${s.durationSec} s` : '', s.loudness != null ? `${s.loudness} LUFS` : ''].filter(Boolean).join(' · ')}</span>
       <span className="st-spacer" />
       {s.assetId && <audio className="st-audio" src={assetUrl(s.assetId)} controls preload="none" />}
-      <button className="st-btn sm ghost icon" onClick={() => void archive()} aria-label={`Remove ${s.title}`} title="Remove from the library"><Archive size={14} /></button>
+      {!sel.on && <DeleteButton onClick={() => void del.ask([soundRef(s)])} label={s.title || 'this sound'} />}
     </div>
   )
 }
 
-function ExportedPosts({ data, characterId }: { data: ContentData; characterId: string | null }) {
-  const done = data.items.filter(i => (i.status === 'ready' || i.outputs.zipAssetId || i.outputs.videoAssetId) && (!characterId || i.characterId === characterId))
+// A render's delete moves its files to the Trash; the post stays, back to a
+// draft, and can be exported again.
+const renderRef = (i: { id: string } & Parameters<typeof postName>[0]): Deletable => ({ kind: 'render', id: i.id, label: `Render: ${postName(i)}` })
+function ExportedPosts({ data, characterId, sel, del }: { data: ContentData; characterId: string | null; sel: Sel; del: Del }) {
+  const done = data.items.filter(i => (i.outputs.zipAssetId || i.outputs.videoAssetId || i.outputs.imageAssetIds?.length || i.outputs.videos?.some(v => v)) && (!characterId || i.characterId === characterId))
   if (!done.length) return <Callout tone="info">No exported posts yet. Export one from its Finish step.</Callout>
   return (
+    <>
     <div className="st-content-videos">
       {done.map(i => {
         const o = i.outputs
         const name = fileSlug(postName(i))
+        const on = sel.has(i.id)
         return (
-          <div key={i.id} className="st-card st-col" style={{ gap: 8, padding: 10 }}>
+          <div key={i.id} className={`st-card st-col st-postcard ${on ? 'on' : ''}`} style={{ gap: 8, padding: 10 }}>
+            {sel.on && <button type="button" className="st-tile-open st-postcard-select" aria-pressed={on} aria-label={`Select ${postName(i)}`} onClick={() => sel.toggle(renderRef(i))}><TileCheck on={on} /></button>}
             {o.videoAssetId ? <video className="st-content-result sm" src={assetUrl(o.videoAssetId)} controls playsInline preload="metadata" />
               : o.imageAssetIds?.[0] ? <Img assetId={o.imageAssetIds[0]} width={320} style={{ aspectRatio: '9 / 16' }} />
               : o.videos?.find(v => v) ? <video className="st-content-result sm" src={assetUrl(o.videos.find(v => v)!.assetId)} controls playsInline preload="metadata" /> : null}
@@ -200,11 +235,15 @@ function ExportedPosts({ data, characterId }: { data: ContentData; characterId: 
             <div className="st-row" style={{ gap: 6 }}>
               {o.videoAssetId && <a className="st-btn sm secondary" href={downloadUrl(o.videoAssetId, `${name}.mp4`)}><Download size={13} />MP4</a>}
               {o.zipAssetId && <a className="st-btn sm secondary" href={downloadUrl(o.zipAssetId, `${name}.zip`)}><Download size={13} />Zip</a>}
+              <span className="st-spacer" />
+              {!sel.on && <DeleteButton onClick={() => void del.ask([renderRef(i)])} label={`the render of ${postName(i)}`} />}
             </div>
           </div>
         )
       })}
     </div>
+    <DeleteBar sel={sel} del={del} all={done.map(renderRef)} />
+    </>
   )
 }
 
@@ -228,7 +267,8 @@ function ComboLog({ characterId }: { characterId: string }) {
 
 // ── B-roll ────────────────────────────────────────────────────────────
 
-function BrollTab({ data }: { data: ContentData }) {
+const brollRef = (b: BrollClip): Deletable => ({ kind: 'broll', id: b.id, label: `B-roll: ${b.title || 'clip'}` })
+function BrollTab({ data, sel, del }: { data: ContentData; sel: Sel; del: Del }) {
   const toast = useToast()
   const qc = useQueryClient()
   const [product, setProduct] = useState('')
@@ -270,13 +310,14 @@ function BrollTab({ data }: { data: ContentData }) {
         </div>
       )}
       {!shown.length ? <Callout tone="info">No B-roll yet. Upload a screen recording to start the library.</Callout> : (
-        <div className="st-content-videos">{shown.map(b => <BrollCard key={b.id} b={b} products={data.products} />)}</div>
+        <div className="st-content-videos">{shown.map(b => <BrollCard key={b.id} b={b} products={data.products} sel={sel} del={del} />)}</div>
       )}
+      <DeleteBar sel={sel} del={del} all={shown.map(brollRef)} />
     </div>
   )
 }
 
-function BrollCard({ b, products }: { b: BrollClip; products: string[] }) {
+function BrollCard({ b, products, sel, del }: { b: BrollClip; products: string[]; sel: Sel; del: Del }) {
   const toast = useToast()
   const qc = useQueryClient()
   const [title, setTitle] = useState(b.title)
@@ -285,18 +326,17 @@ function BrollCard({ b, products }: { b: BrollClip; products: string[] }) {
   async function save(patch: { title?: string; product?: string }) {
     try { await api.updateBroll(b.id, patch); await qc.invalidateQueries({ queryKey: keys.content }) } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) }
   }
-  async function archive() {
-    try { await api.archiveBroll(b.id); await qc.invalidateQueries({ queryKey: keys.content }) } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) }
-  }
+  const on = sel.has(b.id)
   return (
-    <div className="st-card st-col" style={{ gap: 8, padding: 10 }}>
+    <div className={`st-card st-col st-postcard ${on ? 'on' : ''}`} style={{ gap: 8, padding: 10 }}>
+      {sel.on && <button type="button" className="st-tile-open st-postcard-select" aria-pressed={on} aria-label={`Select ${b.title || 'B-roll'}`} onClick={() => sel.toggle(brollRef(b))}><TileCheck on={on} /></button>}
       {b.status === 'ready' && b.assetId ? <video className="st-content-result sm" src={assetUrl(b.assetId)} controls muted playsInline preload="metadata" />
         : b.status === 'processing' ? <div className="st-content-processing"><Loader2 size={18} className="st-spin" />Preparing...</div>
         : <div className="st-content-processing bad">{b.error ?? 'This upload failed.'}</div>}
       <input className="st-input" value={title} onChange={e => setTitle(e.target.value)} onBlur={() => title !== b.title && save({ title })} aria-label="Title" />
       <input className="st-input" list={listId} value={product} onChange={e => setProduct(e.target.value)} onBlur={() => product !== b.product && save({ product })} placeholder="Product" aria-label="Product" />
       <datalist id={listId}>{products.map(p => <option key={p} value={p} />)}</datalist>
-      <div className="st-row"><span className="st-hint">{b.durationSec != null ? `${b.durationSec} s` : ''}</span><span className="st-spacer" /><button className="st-btn ghost sm" onClick={archive}><Archive size={13} />Archive</button></div>
+      <div className="st-row"><span className="st-hint">{b.durationSec != null ? `${b.durationSec} s` : ''}</span><span className="st-spacer" />{!sel.on && b.status !== 'processing' && <DeleteButton onClick={() => void del.ask([brollRef(b)])} label={b.title || 'this B-roll'} />}</div>
     </div>
   )
 }

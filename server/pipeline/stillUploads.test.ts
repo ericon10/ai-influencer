@@ -62,7 +62,7 @@ describe('upload images', () => {
     const mine = groups.find(g => g.id === 'stills')!
     expect(mine.label).toBe("Callie's stills")
     expect(mine.items.map(x => x.id).sort()).toEqual(stills.map(s => s.assetId).sort())
-    expect(mine.items.every(x => x.kind === 'image' && x.thumb?.endsWith('?w=320'))).toBe(true)
+    expect(mine.items.every(x => x.kind === 'image' && x.thumb?.endsWith('?w=320&cors=1'))).toBe(true)
   })
 
   it('refuses what is not an image, names HEIC, and checks the post belongs to the character', async () => {

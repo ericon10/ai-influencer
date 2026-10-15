@@ -179,6 +179,7 @@ the Studio; they are not creative limits on a character.
 | `src/studio/pages/Guide.tsx`, `src/studio/guide/` | The Guide (DECISIONS G21): Quick start, every page and step with annotated screenshots (`public/studio-guide/`, hotspots in `shots.json`), glossary; `HowTo` opens a section in a drawer from each page and step. Update its text and screenshots when a screen changes |
 | `src/studio/pages/Posts.tsx`, `Library.tsx`, `src/studio/library.tsx` | Posts home (account and character filters, Make another like this); the Library and its drawer |
 | `config/content.yaml`, `server/pipeline/content.ts`, `server/core/overlay.ts`, `server/media/meme.ts` | Posts on the server: idea, scene, account tag, step; B-roll; video posts, slideshows, batches (clips rotate); TikTok caption box (bundled fonts); renders free on the worker |
+| `server/pipeline/trash.ts`, `server/pipeline/storage.ts`, `src/studio/trash.tsx` | Storage, traffic and auto-clean (G49): Delete one or many (Select), warnings for sheet refs and used items, Library > Trash (7 days, Restore), then files and thumbnails removed for good; Auto-clean of never-kept takes (14 days, a setting, Off; starred never); the daily clean on the worker (upload slots, Trash, Auto-clean, the storage measure); Settings > General > Storage. Every file on R2 is served as a redirect, thumbnails too (`server/storage/assets.ts`) |
 | `server/pipeline/clips.ts` | Uploaded clips (kept clips of a character), uploaded images (kept byte for byte, `upload_image`, G48) and the Library view |
 | `server/pipeline/editorMedia.ts`, fork `apps/web/src/studio/media/` | The editor's Add media, Studio first (G48): this post's takes and stills, the character's clips and stills, the Library; tap or drag onto the timeline |
 | `e2e/editor/r2.ts` | The live site's media path for the browser tests: a proxy and a fake R2 with the browser cache on (never Playwright routing for media) |
@@ -245,7 +246,7 @@ inline-style convention.
 | `src/utils/systemPrompt.js` | Prompt templates: poses, wardrobe library, vibe palettes, Soul vs GPT Image 2 variants |
 | `src/pages/Create.jsx` | Multi-step influencer creation wizard |
 | `src/pages/Influencers.jsx` | Influencer profile + Content Studio + Video Studio (very large, known structural debt) |
-| `api/hf/[...path].js` | Edge function that proxies all Higgsfield MCP traffic and forwards SSE streams |
+| (removed) `api/hf`, `api/hfproxy`, `api/img-proxy` | The old app's Higgsfield and image proxies through Vercel, deleted 2026-10-15 (G49): the Studio never used them, and the old pages at the site root lose Higgsfield connect, generation and image downloads |
 | `api/claude.js` | Anthropic API proxy; caller supplies their own `x-api-key` |
 
 ## Conventions

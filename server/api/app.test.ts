@@ -10,7 +10,9 @@ import { createAccount } from '../auth/accounts.js'
 import { hashPassword } from '../lib/passwords.js'
 import { registerPipelineHooks } from '../pipeline/hooks.js'
 import { renderPlaceholderPortrait } from '../providers/mock.js'
-import { providerCredentials } from '../db/schema.js'
+import { candidates, providerCredentials } from '../db/schema.js'
+import { saveAsset } from '../storage/assets.js'
+import { newId } from '../lib/ids.js'
 
 let h: Harness
 let app: ReturnType<typeof createApp>
@@ -119,7 +121,7 @@ describe('Studio API', () => {
     expect(other.status).toBe(404)
   })
 
-  it('the editor fetches a file from storage directly, or from the Studio in parts of at most 4 MB; large originals are never shrunk', async () => {
+  it('every file comes from storage by a redirect (thumbnails too); the editor\'s fallback sends parts of at most 4 MB; originals are never shrunk', async () => {
     const id = (await call('POST', '/characters', { body: { name: 'Proxy test' }, cookie: cookieA })).json.id
     // Noise compresses badly: a PNG over 4 MB.
     const noise = Buffer.alloc(1400 * 1300 * 3)
@@ -148,11 +150,58 @@ describe('Studio API', () => {
       expect(rest.status).toBe(206)
       expect(Buffer.concat([firstBytes, Buffer.from(await rest.arrayBuffer())]).equals(png)).toBe(true)
       expect((await get('?proxy=1', `bytes=${png.length}-`)).status).toBe(416)
+      // Thumbnails too (owner, 2026-10-15: Vercel moves only JSON): made
+      // once as WebP next to the original, then a redirect to storage.
+      const thumb = await get('?w=300')
+      expect(thumb.status).toBe(302)
+      expect(thumb.headers.get('location')).toMatch(/\.w320\.webp\?sig=1$/)
+      const kept = thumb.headers.get('location')!.replace('https://r2.test/', '').replace('?sig=1', '')
+      expect(await mem.exists(kept)).toBe(true)
+      // A page that reads files with CORS gets its own link (signed apart).
+      const corsLinks: string[] = []
+      ;(h.deps as { store: typeof mem }).store = { ...mem, driver: 's3', presignGet: async (key: string, _t: number, o?: { cors?: boolean }) => { if (o?.cors) corsLinks.push(key); return `https://r2.test/${key}?sig=${o?.cors ? 'cors' : '1'}` } }
+      expect((await get('?w=300&cors=1')).headers.get('location')).toMatch(/\.w320\.webp\?sig=cors$/)
+      expect(corsLinks).toHaveLength(1)
       // Another account gets nothing.
       expect((await app.request(`/api/v1/assets/${assetId}/content?proxy=1`, { headers: { cookie: cookieB, range: 'bytes=0-' } })).status).toBe(404)
     } finally {
       ;(h.deps as { store: typeof mem }).store = mem
     }
+  })
+
+  it('Delete and the Trash: check, move, list, restore; the storage readout and Auto-clean; one account never touches another', async () => {
+    const characterId = (await call('POST', '/characters', { body: { name: 'Trash test' }, cookie: cookieA })).json.id
+    const accountId = (await call('GET', '/me', { cookie: cookieA })).json.accountId
+    const png = await sharp({ create: { width: 40, height: 60, channels: 3, background: '#a87' } }).png().toBuffer()
+    const asset = await saveAsset(h.deps, { ...h.ctx, accountId }, { data: png, origin: 'upload' })
+    const id = newId('cand')
+    await h.deps.db.insert(candidates).values({ id, accountId, characterId, target: 'scene', op: 'upload_image', label: 'Beach', assetId: asset.id, status: 'approved' })
+    const items = [{ kind: 'candidate', id }]
+    expect((await call('POST', '/trash/check', { body: { items }, cookie: cookieA })).json.warnings).toEqual([])
+    // Another account can neither move it nor see it.
+    expect((await call('POST', '/trash', { body: { items }, cookie: cookieB })).json.moved).toBe(0)
+    const moved = await call('POST', '/trash', { body: { items }, cookie: cookieA })
+    expect(moved.json).toMatchObject({ moved: 1, ids: [expect.stringMatching(/^trash_/)] })
+    expect((await call('GET', '/trash', { cookie: cookieB })).json.items).toEqual([])
+    const list = await call('GET', '/trash', { cookie: cookieA })
+    expect(list.json).toMatchObject({ days: 7, items: [{ refId: id, label: 'Beach', reason: 'owner', daysLeft: 7 }] })
+    expect((await call('GET', `/library?characterId=${characterId}`, { cookie: cookieA })).json.stills).toEqual([])
+    expect((await call('POST', '/trash/restore', { body: { ids: moved.json.ids }, cookie: cookieB })).json.restored).toBe(0)
+    expect((await call('POST', '/trash/restore', { body: { ids: moved.json.ids }, cookie: cookieA })).json.restored).toBe(1)
+    expect((await call('GET', `/library?characterId=${characterId}`, { cookie: cookieA })).json.stills.map((s: { id: string }) => s.id)).toEqual([id])
+    // Bad input is refused, not guessed.
+    expect((await call('POST', '/trash', { body: { items: [{ kind: 'everything', id }] }, cookie: cookieA })).status).toBe(400)
+    // Settings > Storage: the readout and Auto-clean (14 days, a choice, or Off).
+    const storage = await call('GET', '/settings/storage', { cookie: cookieA })
+    expect(storage.json).toMatchObject({ autoCleanDays: 14, autoCleanChoices: [3, 7, 14, 30], trashDays: 7, uploadSlotDays: 1, worker: expect.any(Object) })
+    expect((await call('PUT', '/settings/storage/auto-clean', { body: { days: null }, cookie: cookieA })).json.autoCleanDays).toBeNull()
+    expect((await call('PUT', '/settings/storage/auto-clean', { body: { days: 9 }, cookie: cookieA })).status).toBe(400)
+    expect((await call('PUT', '/settings/storage/auto-clean', { body: { days: 14 }, cookie: cookieA })).json.autoCleanDays).toBe(14)
+    expect((await call('GET', '/settings/storage', { cookie: cookieB })).json.autoCleanDays).toBe(14)
+    await drain(h)
+    expect((await call('POST', '/settings/storage/measure', { body: {}, cookie: cookieA })).json).toEqual({ queued: true })
+    await drain(h)
+    expect((await call('GET', '/settings/storage', { cookie: cookieA })).json.usage).toMatchObject({ files: expect.any(Number), bytes: expect.any(Number) })
   })
 
   it("imports Callie's file, then adds her sheet images to the same character", async () => {

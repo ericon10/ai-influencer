@@ -1,6 +1,5 @@
 import { Hono, type Context } from 'hono'
 import { z } from 'zod'
-import sharp from 'sharp'
 import { and, desc, eq, gt, inArray, or } from 'drizzle-orm'
 import type { Ctx, Deps, Principal } from '../context.js'
 import { hasRole } from '../context.js'
@@ -9,7 +8,7 @@ import { ProviderError } from '../providers/types.js'
 import { newId } from '../lib/ids.js'
 import type { AuthProvider } from '../auth/provider.js'
 import { jobEvents, jobs } from '../db/schema.js'
-import { readAsset, saveAsset, getAsset } from '../storage/assets.js'
+import { readAsset, saveAsset, getAsset, thumbnail } from '../storage/assets.js'
 import { verifyAssetSignature } from '../jobs/assetUrls.js'
 import { cancelJob, getJob, resolveJob, wakeFromWebhook } from '../jobs/runner.js'
 import { wakeWorker } from '../jobs/wake.js'
@@ -22,6 +21,8 @@ import { whatWasSent, whatWasSentForJob } from '../pipeline/sent.js'
 import { videoPrices } from '../pipeline/sceneActions.js'
 import { expectedVersion, readWorkerStatus } from '../jobs/workerStatus.js'
 import { addClip, addStills, libraryView } from '../pipeline/clips.js'
+import { cleanIfDue, setAutoCleanDays, storageView } from '../pipeline/storage.js'
+import { listTrash, parseRefs, restore, trash, trashWarnings, TRASH_DAYS } from '../pipeline/trash.js'
 import { cancelContinue, continueShot, keepTwoShots, useChainTake } from '../pipeline/chain.js'
 import { postCutView, postEditorProject } from '../pipeline/cutView.js'
 import { makeCloseup } from '../pipeline/closeup.js'
@@ -35,7 +36,7 @@ import { addCloneSource, cloneOptions, cloneStills, keepClone, pickCloneStill, p
 import { editorLibrary } from '../pipeline/editorMedia.js'
 import { addRecreateRow, recreateBatch, recreateFor, reviewTakeAgain, setRecreateRows, startRecreate, useCloneTake } from '../pipeline/recreate.js'
 import { jobViews } from '../jobs/jobView.js'
-import { POST_STEPS, addBroll, archiveBroll, archiveContent, contentView, createContent, duplicateContent, postScene, retryFailedBatch, startRender, updateBroll, updateContent } from '../pipeline/content.js'
+import { POST_STEPS, addBroll, archiveBroll, archiveContent, contentItemView, contentView, createContent, duplicateContent, postScene, retryFailedBatch, startRender, updateBroll, updateContent } from '../pipeline/content.js'
 import { rulesView, setRuleSwitch } from '../pipeline/rules.js'
 import { chooseConcept } from '../pipeline/concepts.js'
 import { approveCandidate, keepStale, pickHero, rejectCandidate, reopenCandidate, setFavorite, mirrorCandidate } from '../pipeline/review.js'
@@ -281,7 +282,27 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
 
   app.get('/settings/storage', async c => {
     const origins = studioOrigins(c.req.header('origin'))
-    return c.json({ driver: deps.store.driver, bucket: deps.store.driver === 's3' ? deps.env.S3_BUCKET : null, origins, corsRules: corsRules(origins) })
+    const worker = await readWorkerStatus(deps)
+    return c.json({
+      driver: deps.store.driver, bucket: deps.store.driver === 's3' ? deps.env.S3_BUCKET : null, origins, corsRules: corsRules(origins),
+      ...(await storageView(deps, c.get('ctx'))),
+      worker: { freeDiskMb: worker.freeDiskMb, checkedAt: worker.diskCheckedAt },
+    })
+  })
+  // Auto-clean: takes never kept go to the Trash N days after the post is
+  // finished (3, 7, 14 or 30), or Off (owner, 2026-10-15).
+  app.put('/settings/storage/auto-clean', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    const body = parse(z.object({ days: z.number().int().nullable() }), await json(c))
+    await setAutoCleanDays(deps, ctx, body.days)
+    return c.json(await storageView(deps, ctx))
+  })
+  // Measure now: the daily clean right away (free, on the worker).
+  app.post('/settings/storage/measure', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    return c.json({ queued: await cleanIfDue(deps, ctx, { now: true }) })
   })
 
   app.post('/settings/storage/check', async c => {
@@ -518,31 +539,23 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
     return c.json({ ok: true })
   })
 
-  // ── Assets (auth-checked; thumbnails resized on the fly) ──
+  // ── Assets (auth-checked; thumbnails made once and kept) ──
+  // On R2 every file (full size or a thumbnail) is a redirect to a
+  // short-lived storage link (owner, 2026-10-15: Vercel moves only JSON;
+  // a 2K still over 4.5 MB failed as bytes through the function). The
+  // redirect may be kept for 10 minutes: pages that read files with CORS
+  // ask for `cors=1` and get their own link (see BlobStore.presignGet).
+  // On local disk (development) the Studio serves the bytes itself.
   app.get('/assets/:id/content', async c => {
     const ctx = c.get('ctx')
+    const id = c.req.param('id')
     const width = Number(c.req.query('w') ?? 0)
-    if (width) {
-      const asset = await getAsset(deps, ctx, c.req.param('id'))
-      if (asset.kind === 'image') {
-        // Assets never change, so each thumbnail size is made once and kept.
-        const w = [160, 320, 480, 720, 960, 1600].find(x => x >= width) ?? 1600
-        const key = `${asset.storageKey.replace(/\.[a-z0-9]+$/, '')}.w${w}.webp`
-        let thumb: Buffer
-        if (await deps.store.exists(key)) thumb = await deps.store.get(key)
-        else {
-          const { data } = await readAsset(deps, ctx, asset.id)
-          thumb = await sharp(data).resize({ width: w, withoutEnlargement: true }).webp({ quality: 82 }).toBuffer()
-          await deps.store.put(key, thumb, 'image/webp')
-        }
-        return new Response(new Uint8Array(thumb), { headers: { 'content-type': 'image/webp', 'cache-control': 'private, max-age=31536000, immutable' } })
-      }
-    }
+    const download = c.req.query('download') ? (c.req.query('name') || id) : null
     // The editor's fallback (owner, 2026-10-15): a part of the file from the
     // Studio's own address, at most 4 MB, when storage will not answer the
     // browser. Same origin, so no CORS and no redirect.
     if (c.req.query('proxy') && deps.store.driver === 's3') {
-      const asset = await getAsset(deps, ctx, c.req.param('id'))
+      const asset = await getAsset(deps, ctx, id)
       const PART = 4 * 1024 * 1024
       const m = /^bytes=(\d+)-(\d*)$/.exec(c.req.header('range') ?? '')
       const start = m ? Number(m[1]) : 0
@@ -552,25 +565,17 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
       const last = start + part.data.length - 1
       return new Response(new Uint8Array(part.data), { status: 206, headers: { 'content-type': asset.mime, 'content-range': `bytes ${start}-${last}/${part.total}`, 'content-length': String(part.data.length), 'cache-control': 'private, max-age=600' } })
     }
-    // Videos and download bundles come straight from storage (a short-lived
-    // link): a function response is capped at 4.5 MB on Vercel.
-    const download = c.req.query('download') ? (c.req.query('name') || `${c.req.param('id')}`) : null
+    const asset = await getAsset(deps, ctx, id)
+    const ext = asset.storageKey.split('.').pop() ?? 'bin'
+    const fileName = download ? (download.endsWith(`.${ext}`) ? download : `${download}.${ext}`) : null
+    const thumbKey = width && asset.kind === 'image' && !download ? await thumbnail(deps, ctx, asset, width) : null
     if (deps.store.driver === 's3') {
-      const asset = await getAsset(deps, ctx, c.req.param('id'))
-      // A full-resolution upload (an image or a sound over 4 MB) too: the
-      // original is never shrunk to fit (owner, 2026-10-15).
-      if (asset.kind === 'video' || asset.kind === 'file' || download || asset.bytes > 4 * 1024 * 1024) {
-        const ext = asset.storageKey.split('.').pop() ?? 'bin'
-        const url = await deps.store.presignGet(asset.storageKey, 3600, download ? { downloadName: download.endsWith(`.${ext}`) ? download : `${download}.${ext}` } : undefined)
-        // Not kept by the browser (owner, 2026-10-15): a kept redirect led
-        // the editor to storage's answer for a <video>, which has no CORS
-        // header, and the take never reached the timeline.
-        if (url) return new Response(null, { status: 302, headers: { location: url, 'cache-control': 'no-store' } })
-      }
+      const url = await deps.store.presignGet(thumbKey ?? asset.storageKey, 3600, { ...(fileName ? { downloadName: fileName } : {}), cors: !!c.req.query('cors') })
+      if (url) return new Response(null, { status: 302, headers: { location: url, 'cache-control': 'private, max-age=600' } })
     }
-    const { row, data } = await readAsset(deps, ctx, c.req.param('id'))
-    const ext = row.storageKey.split('.').pop() ?? 'bin'
-    const headers: Record<string, string> = { 'content-type': row.mime, 'cache-control': 'private, max-age=31536000, immutable', 'accept-ranges': 'bytes', 'content-disposition': download ? `attachment; filename="${(download.endsWith(`.${ext}`) ? download : `${download}.${ext}`).replace(/[^\w.-]+/g, '_')}"` : 'inline' }
+    if (thumbKey) return new Response(new Uint8Array(await deps.store.get(thumbKey)), { headers: { 'content-type': 'image/webp', 'cache-control': 'private, max-age=31536000, immutable' } })
+    const { row, data } = await readAsset(deps, ctx, id)
+    const headers: Record<string, string> = { 'content-type': row.mime, 'cache-control': 'private, max-age=31536000, immutable', 'accept-ranges': 'bytes', 'content-disposition': fileName ? `attachment; filename="${fileName.replace(/[^\w.-]+/g, '_')}"` : 'inline' }
     // Video players ask for byte ranges (Safari will not play a clip without them).
     const range = /^bytes=(\d*)-(\d*)$/.exec(c.req.header('range') ?? '')
     if (range && data.length) {
@@ -586,7 +591,29 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
   app.get('/worker', async c => c.json(await readWorkerStatus(deps)))
 
   // ── Posts: B-roll, video posts, slideshows, batches; clips; the Library ──
-  app.get('/content', async c => c.json(await contentView(deps, c.get('ctx'))))
+  app.get('/content', async c => {
+    const ctx = c.get('ctx')
+    // The daily clean, when it is due (queueing it wakes the worker). Never
+    // in the way of the list.
+    await cleanIfDue(deps, ctx).catch(e => ctx.log.warn({ message: (e as Error).message }, 'daily clean not queued'))
+    return c.json(await contentView(deps, ctx))
+  })
+  // One post, also one older than the newest 200 the list holds.
+  app.get('/content/:id', async c => c.json(await contentItemView(deps, c.get('ctx'), c.req.param('id'))))
+  // Delete and the Trash (owner, 2026-10-15; UX-PLAN.md section 22).
+  app.post('/trash/check', async c => c.json({ warnings: await trashWarnings(deps, c.get('ctx'), parseRefs((await json(c) as { items?: unknown }).items)) }))
+  app.post('/trash', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    return c.json(await trash(deps, ctx, parseRefs((await json(c) as { items?: unknown }).items)))
+  })
+  app.get('/trash', async c => c.json({ items: await listTrash(deps, c.get('ctx')), days: TRASH_DAYS }))
+  app.post('/trash/restore', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    const body = parse(z.object({ ids: z.array(z.string().max(60)).min(1).max(200) }), await json(c))
+    return c.json(await restore(deps, ctx, body.ids))
+  })
   app.get('/library', async c => c.json(await libraryView(deps, c.get('ctx'), { characterId: c.req.query('characterId') || null })))
   // An uploaded video becomes a kept clip of the character (picked in the
   // post it was uploaded from).

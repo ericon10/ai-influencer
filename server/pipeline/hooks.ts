@@ -25,6 +25,7 @@ import { registerSounds } from './sounds.js'
 import { registerVoiceLines } from './voiceLines.js'
 import { registerScaleKit } from './scaleKit.js'
 import { registerCloseup } from './closeup.js'
+import { registerStorage } from './storage.js'
 import type { GenRequest } from '../providers/types.js'
 
 // What each finished job does to the character. Registered once at boot.
@@ -209,4 +210,5 @@ export function registerPipelineHooks(): void {
   registerVoiceLines()
   registerScaleKit()
   registerCloseup()
+  registerStorage()
 }

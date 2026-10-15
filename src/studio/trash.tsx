@@ -1,0 +1,199 @@
+import { useEffect, useState, type ReactNode } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { AlertTriangle, AudioLines, CheckSquare, File, Loader2, RotateCcw, Square, Star, Trash2, X } from 'lucide-react'
+import { api, assetUrl } from './api'
+import { keys } from './hooks'
+import { Callout, Img, Modal, errorMessage, useToast } from './ui'
+import { HowTo } from './guide/Guide'
+import type { TrashItem, TrashRef } from './types'
+import type { GuideId } from './guide/content'
+
+// Delete, Select and the Trash (owner, 2026-10-15; UX-PLAN.md section 22).
+// Deleting moves an item to the Trash for 7 days, restorable; then the daily
+// clean removes its files from storage for good, thumbnails included. An
+// item that a post uses, or a character's sheet ref, asks first.
+
+export interface Deletable extends TrashRef { label: string }
+type Warning = { id: string; kind: TrashRef['kind']; text: string }
+
+const refresh = (qc: ReturnType<typeof useQueryClient>) => {
+  for (const key of [['library'], keys.content, ['sounds'], ['trash'], ['scenes'], ['clones'], ['character'], ['voice-lines']]) void qc.invalidateQueries({ queryKey: key })
+}
+
+export function useDelete() {
+  const qc = useQueryClient()
+  const toast = useToast()
+  const [pending, setPending] = useState<{ items: Deletable[]; warnings: Warning[]; done?: () => void } | null>(null)
+  const [busy, setBusy] = useState(false)
+  async function move(items: Deletable[], done?: () => void) {
+    setBusy(true)
+    try {
+      const { moved, ids } = await api.trash(items.map(({ kind, id }) => ({ kind, id })))
+      setPending(null)
+      done?.()
+      refresh(qc)
+      toast({
+        tone: 'ok',
+        text: moved === 1 ? `Moved "${items[0]!.label}" to the Trash. It stays there 7 days.` : `Moved ${moved} items to the Trash. They stay there 7 days.`,
+        action: ids.length ? { label: 'Undo', run: () => void api.restore(ids).then(() => refresh(qc)).catch(e => toast({ tone: 'bad', text: errorMessage(e) })) } : undefined,
+      })
+    } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) } finally { setBusy(false) }
+  }
+  // Nothing to warn about: straight to the Trash, with Undo. Otherwise ask.
+  async function ask(items: Deletable[], done?: () => void) {
+    if (!items.length || busy) return
+    setBusy(true)
+    let warnings: Warning[] = []
+    try { warnings = (await api.trashCheck(items.map(({ kind, id }) => ({ kind, id })))).warnings } catch (e) { setBusy(false); toast({ tone: 'bad', text: errorMessage(e) }); return }
+    setBusy(false)
+    if (!warnings.length) return move(items, done)
+    setPending({ items, warnings, done })
+  }
+  const label = (id: string) => pending?.items.find(i => i.id === id)?.label ?? 'This item'
+  const dialog = (
+    <Modal open={!!pending} onClose={() => !busy && setPending(null)}>
+      {pending && (
+        <div className="st-col" style={{ gap: 14, padding: 22, maxWidth: 520 }} data-field="trash-warn">
+          <div className="st-row" style={{ gap: 10 }}><AlertTriangle size={18} style={{ color: 'var(--st-warn)' }} /><div className="st-h3 grow">{pending.items.length === 1 ? `Delete "${pending.items[0]!.label}"?` : `Delete ${pending.items.length} items?`}</div></div>
+          <ul className="st-col st-trash-warnings" style={{ gap: 8 }}>
+            {pending.warnings.map((w, i) => <li key={i}><b>{label(w.id)}</b>: {w.text}</li>)}
+          </ul>
+          <span className="st-hint">It goes to the Trash first: nothing changes for 7 days, and Restore puts it back. After that its files are removed from storage for good.</span>
+          <div className="st-row" style={{ gap: 8, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+            <button type="button" className="st-btn ghost" disabled={busy} onClick={() => setPending(null)}>Cancel</button>
+            <button type="button" className="st-btn bad" disabled={busy} onClick={() => void move(pending.items, pending.done)}>{busy ? <Loader2 size={15} className="st-spin" /> : <Trash2 size={15} />}Move to the Trash anyway</button>
+          </div>
+        </div>
+      )}
+    </Modal>
+  )
+  return { ask, dialog, busy }
+}
+
+// Select many: a Select button turns the grid's tiles into checkboxes; the
+// bar below counts them, selects all, and deletes (or restores) them.
+export function useSelection<T extends { id: string }>() {
+  const [on, setOn] = useState(false)
+  const [picked, setPicked] = useState<Map<string, T>>(new Map())
+  return {
+    on,
+    start: () => setOn(true),
+    stop: () => { setOn(false); setPicked(new Map()) },
+    has: (id: string) => picked.has(id),
+    toggle: (item: T) => setPicked(m => { const n = new Map(m); if (n.has(item.id)) n.delete(item.id); else n.set(item.id, item); return n }),
+    setAll: (items: T[]) => setPicked(new Map(items.map(i => [i.id, i]))),
+    clear: () => setPicked(new Map()),
+    items: [...picked.values()],
+  }
+}
+export type Selection<T extends { id: string }> = ReturnType<typeof useSelection<T>>
+
+export function SelectToggle({ sel, disabled = false }: { sel: { on: boolean; start: () => void; stop: () => void }; disabled?: boolean }) {
+  return sel.on
+    ? <button type="button" className="st-btn sm ghost" onClick={sel.stop}><X size={14} />Done selecting</button>
+    : <button type="button" className="st-btn sm" disabled={disabled} onClick={sel.start} data-field="library-select"><CheckSquare size={14} />Select</button>
+}
+
+export function SelectBar<T extends { id: string }>({ sel, all, children, help = 'library' }: { sel: Selection<T>; all: T[]; children: ReactNode; help?: GuideId }) {
+  if (!sel.on) return null
+  const every = all.length > 0 && all.every(x => sel.has(x.id))
+  return (
+    <div className="st-selectbar" role="toolbar" aria-label="Selected items" data-field="library-selectbar">
+      <b>{sel.items.length} selected</b>
+      <button type="button" className="st-btn sm ghost" onClick={() => (every ? sel.clear() : sel.setAll(all))}>{every ? 'Select none' : `Select all ${all.length}`}</button>
+      <span className="st-spacer" />
+      {children}
+      <button type="button" className="st-btn sm ghost" onClick={sel.stop}>Cancel</button>
+      <HowTo id={help} label="About Select" />
+    </div>
+  )
+}
+
+// The checkbox on a tile in Select mode; the tile itself toggles it.
+export function TileCheck({ on }: { on: boolean }) {
+  return <span className={`st-check ${on ? 'on' : ''}`} aria-hidden>{on ? <CheckSquare size={14} /> : <Square size={14} />}</span>
+}
+
+export function DeleteButton({ onClick, label, text = false, disabled = false }: { onClick: () => void; label: string; text?: boolean; disabled?: boolean }) {
+  return text
+    ? <button type="button" className="st-btn sm ghost" disabled={disabled} onClick={onClick} aria-label={`Delete ${label}`}><Trash2 size={13} />Delete</button>
+    : <button type="button" className="st-btn sm ghost icon" disabled={disabled} onClick={onClick} aria-label={`Delete ${label}`} title="Delete: it goes to the Trash for 7 days"><Trash2 size={14} /></button>
+}
+
+// A star on a take (owner, 2026-10-15): starred takes are never auto-cleaned.
+export function StarButton({ id, on, size = 'sm' }: { id: string; on: boolean; size?: 'sm' | 'xs' }) {
+  const qc = useQueryClient()
+  const toast = useToast()
+  const [value, setValue] = useState(on)
+  const [busy, setBusy] = useState(false)
+  useEffect(() => { setValue(on) }, [on])
+  return (
+    <button type="button" className={`st-btn ${size} ghost icon st-star ${value ? 'on' : ''}`} aria-pressed={value} aria-label={value ? 'Starred: never auto-cleaned' : 'Star: never auto-clean this take'} title={value ? 'Starred: never auto-cleaned. Press to unstar.' : 'Star it: Auto-clean never moves a starred take to the Trash.'} disabled={busy}
+      onClick={async e => {
+        e.stopPropagation()
+        const next = !value
+        setValue(next); setBusy(true)
+        try { await api.favorite(id, next); refresh(qc) } catch (err) { setValue(!next); toast({ tone: 'bad', text: errorMessage(err) }) } finally { setBusy(false) }
+      }}><Star size={14} fill={value ? 'currentColor' : 'none'} /></button>
+  )
+}
+
+// Library > Trash: what was deleted, by you or by Auto-clean, with the days
+// left before it is removed for good. Restore one or many.
+export function TrashTab({ characterId }: { characterId: string | null }) {
+  const qc = useQueryClient()
+  const toast = useToast()
+  const q = useQuery({ queryKey: ['trash'], queryFn: api.trashList })
+  const sel = useSelection<TrashItem>()
+  const [busy, setBusy] = useState(false)
+  const list = (q.data?.items ?? []).filter(t => !characterId || t.characterId === characterId)
+  async function restore(items: TrashItem[]) {
+    setBusy(true)
+    try {
+      const { restored } = await api.restore(items.map(i => i.id))
+      sel.stop()
+      refresh(qc)
+      toast({ tone: 'ok', text: restored === 1 ? `Restored "${items[0]!.label}".` : `Restored ${restored} items.` })
+    } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) } finally { setBusy(false) }
+  }
+  return (
+    <div className="st-col" style={{ gap: 16 }} data-field="library-trash">
+      <div className="st-row" style={{ gap: 10, flexWrap: 'wrap' }}>
+        <span className="st-hint grow">Deleted items wait here {q.data?.days ?? 7} days. Restore puts one back where it was. After that the daily clean removes its files from storage for good, thumbnails included. Auto-clean moves takes you never kept here too (Settings, Storage).</span>
+        <SelectToggle sel={sel} disabled={!list.length} />
+        <HowTo id="library" label="About the Trash" />
+      </div>
+      {!q.data ? <div className="st-skel" style={{ height: 200, borderRadius: 18 }} />
+        : !list.length ? <Callout tone="info">The Trash is empty.</Callout>
+        : (
+          <div className="st-grid scenes">
+            {list.map(t => {
+              const on = sel.has(t.id)
+              const media = (
+                <>
+                  {t.media === 'image' && t.assetId ? <Img assetId={t.assetId} width={320} style={{ aspectRatio: '9 / 16' }} />
+                    : t.media === 'video' && t.assetId ? <video className="st-clip" src={`${assetUrl(t.assetId)}#t=0.1`} muted playsInline preload="metadata" style={{ aspectRatio: '9 / 16' }} />
+                    : <div className="st-clip st-clip-empty" style={{ aspectRatio: '9 / 16' }}>{t.media === 'audio' ? <AudioLines size={20} /> : <File size={20} />}</div>}
+                  {sel.on && <TileCheck on={on} />}
+                  <span className={`st-badge ${t.daysLeft <= 1 ? 'bad' : 'warn'}`}>{t.daysLeft <= 0 ? 'Removed today' : t.daysLeft === 1 ? '1 day left' : `${t.daysLeft} days left`}</span>
+                </>
+              )
+              return (
+                <div key={t.id} className={`st-tile st-scene-tile ${on ? 'picked' : ''}`}>
+                  {sel.on ? <button type="button" className="st-tile-open" aria-pressed={on} aria-label={`Select ${t.label}`} onClick={() => sel.toggle(t)}>{media}</button> : <div className="st-tile-open">{media}</div>}
+                  <div className="st-col" style={{ gap: 2, padding: '0 4px 2px' }}>
+                    <span className="st-tile-label">{t.label}</span>
+                    <span className="st-hint">{t.reason === 'auto' ? 'Auto-clean' : 'Deleted by you'} · {new Date(t.deletedAt).toLocaleDateString()}</span>
+                  </div>
+                  {!sel.on && <div className="st-tile-action"><button type="button" className="st-btn sm" disabled={busy} onClick={() => void restore([t])}><RotateCcw size={13} />Restore</button></div>}
+                </div>
+              )
+            })}
+          </div>
+        )}
+      <SelectBar sel={sel} all={list}>
+        <button type="button" className="st-btn sm primary" disabled={busy || !sel.items.length} onClick={() => void restore(sel.items)}><RotateCcw size={13} />Restore {sel.items.length || ''}</button>
+      </SelectBar>
+    </div>
+  )
+}

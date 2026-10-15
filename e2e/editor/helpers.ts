@@ -36,7 +36,7 @@ async function findBasePost(): Promise<string> {
   throw new Error('No post with a picked clip. Make one in the Studio (demo mode) or set E2E_POST.')
 }
 
-async function uploadFile(path: string, name: string, type: string): Promise<string> {
+export async function uploadFile(path: string, name: string, type: string): Promise<string> {
   const data = readFileSync(path)
   const { slots } = await api<{ slots: { uploadId: string; url: string; headers?: Record<string, string> }[] }>('POST', '/uploads', { files: [{ name, type, size: data.length }] })
   const slot = slots[0]!

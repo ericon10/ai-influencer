@@ -208,7 +208,7 @@ function FramePick({ ctx, source, words }: { ctx: PostCtx; source: CloneSource; 
     <div className="st-row" style={{ gap: 14, alignItems: 'flex-start', flexWrap: 'wrap' }}>
       <button type="button" className="st-framepick" disabled={busy} aria-label="Tap the person to replace"
         onClick={e => { const r = e.currentTarget.getBoundingClientRect(); void set({ x: (e.clientX - r.left) / r.width, y: (e.clientY - r.top) / r.height }) }}>
-        <img src={assetUrl(source.firstFrameId)} alt="The first frame of the clip" />
+        <img src={assetUrl(source.firstFrameId, 720)} alt="The first frame of the clip" />
         {people.map((b, i) => (
           <span key={i} className={`st-framepick-ring ${i === chosen ? 'on' : ''}`} style={{ left: `${b.x * 100}%`, top: `${b.y * 100}%`, width: `${b.w * 100}%`, height: `${b.h * 100}%` }} />
         ))}
@@ -241,15 +241,15 @@ function RunPreview({ ctx, source, mode, words, wear, still, list }: { ctx: Post
         {mode === 'replace' ? (
           <>
             <div className="st-framepick sm">
-              {source.firstFrameId ? <img src={assetUrl(source.firstFrameId)} alt="The clip's first frame" /> : <div className="st-skel" style={{ width: 90, aspectRatio: '9 / 16' }} />}
+              {source.firstFrameId ? <img src={assetUrl(source.firstFrameId, 320)} alt="The clip's first frame" /> : <div className="st-skel" style={{ width: 90, aspectRatio: '9 / 16' }} />}
               {chosen != null && people[chosen] && <span className="st-framepick-ring on" style={{ left: `${people[chosen]!.x * 100}%`, top: `${people[chosen]!.y * 100}%`, width: `${people[chosen]!.w * 100}%`, height: `${people[chosen]!.h * 100}%` }} />}
             </div>
             <ArrowRight size={16} aria-hidden />
-            {refs.map(a => <img key={a} className="st-clonepreview-ref" src={assetUrl(a)} alt="Face reference" />)}
+            {refs.map(a => <img key={a} className="st-clonepreview-ref" src={assetUrl(a, 320)} alt="Face reference" />)}
           </>
         ) : stillAsset ? (
           <>
-            <img className="st-clonepreview-still" src={assetUrl(stillAsset)} alt="The scene still" />
+            <img className="st-clonepreview-still" src={assetUrl(stillAsset, 720)} alt="The scene still" />
             <span className="st-hint">+ the clip's moves</span>
           </>
         ) : <span className="st-hint">Make the scene still above; it shows here before the run.</span>}
@@ -288,7 +288,7 @@ function RecreateSteps({ ctx, source, characterIds, outfit, look, list, kept, ta
   return (
     <div className="st-col" style={{ gap: 16 }}>
       <div className="st-row" style={{ gap: 14, alignItems: 'flex-start', flexWrap: 'wrap' }}>
-        {frame && <img className="st-clonepreview-still" src={assetUrl(frame)} alt="The clip's frame the stills are made from" />}
+        {frame && <img className="st-clonepreview-still" src={assetUrl(frame, 720)} alt="The clip's frame the stills are made from" />}
         <div className="st-col grow" style={{ gap: 6, minWidth: 240 }}>
           <span className="st-row" style={{ gap: 8 }}><span className="st-label grow">Not like the person in the clip <span className="st-muted">(optional)</span></span><HowTo id="post-clone" label="How Recreate works" /></span>
           <input className="st-input" value={notLike} maxLength={300} onChange={e => setNotLike(e.target.value)} onBlur={() => void saveNotLike()} placeholder="e.g. dark brown hair, brown eyes, a nose ring, winged liner" />
@@ -308,7 +308,7 @@ function RecreateSteps({ ctx, source, characterIds, outfit, look, list, kept, ta
                 {mine.map(x => (
                   <div key={x.id} className={`st-tile st-scene-tile ${kept[cid] === x.id ? 'picked' : ''} ${isFresh(x.createdAt) ? 'st-new' : ''}`}>
                     <div className="st-tile-open">
-                      {x.assetId ? <img className="st-clip" style={{ aspectRatio: '9 / 16', objectFit: 'cover' }} src={assetUrl(x.assetId)} alt={`Still of ${x.characterName}`} /> : <div className="st-clip st-clip-empty" style={{ aspectRatio: '9 / 16' }}><AlertTriangle size={18} /></div>}
+                      {x.assetId ? <img className="st-clip" style={{ aspectRatio: '9 / 16', objectFit: 'cover' }} src={assetUrl(x.assetId, 480)} alt={`Still of ${x.characterName}`} /> : <div className="st-clip st-clip-empty" style={{ aspectRatio: '9 / 16' }}><AlertTriangle size={18} /></div>}
                       {kept[cid] === x.id && <span className="st-badge ok"><Check size={12} /></span>}
                     </div>
                     <div className="st-row" style={{ gap: 6, padding: '0 4px', flexWrap: 'wrap' }}>

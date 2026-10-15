@@ -63,32 +63,6 @@ const searchPlugin = {
   },
 }
 
-// Local dev image proxy — mirrors api/img-proxy.js for Vercel production
-const imgProxyPlugin = {
-  name: 'img-proxy',
-  configureServer(server) {
-    server.middlewares.use('/api/img-proxy', async (req, res) => {
-      const qs = new URLSearchParams(req.url.split('?')[1] || '')
-      const url = qs.get('url')
-      const name = qs.get('name') || 'image.jpg'
-      if (!url) { res.writeHead(400); res.end('Missing url'); return }
-      try {
-        const r = await fetch(decodeURIComponent(url))
-        const ct = r.headers.get('content-type') || 'image/jpeg'
-        const buf = await r.arrayBuffer()
-        res.writeHead(r.status, {
-          'Content-Type': ct,
-          'Content-Disposition': `attachment; filename="${decodeURIComponent(name)}"`,
-          'Access-Control-Allow-Origin': '*',
-        })
-        res.end(Buffer.from(buf))
-      } catch (e) {
-        res.writeHead(500); res.end('Proxy error: ' + e.message)
-      }
-    })
-  },
-}
-
 // Local dev Claude proxy — mirrors api/claude.js for Vercel production
 const claudePlugin = {
   name: 'claude-proxy',
@@ -125,18 +99,13 @@ const claudePlugin = {
 }
 
 export default defineConfig({
-  plugins: [react(), searchPlugin, imgProxyPlugin, claudePlugin, editorPlugin],
+  plugins: [react(), searchPlugin, claudePlugin, editorPlugin],
   server: {
     proxy: {
-      // Character Studio API (npm run dev:api). Keep before /api/hf.
+      // Character Studio API (npm run dev:api).
       '/api/v1': {
         target: `http://127.0.0.1:${process.env.STUDIO_API_PORT || 8787}`,
         changeOrigin: false,
-      },
-      '/api/hf': {
-        target: 'https://mcp.higgsfield.ai',
-        changeOrigin: true,
-        rewrite: path => path.replace(/^\/api\/hf/, ''),
       },
     },
   },

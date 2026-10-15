@@ -751,6 +751,24 @@ button.st-chip:hover { color: var(--st-text); border-color: var(--st-text-3); }
 .st-tile-action .st-btn { width: 100%; justify-content: center; }
 .st-tile.picked { border-color: rgba(63, 209, 143, 0.6); box-shadow: 0 0 0 2px var(--st-ok-soft); }
 
+/* Delete, Select and the Trash (UX-PLAN.md section 22). */
+.st-tile-meta { display: flex; align-items: flex-start; gap: 4px; padding: 0 2px 2px 4px; }
+.st-tile-meta .st-btn.icon { flex: none; margin-top: -2px; color: var(--st-text-3); }
+.st-tile-meta .st-btn.icon:hover { color: var(--st-bad); }
+.st-check { position: absolute; top: 8px; right: 8px; width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center; color: #fff; background: rgba(12, 11, 10, 0.55); border: 1.5px solid rgba(255, 255, 255, 0.85); box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35); }
+.st-check.on { background: var(--st-ok); border-color: var(--st-ok); color: #06140d; }
+.st-selectbar { position: sticky; bottom: 14px; z-index: 6; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin-top: 4px; padding: 10px 14px; border-radius: var(--st-r-l); border: 1px solid var(--st-line-2); background: var(--st-surface-2); box-shadow: var(--st-shadow); }
+.st-trash-warnings { margin: 0; padding-left: 18px; font-size: 13.5px; line-height: 1.45; }
+.st-star { flex: none; }
+.st-star.on { color: var(--st-accent-2); }
+.st-btn.xs.icon { width: 24px; }
+.st-postcard { position: relative; }
+.st-postcard.on { border-color: rgba(63, 209, 143, 0.6); box-shadow: 0 0 0 2px var(--st-ok-soft); }
+.st-postcard-select { position: absolute; inset: 0; z-index: 2; border-radius: inherit; }
+.st-postcard-select .st-check { top: 16px; right: 16px; }
+.st-sounditem.picked { border-color: rgba(63, 209, 143, 0.6); }
+.st-checkbox { width: 18px; height: 18px; accent-color: var(--st-ok); }
+
 .st-charchip { display: inline-flex; align-items: center; gap: 8px; padding: 4px 12px 4px 4px; border-radius: 999px; border: 1px solid var(--st-line-2); background: var(--st-surface-2); color: var(--st-text); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
 .st-charchip .st-img { width: 28px; height: 28px; border-radius: 50%; }
 .st-charchip.on { border-color: rgba(255, 106, 61, 0.7); background: var(--st-accent-soft); }
@@ -1066,6 +1084,10 @@ button.st-chip:hover { color: var(--st-text); border-color: var(--st-text-3); }
 .st-soundline > .st-label { display: flex; align-items: center; gap: 6px; }
 .st-soundline > .st-seg { justify-self: start; }
 .st-seg.sm button { padding: 4px 10px; font-size: 12px; }
+/* A long tab row scrolls inside itself on a phone, never the whole page. */
+.st-tabstrip { max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+.st-tabstrip::-webkit-scrollbar { display: none; }
+.st-tabstrip button { flex: none; white-space: nowrap; }
 .st-audio { height: 32px; max-width: 260px; }
 .st-soundlist { display: grid; gap: 8px; }
 .st-sounditem { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 10px 12px; border-radius: var(--st-r); border: 1px solid var(--st-line); background: var(--st-surface); }

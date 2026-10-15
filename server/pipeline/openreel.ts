@@ -42,7 +42,7 @@ export interface EditorMedia { id: string; name: string; kind: 'video' | 'audio'
 export async function directLink(deps: Deps, ctx: Ctx, assetId: string): Promise<string | null> {
   if (deps.store.driver !== 's3') return null
   const asset = await getAsset(deps, ctx, assetId).catch(() => null)
-  return asset ? deps.store.presignGet(asset.storageKey, 6 * 3600) : null
+  return asset ? deps.store.presignGet(asset.storageKey, 6 * 3600, { cors: true }) : null
 }
 
 function memeOf(post: { kind: string; spec: unknown }): MemeSpec {

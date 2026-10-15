@@ -510,6 +510,18 @@ Decisions: `DECISIONS.md` G37 and G38. UX: `UX-PLAN.md` section 15.
 - [x] A working run row pulses everywhere (images, videos, renders, Claude)
 - [x] Playwright like a user, desktop and phone: the live failure reproduced behind a proxy with the browser cache on (`e2e/editor/r2.ts`), every way into the editor, the picker (tap, drag, From computer, after Done), No caption (editor and export pixels), uploads (picked, dropped, byte for byte, slideshow)
 
+### Storage, traffic and auto-clean (G49, UX-PLAN.md section 22)
+
+- [x] Every image (full size and thumbnails) a redirect to a short-lived R2 link; thumbnails made once and kept in R2; grids ask for thumbnails
+- [x] `/api/hf`, `/api/hfproxy`, `/api/img-proxy` deleted (unused by the Studio)
+- [x] Worker deletes crash temp folders on start; free disk in `/health`, `/api/v1/worker` and Settings
+- [x] Upload slots never used deleted after 1 day (daily clean, and an R2 lifecycle rule when the key may)
+- [x] Settings > General > Storage: GB, files, estimated monthly cost ($0.015 per GB-month after 10 GB free), Measure now
+- [x] Library: Delete one, Select many, warnings for sheet refs and items a post uses, Trash with Restore (7 days), then removed for good with thumbnails
+- [x] Auto-clean of never-kept takes (14 days by default; 3, 7, 14, 30 or Off); a star on take cards keeps one out
+- [x] A post outside the newest 200 opens by its own address
+- [x] Tests: trash, auto-clean, daily clean, temp sweep, API routes; Playwright desktop and phone; before and after transfer for a normal session
+
 ## Roadmap after Phase 4 (owner, 2026-10-13; not started)
 
 SPEC 13.1, R1 to R7: Clone Video (first after Phase 3), Inspo board

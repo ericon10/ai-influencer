@@ -8,6 +8,7 @@ import { AsyncButton, Callout, Drawer, Field, Img, PromptViewer, errorMessage, i
 import type { CharacterView, SceneStill, SceneView, ScenesData } from '../../types'
 import { OP_LABEL, STILL_STATUS, claudeChecked, wrap } from './StillDrawer'
 import { PromptBox } from './PromptBox'
+import { StarButton } from '../../trash'
 
 // Stage 9 (owner ruling 2026-10-13): a video from a picked still. Straight
 // to the picked model (Kling 3.0 Pro unless another was picked last, each
@@ -267,8 +268,9 @@ function ClipTile({ c, aspect, onOpen, onUse, used }: { c: SceneStill; aspect: s
           : <div className="st-clip st-clip-empty" style={{ aspectRatio: aspect.replace(':', ' / ') }}><AlertTriangle size={18} /></div>}
         <span className={`st-badge ${used ? 'ok' : s.tone}`}>{used ? 'Used' : s.label}</span>
       </button>
-      <div className="st-row" style={{ gap: 6, padding: '0 4px 2px' }}>
+      <div className="st-row" style={{ gap: 4, padding: '0 2px 2px 4px', flexWrap: 'nowrap' }}>
         <span className="st-tile-label">{test ? 'Motion test' : OP_LABEL[c.op]}</span>
+        {c.assetId && <StarButton id={c.id} on={c.favorite} size="xs" />}
         <span className="st-spacer" />
         {c.qaVerdict && <span className={`st-badge plain ${c.qaVerdict === 'post' ? 'ok' : c.qaVerdict === 'regenerate' ? 'bad' : 'warn'}`}>{c.qaVerdict === 'post' ? (claudeChecked(c.qaReport) ? 'QA ok' : 'Free checks ok') : c.qaVerdict === 'regenerate' ? 'Face?' : 'Look'}</span>}
       </div>

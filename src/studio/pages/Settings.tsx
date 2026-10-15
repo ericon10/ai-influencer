@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
-import { Bot, CheckCircle2, CreditCard, KeyRound, Link2, Loader2, RefreshCw, ShieldCheck, Trash2, UserRound } from 'lucide-react'
+import { Bot, CheckCircle2, CreditCard, HardDrive, KeyRound, Link2, Loader2, RefreshCw, ShieldCheck, Trash2, UserRound } from 'lucide-react'
 import { api } from '../api'
 import { keys, useHiggsfieldAccount, useSettings } from '../hooks'
 import { Callout, Field, PromptViewer, errorMessage, useToast } from '../ui'
 import { PriceButton } from '../PriceButton'
-import type { SettingsView } from '../types'
+import type { SettingsView, StorageInfo } from '../types'
 import { RulesPanel } from './Rules'
 import { UsagePanel } from './Usage'
 import { HowTo } from '../guide/Guide'
@@ -330,32 +330,76 @@ function ConnectionRow({ c }: { c: SettingsView['connections'][number] }) {
   )
 }
 
-// Where files live, and the bucket rules that let the browser upload
-// straight to R2 (CORS).
+// Where files live, how much they take, and what clears itself (owner,
+// 2026-10-15; UX-PLAN.md section 22): the bucket rules that let the browser
+// upload straight to R2 (CORS), the storage readout, the worker's free disk
+// and Auto-clean.
+const gb = (bytes: number) => bytes >= 1e9 ? `${(bytes / 1e9).toFixed(2)} GB` : `${Math.max(0.01, bytes / 1e6).toFixed(bytes < 1e7 ? 2 : 0)} MB`
+const when = (iso: string | null) => iso ? new Date(iso).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : 'not yet'
 function StorageCard() {
   const toast = useToast()
-  const [info, setInfo] = useState<{ driver: string; bucket: string | null; origins: string[]; corsRules: unknown[] } | null>(null)
+  const [info, setInfo] = useState<StorageInfo | null>(null)
   const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null)
-  const [busy, setBusy] = useState(false)
-  useEffect(() => { api.storage().then(setInfo).catch(() => undefined) }, [])
+  const [busy, setBusy] = useState<string | null>(null)
+  const load = () => api.storage().then(setInfo).catch(() => undefined)
+  useEffect(() => { void load() }, [])
+  // While a measure runs, check back every few seconds.
+  useEffect(() => {
+    if (!info?.measuring) return
+    const t = window.setTimeout(() => void load(), 3000)
+    return () => window.clearTimeout(t)
+  }, [info])
   async function check() {
-    setBusy(true)
-    try { setResult(await api.checkStorage()) } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) } finally { setBusy(false) }
+    setBusy('check')
+    try { setResult(await api.checkStorage()) } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) } finally { setBusy(null) }
+  }
+  async function measure() {
+    setBusy('measure')
+    try { await api.measureStorage(); await load(); toast({ tone: 'ok', text: 'Measuring on the worker (free). The numbers update here in a moment.' }) } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) } finally { setBusy(null) }
+  }
+  async function auto(days: number | null) {
+    setBusy('auto')
+    try { const next = await api.setAutoClean(days); setInfo(i => i ? { ...i, ...next } : i); toast({ tone: 'ok', text: days ? `Takes you never kept go to the Trash ${days} days after their post is finished.` : 'Auto-clean is off.' }) } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) } finally { setBusy(null) }
   }
   if (!info) return null
   const r2 = info.driver === 's3'
+  const u = info.usage
   return (
-    <div className="st-card">
-      <div className="st-card-head"><div className="grow"><div className="st-h2">Storage</div><div className="st-hint">{r2 ? `Cloudflare R2, bucket ${info.bucket}. Uploads go from your browser straight to the bucket.` : 'Local disk (development). Uploads go through the Studio.'}</div></div>
-        {r2 && <button className="st-btn sm" onClick={check} disabled={busy}>{busy ? <Loader2 size={14} className="st-spin" /> : <ShieldCheck size={14} />}Check uploads</button>}
+    <div className="st-card" data-field="settings-storage">
+      <div className="st-card-head"><div className="grow"><div className="st-h2 st-row" style={{ gap: 8 }}>Storage<HowTo id="settings" label="About storage" /></div><div className="st-hint">{r2 ? `Cloudflare R2, bucket ${info.bucket}. Uploads and every image, video and sound go between your browser and the bucket directly; the Studio only sends the links.` : 'Local disk (development). Uploads go through the Studio.'}</div></div>
+        {r2 && <button className="st-btn sm" onClick={check} disabled={!!busy}>{busy === 'check' ? <Loader2 size={14} className="st-spin" /> : <ShieldCheck size={14} />}Check uploads</button>}
       </div>
-      {r2 && (
-        <div className="st-card-body st-col" style={{ gap: 12 }}>
-          {result && <Callout tone={result.ok ? 'ok' : 'warn'}>{result.message}</Callout>}
-          <span className="st-hint">If the check says the key cannot set them, paste these rules in Cloudflare: R2, the bucket, Settings, CORS policy, Edit.</span>
-          <PromptViewer label="CORS policy" text={JSON.stringify(info.corsRules, null, 2)} wrapped={JSON.stringify(info.corsRules, null, 2)} />
+      <div className="st-card-body st-col" style={{ gap: 14 }}>
+        <div className="st-row" style={{ gap: 18, flexWrap: 'wrap', alignItems: 'flex-end' }} data-field="storage-usage">
+          <div className="st-col" style={{ gap: 2 }}>
+            <span className="st-label">Your files in storage</span>
+            <b style={{ fontSize: 22 }}>{u ? gb(u.bytes) : 'Not measured yet'}</b>
+            <span className="st-hint">{u ? `${u.files.toLocaleString()} files${u.uploadsWaiting ? `, ${u.uploadsWaiting} upload${u.uploadsWaiting === 1 ? '' : 's'} not used yet` : ''}. Measured ${when(u.measuredAt)}.` : 'The daily clean measures it, or press Measure now.'}</span>
+          </div>
+          <div className="st-col" style={{ gap: 2 }}>
+            <span className="st-label">Estimated monthly cost</span>
+            <b style={{ fontSize: 22 }}>{info.monthlyCost == null ? 'n/a' : `$${info.monthlyCost.toFixed(2)}`}</b>
+            <span className="st-hint">{info.priceNote}</span>
+          </div>
+          <button className="st-btn sm" onClick={measure} disabled={!!busy || info.measuring}>{busy === 'measure' || info.measuring ? <Loader2 size={14} className="st-spin" /> : <HardDrive size={14} />}{info.measuring ? 'Measuring...' : 'Measure now'}</button>
         </div>
-      )}
+        <div className="st-col" style={{ gap: 6 }} data-field="storage-auto-clean">
+          <span className="st-label">Auto-clean</span>
+          <div className="st-seg" role="radiogroup" aria-label="Auto-clean">
+            {info.autoCleanChoices.map(d => <button key={d} type="button" role="radio" aria-checked={info.autoCleanDays === d} className={info.autoCleanDays === d ? 'on' : ''} disabled={!!busy} onClick={() => void auto(d)}>{d} days</button>)}
+            <button type="button" role="radio" aria-checked={info.autoCleanDays == null} className={info.autoCleanDays == null ? 'on' : ''} disabled={!!busy} onClick={() => void auto(null)}>Off</button>
+          </div>
+          <span className="st-hint">{info.autoCleanDays ? `Takes you never kept (not Use this take, not Keep this take) go to the Trash ${info.autoCleanDays} days after their post is finished. Starred takes and the post's own clip never do.` : 'Off: takes you never kept stay until you delete them.'} Anything in the Trash is removed for good after {info.trashDays} days; restore it from Library &gt; Trash until then. Upload slots never used are deleted after {info.uploadSlotDays} day.</span>
+        </div>
+        <span className="st-hint" data-field="storage-clean">Daily clean: last run {when(info.cleanedAt)}. Worker free disk: {info.worker.freeDiskMb == null ? 'not reported yet' : `${(info.worker.freeDiskMb / 1024).toFixed(1)} GB`}{info.worker.checkedAt ? ` (${when(info.worker.checkedAt)})` : ''}. Temp folders a crash leaves behind are deleted when the worker starts.</span>
+        {r2 && (
+          <>
+            {result && <Callout tone={result.ok ? 'ok' : 'warn'}>{result.message}</Callout>}
+            <span className="st-hint">If the check says the key cannot set them, paste these rules in Cloudflare: R2, the bucket, Settings, CORS policy, Edit.</span>
+            <PromptViewer label="CORS policy" text={JSON.stringify(info.corsRules, null, 2)} wrapped={JSON.stringify(info.corsRules, null, 2)} />
+          </>
+        )}
+      </div>
     </div>
   )
 }

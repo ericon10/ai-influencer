@@ -407,6 +407,7 @@ export interface CloneResult {
   // The video rule over the take, the owner's call, a take the old check
   // rejected (shown again), and text found without frames yet.
   gate: TakeGate | null; decision: 'kept' | 'tried_again' | null; oldReject: string | null; needsFrames: boolean
+  favorite: boolean
 }
 // A batch of recreates: each row a clip and a character in its own post.
 export interface RecreateRow {
@@ -487,4 +488,20 @@ export interface ProductView {
 export interface SocialAccount {
   tag: string; characterId: string | null; productId: string | null; link: string; code: string; signups: number; views: number | null; notes: string
   posts: number; exported: number; perPost: number | null; updatedAt: string | null; rank: number
+}
+
+// Storage, traffic and auto-clean (owner, 2026-10-15; UX-PLAN.md section 22).
+export interface StorageInfo {
+  driver: string; bucket: string | null; origins: string[]; corsRules: unknown[]
+  usage: { bytes: number; files: number; uploadsWaiting: number; measuredAt: string } | null
+  monthlyCost: number | null; priceNote: string
+  autoCleanDays: number | null; autoCleanChoices: number[]
+  trashDays: number; uploadSlotDays: number; cleanedAt: string | null; measuring: boolean
+  worker: { freeDiskMb: number | null; checkedAt: string | null }
+}
+export interface TrashRef { kind: 'candidate' | 'broll' | 'sound' | 'render'; id: string }
+export interface TrashItem {
+  id: string; kind: TrashRef['kind']; refId: string; label: string; characterId: string | null; reason: 'owner' | 'auto'
+  assetId: string | null; media: 'image' | 'video' | 'audio' | 'file' | null
+  deletedAt: string; purgeAfter: string; daysLeft: number
 }

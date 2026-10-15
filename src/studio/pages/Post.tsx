@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Archive, ArrowLeft, Check, CopyPlus, Loader2 } from 'lucide-react'
 import { api } from '../api'
 import { keys, useCharacter, useCharacters, useContent, useLibrary, useScenes } from '../hooks'
@@ -30,8 +30,11 @@ const STEP_GUIDE: Record<PostStep, GuideId> = { idea: 'post-idea', stills: 'post
 export default function Post({ editing = false }: { editing?: boolean }) {
   const { id = '' } = useParams()
   const content = useContent()
-  const item = content.data?.items.find(i => i.id === id)
-  if (!content.data) return <div className="st-page"><div className="st-skel" style={{ height: 48, width: 320, marginBottom: 20 }} /><div className="st-skel" style={{ height: 360, borderRadius: 18 }} /></div>
+  const listed = content.data?.items.find(i => i.id === id)
+  // The list holds the newest 200 posts; an older one is read on its own.
+  const single = useQuery({ queryKey: [...keys.content, 'item', id], queryFn: () => api.contentItem(id), enabled: !!content.data && !listed, retry: false })
+  const item = listed ?? single.data?.item
+  if (!content.data || (!listed && single.isLoading)) return <div className="st-page"><div className="st-skel" style={{ height: 48, width: 320, marginBottom: 20 }} /><div className="st-skel" style={{ height: 360, borderRadius: 18 }} /></div>
   if (!item) {
     return (
       <div className="st-page">

@@ -1,4 +1,5 @@
-import { and, desc, eq, inArray, isNull, sql } from 'drizzle-orm'
+import { and, desc, eq, inArray, isNull, notInArray, sql } from 'drizzle-orm'
+import { GONE_STATUSES } from '../core/clips.js'
 import sharp from 'sharp'
 import { candidates, jobs, scenes } from '../db/schema.js'
 import type { Ctx, Deps } from '../context.js'
@@ -235,7 +236,7 @@ export async function sceneRefs(deps: Deps, ctx: Ctx, characterId: string, f: Pi
 export async function sceneCandidates(deps: Deps, ctx: Ctx, sceneIds: string[]) {
   if (!sceneIds.length) return []
   return deps.db.select().from(candidates)
-    .where(and(eq(candidates.accountId, ctx.accountId), inArray(candidates.sceneId, sceneIds)))
+    .where(and(eq(candidates.accountId, ctx.accountId), inArray(candidates.sceneId, sceneIds), notInArray(candidates.status, GONE_STATUSES)))
     .orderBy(desc(candidates.createdAt))
 }
 

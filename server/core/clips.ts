@@ -6,3 +6,7 @@
 export const VIDEO_OPS: readonly string[] = ['video', 'video_upscale', 'upload', 'clone', 'chain']
 
 export const isVideoOp = (op: string): boolean => VIDEO_OPS.includes(op)
+
+// Deleted (in the Trash) or removed for good (owner, 2026-10-15): such a
+// candidate is left out of every list.
+export const GONE_STATUSES = ['trashed', 'purged']

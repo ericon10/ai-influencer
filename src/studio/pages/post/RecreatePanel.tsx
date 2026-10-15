@@ -13,6 +13,7 @@ import type { CloneModel, CloneOptions, CloneResult, CloneSource, CloneStill, Ta
 import type { PostCtx } from './ctx'
 import { HowTo } from '../../guide/Guide'
 import { SentButton } from '../character/SentPanel'
+import { StarButton } from '../../trash'
 
 // Recreate from a real clip (owner, 2026-10-14; UX-PLAN.md sections 15 and
 // 16), in the Video step. Step 2: what to keep from the frame and the traits
@@ -132,7 +133,7 @@ function StepTwo({ ctx, source }: { ctx: PostCtx; source: CloneSource }) {
   const name = ctx.v?.data.name ?? 'your character'
   return (
     <div className="st-row" style={{ gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' }}>
-      {frame && <img className="st-clonepreview-still" src={assetUrl(frame)} alt="The clip's frame the stills are made from" />}
+      {frame && <img className="st-clonepreview-still" src={assetUrl(frame, 720)} alt="The clip's frame the stills are made from" />}
       <div className="st-col grow" style={{ gap: 12, minWidth: 260 }}>
         <ChipList label="Scene to keep" items={keep} placeholder="Add: the place, the light, the angle, where she stands" onChange={next => save({ keep: next })} tone="keep" />
         <ChipList label="Source traits to drop" items={drop} placeholder="Add: hair color, eye color, piercings, winged liner" onChange={next => save({ notLike: next.join(', ') })} tone="drop" />
@@ -234,7 +235,7 @@ function StillsStep({ ctx, list: all, kept, takes, picked, opts }: { ctx: PostCt
   const tile = (x: CloneStill) => (
             <div key={x.id} className={`st-tile st-scene-tile ${kept === x.id ? 'picked' : ''} ${isFresh(x.createdAt) ? 'st-new' : ''} ${x.pass === 'face' ? 'st-facepass' : ''}`}>
               <div className="st-tile-open">
-                {x.assetId ? <img className="st-clip" style={{ aspectRatio: '9 / 16', objectFit: 'cover' }} src={assetUrl(x.assetId)} alt={`${x.pass === 'face' ? 'Face pass' : 'Still'} of ${x.characterName}`} /> : <div className="st-clip st-clip-empty" style={{ aspectRatio: '9 / 16' }}><AlertTriangle size={18} /></div>}
+                {x.assetId ? <img className="st-clip" style={{ aspectRatio: '9 / 16', objectFit: 'cover' }} src={assetUrl(x.assetId, 480)} alt={`${x.pass === 'face' ? 'Face pass' : 'Still'} of ${x.characterName}`} /> : <div className="st-clip st-clip-empty" style={{ aspectRatio: '9 / 16' }}><AlertTriangle size={18} /></div>}
                 {kept === x.id && <span className="st-badge ok"><Check size={12} /></span>}
               </div>
               <div className="st-row" style={{ gap: 6, padding: '0 4px', flexWrap: 'wrap' }}>
@@ -418,6 +419,7 @@ function TakeReview({ ctx, c }: { ctx: PostCtx; c: CloneResult }) {
       <div className="st-row" style={{ gap: 8, flexWrap: 'wrap' }}>
         <b className="grow">{c.label}</b>
         {c.model && <span className="st-badge plain">{c.model}</span>}
+        {c.assetId && <StarButton id={c.id} on={c.favorite} />}
         {c.status === 'approved' ? <span className="st-badge ok">Kept</span> : waiting ? <span className="st-badge warn">{c.gate && !c.gate.ok ? 'Misses the video rule' : 'Your call'}</span> : failed ? <span className="st-badge bad">Did not finish</span> : null}
       </div>
       {c.error && <Callout tone="bad">{c.error}</Callout>}
@@ -511,7 +513,7 @@ function SyncedPair({ source, take, posters, review, duration, onTrim }: { sourc
               <div className="st-row" style={{ gap: 6, flexWrap: 'wrap' }}>
                 {review.text.map((x, i) => (
                   <button key={i} type="button" className={`st-texthit text-${x.kind}`} onClick={() => seek(x.t)} title="Show this moment in both videos">
-                    {x.frameAssetId ? <img src={assetUrl(x.frameAssetId)} alt={`The frame at ${x.t.toFixed(1)} s with the words boxed`} /> : <span className="st-texthit-empty">Getting the frame...</span>}
+                    {x.frameAssetId ? <img src={assetUrl(x.frameAssetId, 480)} alt={`The frame at ${x.t.toFixed(1)} s with the words boxed`} /> : <span className="st-texthit-empty">Getting the frame...</span>}
                     <span>{x.kind === 'handle' ? 'Handle' : x.kind === 'logo' ? 'Logo' : 'Text'}: <b>{x.text}</b> <span className="st-muted">{x.t.toFixed(1)} s</span></span>
                   </button>
                 ))}
@@ -636,7 +638,7 @@ export function RecreateBatch({ ctx, onTakes }: { ctx: PostCtx; onTakes: (ids: s
             const p = prices[r.postId]
             return (
               <div key={r.postId} className="st-batchrow">
-                {r.frameId ? <img src={assetUrl(r.frameId)} alt={`Row ${i + 1}: ${r.name}`} /> : <div className="st-skel" style={{ width: 64, aspectRatio: '9 / 16' }} />}
+                {r.frameId ? <img src={assetUrl(r.frameId, 160)} alt={`Row ${i + 1}: ${r.name}`} /> : <div className="st-skel" style={{ width: 64, aspectRatio: '9 / 16' }} />}
                 <div className="st-col" style={{ gap: 6, minWidth: 0 }}>
                   <div className="st-row" style={{ gap: 8, flexWrap: 'wrap' }}>
                     <b>Row {i + 1}</b><span>{r.characterName}</span><span className="st-muted">{r.name}{r.seconds ? `, ${r.seconds} s` : ''}</span>

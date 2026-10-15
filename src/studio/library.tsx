@@ -5,6 +5,7 @@ import { useLibrary, useRefresh, useWorkerGate } from './hooks'
 import { Callout, Drawer, Img, errorMessage, isFresh, useToast } from './ui'
 import { RunStatus } from './runs'
 import { HowTo } from './guide/Guide'
+import { DeleteButton, TileCheck } from './trash'
 import type { LibraryClip, LibraryStill } from './types'
 
 // The Library's grids (UX-PLAN.md): stills and clips across characters. The
@@ -12,26 +13,34 @@ import type { LibraryClip, LibraryStill } from './types'
 // from, and the pick drops into the step.
 
 const firstFrame = (id: string) => `${assetUrl(id)}#t=0.1`
+// Select mode (Library, owner 2026-10-15): the tile toggles its checkbox.
+export interface GridSelect<T> { has: (id: string) => boolean; toggle: (x: T) => void }
 
-export function StillGrid({ stills, picked = [], onPick, action, showCharacter = false }: { stills: LibraryStill[]; picked?: string[]; onPick?: (s: LibraryStill) => void; action?: (s: LibraryStill) => ReactNode; showCharacter?: boolean }) {
+export function StillGrid({ stills, picked = [], onPick, action, showCharacter = false, select, onDelete }: { stills: LibraryStill[]; picked?: string[]; onPick?: (s: LibraryStill) => void; action?: (s: LibraryStill) => ReactNode; showCharacter?: boolean; select?: GridSelect<LibraryStill> | null; onDelete?: (s: LibraryStill) => void }) {
   return (
     <div className="st-grid scenes">
       {stills.map(s => {
         const n = picked.indexOf(s.id)
+        const on = !!select?.has(s.id)
         const body = (
           <>
-            <Img assetId={s.assetId} width={420} style={{ aspectRatio: '9 / 16' }} />
-            {n >= 0 && <span className="st-badge ok">{picked.length > 1 ? `${n + 1}` : <Check size={12} />}</span>}
+            <Img assetId={s.assetId} width={480} style={{ aspectRatio: '9 / 16' }} />
+            {select ? <TileCheck on={on} /> : n >= 0 && <span className="st-badge ok">{picked.length > 1 ? `${n + 1}` : <Check size={12} />}</span>}
           </>
         )
+        const name = s.sceneTitle || 'Still'
         return (
-          <div key={s.id} className={`st-tile st-scene-tile ${n >= 0 ? 'picked' : ''} ${isFresh(s.createdAt) ? 'st-new' : ''}`}>
-            {onPick ? <button type="button" className="st-tile-open" onClick={() => onPick(s)} aria-pressed={n >= 0}>{body}</button> : <div className="st-tile-open">{body}</div>}
-            <div className="st-col" style={{ gap: 2, padding: '0 4px 2px' }}>
-              <span className="st-tile-label">{s.sceneTitle || 'Still'}</span>
-              <span className="st-hint">{[showCharacter ? s.characterName : '', s.status === 'approved' ? 'Picked' : ''].filter(Boolean).join(' · ')}</span>
+          <div key={s.id} className={`st-tile st-scene-tile ${n >= 0 || on ? 'picked' : ''} ${isFresh(s.createdAt) ? 'st-new' : ''}`}>
+            {select ? <button type="button" className="st-tile-open" onClick={() => select.toggle(s)} aria-pressed={on} aria-label={`Select ${name}`}>{body}</button>
+              : onPick ? <button type="button" className="st-tile-open" onClick={() => onPick(s)} aria-pressed={n >= 0}>{body}</button> : <div className="st-tile-open">{body}</div>}
+            <div className="st-tile-meta">
+              <div className="st-col" style={{ gap: 2, minWidth: 0, flex: 1 }}>
+                <span className="st-tile-label">{name}</span>
+                <span className="st-hint">{[showCharacter ? s.characterName : '', s.op === 'upload_image' ? 'Uploaded' : '', s.status === 'approved' ? 'Picked' : ''].filter(Boolean).join(' · ')}</span>
+              </div>
+              {onDelete && !select && <DeleteButton onClick={() => onDelete(s)} label={name} />}
             </div>
-            {action && <div className="st-tile-action">{action(s)}</div>}
+            {action && !select && <div className="st-tile-action">{action(s)}</div>}
           </div>
         )
       })}
@@ -39,30 +48,35 @@ export function StillGrid({ stills, picked = [], onPick, action, showCharacter =
   )
 }
 
-export function ClipGrid({ clips, picked = [], onPick, action, showCharacter = false }: { clips: LibraryClip[]; picked?: string[]; onPick?: (c: LibraryClip) => void; action?: (c: LibraryClip) => ReactNode; showCharacter?: boolean }) {
+export function ClipGrid({ clips, picked = [], onPick, action, showCharacter = false, select, onDelete }: { clips: LibraryClip[]; picked?: string[]; onPick?: (c: LibraryClip) => void; action?: (c: LibraryClip) => ReactNode; showCharacter?: boolean; select?: GridSelect<LibraryClip> | null; onDelete?: (c: LibraryClip) => void }) {
   return (
     <div className="st-grid scenes">
       {clips.map(c => {
         const n = picked.indexOf(c.id)
+        const on = !!select?.has(c.id)
         const ready = c.status === 'approved' && !!c.assetId
         const body = (
           <>
             {ready
               ? <video className="st-clip" src={firstFrame(c.assetId)} poster={c.posterId ? assetUrl(c.posterId, 420) : undefined} muted loop playsInline preload="metadata" style={{ aspectRatio: '9 / 16' }} onMouseEnter={e => void e.currentTarget.play().catch(() => {})} onMouseLeave={e => e.currentTarget.pause()} />
               : <div className="st-clip st-clip-empty" style={{ aspectRatio: '9 / 16' }}>{c.status === 'failed' ? <AlertTriangle size={18} /> : <Loader2 size={18} className="st-spin" />}</div>}
-            {n >= 0 && <span className="st-badge ok">{picked.length > 1 ? `${n + 1}` : <Check size={12} />}</span>}
+            {select ? <TileCheck on={on} /> : n >= 0 && <span className="st-badge ok">{picked.length > 1 ? `${n + 1}` : <Check size={12} />}</span>}
             {!ready && <span className={`st-badge ${c.status === 'failed' ? 'bad' : 'accent live'}`}>{c.status === 'failed' ? 'Failed' : 'Preparing'}</span>}
           </>
         )
         return (
-          <div key={c.id} className={`st-tile st-scene-tile ${n >= 0 ? 'picked' : ''} ${isFresh(c.createdAt) ? 'st-new' : ''}`}>
-            {onPick && ready ? <button type="button" className="st-tile-open" onClick={() => onPick(c)} aria-pressed={n >= 0}>{body}</button> : <div className="st-tile-open">{body}</div>}
-            <div className="st-col" style={{ gap: 2, padding: '0 4px 2px' }}>
-              <span className="st-tile-label">{c.title}</span>
-              <span className="st-hint">{[showCharacter ? c.characterName : '', c.op === 'upload' ? 'Uploaded' : c.op === 'video_upscale' ? 'Upscaled take' : c.op === 'clone' ? 'Clone' : 'Take', c.durationSec ? `${c.durationSec} s` : ''].filter(Boolean).join(' · ')}</span>
-              {c.error && <span className="st-hint" style={{ color: 'var(--st-bad)' }}>{c.error}</span>}
+          <div key={c.id} className={`st-tile st-scene-tile ${n >= 0 || on ? 'picked' : ''} ${isFresh(c.createdAt) ? 'st-new' : ''}`}>
+            {select ? <button type="button" className="st-tile-open" onClick={() => select.toggle(c)} aria-pressed={on} aria-label={`Select ${c.title}`}>{body}</button>
+              : onPick && ready ? <button type="button" className="st-tile-open" onClick={() => onPick(c)} aria-pressed={n >= 0}>{body}</button> : <div className="st-tile-open">{body}</div>}
+            <div className="st-tile-meta">
+              <div className="st-col" style={{ gap: 2, minWidth: 0, flex: 1 }}>
+                <span className="st-tile-label">{c.title}</span>
+                <span className="st-hint">{[showCharacter ? c.characterName : '', c.op === 'upload' ? 'Uploaded' : c.op === 'video_upscale' ? 'Upscaled take' : c.op === 'clone' ? 'Clone' : 'Take', c.durationSec ? `${c.durationSec} s` : ''].filter(Boolean).join(' · ')}</span>
+                {c.error && <span className="st-hint" style={{ color: 'var(--st-bad)' }}>{c.error}</span>}
+              </div>
+              {onDelete && !select && c.status !== 'generating' && <DeleteButton onClick={() => onDelete(c)} label={c.title} />}
             </div>
-            {action && ready && <div className="st-tile-action">{action(c)}</div>}
+            {action && ready && !select && <div className="st-tile-action">{action(c)}</div>}
           </div>
         )
       })}

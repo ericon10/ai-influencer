@@ -2158,3 +2158,61 @@ or makes her pose (UX-PLAN.md section 20).
   cache on (Playwright's routing turns the cache off and hid the bug).
   The full flows run locally; the live site needs the owner's login.
 
+### G49. Storage, traffic and auto-clean (owner, 2026-10-15)
+
+Goal: Vercel moves only JSON; media always goes between the browser and
+R2 directly; junk clears itself (UX-PLAN.md section 22).
+
+- **Every file is a redirect.** `GET /assets/:id/content` on R2 answers
+  302 to a presigned link for images too, full size and thumbnails,
+  never the bytes (a 2K still over 4.5 MB failed through the function).
+  A thumbnail (160, 320, 480, 720, 960 or 1600 wide, WebP) is made once,
+  the first time a size is asked for, and kept next to the original as
+  `<key>.w<width>.webp`. Links are signed on the hour so a page's
+  repeated images stay cacheable; a page that reads files with CORS (the
+  editor's picker and direct links) asks with `cors=1` and gets its own
+  link, so a no-CORS answer kept for an <img> or <video> is never reused
+  for it. Grids ask for thumbnails, the Recreate stills grid included.
+  Locally (development) the Studio still serves the bytes.
+- **The old app's proxies are gone**: `api/hf/[...path].js`,
+  `api/hfproxy.js`, `api/img-proxy.js`, their `vercel.json` rewrite and
+  the dev proxies in `vite.config.js`. The Studio never used them. The old
+  pages at the site's root lose Higgsfield connect, generation and image
+  downloads; /studio is unchanged.
+- **Worker temp sweep**: on start the worker deletes temp folders older
+  than 5 minutes that a crash left (`studio-media-`, `ingest-`,
+  `mock-video-`), and reports its free disk (`/health`, `/api/v1/worker`,
+  Settings > General > Storage).
+- **The daily clean** (a free local job, `storage_clean:<date>`, queued
+  when Posts home opens and a day has passed, which wakes the worker):
+  upload slots under `uploads/` never used after 1 day (and an R2
+  lifecycle rule for the same, set only when the key may and never over
+  the bucket's other rules), the Trash past its 7 days, Auto-clean, then
+  the storage measure. Measure now in Settings runs it at once.
+- **Storage readout**: the account's files in R2 (bytes, files, upload
+  slots waiting) and the estimated monthly cost at $0.015 per GB-month
+  after the first 10 GB, which are free (per Cloudflare account).
+- **Delete and the Trash**: any Library item (a still, an uploaded image,
+  a kept take or clip, B-roll, a sound, a render) is deleted one at a time
+  or many with Select. It moves to the Trash (`trash_items`), restorable
+  for 7 days, with Undo in the message. A still that is (or shares its
+  file with) a character's sheet ref, or anything a live post uses, asks
+  first and names the REF or the posts. Candidates become `trashed`, then
+  `purged`; B-roll and sounds are archived; a render keeps a snapshot of
+  the post's outputs and the post goes back to a draft. Every list (post
+  views, scene candidates, Recreate, the gate check, the Library) leaves
+  trashed items out. After 7 days the daily clean deletes the file and all
+  its thumbnails, unless another live item, a live post's render or
+  another Trash entry still uses the same file.
+- **Auto-clean** (default 14 days; 3, 7, 14, 30 or Off; a default per rule
+  one): takes never kept (not Use this take, not Keep this take) of a post
+  finished that many days ago move to the Trash, marked Auto-clean.
+  Starred takes, kept takes, uploads and anything a post uses stay. Each
+  take card (Video step, Recreate review) has a star.
+- **Posts older than the newest 200** open by their own address now
+  (`GET /content/:id`), found while testing.
+- **Measured** (locally, on the live-site path, same client, a fresh
+  browser): a normal session sends no file bytes through the Studio any
+  more; what is left is JSON. The numbers are in the report and in
+  `e2e/editor/storage.spec.ts` (transfer).
+

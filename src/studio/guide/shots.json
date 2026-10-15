@@ -1994,5 +1994,179 @@
     "label": "Tap adds at the playhead; or drag one onto a track"
    }
   ]
+ },
+ "library-select": {
+  "w": 1360,
+  "h": 900,
+  "spots": [
+   {
+    "n": 1,
+    "x": 20.6,
+    "y": 26.5,
+    "w": 10,
+    "h": 3.3,
+    "label": "Select turns the tiles into checkboxes; Done selecting leaves"
+   },
+   {
+    "n": 2,
+    "x": 63.1,
+    "y": 53,
+    "w": 1.9,
+    "h": 2.9,
+    "label": "Tap a tile to pick it"
+   },
+   {
+    "n": 3,
+    "x": 27.8,
+    "y": 93.9,
+    "w": 6.7,
+    "h": 3.3,
+    "label": "Select all, or none"
+   },
+   {
+    "n": 4,
+    "x": 74,
+    "y": 93.9,
+    "w": 7,
+    "h": 3.3,
+    "label": "Delete them together: they go to the Trash for 7 days"
+   }
+  ]
+ },
+ "library-warn": {
+  "w": 568,
+  "h": 230,
+  "spots": [
+   {
+    "n": 1,
+    "x": 7.9,
+    "y": 26.9,
+    "w": 80.6,
+    "h": 17,
+    "label": "Names the post that uses it (a sheet ref names the REF)"
+   },
+   {
+    "n": 2,
+    "x": 34.3,
+    "y": 71.8,
+    "w": 13.6,
+    "h": 16.5,
+    "label": "Cancel keeps it"
+   },
+   {
+    "n": 3,
+    "x": 49.3,
+    "y": 71.8,
+    "w": 39.3,
+    "h": 16.5,
+    "label": "Or move it; nothing changes for 7 days"
+   }
+  ]
+ },
+ "library-trash": {
+  "w": 1360,
+  "h": 900,
+  "spots": [
+   {
+    "n": 1,
+    "x": 64.9,
+    "y": 21.4,
+    "w": 5.7,
+    "h": 3.3,
+    "label": "Library > Trash"
+   },
+   {
+    "n": 2,
+    "x": 21.7,
+    "y": 39.1,
+    "w": 6.3,
+    "h": 2.4,
+    "label": "Days left before it is removed for good"
+   },
+   {
+    "n": 3,
+    "x": 21.5,
+    "y": 76.8,
+    "w": 12.6,
+    "h": 2,
+    "label": "Deleted by you, or by Auto-clean"
+   },
+   {
+    "n": 4,
+    "x": 21.4,
+    "y": 79.9,
+    "w": 12.9,
+    "h": 3.3,
+    "label": "Restore puts it back where it was"
+   },
+   {
+    "n": 5,
+    "x": 20.6,
+    "y": 32.3,
+    "w": 6.2,
+    "h": 3.3,
+    "label": "Select restores many at once"
+   }
+  ]
+ },
+ "settings-storage": {
+  "w": 1068,
+  "h": 370,
+  "spots": [
+   {
+    "n": 1,
+    "x": 3.1,
+    "y": 30.3,
+    "w": 22.4,
+    "h": 20,
+    "label": "Your files in storage, in GB"
+   },
+   {
+    "n": 2,
+    "x": 27.2,
+    "y": 30.3,
+    "w": 51.9,
+    "h": 20,
+    "label": "The estimated monthly cost: $0.015 per GB-month, the first 10 GB free"
+   },
+   {
+    "n": 3,
+    "x": 80.8,
+    "y": 42.2,
+    "w": 11,
+    "h": 8.1,
+    "label": "Measure now (free, on the worker); the daily clean also does it"
+   },
+   {
+    "n": 4,
+    "x": 3.1,
+    "y": 60.8,
+    "w": 93.8,
+    "h": 10.3,
+    "label": "Auto-clean: takes you never used go to the Trash after 3, 7, 14 or 30 days, or Off"
+   },
+   {
+    "n": 5,
+    "x": 3.1,
+    "y": 86.2,
+    "w": 93.8,
+    "h": 4.9,
+    "label": "The daily clean, and the worker's free disk"
+   }
+  ]
+ },
+ "post-video-star": {
+  "w": 222,
+  "h": 430,
+  "spots": [
+   {
+    "n": 1,
+    "x": 27.5,
+    "y": 78.8,
+    "w": 10.8,
+    "h": 5.6,
+    "label": "Star a take: Auto-clean never moves a starred take to the Trash"
+   }
+  ]
  }
 }

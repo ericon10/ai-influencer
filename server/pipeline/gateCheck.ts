@@ -1,4 +1,5 @@
-import { and, eq, inArray, like, ne, or } from 'drizzle-orm'
+import { and, eq, inArray, like, ne, notInArray, or } from 'drizzle-orm'
+import { GONE_STATUSES } from '../core/clips.js'
 import { candidates, jobs } from '../db/schema.js'
 import type { Ctx, Deps } from '../context.js'
 import { AppError } from '../lib/errors.js'
@@ -101,7 +102,7 @@ export async function videoGateCheck(deps: Deps, ctx: Ctx): Promise<VideoGateVie
   let count = 0
   if (runs.length) {
     const byRun = new Map(runs.map(r => [r.id, r]))
-    const rows = await deps.db.select().from(candidates).where(and(eq(candidates.accountId, ctx.accountId), eq(candidates.op, 'clone'), inArray(candidates.jobId, runs.map(r => r.id))))
+    const rows = await deps.db.select().from(candidates).where(and(eq(candidates.accountId, ctx.accountId), eq(candidates.op, 'clone'), inArray(candidates.jobId, runs.map(r => r.id)), notInArray(candidates.status, GONE_STATUSES)))
     for (const c of rows) {
       const meta = (c.meta ?? {}) as { review?: CloneReview; gate?: TakeGate | null; decision?: { kind?: string } | null }
       const gate = meta.review?.gate ?? meta.gate ?? null
@@ -143,7 +144,7 @@ export async function gateCheck(deps: Deps, ctx: Ctx): Promise<GateCheckView> {
     if (!made.length) continue
     const modelOf = new Map(made.map(m => [m.id, (m.request as GenRequest).modelRef ?? null]))
     const rows = await deps.db.select().from(candidates)
-      .where(and(eq(candidates.accountId, ctx.accountId), eq(candidates.op, 'clone_still'), inArray(candidates.jobId, made.map(m => m.id)), ...(run.characterId ? [eq(candidates.characterId, run.characterId)] : [])))
+      .where(and(eq(candidates.accountId, ctx.accountId), eq(candidates.op, 'clone_still'), inArray(candidates.jobId, made.map(m => m.id)), notInArray(candidates.status, GONE_STATUSES), ...(run.characterId ? [eq(candidates.characterId, run.characterId)] : [])))
     const pick = rows.find(c => c.assetId === stillAsset)
     if (!pick) continue
     if (!seen.has(pick.id)) { seen.add(pick.id); picked.push(sample(pick, postId, modelOf.get(pick.jobId ?? '') ?? null)) }
