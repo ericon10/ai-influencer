@@ -4,6 +4,7 @@ import { api } from '../../api'
 import { useRefresh } from '../../hooks'
 import { Callout, PromptViewer, errorMessage, useToast } from '../../ui'
 import type { CharacterView } from '../../types'
+import { BrandCard, TemplateCheckList } from './BrandCard'
 
 // Stage 5: character-[name].md, the human-readable source of truth. It
 // round-trips: export, edit by hand, import the edits back.
@@ -25,6 +26,7 @@ export function FileTab({ v }: { v: CharacterView }) {
 
   return (
     <div className="st-col" style={{ gap: 20 }}>
+      <BrandCard v={v} />
       <section className="st-card">
         <div className="st-card-head"><div className="grow"><div className="st-h2">5. Character file</div><div className="st-hint">character-{v.slug}.md: card, side-specific marks, body, makeup, and every approved sheet shot with its checksum.</div></div></div>
         <div className="st-card-body st-col" style={{ gap: 14 }}>
@@ -35,8 +37,9 @@ export function FileTab({ v }: { v: CharacterView }) {
               <input type="file" multiple accept=".md,text/markdown,image/*" hidden onChange={e => e.target.files?.length && applyEdits(Array.from(e.target.files))} />
             </label>
           </div>
-          <Callout tone="info">Edit the Card, Body and Notes sections freely. Marks and settings live in the block at the top. Images named REF 00 to REF 11 (or REF-00) become approved sheet shots. Importing keeps the previous version in history.</Callout>
+          <Callout tone="info">Edit the Card, Body and Notes sections freely, or bring in a new version from the Claude project. Marks and settings live in the block at the top. Images named REF 00 to REF 11 (or REF-00) become approved sheet shots; one identical to the approved shot is skipped. Importing keeps the posts, takes and sheet, merges the combo log, and keeps the previous version in history.</Callout>
           {!v.sheet.progress.complete && <Callout tone="warn">The sheet is {v.sheet.progress.approved} of 12. The file records what is approved so far.</Callout>}
+          <TemplateCheckList report={v.template} />
         </div>
       </section>
       <Knowledge v={v} />

@@ -16,6 +16,8 @@ import { readBilling } from '../providers/billing.js'
 import { serverKeyFor } from '../providers/serverKeys.js'
 import { identityForModel } from '../core/identity.js'
 import { checkSceneFields, isBankHair, sceneFieldsSchema, templateBody } from '../core/scenes.js'
+import { readBrand } from '../core/brand.js'
+import { characterTemplate } from '../pipeline/brand.js'
 import { scenePrompts } from '../core/promptWriter.js'
 import { realismBlock } from '../core/realism.js'
 import { modelLabel } from '../costs/quotes.js'
@@ -70,6 +72,10 @@ export async function characterView(deps: Deps, ctx: Ctx, id: string) {
     // Kept sections are shown hard-wrapped, like prompts.
     data: { ...data, sections: data.sections.map(sec => ({ ...sec, wrapped: hardWrap(sec.body, 80) })) },
     breakdown: row.breakdown, issues: validateCharacter(data),
+    // The brand layer from the file's own sections, and the file checked
+    // against character template v1.6 (long run part 3).
+    brand: readBrand(data.sections),
+    template: await characterTemplate(deps, ctx, id),
     sheetLock: row.sheetLock,
     ref00: ref00 ? { assetId: ref00.id, width: ref00.width, height: ref00.height, needsUpscale: (ref00.height ?? 0) < deps.config.pipeline.sheet.settings.upscale_ref00_below_px } : null,
     cardSuggestion: cardJob ? { jobId: cardJob.id, at: cardJob.completedAt?.toISOString() ?? null, ...((cardJob.resultMeta as { data?: object } | null)?.data ?? {}) } : null,

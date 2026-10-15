@@ -332,7 +332,21 @@ export function importFreeform(md: string, opts: ImportOptions = {}): ImportResu
     else if (/pieces|staples|wardrobe/.test(k)) style.pieces = splitList(b.value, ',')
     else if (/idea|suggest|starting/.test(k)) style.ideas = splitList(b.value, ',')
     else if (/accessor/.test(k)) style.accessories = splitList(b.value, ';')
-    else if (/hair/.test(k)) style.hair_options = splitList(b.value, ';')
+    else if (/hair/.test(k)) style.hair_options = splitList(b.value, b.value.includes(';') ? ';' : ',')
+    // Template v1.6: "Grooming default: natural. Dressed-up version: soft
+    // glam for nights out and events."
+    else if (/groom/.test(k)) {
+      const [def, ...rest] = b.value.split(/(?<=\.)\s+/)
+      const d = (def ?? '').replace(/\.$/, '').trim().toLowerCase()
+      if (d && !/^\[/.test(d)) makeup.default = d
+      const dressed = rest.join(' ').match(/dressed[- ]up(?: version)?\s*:\s*(.+)$/i)?.[1]?.replace(/\.$/, '').trim()
+      if (dressed && !/^\[/.test(dressed)) {
+        const when = dressed.match(/\bfor\s+(.+)$/i)?.[1]
+        const look = dressed.replace(/\s*\bfor\s+.+$/i, '').trim()
+        if (look) makeup.glam = look.toLowerCase()
+        if (when) makeup.glam_when = when.split(/,|\band\b/).map(w => w.trim().toLowerCase().replace(/\s+/g, '_')).filter(Boolean)
+      }
+    }
     else if (/makeup/.test(k)) {
       const def = b.value.match(/^([a-z][a-z ]*?)\s+by default(?:\s*\(([^)]*)\))?/i)
       if (def) makeup.default = def[2] ? `${def[1]!.toLowerCase()} (${def[2]})` : def[1]!.toLowerCase()
@@ -360,11 +374,11 @@ export function importFreeform(md: string, opts: ImportOptions = {}): ImportResu
     else if (/^(never|avoid|don)/.test(k)) persona.never = splitList(b.value, ',')
   }
   // The voice card (a "## Voice" section, like the script kit's cards).
-  const voiceSec = find(sections, /^voice(?: card)?$/, /voice card$/)
-  if (voiceSec) {
-    const voice = parseVoiceSection(bullets(voiceSec.body))
-    if (Object.keys(voice).length) persona.voice = voice
-  }
+  // Template v1.6 has both "Voice" (the ElevenLabs voice) and "Voice card"
+  // (how the character talks); both are read.
+  let voice: ReturnType<typeof parseVoiceSection> = {}
+  for (const sec of sections.filter(x => /^voice(?: card)?$/.test(norm(x.title)) || /voice card$/.test(norm(x.title)))) voice = { ...voice, ...parseVoiceSection(bullets(sec.body)) }
+  if (Object.keys(voice).length) persona.voice = voice
 
   // Disclosure.
   const discSec = find(sections, /^disclosure$/)
@@ -404,6 +418,20 @@ export function importFreeform(md: string, opts: ImportOptions = {}): ImportResu
       if (/still|scene|image/.test(k)) set('scene_still')
       if (/edit/.test(k)) set('edit')
     } else if (!b.key && /sheet/i.test(b.value)) preferredModels.sheet = ref
+  }
+  // Template v1.6 keeps the saved identity in its own section:
+  // "Higgsfield Element "Wren": 4b2a...". Kept as written too.
+  for (const b of bullets(find(sections, /^saved identity$/)?.body ?? '')) {
+    const line = b.key ? `${b.key}: ${b.value}` : b.value
+    const id = line.match(UUID)?.[0]
+    if (!id || identities.some(i => i.externalId === id)) continue
+    const kind = /element/i.test(line) ? 'element' : 'trained'
+    identities.push({
+      provider: /higgsfield|soul|element/i.test(line) ? 'higgsfield' : 'unknown',
+      kind, name: line.match(/["“]([^"”]+)["”]/)?.[1] ?? name, externalId: id, status: 'ready',
+      ...(kind === 'trained' && modelIn(line, models) ? { model: modelIn(line, models)! } : {}),
+      notes: b.value,
+    })
   }
   // A follow-up belongs to the identity whose model it names ("after any Soul
   // still"); the pass itself runs on the other model it names.

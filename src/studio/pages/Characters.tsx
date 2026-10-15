@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { FileUp, FolderOpen, Plus, Upload } from 'lucide-react'
 import { api } from '../api'
@@ -7,6 +7,8 @@ import { Callout, Field, Img, Modal, STAGES, Todo, errorMessage, useToast } from
 import { REALISM_LINE } from '../copy'
 import { filesFromDrop, sheetRefOf, typeOf } from '../files'
 import { HowTo } from '../guide/Guide'
+import { TemplateCheckList } from './character/BrandCard'
+import type { TemplateReport } from '../types'
 
 export default function Characters() {
   const list = useCharacters()
@@ -30,8 +32,10 @@ export default function Characters() {
           <h1 className="st-h1">Your characters</h1>
           <p className="st-sub">Set each one up once: inspiration, face, a 12-shot reference sheet and a character file. Posts use them after that.</p>
         </div>
-        <button className="st-btn" onClick={() => setImporting(true)}><FileUp size={16} />Import</button>
-        <button className="st-btn primary" onClick={create} disabled={creating}><Plus size={16} />New character</button>
+        {/* Import first (long run part 3): most characters are built in the
+            Claude project with character template v1.6. */}
+        <button className="st-btn primary" onClick={() => setImporting(true)}><FileUp size={16} />Import a character file</button>
+        <button className="st-btn" onClick={create} disabled={creating}><Plus size={16} />Start from a concept</button>
       </div>
 
       {list.isLoading && <div className="st-grid cards">{[0, 1, 2, 3].map(i => <div key={i} className="st-casting"><div className="st-img"><div className="st-skel" style={{ aspectRatio: '3/4' }} /></div><div className="st-casting-body"><div className="st-skel" style={{ height: 22, width: '60%' }} /></div></div>)}</div>}
@@ -39,11 +43,11 @@ export default function Characters() {
       {!list.isLoading && chars.length === 0 && (
         <div className="st-empty">
           <h2 className="st-h1">Cast your first <em>character</em></h2>
-          <p className="st-sub" style={{ margin: 0 }}>Start from an inspiration image, or import a character you already built.</p>
+          <p className="st-sub" style={{ margin: 0 }}>Import the character file you built in the Claude project with its 12 REF images, or start from an inspiration image and three concepts.</p>
           <p className="st-realism">{REALISM_LINE}</p>
           <div className="st-row" style={{ justifyContent: 'center' }}>
-            <button className="st-btn" onClick={() => setImporting(true)}><FileUp size={16} />Import</button>
-            <button className="st-btn primary big" onClick={create}><Plus size={18} />New character</button>
+            <button className="st-btn primary big" onClick={() => setImporting(true)}><FileUp size={18} />Import a character file</button>
+            <button className="st-btn" onClick={create}><Plus size={16} />Start from a concept</button>
           </div>
         </div>
       )}
@@ -76,7 +80,18 @@ function ImportDialog({ open, onClose }: { open: boolean; onClose: () => void })
   const [images, setImages] = useState<File[]>([])
   const [busy, setBusy] = useState<string | null>(null)
   const [over, setOver] = useState(false)
-  const [done, setDone] = useState<{ characterId: string; importedShots: string[]; checkShots: string[]; checkJobId: string | null; warnings: string[] } | null>(null)
+  const [done, setDone] = useState<{ characterId: string; updated: boolean; importedShots: string[]; unchangedShots: string[]; checkShots: string[]; checkJobId: string | null; warnings: string[] } | null>(null)
+  // The free template check (v1.6) and the character of the same name.
+  const [check, setCheck] = useState<{ report: TemplateReport; name: string; match: { id: string; name: string } | null } | null>(null)
+  const [update, setUpdate] = useState(true)
+  useEffect(() => {
+    let live = true
+    setCheck(null)
+    if (file) file.text().then(md => api.importCheck(md)).then(r => { if (live) { setCheck(r); setUpdate(true) } }).catch(e => toast({ tone: 'bad', text: errorMessage(e) }))
+    return () => { live = false }
+  }, [file]) // eslint-disable-line react-hooks/exhaustive-deps
+  const updating = !!check?.match && update
+  const needed = check ? check.report.needed.filter(n => !n.ok).length : 0
 
   function take(files: FileList | File[]) {
     for (const f of Array.from(files)) {
@@ -97,7 +112,7 @@ function ImportDialog({ open, onClose }: { open: boolean; onClose: () => void })
     if (!file) return
     setBusy('Reading the file...')
     try {
-      const r = await api.importCharacter(await file.text(), mapped.filter(m => m.ref).map(m => m.f), (n, total) => setBusy(`Uploading images ${n} of ${total}...`))
+      const r = await api.importCharacter(await file.text(), mapped.filter(m => m.ref).map(m => m.f), (n, total) => setBusy(`Uploading images ${n} of ${total}...`), updating ? check!.match!.id : undefined)
       refresh()
       // Show what was read before opening the character.
       setDone(r); setFile(null); setImages([])
@@ -110,7 +125,7 @@ function ImportDialog({ open, onClose }: { open: boolean; onClose: () => void })
     return (
       <Modal open={open} onClose={close}>
         <div className="st-card-body st-col" style={{ gap: 16 }}>
-          <div><div className="st-kicker">Imported</div><div className="st-h2">Here is what the Studio read</div><p className="st-sub">{done.importedShots.length ? `${done.importedShots.length} approved sheet shot${done.importedShots.length === 1 ? '' : 's'}: ${done.importedShots.join(', ')}.` : 'No sheet images yet. Add them any time from the Sheet tab.'}{done.checkShots.length ? ` To check with QA: ${done.checkShots.join(', ')}.` : ''}</p></div>
+          <div><div className="st-kicker">{done.updated ? 'Updated' : 'Imported'}</div><div className="st-h2">Here is what the Studio read</div><p className="st-sub">{done.updated ? 'The file\'s words replaced the old ones; posts, takes and the sheet stayed, and the combo log was merged. ' : ''}{done.importedShots.length ? `${done.importedShots.length} approved sheet shot${done.importedShots.length === 1 ? '' : 's'}: ${done.importedShots.join(', ')}.` : done.unchangedShots.length ? '' : 'No sheet images yet. Add them any time from the Sheet tab.'}{done.unchangedShots.length ? ` Already in the sheet, unchanged: ${done.unchangedShots.length === 12 ? 'all 12' : done.unchangedShots.join(', ')}.` : ''}{done.checkShots.length ? ` To check with QA: ${done.checkShots.join(', ')}.` : ''}</p></div>
           {done.checkJobId && <Callout tone="info">Checking each image against REF-00: face match and skin texture. It is free and runs in the background; any failures show on the Sheet tab.</Callout>}
           {done.warnings.length > 0 && <ul className="st-notes">{done.warnings.map((w, i) => <li key={i}>{w}</li>)}</ul>}
           <div className="st-row"><span className="st-spacer" /><button className="st-btn primary" onClick={open_}>Open character</button></div>
@@ -122,7 +137,7 @@ function ImportDialog({ open, onClose }: { open: boolean; onClose: () => void })
   return (
     <Modal open={open} onClose={close}>
       <div className="st-card-body st-col" style={{ gap: 16 }}>
-        <div><div className="st-kicker">Import</div><div className="st-h2">Bring in a character you already built</div><p className="st-sub">Drop the character file (.md) and the sheet folder. Images named REF 00 to REF 11 (or REF-00) become the approved sheet.</p></div>
+        <div><div className="st-kicker st-row" style={{ gap: 10 }}>Import<HowTo id="characters" /></div><div className="st-h2">Import a character file</div><p className="st-sub">The character file (.md) from the Claude project, made with character template v1.6, and its sheet folder. Images named REF 00 to REF 11 (or REF-00) become the approved sheet. The file is checked against the template for free before anything is imported.</p></div>
         <Field id="import-file" label="Character file (.md)" required done={!!file} group hint="The sheet images are optional; add them now or later.">
         <label className={`st-drop ${over ? 'over' : ''}`} onDragOver={e => { e.preventDefault(); setOver(true) }} onDragLeave={() => setOver(false)} onDrop={e => { e.preventDefault(); setOver(false); void drop(e.dataTransfer) }}>
           <Upload size={22} />
@@ -141,8 +156,20 @@ function ImportDialog({ open, onClose }: { open: boolean; onClose: () => void })
           </div>
         )}
         {missing.length > 0 && <span className="st-hint">Not in this folder: {missing.join(', ')}. You can add them later from the Sheet tab.</span>}
+        {file && !check && <span className="st-hint">Checking the file against the template...</span>}
+        {check && <TemplateCheckList report={check.report} />}
+        {check?.match && (
+          <div className="st-col" style={{ gap: 6 }} role="radiogroup" aria-label="Update or new" data-field="import-update">
+            <button type="button" role="radio" aria-checked={update} className={`st-choice ${update ? 'on' : ''}`} onClick={() => setUpdate(true)}>
+              <b>Update {check.match.name}</b><span className="st-hint">Keeps {check.match.name}'s posts, takes, stills and sheet; the combo log is merged.</span>
+            </button>
+            <button type="button" role="radio" aria-checked={!update} className={`st-choice ${!update ? 'on' : ''}`} onClick={() => setUpdate(false)}>
+              <b>Import as a new character</b><span className="st-hint">A second {check.name}, with nothing from the first.</span>
+            </button>
+          </div>
+        )}
         {!file && <Todo items={[{ label: 'Add the character file (.md)', target: 'import-file' }]} />}
-        <div className="st-row"><span className="st-spacer" />{busy && <span className="st-hint">{busy}</span>}<button className="st-btn ghost" onClick={onClose}>Cancel</button><button className="st-btn primary" disabled={!file || !!busy} onClick={submit}>{busy ? 'Importing...' : 'Import character'}</button></div>
+        <div className="st-row"><span className="st-spacer" />{busy && <span className="st-hint">{busy}</span>}<button className="st-btn ghost" onClick={onClose}>Cancel</button><button className="st-btn primary" disabled={!file || !!busy} onClick={submit} title={needed ? 'The template check found items to add; the import still works.' : undefined}>{busy ? 'Importing...' : updating ? `Update ${check!.match!.name}${needed ? ' anyway' : ''}` : needed ? 'Import anyway' : 'Import character'}</button></div>
       </div>
     </Modal>
   )

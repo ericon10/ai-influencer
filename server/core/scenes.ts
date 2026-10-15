@@ -162,7 +162,9 @@ export function makeupLine(t: TemplatesConfig, makeup: string, ch: Pick<Characte
   if (makeup === 'bare') return t.scene.makeup.bare
   if (makeup === 'soft_glam') return fill(t.scene.makeup.soft_glam, { glam: ch.makeup.glam?.trim() || 'soft glam' })
   const own = ch.makeup.default?.trim() ?? ''
-  return fill(t.scene.makeup.natural, { natural: own && !/^(?:natural|light|minimal|soft|everyday|none)$/i.test(own) ? own : t.scene.makeup.everyday })
+  // A file whose grooming default is "none" (template v1.6) goes bare-faced.
+  if (/^(?:none|no makeup|bare)$/i.test(own)) return t.scene.makeup.bare
+  return fill(t.scene.makeup.natural, { natural: own && !/^(?:natural|light|minimal|soft|everyday)$/i.test(own) ? own : t.scene.makeup.everyday })
 }
 
 // ── Makeup by setting and hair rotation (character template v1.6) ──
@@ -512,10 +514,16 @@ const PLANNED = ['title', 'momentType', 'moment', 'task', 'trigger', 'setting', 
 export const PLANNED_FIELDS: readonly string[] = PLANNED
 
 // "Punch it up": three specific moments from a rough idea.
-export interface SceneIdea { moment: string; action: string; shooter: string; place: string; detail: string; other_person: string }
+export interface SceneIdea { moment: string; action: string; shooter: string; place: string; detail: string; other_person: string; fits_brand?: boolean; brand_note?: string }
 
-export function sceneIdeasJsonSchema(): Record<string, unknown> {
+export function sceneIdeasJsonSchema(o: { brand?: boolean } = {}): Record<string, unknown> {
   const str = (description: string) => ({ type: 'string', description })
+  // The brand check (default rule brand-check): whether each moment fits
+  // the brand statement, and why not when it does not.
+  const brand = o.brand ? {
+    fits_brand: { type: 'boolean', description: 'Whether this moment fits the brand statement.' },
+    brand_note: str('When it does not fit, why, in a few plain words; otherwise an empty string.'),
+  } : {}
   return {
     type: 'object',
     additionalProperties: false,
@@ -527,7 +535,7 @@ export function sceneIdeasJsonSchema(): Record<string, unknown> {
         items: {
           type: 'object',
           additionalProperties: false,
-          required: ['moment', 'action', 'shooter', 'place', 'detail', 'other_person'],
+          required: ['moment', 'action', 'shooter', 'place', 'detail', 'other_person', ...Object.keys(brand)],
           properties: {
             moment: str('The whole moment in one or two sentences, starting with the character\'s name. This is what fills the scene box.'),
             action: str('The one action caught mid-motion.'),
@@ -535,6 +543,7 @@ export function sceneIdeasJsonSchema(): Record<string, unknown> {
             place: str('The specific place, the time of day and the light.'),
             detail: str('One small real-life detail.'),
             other_person: str('The other person and their look (hair color and cut), or an empty string when nobody else is in it.'),
+            ...brand,
           },
         },
       },
@@ -543,15 +552,16 @@ export function sceneIdeasJsonSchema(): Record<string, unknown> {
 }
 
 // Demo mode: three plain options made from the owner's words.
-export function mockSceneIdeas(name: string, idea: string, poss: string): { options: SceneIdea[] } {
+export function mockSceneIdeas(name: string, idea: string, poss: string, o: { brand?: boolean } = {}): { options: SceneIdea[] } {
   const what = idea.trim().replace(/[.!?]+$/, '').replace(new RegExp(`^${name}\\s+`, 'i'), '') || 'out for the day'
-  return {
+  const out = {
     options: [
       { moment: `${name} ${what}, caught mid-laugh as she turns back toward a friend who snaps it on a phone from a few steps behind, late-morning sun on a busy sidewalk, a paper coffee cup in ${poss} hand.`, action: 'turning back mid-laugh', shooter: 'a friend on a phone, a few steps behind', place: 'a busy sidewalk, late morning, bright sun', detail: 'a paper coffee cup', other_person: '' },
       { moment: `${name} ${what}, reaching up to tuck hair behind ${poss} ear as a stranger she asked takes the shot from across a small cafe table, soft window light at 4 p.m., a half-eaten croissant on the plate.`, action: 'tucking hair behind an ear', shooter: 'a stranger across the table', place: 'a small cafe, 4 p.m., soft window light', detail: 'a half-eaten croissant', other_person: '' },
       { moment: `${name} ${what}, mid-step down a few stone stairs while a friend with a short black bob films from the landing below, golden hour by the water, sunglasses pushed up on ${poss} head.`, action: 'stepping down the stairs', shooter: 'a friend on the landing below', place: 'stone stairs by the water, golden hour', detail: 'sunglasses pushed up on her head', other_person: 'A friend with a short black bob' },
-    ],
+    ] as SceneIdea[],
   }
+  return o.brand ? { options: out.options.map(x => ({ ...x, fits_brand: true, brand_note: '' })) } : out
 }
 
 export function scenePlanJsonSchema(sc: ScenesConfig, views: ViewsConfig): Record<string, unknown> {

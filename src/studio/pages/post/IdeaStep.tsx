@@ -343,7 +343,7 @@ function ShotChips({ ctx, idea, scene, data }: { ctx: PostCtx; idea: string; sce
   )
 }
 
-interface Idea { moment: string; shooter: string; place: string; detail: string; other_person: string }
+interface Idea { moment: string; shooter: string; place: string; detail: string; other_person: string; fits_brand?: boolean; brand_note?: string }
 
 // The option as the idea: the moment, and who takes it when the moment does
 // not say (a selfie stays a selfie, a friend's photo says so).
@@ -376,6 +376,7 @@ function IdeaOptions({ jobId, current, onPick, onClose }: { jobId: string; curre
               <span className="st-row" style={{ gap: 8, alignItems: 'flex-start' }}><span style={{ flex: 1 }}>{text}</span>{on && <Check size={14} />}</span>
               <span className="st-hint">{[o.place, o.detail].map(noDash).filter(Boolean).join(' · ')}</span>
               {o.other_person && <span className="st-hint">Also in it: {noDash(o.other_person)}</span>}
+              {o.fits_brand === false && <span className="st-hint st-idea-brand" data-field="off-brand">Off brand: {noDash(o.brand_note || 'it does not match the brand statement')}. You can still use it.</span>}
             </button>
           )
         })}

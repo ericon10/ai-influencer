@@ -2,7 +2,10 @@ import { and, eq } from 'drizzle-orm'
 import { candidates, refImages } from '../db/schema.js'
 import type { Ctx, Deps } from '../context.js'
 import { exportCharacterFile, importCharacterFile, type ImportResult, type SheetEntry } from '../core/characterFile.js'
+import type { CharacterData, FileSection } from '../core/character.js'
+import { appendCombo, isComboSection, parseComboLog, formatComboEntry } from '../core/scenes.js'
 import { newId } from '../lib/ids.js'
+import { sha256Hex } from '../lib/passwords.js'
 import { AppError } from '../lib/errors.js'
 import { getAsset, saveAsset } from '../storage/assets.js'
 import { approvedAssets, createCharacter, getCharacter, getRef, refRows, setCharacterFields, toData, updateCharacter } from './characters.js'
@@ -29,28 +32,60 @@ export interface ImportOptions {
   checks?: CheckImage[] // images to check with QA, never approved on import
 }
 
-export async function importCharacter(deps: Deps, ctx: Ctx, markdown: string, opts: ImportOptions = {}): Promise<{ characterId: string; result: ImportResult; importedShots: string[]; checkShots: string[] }> {
+export async function importCharacter(deps: Deps, ctx: Ctx, markdown: string, opts: ImportOptions = {}): Promise<{ characterId: string; result: ImportResult; importedShots: string[]; unchangedShots: string[]; checkShots: string[] }> {
   const result = importCharacterFile(markdown, { models: deps.config.models.models })
-  const data = result.character
+  let data = result.character
   let characterId: string
   if (opts.characterId) {
+    // A re-import (owner, 2026-10-15): the file's words replace the
+    // character's words; posts, takes, stills and the sheet live elsewhere
+    // and stay. What the Studio added since the last export is kept.
+    const current = toData(await getCharacter(deps, ctx, opts.characterId))
+    data = mergeReimport(current, data, deps.config.pipeline.scenes.settings.combo_window)
     await updateCharacter(deps, ctx, opts.characterId, data, 'imported character file')
     characterId = opts.characterId
   } else {
     const row = await createCharacter(deps, ctx, { name: data.name, data, stage: 5 })
     characterId = row.id
   }
-  const importedShots = await attachSheetImages(deps, ctx, characterId, opts.images ?? {}, data.name)
+  const unchangedShots: string[] = []
+  const importedShots = await attachSheetImages(deps, ctx, characterId, opts.images ?? {}, data.name, unchangedShots)
   const checkShots = await attachCheckImages(deps, ctx, characterId, opts.checks ?? [])
   const sheetModel = data.preferredModels.sheet
   if (sheetModel && !opts.characterId) await setCharacterFields(deps, ctx, characterId, { sheetLock: { model: sheetModel, quality: deps.config.pipeline.sheet.settings.quality, resolution: deps.config.pipeline.sheet.settings.resolution } })
-  return { characterId, result, importedShots, checkShots }
+  return { characterId, result, importedShots, unchangedShots, checkShots }
+}
+
+// On a re-import: the combo log merged (the Studio's entries kept, the
+// newest `window`), every saved identity kept, and the voice card and the
+// REALISM block kept when the file has none.
+export function mergeReimport(current: CharacterData, incoming: CharacterData, window: number): CharacterData {
+  const out = { ...incoming }
+  const mine = current.sections.find(s => isComboSection(s.title))
+  const theirs = incoming.sections.find(s => isComboSection(s.title))
+  if (mine) {
+    const seen = new Set<string>()
+    const all = [...parseComboLog(mine.body), ...(theirs ? parseComboLog(theirs.body) : [])]
+      .filter(e => { const k = formatComboEntry(e).toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true })
+      .sort((a, b) => a.date.localeCompare(b.date))
+    let body = ''
+    for (const e of all) body = appendCombo(body, e, window)
+    const section: FileSection = { title: theirs?.title ?? mine.title, body }
+    out.sections = theirs ? incoming.sections.map(s => (s === theirs ? section : s)) : [...incoming.sections, section]
+  }
+  // A saved identity is never dropped by a file that leaves it out (an
+  // Element takes a new build to replace); the file's own come first.
+  const ids = new Set(incoming.identities.map(i => i.externalId))
+  out.identities = [...incoming.identities, ...current.identities.filter(i => !ids.has(i.externalId))]
+  if (!incoming.persona.voice && current.persona.voice) out.persona = { ...incoming.persona, voice: current.persona.voice }
+  if (!incoming.realism?.block && current.realism?.block) out.realism = { ...current.realism, ...incoming.realism, block: current.realism.block }
+  return out
 }
 
 // Approved sheet images brought in from outside (for example a sheet built
 // before the Studio). An image that replaces an approved one supersedes it
 // and marks the shots built on it for re-check, as a regeneration would.
-export async function attachSheetImages(deps: Deps, ctx: Ctx, characterId: string, images: Record<string, { data: Buffer; mime?: string }>, label?: string): Promise<string[]> {
+export async function attachSheetImages(deps: Deps, ctx: Ctx, characterId: string, images: Record<string, { data: Buffer; mime?: string }>, label?: string, unchanged: string[] = []): Promise<string[]> {
   const shots = deps.config.pipeline.sheet.shots
   const name = label ?? (await getCharacter(deps, ctx, characterId)).name
   const attached: string[] = []
@@ -58,8 +93,13 @@ export async function attachSheetImages(deps: Deps, ctx: Ctx, characterId: strin
   for (const refId of order) {
     if (!shots.some(s => s.id === refId)) throw new AppError('bad_request', `Unknown shot ${refId}.`)
   }
+  const approved = await approvedAssets(deps, ctx, characterId)
   for (const refId of order) {
     const img = images[refId]!
+    // The same image as the approved one (a re-import of the same folder):
+    // nothing to do, so nothing built on it goes stale.
+    const currentId = approved.get(refId)
+    if (currentId && (await getAsset(deps, ctx, currentId)).checksumSha256 === sha256Hex(img.data)) { unchanged.push(refId); continue }
     const asset = await saveAsset(deps, ctx, { data: img.data, mime: img.mime, origin: 'upload', label: `${name} ${refId}` })
     const ref = await getRef(deps, ctx, characterId, refId)
     const previous = ref.approvedCandidateId

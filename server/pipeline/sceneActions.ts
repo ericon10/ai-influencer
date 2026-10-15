@@ -24,6 +24,7 @@ import { listCredentials } from '../providers/credentials.js'
 import { ACCOUNT_PROVIDER } from '../providers/higgsfieldOAuth.js'
 import { forMode, providerMode, resolveRoute } from './settings.js'
 import { approvedAssets, getCandidate, toData, type CharacterRow } from './characters.js'
+import { brandCheckLine, readBrand, winningStackLine } from '../core/brand.js'
 import { comboEntries, comboProblem, getScene, sceneFields, sceneFieldsFor, sceneRefs, videoModel, type SceneRef } from './scenes.js'
 import { assertFace } from './videoAssets.js'
 import { getAsset } from '../storage/assets.js'
@@ -197,7 +198,13 @@ export async function buildSceneIdeas(deps: Deps, ctx: Ctx, row: CharacterRow, i
   const t = deps.config.pipeline.templates
   const route = await resolveRoute(deps, ctx, 'scene_ideas')
   const pv = pronounVars(ch.pronouns)
-  const system = fill(t.scene_ideas.system, { ...pv, name: ch.name, look: ch.card.trim() || 'not given' })
+  // Default rule brand-check (template v1.6): each moment is checked against
+  // the brand statement; one that does not fit says why. Advice only.
+  const sw = await ruleSwitches(deps, ctx, row.id)
+  const brand = readBrand(ch.sections)
+  const check = sw.on('brand-check') ? brandCheckLine(brand) : ''
+  const stack = sw.on('brand-winning-stack') ? winningStackLine(brand) : ''
+  const system = [fill(t.scene_ideas.system, { ...pv, name: ch.name, look: ch.card.trim() || 'not given' }), check, stack].filter(Boolean).join('\n')
   const prompt = fill(t.scene_ideas.prompt, {
     ...pv, name: ch.name, idea: idea.trim(),
     vibe: ch.persona.vibe ?? 'not given',
@@ -209,8 +216,8 @@ export async function buildSceneIdeas(deps: Deps, ctx: Ctx, row: CharacterRow, i
     specs: [{
       type: 'llm', stage: 'scene', purpose: 'scene_ideas', label: 'Punch it up: three moment options',
       request: {
-        model: route.model, system, prompt, schema: sceneIdeasJsonSchema(), schemaName: 'scene_ideas',
-        maxTokens: 1500, effort: route.effort ?? 'low', meta: { mockIdeas: mockSceneIdeas(ch.name, idea, pv.poss ?? 'her') },
+        model: route.model, system, prompt, schema: sceneIdeasJsonSchema({ brand: !!check }), schemaName: 'scene_ideas',
+        maxTokens: 1500, effort: route.effort ?? 'low', meta: { mockIdeas: mockSceneIdeas(ch.name, idea, pv.poss ?? 'her', { brand: !!check }) },
       },
     }],
   }
@@ -227,7 +234,8 @@ export async function buildScenePlan(deps: Deps, ctx: Ctx, row: CharacterRow, sc
   const route = await resolveRoute(deps, ctx, 'scene_plan')
   const combos = sw.on('scene-combo-log') ? comboEntries(ch).slice(-sc.settings.combo_window) : []
   const prompt = scenePlanPrompt(templates, sc, views, ch, scene.brief, combos, { persona: sw.on('scene-persona-never') })
-  const system = fill(templates.scene_plan.system, { rules: plannerRules(rules, id => sw.on(id), brands) })
+  const stack = sw.on('brand-winning-stack') ? winningStackLine(readBrand(ch.sections)) : ''
+  const system = [fill(templates.scene_plan.system, { rules: plannerRules(rules, id => sw.on(id), brands) }), stack].filter(Boolean).join('\n')
   return {
     purpose: `scene_plan:${scene.id}`,
     preview: { title: 'Plan the scene', prompts: [{ label: 'Scene plan', text: `${system}\n${prompt}`, wrapped: hardWrap(`${system}\n${prompt}`) }], warnings: [], invalidates: [] },
@@ -272,6 +280,10 @@ export async function buildScenePromptWrite(deps: Deps, ctx: Ctx, row: Character
     notes ? fill(t.prompt_writer.notes_given, { notes }) : '',
   ].filter(Boolean).join('\n')
   const directorsMeta = directors ? { directors: true, mockNotes: notes || mockDirectorNotes(input.target), ...(notes ? { notes } : {}) } : {}
+  // Default rule brand-winning-stack (template v1.6): the stack from the
+  // last growth review goes with every written prompt.
+  const stack = sw.on('brand-winning-stack') ? winningStackLine(readBrand(ch.sections)) : ''
+  const withStack = (system: string) => (stack ? `${system}\n${stack}` : system)
   const llm = (system: string, prompt: string, extra: { imageAssetIds?: string[]; meta: Record<string, unknown> }): SceneBuilt => ({
     purpose,
     preview: { title: input.target === 'still' ? 'Write the prompt' : 'Write the video prompt', prompts: [{ label: 'Prompt writer', text: `${system}\n${prompt}`, wrapped: hardWrap(`${system}\n${prompt}`) }], warnings: [], invalidates: [] },
@@ -287,7 +299,7 @@ export async function buildScenePromptWrite(deps: Deps, ctx: Ctx, row: Character
   if (input.target === 'still') {
     const range = sc.settings.prompt_words.still
     const facts = writerFacts(t, sc, views, f, ch)
-    const system = fill(t.prompt_writer.still_system, { ...pv, name: ch.name, min: String(range[0]), max: String(range[1]), directors_pass: pass })
+    const system = withStack(fill(t.prompt_writer.still_system, { ...pv, name: ch.name, min: String(range[0]), max: String(range[1]), directors_pass: pass }))
     const prompt = fill(t.prompt_writer.still_prompt, { name: ch.name, facts })
     return llm(system, prompt, { meta: { basis: sha256Hex(facts), mockPrompt: mockWrittenPrompt('still', { facts }, range) } })
   }
@@ -302,7 +314,7 @@ export async function buildScenePromptWrite(deps: Deps, ctx: Ctx, row: Character
   // task, trigger, camera and light; the Studio writes FORMAT (9:16 by
   // default) and AUDIO (sound off unless turned on) itself.
   const range = sc.settings.prompt_words.video
-  const system = fill(t.prompt_writer.video_system, { ...pv, name: ch.name, min: String(range[0]), max: String(range[1]), directions, end_frame: input.endCandidateId ? t.prompt_writer.end_frame : '', directors_pass: pass })
+  const system = withStack(fill(t.prompt_writer.video_system, { ...pv, name: ch.name, min: String(range[0]), max: String(range[1]), directions, end_frame: input.endCandidateId ? t.prompt_writer.end_frame : '', directors_pass: pass }))
   let facts = videoWriterFacts(t, sc, views, f, ch)
   // Chaining: a start frame taken from a kept clip continues that shot.
   if (start?.op === 'last_frame' && start.parentId) {

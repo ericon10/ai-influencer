@@ -897,3 +897,23 @@ or step: both show as filled fields in the scene form, editable as before.
 Both scene behaviors are defaults in Settings > Rules: "Rotate hair styling
 per scene" (`hair-rotation`) and "Makeup by setting" (`makeup-by-setting`),
 each switchable for all characters or one.
+
+## 24. Character files from the Claude project (owner, 2026-10-15, long run part 3)
+
+Character template v1.6 (`docs/character-template.md`, Part B) is how the
+owner builds a character in the Claude project. Its file comes into the
+Studio as is; the brand layer it carries shows on the character page and
+feeds the writers. No new page: the Characters page, its Import dialog and
+the character page's File step.
+
+| Piece | Where | How it works | Clicks |
+|---|---|---|---|
+| Import first | Characters page header and empty state | "Import a character file" is the first, primary button; "Start from a concept" (inspiration, concepts, hero, sheet) is the second. Both always there | 1 |
+| The 12 REF images | Import dialog | Drop the .md and the sheet folder (or choose a folder): images named REF-00 to REF-11 (REF 00 works) become the approved sheet, as before; the dialog lists which of the 12 are in and which are not | 0 |
+| Template check | Import dialog, right after the file is chosen (free, no Claude) | Checked against template v1.6: every UNIVERSAL section (Realism principle, Models, Scene rules, Video rules, Recipe: candid, Recipe: recreate), one distinguishing mark, REF-00 to REF-11 each labeled in the Reference sheet, and the Element ID when the file names an Element. Each shows as a green tick or "Missing" with what to add. Optional sections that are missing (Brand, Why people watch, Accounts, Winning stack, Growth log and the rest) show in one gray line, and sections still holding [brackets] are named. Nothing blocks: with a needed item missing the button reads "Import anyway" | 0 |
+| Update, not a copy | Import dialog, when a character of that name exists | "Update Callie (keeps her posts, takes and sheet)" is chosen by default; "Import as a new character" is the other choice | 0 or 1 |
+| Re-import keeps everything | Same, and the File step's Import edits | The file's words replace the character's words; posts, takes, stills, clips and the sheet stay. The combo log is merged (the Studio's entries are kept), a saved identity stays when the file has none, and a sheet image identical to the approved one is skipped, so nothing goes stale | 0 |
+| Brand card | Character page > File step, first card | The brand layer, editable in place and written back into the file's own sections: brand statement (with interest, sub-interest and arc), series, running bits, cast, accounts, winning stack, growth log (newest first, Add this month's entry). Saves as you leave a field; the previous version is in history | 1 per field |
+| Template check on the character | Character page > File step | The same check over the character's current file, so a character imported before v1.6 shows what to add | 0 |
+| Winning stack in every post | Prompt writer and planner (Write and generate, Plan the details) | The winning stack goes with the facts: every post carries it for 30 days, inside the fixed rules. Default rule `brand-winning-stack` | 0 |
+| Brand check | Punch it up's three moments | Each moment is checked against the brand statement; one that does not fit says so in a small "Off brand" note with the reason. Advice only. Default rule `brand-check` | 0 |

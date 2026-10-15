@@ -42,6 +42,7 @@ import { chooseConcept } from '../pipeline/concepts.js'
 import { approveCandidate, keepStale, pickHero, rejectCandidate, reopenCandidate, setFavorite, mirrorCandidate } from '../pipeline/review.js'
 import { isValidEndpoint, MODEL_OVERRIDES_KEY, readModelOverrides } from '../providers/modelOverrides.js'
 import { attachCheckImages, attachSheetImages, exportCharacter, importCharacter, type CheckImage } from '../pipeline/files.js'
+import { importCheck, updateBrand } from '../pipeline/brand.js'
 import { accountUsage } from '../pipeline/costs.js'
 import { providerMode, setClaudeModel, setSetting } from '../pipeline/settings.js'
 import { listCredentials, markVerified, revokeCredential, saveCredential } from '../providers/credentials.js'
@@ -109,10 +110,10 @@ const uploadRefs = z.array(z.object({ uploadId: z.string(), name: z.string().max
 
 // A character file and its images, from a multipart body or a JSON body
 // naming direct uploads.
-async function fileBundle(deps: Deps, c: Context, ctx: Ctx): Promise<{ markdown: string | null; files: UploadedFile[] }> {
+async function fileBundle(deps: Deps, c: Context, ctx: Ctx): Promise<{ markdown: string | null; files: UploadedFile[]; characterId?: string }> {
   if ((c.req.header('content-type') ?? '').includes('application/json')) {
-    const body = parse(z.object({ markdown: z.string().max(500_000).optional(), uploads: uploadRefs }), await json(c))
-    return { markdown: body.markdown ?? null, files: await takeUploads(deps, ctx, body.uploads) }
+    const body = parse(z.object({ markdown: z.string().max(500_000).optional(), uploads: uploadRefs, characterId: z.string().regex(/^chr_[a-z0-9]{20}$/).optional() }), await json(c))
+    return { markdown: body.markdown ?? null, files: await takeUploads(deps, ctx, body.uploads), characterId: body.characterId }
   }
   const body = await c.req.parseBody({ all: true })
   const md = ([] as unknown[]).concat(body.file ?? [])[0]
@@ -484,15 +485,39 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
     return c.json({ warnings, importedShots, checkShots, checkJobId, view: await characterView(deps, ctx, id) })
   })
 
+  // A new character from its file, or (with characterId) an update of one
+  // that keeps its posts, takes and sheet (long run part 3).
   app.post('/characters/import', async c => {
     const ctx = c.get('ctx')
     requireRole(ctx, 'member')
-    const { markdown, files } = await fileBundle(deps, c, ctx)
+    const { markdown, files, characterId } = await fileBundle(deps, c, ctx)
     if (!markdown) throw new AppError('bad_request', 'Attach the character file (.md).')
+    if (characterId) await getCharacter(deps, ctx, characterId)
     const { images, checks } = sheetImagesFrom(files)
-    const result = await importCharacter(deps, ctx, markdown, { images, checks })
+    const result = await importCharacter(deps, ctx, markdown, { images, checks, characterId })
     const checkJobId = result.importedShots.length ? await startImportCheck(deps, ctx, result.characterId, result.importedShots) : null
-    return c.json({ characterId: result.characterId, importedShots: result.importedShots, checkShots: result.checkShots, checkJobId, warnings: result.result.warnings }, 201)
+    return c.json({ characterId: result.characterId, updated: !!characterId, importedShots: result.importedShots, unchangedShots: result.unchangedShots, checkShots: result.checkShots, checkJobId, warnings: result.result.warnings }, characterId ? 200 : 201)
+  })
+
+  // The file checked against character template v1.6 before an import
+  // (free), and the character of the same name, if any.
+  app.post('/characters/import/check', async c => {
+    const body = parse(z.object({ markdown: z.string().min(1).max(500_000) }), await json(c))
+    return c.json(await importCheck(deps, c.get('ctx'), body.markdown))
+  })
+
+  // The brand layer, written back into the file's own sections.
+  app.put('/characters/:id/brand', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    const line = z.string().max(600)
+    const list = z.array(z.string().max(300)).max(30)
+    const patch = parse(z.object({
+      interest: line, subInterest: line, arc: line, statement: line,
+      series: list, runningBits: list, cast: list, payoff: line, howTheyFilm: line,
+      accounts: z.string().max(3000), winningStack: list, growthLog: z.array(z.string().max(1200)).max(60),
+    }).partial(), await json(c))
+    return c.json({ brand: await updateBrand(deps, ctx, c.req.param('id'), patch) })
   })
 
   // ── Paid actions: estimate first, then run with the quote ──

@@ -143,6 +143,10 @@ export interface CharacterView {
   id: string; name: string; slug: string; stage: number; status: string; revision: number
   data: CharacterData; breakdown: Breakdown | null; issues: Array<{ field: string; message: string; severity: 'error' | 'warning' }>
   sheetLock: { model: string } | null
+  // The brand layer from the file's sections, and the file checked against
+  // character template v1.6 (long run part 3).
+  brand: BrandLayer
+  template: TemplateReport
   ref00: { assetId: string; width: number | null; height: number | null; needsUpscale: boolean } | null
   cardSuggestion: { jobId: string; at: string | null; differences?: Array<{ field: string; card_says: string; image_shows: string }>; card?: string; marks?: Mark[] } | null
   inspirations: string[]; concepts: Concept[]; heroes: Candidate[]
@@ -151,6 +155,20 @@ export interface CharacterView {
   reasons: Array<{ id: string; label: string }>
   variationDefault: number
   modelLabels: Record<string, string>
+}
+
+export interface BrandLayer {
+  interest: string; subInterest: string; arc: string; statement: string
+  series: string[]; runningBits: string[]; cast: string[]; payoff: string; howTheyFilm: string
+  accounts: string; winningStack: string[]; growthLog: string[]
+}
+
+export interface TemplateReport {
+  version: string
+  needed: Array<{ id: string; label: string; ok: boolean; detail: string }>
+  missingOptional: string[]
+  brackets: string[]
+  complete: boolean
 }
 
 export interface CharacterSummary { id: string; name: string; stage: number; status: string; card: string; portraitAssetId: string | null; progress: { approved: number; total: number }; spent: string; updatedAt: string }

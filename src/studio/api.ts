@@ -1,4 +1,4 @@
-import type { ActionPreview, CharacterSummary, CharacterView, HiggsfieldAccount, JobView, Me, QuoteView, RulesView, SceneFields, ScenesData, SettingsView, StudioAction, Usage, VideoPrice, BrollClip, ContentData, ContentKind, LibraryData, PostStep, WorkerStatus, CloneOptions, CloneResult, CloneSource, CloneStill, CutView, SoundItem, EditorStyle, ImportPreview, VoiceLine, ProductSummary, ProductView, ProductClaims, KitGroup, SocialAccount, SentView, RecreateBatchView, GateCheckView, StorageInfo, TrashRef, TrashItem, ContentItem, AutoCleanItem } from './types'
+import type { ActionPreview, CharacterSummary, CharacterView, HiggsfieldAccount, JobView, Me, QuoteView, RulesView, SceneFields, ScenesData, SettingsView, StudioAction, Usage, VideoPrice, BrollClip, ContentData, ContentKind, LibraryData, PostStep, WorkerStatus, CloneOptions, CloneResult, CloneSource, CloneStill, CutView, SoundItem, EditorStyle, ImportPreview, VoiceLine, ProductSummary, ProductView, ProductClaims, KitGroup, SocialAccount, SentView, RecreateBatchView, GateCheckView, StorageInfo, TrashRef, TrashItem, ContentItem, AutoCleanItem, BrandLayer, TemplateReport } from './types'
 import { sheetRefOf, typeOf, uploadFiles } from './files'
 
 // Thin client for /api/v1. Every write sends the CSRF header the server
@@ -58,10 +58,15 @@ export const api = {
 
   // A character file and its sheet images. Images go straight to storage;
   // names like "REF 00" are normalized; the face and skin checks run after.
-  importCharacter: async (markdown: string, images: File[], onProgress?: (done: number, total: number) => void) => {
+  // `characterId` updates that character instead of making a new one; its
+  // posts, takes and sheet stay (long run part 3).
+  importCharacter: async (markdown: string, images: File[], onProgress?: (done: number, total: number) => void, characterId?: string) => {
     const uploads = await uploadFiles(images.filter(f => sheetRefOf(f.name)), onProgress)
-    return request<{ characterId: string; importedShots: string[]; checkShots: string[]; checkJobId: string | null; warnings: string[] }>('POST', '/characters/import', { markdown, uploads })
+    return request<{ characterId: string; updated: boolean; importedShots: string[]; unchangedShots: string[]; checkShots: string[]; checkJobId: string | null; warnings: string[] }>('POST', '/characters/import', { markdown, uploads, ...(characterId ? { characterId } : {}) })
   },
+  // The file checked against character template v1.6 (free).
+  importCheck: (markdown: string) => request<{ report: TemplateReport; name: string; match: { id: string; name: string } | null }>('POST', '/characters/import/check', { markdown }),
+  updateBrand: (id: string, patch: Partial<BrandLayer>) => request<{ brand: BrandLayer }>('PUT', `/characters/${id}/brand`, patch),
   exportUrl: (id: string) => `/api/v1/characters/${id}/export`,
   applyFile: async (id: string, files: File[], onProgress?: (done: number, total: number) => void) => {
     const md = files.find(f => f.name.toLowerCase().endsWith('.md'))

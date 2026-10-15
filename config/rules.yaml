@@ -398,6 +398,23 @@ rules:
     title: Makeup by setting
     check: { type: behavior }
     message: Out in public, soft everyday makeup (light coverage that still shows skin texture, groomed brows, mascara, warm bronzer, a matte nude lip, the same lip shape, nose and jaw as the references). At home, the gym, an early beach or waking up, no makeup. Soft glam stays for nights out and events. Men get groomed brows and beard, never makeup words. A makeup choice or makeup words of your own win.
+  - id: brand-winning-stack
+    bucket: default
+    area: scene
+    spec: "9"
+    # Character template v1.6 (owner, 2026-10-15): the winning stack from
+    # the last monthly growth review, carried by every post for 30 days.
+    title: Every post carries the winning stack
+    check: { type: behavior }
+    message: The winning stack from the character file (the Brand card on the character page) goes with the prompt writer, the planner and Punch it up, so every post carries it where it fits the shot and inside the fixed rules.
+  - id: brand-check
+    bucket: default
+    area: scene
+    spec: "9"
+    # Character template v1.6: every concept maps to the brand statement.
+    title: Check concepts against the brand statement
+    check: { type: behavior }
+    message: Punch it up checks each of its three moments against the brand statement; one that does not fit says "Off brand" and why. Advice only; any moment can still be used.
   - id: wording-risky
     bucket: default
     area: scene

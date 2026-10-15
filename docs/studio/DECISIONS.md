@@ -2316,3 +2316,61 @@ UX-PLAN.md section 23.
   planner); Playwright desktop and phone (`e2e/editor/scenerules.spec.ts`).
 - **No paid runs.** Whether the soft everyday line and the styling line
   hold on a real still is in the paid test queue.
+
+### G52. Long run, part 3: character files from the Claude project (owner away, 2026-10-15)
+
+Character template v1.6 (`docs/character-template.md`) is how the owner
+builds a character in the Claude project. UX-PLAN.md section 24.
+
+- **Import first.** The Characters page leads with "Import a character
+  file" (primary); "Start from a concept" stays as the second choice, in
+  the header and in the empty state.
+- **Template check (free, `server/core/templateCheck.ts`).** Needed: every
+  UNIVERSAL section (Realism principle, Models, Scene rules, Video rules,
+  Recipe: candid, Recipe: recreate), the age 21 or older (a fixed rule, so
+  it is checked here too), one distinguishing mark, REF-00 to REF-11 each
+  labeled in the Reference sheet, and the Element ID when an Element is
+  named. Calls: sections are matched by title words, so Callie's older
+  titles ("Scene rules learned", "Proven recipe: recreate from a real
+  clip") count; a jewelry piece listed with the marks does not count as a
+  mark (template v1.6: no accessory is permanent); optional sections that
+  are missing and sections still holding [brackets] are listed, never
+  blocking. With a needed item missing the button reads "Import anyway"
+  (rule one: a warning at most, never a block).
+- **Callie's current file** (`fixtures/callie/character-callie.md`) passes
+  every needed item; the brand layer and the build-path sections (Brand,
+  Why people watch, Voice card, Build notes, Stress test, Identity fixes,
+  Saved identity, Competitors, Accounts, Monetization, Winning stack,
+  Growth log) are listed as optional and missing. A full v1.6 test file
+  (`fixtures/template/character-wren.md`, a made-up character) passes with
+  nothing missing.
+- **Importer, v1.6 fields:** the Saved identity section (Element and its
+  ID), "Grooming default" and "Dressed-up version" (makeup default, glam
+  and when), both "Voice" and "Voice card" sections, and comma-separated
+  hair options. A grooming default of "none" means no makeup in public too.
+- **Update, not a copy.** When a character of the same name exists, the
+  dialog chooses "Update <name>" by default ("Import as a new character" is
+  the other choice). A re-import replaces the character's words; posts,
+  takes, stills, clips and the sheet live in their own tables and stay.
+  Calls: the combo log is merged (the Studio's entries are kept, newest 10);
+  every saved identity is kept even when the file leaves it out (an
+  Element takes a new build to replace); the voice card and REALISM block
+  are kept when the file has none; a sheet image identical to the approved
+  one (same checksum) is skipped, so nothing built on it goes stale.
+- **Brand layer.** Read from and written back into the file's own sections
+  (Brand, Why people watch, Accounts, Winning stack, Growth log), so the
+  file stays the source of truth: the Brand card on the character page's
+  Character file step edits each field in place and keeps every other line
+  as written; a missing section is added before Disclosure and the combo
+  log, in the template's words. No new table.
+- **Writers.** Default rule `brand-winning-stack`: the winning stack goes
+  with the prompt writer (still and video), the planner and Punch it up,
+  "where it fits this shot and inside the fixed rules". Default rule
+  `brand-check`: Punch it up checks each moment against the brand statement
+  (two new fields in its answer) and the Idea step marks one that does not
+  fit "Off brand" with the reason. Advice only; both are switchable.
+- **Tests:** unit (the check on Callie's file, the v1.6 file and the blank
+  template; brand read and write), pipeline (re-import keeps posts, takes,
+  refs, the combo log and identities; brand edits come back on export; the
+  writers carry the stack and the check, and drop them when switched off),
+  Playwright desktop and phone (`e2e/editor/charfile.spec.ts`).

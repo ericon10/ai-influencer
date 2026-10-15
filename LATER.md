@@ -152,6 +152,13 @@ first.
 - **No makeup in a gym scene:** one gym scene, to check "No makeup, bare
   skin" reads as bare and not as a sheet look. About 1 still.
 
+- **Winning stack in a real prompt (part 3):** one Write and generate for a
+  character with a winning stack, to see the writer carry it without
+  bending the shot. About 1 Claude call and 1 still.
+- **Brand check on real moments (part 3):** one Punch it up on a rough idea
+  that is off brand, to see the note come back. About 1 Claude call (under
+  a cent).
+
 ### Small ideas (not built)
 
 - Hair rotation could prefer stylings that fit the moment (damp and
@@ -159,3 +166,7 @@ first.
   bank order, never one of the last 5.
 - A "Makeup: by setting" chip in the Idea step's chips row, so the setting
   choice shows without opening More control.
+- The template check could offer "Add the missing sections" with the
+  template's blank text, so the Brand card has every field to fill.
+- A monthly reminder on Posts home for the growth review (template step 13),
+  with the top 5 reels by follows once TikTok stats come in.

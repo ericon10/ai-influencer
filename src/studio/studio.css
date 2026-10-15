@@ -1301,3 +1301,12 @@ button.st-chip:hover { color: var(--st-text); border-color: var(--st-text-3); }
 .st-safer .st-price-error { max-width: 100%; }
 /* Words kept while No caption is on (owner, 2026-10-15). */
 .st-textarea.st-dim { opacity: 0.55; }
+
+/* Character template check and the growth log (long run part 3). */
+.st-checklist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.st-checklist li { display: flex; gap: 8px; align-items: flex-start; font-size: 13px; line-height: 1.4; }
+.st-checklist li > svg { flex: none; margin-top: 2px; }
+.st-checklist li.ok > svg { color: var(--st-ok); }
+.st-checklist li.missing > svg { color: var(--st-warn); }
+.st-growth { font-size: 13px; line-height: 1.45; padding: 8px 10px; border: 1px solid var(--st-line); border-radius: 8px; background: var(--st-surface-2); overflow-wrap: anywhere; }
+.st-idea-brand { color: var(--st-warn); }

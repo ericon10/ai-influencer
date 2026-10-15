@@ -536,6 +536,15 @@ Decisions: `DECISIONS.md` G37 and G38. UX: `UX-PLAN.md` section 15.
 - [x] Makeup by setting: bare at home, the gym, an early beach, waking up; soft everyday makeup in public; men groomed, no makeup words
 - [x] Rules hair-rotation and makeup-by-setting (defaults); guide and help; unit, pipeline and Playwright tests
 
+### Long run, part 3: character files from the Claude project (G52, UX-PLAN.md section 24)
+
+- [x] Import a character file first on the Characters page; Start from a concept second
+- [x] Free template v1.6 check in the Import dialog and on the character file (needed items, optional sections, [brackets]); never blocks
+- [x] Update the character of the same name by default: posts, takes, sheet kept; combo log merged; identities kept; identical images skipped
+- [x] Brand card on the character page, written back into the file's sections
+- [x] Winning stack in the prompt writer, planner and Punch it up; brand check in Punch it up (defaults)
+- [x] Tested with Callie's current file and a full v1.6 file; unit, pipeline and Playwright tests
+
 ## Roadmap after Phase 4 (owner, 2026-10-13; not started)
 
 SPEC 13.1, R1 to R7: Clone Video (first after Phase 3), Inspo board
