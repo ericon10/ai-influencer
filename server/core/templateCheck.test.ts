@@ -23,7 +23,9 @@ describe('the template check', () => {
     expect(r.needed.find(n => n.id === 'scene-rules')!.detail).toBe('Found: "Scene rules learned".')
     expect(r.needed.find(n => n.id === 'mark')!.detail).toMatch(/mole, LEFT brow/)
     expect(r.needed.find(n => n.id === 'element')!.detail).toMatch(/^705d2b7d-596d-468e-bd2c-b171799cd7a6/)
-    expect(r.missingOptional).toEqual(['Brand', 'Why people watch', 'Voice card', 'Build notes', 'Stress test', 'Identity fixes', 'Saved identity', 'Competitors', 'Accounts', 'Monetization', 'Winning stack', 'Growth log'])
+    expect(r.missingOptional).toEqual(['Brand', 'Why people watch', 'Voice card', 'Build notes', 'Stress test', 'Identity fixes', 'Competitors', 'Accounts', 'Monetization', 'Winning stack', 'Growth log'])
+    // Her saved identity is a line in Models, so it is not listed as missing.
+    expect(r.missingOptional).not.toContain('Saved identity')
     expect(r.brackets).toEqual([])
   })
 

@@ -141,7 +141,10 @@ export function checkTemplate(md: string): TemplateReport {
   if (el.named) {
     needed.push({ id: 'element', label: 'Element ID', ok: !!el.id, detail: el.id ? `${el.id} (in ${el.where}).` : `An Element is named in ${el.where} without its ID. Add the ID from Higgsfield.` })
   }
-  const missingOptional = OPTIONAL.filter(o => !has(sections, o.re)).map(o => o.label)
+  // The saved identity also counts as a line ("- Saved identity: ...") or
+  // the identity the Studio already read from the file.
+  const savedLine = sections.some(s => /^\s*[-*]?\s*\**saved identity\**\s*:/im.test(s.body)) || (parsed?.character.identities.length ?? 0) > 0
+  const missingOptional = OPTIONAL.filter(o => !has(sections, o.re) && !(o.label === 'Saved identity' && savedLine)).map(o => o.label)
   if (!has(sections, /^card\b/)) missingOptional.unshift('Card')
   const brackets = sections.filter(s => BRACKET.test(s.body) || BRACKET.test(s.title)).map(s => s.title)
   return { version: TEMPLATE_VERSION, needed, missingOptional, brackets, complete: needed.every(n => n.ok) }

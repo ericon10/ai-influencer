@@ -2260,5 +2260,81 @@
         "label": "Hair styling, rotated from the bank"
       }
     ]
+  },
+  "import-check": {
+    "w": 1030,
+    "h": 1990,
+    "spots": [
+      {
+        "n": 1,
+        "x": 30.7,
+        "y": 43.4,
+        "w": 34.3,
+        "h": 2,
+        "label": "The free check against character template v1.6"
+      },
+      {
+        "n": 2,
+        "x": 3.8,
+        "y": 72.1,
+        "w": 92.5,
+        "h": 5,
+        "label": "Optional sections not in the file; never a block"
+      },
+      {
+        "n": 3,
+        "x": 3.8,
+        "y": 78.6,
+        "w": 92.5,
+        "h": 14.4,
+        "label": "Update Callie keeps her posts, takes and sheet"
+      },
+      {
+        "n": 4,
+        "x": 75.1,
+        "y": 94.5,
+        "w": 21.2,
+        "h": 3.5,
+        "label": "Import, or update the character of the same name"
+      }
+    ]
+  },
+  "brand-card": {
+    "w": 1030,
+    "h": 1668,
+    "spots": [
+      {
+        "n": 1,
+        "x": 2.8,
+        "y": 9.7,
+        "w": 94.4,
+        "h": 7.5,
+        "label": "The brand statement: Punch it up checks moments against it"
+      },
+      {
+        "n": 2,
+        "x": 2.8,
+        "y": 33.6,
+        "w": 94.4,
+        "h": 7.5,
+        "label": "Series, running bits and cast"
+      },
+      {
+        "n": 3,
+        "x": 2.8,
+        "y": 71.4,
+        "w": 94.4,
+        "h": 10.9,
+        "label": "The winning stack: the writers carry it into every scene"
+      },
+      {
+        "n": 4,
+        "x": 2.8,
+        "y": 83.7,
+        "w": 94.4,
+        "h": 14.6,
+        "label": "The growth log, newest first"
+      }
+    ]
   }
 }
