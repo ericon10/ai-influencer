@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { median, takeGateFor, takeGateLine } from './takeGate.js'
+import { driftSpans, median, takeGateFor, takeGateLine } from './takeGate.js'
 
 const g = { face_min: 0.45, margin: 0.12, source_max: 0.45 }
 
@@ -43,5 +43,13 @@ describe('the video rule for a take', () => {
     expect(median([3, 1, 2])).toBe(2)
     expect(median([4, 1, 2, 3])).toBe(2.5)
     expect(median([])).toBeNull()
+  })
+
+  it('marks drift under the video rule: the kitchen take drifts once, at 3.5 s (0.41)', () => {
+    expect(driftSpans(kitchen, 0.45, 0.5, 6)).toEqual([{ start: 3.5, end: 4 }])
+    // The old bar (0.363) marked none: the strip was green where the rule was not.
+    expect(driftSpans(kitchen, 0.363, 0.5, 6)).toEqual([])
+    // A missing face is drift too, and runs join.
+    expect(driftSpans([{ t: 0, face: null, likeness: null }, { t: 0.5, face: 0.3, likeness: 0.1 }, { t: 1, face: 0.6, likeness: 0.1 }], 0.45, 0.5, 2)).toEqual([{ start: 0, end: 1 }])
   })
 })

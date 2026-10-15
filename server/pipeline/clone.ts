@@ -23,7 +23,7 @@ import { muxSound } from '../media/edit.js'
 import { ffmpeg, probeFile, withTempDir } from '../media/ffmpeg.js'
 import { compareTexture } from '../qa/texture.js'
 import { sceneOutsideFace, SCENE_MIN } from '../qa/sceneMatch.js'
-import { takeGateFor, type TakeGate, type TakeSample } from '../core/takeGate.js'
+import { driftSpans, takeGateFor, type TakeGate, type TakeSample } from '../core/takeGate.js'
 import { cosineSimilarity } from '../qa/faces.js'
 import type { GenRequest } from '../providers/types.js'
 import { readBilling } from '../providers/billing.js'
@@ -1195,14 +1195,18 @@ export interface CloneStillView {
   note: string | null
   // The gates before the video (fixed): whether this still can start it, and why not.
   gate: StillGate
+  // The run it came from (one click, one quote) and, for a failure, what kind.
+  runId: string
+  failure: FailureKind | null
 }
 
 export async function cloneStills(deps: Deps, ctx: Ctx, contentId: string): Promise<CloneStillView[]> {
   const post = await getContent(deps, ctx, contentId)
   const source = cloneOf(post)
-  const jobRows = await deps.db.select({ id: jobs.id, provider: jobs.provider }).from(jobs).where(and(eq(jobs.accountId, ctx.accountId), or(like(jobs.purpose, `clone_still:${contentId}:%`), like(jobs.purpose, `clone_face:${contentId}:%`))))
+  const jobRows = await deps.db.select({ id: jobs.id, provider: jobs.provider, quoteId: jobs.quoteId, status: jobs.status, error: jobs.error }).from(jobs).where(and(eq(jobs.accountId, ctx.accountId), or(like(jobs.purpose, `clone_still:${contentId}:%`), like(jobs.purpose, `clone_face:${contentId}:%`))))
   if (!jobRows.length) return []
   const mock = new Set(jobRows.filter(j => j.provider === 'mock').map(j => j.id))
+  const byJob = new Map(jobRows.map(j => [j.id, j]))
   const g = await recreateGate(deps, ctx)
   const rows = await deps.db.select().from(candidates)
     .where(and(eq(candidates.accountId, ctx.accountId), eq(candidates.op, 'clone_still'), inArray(candidates.jobId, jobRows.map(j => j.id))))
@@ -1214,15 +1218,35 @@ export async function cloneStills(deps: Deps, ctx: Ctx, contentId: string): Prom
     // A face pass skipped because the still was already clear is news, not a failure.
     const skipped = c.status === 'failed' && (c.rejectNote ?? '').startsWith(FACE_SKIPPED)
     const unchecked = meta.pass === 'face' && !demo && c.status !== 'failed' && meta.sceneChecked === undefined
+    const job = c.jobId ? byJob.get(c.jobId) : undefined
+    const error = skipped ? null : c.status === 'failed' || c.status === 'qa_failed' ? c.rejectNote || 'The still failed.' : null
     return {
+      // One click is one run (its quote); a failure says what kind it was,
+      // for the gray line of earlier failures (owner, 2026-10-15).
+      runId: job?.quoteId ?? c.jobId ?? c.id,
+      failure: c.status === 'failed' && !skipped ? failureKind(job?.status ?? null, `${c.rejectNote ?? ''} ${errorText(job?.error)}`) : null,
       id: c.id, characterId: c.characterId, characterName: names.get(c.characterId) ?? '', assetId: c.assetId, status: skipped ? 'skipped' : c.status, kept: source?.stills[c.characterId] === c.id,
-      error: skipped ? null : c.status === 'failed' || c.status === 'qa_failed' ? c.rejectNote || 'The still failed.' : null,
+      error,
       note: skipped ? c.rejectNote : null,
       findings: ((c.qaReport as QaReport | null)?.findings ?? []).map(f => ({ code: f.code, severity: f.severity, message: f.message })), createdAt: c.createdAt.toISOString(),
       parentId: c.parentId, pass: meta.pass ?? 'still', faceScore: meta.faceScore ?? null, sourceScore: meta.sourceScore ?? null,
       gate: gateFor(g, { status: c.status, faceScore: meta.faceScore ?? null, sourceScore: meta.sourceScore ?? null, demo, blocked: c.rejectNote || null, unchecked }),
     }
   })
+}
+
+// What kind of failure a still was: the provider's filter blocked it, it
+// never ran (a face pass with no usable still), or it failed. Failed and
+// canceled runs are never charged.
+export type FailureKind = 'blocked' | 'not_run' | 'failed'
+export function failureKind(jobStatus: string | null, text: string): FailureKind {
+  if (jobStatus === 'canceled') return 'not_run'
+  return /content filter|filter blocked|blocked by|moderation|safety system|not allowed by the provider/i.test(text) ? 'blocked' : 'failed'
+}
+function errorText(e: unknown): string {
+  if (!e) return ''
+  if (typeof e === 'string') return e
+  return typeof (e as { message?: unknown }).message === 'string' ? (e as { message: string }).message : ''
 }
 
 // "You pick": the best still for the run by the free checks: the closest
@@ -1395,7 +1419,11 @@ export async function postClones(deps: Deps, ctx: Ctx, contentId: string): Promi
     const asset = c.assetId ? await getAsset(deps, ctx, c.assetId).catch(() => null) : null
     const report = c.qaReport as QaReport | null
     const meta = (c.meta ?? {}) as { review?: CloneReview; gate?: TakeGate | null; decision?: { kind: 'kept' | 'tried_again' } | null }
-    const review = meta.review ?? null
+    // The strip marks drift under the video rule's face number (owner,
+    // 2026-10-15), reviews made before it included.
+    const review = meta.review && meta.review.samples.some(x => x.face != null)
+      ? { ...meta.review, faceMin: videoGate.face_min, drift: driftSpans(meta.review.samples, videoGate.face_min, meta.review.step, meta.review.duration) }
+      : meta.review ?? null
     // Read again with today's numbers: the whole take once reviewed.
     const demo = !!c.jobId && mockRuns.has(c.jobId)
     // (Only when the review found faces; with face matching off, the gate

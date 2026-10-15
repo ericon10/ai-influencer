@@ -258,6 +258,9 @@ const memeSpec = z.object({
   // stack: its presets with relative places (editor phase C), which "Make
   // another like this" carries to the next post.
   editor: z.object({ projectAssetId: id.nullable().default(null), savedAt: z.string().max(40).nullable().default(null), stack: stackSchema.nullable().default(null) }).nullable().default(null),
+  // Earlier failures cleared from the gray line (owner, 2026-10-15): the
+  // ones made before this time stay out of sight; the records stay.
+  failuresClearedAt: z.string().max(40).nullable().default(null),
 })
 const slideshowSpec = z.object({
   stillIds: z.array(id).max(20).default([]),

@@ -786,3 +786,40 @@ the owner's call. No new page, step or panel.
 **Clicks, link to finished video (unchanged when the take passes):** open
 the link (0), Make 4 stills + face pass (1), Make the video (1), Use this
 take (1): **3**. When the take misses the rule: **+1** (Keep this take).
+
+## 19. Usability fixes from the editor audit (owner, 2026-10-15)
+
+The owner picked these from the audit's usability notes. No new page or
+step; the stills grid, the run rows, the Recreate review and the editor
+behave differently.
+
+| Piece | Where | How it works | Clicks |
+|---|---|---|---|
+| Earlier failures, one gray line | The Recreate stills grid | Failed and not-run stills from earlier runs leave the grid and become one gray line under it, counted by reason: "4 blocked by the filter, refunded; 2 face passes not run. Nothing charged." **Show** opens them (with What was sent); **Clear** removes the line for good on this post (the records stay, in Activity). Only the run you just started (the newest one, while it is fresh) shows its failures red | 0 (1 to Show, 1 to Clear) |
+| The same in the run rows | Every step's run rows | Failures other than the run you just started fold into one gray line with the same counts, **Show** and **Clear** (Clear is remembered in this browser) | 0 |
+| Face strip | Recreate review | Drift is marked under the video rule's face number (0.45, or the number you approved in the gate check), so the strip and the rule agree. The legend says "face under 0.45" | 0 |
+| Caption handles | Editor preview | Small round handles just outside the caption (the hit area stays finger-sized); the Locked button is gone for text, and a caption always grows in proportion | 1 drag |
+| Caption size | Editor preview | A caption cannot be made taller than the frame: the handle stops there | 0 |
+| Freeze and speed ramp | Editor timeline, the Presets track | Each one placed on a shot gets a small marker on the Presets track at its time ("Freeze", "Speed ramp"). Clicking it selects the shot and opens its Speed panel (on a phone, the Edit tab) | 1 |
+| Bigger preview | Editor | The timeline starts shorter, so the frame is about twice as tall on a laptop; the timeline's edge still drags | 0 |
+| Click away to deselect | Editor preview | A click on the empty space around the frame (or on the frame where nothing is) clears the selection | 1 |
+| Named tracks | Editor timeline | The Studio names the tracks it lays out: Shots, B-roll, Voice, Music, Ambience, Captions, Presets | 0 |
+| Speed on the clip | Editor timeline | A shot that is not at normal speed shows its speed on the block ("2x", "0.5x", "Ramp") | 0 |
+
+## 20. Catalog wording in every prompt (owner, 2026-10-15)
+
+Outfits are said the way a shop catalog says them, and nothing in a prompt
+describes her body or makes her pose. It applies to every prompt the Studio
+writes: scene stills (template and the Claude writer), Recreate stills, the
+face pass and the video prompts. The wording changes; what she wears never
+does. No new page or step; the warnings and the refusal help appear where
+prices and failures already show.
+
+| Piece | Where | How it works | Clicks |
+|---|---|---|---|
+| Catalog outfit | Every outfit line the Studio writes (the planner, the writer, the outfit read from a clip) | Garment type, color and fabric, plus a style word when it is clear: "dark green ribbed tank top with thin straps, going-out look". Garment names stay (tank, cami, halter, slip dress, bodysuit). A bare "top" is never sent: the read asks for the garment | 0 |
+| No fit or body words | Every prompt | Never sent: fitted, tight, low-cut, sheer, toned, curvy, hips, waist, legs (and their close cousins: skin-tight, form-fitting, plunging, see-through, figure-hugging). The refs carry her build | 0 |
+| Underwear-sounding names | Every prompt | Swapped for the everyday garment: "boy shorts" to "bike shorts", "sports bra" to "athletic crop top", "bralette" to "crop top", "bra top" to "crop top". The list is data (`config/wording.yaml`) | 0 |
+| A moment, not a pose | The writer, the planner, the templates | What she is doing ("refilling her water bottle"), never "posing in". Templates say "her position" where they meant the pose | 0 |
+| Your words stay yours | Anything you type (idea, outfit, a pasted prompt) | Sent as typed. When a word is likely to be blocked, the price shows a warning under it: "May be blocked by the provider's filter: tight, low-cut. Your words go as typed." | 0 |
+| A refusal | The failed run's row, the failed still's tile | "Likely trigger words: tight, boy shorts" (read from what was sent), and **Retry with safer wording**: the same request with only those words reworded by code (no Claude call, the rewording is free), priced like the run that was blocked and refunded. What was sent shows both | 1 |

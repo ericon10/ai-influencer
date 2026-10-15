@@ -1,5 +1,5 @@
 import { expect, test, type Page, type TestInfo } from '@playwright/test'
-import { captionBlock, clipBlocks, deselect, duration, exportFrame, exportWithDone, framePoint, imageDiff, openEditor, presetCard, previewPng, ruler, seedTimerPost, seek, snap, textBox, timeline } from './helpers'
+import { captionBlock, clipBlocks, countColor, deselect, duration, exportFrame, exportWithDone, frame, framePoint, imageDiff, openEditor, presetCard, previewPng, ruler, seedTimerPost, seek, snap, textBox, timeline } from './helpers'
 
 // The render check, feature by feature (editor QA, 2026-10-15): each edit is
 // made by hand, exported with Done through the worker, and the MP4 compared
@@ -9,13 +9,23 @@ import { captionBlock, clipBlocks, deselect, duration, exportFrame, exportWithDo
 async function previews(page: Page, name: string, times: number[]): Promise<string[]> {
   await deselect(page)
   const out: string[] = []
+  const f = await frame(page)
+  const black = async () => (await countColor(page, f, [0, 0, 0], 12)) > f.width * f.height * 0.5
   for (const t of times) {
-    await seek(page, t)
-    // One frame on and back: the playhead sits exactly on a frame, as every
-    // frame of the export does (the preview draws any moment in between).
-    await page.keyboard.press('ArrowRight')
-    await page.keyboard.press('ArrowLeft')
-    await page.waitForTimeout(1200)
+    // Headless Chromium decodes in software and, late in a long run, a frame
+    // can stay undrawn until the playhead moves again: scrub away and back,
+    // as a person would, up to three times (the clip is never black).
+    for (let attempt = 0; attempt < 3; attempt++) {
+      if (attempt) { await seek(page, Math.max(0, t - 0.4)); await page.waitForTimeout(500) }
+      await seek(page, t)
+      // One frame on and back: the playhead sits exactly on a frame, as every
+      // frame of the export does (the preview draws any moment in between).
+      await page.keyboard.press('ArrowRight')
+      await page.keyboard.press('ArrowLeft')
+      for (let i = 0; i < 10 && (await black()); i++) await page.waitForTimeout(300)
+      if (!(await black())) break
+    }
+    await page.waitForTimeout(400)
     out.push(await previewPng(page, `${name}-preview-${t}`))
   }
   return out

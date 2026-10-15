@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { AlertTriangle, CheckCircle2, Circle, Loader2, X, XCircle } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, Circle, Info, Loader2, X, XCircle } from 'lucide-react'
+import { clearedRuns, clearRuns, failureLine, jobFailureKind } from './failures'
 import { useLiveJobs } from './hooks'
 import { useToast } from './ui'
 import { PriceButton } from './PriceButton'
@@ -48,8 +49,17 @@ export function RunStatus({ ids = [], match, pending = false, className = '' }: 
   const toast = useToast()
   const box = useRef<HTMLDivElement | null>(null)
   const [dismissed, setDismissed] = useState<string[]>([])
+  const [cleared, setCleared] = useState(() => clearedRuns())
+  const [showOld, setShowOld] = useState(false)
   const all = live.data?.jobs ?? []
   const list = all.filter(j => (ids.includes(j.id) || match?.(j)) && !dismissed.includes(j.id)).reverse()
+  // Earlier failures in one gray line (owner, 2026-10-15): only the run just
+  // started from here, or the newest run, can show its failures red.
+  const newestAt = Math.max(0, ...list.map(j => Date.parse(j.createdAt)))
+  const fresh = (j: JobView) => ids.includes(j.id) || newestAt - Date.parse(j.createdAt) < 5000
+  const failedOld = (j: JobView) => (j.phase === 'failed' || j.phase === 'canceled') && !fresh(j)
+  const old = list.filter(j => failedOld(j) && !cleared.has(j.id))
+  const current = list.filter(j => !failedOld(j))
   const missing = ids.filter(id => !all.some(j => j.id === id))
   const seen = useRef(new Map<string, string>())
 
@@ -68,16 +78,25 @@ export function RunStatus({ ids = [], match, pending = false, className = '' }: 
     }
   }) // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (!list.length && !missing.length && !pending) return null
+  if (!current.length && !old.length && !missing.length && !pending) return null
   // Many runs of one kind (a batch, several stills) read as one line.
   const groups = new Map<string, JobView[]>()
-  for (const j of list) groups.set(j.purpose, [...(groups.get(j.purpose) ?? []), j])
+  for (const j of current) groups.set(j.purpose, [...(groups.get(j.purpose) ?? []), j])
   return (
     <div className={`st-runs ${className}`} ref={box} aria-live="polite">
       {(pending || missing.length > 0) && !list.length && <div className="st-run"><Loader2 size={15} className="st-spin" /><span className="st-run-text"><b>Submitting...</b></span></div>}
       {[...groups.values()].map(g => (g.length > 3
         ? <RunGroup key={g[0]!.purpose} jobs={g} onDismiss={() => setDismissed(d => [...d, ...g.map(x => x.id)])} />
         : g.map(j => <RunRow key={j.id} j={j} onDismiss={() => setDismissed(d => [...d, j.id])} />)))}
+      {old.length > 0 && (
+        <FailureLine
+          text={`Earlier: ${failureLine(old.map(j => ({ kind: jobFailureKind(j), charged: j.charged })))}`}
+          open={showOld}
+          onToggle={() => setShowOld(v => !v)}
+          onClear={() => { clearRuns(old.map(j => j.id)); setCleared(clearedRuns()); setShowOld(false) }}
+        />
+      )}
+      {showOld && old.map(j => <RunRow key={j.id} j={j} />)}
     </div>
   )
 }
@@ -125,6 +144,18 @@ export function RunRow({ j, onDismiss, showLabel = true }: { j: JobView; onDismi
         {timed && <span className="st-muted"> · {clock(elapsed)}{showUsual ? ` (usually ${usual(j.typicalSec!)})` : ''}</span>}
         {showUsual && elapsed > j.typicalSec! * 2.5 && <span className="st-muted"> Slower than usual; it keeps going.</span>}
       </span>
+    </div>
+  )
+}
+
+// Earlier failures, one gray line: Show opens them, Clear puts them away.
+export function FailureLine({ text, open, onToggle, onClear }: { text: string; open: boolean; onToggle: () => void; onClear: () => void }) {
+  return (
+    <div className="st-failline" role="status" data-field="failure-line">
+      <Info size={14} />
+      <span className="grow">{text}</span>
+      <button type="button" className="st-btn xs ghost" onClick={onToggle} aria-expanded={open}>{open ? 'Hide them' : 'Show'}</button>
+      <button type="button" className="st-btn xs ghost" onClick={onClear}>Clear</button>
     </div>
   )
 }

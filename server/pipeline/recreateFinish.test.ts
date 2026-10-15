@@ -3,13 +3,13 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { and, eq, like } from 'drizzle-orm'
+import { and, eq, inArray, like } from 'drizzle-orm'
 import { createHarness, drain, type Harness } from '../testing/harness.js'
 import { registerPipelineHooks } from './hooks.js'
 import { estimateAction, runAction, type StudioAction } from './actions.js'
 import { importCharacter } from './files.js'
 import { createContent, getContent, type MemeSpec } from './content.js'
-import { addCloneSource, buildCloneFace, buildCloneStill, checkCloneCap, cloneOptions, recreateGate, saveRecreateStillModel, setRecreateGate, cloneStills, gateFor, postClones, setCloneChoices } from './clone.js'
+import { addCloneSource, buildCloneFace, buildCloneStill, checkCloneCap, cloneOptions, failureKind, recreateGate, saveRecreateStillModel, setRecreateGate, cloneStills, gateFor, postClones, setCloneChoices } from './clone.js'
 import { addRecreateRow, recreateBatch, recreateFor, setRecreateRows, startRecreate, useCloneTake } from './recreate.js'
 import { createScene } from './scenes.js'
 import { candidates, jobs } from '../db/schema.js'
@@ -243,7 +243,8 @@ describe('step 2, the stills and the gates', () => {
     expect(req).toMatchObject({ sourceVideo: { assetId: c.assetId }, resolution: '720p', aspect: '9:16', audio: false, modelRef: 'higgsfield/genjutsu-motion-control' })
     const [take] = await postClones(h.deps, h.ctx, postId)
     expect(take!.sourceAssetId).toBe(c.assetId)
-    expect(take!.review).toMatchObject({ step: 0.5, faceMin: 0.363 })
+    // Drift is marked under the video rule's face number (owner, 2026-10-15).
+    expect(take!.review).toMatchObject({ step: 0.5, faceMin: 0.45 })
     expect(take!.review!.samples.length).toBeGreaterThanOrEqual(10)
     expect(Array.isArray(take!.review!.cuts) && Array.isArray(take!.review!.text)).toBe(true)
     expect(take!.review!.notes.join(' ')).toMatch(/Demo mode/)
@@ -544,5 +545,36 @@ describe('the text check', () => {
     expect(classifyText({ text: 'when he says he is fine', confidence: 85 })).toEqual({ kind: 'caption', text: 'when he says he is fine' })
     expect(classifyText({ text: 'x.', confidence: 90 })).toBeNull()
     expect(classifyText({ text: 'blurry words', confidence: 30 })).toBeNull()
+  })
+})
+
+describe('earlier failures fold into one gray line (owner, 2026-10-15)', () => {
+  it('a still blocked by the filter and a face pass that never ran say so, with the run they came from', async () => {
+    const all = await cloneStills(h.deps, h.ctx, postId)
+    const [a, b] = all.filter(x => x.assetId)
+    expect(a && b).toBeTruthy()
+    const rows = await h.deps.db.select().from(candidates).where(inArray(candidates.id, [a!.id, b!.id]))
+    const jobRows = await h.deps.db.select().from(jobs).where(inArray(jobs.id, rows.map(r => r.jobId!)))
+    try {
+      await h.deps.db.update(candidates).set({ status: 'failed', assetId: null, rejectNote: 'The provider content filter blocked this result.' }).where(eq(candidates.id, a!.id))
+      await h.deps.db.update(candidates).set({ status: 'failed', assetId: null, rejectNote: 'No still came out usable, so the face pass did not run. Nothing was charged for it.' }).where(eq(candidates.id, b!.id))
+      await h.deps.db.update(jobs).set({ status: 'canceled' }).where(eq(jobs.id, rows.find(r => r.id === b!.id)!.jobId!))
+      const view = await cloneStills(h.deps, h.ctx, postId)
+      const va = view.find(x => x.id === a!.id)!, vb = view.find(x => x.id === b!.id)!
+      expect(va).toMatchObject({ failure: 'blocked', runId: jobRows.find(j => j.id === rows.find(r => r.id === a!.id)!.jobId)!.quoteId })
+      expect(vb.failure).toBe('not_run')
+      // A good still is no failure.
+      expect(view.filter(x => x.assetId).every(x => x.failure === null)).toBe(true)
+    } finally {
+      for (const r of rows) await h.deps.db.update(candidates).set({ status: r.status, assetId: r.assetId, rejectNote: r.rejectNote }).where(eq(candidates.id, r.id))
+      for (const j of jobRows) await h.deps.db.update(jobs).set({ status: j.status }).where(eq(jobs.id, j.id))
+    }
+  })
+
+  it('tells the kinds apart from the job and the message', () => {
+    expect(failureKind('failed', 'Higgsfield moderation blocked this result (refunded).')).toBe('blocked')
+    expect(failureKind('failed', 'The provider content filter blocked this result.')).toBe('blocked')
+    expect(failureKind('canceled', 'No still came out usable')).toBe('not_run')
+    expect(failureKind('failed', 'The provider timed out.')).toBe('failed')
   })
 })

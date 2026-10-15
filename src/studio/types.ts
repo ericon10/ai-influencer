@@ -367,6 +367,10 @@ export interface CloneStill {
   note: string | null
   // The gates before the video (fixed): whether it can start it, and why not.
   gate: StillGate
+  // The run it came from (one click) and, for a failure, what kind: blocked
+  // by the provider's filter, never run, or failed. None of them is charged.
+  runId: string
+  failure: 'blocked' | 'not_run' | 'failed' | null
 }
 export interface CloneModel {
   ref: string; label: string; mode: CloneMode; resolution: string | null; background: Array<'video' | 'image'>; minSec: number; maxSec: number

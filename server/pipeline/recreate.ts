@@ -12,7 +12,7 @@ import { classifyText, createOcr, type TextKind } from '../qa/ocr.js'
 import type { GenRequest } from '../providers/types.js'
 import { readAsset, saveAsset } from '../storage/assets.js'
 import sharp from 'sharp'
-import { takeGateFor, type TakeGate } from '../core/takeGate.js'
+import { driftSpans, takeGateFor, type TakeGate } from '../core/takeGate.js'
 import { approvedAssets, getCandidate } from './characters.js'
 import { createContent, getContent, specSchemas, updateContent, type CloneSource, type ContentKind } from './content.js'
 import { addCloneSource, bestCloneStill, buildClone, buildCloneFace, buildCloneStill, cloneModel, cloneStills, keepClone, postClones, queueCloneReview, recreateVideoGate, saveCloneModel, useCloneStill, type StillGate } from './clone.js'
@@ -278,9 +278,9 @@ async function runCloneReview(deps: Deps, ctx: Ctx, job: JobRow): Promise<unknow
   const cand = await getCandidate(deps, ctx, candidateId)
   if (!cand.assetId) return { skipped: true }
   const cfg = deps.config.pipeline.content.clone.recreate
-  // Moving frames read lower than a still; drift is the standard face match
-  // (the same bar as scene QA), not the stills' stricter gate.
-  const faceMin = deps.config.pipeline.review.qa.identity_min_similarity
+  // Drift is marked under the video rule's face number (owner, 2026-10-15),
+  // so the strip and the rule that reads it agree.
+  const faceMin = (await recreateVideoGate(deps, ctx)).face_min
   // The clip it was made from, and whether it ran on the free mock.
   const origin = async (id: string | null): Promise<{ source: string | null; demo: boolean }> => {
     if (!id) return { source: null, demo: false }
@@ -323,15 +323,7 @@ async function runCloneReview(deps: Deps, ctx: Ctx, job: JobRow): Promise<unknow
         likeness: mine && theirs ? round2(cosineSimilarity(mine.embedding, theirs.embedding)) : null,
       })
     }
-    const drift: CloneReview['drift'] = []
-    if (refFace) {
-      for (const s of samples) {
-        const bad = s.face == null || s.face < faceMin
-        const last = drift[drift.length - 1]
-        if (bad && last && Math.abs(last.end - s.t) < 1e-6) last.end = round2(Math.min(duration, s.t + cfg.review_step))
-        else if (bad) drift.push({ start: s.t, end: round2(Math.min(duration, s.t + cfg.review_step)) })
-      }
-    }
+    const drift: CloneReview['drift'] = refFace ? driftSpans(samples, faceMin, cfg.review_step, duration) : []
     // Text on the frames: logos, @handles and captions that carried over.
     const text: CloneReview['text'] = []
     const ocr = createOcr()

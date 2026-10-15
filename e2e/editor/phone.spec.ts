@@ -71,3 +71,18 @@ test('phone: drag a caption with a finger to move it, and resize it', async ({ p
   expect(c.width * c.height).toBeGreaterThan(a.width * a.height * 1.3)
   await snap(page, info, 'phone: caption made bigger')
 })
+
+test('phone: a freeze marker opens the Edit tab with the Speed panel', async ({ page }, info) => {
+  await openEditor(page, await seedPost())
+  const nav = page.getByRole('navigation', { name: 'Editor workspace' })
+  await nav.getByRole('button', { name: 'Media' }).tap()
+  await presetCard(page, 'Holds the frame for a beat (add a text pop or the record scratch).').tap()
+  await nav.getByRole('button', { name: 'Timeline' }).tap()
+  const marker = page.locator('[data-studio-marker="freeze"]')
+  await expect(marker).toHaveCount(1)
+  await marker.tap()
+  const curves = page.locator('#editor-panel-inspector').getByRole('button', { name: /Speed Curves/ }).first()
+  await expect(curves).toBeVisible()
+  await expect(curves).toHaveAttribute('aria-expanded', 'true')
+  await snap(page, info, 'phone: the Speed panel from the marker')
+})

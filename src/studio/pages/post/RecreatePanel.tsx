@@ -6,7 +6,8 @@ import { api, ApiError, assetUrl } from '../../api'
 import { uploadFiles } from '../../files'
 import { keys, useClones, useCloneStills } from '../../hooks'
 import { PriceButton } from '../../PriceButton'
-import { RunStatus } from '../../runs'
+import { FailureLine, RunStatus } from '../../runs'
+import { failureLine, FRESH_MS } from '../../failures'
 import { AsyncButton, Callout, Field, errorMessage, isFresh, useToast, type TodoItem } from '../../ui'
 import type { CloneModel, CloneOptions, CloneResult, CloneSource, CloneStill, TakeGate } from '../../types'
 import type { PostCtx } from './ctx'
@@ -217,15 +218,19 @@ function StillsStep({ ctx, list: all, kept, takes, picked, opts }: { ctx: PostCt
   async function use(id: string) {
     try { await api.useCloneStill(ctx.item.id, id); void qc.invalidateQueries({ queryKey: keys.content }); void qc.invalidateQueries({ queryKey: ['clone-stills', ctx.item.id] }) } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) }
   }
+  // Earlier failures in one gray line (owner, 2026-10-15): only the run just
+  // started (the newest, while it is fresh) shows its failures as tiles.
+  const [showEarlier, setShowEarlier] = useState(false)
+  const clearedAt = (ctx.draft.spec as { failuresClearedAt?: string | null }).failuresClearedAt ?? null
+  const newest = list.reduce<CloneStill | null>((a, x) => (!a || x.createdAt > a.createdAt ? x : a), null)
+  const freshRun = newest && Date.now() - Date.parse(newest.createdAt) < FRESH_MS ? newest.runId : null
+  const folded = list.filter(x => !!x.error && !x.assetId && x.runId !== freshRun)
+  const earlier = folded.filter(x => !clearedAt || x.createdAt > clearedAt)
+  const shown = list.filter(x => !folded.includes(x))
   // Face passes sit next to the still they fix.
-  const order = [...list.filter(x => x.pass === 'still')].flatMap(s => [s, ...list.filter(f => f.parentId === s.id)])
-  const rest = list.filter(x => !order.includes(x))
-  return (
-    <div className="st-col" style={{ gap: 12 }}>
-      {skipped?.note && <span className="st-hint" data-field="facepass-skipped"><ShieldCheck size={12} /> {skipped.note}</span>}
-      {list.length > 0 && (
-        <div className="st-grid scenes">
-          {[...order, ...rest].map(x => (
+  const order = [...shown.filter(x => x.pass === 'still')].flatMap(s => [s, ...shown.filter(f => f.parentId === s.id)])
+  const rest = shown.filter(x => !order.includes(x))
+  const tile = (x: CloneStill) => (
             <div key={x.id} className={`st-tile st-scene-tile ${kept === x.id ? 'picked' : ''} ${isFresh(x.createdAt) ? 'st-new' : ''} ${x.pass === 'face' ? 'st-facepass' : ''}`}>
               <div className="st-tile-open">
                 {x.assetId ? <img className="st-clip" style={{ aspectRatio: '9 / 16', objectFit: 'cover' }} src={assetUrl(x.assetId)} alt={`${x.pass === 'face' ? 'Face pass' : 'Still'} of ${x.characterName}`} /> : <div className="st-clip st-clip-empty" style={{ aspectRatio: '9 / 16' }}><AlertTriangle size={18} /></div>}
@@ -252,9 +257,20 @@ function StillsStep({ ctx, list: all, kept, takes, picked, opts }: { ctx: PostCt
                 </div>
               )}
             </div>
-          ))}
-        </div>
+  )
+  return (
+    <div className="st-col" style={{ gap: 12 }}>
+      {skipped?.note && <span className="st-hint" data-field="facepass-skipped"><ShieldCheck size={12} /> {skipped.note}</span>}
+      {shown.length > 0 && <div className="st-grid scenes">{[...order, ...rest].map(tile)}</div>}
+      {earlier.length > 0 && (
+        <FailureLine
+          text={failureLine(earlier.map(x => ({ kind: x.failure ?? 'failed', facePass: x.pass === 'face', charged: 'no' })))}
+          open={showEarlier}
+          onToggle={() => setShowEarlier(v => !v)}
+          onClear={() => { ctx.draft.setSpec({ failuresClearedAt: new Date().toISOString() }); setShowEarlier(false) }}
+        />
       )}
+      {showEarlier && earlier.length > 0 && <div className="st-grid scenes st-earlier" data-field="earlier-failures">{earlier.map(tile)}</div>}
       {choices.length > 1 && (
         <div className="st-videomodels" role="radiogroup" aria-label="Stills model" data-field="recreate-stillmodel">
           {choices.map(c => {
@@ -481,7 +497,7 @@ function SyncedPair({ source, take, posters, review, duration, onTrim }: { sourc
             <span className="st-strip-head" style={{ left: at(t) }} aria-hidden />
           </div>
           <div className="st-row st-hint" style={{ gap: 12, flexWrap: 'wrap' }}>
-            <span><span className="st-dot ok" /> face matches</span><span><span className="st-dot drift" /> face drifts (under {review.faceMin.toFixed(2)})</span>
+            <span><span className="st-dot ok" /> face matches</span><span><span className="st-dot drift" /> face under {review.faceMin.toFixed(2)} (the video rule)</span>
             {review.drift.length > 0 && <span>Drift at {review.drift.map(d => `${d.start.toFixed(1)} to ${d.end.toFixed(1)} s`).join(', ')}</span>}
           </div>
           {review.text.length > 0 && (

@@ -60,3 +60,17 @@ export function takeGateLine(gate: TakeGate): string {
   ].filter(Boolean)
   return parts.length ? parts.join(', ') : 'no face scores'
 }
+
+// Stretches where the face drifts: under the face number (the video rule's,
+// owner 2026-10-15, so the strip and the rule agree) or no face at all.
+export function driftSpans(samples: TakeSample[], faceMin: number, step: number, duration: number): Array<{ start: number; end: number }> {
+  const out: Array<{ start: number; end: number }> = []
+  const end = (t: number) => Math.round(Math.min(duration, t + step) * 100) / 100
+  for (const s of samples) {
+    const bad = s.face == null || s.face < faceMin
+    const last = out[out.length - 1]
+    if (bad && last && Math.abs(last.end - s.t) < 1e-6) last.end = end(s.t)
+    else if (bad) out.push({ start: s.t, end: end(s.t) })
+  }
+  return out
+}
