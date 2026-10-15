@@ -2236,3 +2236,27 @@ R2 directly; junk clears itself (UX-PLAN.md section 22).
   more; what is left is JSON. The numbers are in the report and in
   `e2e/editor/storage.spec.ts` (transfer).
 
+### G50. Long run, part 1: usability fixes, audited (owner away, 2026-10-15)
+
+The owner's long-run list repeated the six usability fixes. All six were
+already shipped (G45, UX-PLAN.md section 19), so this part checked each one
+against the code and filled the gaps rather than building them again.
+
+- **Already live:** earlier failures in one gray line with Show and Clear
+  (stills grid and run rows), small caption handles with no Locked on text,
+  freeze and speed ramp markers on the Presets track, the caption capped at
+  the frame height, the bigger preview, click-away deselect, named tracks,
+  the speed on the clip, and face-strip drift under 0.45.
+- **Found and fixed:** on a phone the Recreate stills grid was wider than
+  the screen (two columns that could not shrink below their widest
+  button), which pushed the second tile and the gray line's Show button
+  off screen. The columns now shrink and tile buttons wrap their words.
+- **Tests added** so every item is covered on a phone too: the gray line
+  in the stills grid and the run rows, small handles and no Locked, the
+  height cap, a tap beside the frame to deselect, named tracks and the
+  speed label; and a face strip test (desktop and phone) that checks the
+  API's drift line is 0.45 and only scores under it are marked. Locally the
+  face models are not installed, so that test serves known scores over the
+  real take.
+- **Decision:** no change to UX-PLAN.md (no new behavior); the phone grid
+  fix is a layout bug.

@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Locator, type Page, type TestInfo } from '@playwright/test'
 import { api, snap } from './helpers'
 
 // Earlier failures in one gray line (owner, 2026-10-15): in the Recreate
@@ -42,7 +42,10 @@ async function openStills(page: Page, post: string) {
   }).toPass({ timeout: 20_000 })
 }
 
-test('the stills grid: earlier failures fold into one gray line with Show and Clear', async ({ page }, info) => {
+// A click on a computer, a tap on a phone.
+const press = (l: Locator, phone: boolean) => (phone ? l.tap() : l.click())
+
+async function stillsGrid(page: Page, info: TestInfo, phone: boolean) {
   const { id, characterId } = await recreatePost()
   await api('PATCH', `/content/${id}`, { spec: { failuresClearedAt: null } })
   const hourAgo = new Date(Date.now() - 3600_000).toISOString()
@@ -65,17 +68,17 @@ test('the stills grid: earlier failures fold into one gray line with Show and Cl
   await expect(bad.locator('[data-field="trigger-words"]')).toHaveText(/^Likely trigger words: tight, boy shorts\./)
   await expect(bad.getByRole('button', { name: /Retry with safer wording/ })).toBeVisible()
   await snap(page, info, 'one gray line')
-  await line.getByRole('button', { name: 'Show' }).click()
+  await press(line.getByRole('button', { name: 'Show' }), phone)
   await expect(page.locator('[data-field="earlier-failures"] .st-tile')).toHaveCount(6)
   await snap(page, info, 'shown')
-  await line.getByRole('button', { name: 'Clear' }).click()
+  await press(line.getByRole('button', { name: 'Clear' }), phone)
   await expect(line).toHaveCount(0)
   // Cleared for good on this post: saved with it.
   await expect.poll(async () => (await api<{ items: { id: string; spec?: { failuresClearedAt?: string | null } }[] }>('GET', '/content')).items.find(i => i.id === id)?.spec?.failuresClearedAt ?? null, { timeout: 10_000 }).not.toBeNull()
   await api('PATCH', `/content/${id}`, { spec: { failuresClearedAt: null } })
-})
+}
 
-test('the run rows: only the run just started is red; earlier failures are one gray line', async ({ page }, info) => {
+async function runRows(page: Page, info: TestInfo, phone: boolean) {
   // Library > Hooks always shows its run list, so the served jobs land there.
   const now = Date.now()
   const job = (n: number, at: number, o: Record<string, unknown>) => ({
@@ -99,9 +102,9 @@ test('the run rows: only the run just started is red; earlier failures are one g
   await expect(fresh.locator('[data-field="trigger-words"]')).toHaveText(/^Likely trigger words: tight, boy shorts\./)
   await expect(fresh.getByRole('button', { name: /Retry with safer wording/ })).toBeVisible()
   await snap(page, info, 'one red row, one gray line')
-  await rows.getByRole('button', { name: 'Show' }).click()
+  await press(rows.getByRole('button', { name: 'Show' }), phone)
   await expect(rows.locator('.st-run.bad')).toHaveCount(4)
-  await rows.getByRole('button', { name: 'Clear' }).click()
+  await press(rows.getByRole('button', { name: 'Clear' }), phone)
   await expect(page.locator('[data-field="failure-line"]')).toHaveCount(0)
   await expect(page.locator('.st-run.bad')).toHaveCount(1)
   // Remembered in this browser.
@@ -109,4 +112,56 @@ test('the run rows: only the run just started is red; earlier failures are one g
   await expect(page.locator('.st-run.bad')).toHaveCount(1)
   await expect(page.locator('[data-field="failure-line"]')).toHaveCount(0)
   await page.evaluate(() => localStorage.removeItem('studio.clearedRuns'))
+}
+
+// The face strip under a Recreate take (owner, 2026-10-15): drift is marked
+// under the video rule's face number, 0.45, so the strip and the rule agree.
+// The local face models are not installed, so the test serves known scores
+// over the real take; the line itself comes from the API.
+async function faceStrip(page: Page, info: TestInfo, phone: boolean) {
+  test.setTimeout(300_000)
+  const { id } = await recreatePost()
+  type Clones = { clones: Array<{ id: string; assetId: string | null; review: { faceMin: number; step: number; duration: number; samples: Array<{ t: number; face: number | null }> } | null }> }
+  // A review may be running again (the page asks for missing text frames).
+  let real: Clones = { clones: [] }
+  await expect.poll(async () => { real = await api<Clones>('GET', `/content/${id}/clones`); return real.clones.some(c => c.assetId && c.review) }, { timeout: 180_000, intervals: [2000] }).toBe(true)
+  const take = real.clones.find(c => c.assetId && c.review)!
+  expect(take.review!.faceMin).toBe(0.45)
+  const faces = [0.62, 0.58, 0.47, 0.45, 0.44, 0.31, 0.5, 0.6, null, 0.55, 0.52, 0.49]
+  await page.route(`**/api/v1/content/${id}/clones`, async r => {
+    const res = await r.fetch()
+    const body = await res.json() as Clones
+    for (const c of body.clones) if (c.id === take.id && c.review) {
+      c.review.samples = c.review.samples.map((s, i) => ({ ...s, face: faces[i % faces.length] ?? null }))
+      ;(c.review as Record<string, unknown>).drift = [{ start: 2, end: 3 }]
+    }
+    await r.fulfill({ response: res, json: body })
+  })
+  await openStills(page, id)
+  const strip = page.locator('.st-strip').first()
+  await strip.scrollIntoViewIfNeeded()
+  await expect(strip).toBeVisible({ timeout: 30_000 })
+  const cells = strip.locator('.st-strip-cell')
+  await expect(cells).toHaveCount(take.review!.samples.length)
+  // Under 0.45 is drift; 0.45 and above match; no face found is its own mark.
+  for (const [i, f] of faces.entries()) {
+    if (i >= take.review!.samples.length) break
+    await expect(cells.nth(i)).toHaveClass(new RegExp(f == null ? 'none' : f < 0.45 ? 'drift' : 'ok'))
+  }
+  await expect(page.getByText('face under 0.45 (the video rule)')).toBeVisible()
+  await expect(page.getByText('Drift at 2.0 to 3.0 s')).toBeVisible()
+  // A cell takes you to its moment.
+  await press(cells.nth(5), phone)
+  await snap(page, info, phone ? 'phone: face strip, drift under 0.45' : 'face strip, drift under 0.45')
+}
+
+test('the stills grid: earlier failures fold into one gray line with Show and Clear', async ({ page }, info) => { await stillsGrid(page, info, false) })
+test('the run rows: only the run just started is red; earlier failures are one gray line', async ({ page }, info) => { await runRows(page, info, false) })
+test('the face strip marks drift under 0.45, the video rule', async ({ page }, info) => { await faceStrip(page, info, false) })
+
+test.describe('phone', () => {
+  test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true })
+  test('phone: the stills grid folds earlier failures into one gray line', async ({ page }, info) => { await stillsGrid(page, info, true) })
+  test('phone: the run rows show one red row and one gray line', async ({ page }, info) => { await runRows(page, info, true) })
+  test('phone: the face strip marks drift under 0.45', async ({ page }, info) => { await faceStrip(page, info, true) })
 })

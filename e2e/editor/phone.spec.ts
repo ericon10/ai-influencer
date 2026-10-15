@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { CAPTION, captionBlock, framePoint, inlineEditor, openEditor, presetCard, seedPost, snap } from './helpers'
+import { CAPTION, captionBlock, clipBlocks, frame, framePoint, inlineEditor, openEditor, presetCard, seedPost, snap, timeline } from './helpers'
 
 // The editor at phone width, by touch (editor QA, 2026-10-15). The audit
 // found the bottom tabs (Timeline, Media, Edit, AI) pushed off the screen,
@@ -85,4 +85,73 @@ test('phone: a freeze marker opens the Edit tab with the Speed panel', async ({ 
   await expect(curves).toBeVisible()
   await expect(curves).toHaveAttribute('aria-expanded', 'true')
   await snap(page, info, 'phone: the Speed panel from the marker')
+})
+
+// The usability fixes at phone width (owner, 2026-10-15), by touch.
+test('phone: small caption handles outside the caption, no Locked button', async ({ page }, info) => {
+  await openEditor(page, await seedPost())
+  const p = await framePoint(page, 0.5, 0.26)
+  await page.touchscreen.tap(p.x, p.y)
+  const box = (await page.locator('[data-studio="text-box"]').boundingBox())!
+  const handles = page.locator('[data-studio^="text-handle-"]')
+  await expect(handles).toHaveCount(4)
+  for (let i = 0; i < 4; i++) {
+    const h = (await handles.nth(i).boundingBox())!
+    // A finger-sized hit area that stays off the caption, with a small dot.
+    expect(h.width).toBeGreaterThanOrEqual(20)
+    const overlapX = Math.min(h.x + h.width, box.x + box.width) - Math.max(h.x, box.x)
+    const overlapY = Math.min(h.y + h.height, box.y + box.height) - Math.max(h.y, box.y)
+    expect(overlapX <= 1 || overlapY <= 1).toBeTruthy()
+    expect((await handles.nth(i).locator('span').boundingBox())!.width).toBeLessThanOrEqual(12)
+  }
+  const nav = page.getByRole('navigation', { name: 'Editor workspace' })
+  await nav.getByRole('button', { name: 'Edit' }).tap()
+  await expect(page.getByRole('button', { name: /Lock aspect ratio|Unlock aspect ratio/ })).toHaveCount(0)
+  await snap(page, info, 'phone: small handles, no Locked')
+})
+
+test('phone: a caption never grows taller than the frame', async ({ page }, info) => {
+  await openEditor(page, await seedPost())
+  const p = await framePoint(page, 0.5, 0.26)
+  await page.touchscreen.tap(p.x, p.y)
+  const box = page.locator('[data-studio="text-box"]')
+  const b = (await box.boundingBox())!
+  // A long pull on the corner handle, well past the bottom of the frame.
+  await touchDrag(page, { x: b.x + b.width + 8, y: b.y + b.height + 8 }, { x: b.x + b.width + 40, y: b.y + b.height + 600 })
+  await page.waitForTimeout(400)
+  const f = await frame(page)
+  const a = (await box.boundingBox())!
+  expect(a.height).toBeGreaterThan(b.height)
+  expect(a.height).toBeLessThanOrEqual(f.height + 2)
+  await snap(page, info, 'phone: as big as the frame allows')
+})
+
+test('phone: a tap beside the frame clears the selection', async ({ page }, info) => {
+  await openEditor(page, await seedPost())
+  const p = await framePoint(page, 0.5, 0.26)
+  await page.touchscreen.tap(p.x, p.y)
+  await expect(page.locator('[data-studio="text-box"]')).toBeVisible()
+  // A spot on the frame where nothing is.
+  const q = await framePoint(page, 0.5, 0.9)
+  await page.touchscreen.tap(q.x, q.y)
+  await expect(page.locator('[data-studio="text-box"]')).toBeHidden()
+  await snap(page, info, 'phone: nothing selected')
+})
+
+test('phone: the Studio names its tracks, and a shot shows its speed', async ({ page }, info) => {
+  await openEditor(page, await seedPost({ music: true }), { mp3: true })
+  for (const n of ['Captions', 'Shots', 'Music']) await expect(timeline(page).getByText(n, { exact: true }).first()).toBeAttached()
+  await expect(timeline(page).getByText(/^Track \d+$/)).toHaveCount(0)
+  await clipBlocks(page).first().tap()
+  const nav = page.getByRole('navigation', { name: 'Editor workspace' })
+  await nav.getByRole('button', { name: 'Edit' }).tap()
+  const section = page.locator('#editor-panel-inspector').getByText('Speed & Direction', { exact: true })
+  await section.scrollIntoViewIfNeeded()
+  await section.tap()
+  const set2x = page.getByRole('button', { name: 'Set speed to 2×' })
+  await set2x.scrollIntoViewIfNeeded()
+  await set2x.tap()
+  await nav.getByRole('button', { name: 'Timeline' }).tap()
+  await expect(timeline(page).locator('[data-studio="clip-speed"]').first()).toHaveText('2x')
+  await snap(page, info, 'phone: named tracks, 2x on the shot')
 })
