@@ -112,7 +112,7 @@ const uploadRefs = z.array(z.object({ uploadId: z.string(), name: z.string().max
 // naming direct uploads.
 async function fileBundle(deps: Deps, c: Context, ctx: Ctx): Promise<{ markdown: string | null; files: UploadedFile[]; characterId?: string }> {
   if ((c.req.header('content-type') ?? '').includes('application/json')) {
-    const body = parse(z.object({ markdown: z.string().max(500_000).optional(), uploads: uploadRefs, characterId: z.string().regex(/^chr_[a-z0-9]{20}$/).optional() }), await json(c))
+    const body = parse(z.object({ markdown: z.string().max(500_000).optional(), uploads: uploadRefs, characterId: z.string().regex(/^chr_[a-z0-9]{8,40}$/).optional() }), await json(c))
     return { markdown: body.markdown ?? null, files: await takeUploads(deps, ctx, body.uploads), characterId: body.characterId }
   }
   const body = await c.req.parseBody({ all: true })

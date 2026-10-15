@@ -247,6 +247,36 @@ describe('Studio API', () => {
     expect(foreign.status).toBe(404)
   })
 
+  it('checks a file against the template, updates the character of the same name, and edits the brand layer', async () => {
+    const md = readFileSync(join(process.cwd(), 'fixtures/template/character-wren.md'), 'utf8')
+    // The free check: nothing missing, no match yet in this account.
+    const first = await call('POST', '/characters/import/check', { cookie: cookieB, body: { markdown: md } })
+    expect(first.status).toBe(200)
+    expect(first.json).toMatchObject({ name: 'Wren', match: null, report: { complete: true } })
+    const made = await call('POST', '/characters/import', { cookie: cookieB, body: { markdown: md } })
+    expect(made.status).toBe(201)
+    const id = made.json.characterId as string
+    expect(id).toMatch(/^chr_[a-z0-9]{8,40}$/)
+    expect((await call('POST', '/characters/import/check', { cookie: cookieB, body: { markdown: md } })).json.match).toEqual({ id, name: 'Wren' })
+    // Another account does not see her as a match, and cannot update her.
+    expect((await call('POST', '/characters/import/check', { cookie: cookieA, body: { markdown: md } })).json.match).toBeNull()
+    expect((await call('POST', '/characters/import', { cookie: cookieA, body: { markdown: md, characterId: id } })).status).toBe(404)
+    // The same file again with her id: an update, the same character.
+    const updated = await call('POST', '/characters/import', { cookie: cookieB, body: { markdown: md, characterId: id } })
+    expect(updated.status).toBe(200)
+    expect(updated.json).toMatchObject({ characterId: id, updated: true })
+    expect((await call('POST', '/characters/import', { cookie: cookieB, body: { markdown: md, characterId: 'chr_NOPE' } })).status).toBe(400)
+    // The brand layer, written into the file.
+    const brand = await call('PUT', `/characters/${id}/brand`, { cookie: cookieB, body: { statement: 'Wren, the slow trail runner', winningStack: ['The mishap in the first second'] } })
+    expect(brand.status).toBe(200)
+    expect(brand.json.brand).toMatchObject({ statement: 'Wren, the slow trail runner', winningStack: ['The mishap in the first second'] })
+    expect((await call('PUT', `/characters/${id}/brand`, { cookie: cookieB, body: { series: 'not a list' } })).status).toBe(400)
+    expect((await call('PUT', `/characters/${id}/brand`, { cookie: cookieA, body: { statement: 'x' } })).status).toBe(404)
+    const view = await call('GET', `/characters/${id}`, { cookie: cookieB })
+    expect(view.json.brand.statement).toBe('Wren, the slow trail runner')
+    expect(view.json.template.complete).toBe(true)
+  })
+
   it("imports a dropped sheet folder: direct uploads, 'REF 00' names normalized, then a free face and texture check", async () => {
     const md = readFileSync(join(process.cwd(), 'fixtures/callie/character-callie.md'), 'utf8')
     const face = readFileSync(join(process.cwd(), 'fixtures/faces/person-a-1.jpg'))
