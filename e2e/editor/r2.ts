@@ -74,8 +74,14 @@ function send(res: ServerResponse, status: number, headers: Record<string, strin
 }
 
 // Forward a request to the Vite dev server (which proxies /api to the API).
+// A browser that navigates away cancels its requests: the sockets close
+// mid-stream, which is normal and must not end the test run.
+const quiet = (...xs: Array<{ on: (e: 'error', f: () => void) => unknown }>) => { for (const x of xs) x.on('error', () => undefined) }
+
 function forward(req: IncomingMessage, res: ServerResponse, rewrite?: (json: any) => void) {
+  quiet(req, res)
   const up = httpRequest({ host: VITE.hostname, port: VITE.port, path: req.url, method: req.method, headers: { ...req.headers, host: VITE.host } }, upRes => {
+    quiet(upRes)
     if (!rewrite || !(upRes.headers['content-type'] ?? '').includes('json')) {
       res.writeHead(upRes.statusCode ?? 502, upRes.headers)
       return upRes.pipe(res)
@@ -101,6 +107,7 @@ export async function startLive(): Promise<Live> {
   // Storage: the CORS header only for a request from the Studio's origin;
   // the answer may be kept by the browser (no Vary: Origin), as R2 does.
   const r2 = createServer((req, res) => {
+    quiet(req, res)
     const origin = (req.headers.origin as string | undefined) ?? null
     const id = (req.url ?? '/').slice(1).split('?')[0]!
     const allowed = !live.refuse && origin === LIVE
@@ -116,6 +123,7 @@ export async function startLive(): Promise<Live> {
 
   // The deployed Studio: same pages and API, with storage behind it.
   const studio = createServer(async (req, res) => {
+    quiet(req, res)
     const url = new URL(req.url ?? '/', LIVE)
     const asset = url.pathname.match(/^\/api\/v1\/assets\/([^/]+)\/content$/)
     if (asset && req.method === 'GET' && !url.searchParams.get('w')) {
@@ -147,7 +155,9 @@ export async function startLive(): Promise<Live> {
     forward(req, res)
   })
   // Vite's live reload socket goes straight through.
+  for (const srv of [r2, studio]) srv.on('clientError', (_e, socket) => socket.destroy())
   studio.on('upgrade', (req, socket: Socket, head) => {
+    socket.on('error', () => undefined)
     const up = connect(Number(VITE.port), VITE.hostname, () => {
       up.write(`${req.method} ${req.url} HTTP/1.1\r\n${Object.entries(req.headers).map(([k, v]) => `${k}: ${k === 'host' ? VITE.host : v}`).join('\r\n')}\r\n\r\n`)
       up.write(head)

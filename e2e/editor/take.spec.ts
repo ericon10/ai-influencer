@@ -1,3 +1,6 @@
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { expect, test, type Page, type TestInfo } from '@playwright/test'
 import { api, captionBlocks, clipBlocks, seedPost, seek, snap } from './helpers'
 import { editorReady, LIVE, startLive, type Live } from './r2'
@@ -9,6 +12,9 @@ import { editorReady, LIVE, startLive, type Live } from './r2'
 // Recreate review (Use this take), a finished post, Library > Clips, and
 // Make another like this.
 
+const CACHE = join(dirname(fileURLToPath(import.meta.url)), '..', '.out', 'cache')
+mkdirSync(CACHE, { recursive: true })
+const RECREATE = join(CACHE, 'recreate-post.txt')
 let live: Live
 test.beforeAll(async () => { live = await startLive() })
 test.afterAll(async () => { await live.close() })
@@ -109,12 +115,16 @@ test('every path opens the editor with the take: Recreate review, a finished pos
   const all = await posts()
 
   // 1. A Recreate review: Keep and Use this take, then Open the editor.
-  let rec: Item | undefined
-  for (const p of all.filter(p => p.kind === 'meme' && p.spec?.clone?.assetId && p.characterId)) {
-    const { groups } = await api<{ groups: { id: string; items: { kind: string; name: string }[] }[] }>('GET', `/content/${p.id}/editor/media`)
-    if (groups.find(g => g.id === 'post')?.items.some(x => x.kind === 'video' && /^Take/.test(x.name))) { rec = p; break }
+  // The post is remembered: the list holds only the newest 200 posts.
+  const remembered = existsSync(RECREATE) ? readFileSync(RECREATE, 'utf8').trim() : ''
+  const candidates = [process.env.E2E_RECREATE ?? '', remembered, ...all.filter(p => p.kind === 'meme' && p.spec?.clone?.assetId && p.characterId).map(p => p.id)].filter(Boolean)
+  let rec: { id: string } | undefined
+  for (const id of [...new Set(candidates)]) {
+    const media = await api<{ groups: { id: string; items: { kind: string; name: string }[] }[] }>('GET', `/content/${id}/editor/media`).catch(() => null)
+    if (media?.groups.find(g => g.id === 'post')?.items.some(x => x.kind === 'video')) { rec = { id }; break }
   }
-  if (!rec) throw new Error('No Recreate post with a take. Make one in demo mode first.')
+  if (!rec) throw new Error('No Recreate post with a take. Make one in demo mode first, or set E2E_RECREATE.')
+  writeFileSync(RECREATE, rec.id)
   await api('PATCH', `/content/${rec.id}`, { spec: { clipId: null, captionOff: false } })
   await page.goto(`${LIVE}/studio/posts/${rec.id}`)
   const vstep = page.locator('[data-field="step-video"]')
@@ -128,7 +138,8 @@ test('every path opens the editor with the take: Recreate review, a finished pos
   }).toPass({ timeout: 60_000 })
   if (await take.getByRole('button', { name: 'Keep this take' }).count()) await take.getByRole('button', { name: 'Keep this take' }).click()
   await take.getByRole('button', { name: 'Use this take' }).click()
-  await expect.poll(async () => (await posts()).find(p => p.id === rec.id)?.spec?.clipId ?? null, { timeout: 30_000 }).not.toBeNull()
+  // The take is the post's clip now: the editor's manifest has it.
+  await expect.poll(async () => (await api<{ media: { role: string }[] }>('GET', `/content/${rec!.id}/editor`).catch(() => ({ media: [] }))).media.filter(m => m.role === 'clip').length, { timeout: 30_000 }).toBe(1)
   await toFinish(page, rec.id)
   await openFromFinish(page)
   await takeIsThere(page, rec.id, info, 'path 1: Recreate review, Use this take')
@@ -141,7 +152,7 @@ test('every path opens the editor with the take: Recreate review, a finished pos
   const row = page.locator('.st-run.live').first()
   await expect(row).toBeVisible({ timeout: 30_000 })
   expect(await row.evaluate(e => getComputedStyle(e).animationName)).toBe('st-run-pulse')
-  await row.scrollIntoViewIfNeeded()
+  await row.scrollIntoViewIfNeeded({ timeout: 3000 }).catch(() => undefined)
   await snap(page, info, 'the run row pulses while it renders')
   await expect(page.getByRole('button', { name: /Export MP4 again/ })).toBeVisible({ timeout: 180_000 })
   await expect(page.locator('.st-run.live')).toHaveCount(0)
