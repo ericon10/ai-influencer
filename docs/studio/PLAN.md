@@ -468,6 +468,17 @@ Decisions: `DECISIONS.md` G37 and G38. UX: `UX-PLAN.md` section 15.
 - [x] `e2e/editor/` suite (`npm run e2e:editor`), before and after runs in the report
 - [ ] Usability fixes from the report (the owner picks)
 
+### Recreate gates (G44)
+
+- [x] Video rule: the still numbers over the take (middle face 0.45+, middle margin 0.12+, highest likeness under 0.45)
+- [x] A paid take is never rejected: a warning with Keep this take or Try again; only the still gate blocks spend
+- [x] Old rejects shown again with their scores and Keep this take (today's kitchen take)
+- [x] Text found shows its frame with the words boxed
+- [x] Face pass edits the chosen still (first image; element and REF-00 for the face only); scene check outside the face
+- [x] Face pass skipped, not charged, when the best still clears a 0.30 margin
+- [x] Video numbers in the gate check after every 10 real takes (kept vs tried again)
+- [ ] The owner keeps today's take on production (the click is the owner's)
+
 ## Roadmap after Phase 4 (owner, 2026-10-13; not started)
 
 SPEC 13.1, R1 to R7: Clone Video (first after Phase 3), Inspo board

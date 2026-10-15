@@ -31,8 +31,8 @@ import { addHook, archiveHook, archiveProduct, archiveVariant, importKit, produc
 import { deleteStyle, editorManifest, listStyles, saveFromEditor, saveStyle } from '../pipeline/openreel.js'
 import { previewImport, runImport } from '../pipeline/csvImport.js'
 import { answerGateCheck, gateCheck } from '../pipeline/gateCheck.js'
-import { addCloneSource, cloneOptions, cloneStills, keepClone, pickCloneStill, postClones, postFromClone, saveCloneModel, saveRecreateStillModel, setCloneChoices, setCloneCleanup, setCloneNotLike, setCloneTarget, trimClone, useCloneStill } from '../pipeline/clone.js'
-import { addRecreateRow, recreateBatch, recreateFor, setRecreateRows, startRecreate, useCloneTake } from '../pipeline/recreate.js'
+import { addCloneSource, cloneOptions, cloneStills, keepClone, pickCloneStill, postClones, postFromClone, saveCloneModel, saveRecreateStillModel, setCloneChoices, setCloneCleanup, setCloneNotLike, setCloneTarget, trimClone, tryCloneAgain, useCloneStill } from '../pipeline/clone.js'
+import { addRecreateRow, recreateBatch, recreateFor, reviewTakeAgain, setRecreateRows, startRecreate, useCloneTake } from '../pipeline/recreate.js'
 import { jobViews } from '../jobs/jobView.js'
 import { POST_STEPS, addBroll, archiveBroll, archiveContent, contentView, createContent, duplicateContent, postScene, retryFailedBatch, startRender, updateBroll, updateContent } from '../pipeline/content.js'
 import { rulesView, setRuleSwitch } from '../pipeline/rules.js'
@@ -633,6 +633,18 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
     const body = parse(z.object({ acknowledge: z.boolean().default(false) }), await json(c))
     return c.json(await useCloneTake(deps, ctx, c.req.param('id'), c.req.param('cid'), body.acknowledge))
   })
+  // A take the owner passes on (recorded for the gate check; nothing spent),
+  // and a free review again (fills in the frames of the text found).
+  app.post('/content/:id/clones/:cid/try-again', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    return c.json(await tryCloneAgain(deps, ctx, c.req.param('cid')))
+  })
+  app.post('/content/:id/clones/:cid/review', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    return c.json(await reviewTakeAgain(deps, ctx, c.req.param('id'), c.req.param('cid')))
+  })
   app.get('/content/:id/clone-options', async c => c.json(await cloneOptions(deps, c.get('ctx'), c.req.param('id'))))
   app.get('/content/:id/clones', async c => c.json({ clones: await postClones(deps, c.get('ctx'), c.req.param('id')) }))
   // Tap the person to replace on the first frame (null: the largest again).
@@ -690,8 +702,8 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
   app.post('/recreate/gate-check', async c => {
     const ctx = c.get('ctx')
     requireRole(ctx, 'owner')
-    const body = parse(z.object({ use: z.boolean() }), await json(c))
-    return c.json(await answerGateCheck(deps, ctx, body.use))
+    const body = parse(z.object({ use: z.boolean(), kind: z.enum(['still', 'video']).default('still') }), await json(c))
+    return c.json(await answerGateCheck(deps, ctx, body.use, body.kind))
   })
   app.put('/settings/recreate-still-model', async c => {
     const ctx = c.get('ctx')

@@ -205,15 +205,24 @@ describe('Clone Video: the run', () => {
     await expect(estimateAction(h.deps, h.ctx, { type: 'clone', contentId: long, characterIds: [callie], model: 'higgsfield/kling-o3-video-edit', looks: {}, keepSound: false })).rejects.toThrow(/3 to 15.5 s/)
   }, 60_000)
 
-  it('a copy of the performer is never usable; face drift asks first', async () => {
+  it('a paid take is never rejected: the old check\'s rejection can be kept; one that misses the video rule asks first', async () => {
     const [c] = await postClones(h.deps, h.ctx, postId)
-    await h.deps.db.update(candidates).set({ status: 'qa_failed', qaReport: { verdict: 'fail', findings: [{ code: 'too_similar', severity: 'fail', message: 'Looks like the performer.' }] } }).where(eq(candidates.id, c!.id))
-    await expect(keepClone(h.deps, h.ctx, c!.id)).rejects.toThrow(/fixed rule/)
-    await h.deps.db.update(candidates).set({ status: 'in_review', qaReport: { verdict: 'fail', findings: [{ code: 'face_drift', severity: 'fail', message: 'The face does not match REF-00.' }] } }).where(eq(candidates.id, c!.id))
-    await expect(keepClone(h.deps, h.ctx, c!.id)).rejects.toMatchObject({ code: 'confirm_required' })
-    await keepClone(h.deps, h.ctx, c!.id, true)
-    const [row] = await h.deps.db.select().from(candidates).where(eq(candidates.id, c!.id))
+    // The old check's "Not kept" shows again for the owner's call.
+    await h.deps.db.update(candidates).set({ status: 'qa_failed', rejectNote: 'Looks like the performer.', qaReport: { verdict: 'regenerate', summary: '', findings: [{ code: 'too_similar', severity: 'fail', message: 'Looks like the performer.' }] } }).where(eq(candidates.id, c!.id))
+    const shown = (await postClones(h.deps, h.ctx, postId)).find(x => x.id === c!.id)!
+    expect(shown).toMatchObject({ status: 'in_review', error: null, oldReject: 'Looks like the performer.' })
+    await keepClone(h.deps, h.ctx, c!.id)
+    let [row] = await h.deps.db.select().from(candidates).where(eq(candidates.id, c!.id))
     expect(row!.status).toBe('approved')
+    expect((row!.qaReport as { findings: Array<{ code: string; severity: string }> }).findings.find(f => f.code === 'too_similar')!.severity).toBe('warn')
+    // A take that misses the video rule asks once, then is kept.
+    const missing = { ok: false, face: 0.4, likeness: 0.5, margin: -0.1, frames: 3, reasons: ['Face match 0.40, needs 0.45 or more.'], note: null }
+    await h.deps.db.update(candidates).set({ status: 'in_review', meta: { gate: missing } }).where(eq(candidates.id, c!.id))
+    await expect(keepClone(h.deps, h.ctx, c!.id)).rejects.toMatchObject({ code: 'confirm_required' })
+    await keepClone(h.deps, h.ctx, c!.id, true);
+    [row] = await h.deps.db.select().from(candidates).where(eq(candidates.id, c!.id))
+    expect(row!.status).toBe('approved')
+    expect((row!.meta as { decision: { kind: string } }).decision.kind).toBe('kept')
   })
 
   it('"Make a video post" with another character\'s clone opens a new post at the Text step', async () => {

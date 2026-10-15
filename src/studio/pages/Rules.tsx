@@ -4,7 +4,7 @@ import { Gauge, Lock, RotateCcw } from 'lucide-react'
 import { api } from '../api'
 import { useCharacters, useRules } from '../hooks'
 import { Callout, errorMessage, useToast } from '../ui'
-import type { GateNumbers, GateSample, RuleRow } from '../types'
+import type { GateNumbers, GateSample, RuleRow, TakeScore, VideoGateView } from '../types'
 import { HowTo } from '../guide/Guide'
 
 // Settings, Rules (owner ruling G1, "defaults, not locks"). Every rule in the
@@ -164,7 +164,50 @@ function GateCheckCard() {
             <button type="button" className="st-btn sm" disabled={busy} onClick={() => void answer(false)}>Keep the current numbers</button>
           </div>
         )}
+        <VideoGateSection v={v.video} />
       </div>
     </section>
+  )
+}
+
+// Video takes get their own numbers (owner, 2026-10-15): the takes you kept
+// next to the ones you tried again on, every 10 real takes. A take that
+// misses is only ever a warning.
+function VideoGateSection({ v }: { v: VideoGateView }) {
+  const qc = useQueryClient()
+  const toast = useToast()
+  const [busy, setBusy] = useState(false)
+  async function answer(use: boolean) {
+    setBusy(true)
+    try { await api.answerGateCheck(use, 'video'); await qc.invalidateQueries({ queryKey: ['gate-check'] }); toast({ tone: 'ok', text: use ? 'The new video numbers are in use.' : 'Kept the current video numbers until the next 10.' }) } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) } finally { setBusy(false) }
+  }
+  const range = (list: TakeScore[], k: 'face' | 'margin' | 'likeness') => {
+    const a = list.map(x => x[k]).filter((x): x is number => x != null)
+    return a.length ? `${Math.min(...a).toFixed(2)} to ${Math.max(...a).toFixed(2)}` : 'no scores'
+  }
+  return (
+    <div className="st-col" style={{ gap: 8, borderTop: '1px solid var(--st-line)', paddingTop: 10 }} data-field="video-gate-check">
+      <b>Video takes</b>
+      <span className="st-hint">A take is read over the whole clip: the middle face match, the middle margin and the highest likeness. Now: {nums(v.current)} (a take that misses is a warning, never rejected).</span>
+      <span>{v.count} real take{v.count === 1 ? '' : 's'} with scores. {v.due ? <b>A video check is ready.</b> : <>The next video check is at {v.nextAt}.</>}</span>
+      {(v.kept.length > 0 || v.triedAgain.length > 0) && (
+        <div className="st-col" style={{ gap: 4 }}>
+          <span><b>Kept</b>: {v.kept.length}; face {range(v.kept, 'face')}; margin {range(v.kept, 'margin')}; likeness {range(v.kept, 'likeness')}</span>
+          <span><b>Tried again</b>: {v.triedAgain.length}; face {range(v.triedAgain, 'face')}; margin {range(v.triedAgain, 'margin')}; likeness {range(v.triedAgain, 'likeness')}</span>
+        </div>
+      )}
+      {v.suggested ? (
+        <Callout tone="info">
+          <b>Suggested for video: {nums(v.suggested)}.</b> With these, {v.effect.suggested!.keptPass} of {v.kept.length} kept takes pass and {v.effect.suggested!.triedAgainHeld} of {v.triedAgain.length} tried-again takes would be flagged (now: {v.effect.current.keptPass} and {v.effect.current.triedAgainHeld}).
+          <ul style={{ margin: '6px 0 0 18px' }}>{v.why.map(w => <li key={w}>{w}</li>)}</ul>
+        </Callout>
+      ) : <span className="st-hint">{v.why[0]}</span>}
+      {v.due && (
+        <div className="st-row" style={{ gap: 8 }}>
+          {v.suggested && <button type="button" className="st-btn primary sm" disabled={busy} onClick={() => void answer(true)}>Use these video numbers</button>}
+          <button type="button" className="st-btn sm" disabled={busy} onClick={() => void answer(false)}>Keep the current video numbers</button>
+        </div>
+      )}
+    </div>
   )
 }

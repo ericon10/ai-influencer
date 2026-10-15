@@ -137,7 +137,7 @@ const templatesSchema = z.object({
   scene_plan: z.object({ system: z.string(), prompt: z.string() }),
   scene_ideas: z.object({ system: z.string(), prompt: z.string() }),
   video: z.object({ base: z.string(), silent: z.string(), end_frame: z.string(), continue: z.string() }),
-  clone: z.object({ swap: z.string(), image: z.string(), replace: z.string(), scene_still: z.string(), recreate_still: z.string(), recreate_not_like: z.string(), recreate_element_api: z.string(), recreate_realism: z.string(), face_pass: z.string(), recreate_keep: z.string(), outfit_keep_named: z.string(), outfit_hers_named: z.string(), motion: z.string(), motion_scene: z.string(), motion_what: z.string(), outfit_source: z.string(), outfit_hers: z.string(), target_main: z.string(), target_at: z.string() }),
+  clone: z.object({ swap: z.string(), image: z.string(), replace: z.string(), scene_still: z.string(), recreate_still: z.string(), recreate_not_like: z.string(), recreate_element_api: z.string(), recreate_realism: z.string(), face_pass: z.string(), face_pass_refs: z.string().default(" (the face in the other images)"), recreate_keep: z.string(), outfit_keep_named: z.string(), outfit_hers_named: z.string(), motion: z.string(), motion_scene: z.string(), motion_what: z.string(), outfit_source: z.string(), outfit_hers: z.string(), target_main: z.string(), target_at: z.string() }),
   clone_traits: z.object({ system: z.string(), prompt: z.string() }),
   content_slides: z.object({ system: z.string(), prompt: z.string() }),
   content_captions: z.object({ system: z.string(), prompt: z.string() }),
@@ -265,12 +265,13 @@ const contentSchema = z.object({
     recreate: z.object({
       frame_at: z.number().min(0).max(5), takes: z.number().int().min(1).max(4), face_takes: z.number().int().min(1).max(4), face_pass: z.boolean().default(true), dark_luma: z.number(), busy_motion: z.number(),
       gate: z.object({ face_min: z.number().min(0).max(1), margin: z.number().min(0).max(1).default(0.12), source_max: z.number().min(0).max(1) }).default({ face_min: 0.45, margin: 0.12, source_max: 0.45 }),
+      face_skip_margin: z.number().min(0).max(1).default(0.3),
       resolution: z.string().default('720p'),
       review_step: z.number().positive().default(0.5), ocr_step: z.number().positive().default(1), cut_threshold: z.number().min(0).max(1).default(0.35),
       batch_max: z.number().int().min(1).max(50).default(20),
       credit_usd: z.number().positive().default(0.0625),
     })
-      .default({ frame_at: 0.2, takes: 4, face_takes: 2, face_pass: true, dark_luma: 70, busy_motion: 14, gate: { face_min: 0.45, margin: 0.12, source_max: 0.45 }, resolution: '720p', review_step: 0.5, ocr_step: 1, cut_threshold: 0.35, batch_max: 20, credit_usd: 0.0625 }),
+      .default({ frame_at: 0.2, takes: 4, face_takes: 2, face_pass: true, dark_luma: 70, busy_motion: 14, gate: { face_min: 0.45, margin: 0.12, source_max: 0.45 }, face_skip_margin: 0.3, resolution: '720p', review_step: 0.5, ocr_step: 1, cut_threshold: 0.35, batch_max: 20, credit_usd: 0.0625 }),
     models: z.array(z.object({ ref: z.string(), resolution: z.string().optional() })).min(1),
     min_seconds: z.number().positive(),
     max_seconds: z.number().positive(),

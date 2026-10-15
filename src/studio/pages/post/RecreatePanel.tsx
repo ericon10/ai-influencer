@@ -1,14 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { AlertTriangle, Check, CheckCircle2, Copy, Pause, Play, Plus, Scissors, ShieldAlert, ShieldCheck, Sparkles, Users, X } from 'lucide-react'
+import { AlertTriangle, Check, CheckCircle2, Copy, Pause, Play, Plus, RotateCcw, Scissors, ShieldAlert, ShieldCheck, Sparkles, Users, X } from 'lucide-react'
 import { api, ApiError, assetUrl } from '../../api'
 import { uploadFiles } from '../../files'
 import { keys, useClones, useCloneStills } from '../../hooks'
 import { PriceButton } from '../../PriceButton'
 import { RunStatus } from '../../runs'
 import { AsyncButton, Callout, Field, errorMessage, isFresh, useToast, type TodoItem } from '../../ui'
-import type { CloneModel, CloneOptions, CloneResult, CloneSource, CloneStill } from '../../types'
+import type { CloneModel, CloneOptions, CloneResult, CloneSource, CloneStill, TakeGate } from '../../types'
 import type { PostCtx } from './ctx'
 import { HowTo } from '../../guide/Guide'
 import { SentButton } from '../character/SentPanel'
@@ -57,7 +57,7 @@ export function RecreatePanel({ ctx, source, o, takes }: { ctx: PostCtx; source:
       <Field id="recreate-keep" label="2. What to keep, what to drop" group hint="Read from the frame; every chip is yours to change.">
         <StepTwo ctx={ctx} source={source} />
       </Field>
-      <Field id="recreate-stills" label={`3. ${takes.still} stills of ${name} and the face pass`} group done={!!keptStill?.gate.ok} hint="Pick the stills model: Nano Banana 2.1 on your plan or GPT Image 2.5 on the API, with the same prompts, face pass and gates. One price for the stills and the face pass on the best one (switch it off to skip). Each shows its face match to REF-00, its likeness to the person in the clip, and the margin between them. Fix this face redoes only the face on any other still.">
+      <Field id="recreate-stills" label={`3. ${takes.still} stills of ${name} and the face pass`} group done={!!keptStill?.gate.ok} hint="Pick the stills model: Nano Banana 2.1 on your plan or GPT Image 2.5 on the API, with the same prompts, face pass and gates. One price for the stills and the face pass on the best one (switch it off to skip; it is also skipped, and not charged, when the best still already beats the clip's person by 0.30 or more). The face pass edits the still: outside the face it must still match it, or it is marked not usable. Each shows its face match to REF-00, its likeness to the person in the clip, and the margin between them. Fix this face redoes only the face on any other still.">
         <StillsStep ctx={ctx} list={list} kept={kept} takes={takes} picked={picked} opts={o} />
       </Field>
       <Field id="recreate-model" label="5. The motion model" group hint={`The still as the image, the cleaned clip as the motion, 720p, 9:16, audio off. Price for this ${source.durationSec ?? ''} s clip; your last pick is selected.`}>
@@ -187,7 +187,7 @@ function ChipList({ label, items, placeholder, onChange, tone }: { label: string
 
 // Step 3 and 4: the stills with their scores and gates; the face pass in
 // one click; "Make the video" on a still that passes.
-function StillsStep({ ctx, list, kept, takes, picked, opts }: { ctx: PostCtx; list: CloneStill[]; kept: string | null; takes: { still: number; face: number }; picked: CloneModel | null; opts: CloneOptions | undefined }) {
+function StillsStep({ ctx, list: all, kept, takes, picked, opts }: { ctx: PostCtx; list: CloneStill[]; kept: string | null; takes: { still: number; face: number }; picked: CloneModel | null; opts: CloneOptions | undefined }) {
   const toast = useToast()
   const qc = useQueryClient()
   const gateMargin = opts?.gate.margin ?? null
@@ -204,6 +204,10 @@ function StillsStep({ ctx, list, kept, takes, picked, opts }: { ctx: PostCtx; li
     api.setRecreateStillModel(ref).catch(() => undefined)
   }
   const untested = chosen?.path === 'api' ? `${chosen.label}, ${chosen.note ?? 'untested for recreates'}` : null
+  // A face pass skipped because the best still was already clear (owner,
+  // 2026-10-15): one line, nothing charged.
+  const skipped = all.find(x => x.status === 'skipped')
+  const list = all.filter(x => x.status !== 'skipped')
   const stillsLabel = `${list.length ? `Make ${takes.still} new stills` : `Make ${takes.still} stills`}${facePass ? ' + face pass' : ''}${untested ? ` (${untested})` : ''}`
   const cid = ctx.item.characterId ?? ''
   const usable = list.filter(x => x.assetId && !x.error)
@@ -218,6 +222,7 @@ function StillsStep({ ctx, list, kept, takes, picked, opts }: { ctx: PostCtx; li
   const rest = list.filter(x => !order.includes(x))
   return (
     <div className="st-col" style={{ gap: 12 }}>
+      {skipped?.note && <span className="st-hint" data-field="facepass-skipped"><ShieldCheck size={12} /> {skipped.note}</span>}
       {list.length > 0 && (
         <div className="st-grid scenes">
           {[...order, ...rest].map(x => (
@@ -280,8 +285,8 @@ function StillsStep({ ctx, list, kept, takes, picked, opts }: { ctx: PostCtx; li
 // check in Settings > Rules (owner, round 18).
 function GateCheckNotice() {
   const q = useQuery({ queryKey: ['gate-check'], queryFn: api.gateCheck, staleTime: 5 * 60_000, retry: false })
-  if (!q.data?.due) return null
-  return <Callout tone="info">{q.data.count} real recreates since the gate numbers were last checked. <Link to="/studio/settings?tab=rules#gate-check">See the face and margin scores and the suggested numbers</Link>; nothing changes until you approve.</Callout>
+  if (!q.data?.due && !q.data?.video?.due) return null
+  return <Callout tone="info">{q.data.due ? `${q.data.count} real recreates` : `${q.data.video.count} real takes`} since the gate numbers were last checked. <Link to="/studio/settings?tab=rules#gate-check">See the scores and the suggested numbers</Link>; nothing changes until you approve.</Callout>
 }
 
 // The gates (fixed): ready for the video, or why not.
@@ -324,13 +329,43 @@ function Takes({ ctx }: { ctx: PostCtx }) {
   )
 }
 
+// Takes reviewed before text frames were kept: one free review again per
+// visit fills them in.
+const framesAsked = new Set<string>()
+
+const two = (v: number | null) => (v == null ? 'none' : v.toFixed(2))
+const takeLine = (g: TakeGate) => [g.face != null ? `face ${two(g.face)}` : null, g.margin != null ? `margin ${two(g.margin)}` : null, g.likeness != null ? `likeness ${two(g.likeness)}` : null].filter(Boolean).join(', ') || 'no face scores'
+
 function TakeReview({ ctx, c }: { ctx: PostCtx; c: CloneResult }) {
   const toast = useToast()
   const qc = useQueryClient()
   const nav = useNavigate()
   const used = (ctx.draft.spec as { clipId?: string | null }).clipId === c.id
+  // A paid take is never rejected (owner, 2026-10-15): one that misses the
+  // video rule, or that the old check rejected, waits for your call.
   const failed = c.status === 'failed' || c.status === 'qa_failed'
+  const waiting = c.status === 'in_review'
   const [others, setOthers] = useState(false)
+  useEffect(() => {
+    if (!c.needsFrames || framesAsked.has(c.id)) return
+    framesAsked.add(c.id)
+    api.reviewTakeAgain(ctx.item.id, c.id).then(() => qc.invalidateQueries({ queryKey: ['jobs'] })).catch(() => undefined)
+  }, [c.id, c.needsFrames, ctx.item.id, qc])
+  async function keepTake(): Promise<void> {
+    try {
+      await api.keepClone(c.id, true)
+      await qc.invalidateQueries({ queryKey: ['clones', ctx.item.id] })
+      toast({ tone: 'ok', text: 'Kept. Use this take when you are ready.' })
+    } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) }
+  }
+  async function tryAgain(): Promise<void> {
+    try {
+      await api.tryCloneAgain(ctx.item.id, c.id)
+      await qc.invalidateQueries({ queryKey: ['clones', ctx.item.id] })
+      document.querySelector('[data-field="recreate-model"]')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      toast({ tone: 'ok', text: 'Noted. Make the video again below (priced as before), or pick another still or model first.' })
+    } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) }
+  }
   async function useTake(acknowledge = false): Promise<void> {
     try {
       await api.useCloneTake(ctx.item.id, c.id, acknowledge)
@@ -362,11 +397,23 @@ function TakeReview({ ctx, c }: { ctx: PostCtx; c: CloneResult }) {
       <div className="st-row" style={{ gap: 8, flexWrap: 'wrap' }}>
         <b className="grow">{c.label}</b>
         {c.model && <span className="st-badge plain">{c.model}</span>}
-        {c.status === 'approved' ? <span className="st-badge ok">Kept</span> : c.status === 'in_review' ? <span className="st-badge warn">Check the face</span> : failed ? <span className="st-badge bad">Not kept</span> : null}
+        {c.status === 'approved' ? <span className="st-badge ok">Kept</span> : waiting ? <span className="st-badge warn">{c.gate && !c.gate.ok ? 'Misses the video rule' : 'Your call'}</span> : failed ? <span className="st-badge bad">Did not finish</span> : null}
       </div>
       {c.error && <Callout tone="bad">{c.error}</Callout>}
+      {c.oldReject && waiting && <Callout tone="info">The old check marked this take Not kept: "{c.oldReject.split('. ')[0]!.replace(/\.$/, '')}." That check is gone. A paid take is never rejected now: keep it or try again.</Callout>}
+      {c.gate && (c.gate.ok
+        ? <span className="st-hint" data-field="take-rule"><ShieldCheck size={12} /> Passes the video rule over {c.gate.frames} frames: {takeLine(c.gate)}.</span>
+        : <Callout tone="warn"><b>Misses the video rule</b> ({takeLine(c.gate)}): {c.gate.reasons.join(' ')} It is not thrown away: keep it, or try again.</Callout>)}
+      {c.gate?.note && <span className="st-hint">{c.gate.note}</span>}
       {c.assetId && <SyncedPair source={c.sourceAssetId} take={c.assetId} posters={c.posters} review={c.review} onTrim={trimAt} duration={c.durationSec ?? c.review?.duration ?? 0} />}
-      {!failed && c.assetId && (
+      {waiting && c.assetId && (
+        <div className="st-row" style={{ gap: 8, flexWrap: 'wrap', alignItems: 'center' }} data-field="take-call">
+          <AsyncButton className="st-btn primary" onClick={keepTake} icon={<CheckCircle2 size={15} />}>Keep this take</AsyncButton>
+          <AsyncButton className="st-btn" onClick={tryAgain} icon={<RotateCcw size={15} />}>Try again</AsyncButton>
+          <span className="st-hint">{c.decision === 'tried_again' ? 'You tried again on this take; it stays here if you change your mind.' : 'Your call counts toward the gate check. Try again spends nothing until you make the video.'}</span>
+        </div>
+      )}
+      {c.status === 'approved' && c.assetId && (
         <div className="st-row" style={{ gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
           {used ? <span className="st-badge ok"><CheckCircle2 size={12} /> In this post</span> : <AsyncButton className="st-btn primary" onClick={() => useTake()} icon={<CheckCircle2 size={15} />}>Use this take</AsyncButton>}
           <span className="st-hint">Opens the Text step. No music unless you add one.</span>
@@ -439,9 +486,14 @@ function SyncedPair({ source, take, posters, review, duration, onTrim }: { sourc
           </div>
           {review.text.length > 0 && (
             <div className="st-col" style={{ gap: 4 }}>
-              <span className="st-label">Text found on the take</span>
+              <span className="st-label">Text found on the take <span className="st-muted" style={{ fontWeight: 400 }}>(the words boxed in red on their frame: tell real leftover text from a false reading)</span></span>
               <div className="st-row" style={{ gap: 6, flexWrap: 'wrap' }}>
-                {review.text.map((x, i) => <button key={i} type="button" className={`st-chip text-${x.kind}`} onClick={() => seek(x.t)}>{x.kind === 'handle' ? 'Handle' : x.kind === 'logo' ? 'Logo' : 'Text'}: {x.text} <span className="st-muted">{x.t.toFixed(1)} s</span></button>)}
+                {review.text.map((x, i) => (
+                  <button key={i} type="button" className={`st-texthit text-${x.kind}`} onClick={() => seek(x.t)} title="Show this moment in both videos">
+                    {x.frameAssetId ? <img src={assetUrl(x.frameAssetId)} alt={`The frame at ${x.t.toFixed(1)} s with the words boxed`} /> : <span className="st-texthit-empty">Getting the frame...</span>}
+                    <span>{x.kind === 'handle' ? 'Handle' : x.kind === 'logo' ? 'Logo' : 'Text'}: <b>{x.text}</b> <span className="st-muted">{x.t.toFixed(1)} s</span></span>
+                  </button>
+                ))}
               </div>
             </div>
           )}

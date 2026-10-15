@@ -162,7 +162,10 @@ clone:
   # 2026-10-15), in place of the full REALISM and AVOID blocks.
   recreate_realism: "Natural skin texture, not retouched."
   # The face-only pass on a chosen still: nothing else moves.
-  face_pass: "Change only {poss} face to match {name}{element}: {face}. Keep everything else in the image exactly the same, pixel for pixel: the hair, the outfit, the pose, the hands, the light, the background and the framing."
+  # Owner, 2026-10-15: the still is the image being edited (the first
+  # image); the element and REF-00 are face references only.
+  face_pass: "Edit the first image. Change only {poss} face to match {name}{element}: {face}. Use the other images only for the face. Keep everything else in the first image exactly the same, pixel for pixel: the hair, the outfit, the pose, the hands, the light, the background and the framing."
+  face_pass_refs: " (the face in the other images)"
   # Step 2 chips (owner, 2026-10-14): what to keep from the frame, named.
   recreate_keep: " Keep from it: {keep}."
   # Owner, 2026-10-15: the outfit stays plain ("dark green dress, same as in

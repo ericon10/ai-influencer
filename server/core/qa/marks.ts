@@ -14,6 +14,9 @@ export type QaCode =
   // Realism principle: smoothed or plastic skin is a defect; natural flaws
   // are kept and never reported as one.
   | 'skin_smoothed' | 'skin_plastic' | 'skin_real' | 'flaws_kept'
+  // Recreate (owner, 2026-10-15): a face pass that made a new picture, and
+  // a take that misses the video rule (a warning, never a rejection).
+  | 'scene_changed' | 'take_rule'
 
 export interface QaFinding {
   code: QaCode

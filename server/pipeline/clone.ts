@@ -22,6 +22,9 @@ import { cleanClip, detectEndCard, detectOverlays } from '../media/cleanup.js'
 import { muxSound } from '../media/edit.js'
 import { ffmpeg, probeFile, withTempDir } from '../media/ffmpeg.js'
 import { compareTexture } from '../qa/texture.js'
+import { sceneOutsideFace, SCENE_MIN } from '../qa/sceneMatch.js'
+import { takeGateFor, type TakeGate, type TakeSample } from '../core/takeGate.js'
+import { cosineSimilarity } from '../qa/faces.js'
 import type { GenRequest } from '../providers/types.js'
 import { readBilling } from '../providers/billing.js'
 import type { HiggsfieldBilling } from '../providers/types.js'
@@ -604,12 +607,15 @@ const two = (n: number) => n.toFixed(2)
 // like the character). A still the face checks could not read is held too,
 // unless no face shows in the clip's frame to compare with. Demo stills
 // (the free mock) have no scores and pass, with a note.
-export function gateFor(g: { face_min: number; margin: number; source_max: number }, still: { status: string; faceScore: number | null; sourceScore: number | null; demo: boolean }): StillGate {
+export function gateFor(g: { face_min: number; margin: number; source_max: number }, still: { status: string; faceScore: number | null; sourceScore: number | null; demo: boolean; blocked?: string | null; unchecked?: boolean }): StillGate {
   const { faceScore: face, sourceScore: likeness } = still
   const margin = face != null && likeness != null ? Math.round((face - likeness) * 1000) / 1000 : null
   if (still.demo) return { ok: true, face, likeness, margin, reasons: [], note: 'Demo mode: the face checks do not run on mock stills.' }
   const reasons: string[] = []
-  if (still.status === 'qa_failed') reasons.push('It looks like the person in the clip (a new person is a fixed rule).')
+  if (still.status === 'qa_failed') reasons.push(still.blocked || 'It looks like the person in the clip (a new person is a fixed rule).')
+  // A face pass from before the scene check may not be its still (owner,
+  // 2026-10-15: both came back as studio portraits).
+  if (still.unchecked) reasons.push('This face pass was made before the scene check, so it may not match its still. Make the face pass again, or use a still.')
   if (face == null) reasons.push('No face to match with REF-00 was found on it.')
   else if (face < g.face_min) reasons.push(`Face match ${two(face)}, needs ${two(g.face_min)} or more.`)
   if (margin != null && margin < g.margin) reasons.push(`Beats the clip's person by ${two(margin)} (face ${two(face!)}, likeness ${two(likeness!)}), needs ${two(g.margin)} or more.`)
@@ -633,6 +639,21 @@ export async function recreateGate(deps: Deps, ctx: Ctx): Promise<GateNumbers> {
 
 export async function setRecreateGate(deps: Deps, ctx: Ctx, g: GateNumbers): Promise<void> {
   await setSetting(deps, ctx, GATE_KEY, { ...g, approvedAt: deps.clock.now().toISOString() })
+}
+
+// The video rule's numbers: the still rule's calibrated defaults until a
+// gate check gives video takes their own (owner, 2026-10-15). A take that
+// misses them is a warning; it never blocks.
+const VIDEO_GATE_KEY = 'recreate_video_gate'
+export async function recreateVideoGate(deps: Deps, ctx: Ctx): Promise<GateNumbers> {
+  const base = deps.config.pipeline.content.clone.recreate.gate
+  const own = await getSetting<Partial<GateNumbers> | null>(deps.db, ctx.accountId, VIDEO_GATE_KEY, null)
+  const ok = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= 1
+  return own && ok(own.face_min) && ok(own.margin) && ok(own.source_max) ? { face_min: own.face_min, margin: own.margin, source_max: own.source_max } : base
+}
+
+export async function setRecreateVideoGate(deps: Deps, ctx: Ctx, g: GateNumbers): Promise<void> {
+  await setSetting(deps, ctx, VIDEO_GATE_KEY, { ...g, approvedAt: deps.clock.now().toISOString() })
 }
 
 async function stillGate(deps: Deps, ctx: Ctx, still: { status: string; jobId: string | null; meta: unknown }): Promise<StillGate> {
@@ -910,6 +931,7 @@ export async function buildCloneStill(deps: Deps, ctx: Ctx, input: CloneStillInp
     for (const sp of fp.specs) specs.push({ ...sp, parentIndex: 0 })
     prompts.push(...fp.prompts)
     warnings.push(...fp.warnings)
+    warnings.push(warn('clone-face-skip', 'The face pass is priced in, up to', `It is skipped, and its part of the price is not charged, when the best still already beats the clip's person by ${cfg.recreate.face_skip_margin.toFixed(2)} or more.`))
   }
   return {
     purpose: `clone_still:${post.id}`,
@@ -951,12 +973,17 @@ async function facePassRun(deps: Deps, ctx: Ctx, o: { postId: string; characterI
   const { templates: t, rules } = deps.config.pipeline
   const { row, ch, approved, model, run, entry, element, level } = await stillRun(deps, ctx, o.characterId, o.model)
   const takes = Math.min(Math.max(1, Math.round(o.takes ?? cfg.recreate.face_takes)), 4)
-  const refs = [o.assetId, ...(element ? [] : replaceRefs(deps, approved))]
+  // The still is the image being edited, so it goes first; REF-00 (and with
+  // no element, a three-quarter view) is a face reference only. With only
+  // the element, the model made a new studio portrait from the element and
+  // ignored the still (owner, 2026-10-15).
+  const ref00 = approved.get('REF-00')
+  const refs = [o.assetId, ...(element ? (ref00 ? [ref00] : []) : replaceRefs(deps, approved))]
   const pv = pronounVars(ch.pronouns)
   const { face } = faceWords(ch)
   const sw = await ruleSwitches(deps, ctx, row.id)
   const realism: RealismWarning[] = []
-  const change = fill(t.clone.face_pass, { ...pv, name: ch.name, face, element: element ? ` <<<${element.externalId}>>>` : t.clone.recreate_element_api })
+  const change = fill(t.clone.face_pass, { ...pv, name: ch.name, face, element: element ? ` <<<${element.externalId}>>>${ref00 ? t.clone.face_pass_refs : ''}` : t.clone.face_pass_refs })
   const prompt = buildEditPrompt(t, change, ch, false, { warnings: realism, flawDose: sw.on('realism-flaw-dose'), realismLine: t.clone.recreate_realism })
   const request: GenRequest = {
     kind: 'image_edit', model: run.model, modelRef: model, prompt, aspect: o.aspect, quality: level.quality, resolution: level.resolution,
@@ -1088,13 +1115,31 @@ async function onCloneStill(deps: Deps, ctx: Ctx, job: JobRow, out: JobOutcome):
   } catch (e) {
     findings.push({ code: 'uncertain', severity: 'warn', message: `The free checks could not run on this still (${(e as Error).message.slice(0, 160)}). Look at the face yourself.` })
   }
+  // A face pass must still be its still outside the face: the place, the
+  // outfit, the pose, the framing (owner, 2026-10-15).
+  let scene: number | null = null
+  if (face && parentId && !demo) {
+    try {
+      const parent = await getCandidate(deps, ctx, parentId)
+      if (parent.assetId) {
+        const still = (await readAsset(deps, ctx, parent.assetId)).data
+        const box = (await deps.faces.status()).available ? (await deps.faces.analyze(still).catch(() => null))?.face.box ?? null : null
+        const m = await sceneOutsideFace(still, (await readAsset(deps, ctx, asset.id)).data, box)
+        scene = m.score
+        if (!m.ok) findings.push({ code: 'scene_changed', severity: 'fail', message: `${SCENE_CHANGED} Outside the face it no longer matches its still (match ${m.score.toFixed(2)}, needs ${SCENE_MIN.toFixed(2)}): the place, the outfit, the pose or the framing changed.` })
+      }
+    } catch (e) {
+      findings.push({ code: 'uncertain', severity: 'warn', message: `The scene check could not run on this face pass (${(e as Error).message.slice(0, 160)}). Compare it with its still yourself.` })
+    }
+  }
   const report = freeChecksOnly(finalize(findings, null))
   const fails = (code: string) => findings.some(f => f.code === code && f.severity === 'fail')
-  const status = fails('too_similar') ? 'qa_failed' : fails('face_drift') ? 'in_review' : 'approved'
+  const blocked = findings.find(f => f.severity === 'fail' && (f.code === 'scene_changed' || f.code === 'too_similar'))
+  const status = blocked ? 'qa_failed' : fails('face_drift') ? 'in_review' : 'approved'
   const id = newId('cand')
   await deps.db.insert(candidates).values({
-    ...base, id, assetId: asset.id, status, qaReport: report, qaVerdict: report.verdict, meta: { pass: face ? 'face' : 'still', ...scores },
-    ...(status === 'qa_failed' ? { rejectNote: findings.find(f => f.code === 'too_similar')!.message } : {}),
+    ...base, id, assetId: asset.id, status, qaReport: report, qaVerdict: report.verdict, meta: { pass: face ? 'face' : 'still', ...scores, ...(face ? { scene, sceneChecked: !demo } : {}) },
+    ...(blocked ? { rejectNote: blocked.message } : {}),
   })
   // The first good still is kept for the run; "Use this still" or "You
   // pick" picks another. A face pass never replaces a pick by itself.
@@ -1106,6 +1151,11 @@ async function onCloneStill(deps: Deps, ctx: Ctx, job: JobRow, out: JobOutcome):
 }
 
 const DONE = new Set(['completed', 'failed', 'canceled', 'needs_attention'])
+export const FACE_SKIPPED = 'Face pass skipped.'
+// The best still passes its gate and beats the clip's person by the skip
+// margin or more (owner, 2026-10-15: today all 4 stills scored 0.47 to 0.64).
+export const skipsFacePass = (gate: StillGate, skip: number): boolean => gate.ok && gate.margin != null && gate.margin >= skip
+export const SCENE_CHANGED = 'Face pass changed the scene, not usable.'
 
 // The face pass that came with "Make 4 stills" waits as children of the
 // first still. Once every still of that run has landed and been checked,
@@ -1125,6 +1175,12 @@ async function startAutoFace(deps: Deps, ctx: Ctx, job: JobRow, postId: string, 
     await cancelChildren(deps, parent.id, 'No still came out usable, so the face pass did not run. Nothing was charged for it.')
     return
   }
+  // Already clear of the clip's person: nothing to fix, nothing charged.
+  const skip = deps.config.pipeline.content.clone.recreate.face_skip_margin
+  if (skipsFacePass(best.gate, skip)) {
+    await cancelChildren(deps, parent.id, `${FACE_SKIPPED} The best still already beats the clip's person by ${(best.gate.margin ?? 0).toFixed(2)} (${skip.toFixed(2)} or more skips it), so its face needs no fixing. Nothing was charged for it.`)
+    return
+  }
   await activateChildren(deps, parent.id, child => {
     const refs = ((child.request as GenRequest).refs ?? []).slice(1)
     return { refs: [{ assetId: best.assetId! }, ...refs], faceOf: best.id }
@@ -1135,6 +1191,8 @@ export interface CloneStillView {
   id: string; characterId: string; characterName: string; assetId: string | null; status: string; kept: boolean; error: string | null
   findings: Array<{ code: string; severity: string; message: string }>; createdAt: string
   parentId: string | null; pass: 'still' | 'face'; faceScore: number | null; sourceScore: number | null
+  // Why a face pass did not run when that is good news (the still was clear).
+  note: string | null
   // The gates before the video (fixed): whether this still can start it, and why not.
   gate: StillGate
 }
@@ -1151,13 +1209,18 @@ export async function cloneStills(deps: Deps, ctx: Ctx, contentId: string): Prom
     .orderBy(desc(candidates.createdAt))
   const names = new Map((await deps.db.select({ id: characters.id, name: characters.name }).from(characters).where(eq(characters.accountId, ctx.accountId))).map(c => [c.id, c.name]))
   return rows.map(c => {
-    const meta = (c.meta ?? {}) as { pass?: 'still' | 'face'; faceScore?: number | null; sourceScore?: number | null }
+    const meta = (c.meta ?? {}) as { pass?: 'still' | 'face'; faceScore?: number | null; sourceScore?: number | null; sceneChecked?: boolean }
+    const demo = !!c.jobId && mock.has(c.jobId)
+    // A face pass skipped because the still was already clear is news, not a failure.
+    const skipped = c.status === 'failed' && (c.rejectNote ?? '').startsWith(FACE_SKIPPED)
+    const unchecked = meta.pass === 'face' && !demo && c.status !== 'failed' && meta.sceneChecked === undefined
     return {
-      id: c.id, characterId: c.characterId, characterName: names.get(c.characterId) ?? '', assetId: c.assetId, status: c.status, kept: source?.stills[c.characterId] === c.id,
-      error: c.status === 'failed' || c.status === 'qa_failed' ? c.rejectNote || 'The still failed.' : null,
+      id: c.id, characterId: c.characterId, characterName: names.get(c.characterId) ?? '', assetId: c.assetId, status: skipped ? 'skipped' : c.status, kept: source?.stills[c.characterId] === c.id,
+      error: skipped ? null : c.status === 'failed' || c.status === 'qa_failed' ? c.rejectNote || 'The still failed.' : null,
+      note: skipped ? c.rejectNote : null,
       findings: ((c.qaReport as QaReport | null)?.findings ?? []).map(f => ({ code: f.code, severity: f.severity, message: f.message })), createdAt: c.createdAt.toISOString(),
       parentId: c.parentId, pass: meta.pass ?? 'still', faceScore: meta.faceScore ?? null, sourceScore: meta.sourceScore ?? null,
-      gate: gateFor(g, { status: c.status, faceScore: meta.faceScore ?? null, sourceScore: meta.sourceScore ?? null, demo: !!c.jobId && mock.has(c.jobId) }),
+      gate: gateFor(g, { status: c.status, faceScore: meta.faceScore ?? null, sourceScore: meta.sourceScore ?? null, demo, blocked: c.rejectNote || null, unchecked }),
     }
   })
 }
@@ -1188,7 +1251,7 @@ export async function useCloneStill(deps: Deps, ctx: Ctx, contentId: string, can
   if (cand.op !== 'clone_still' || !cand.assetId) throw new AppError('bad_request', 'That is not a finished scene still.')
   const job = cand.jobId ? (await deps.db.select({ purpose: jobs.purpose }).from(jobs).where(eq(jobs.id, cand.jobId)))[0] : undefined
   if (!job?.purpose.startsWith(`clone_still:${post.id}:`) && !job?.purpose.startsWith(`clone_face:${post.id}:`)) throw new AppError('bad_request', 'That still belongs to another post.')
-  if (cand.status === 'qa_failed') throw new AppError('bad_request', 'This still looks like the person in the clip, not the character. A new person is a fixed rule, so it cannot be used. Make it again.')
+  if (cand.status === 'qa_failed') throw new AppError('bad_request', (cand.rejectNote ?? '').startsWith(SCENE_CHANGED) ? `${SCENE_CHANGED} Make the face pass again, or use a still.` : 'This still looks like the person in the clip, not the character. A new person is a fixed rule, so it cannot be used. Make it again.')
   await updateContent(deps, ctx, post.id, { spec: { clone: { ...source, stills: { ...source.stills, [cand.characterId]: cand.id } } } })
   return { ok: true }
 }
@@ -1208,7 +1271,6 @@ async function onClone(deps: Deps, ctx: Ctx, job: JobRow, out: JobOutcome): Prom
     await deps.db.insert(candidates).values({ ...base, id: newId('cand'), status: 'failed', rejectNote: out.error || 'The clone did not finish.' })
     return
   }
-  const row = await getCharacter(deps, ctx, characterId)
   const findings: QaReport['findings'] = []
   let clipAssetId = asset.id
   // "Keep original sound": the source clip's sound under the clone (free).
@@ -1226,21 +1288,33 @@ async function onClone(deps: Deps, ctx: Ctx, job: JobRow, out: JobOutcome): Prom
       findings.push({ code: 'uncertain', severity: 'warn', message: `The original sound could not be added (${(e as Error).message.slice(0, 160)}), so this clone is silent.` })
     }
   }
-  // Free checks: the face against REF-00 on two frames, that it is not the
-  // performer from the source clip at the same moments, and the skin.
+  // Free checks: the face against REF-00 and the likeness to the clip's
+  // person on three frames, read with the video rule (the still rule's
+  // numbers), and the skin. A paid take is never rejected (owner,
+  // 2026-10-15): one that misses the rule waits for the owner to keep it or
+  // try again; the review then reads the whole take every half second.
   const demo = job.provider === 'mock'
+  let gate: TakeGate | null = null
   try {
     const at = [0.3, 0.6, 0.9]
     const frames = await clipFrames(deps, ctx, asset.id, at)
     const sourceFrames = await clipFrames(deps, ctx, req.sourceVideo.assetId, at)
     const ref00 = (await approvedAssets(deps, ctx, characterId)).get('REF-00')
-    for (const i of [1, 2]) {
-      const frame = await saveAsset(deps, ctx, { data: frames[i]!, mime: 'image/png', origin: 'derived', label: `frame of ${asset.id}`, sourceJobId: job.id })
-      const r = await scoreSceneIdentity(deps, ctx, { assetId: frame.id, refs: ref00 ? [{ refId: 'REF-00', assetId: ref00 }] : [], demo })
-      for (const f of r.findings) if (!findings.some(x => x.code === f.code && x.severity === f.severity)) findings.push(f)
+    const facesOn = !demo && !!ref00 && (await deps.faces.status()).available
+    if (facesOn) {
+      const ref = await deps.faces.analyze((await readAsset(deps, ctx, ref00!)).data, `ref:${ref00}`)
+      const samples: TakeSample[] = []
+      for (const [i, f] of frames.entries()) {
+        const mine = await deps.faces.analyze(f)
+        const theirs = sourceFrames[i] ? await deps.faces.analyze(sourceFrames[i]!) : null
+        samples.push({ t: at[i]!, face: mine && ref ? cosineSimilarity(mine.embedding, ref.embedding) : null, likeness: mine && theirs ? cosineSimilarity(mine.embedding, theirs.embedding) : null })
+      }
+      gate = takeGateFor(await recreateVideoGate(deps, ctx), samples)
+      if (!gate.ok) findings.push({ code: 'take_rule', severity: 'warn', message: `Misses the video rule (${gate.reasons.join(' ')}) Keep this take or try again.` })
+      else findings.push({ code: 'identity_match', severity: 'info', message: `Passes the video rule on three frames (face ${gate.face?.toFixed(2)}${gate.margin != null ? `, margin ${gate.margin.toFixed(2)}` : ''}${gate.likeness != null ? `, likeness ${gate.likeness.toFixed(2)}` : ''}).` })
+    } else if (!demo) {
+      findings.push({ code: 'identity_skipped', severity: 'warn', message: 'Face matching is off, so the face was not checked. Look at the face yourself.' })
     }
-    const p = await scorePerformer(deps, ctx, { pairs: frames.map((f, i) => ({ result: f, source: sourceFrames[i]! })), name: row.name, demo })
-    findings.push(...p.findings.filter(f => !findings.some(x => x.code === f.code && x.message === f.message)))
     if (ref00 && !demo) {
       const { data } = await readAsset(deps, ctx, ref00)
       const tex = await compareTexture(data, frames[1]!, { faces: deps.faces, minRatio: deps.config.runtime.qa.texture_min_ratio * 0.6, sameFraming: false })
@@ -1250,16 +1324,10 @@ async function onClone(deps: Deps, ctx: Ctx, job: JobRow, out: JobOutcome): Prom
     findings.push({ code: 'uncertain', severity: 'warn', message: `The free checks could not run on this clone (${(e as Error).message.slice(0, 160)}). Look at the face yourself.` })
   }
   const report = freeChecksOnly(finalize(findings, null))
-  const fails = (code: string) => findings.some(f => f.code === code && f.severity === 'fail')
-  // A copy of the performer breaks a fixed rule (a new person, never a
-  // copy), so it is not kept. Face drift is a strong warning: kept for a
-  // person to decide, never picked automatically.
-  const status = fails('too_similar') ? 'qa_failed' : fails('face_drift') ? 'in_review' : 'approved'
+  // Kept when it passes (or in the demo); otherwise the owner decides.
+  const status = demo || gate?.ok ? 'approved' : 'in_review'
   const id = newId('cand')
-  await deps.db.insert(candidates).values({
-    ...base, id, assetId: clipAssetId, status, qaReport: report, qaVerdict: report.verdict,
-    ...(status === 'qa_failed' ? { rejectNote: findings.find(f => f.code === 'too_similar')!.message } : {}),
-  })
+  await deps.db.insert(candidates).values({ ...base, id, assetId: clipAssetId, status, qaReport: report, qaVerdict: report.verdict, meta: { gate } })
   await confirmByRun(deps, ctx, job)
   // The review (free, on the worker): the face every half second, text on
   // the frames, cuts.
@@ -1298,6 +1366,16 @@ export interface CloneView {
   // Frames shown until the videos load: the clip's first frame and the still
   // the take started from.
   posters: { source: string | null; take: string | null }
+  // The video rule over the take (the review's every half second, else the
+  // three frames checked when it landed), and the owner's call on it.
+  gate: TakeGate | null
+  decision: 'kept' | 'tried_again' | null
+  // A take the old check marked "Not kept" (owner, 2026-10-15: never
+  // reject a paid take), shown again for the owner to decide.
+  oldReject: string | null
+  // Text found without frame thumbnails (reviewed before them): a free
+  // review again fills them in.
+  needsFrames: boolean
 }
 
 export async function postClones(deps: Deps, ctx: Ctx, contentId: string): Promise<CloneView[]> {
@@ -1311,15 +1389,28 @@ export async function postClones(deps: Deps, ctx: Ctx, contentId: string): Promi
     .orderBy(desc(candidates.createdAt))
   const names = new Map((await deps.db.select({ id: characters.id, name: characters.name }).from(characters).where(eq(characters.accountId, ctx.accountId))).map(c => [c.id, c.name]))
   const out: CloneView[] = []
+  const videoGate = await recreateVideoGate(deps, ctx)
+  const mockRuns = new Set((await deps.db.select({ id: jobs.id }).from(jobs).where(and(eq(jobs.accountId, ctx.accountId), inArray(jobs.id, jobRows.map(j => j.id)), eq(jobs.provider, 'mock')))).map(j => j.id))
   for (const c of rows) {
     const asset = c.assetId ? await getAsset(deps, ctx, c.assetId).catch(() => null) : null
     const report = c.qaReport as QaReport | null
+    const meta = (c.meta ?? {}) as { review?: CloneReview; gate?: TakeGate | null; decision?: { kind: 'kept' | 'tried_again' } | null }
+    const review = meta.review ?? null
+    // Read again with today's numbers: the whole take once reviewed.
+    const demo = !!c.jobId && mockRuns.has(c.jobId)
+    // (Only when the review found faces; with face matching off, the gate
+    // stored with the take stands.)
+    const gate = review?.samples.some(x => x.face != null) ? takeGateFor(videoGate, review.samples, { demo }) : review?.gate ?? meta.gate ?? null
+    // A take the old check rejected is not a failure any more.
+    const oldReject = c.status === 'qa_failed' && !!c.assetId ? c.rejectNote || 'Marked Not kept by the old check.' : null
     out.push({
-      id: c.id, characterId: c.characterId, characterName: names.get(c.characterId) ?? '', assetId: c.assetId, status: c.status, label: c.label ?? 'Clone',
-      durationSec: asset?.durationMs ? Math.round(asset.durationMs / 100) / 10 : null, error: c.status === 'failed' || c.status === 'qa_failed' ? c.rejectNote || 'The clone failed.' : null,
-      findings: (report?.findings ?? []).map(f => ({ code: f.code, severity: f.severity, message: f.message })), createdAt: c.createdAt.toISOString(),
-      sourceAssetId: null, review: ((c.meta ?? {}) as { review?: CloneReview }).review ?? null, model: null, parentId: c.parentId,
+      id: c.id, characterId: c.characterId, characterName: names.get(c.characterId) ?? '', assetId: c.assetId, status: oldReject ? 'in_review' : c.status, label: c.label ?? 'Clone',
+      durationSec: asset?.durationMs ? Math.round(asset.durationMs / 100) / 10 : null, error: c.status === 'failed' || (c.status === 'qa_failed' && !oldReject) ? c.rejectNote || 'The clone failed.' : null,
+      findings: (report?.findings ?? []).filter(f => !(oldReject && (f.code === 'too_similar' || f.code === 'face_drift'))).map(f => ({ code: f.code, severity: f.severity, message: f.message })), createdAt: c.createdAt.toISOString(),
+      sourceAssetId: null, review, model: null, parentId: c.parentId,
       posters: { source: firstFrame, take: null },
+      gate, decision: meta.decision?.kind ?? null, oldReject,
+      needsFrames: !!review && review.text.some(x => !x.frameAssetId),
     })
     const run = c.jobId ? runs.get(c.jobId) : undefined
     const req = run && !run.purpose.startsWith('clone_trim:') ? run.request as GenRequest : null
@@ -1334,20 +1425,36 @@ export async function postClones(deps: Deps, ctx: Ctx, contentId: string): Promi
   return out
 }
 
-// "Use this clip" keeps a clone the checks left for a person (face drift
-// asks first). A copy of the performer can never be used.
+// "Keep this take" (and "Use this take"): the owner's call on a take. A
+// paid take is never rejected (owner, 2026-10-15); one that misses the
+// video rule asks once, then is kept. The call is recorded for the gate
+// check.
 export async function keepClone(deps: Deps, ctx: Ctx, candidateId: string, acknowledge = false): Promise<{ ok: true }> {
   const cand = await getCandidate(deps, ctx, candidateId)
   if (cand.op !== 'clone' || !cand.assetId) throw new AppError('bad_request', 'That is not a finished clone.')
-  const findings = (cand.qaReport as QaReport | null)?.findings ?? []
-  const fails = (code: string) => findings.some(f => f.code === code && f.severity === 'fail')
-  if (fails('too_similar')) throw new AppError('bad_request', 'This clone looks like the person in the source clip, not the character. A new person is a fixed rule, so it cannot be used. Try another model or a clearer character image.')
   if (cand.status === 'approved') return { ok: true }
-  if (fails('face_drift') && !acknowledge && (await ruleSwitches(deps, ctx, cand.characterId)).on('qa-face-drift')) {
-    throw new AppError('confirm_required', 'The face in this clone does not match REF-00. Use it anyway?')
-  }
+  const meta = (cand.meta ?? {}) as { review?: CloneReview; gate?: TakeGate | null; decision?: unknown }
+  // Read again with today's numbers when the review found faces; else the
+  // gate stored with the take (a demo take passes with a note).
+  const stored = meta.review?.gate ?? meta.gate ?? null
+  const gate = meta.review?.samples.some(x => x.face != null) ? takeGateFor(await recreateVideoGate(deps, ctx), meta.review.samples) : stored
+  if (!acknowledge && gate && !gate.ok) throw new AppError('confirm_required', `This take misses the video rule: ${gate.reasons.join(' ')} Keep it anyway?`)
   const now = deps.clock.now()
-  await deps.db.update(candidates).set({ status: 'approved', reviewedBy: ctx.userId, reviewedAt: now, updatedAt: now }).where(eq(candidates.id, cand.id))
+  // The old check's rejection becomes a warning once the owner keeps it.
+  const report = cand.qaReport as QaReport | null
+  const qaReport = report ? { ...report, findings: report.findings.map(f => (f.severity === 'fail' && (f.code === 'too_similar' || f.code === 'face_drift') ? { ...f, severity: 'warn' as const, message: `${f.message} Kept by you.` } : f)) } : report
+  await deps.db.update(candidates).set({ status: 'approved', qaReport, rejectNote: '', reviewedBy: ctx.userId, reviewedAt: now, updatedAt: now, meta: { ...meta, decision: { kind: 'kept', at: now.toISOString() } } }).where(eq(candidates.id, cand.id))
+  return { ok: true }
+}
+
+// "Try again": the owner passes on this take (recorded for the gate
+// check). Nothing is spent here; Make the video is priced as before.
+export async function tryCloneAgain(deps: Deps, ctx: Ctx, candidateId: string): Promise<{ ok: true }> {
+  const cand = await getCandidate(deps, ctx, candidateId)
+  if (cand.op !== 'clone') throw new AppError('bad_request', 'That is not a clone.')
+  const meta = (cand.meta ?? {}) as Record<string, unknown>
+  const now = deps.clock.now()
+  await deps.db.update(candidates).set({ reviewedBy: ctx.userId, reviewedAt: now, updatedAt: now, meta: { ...meta, decision: { kind: 'tried_again', at: now.toISOString() } } }).where(eq(candidates.id, cand.id))
   return { ok: true }
 }
 
@@ -1370,7 +1477,6 @@ export async function postFromClone(deps: Deps, ctx: Ctx, contentId: string, can
 export async function trimClone(deps: Deps, ctx: Ctx, candidateId: string, range: { start: number; end: number }): Promise<{ ok: true }> {
   const cand = await getCandidate(deps, ctx, candidateId)
   if (cand.op !== 'clone' || !cand.assetId) throw new AppError('bad_request', 'That is not a finished clone.')
-  if ((cand.qaReport as QaReport | null)?.findings.some(f => f.code === 'too_similar' && f.severity === 'fail')) throw new AppError('bad_request', 'This clone looks like the person in the source clip, so it cannot be used.')
   const asset = await getAsset(deps, ctx, cand.assetId)
   const total = (asset.durationMs ?? 0) / 1000
   const start = Math.max(0, Math.round(range.start * 100) / 100)

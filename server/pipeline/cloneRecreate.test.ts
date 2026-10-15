@@ -15,6 +15,7 @@ import { renderPlaceholderPortrait } from '../providers/mock.js'
 import { makeClip } from '../media/testClips.js'
 import { probeFile } from '../media/ffmpeg.js'
 import { readAsset } from '../storage/assets.js'
+import { approvedAssets } from './characters.js'
 import { uploadKey } from '../storage/uploads.js'
 import type { GenRequest } from '../providers/types.js'
 
@@ -117,13 +118,17 @@ describe('the stills, the face pass and the pick', () => {
     // A still the automatic face pass did not take.
     const chosen = stills.find(x => x.pass === 'still' && !x.error && !stills.some(f => f.parentId === x.id))!
     const { preview } = await run({ type: 'clone_face', contentId: postId, characterId: callie, candidateId: chosen.id })
-    expect(preview.prompts[0]!.text).toMatch(/^Change only her face to match Callie \(the person in the other reference images\)/)
-    expect(preview.prompts[0]!.text).toMatch(/Keep everything else in the image exactly the same, pixel for pixel/)
+    // The still is the image being edited; the other images carry only the face.
+    expect(preview.prompts[0]!.text).toMatch(/^Edit the first image\. Change only her face to match Callie \(the face in the other images\)/)
+    expect(preview.prompts[0]!.text).toMatch(/Use the other images only for the face\. Keep everything else in the first image exactly the same, pixel for pixel/)
     const face = (await cloneStills(h.deps, h.ctx, postId)).filter(x => x.pass === 'face' && x.parentId === chosen.id)
     expect(face).toHaveLength(2)
     expect(face.every(x => !x.kept)).toBe(true)
     const reqs = await requests(`clone_face:${postId}:${callie}:${chosen.id}`)
     expect(reqs[0]!.refs![0]!.assetId).toBe(chosen.assetId)
+    // REF-00 rides second, as the face to match.
+    const ref00 = (await approvedAssets(h.deps, h.ctx, callie)).get('REF-00')
+    expect(reqs[0]!.refs![1]!.assetId).toBe(ref00)
   }, 120_000)
 
   it('You pick keeps one still for the run, never one that looks like the person in the clip', async () => {

@@ -339,7 +339,18 @@ export interface CloneSource {
 export interface StillChoice { ref: string; label: string; path: 'account' | 'api'; pathLabel: string; problem: string | null; note: string | null }
 export type GateNumbers = { face_min: number; margin: number; source_max: number }
 export interface GateSample { postId: string; candidateId: string; assetId: string | null; pass: 'still' | 'face'; face: number | null; likeness: number | null; margin: number | null; model: string | null; at: string }
+// A take's scores over the whole take (the video rule) and the gate
+// check's video section (owner, 2026-10-15).
+export interface TakeGate { ok: boolean; face: number | null; likeness: number | null; margin: number | null; frames: number; reasons: string[]; note: string | null }
+export interface TakeScore { postId: string; candidateId: string; assetId: string | null; face: number | null; likeness: number | null; margin: number | null; model: string | null; at: string }
+export interface VideoGateView {
+  count: number; every: number; reviewedAt: number; due: boolean; nextAt: number
+  current: GateNumbers; suggested: GateNumbers | null; kept: TakeScore[]; triedAgain: TakeScore[]
+  effect: { current: { keptPass: number; triedAgainHeld: number }; suggested: { keptPass: number; triedAgainHeld: number } | null }
+  why: string[]
+}
 export interface GateCheckView {
+  video: VideoGateView
   count: number; every: number; reviewedAt: number; due: boolean; nextAt: number
   current: GateNumbers; suggested: GateNumbers | null; picked: GateSample[]; passedOver: GateSample[]
   effect: { current: { pickedPass: number; passedOverHeld: number }; suggested: { pickedPass: number; passedOverHeld: number } | null }
@@ -352,6 +363,8 @@ export interface CloneStill {
   // A face pass made from another still, and the free scores (face match
   // to REF-00, likeness to the person in the clip; null in demo mode).
   parentId: string | null; pass: 'still' | 'face'; faceScore: number | null; sourceScore: number | null
+  // Why a face pass did not run when that is good news (status 'skipped').
+  note: string | null
   // The gates before the video (fixed): whether it can start it, and why not.
   gate: StillGate
 }
@@ -369,14 +382,18 @@ export interface CloneReview {
   at: string; duration: number; step: number; faceMin: number
   samples: Array<{ t: number; face: number | null; likeness: number | null }>
   drift: Array<{ start: number; end: number }>
-  text: Array<{ t: number; kind: 'handle' | 'logo' | 'caption'; text: string }>
+  text: Array<{ t: number; kind: 'handle' | 'logo' | 'caption'; text: string; frameAssetId?: string | null }>
   cuts: number[]; notes: string[]
+  gate?: TakeGate | null
 }
 export interface CloneResult {
   id: string; characterId: string; characterName: string; assetId: string | null; status: string; label: string
   durationSec: number | null; error: string | null; findings: Array<{ code: string; severity: string; message: string }>; createdAt: string
   sourceAssetId: string | null; review: CloneReview | null; model: string | null; parentId: string | null
   posters: { source: string | null; take: string | null }
+  // The video rule over the take, the owner's call, a take the old check
+  // rejected (shown again), and text found without frames yet.
+  gate: TakeGate | null; decision: 'kept' | 'tried_again' | null; oldReject: string | null; needsFrames: boolean
 }
 // A batch of recreates: each row a clip and a character in its own post.
 export interface RecreateRow {

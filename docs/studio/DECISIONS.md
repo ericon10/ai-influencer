@@ -1946,3 +1946,58 @@ person" in the clone panel.
 - **Not built (owner picks).** The usability notes in the audit report:
   the small preview, handles over a small caption, no click-away deselect
   in the preview, track names, the Tap button's second click, and the rest.
+
+### G44. Recreate: no paid take is rejected; the face pass edits the still (owner, 2026-10-15)
+
+From the owner's first real Recreate (kitchen clip, Callie, Wan 3.0): the
+pipeline worked, the gates did not.
+
+- **The video rule.** The take review still used the old 0.36 cap on the
+  likeness and marked a take that was clearly Callie "Not kept" (likeness
+  0.39 on three frames). A take now uses the still gate's numbers over
+  the whole review (`server/core/takeGate.ts`): the middle face match 0.45
+  or more, the middle margin (face minus likeness, frame by frame) 0.12 or
+  more, the highest likeness under 0.45. The middle face and margin,
+  because one turned head should not sink a take; the highest likeness,
+  because the moment it looks most like the clip's person is the one that
+  matters (she copies the clip's expressions, so a take reads higher than
+  a still). The kitchen take: face 0.645, margin 0.43, likeness 0.32 over
+  12 frames, a pass.
+- **A paid take is never rejected.** A take that misses the rule shows
+  "Misses the video rule": a warning with the scores and what missed, and
+  two buttons, **Keep this take** and **Try again** (the call is recorded,
+  nothing spends, the page goes back to Make the video). A take that
+  passes is kept. Only the still gate blocks spend; "a new person" stays a
+  fixed rule, enforced by that gate before the motion.
+- **Old rejects come back.** A take the old check marked Not kept shows
+  as "Your call" with the old reason, its scores worked out again from its
+  review, and Keep this take. The kitchen take on production is one;
+  nothing is kept for the owner on its own.
+- **Text found, with its frame.** Each text hit keeps a thumbnail of its
+  frame with the words boxed in red (`textThumb`), so a false reading
+  ("if 7", "Vij") can be told from leftover text. Older reviews get
+  theirs from a free review again when the take is opened. The first
+  version failed on frames wider than 360 px (sharp resizes before it
+  composites); two passes now, tested at a real take's size.
+- **The face pass edits the still.** Both kitchen face passes came back as
+  studio portraits in the sheet's white tee (0.82 and 0.85, marked ready).
+  The chosen still is now the first image, the one being edited; the
+  element and REF-00 are face reference only; the prompt starts "Edit the
+  first image." (`config/templates.yaml`, `face_pass`).
+- **The scene check.** Outside the face (its box grown by half each way,
+  blanked in both), a face pass must match its still: both made small and
+  gray and compared by correlation, 0.6 or more (`server/qa/sceneMatch.ts`).
+  One that misses says "Face pass changed the scene, not usable" and has
+  no Make the video. Face passes made before the check are held with a
+  line saying so (make it again, or use a still).
+- **The face pass skips itself when not needed.** When the best still
+  already passes with a margin of 0.30 or more (`content.yaml`,
+  `recreate.face_skip_margin`), the face pass is canceled before it runs
+  and its hold released, with the line "Face pass skipped." The kitchen
+  stills had margins of 0.47 to 0.64, so it would have been skipped.
+- **Video numbers in the gate check.** After every 10 real takes,
+  Settings > Rules shows the scores of the takes kept next to the ones
+  tried again on, with suggested video numbers and what they would have
+  held. Use these video numbers stores them for the account
+  (`recreate_video_gate`); Keep the current video numbers closes the check
+  until the next 10. Until then a take uses the still numbers.

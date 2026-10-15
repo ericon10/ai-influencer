@@ -323,6 +323,140 @@ describe('the gate check every 10 real recreates', () => {
   })
 })
 
+// The owner's first real Recreate (kitchen clip, Callie, Wan 3.0): the take
+// was clearly Callie but marked "Not kept" (likeness 0.39 against an old
+// 0.36 cap). A paid take is never rejected now (owner, 2026-10-15).
+const kitchenSamples = [
+  [0.77, 0.28], [0.74, 0.27], [0.72, 0.24], [0.74, 0.23], [0.62, 0.26], [0.69, 0.24],
+  [0.54, 0.17], [0.41, 0.32], [0.65, 0.22], [0.63, 0.22], [0.61, 0.23], [0.64, 0.21],
+].map(([face, likeness], i) => ({ t: i * 0.5, face: face!, likeness: likeness! }))
+
+describe('a paid take is never rejected; the face pass edits the still', () => {
+  it('the kitchen take: shown again with its scores and Keep this take; the text it found asks for frames', async () => {
+    const [take] = await postClones(h.deps, h.ctx, postId)
+    const [motion] = await h.deps.db.select().from(jobs).where(and(eq(jobs.accountId, h.ctx.accountId), like(jobs.purpose, `clone:${postId}:%`)))
+    await h.deps.db.update(jobs).set({ provider: 'higgsfield' }).where(eq(jobs.id, motion!.id))
+    const review = { at: new Date(0).toISOString(), duration: 6, step: 0.5, faceMin: 0.363, samples: kitchenSamples, drift: [], text: [{ t: 3, kind: 'caption', text: 'if 7' }, { t: 5, kind: 'caption', text: 'Vij' }], cuts: [], notes: [] }
+    const reject = 'This looks like the person in the source clip (match 0.39, must stay under 0.36), not Callie. A clone must be the character, so it is not kept.'
+    await h.deps.db.update(candidates).set({ status: 'qa_failed', rejectNote: reject, reviewedBy: null, meta: { review }, qaReport: { verdict: 'regenerate', summary: '', findings: [{ code: 'too_similar', severity: 'fail', message: reject }] } }).where(eq(candidates.id, take!.id))
+    const shown = (await postClones(h.deps, h.ctx, postId)).find(x => x.id === take!.id)!
+    expect(shown).toMatchObject({ status: 'in_review', error: null, oldReject: reject, needsFrames: true })
+    expect(shown.gate).toMatchObject({ ok: true, face: 0.645, likeness: 0.32, margin: 0.43, frames: 12 })
+    expect(shown.findings.some(f => f.code === 'too_similar')).toBe(false)
+    // A review again (free) fills in the frames and never keeps a take the
+    // old check rejected without the owner.
+    const { reviewTakeAgain } = await import('./recreate.js')
+    await reviewTakeAgain(h.deps, h.ctx, postId, take!.id)
+    await drain(h, 20)
+    const [after] = await h.deps.db.select().from(candidates).where(eq(candidates.id, take!.id))
+    expect(after!.status).toBe('in_review')
+    // Keep this take: kept, and the call is recorded.
+    const { keepClone } = await import('./clone.js')
+    await keepClone(h.deps, h.ctx, take!.id, true)
+    const [kept] = await h.deps.db.select().from(candidates).where(eq(candidates.id, take!.id))
+    expect(kept!.status).toBe('approved')
+    expect((kept!.meta as { decision: { kind: string } }).decision.kind).toBe('kept')
+    expect((await postClones(h.deps, h.ctx, postId)).find(x => x.id === take!.id)).toMatchObject({ status: 'approved', decision: 'kept', oldReject: null })
+    await h.deps.db.update(jobs).set({ provider: 'mock' }).where(eq(jobs.id, motion!.id))
+  }, 120_000)
+
+  it('a text hit keeps a thumbnail of its frame with the words boxed, whatever the frame size', async () => {
+    const sharp = (await import('sharp')).default
+    const { textThumb } = await import('./recreate.js')
+    const { readAsset } = await import('../storage/assets.js')
+    // A small frame and a real take's size (wider than the thumbnail).
+    for (const [width, height] of [[301, 533], [720, 1280]] as const) {
+      const frame = await sharp({ create: { width, height, channels: 3, background: '#7a6a50' } }).png().toBuffer()
+      const id = await textThumb(h.deps, h.ctx, frame, { x: 250, y: 500, w: 120, h: 60 }, 'Text at 3 s', null)
+      const { data, row } = await readAsset(h.deps, h.ctx, id)
+      expect(row.mime).toBe('image/jpeg')
+      const { data: px, info } = await sharp(data).raw().toBuffer({ resolveWithObject: true })
+      expect(info.width).toBe(360)
+      // The red box is drawn on the frame.
+      let red = 0
+      for (let i = 0; i < px.length; i += info.channels) if (px[i]! > 200 && px[i + 1]! < 110 && px[i + 2]! < 110) red++
+      expect(red).toBeGreaterThan(50)
+    }
+  })
+
+  it('Try again records the call and spends nothing', async () => {
+    const [take] = await postClones(h.deps, h.ctx, postId)
+    const before = await h.deps.db.select({ id: jobs.id }).from(jobs).where(eq(jobs.accountId, h.ctx.accountId))
+    const { tryCloneAgain } = await import('./clone.js')
+    await tryCloneAgain(h.deps, h.ctx, take!.id)
+    const after = await h.deps.db.select({ id: jobs.id }).from(jobs).where(eq(jobs.accountId, h.ctx.accountId))
+    expect(after.length).toBe(before.length)
+    expect((await postClones(h.deps, h.ctx, postId)).find(x => x.id === take!.id)!.decision).toBe('tried_again')
+  })
+
+  it('a face pass that changed the scene is not usable and has no Make the video; one from before the check says so', async () => {
+    const stills = await cloneStills(h.deps, h.ctx, postId)
+    const fp = stills.find(x => x.pass === 'face' && x.assetId)!
+    const [row] = await h.deps.db.select().from(candidates).where(eq(candidates.id, fp.id))
+    await h.deps.db.update(jobs).set({ provider: 'higgsfield' }).where(eq(jobs.id, row!.jobId!))
+    const { SCENE_CHANGED, useCloneStill } = await import('./clone.js')
+    await h.deps.db.update(candidates).set({ status: 'qa_failed', rejectNote: `${SCENE_CHANGED} Outside the face it no longer matches its still.`, meta: { pass: 'face', faceScore: 0.82, sourceScore: 0.2, scene: 0.12, sceneChecked: true } }).where(eq(candidates.id, fp.id))
+    let v = (await cloneStills(h.deps, h.ctx, postId)).find(x => x.id === fp.id)!
+    expect(v.gate.ok).toBe(false)
+    expect(v.error).toMatch(/changed the scene, not usable/)
+    await expect(useCloneStill(h.deps, h.ctx, postId, fp.id)).rejects.toThrow(/changed the scene/)
+    // Made before the scene check (scores, no check): held with the reason.
+    await h.deps.db.update(candidates).set({ status: 'approved', rejectNote: '', meta: { pass: 'face', faceScore: 0.85, sourceScore: 0.17 } }).where(eq(candidates.id, fp.id))
+    v = (await cloneStills(h.deps, h.ctx, postId)).find(x => x.id === fp.id)!
+    expect(v.gate.ok).toBe(false)
+    expect(v.gate.reasons.join(' ')).toMatch(/made before the scene check/)
+    await h.deps.db.update(jobs).set({ provider: 'mock' }).where(eq(jobs.id, row!.jobId!))
+  })
+
+  it('the face pass is skipped, and not charged, when the best still beats the clip\'s person by 0.30 or more', async () => {
+    const { skipsFacePass } = await import('./clone.js')
+    const gate = (margin: number | null, ok = true) => ({ ok, face: 0.75, likeness: 0.12, margin, reasons: [], note: null })
+    // Today's stills: margins 0.47 to 0.64.
+    expect(skipsFacePass(gate(0.64), 0.3)).toBe(true)
+    expect(skipsFacePass(gate(0.47), 0.3)).toBe(true)
+    expect(skipsFacePass(gate(0.29), 0.3)).toBe(false)
+    expect(skipsFacePass(gate(0.5, false), 0.3)).toBe(false)
+    expect(skipsFacePass(gate(null), 0.3)).toBe(false)
+    const { preview } = await estimateAction(h.deps, h.ctx, { type: 'clone_still', contentId: postId, characterId: callie, takes: 1, facePass: true })
+    expect(preview.prompts.find(p => /Face pass/.test(p.label))!.text).toMatch(/^Edit the first image\./)
+  })
+
+  it('video takes get their own numbers after 10 real takes: kept vs tried again, suggest only', async () => {
+    const [take] = await postClones(h.deps, h.ctx, postId)
+    const [motion] = await h.deps.db.select().from(jobs).where(and(eq(jobs.accountId, h.ctx.accountId), like(jobs.purpose, `clone:${postId}:%`)))
+    await h.deps.db.update(jobs).set({ provider: 'higgsfield' }).where(eq(jobs.id, motion!.id))
+    const gateOf = (face: number, likeness: number, margin: number) => ({ ok: true, face, likeness, margin, frames: 12, reasons: [], note: null })
+    await h.deps.db.update(candidates).set({ status: 'approved', meta: { review: { samples: [], text: [], gate: gateOf(0.66, 0.32, 0.43) }, decision: { kind: 'kept' } } }).where(eq(candidates.id, take!.id))
+    let v = (await gateCheck(h.deps, h.ctx)).video
+    expect(v).toMatchObject({ count: 1, due: false, kept: [{ face: 0.66 }], triedAgain: [] })
+    // Nine more real takes: eight kept like it, one tried again.
+    const [row] = await h.deps.db.select().from(candidates).where(eq(candidates.id, take!.id))
+    for (let i = 1; i <= 9; i++) {
+      const jobId = `job_videogate${String(i).padStart(14, '0')}`
+      await h.deps.db.insert(jobs).values({ ...motion!, id: jobId, idempotencyKey: `${motion!.idempotencyKey}:vg${i}`, provider: 'higgsfield' })
+      const tried = i === 9
+      await h.deps.db.insert(candidates).values({ ...row!, id: `cand_videogate${String(i).padStart(12, '0')}`, jobId, status: tried ? 'in_review' : 'approved', meta: { review: { samples: [], text: [], gate: tried ? { ...gateOf(0.5, 0.44, 0.06), ok: false } : gateOf(0.7, 0.3, 0.45) }, decision: { kind: tried ? 'tried_again' : 'kept' } } })
+    }
+    v = (await gateCheck(h.deps, h.ctx)).video
+    expect(v).toMatchObject({ count: 10, due: true, current: { face_min: 0.45, margin: 0.12, source_max: 0.45 }, suggested: { face_min: 0.63, margin: 0.4, source_max: 0.35 } })
+    expect(v.kept).toHaveLength(9)
+    expect(v.triedAgain).toHaveLength(1)
+    expect(v.effect.suggested).toEqual({ keptPass: 9, triedAgainHeld: 1 })
+    // The still numbers stay; the video ones change only on approval.
+    const { recreateVideoGate } = await import('./clone.js')
+    expect(await recreateVideoGate(h.deps, h.ctx)).toEqual({ face_min: 0.45, margin: 0.12, source_max: 0.45 })
+    v = (await answerGateCheck(h.deps, h.ctx, true, 'video')).video
+    expect(await recreateVideoGate(h.deps, h.ctx)).toEqual({ face_min: 0.63, margin: 0.4, source_max: 0.35 })
+    expect(await recreateGate(h.deps, h.ctx)).toEqual({ face_min: 0.45, margin: 0.12, source_max: 0.45 })
+    expect(v).toMatchObject({ due: false, nextAt: 20, suggested: null })
+    // Back as it was for the rest of the file.
+    await setSetting(h.deps, h.ctx, 'recreate_video_gate', {})
+    await h.deps.db.delete(candidates).where(like(candidates.id, 'cand_videogate%'))
+    await h.deps.db.delete(jobs).where(like(jobs.id, 'job_videogate%'))
+    await h.deps.db.update(jobs).set({ provider: 'mock' }).where(eq(jobs.id, motion!.id))
+  })
+})
+
 describe('the credit cap, the ways in and scale', () => {
   it('a step that would pass the post\'s cap is refused with what it costs and what is left', async () => {
     // What this post's priced steps started so far counts against the cap.

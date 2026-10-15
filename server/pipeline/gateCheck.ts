@@ -3,7 +3,9 @@ import { candidates, jobs } from '../db/schema.js'
 import type { Ctx, Deps } from '../context.js'
 import { AppError } from '../lib/errors.js'
 import type { GenRequest } from '../providers/types.js'
-import { gateFor, recreateGate, setRecreateGate, type GateNumbers } from './clone.js'
+import { gateFor, recreateGate, recreateVideoGate, setRecreateGate, setRecreateVideoGate, type GateNumbers } from './clone.js'
+import type { TakeGate } from '../core/takeGate.js'
+import type { CloneReview } from './recreate.js'
 import { getSetting, setSetting } from './settings.js'
 
 // The Recreate gate check (owner, round 18): after every 10 real recreates
@@ -22,7 +24,23 @@ export interface GateSample {
   face: number | null; likeness: number | null; margin: number | null; model: string | null; at: string
 }
 
+// A video take's scores over the whole take, and the owner's call on it
+// (owner, 2026-10-15: video gets its own numbers after 10 real takes).
+export interface TakeScore {
+  postId: string; candidateId: string; assetId: string | null
+  face: number | null; likeness: number | null; margin: number | null; model: string | null; at: string
+}
+
+export interface VideoGateView {
+  count: number; every: number; reviewedAt: number; due: boolean; nextAt: number
+  current: GateNumbers; suggested: GateNumbers | null
+  kept: TakeScore[]; triedAgain: TakeScore[]
+  effect: { current: { keptPass: number; triedAgainHeld: number }; suggested: { keptPass: number; triedAgainHeld: number } | null }
+  why: string[]
+}
+
 export interface GateCheckView {
+  video: VideoGateView
   count: number; every: number; reviewedAt: number; due: boolean; nextAt: number
   current: GateNumbers; suggested: GateNumbers | null
   picked: GateSample[]; passedOver: GateSample[]
@@ -64,6 +82,50 @@ function effectOf(g: GateNumbers, picked: GateSample[], passedOver: GateSample[]
   return { pickedPass: picked.filter(ok).length, passedOverHeld: passedOver.filter(s => !ok(s)).length }
 }
 
+const VIDEO_REVIEW_KEY = 'recreate_video_gate_review'
+
+// A take passes when its middle face, middle margin and highest likeness
+// clear the numbers (the video rule).
+const takeOk = (g: GateNumbers, s: TakeScore) => s.face != null && s.face >= g.face_min && (s.margin == null || s.margin >= g.margin) && (s.likeness == null || s.likeness < g.source_max)
+
+// Real takes (motion videos on a real model) with their scores: the ones
+// the owner kept (by a click, or kept by the rule and used) next to the ones
+// the owner tried again on.
+export async function videoGateCheck(deps: Deps, ctx: Ctx): Promise<VideoGateView> {
+  const motion = new Set(deps.config.models.models.filter(m => m.clone?.mode === 'motion').map(m => m.ref))
+  const runs = (await deps.db.select({ id: jobs.id, purpose: jobs.purpose, request: jobs.request })
+    .from(jobs).where(and(eq(jobs.accountId, ctx.accountId), like(jobs.purpose, 'clone:%'), eq(jobs.status, 'completed'), ne(jobs.provider, 'mock'))))
+    .filter(j => motion.has((j.request as GenRequest).modelRef ?? ''))
+  const kept: TakeScore[] = []
+  const triedAgain: TakeScore[] = []
+  let count = 0
+  if (runs.length) {
+    const byRun = new Map(runs.map(r => [r.id, r]))
+    const rows = await deps.db.select().from(candidates).where(and(eq(candidates.accountId, ctx.accountId), eq(candidates.op, 'clone'), inArray(candidates.jobId, runs.map(r => r.id))))
+    for (const c of rows) {
+      const meta = (c.meta ?? {}) as { review?: CloneReview; gate?: TakeGate | null; decision?: { kind?: string } | null }
+      const gate = meta.review?.gate ?? meta.gate ?? null
+      if (!gate || gate.face == null) continue
+      count++
+      const run = byRun.get(c.jobId ?? '')!
+      const score: TakeScore = { postId: run.purpose.split(':')[1]!, candidateId: c.id, assetId: c.assetId, face: gate.face, likeness: gate.likeness, margin: gate.margin, model: (run.request as GenRequest).modelRef ?? null, at: c.createdAt.toISOString() }
+      if (meta.decision?.kind === 'tried_again') triedAgain.push(score)
+      else if (c.status === 'approved') kept.push(score)
+    }
+  }
+  const reviewedAt = (await getSetting<{ count?: number } | null>(deps.db, ctx.accountId, VIDEO_REVIEW_KEY, null))?.count ?? 0
+  const current = await recreateVideoGate(deps, ctx)
+  const s = suggestGate(current, kept.map(k => ({ ...k, pass: 'still' as const })))
+  const same = s.numbers && s.numbers.face_min === current.face_min && s.numbers.margin === current.margin && s.numbers.source_max === current.source_max
+  const effect = (g: GateNumbers) => ({ keptPass: kept.filter(k => takeOk(g, k)).length, triedAgainHeld: triedAgain.filter(k => !takeOk(g, k)).length })
+  return {
+    count, every: EVERY, reviewedAt, due: count - reviewedAt >= EVERY, nextAt: reviewedAt + EVERY,
+    current, suggested: same ? null : s.numbers, kept, triedAgain,
+    effect: { current: effect(current), suggested: s.numbers && !same ? effect(s.numbers) : null },
+    why: !kept.length ? ['No kept take has scores yet.'] : same ? ['The current numbers already fit the takes you kept.', ...s.why.map(w => w.replace('picked still', 'kept take').replace('picked margin', 'kept margin').replace('picked likeness', 'kept likeness'))] : s.why.map(w => w.replace('picked still', 'kept take').replace('picked margin', 'kept margin').replace('picked likeness', 'kept likeness')),
+  }
+}
+
 export async function gateCheck(deps: Deps, ctx: Ctx): Promise<GateCheckView> {
   const motion = new Set(deps.config.models.models.filter(m => m.clone?.mode === 'motion').map(m => m.ref))
   // Real recreates: finished motion videos on a real model.
@@ -100,6 +162,7 @@ export async function gateCheck(deps: Deps, ctx: Ctx): Promise<GateCheckView> {
   const s = suggestGate(current, picked)
   const same = s.numbers && s.numbers.face_min === current.face_min && s.numbers.margin === current.margin && s.numbers.source_max === current.source_max
   return {
+    video: await videoGateCheck(deps, ctx),
     count, every: EVERY, reviewedAt, due: count - reviewedAt >= EVERY, nextAt: reviewedAt + EVERY,
     current, suggested: same ? null : s.numbers,
     picked, passedOver: others,
@@ -111,7 +174,16 @@ export async function gateCheck(deps: Deps, ctx: Ctx): Promise<GateCheckView> {
 // "Use these numbers" (the suggestion, worked out again here, never taken
 // from the page) or "Keep the current numbers". Either closes the check
 // until the next 10.
-export async function answerGateCheck(deps: Deps, ctx: Ctx, use: boolean): Promise<GateCheckView> {
+export async function answerGateCheck(deps: Deps, ctx: Ctx, use: boolean, kind: 'still' | 'video' = 'still'): Promise<GateCheckView> {
+  if (kind === 'video') {
+    const v = await videoGateCheck(deps, ctx)
+    if (use) {
+      if (!v.suggested) throw new AppError('bad_request', 'There are no new video numbers to use.')
+      await setRecreateVideoGate(deps, ctx, v.suggested)
+    }
+    await setSetting(deps, ctx, VIDEO_REVIEW_KEY, { count: v.count, at: deps.clock.now().toISOString(), used: use ? v.suggested : null })
+    return gateCheck(deps, ctx)
+  }
   const view = await gateCheck(deps, ctx)
   if (use) {
     if (!view.suggested) throw new AppError('bad_request', 'There are no new numbers to use.')

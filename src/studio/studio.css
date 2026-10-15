@@ -1242,3 +1242,9 @@ button.st-chip:hover { color: var(--st-text); border-color: var(--st-text-3); }
 .st-batchrow img { width: 64px; aspect-ratio: 9 / 16; object-fit: cover; border-radius: 8px; }
 .st-batchrow select { max-width: 220px; }
 .st-startchoice { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
+
+/* Text found on a take: the frame with the words boxed (owner, 2026-10-15). */
+.st-texthit { display: flex; flex-direction: column; align-self: flex-start; gap: 4px; width: 132px; padding: 4px; border: 1px solid var(--st-line); border-radius: 10px; background: var(--st-surface); color: var(--st-text); font: inherit; font-size: 12px; text-align: left; cursor: pointer; }
+.st-texthit:hover { border-color: var(--st-accent); }
+.st-texthit img { width: 100%; aspect-ratio: 9 / 16; object-fit: cover; border-radius: 6px; background: var(--st-surface-3); }
+.st-texthit-empty { display: grid; place-items: center; width: 100%; aspect-ratio: 9 / 16; border-radius: 6px; background: var(--st-surface-3); color: var(--st-text-3); font-size: 11px; }

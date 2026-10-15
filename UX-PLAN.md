@@ -756,3 +756,28 @@ double-click, type, Enter. The usability notes from the audit (a small
 preview, handles that cover a small caption, no click-away deselect in the
 preview, the voice track named "Track 2", and others) are in the audit
 report for the owner to pick; none is built yet.
+
+## 18. Recreate: no paid take is rejected; the face pass edits the still (owner, 2026-10-15)
+
+From the first real Recreate (kitchen clip, Callie, Wan 3.0): the pipeline
+worked, the gates did not. The take was clearly Callie (the face strip green
+the whole clip) but marked "Not kept" (likeness 0.39 against an old 0.36
+cap), and both face pass results were plain studio portraits that ignored
+the kitchen still. Only the still gate blocks spend; everything after it is
+the owner's call. No new page, step or panel.
+
+| Piece | Where | How it works | Clicks |
+|---|---|---|---|
+| The video rule | Step 6, every take | The still rule's numbers: face 0.45 or more against REF-00, beating the clip's person by 0.12 or more, likeness under 0.45. Read over the whole take from the face every half second: the middle face match, the middle margin, the highest likeness (she copies the clip's expressions, so a take reads a little higher than a still) | 0 |
+| A take that passes | Step 6 | Kept: the scores in one line, then Use this take | 1 |
+| A take that misses | Step 6 | Never rejected. A warning with the scores and what missed, and two buttons: **Keep this take** (then Use this take) and **Try again** (back to Make the video, priced as before; nothing is spent by the button) | 1 |
+| Takes the old check rejected | Step 6 | Shown again with their scores and Keep this take (today's kitchen take) | 1 |
+| Text found | Step 6, "Text found on the take" | Each hit with a thumbnail of its frame, the words boxed, so a false reading ("Vij") is told from real leftover text. Takes reviewed before this get their thumbnails on the next look (a free review on the worker) | 0 |
+| Face pass | Step 4, after Make 4 stills | Edits the chosen still: the still is the first image, the element and REF-00 are face references only, and the prompt starts "Edit the first image." | 0 |
+| Face pass check | Step 4 | Outside the face, the result must match its still (the place, the outfit, the pose, the framing). If not: "Face pass changed the scene, not usable", and no Make the video from it. Face passes made before this check say so and are not offered for the video | 0 |
+| Skip the face pass | Step 4 | When the best still already beats the clip's person by 0.30 or more, the face pass is skipped and its part of the price is not charged. The price line says so | 0 |
+| Gate check | Settings > Rules, Recreate gate check | Video takes get their own numbers: after every 10 real takes, the scores of the takes you kept next to the ones you tried again on, with suggested video numbers. Suggest only; you approve. The still numbers stay as they are | 1 |
+
+**Clicks, link to finished video (unchanged when the take passes):** open
+the link (0), Make 4 stills + face pass (1), Make the video (1), Use this
+take (1): **3**. When the take misses the rule: **+1** (Keep this take).

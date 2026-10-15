@@ -128,6 +128,12 @@ clone:
     # (margin -0.114). The old 0.36 cap alone would have blocked the proven
     # rave still.
     gate: { face_min: 0.45, margin: 0.12, source_max: 0.45 }
+    # The face pass is skipped, and not charged, when the best still already
+    # beats the clip's person by this margin (owner, 2026-10-15). A take is
+    # read against the same numbers as a still (the video rule) until a gate
+    # check gives video its own; a take that misses is a warning, never
+    # rejected.
+    face_skip_margin: 0.3
     # The video: 720p, 9:16 for a vertical clip, audio off.
     resolution: 720p
     # The review: the face checked every review_step seconds; text found on

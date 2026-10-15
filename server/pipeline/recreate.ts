@@ -10,10 +10,12 @@ import { detectCuts } from '../media/cuts.js'
 import { cosineSimilarity } from '../qa/faces.js'
 import { classifyText, createOcr, type TextKind } from '../qa/ocr.js'
 import type { GenRequest } from '../providers/types.js'
-import { readAsset } from '../storage/assets.js'
+import { readAsset, saveAsset } from '../storage/assets.js'
+import sharp from 'sharp'
+import { takeGateFor, type TakeGate } from '../core/takeGate.js'
 import { approvedAssets, getCandidate } from './characters.js'
 import { createContent, getContent, specSchemas, updateContent, type CloneSource, type ContentKind } from './content.js'
-import { addCloneSource, bestCloneStill, buildClone, buildCloneFace, buildCloneStill, cloneModel, cloneStills, keepClone, postClones, saveCloneModel, useCloneStill, type StillGate } from './clone.js'
+import { addCloneSource, bestCloneStill, buildClone, buildCloneFace, buildCloneStill, cloneModel, cloneStills, keepClone, postClones, queueCloneReview, recreateVideoGate, saveCloneModel, useCloneStill, type StillGate } from './clone.js'
 import { quoteItemsFor, type JobSpec } from '../jobs/runner.js'
 import { displayPrice } from '../costs/quotes.js'
 import type { RuleViolation } from '../core/rules.js'
@@ -142,7 +144,8 @@ async function rowState(deps: Deps, ctx: Ctx, row: Row, fallbackModel: string): 
   const kept = keptId ? stills.find(x => x.id === keptId) : undefined
   // The still a video would start from: the kept one when its gates pass,
   // else the best face pass (or still) that passes.
-  const chosen = kept?.gate.ok ? kept : bestCloneStill(stills, cid, 'face') ?? kept ?? bestCloneStill(stills, cid) ?? null
+  const passing = stills.filter(x => x.gate.ok)
+  const chosen = kept?.gate.ok ? kept : bestCloneStill(passing, cid, 'face') ?? bestCloneStill(passing, cid) ?? kept ?? bestCloneStill(stills, cid) ?? null
   const takes = await postClones(deps, ctx, post.id)
   const take = takes[0] ?? null
   const model = row.model ?? fallbackModel
@@ -252,8 +255,12 @@ export interface CloneReview {
   samples: Array<{ t: number; face: number | null; likeness: number | null }>
   // Stretches where the face drifts (under faceMin, or no face).
   drift: Array<{ start: number; end: number }>
-  // Text found on the frames: logos, @handles, captions, with when.
-  text: Array<{ t: number; kind: TextKind; text: string }>
+  // Text found on the frames: logos, @handles, captions, with when, and a
+  // thumbnail of the frame with the words boxed (owner, 2026-10-15: tell a
+  // real leftover from a false reading).
+  text: Array<{ t: number; kind: TextKind; text: string; frameAssetId?: string | null }>
+  // The video rule over the whole take.
+  gate?: TakeGate | null
   // Where the picture cuts (trim at the cut).
   cuts: number[]
   notes: string[]
@@ -335,14 +342,17 @@ async function runCloneReview(deps: Deps, ctx: Ctx, job: JobRow): Promise<unknow
         const ocrFrames = await framesOf(r, dir, 'o', 1 / cfg.ocr_step, 720)
         const seen = new Set<string>()
         for (const [i, f] of ocrFrames.entries()) {
-          for (const line of await ocr.read(await readFile(f))) {
+          const png = await readFile(f)
+          for (const line of await ocr.read(png)) {
             const hit = classifyText(line)
             if (!hit) continue
             // The same words read again later (or a letter short) count once.
             const key = hit.text.toLowerCase().replace(/[^a-z0-9@]+/g, '')
             if ([...seen].some(k => k.startsWith(key) || key.startsWith(k))) continue
             seen.add(key)
-            text.push({ t: round2(i * cfg.ocr_step), ...hit })
+            const t = round2(i * cfg.ocr_step)
+            const frameAssetId = await textThumb(deps, ctx, png, line.box, `Text at ${t} s on ${cand.id}`, job.id).catch(() => null)
+            text.push({ t, ...hit, frameAssetId })
           }
         }
       } catch (e) {
@@ -352,11 +362,47 @@ async function runCloneReview(deps: Deps, ctx: Ctx, job: JobRow): Promise<unknow
       }
     }
     const cuts = await detectCuts(r, cfg.cut_threshold).catch(() => [])
-    return { at: deps.clock.now().toISOString(), duration, step: cfg.review_step, faceMin, samples, drift, text, cuts, notes } satisfies CloneReview
+    // The video rule over the whole take (owner, 2026-10-15).
+    const gate = refFace ? takeGateFor(await recreateVideoGate(deps, ctx), samples) : demo ? takeGateFor(await recreateVideoGate(deps, ctx), samples, { demo }) : null
+    return { at: deps.clock.now().toISOString(), duration, step: cfg.review_step, faceMin, samples, drift, text, cuts, notes, gate } satisfies CloneReview
   })
   const meta = (cand.meta ?? {}) as Record<string, unknown>
-  await deps.db.update(candidates).set({ meta: { ...meta, review }, updatedAt: deps.clock.now() }).where(and(eq(candidates.id, cand.id), eq(candidates.accountId, ctx.accountId)))
-  return { drift: review.drift.length, text: review.text.length, cuts: review.cuts.length }
+  // The take is kept when the whole take passes; one that misses waits for
+  // the owner (never rejected). The owner's own call is never overturned,
+  // and a take the old check rejected waits for the owner's Keep.
+  const decided = !!cand.reviewedBy
+  const status = decided || !review.gate ? (cand.status === 'qa_failed' ? 'in_review' : cand.status)
+    : cand.status === 'qa_failed' ? 'in_review' : review.gate.ok ? 'approved' : 'in_review'
+  await deps.db.update(candidates).set({ meta: { ...meta, review }, status, updatedAt: deps.clock.now() }).where(and(eq(candidates.id, cand.id), eq(candidates.accountId, ctx.accountId)))
+  return { drift: review.drift.length, text: review.text.length, cuts: review.cuts.length, gate: review.gate?.ok ?? null }
+}
+
+// A small picture of the frame the text was read on, the words boxed.
+export async function textThumb(deps: Deps, ctx: Ctx, frame: Buffer, box: { x: number; y: number; w: number; h: number }, label: string, jobId: string | null): Promise<string> {
+  // The frame's real size (decoded), so the box overlay matches it exactly.
+  const { data: raw, info } = await sharp(frame).removeAlpha().raw().toBuffer({ resolveWithObject: true })
+  const w = info.width, h = info.height
+  const pad = 6
+  const x = Math.max(0, Math.min(w - 2, box.x - pad)), y = Math.max(0, Math.min(h - 2, box.y - pad))
+  const bw = Math.max(2, Math.min(w - x, box.w + pad * 2)), bh = Math.max(2, Math.min(h - y, box.h + pad * 2))
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><rect x="${x}" y="${y}" width="${bw}" height="${bh}" fill="none" stroke="#ff3b30" stroke-width="6" rx="6"/></svg>`
+  const overlay = await sharp(Buffer.from(svg)).resize(w, h).png().toBuffer()
+  // Two passes: sharp resizes before it composites, so boxing and shrinking
+  // in one pipeline fails on any frame wider than the thumbnail.
+  const boxed = await sharp(raw, { raw: { width: w, height: h, channels: info.channels } }).composite([{ input: overlay }]).png().toBuffer()
+  const data = await sharp(boxed).resize({ width: 360 }).jpeg({ quality: 78 }).toBuffer()
+  const asset = await saveAsset(deps, ctx, { data, mime: 'image/jpeg', origin: 'derived', label, ...(jobId ? { sourceJobId: jobId } : {}) })
+  return asset.id
+}
+
+// "Review again" (free, on the worker): fills in what an older review did
+// not keep, such as the frames of the text found.
+export async function reviewTakeAgain(deps: Deps, ctx: Ctx, postId: string, candidateId: string): Promise<{ ok: true }> {
+  const cand = await getCandidate(deps, ctx, candidateId)
+  if (cand.op !== 'clone' || !cand.assetId) throw new AppError('bad_request', 'That is not a finished take.')
+  const busy = await deps.db.select({ id: jobs.id }).from(jobs).where(and(eq(jobs.accountId, ctx.accountId), eq(jobs.purpose, `clone_review:${postId}:${candidateId}`), inArray(jobs.status, ['queued', 'running', 'submitting', 'ingesting', 'waiting']))).limit(1)
+  if (!busy.length) await queueCloneReview(deps, ctx, postId, candidateId, cand.characterId)
+  return { ok: true }
 }
 
 let registered = false

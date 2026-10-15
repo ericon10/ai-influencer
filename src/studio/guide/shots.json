@@ -1465,47 +1465,47 @@
  },
  "recreate-review": {
   "w": 1030,
-  "h": 786,
+  "h": 992,
   "spots": [
    {
     "n": 1,
-    "x": 1.3,
-    "y": 6,
-    "w": 97.5,
-    "h": 52.6,
-    "label": "The take and the source, playing in sync"
+    "x": 0.1,
+    "y": 3.5,
+    "w": 99.8,
+    "h": 6.4,
+    "label": "The video rule: the scores and what missed; a warning, never a reject"
    },
    {
     "n": 2,
-    "x": 1.3,
-    "y": 64.4,
-    "w": 97.5,
-    "h": 2.8,
-    "label": "The face check every 0.5 s; red marks are drift"
+    "x": 0.1,
+    "y": 11.1,
+    "w": 43.9,
+    "h": 41.7,
+    "label": "The take and the source, playing in sync"
    },
    {
     "n": 3,
-    "x": 1,
-    "y": 65.9,
-    "w": 0.8,
-    "h": 1,
-    "label": "Text found on the frames: logos, @handles, captions"
+    "x": 0.1,
+    "y": 57.4,
+    "w": 99.8,
+    "h": 2.2,
+    "label": "The face check every 0.5 s; red marks are drift"
    },
    {
     "n": 4,
-    "x": 1.3,
-    "y": 85.9,
-    "w": 13.6,
-    "h": 4.8,
-    "label": "Use this take: kept, no music, on to the Text step"
+    "x": 0.1,
+    "y": 64.9,
+    "w": 26.2,
+    "h": 26.9,
+    "label": "Text found, each on its own frame with the words boxed"
    },
    {
     "n": 5,
-    "x": 75.5,
-    "y": 86.4,
-    "w": 23.3,
+    "x": 0.1,
+    "y": 96.1,
+    "w": 26.2,
     "h": 3.8,
-    "label": "The same clip with another character"
+    "label": "Your call: Keep this take, or Try again (nothing spends until you make the video)"
    }
   ]
  },
