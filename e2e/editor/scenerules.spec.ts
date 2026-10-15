@@ -21,7 +21,8 @@ async function callie(): Promise<string> {
 // A new video post for Callie with the idea typed in, and More control open.
 async function newPost(page: Page, characterId: string, idea: string, phone: boolean): Promise<string> {
   await page.addInitScript(id => { try { localStorage.setItem('st-last-character', id) } catch { /* private */ } }, characterId)
-  await page.goto('/studio/posts')
+  // Posts home, then Video post (the header button).
+  await page.goto('/studio')
   await press(page.getByRole('button', { name: 'Video post', exact: true }).first(), phone)
   await page.waitForURL(/\/studio\/posts\/cnt_/)
   const id = page.url().match(/cnt_[a-z0-9]+/)![0]

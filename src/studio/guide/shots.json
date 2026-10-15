@@ -1,2234 +1,2264 @@
 {
- "shell": {
-  "w": 1360,
-  "h": 900,
-  "spots": [
-   {
-    "n": 1,
-    "x": 1,
-    "y": 14,
-    "w": 15.8,
-    "h": 4.6,
-    "label": "New post: a video post, slideshow, batch, or a clone of a TikTok"
-   },
-   {
-    "n": 2,
-    "x": 1,
-    "y": 19.4,
-    "w": 15.8,
-    "h": 4.6,
-    "label": "Posts: everything you are making"
-   },
-   {
-    "n": 3,
-    "x": 1,
-    "y": 24.2,
-    "w": 15.8,
-    "h": 4.6,
-    "label": "Characters: set each one up once"
-   },
-   {
-    "n": 4,
-    "x": 1,
-    "y": 29,
-    "w": 15.8,
-    "h": 4.6,
-    "label": "Library: every still, clip and export"
-   },
-   {
-    "n": 5,
-    "x": 1,
-    "y": 33.8,
-    "w": 15.8,
-    "h": 4.6,
-    "label": "Settings: keys, billing, models, rules, budgets"
-   },
-   {
-    "n": 6,
-    "x": 1.5,
-    "y": 8.2,
-    "w": 14.9,
-    "h": 3.8,
-    "label": "Worker light: green means runs start right away"
-   },
-   {
-    "n": 7,
-    "x": 1,
-    "y": 71.6,
-    "w": 15.8,
-    "h": 4.6,
-    "label": "Activity: what is running and what just finished"
-   },
-   {
-    "n": 8,
-    "x": 1,
-    "y": 81.9,
-    "w": 15.8,
-    "h": 11.6,
-    "label": "Demo or Live: Demo makes free mock results"
-   }
-  ]
- },
- "posts-home": {
-  "w": 1140,
-  "h": 900,
-  "spots": [
-   {
-    "n": 1,
-    "x": 64.6,
-    "y": 11.3,
-    "w": 31.1,
-    "h": 4.2,
-    "label": "Start a post right here too"
-   },
-   {
-    "n": 2,
-    "x": 6.1,
-    "y": 36,
-    "w": 69.2,
-    "h": 4.3,
-    "label": "Accounts: tracked links, promo codes and signups"
-   },
-   {
-    "n": 3,
-    "x": 4.2,
-    "y": 44.8,
-    "w": 6.7,
-    "h": 2.1,
-    "label": "Filter by account (the tag you set on a post)"
-   },
-   {
-    "n": 4,
-    "x": 4.2,
-    "y": 49.4,
-    "w": 21.8,
-    "h": 50,
-    "label": "A post: open it to keep going where you left off"
-   }
-  ]
- },
- "new-post-menu": {
-  "w": 268,
-  "h": 700,
-  "spots": [
-   {
-    "n": 1,
-    "x": 7.8,
-    "y": 25.7,
-    "w": 76.9,
-    "h": 10.9,
-    "label": "Video post: a clip with a caption"
-   },
-   {
-    "n": 2,
-    "x": 7.8,
-    "y": 36.6,
-    "w": 76.9,
-    "h": 8.3,
-    "label": "Slideshow: stills with a hook and slides"
-   },
-   {
-    "n": 3,
-    "x": 7.8,
-    "y": 44.9,
-    "w": 76.9,
-    "h": 8.3,
-    "label": "Batch: many captions, many videos"
-   },
-   {
-    "n": 4,
-    "x": 7.8,
-    "y": 53.3,
-    "w": 76.9,
-    "h": 10.9,
-    "label": "From a TikTok: clone a saved video"
-   }
-  ]
- },
- "characters": {
-  "w": 1140,
-  "h": 900,
-  "spots": [
-   {
-    "n": 1,
-    "x": 82.6,
-    "y": 12.5,
-    "w": 13.2,
-    "h": 4.2,
-    "label": "New character: start from inspiration photos"
-   },
-   {
-    "n": 2,
-    "x": 72.5,
-    "y": 12.5,
-    "w": 8.7,
-    "h": 4.2,
-    "label": "Import a character file you already have"
-   },
-   {
-    "n": 3,
-    "x": 4.2,
-    "y": 19.9,
-    "w": 21.8,
-    "h": 45.9,
-    "label": "A character: open it to see the setup steps"
-   }
-  ]
- },
- "setup-start": {
-  "w": 1140,
-  "h": 1283,
-  "spots": [
-   {
-    "n": 1,
-    "x": 4.2,
-    "y": 12.8,
-    "w": 91.6,
-    "h": 4.1,
-    "label": "The four setup steps, in order"
-   },
-   {
-    "n": 2,
-    "x": 4.2,
-    "y": 18.6,
-    "w": 29.8,
-    "h": 61.4,
-    "label": "The character card: who this person is"
-   },
-   {
-    "n": 3,
-    "x": 38.3,
-    "y": 28.9,
-    "w": 55.6,
-    "h": 1.5,
-    "label": "Inspiration photos: the look you want"
-   },
-   {
-    "n": 4,
-    "x": 38.3,
-    "y": 67.9,
-    "w": 12.7,
-    "h": 3,
-    "label": "Claude splits the look from the face"
-   },
-   {
-    "n": 5,
-    "x": 38.3,
-    "y": 86.1,
-    "w": 16.2,
-    "h": 3,
-    "label": "Three character concepts to pick from"
-   }
-  ]
- },
- "setup-face": {
-  "w": 1140,
-  "h": 1147,
-  "spots": [
-   {
-    "n": 1,
-    "x": 4.2,
-    "y": 20.8,
-    "w": 29.8,
-    "h": 68.7,
-    "label": "REF-00: the face every later image copies"
-   },
-   {
-    "n": 2,
-    "x": 38.3,
-    "y": 40.5,
-    "w": 23,
-    "h": 3.3,
-    "label": "Generate heroes: bare face, real skin. Pick the best one"
-   },
-   {
-    "n": 3,
-    "x": 38.3,
-    "y": 36.8,
-    "w": 8.7,
-    "h": 1.6,
-    "label": "How many per prompt"
-   },
-   {
-    "n": 4,
-    "x": 38.3,
-    "y": 66.1,
-    "w": 24,
-    "h": 3.3,
-    "label": "Check the card still matches the face"
-   },
-   {
-    "n": 5,
-    "x": 80.6,
-    "y": 54.2,
-    "w": 13.4,
-    "h": 3.3,
-    "label": "Next: build the reference sheet"
-   }
-  ]
- },
- "setup-sheet": {
-  "w": 1140,
-  "h": 1500,
-  "spots": [
-   {
-    "n": 1,
-    "x": 21.6,
-    "y": 11.7,
-    "w": 15.8,
-    "h": 2.1,
-    "label": "REF-00 to REF-11: every angle of the same person"
-   },
-   {
-    "n": 2,
-    "x": 36.5,
-    "y": 68.9,
-    "w": 14,
-    "h": 17.5,
-    "label": "A shot: open it to generate, review and approve"
-   },
-   {
-    "n": 3,
-    "x": 55.7,
-    "y": 20.4,
-    "w": 38.4,
-    "h": 1.5,
-    "label": "Done when all 12 are approved"
-   }
-  ]
- },
- "setup-file": {
-  "w": 1140,
-  "h": 1200,
-  "spots": [
-   {
-    "n": 1,
-    "x": 38,
-    "y": 14.6,
-    "w": 11.3,
-    "h": 2.7,
-    "label": "The character file: card, marks, every approved shot"
-   },
-   {
-    "n": 2,
-    "x": 57.7,
-    "y": 28,
-    "w": 21.1,
-    "h": 3.2,
-    "label": "Import an edited file or new sheet images"
-   },
-   {
-    "n": 3,
-    "x": 38.3,
-    "y": 28,
-    "w": 18.5,
-    "h": 3.2,
-    "label": "Download the file to keep or edit"
-   }
-  ]
- },
- "post-idea": {
-  "w": 1068,
-  "h": 531,
-  "spots": [
-   {
-    "n": 1,
-    "x": 2.9,
-    "y": 29.2,
-    "w": 94.2,
-    "h": 20,
-    "label": "One box: describe the shot, or paste a whole prompt"
-   },
-   {
-    "n": 2,
-    "x": 15.1,
-    "y": 56.7,
-    "w": 10.1,
-    "h": 5.3,
-    "label": "Read from your words, free: click a chip to change it"
-   },
-   {
-    "n": 3,
-    "x": 2.9,
-    "y": 63.1,
-    "w": 11.1,
-    "h": 5.7,
-    "label": "Set a detail your words did not name"
-   },
-   {
-    "n": 4,
-    "x": 2.9,
-    "y": 71.7,
-    "w": 18,
-    "h": 5.7,
-    "label": "Punch it up: three sharper versions, keeping what you wrote"
-   },
-   {
-    "n": 5,
-    "x": 3,
-    "y": 80.6,
-    "w": 94,
-    "h": 13.4,
-    "label": "More control: character, account, format, places and every detail"
-   }
-  ]
- },
- "post-stills-start": {
-  "w": 1068,
-  "h": 954,
-  "spots": [
-   {
-    "n": 1,
-    "x": 2.9,
-    "y": 14.9,
-    "w": 94.2,
-    "h": 5.5,
-    "label": "Details: one line; change them in the Idea step"
-   },
-   {
-    "n": 2,
-    "x": 10.8,
-    "y": 32,
-    "w": 4.1,
-    "h": 8.1,
-    "label": "Attaches: face refs only for a close shot"
-   },
-   {
-    "n": 3,
-    "x": 4.9,
-    "y": 41.8,
-    "w": 90.3,
-    "h": 2,
-    "label": "GPT Image 2.5 Flare first, 4 stills, 9:16; Nano Banana 2.1 one click"
-   },
-   {
-    "n": 4,
-    "x": 26.4,
-    "y": 63.6,
-    "w": 22.9,
-    "h": 2.9,
-    "label": "Standard by default, High one click"
-   },
-   {
-    "n": 5,
-    "x": 4.9,
-    "y": 73.5,
-    "w": 32,
-    "h": 5.7,
-    "label": "The price is on the button: credits on your plan, dollars on the API"
-   }
-  ]
- },
- "post-stills-done": {
-  "w": 1068,
-  "h": 1921,
-  "spots": [
-   {
-    "n": 1,
-    "x": 6.3,
-    "y": 42.9,
-    "w": 87.5,
-    "h": 10.2,
-    "label": "The prompt Claude wrote. Edit it freely"
-   },
-   {
-    "n": 2,
-    "x": 3.9,
-    "y": 90.9,
-    "w": 15.7,
-    "h": 1.6,
-    "label": "Use this still: it starts the video"
-   },
-   {
-    "n": 3,
-    "x": 3.9,
-    "y": 96.5,
-    "w": 10.9,
-    "h": 1.2,
-    "label": "What was sent: the prompt, refs, model and cost"
-   },
-   {
-    "n": 4,
-    "x": 3.7,
-    "y": 72.9,
-    "w": 16.1,
-    "h": 15.9,
-    "label": "Open a still: checks, Fix one thing, crop, upscale"
-   }
-  ]
- },
- "still-drawer": {
-  "w": 760,
-  "h": 900,
-  "spots": [
-   {
-    "n": 1,
-    "x": 2.8,
-    "y": 81.2,
-    "w": 94.6,
-    "h": 7,
-    "label": "The free checks: face match and skin"
-   },
-   {
-    "n": 2,
-    "x": 2.8,
-    "y": 90,
-    "w": 19.7,
-    "h": 3.3,
-    "label": "Check this: Claude looks closely (priced)"
-   }
-  ]
- },
- "post-video-ways": {
-  "w": 1038,
-  "h": 165,
-  "spots": [
-   {
-    "n": 1,
-    "x": 1.5,
-    "y": 9.7,
-    "w": 23.5,
-    "h": 80.6,
-    "label": "A real video starting from your still"
-   },
-   {
-    "n": 2,
-    "x": 26,
-    "y": 9.7,
-    "w": 23.5,
-    "h": 80.6,
-    "label": "Rebuild a saved TikTok or Reel with your character"
-   },
-   {
-    "n": 3,
-    "x": 50.5,
-    "y": 9.7,
-    "w": 23.5,
-    "h": 80.6,
-    "label": "Use any video file you have"
-   },
-   {
-    "n": 4,
-    "x": 75,
-    "y": 9.7,
-    "w": 23.5,
-    "h": 80.6,
-    "label": "Use a clip you already kept"
-   }
-  ]
- },
- "post-video-still": {
-  "w": 996,
-  "h": 613,
-  "spots": [
-   {
-    "n": 1,
-    "x": 3.1,
-    "y": 10.2,
-    "w": 93.8,
-    "h": 17.7,
-    "label": "Director's notes: hook, payoff, one camera move"
-   },
-   {
-    "n": 2,
-    "x": 3.1,
-    "y": 30.2,
-    "w": 93.8,
-    "h": 35.4,
-    "label": "The video prompt in labeled lines: FORMAT to CONSTRAINTS"
-   },
-   {
-    "n": 3,
-    "x": 3.1,
-    "y": 82.2,
-    "w": 93.8,
-    "h": 3.6,
-    "label": "Directions added to every take"
-   },
-   {
-    "n": 4,
-    "x": 3.1,
-    "y": 87.1,
-    "w": 93.8,
-    "h": 3.6,
-    "label": "If a take looks off: what to change"
-   }
-  ]
- },
- "post-video-models": {
-  "w": 988,
-  "h": 277,
-  "spots": [
-   {
-    "n": 1,
-    "x": 1.2,
-    "y": 13.3,
-    "w": 23.8,
-    "h": 35.4,
-    "label": "The picked model, with the price of one take"
-   },
-   {
-    "n": 2,
-    "x": 50.4,
-    "y": 13.3,
-    "w": 23.8,
-    "h": 35.4,
-    "label": "Each model shows its price; your pick is remembered"
-   }
-  ]
- },
- "live-status": {
-  "w": 1030,
-  "h": 152,
-  "spots": [
-   {
-    "n": 1,
-    "x": 1.2,
-    "y": 50,
-    "w": 62.1,
-    "h": 23.7,
-    "label": "The live line: what is happening now, and it pulses while it works"
-   }
-  ]
- },
- "post-video-takes": {
-  "w": 1046,
-  "h": 436,
-  "spots": [
-   {
-    "n": 1,
-    "x": 3,
-    "y": 86,
-    "w": 16.1,
-    "h": 6.9,
-    "label": "Use this take: keeps it and puts it in the post"
-   },
-   {
-    "n": 2,
-    "x": 2.8,
-    "y": 6.7,
-    "w": 16.4,
-    "h": 70.2,
-    "label": "Open a take: checks, Upscale this take, download"
-   }
-  ]
- },
- "post-caption": {
-  "w": 1068,
-  "h": 590,
-  "spots": [
-   {
-    "n": 1,
-    "x": 3.3,
-    "y": 21.4,
-    "w": 7.3,
-    "h": 5.1,
-    "label": "TikTok's white box, or Outline (TikTok Classic)"
-   },
-   {
-    "n": 2,
-    "x": 16.8,
-    "y": 21.4,
-    "w": 7.7,
-    "h": 5.1,
-    "label": "No caption: none in the editor or the export; kept with this post"
-   },
-   {
-    "n": 3,
-    "x": 2.9,
-    "y": 42.7,
-    "w": 67.8,
-    "h": 15.6,
-    "label": "The words, optional: leave it empty for no caption"
-   },
-   {
-    "n": 4,
-    "x": 12.1,
-    "y": 36.6,
-    "w": 10.7,
-    "h": 5.1,
-    "label": "Pick a hook from the vault"
-   },
-   {
-    "n": 5,
-    "x": 72.8,
-    "y": 14.9,
-    "w": 24.3,
-    "h": 79.8,
-    "label": "The preview, as the export draws it"
-   }
-  ]
- },
- "post-finish": {
-  "w": 1068,
-  "h": 1200,
-  "spots": [
-   {
-    "n": 1,
-    "x": 4.9,
-    "y": 18.4,
-    "w": 14.5,
-    "h": 3.2,
-    "label": "Open the editor: place presets exactly where you want them"
-   },
-   {
-    "n": 2,
-    "x": 2.9,
-    "y": 24.7,
-    "w": 94.2,
-    "h": 6.1,
-    "label": "Sound: ambience, music and a voiceover, mixed for you"
-   },
-   {
-    "n": 3,
-    "x": 4.9,
-    "y": 49.9,
-    "w": 38.6,
-    "h": 5.3,
-    "label": "Voiceover: one of the character's converted voice lines"
-   },
-   {
-    "n": 4,
-    "x": 26.7,
-    "y": 70.8,
-    "w": 12.7,
-    "h": 2.5,
-    "label": "Download the finished MP4"
-   },
-   {
-    "n": 5,
-    "x": 2.9,
-    "y": 58.3,
-    "w": 25.2,
-    "h": 4.5,
-    "label": "Export again after a change (free)"
-   },
-   {
-    "n": 6,
-    "x": 2.9,
-    "y": 68.5,
-    "w": 94.2,
-    "h": 1.5,
-    "label": "Turn on the AI-generated label when you post"
-   }
-  ]
- },
- "post-slideshow": {
-  "w": 1068,
-  "h": 1135,
-  "spots": [
-   {
-    "n": 1,
-    "x": 2.9,
-    "y": 15.3,
-    "w": 94.2,
-    "h": 1.7,
-    "label": "The hook on the first slide"
-   },
-   {
-    "n": 2,
-    "x": 2.9,
-    "y": 7.6,
-    "w": 23.7,
-    "h": 3.3,
-    "label": "Claude writes the slides (priced)"
-   },
-   {
-    "n": 3,
-    "x": 2.9,
-    "y": 45.5,
-    "w": 10.5,
-    "h": 2.6,
-    "label": "Add or remove slides"
-   },
-   {
-    "n": 4,
-    "x": 2.9,
-    "y": 49.1,
-    "w": 94.2,
-    "h": 1.7,
-    "label": "The caption and hashtags for the post"
-   }
-  ]
- },
- "post-batch": {
-  "w": 1068,
-  "h": 570,
-  "spots": [
-   {
-    "n": 1,
-    "x": 2.9,
-    "y": 15.1,
-    "w": 6.7,
-    "h": 3.3,
-    "label": "How many videos"
-   },
-   {
-    "n": 2,
-    "x": 10.8,
-    "y": 20.3,
-    "w": 21.2,
-    "h": 6.7,
-    "label": "Claude writes the captions (priced)"
-   },
-   {
-    "n": 3,
-    "x": 2.9,
-    "y": 35.1,
-    "w": 67.8,
-    "h": 3.8,
-    "label": "One caption per line: one video each"
-   }
-  ]
- },
- "library": {
-  "w": 1140,
-  "h": 1000,
-  "spots": [
-   {
-    "n": 1,
-    "x": 4.6,
-    "y": 19.3,
-    "w": 6.5,
-    "h": 3,
-    "label": "Stills you made"
-   },
-   {
-    "n": 2,
-    "x": 11.3,
-    "y": 19.3,
-    "w": 6.5,
-    "h": 3,
-    "label": "Kept clips: takes, uploads and clones"
-   },
-   {
-    "n": 3,
-    "x": 18,
-    "y": 19.3,
-    "w": 6.8,
-    "h": 3,
-    "label": "B-roll: screen recordings and phone videos"
-   },
-   {
-    "n": 4,
-    "x": 33,
-    "y": 19.3,
-    "w": 9.6,
-    "h": 3,
-    "label": "Voice lines: your takes in the character's voice"
-   },
-   {
-    "n": 5,
-    "x": 42.7,
-    "y": 19.3,
-    "w": 7.2,
-    "h": 3,
-    "label": "Hooks: the vault, the claims sheet and buyer language"
-   },
-   {
-    "n": 6,
-    "x": 50,
-    "y": 19.3,
-    "w": 6.8,
-    "h": 3,
-    "label": "Finished posts and their exports"
-   },
-   {
-    "n": 7,
-    "x": 4.2,
-    "y": 24.5,
-    "w": 17.3,
-    "h": 45.4,
-    "label": "Open any item, or start a new post from it"
-   }
-  ]
- },
- "settings-general": {
-  "w": 1140,
-  "h": 1684,
-  "spots": [
-   {
-    "n": 1,
-    "x": 4.6,
-    "y": 8,
-    "w": 6.2,
-    "h": 1.8,
-    "label": "General: mode, keys, Higgsfield billing"
-   },
-   {
-    "n": 2,
-    "x": 10.9,
-    "y": 8,
-    "w": 6,
-    "h": 1.8,
-    "label": "Models: Claude per task, Higgsfield model tests"
-   },
-   {
-    "n": 3,
-    "x": 17.1,
-    "y": 8,
-    "w": 5.1,
-    "h": 1.8,
-    "label": "Rules: fixed rules and your switches"
-   },
-   {
-    "n": 4,
-    "x": 22.3,
-    "y": 8,
-    "w": 12.2,
-    "h": 1.8,
-    "label": "Budgets and usage"
-   },
-   {
-    "n": 5,
-    "x": 6.1,
-    "y": 54.6,
-    "w": 87.9,
-    "h": 1.5,
-    "label": "Plan credits (your account) or the pay-per-use API"
-   },
-   {
-    "n": 6,
-    "x": 6.1,
-    "y": 23,
-    "w": 87.9,
-    "h": 1.5,
-    "label": "Keys stay on the server, never in the browser"
-   }
-  ]
- },
- "settings-rules": {
-  "w": 1140,
-  "h": 1400,
-  "spots": [
-   {
-    "n": 1,
-    "x": 4.2,
-    "y": 13.5,
-    "w": 50.5,
-    "h": 3,
-    "label": "Fixed rules: realism, 21+, nothing explicit, prices first"
-   },
-   {
-    "n": 2,
-    "x": 90.1,
-    "y": 99.9,
-    "w": 3.9,
-    "h": 0.1,
-    "label": "A default: switch it off for everyone or one character"
-   }
-  ]
- },
- "settings-usage": {
-  "w": 1140,
-  "h": 1600,
-  "spots": [
-   {
-    "n": 1,
-    "x": 4.2,
-    "y": 75.3,
-    "w": 91.6,
-    "h": 8.7,
-    "label": "Quote against real cost, per run; more than 20% off is flagged"
-   }
-  ]
- },
- "activity": {
-  "w": 480,
-  "h": 900,
-  "spots": [
-   {
-    "n": 1,
-    "x": 4.4,
-    "y": 14.1,
-    "w": 91.5,
-    "h": 4,
-    "label": "Each run with its live status: running first, then the last 15 minutes"
-   }
-  ]
- },
- "still-fix": {
-  "w": 760,
-  "h": 900,
-  "spots": [
-   {
-    "n": 1,
-    "x": 5.5,
-    "y": 8.9,
-    "w": 89.1,
-    "h": 2.3,
-    "label": "Fix one thing: one change per edit, the rest stays"
-   },
-   {
-    "n": 2,
-    "x": 5.5,
-    "y": 17.4,
-    "w": 16.9,
-    "h": 3.1,
-    "label": "Quick fixes: look into the lens, close the mouth, remove a logo"
-   },
-   {
-    "n": 3,
-    "x": 5.5,
-    "y": 22.2,
-    "w": 15,
-    "h": 2,
-    "label": "Diagnose and revise: one-click fixes for common problems"
-   },
-   {
-    "n": 4,
-    "x": 5.5,
-    "y": 29.7,
-    "w": 89.1,
-    "h": 10.2,
-    "label": "The one change, in your words"
-   },
-   {
-    "n": 5,
-    "x": 5.5,
-    "y": 52.7,
-    "w": 18.1,
-    "h": 4.2,
-    "label": "Run the edit (priced)"
-   }
-  ]
- },
- "accounts": {
-  "w": 1068,
-  "h": 424,
-  "spots": [
-   {
-    "n": 1,
-    "x": 3.1,
-    "y": 33.7,
-    "w": 3.5,
-    "h": 13.3,
-    "label": "Ranked by signups, never by views"
-   },
-   {
-    "n": 2,
-    "x": 30.3,
-    "y": 36.4,
-    "w": 22.7,
-    "h": 7.9,
-    "label": "This account's tracked link (it goes in the caption or bio)"
-   },
-   {
-    "n": 3,
-    "x": 55.3,
-    "y": 36.4,
-    "w": 10.3,
-    "h": 7.9,
-    "label": "Or its promo code"
-   },
-   {
-    "n": 4,
-    "x": 77.2,
-    "y": 36.4,
-    "w": 7.5,
-    "h": 7.9,
-    "label": "Signups from your link tracker"
-   },
-   {
-    "n": 5,
-    "x": 3.1,
-    "y": 75.9,
-    "w": 24.3,
-    "h": 10.1,
-    "label": "Add an account by hand"
-   }
-  ]
- },
- "voice-lines": {
-  "w": 1140,
-  "h": 1151,
-  "spots": [
-   {
-    "n": 1,
-    "x": 6.1,
-    "y": 30.2,
-    "w": 17.7,
-    "h": 3.3,
-    "label": "Upload takes: one WAV per line, named by hook"
-   },
-   {
-    "n": 2,
-    "x": 7.8,
-    "y": 41.4,
-    "w": 5.9,
-    "h": 1.9,
-    "label": "The hook number, read from the file name"
-   },
-   {
-    "n": 3,
-    "x": 7.8,
-    "y": 53,
-    "w": 22.8,
-    "h": 2.8,
-    "label": "Your take"
-   },
-   {
-    "n": 4,
-    "x": 7.8,
-    "y": 58.4,
-    "w": 22.8,
-    "h": 2.8,
-    "label": "The same line in the character's voice"
-   },
-   {
-    "n": 5,
-    "x": 7.8,
-    "y": 61.7,
-    "w": 37.7,
-    "h": 1.6,
-    "label": "The words it timed, for captions"
-   },
-   {
-    "n": 6,
-    "x": 46.5,
-    "y": 40.5,
-    "w": 16.9,
-    "h": 2.6,
-    "label": "Convert (priced first)"
-   }
-  ]
- },
- "voice-card": {
-  "w": 560,
-  "h": 852,
-  "spots": [
-   {
-    "n": 1,
-    "x": 3.8,
-    "y": 16,
-    "w": 92.5,
-    "h": 12.9,
-    "label": "The ElevenLabs voice for voice lines"
-   },
-   {
-    "n": 2,
-    "x": 3.8,
-    "y": 40.1,
-    "w": 92.5,
-    "h": 13.7,
-    "label": "How the character talks"
-   },
-   {
-    "n": 3,
-    "x": 51.1,
-    "y": 55.5,
-    "w": 45.2,
-    "h": 10.8,
-    "label": "Never: advice for the writers, not a block"
-   },
-   {
-    "n": 4,
-    "x": 3.8,
-    "y": 89.9,
-    "w": 92.5,
-    "h": 8,
-    "label": "One line in this voice for the writers to match"
-   }
-  ]
- },
- "voiceover": {
-  "w": 1030,
-  "h": 509,
-  "spots": [
-   {
-    "n": 1,
-    "x": 22.8,
-    "y": 68.9,
-    "w": 20.6,
-    "h": 5.5,
-    "label": "The character's converted line"
-   },
-   {
-    "n": 2,
-    "x": 8.3,
-    "y": 76,
-    "w": 7,
-    "h": 8.5,
-    "label": "Where it starts"
-   },
-   {
-    "n": 3,
-    "x": 17.9,
-    "y": 76.5,
-    "w": 16.8,
-    "h": 7.5,
-    "label": "How loud it is (music and ambience dip under it)"
-   },
-   {
-    "n": 4,
-    "x": 36,
-    "y": 77.7,
-    "w": 4.3,
-    "h": 5.1,
-    "label": "Captions from its words, each word timed"
-   }
-  ]
- },
- "hooks": {
-  "w": 1140,
-  "h": 1100,
-  "spots": [
-   {
-    "n": 1,
-    "x": 4.2,
-    "y": 22.4,
-    "w": 8.8,
-    "h": 2.5,
-    "label": "The product (import another script kit any time)"
-   },
-   {
-    "n": 2,
-    "x": 6.1,
-    "y": 33.4,
-    "w": 6.6,
-    "h": 2.5,
-    "label": "Filter the vault by type"
-   },
-   {
-    "n": 3,
-    "x": 6.1,
-    "y": 37.5,
-    "w": 9.1,
-    "h": 1.7,
-    "label": "Which characters get a variant"
-   },
-   {
-    "n": 4,
-    "x": 6.1,
-    "y": 40.7,
-    "w": 87.5,
-    "h": 5.1,
-    "label": "A hook: edit its words in place"
-   }
-  ]
- },
- "hook-variants": {
-  "w": 1030,
-  "h": 342,
-  "spots": [
-   {
-    "n": 1,
-    "x": 6.2,
-    "y": 22.5,
-    "w": 21.3,
-    "h": 8.8,
-    "label": "Write variants: priced first"
-   },
-   {
-    "n": 2,
-    "x": 7.3,
-    "y": 39.2,
-    "w": 5.8,
-    "h": 6.4,
-    "label": "Whose voice it is in"
-   },
-   {
-    "n": 3,
-    "x": 14.1,
-    "y": 36.3,
-    "w": 41.8,
-    "h": 12.3,
-    "label": "The variant"
-   },
-   {
-    "n": 4,
-    "x": 78.2,
-    "y": 38,
-    "w": 14.5,
-    "h": 8.8,
-    "label": "Use in a new post, as the caption"
-   }
-  ]
- },
- "post-idea-more": {
-  "w": 1030,
-  "h": 1500,
-  "spots": [
-   {
-    "n": 1,
-    "x": 3.2,
-    "y": 6.9,
-    "w": 93.6,
-    "h": 4.2,
-    "label": "The character"
-   },
-   {
-    "n": 2,
-    "x": 3.2,
-    "y": 12.3,
-    "w": 93.6,
-    "h": 6.1,
-    "label": "Account tag"
-   },
-   {
-    "n": 3,
-    "x": 3.2,
-    "y": 25.1,
-    "w": 93.6,
-    "h": 54.3,
-    "label": "Format (an edit made by code, free)"
-   },
-   {
-    "n": 4,
-    "x": 3.2,
-    "y": 80.6,
-    "w": 93.6,
-    "h": 19.4,
-    "label": "The shot's details, moved here from Stills"
-   }
-  ]
- },
- "post-idea-paste": {
-  "w": 1068,
-  "h": 580,
-  "spots": [
-   {
-    "n": 1,
-    "x": 2.9,
-    "y": 26.7,
-    "w": 94.2,
-    "h": 18.3,
-    "label": "A whole prompt, pasted"
-   },
-   {
-    "n": 2,
-    "x": 2.9,
-    "y": 64.3,
-    "w": 4.1,
-    "h": 4.5,
-    "label": "Send my prompt as written: on by itself for a pasted prompt"
-   }
-  ]
- },
- "still-sent": {
-  "w": 760,
-  "h": 708,
-  "spots": [
-   {
-    "n": 1,
-    "x": 2.8,
-    "y": 8.9,
-    "w": 94.5,
-    "h": 15.3,
-    "label": "Model, path (your plan or the API), aspect, resolution, quality"
-   },
-   {
-    "n": 2,
-    "x": 75,
-    "y": 18.5,
-    "w": 22.2,
-    "h": 5.7,
-    "label": "Quoted next to the real cost; more than 20% off is flagged"
-   },
-   {
-    "n": 3,
-    "x": 2.8,
-    "y": 29.4,
-    "w": 5.8,
-    "h": 11,
-    "label": "The images attached, by REF id"
-   },
-   {
-    "n": 4,
-    "x": 2.8,
-    "y": 42.1,
-    "w": 94.5,
-    "h": 54.9,
-    "label": "The final prompt exactly as sent, with Copy"
-   }
-  ]
- },
- "post-idea-start": {
-  "w": 1068,
-  "h": 548,
-  "spots": [
-   {
-    "n": 1,
-    "x": 2.9,
-    "y": 23.7,
-    "w": 46.6,
-    "h": 17,
-    "label": "Describe it: write the shot, then stills and a video"
-   },
-   {
-    "n": 2,
-    "x": 50.5,
-    "y": 23.7,
-    "w": 46.6,
-    "h": 17,
-    "label": "Start from a real clip: your character in a TikTok or Reel"
-   }
-  ]
- },
- "recreate-step2": {
-  "w": 1030,
-  "h": 821,
-  "spots": [
-   {
-    "n": 1,
-    "x": 1.2,
-    "y": 28.9,
-    "w": 25.5,
-    "h": 3.4,
-    "label": "Scene to keep: the place, light and props"
-   },
-   {
-    "n": 2,
-    "x": 1.2,
-    "y": 45.3,
-    "w": 13,
-    "h": 3.4,
-    "label": "Source traits to drop: hair, eyes, piercings, makeup"
-   },
-   {
-    "n": 3,
-    "x": 1.2,
-    "y": 61.7,
-    "w": 15.7,
-    "h": 3.4,
-    "label": "The outfit: keep the clip's, or pick hers"
-   },
-   {
-    "n": 4,
-    "x": 1.2,
-    "y": 65.8,
-    "w": 97.1,
-    "h": 5.2,
-    "label": "Said like a catalog: garment, color, fabric, a style word; no fit or body words"
-   },
-   {
-    "n": 5,
-    "x": 1.2,
-    "y": 71.8,
-    "w": 97.1,
-    "h": 2.2,
-    "label": "Your own words go as typed"
-   },
-   {
-    "n": 6,
-    "x": 1.2,
-    "y": 85.1,
-    "w": 22.5,
-    "h": 3.7,
-    "label": "Read them for me: Claude fills the chips (priced)"
-   }
-  ]
- },
- "recreate-stills": {
-  "w": 1030,
-  "h": 1644,
-  "spots": [
-   {
-    "n": 1,
-    "x": 40.8,
-    "y": 2.2,
-    "w": 18.4,
-    "h": 32.5,
-    "label": "The face pass on the best still, made with the stills"
-   },
-   {
-    "n": 2,
-    "x": 22.2,
-    "y": 23.3,
-    "w": 15.9,
-    "h": 1.4,
-    "label": "The gate: face 0.45+, margin 0.12+, likeness under 0.45"
-   },
-   {
-    "n": 3,
-    "x": 41.8,
-    "y": 27.1,
-    "w": 17.1,
-    "h": 1.8,
-    "label": "Make the video: only on a still that passes"
-   },
-   {
-    "n": 4,
-    "x": 2.4,
-    "y": 25.1,
-    "w": 15.9,
-    "h": 2.8,
-    "label": "Refused by the filter: the likely trigger words in what was sent"
-   },
-   {
-    "n": 5,
-    "x": 2.2,
-    "y": 30.3,
-    "w": 16.3,
-    "h": 1.8,
-    "label": "Retry with safer wording: only those words change (free); the run is priced"
-   },
-   {
-    "n": 6,
-    "x": 1.2,
-    "y": 69.8,
-    "w": 62.1,
-    "h": 3.1,
-    "label": "Earlier failures in one gray line: Show them, or Clear for good"
-   },
-   {
-    "n": 7,
-    "x": 1.2,
-    "y": 73.7,
-    "w": 97.7,
-    "h": 5.5,
-    "label": "The stills model: Nano Banana 2.1 (plan) or GPT Image 2.5 (API)"
-   },
-   {
-    "n": 8,
-    "x": 1.2,
-    "y": 79.9,
-    "w": 97.7,
-    "h": 1.6,
-    "label": "Switch off to skip the face pass"
-   }
-  ]
- },
- "recreate-model": {
-  "w": 1030,
-  "h": 200,
-  "spots": [
-   {
-    "n": 1,
-    "x": 1.2,
-    "y": 18.4,
-    "w": 18.9,
-    "h": 63.6,
-    "label": "Each motion model with its price and billing path"
-   },
-   {
-    "n": 2,
-    "x": 2.8,
-    "y": 43.3,
-    "w": 15.6,
-    "h": 15.4,
-    "label": "The price on your plan (credits) or the API (dollars)"
-   }
-  ]
- },
- "recreate-review": {
-  "w": 1030,
-  "h": 1074,
-  "spots": [
-   {
-    "n": 1,
-    "x": 1.3,
-    "y": 4.4,
-    "w": 97.5,
-    "h": 4,
-    "label": "The video rule: the scores and what missed; a warning, never a reject"
-   },
-   {
-    "n": 2,
-    "x": 1.3,
-    "y": 9.5,
-    "w": 97.5,
-    "h": 38.5,
-    "label": "The take and the source, playing in sync"
-   },
-   {
-    "n": 3,
-    "x": 1.3,
-    "y": 52.3,
-    "w": 97.5,
-    "h": 2,
-    "label": "The face check every 0.5 s; red marks are drift: a face under 0.45, the same number as the video rule"
-   },
-   {
-    "n": 4,
-    "x": 1.3,
-    "y": 59.2,
-    "w": 12.8,
-    "h": 24.8,
-    "label": "Text found, each on its own frame with the words boxed"
-   },
-   {
-    "n": 5,
-    "x": 1.3,
-    "y": 89.7,
-    "w": 97.5,
-    "h": 3.5,
-    "label": "Your call: Keep this take, or Try again (nothing spends until you make the video)"
-   }
-  ]
- },
- "recreate-batch": {
-  "w": 1030,
-  "h": 825,
-  "spots": [
-   {
-    "n": 1,
-    "x": 7.2,
-    "y": 9.5,
-    "w": 26.8,
-    "h": 4,
-    "label": "Set all: one motion model for every row"
-   },
-   {
-    "n": 2,
-    "x": 1.2,
-    "y": 14.8,
-    "w": 97.7,
-    "h": 16.6,
-    "label": "A row: its clip, character, model and price"
-   },
-   {
-    "n": 3,
-    "x": 87.8,
-    "y": 16.1,
-    "w": 10,
-    "h": 2.7,
-    "label": "A row that waits says why"
-   },
-   {
-    "n": 4,
-    "x": 1.2,
-    "y": 87.1,
-    "w": 31.6,
-    "h": 4.6,
-    "label": "One price for every row at this step, face pass included"
-   }
-  ]
- },
- "library-clips": {
-  "w": 1140,
-  "h": 900,
-  "spots": [
-   {
-    "n": 1,
-    "x": 5.2,
-    "y": 77.4,
-    "w": 15.4,
-    "h": 3.3,
-    "label": "Use this clip: Recreate it with this clip's character"
-   }
-  ]
- },
- "gate-check": {
-  "w": 1068,
-  "h": 1334,
-  "spots": [
-   {
-    "n": 1,
-    "x": 3.1,
-    "y": 9.6,
-    "w": 93.8,
-    "h": 1.6,
-    "label": "After every 10 real recreates, a check is ready"
-   },
-   {
-    "n": 2,
-    "x": 3.1,
-    "y": 17.7,
-    "w": 93.8,
-    "h": 66.5,
-    "label": "Face, likeness and margin: stills you picked, stills you passed over"
-   },
-   {
-    "n": 3,
-    "x": 3.1,
-    "y": 85,
-    "w": 93.8,
-    "h": 9.6,
-    "label": "Suggested numbers, what they would hold, and why"
-   },
-   {
-    "n": 4,
-    "x": 3.1,
-    "y": 95.3,
-    "w": 13,
-    "h": 2.2,
-    "label": "Use these numbers or keep the current ones; nothing changes until you click"
-   }
-  ]
- },
- "editor-captions": {
-  "w": 1440,
-  "h": 900,
-  "spots": [
-   {
-    "n": 1,
-    "x": 46.5,
-    "y": 24.5,
-    "w": 13.1,
-    "h": 5.8,
-    "label": "Double-click a caption to change its words right here. Enter saves, Esc cancels"
-   },
-   {
-    "n": 2,
-    "x": 15.6,
-    "y": 66.2,
-    "w": 17.9,
-    "h": 6.8,
-    "label": "Or double-click its block on the timeline. Drag a shot onto another to reorder"
-   },
-   {
-    "n": 3,
-    "x": 11,
-    "y": 18.3,
-    "w": 14.6,
-    "h": 6.4,
-    "label": "Presets: one click places one at the playhead (Karaoke captions lights the caption's words)"
-   },
-   {
-    "n": 4,
-    "x": 94.7,
-    "y": 0.2,
-    "w": 4.8,
-    "h": 4,
-    "label": "Done: exports, saves to the post and comes back"
-   }
-  ]
- },
- "editor-resize": {
-  "w": 1440,
-  "h": 900,
-  "spots": [
-   {
-    "n": 1,
-    "x": 46.9,
-    "y": 24.7,
-    "w": 12.2,
-    "h": 3.7,
-    "label": "Drag the caption to move it. One drag is one undo step"
-   },
-   {
-    "n": 2,
-    "x": 59.2,
-    "y": 28.5,
-    "w": 1.7,
-    "h": 2.7,
-    "label": "Drag a small corner dot to make it bigger or smaller; it wraps and never grows taller than the frame. On a phone, drag with a finger"
-   },
-   {
-    "n": 3,
-    "x": 15.9,
-    "y": 82.7,
-    "w": 17.4,
-    "h": 5.9,
-    "label": "Drag its block on the timeline to show it later or sooner; drag its end to show it for less time"
-   }
-  ]
- },
- "price-wording": {
-  "w": 514,
-  "h": 88,
-  "spots": [
-   {
-    "n": 1,
-    "x": 2.3,
-    "y": 65.9,
-    "w": 76.1,
-    "h": 20.5,
-    "label": "A word you typed that the filter often blocks: named here, sent as typed"
-   }
-  ]
- },
- "run-failures": {
-  "w": 664,
-  "h": 260,
-  "spots": [
-   {
-    "n": 1,
-    "x": 1.8,
-    "y": 4.6,
-    "w": 96.4,
-    "h": 68.8,
-    "label": "Only the run you just started can be red"
-   },
-   {
-    "n": 2,
-    "x": 6.9,
-    "y": 23.2,
-    "w": 83.9,
-    "h": 10.8,
-    "label": "Refused by the filter: the likely trigger words in what was sent"
-   },
-   {
-    "n": 3,
-    "x": 25.3,
-    "y": 44.5,
-    "w": 35,
-    "h": 11.6,
-    "label": "The same run with only those words reworded (free rewording, priced run)"
-   },
-   {
-    "n": 4,
-    "x": 1.8,
-    "y": 75.7,
-    "w": 96.4,
-    "h": 19.6,
-    "label": "Earlier failures in one gray line, with what was charged (nothing)"
-   },
-   {
-    "n": 5,
-    "x": 66.1,
-    "y": 80.9,
-    "w": 7.2,
-    "h": 9.2,
-    "label": "Show them, or Clear them for good"
-   }
-  ]
- },
- "editor-speed": {
-  "w": 1440,
-  "h": 1180,
-  "spots": [
-   {
-    "n": 1,
-    "x": 19.3,
-    "y": 85.9,
-    "w": 4,
-    "h": 4.5,
-    "label": "Freeze and speed ramp get a marker on the Presets track: click it to open the Speed panel"
-   },
-   {
-    "n": 2,
-    "x": 27.4,
-    "y": 92,
-    "w": 5.3,
-    "h": 1.3,
-    "label": "The shot shows its speed: 2x, Ramp or Freeze"
-   },
-   {
-    "n": 3,
-    "x": 5.2,
-    "y": 92.5,
-    "w": 6.2,
-    "h": 1.7,
-    "label": "Tracks named by what they hold: Captions, Shots, B-roll, Voice, Music"
-   },
-   {
-    "n": 4,
-    "x": 40.9,
-    "y": 11.1,
-    "w": 24.4,
-    "h": 52.9,
-    "label": "A bigger preview; click anywhere empty to clear the selection"
-   }
-  ]
- },
- "post-caption-off": {
-  "w": 1068,
-  "h": 572,
-  "spots": [
-   {
-    "n": 1,
-    "x": 16.8,
-    "y": 22,
-    "w": 7.7,
-    "h": 5.2,
-    "label": "No caption, picked"
-   },
-   {
-    "n": 2,
-    "x": 2.9,
-    "y": 37.8,
-    "w": 67.8,
-    "h": 6.3,
-    "label": "No caption track in the editor, none in the export"
-   },
-   {
-    "n": 3,
-    "x": 2.9,
-    "y": 45.1,
-    "w": 67.8,
-    "h": 16.1,
-    "label": "Your words are kept, dimmed: pick White box or Outline to put them back"
-   },
-   {
-    "n": 4,
-    "x": 72.8,
-    "y": 15.4,
-    "w": 24.3,
-    "h": 79.2,
-    "label": "The preview shows no caption"
-   }
-  ]
- },
- "library-upload": {
-  "w": 1360,
-  "h": 900,
-  "spots": [
-   {
-    "n": 1,
-    "x": 49.5,
-    "y": 30.2,
-    "w": 11.1,
-    "h": 4.2,
-    "label": "Upload images: several at once; drop them here on a computer, the camera roll on a phone"
-   },
-   {
-    "n": 2,
-    "x": 27.6,
-    "y": 36.3,
-    "w": 62.8,
-    "h": 2,
-    "label": "Kept exactly as uploaded, at full resolution, as stills of this character"
-   },
-   {
-    "n": 3,
-    "x": 51.7,
-    "y": 46.4,
-    "w": 14.5,
-    "h": 47,
-    "label": "In Stills under the file name, ready for a post, a slideshow or the editor"
-   }
-  ]
- },
- "slideshow-upload": {
-  "w": 1068,
-  "h": 620,
-  "spots": [
-   {
-    "n": 1,
-    "x": 2.9,
-    "y": 18.5,
-    "w": 94.2,
-    "h": 35.9,
-    "label": "Uploaded straight into the slideshow, in order"
-   },
-   {
-    "n": 2,
-    "x": 42.9,
-    "y": 68.5,
-    "w": 14.1,
-    "h": 6.1,
-    "label": "Upload images: several at once, or drop them on the box"
-   },
-   {
-    "n": 3,
-    "x": 2.9,
-    "y": 57,
-    "w": 21,
-    "h": 6.1,
-    "label": "Or pick stills from the Library"
-   }
-  ]
- },
- "editor-take": {
-  "w": 1360,
-  "h": 900,
-  "spots": [
-   {
-    "n": 1,
-    "x": 16.8,
-    "y": 89.9,
-    "w": 18.4,
-    "h": 5.3,
-    "label": "The take you picked, on the Shots track, trimmed as you reviewed it"
-   },
-   {
-    "n": 2,
-    "x": 16.8,
-    "y": 82.7,
-    "w": 18.4,
-    "h": 5.9,
-    "label": "Its caption, when one is on"
-   },
-   {
-    "n": 3,
-    "x": 44.6,
-    "y": 14.6,
-    "w": 17.2,
-    "h": 46.3,
-    "label": "The take in the player"
-   },
-   {
-    "n": 4,
-    "x": 94.6,
-    "y": 0.6,
-    "w": 4.5,
-    "h": 3.1,
-    "label": "Done exports and saves to the post"
-   }
-  ]
- },
- "editor-picker": {
-  "w": 1360,
-  "h": 900,
-  "spots": [
-   {
-    "n": 1,
-    "x": 8.2,
-    "y": 7.2,
-    "w": 4.5,
-    "h": 4.9,
-    "label": "Studio first"
-   },
-   {
-    "n": 2,
-    "x": 2.1,
-    "y": 17.1,
-    "w": 27.5,
-    "h": 28.5,
-    "label": "This post's takes and stills"
-   },
-   {
-    "n": 3,
-    "x": 2.1,
-    "y": 46.9,
-    "w": 27.5,
-    "h": 1.7,
-    "label": "This character's clips and stills, then the Library"
-   },
-   {
-    "n": 4,
-    "x": 13,
-    "y": 7.2,
-    "w": 7.2,
-    "h": 4.9,
-    "label": "From computer: files on this computer or phone"
-   },
-   {
-    "n": 5,
-    "x": 16.8,
-    "y": 89.9,
-    "w": 18.4,
-    "h": 5.3,
-    "label": "Tap adds at the playhead; or drag one onto a track"
-   }
-  ]
- },
- "library-select": {
-  "w": 1360,
-  "h": 900,
-  "spots": [
-   {
-    "n": 1,
-    "x": 20.6,
-    "y": 26.5,
-    "w": 10,
-    "h": 3.3,
-    "label": "Select turns the tiles into checkboxes; Done selecting leaves"
-   },
-   {
-    "n": 2,
-    "x": 63.1,
-    "y": 53,
-    "w": 1.9,
-    "h": 2.9,
-    "label": "Tap a tile to pick it"
-   },
-   {
-    "n": 3,
-    "x": 27.8,
-    "y": 93.9,
-    "w": 6.7,
-    "h": 3.3,
-    "label": "Select all, or none"
-   },
-   {
-    "n": 4,
-    "x": 74,
-    "y": 93.9,
-    "w": 7,
-    "h": 3.3,
-    "label": "Delete them together: they go to the Trash for 7 days"
-   }
-  ]
- },
- "library-warn": {
-  "w": 568,
-  "h": 230,
-  "spots": [
-   {
-    "n": 1,
-    "x": 7.9,
-    "y": 26.9,
-    "w": 80.6,
-    "h": 17,
-    "label": "Names the post that uses it (a sheet ref names the REF)"
-   },
-   {
-    "n": 2,
-    "x": 34.3,
-    "y": 71.8,
-    "w": 13.6,
-    "h": 16.5,
-    "label": "Cancel keeps it"
-   },
-   {
-    "n": 3,
-    "x": 49.3,
-    "y": 71.8,
-    "w": 39.3,
-    "h": 16.5,
-    "label": "Or move it; nothing changes for 7 days"
-   }
-  ]
- },
- "library-trash": {
-  "w": 1360,
-  "h": 900,
-  "spots": [
-   {
-    "n": 1,
-    "x": 64.9,
-    "y": 21.4,
-    "w": 5.7,
-    "h": 3.3,
-    "label": "Library > Trash"
-   },
-   {
-    "n": 2,
-    "x": 21.7,
-    "y": 39.1,
-    "w": 6.3,
-    "h": 2.4,
-    "label": "Days left before it is removed for good"
-   },
-   {
-    "n": 3,
-    "x": 21.5,
-    "y": 76.8,
-    "w": 12.6,
-    "h": 2,
-    "label": "Deleted by you, or by Auto-clean"
-   },
-   {
-    "n": 4,
-    "x": 21.4,
-    "y": 79.9,
-    "w": 12.9,
-    "h": 3.3,
-    "label": "Restore puts it back where it was"
-   },
-   {
-    "n": 5,
-    "x": 20.6,
-    "y": 32.3,
-    "w": 6.2,
-    "h": 3.3,
-    "label": "Select restores many at once"
-   }
-  ]
- },
- "settings-storage": {
-  "w": 1068,
-  "h": 472,
-  "spots": [
-   {
-    "n": 1,
-    "x": 3.1,
-    "y": 23.8,
-    "w": 33,
-    "h": 15.6,
-    "label": "Your files in storage, in GB"
-   },
-   {
-    "n": 2,
-    "x": 37.8,
-    "y": 23.8,
-    "w": 51.9,
-    "h": 15.6,
-    "label": "The estimated monthly cost: $0.015 per GB-month, the first 10 GB free"
-   },
-   {
-    "n": 3,
-    "x": 3.1,
-    "y": 43.2,
-    "w": 11.8,
-    "h": 6.4,
-    "label": "Measure now (free, on the worker); the daily clean also does it"
-   },
-   {
-    "n": 4,
-    "x": 3.1,
-    "y": 57.8,
-    "w": 93.8,
-    "h": 8.1,
-    "label": "Auto-clean: takes never kept and stills never picked, after 3, 7, 14 or 30 days, or Off"
-   },
-   {
-    "n": 5,
-    "x": 3.1,
-    "y": 80.8,
-    "w": 15.8,
-    "h": 4.5,
-    "label": "Next auto-clean: how many items it would move"
-   },
-   {
-    "n": 6,
-    "x": 19.8,
-    "y": 79.9,
-    "w": 6.7,
-    "h": 6.4,
-    "label": "Preview: see every item before it runs"
-   },
-   {
-    "n": 7,
-    "x": 27.5,
-    "y": 81.1,
-    "w": 39.5,
-    "h": 3.8,
-    "label": "The first Auto-clean waits for you"
-   }
-  ]
- },
- "post-video-star": {
-  "w": 222,
-  "h": 430,
-  "spots": [
-   {
-    "n": 1,
-    "x": 27.5,
-    "y": 78.8,
-    "w": 10.8,
-    "h": 5.6,
-    "label": "Star a take: Auto-clean never moves a starred take to the Trash"
-   }
-  ]
- },
- "auto-clean-preview": {
-  "w": 760,
-  "h": 900,
-  "spots": [
-   {
-    "n": 1,
-    "x": 2.8,
-    "y": 10.3,
-    "w": 94.6,
-    "h": 4,
-    "label": "Only takes never kept and stills never picked, from posts finished 14 days ago"
-   },
-   {
-    "n": 2,
-    "x": 2.8,
-    "y": 15.9,
-    "w": 94.6,
-    "h": 13.9,
-    "label": "What Auto-clean never touches, whatever its age"
-   },
-   {
-    "n": 3,
-    "x": 2.8,
-    "y": 37.1,
-    "w": 30.3,
-    "h": 50.7,
-    "label": "Each item: its picture, take or still, the post it came from and when it was finished"
-   },
-   {
-    "n": 4,
-    "x": 27.7,
-    "y": 80.7,
-    "w": 3.9,
-    "h": 3.3,
-    "label": "Star one to keep it"
-   },
-   {
-    "n": 5,
-    "x": 2.8,
-    "y": 31.3,
-    "w": 21.5,
-    "h": 4.2,
-    "label": "Start Auto-clean: until you press it, Auto-clean never runs"
-   }
-  ]
- }
+  "shell": {
+    "w": 1360,
+    "h": 900,
+    "spots": [
+      {
+        "n": 1,
+        "x": 1,
+        "y": 14,
+        "w": 15.8,
+        "h": 4.6,
+        "label": "New post: a video post, slideshow, batch, or a clone of a TikTok"
+      },
+      {
+        "n": 2,
+        "x": 1,
+        "y": 19.4,
+        "w": 15.8,
+        "h": 4.6,
+        "label": "Posts: everything you are making"
+      },
+      {
+        "n": 3,
+        "x": 1,
+        "y": 24.2,
+        "w": 15.8,
+        "h": 4.6,
+        "label": "Characters: set each one up once"
+      },
+      {
+        "n": 4,
+        "x": 1,
+        "y": 29,
+        "w": 15.8,
+        "h": 4.6,
+        "label": "Library: every still, clip and export"
+      },
+      {
+        "n": 5,
+        "x": 1,
+        "y": 33.8,
+        "w": 15.8,
+        "h": 4.6,
+        "label": "Settings: keys, billing, models, rules, budgets"
+      },
+      {
+        "n": 6,
+        "x": 1.5,
+        "y": 8.2,
+        "w": 14.9,
+        "h": 3.8,
+        "label": "Worker light: green means runs start right away"
+      },
+      {
+        "n": 7,
+        "x": 1,
+        "y": 71.6,
+        "w": 15.8,
+        "h": 4.6,
+        "label": "Activity: what is running and what just finished"
+      },
+      {
+        "n": 8,
+        "x": 1,
+        "y": 81.9,
+        "w": 15.8,
+        "h": 11.6,
+        "label": "Demo or Live: Demo makes free mock results"
+      }
+    ]
+  },
+  "posts-home": {
+    "w": 1140,
+    "h": 900,
+    "spots": [
+      {
+        "n": 1,
+        "x": 64.6,
+        "y": 11.3,
+        "w": 31.1,
+        "h": 4.2,
+        "label": "Start a post right here too"
+      },
+      {
+        "n": 2,
+        "x": 6.1,
+        "y": 36,
+        "w": 69.2,
+        "h": 4.3,
+        "label": "Accounts: tracked links, promo codes and signups"
+      },
+      {
+        "n": 3,
+        "x": 4.2,
+        "y": 44.8,
+        "w": 6.7,
+        "h": 2.1,
+        "label": "Filter by account (the tag you set on a post)"
+      },
+      {
+        "n": 4,
+        "x": 4.2,
+        "y": 49.4,
+        "w": 21.8,
+        "h": 50,
+        "label": "A post: open it to keep going where you left off"
+      }
+    ]
+  },
+  "new-post-menu": {
+    "w": 268,
+    "h": 700,
+    "spots": [
+      {
+        "n": 1,
+        "x": 7.8,
+        "y": 25.7,
+        "w": 76.9,
+        "h": 10.9,
+        "label": "Video post: a clip with a caption"
+      },
+      {
+        "n": 2,
+        "x": 7.8,
+        "y": 36.6,
+        "w": 76.9,
+        "h": 8.3,
+        "label": "Slideshow: stills with a hook and slides"
+      },
+      {
+        "n": 3,
+        "x": 7.8,
+        "y": 44.9,
+        "w": 76.9,
+        "h": 8.3,
+        "label": "Batch: many captions, many videos"
+      },
+      {
+        "n": 4,
+        "x": 7.8,
+        "y": 53.3,
+        "w": 76.9,
+        "h": 10.9,
+        "label": "From a TikTok: clone a saved video"
+      }
+    ]
+  },
+  "characters": {
+    "w": 1140,
+    "h": 900,
+    "spots": [
+      {
+        "n": 1,
+        "x": 82.6,
+        "y": 12.5,
+        "w": 13.2,
+        "h": 4.2,
+        "label": "New character: start from inspiration photos"
+      },
+      {
+        "n": 2,
+        "x": 72.5,
+        "y": 12.5,
+        "w": 8.7,
+        "h": 4.2,
+        "label": "Import a character file you already have"
+      },
+      {
+        "n": 3,
+        "x": 4.2,
+        "y": 19.9,
+        "w": 21.8,
+        "h": 45.9,
+        "label": "A character: open it to see the setup steps"
+      }
+    ]
+  },
+  "setup-start": {
+    "w": 1140,
+    "h": 1283,
+    "spots": [
+      {
+        "n": 1,
+        "x": 4.2,
+        "y": 12.8,
+        "w": 91.6,
+        "h": 4.1,
+        "label": "The four setup steps, in order"
+      },
+      {
+        "n": 2,
+        "x": 4.2,
+        "y": 18.6,
+        "w": 29.8,
+        "h": 61.4,
+        "label": "The character card: who this person is"
+      },
+      {
+        "n": 3,
+        "x": 38.3,
+        "y": 28.9,
+        "w": 55.6,
+        "h": 1.5,
+        "label": "Inspiration photos: the look you want"
+      },
+      {
+        "n": 4,
+        "x": 38.3,
+        "y": 67.9,
+        "w": 12.7,
+        "h": 3,
+        "label": "Claude splits the look from the face"
+      },
+      {
+        "n": 5,
+        "x": 38.3,
+        "y": 86.1,
+        "w": 16.2,
+        "h": 3,
+        "label": "Three character concepts to pick from"
+      }
+    ]
+  },
+  "setup-face": {
+    "w": 1140,
+    "h": 1147,
+    "spots": [
+      {
+        "n": 1,
+        "x": 4.2,
+        "y": 20.8,
+        "w": 29.8,
+        "h": 68.7,
+        "label": "REF-00: the face every later image copies"
+      },
+      {
+        "n": 2,
+        "x": 38.3,
+        "y": 40.5,
+        "w": 23,
+        "h": 3.3,
+        "label": "Generate heroes: bare face, real skin. Pick the best one"
+      },
+      {
+        "n": 3,
+        "x": 38.3,
+        "y": 36.8,
+        "w": 8.7,
+        "h": 1.6,
+        "label": "How many per prompt"
+      },
+      {
+        "n": 4,
+        "x": 38.3,
+        "y": 66.1,
+        "w": 24,
+        "h": 3.3,
+        "label": "Check the card still matches the face"
+      },
+      {
+        "n": 5,
+        "x": 80.6,
+        "y": 54.2,
+        "w": 13.4,
+        "h": 3.3,
+        "label": "Next: build the reference sheet"
+      }
+    ]
+  },
+  "setup-sheet": {
+    "w": 1140,
+    "h": 1500,
+    "spots": [
+      {
+        "n": 1,
+        "x": 21.6,
+        "y": 11.7,
+        "w": 15.8,
+        "h": 2.1,
+        "label": "REF-00 to REF-11: every angle of the same person"
+      },
+      {
+        "n": 2,
+        "x": 36.5,
+        "y": 68.9,
+        "w": 14,
+        "h": 17.5,
+        "label": "A shot: open it to generate, review and approve"
+      },
+      {
+        "n": 3,
+        "x": 55.7,
+        "y": 20.4,
+        "w": 38.4,
+        "h": 1.5,
+        "label": "Done when all 12 are approved"
+      }
+    ]
+  },
+  "setup-file": {
+    "w": 1140,
+    "h": 1200,
+    "spots": [
+      {
+        "n": 1,
+        "x": 38,
+        "y": 14.6,
+        "w": 11.3,
+        "h": 2.7,
+        "label": "The character file: card, marks, every approved shot"
+      },
+      {
+        "n": 2,
+        "x": 57.7,
+        "y": 28,
+        "w": 21.1,
+        "h": 3.2,
+        "label": "Import an edited file or new sheet images"
+      },
+      {
+        "n": 3,
+        "x": 38.3,
+        "y": 28,
+        "w": 18.5,
+        "h": 3.2,
+        "label": "Download the file to keep or edit"
+      }
+    ]
+  },
+  "post-idea": {
+    "w": 1068,
+    "h": 531,
+    "spots": [
+      {
+        "n": 1,
+        "x": 2.9,
+        "y": 29.2,
+        "w": 94.2,
+        "h": 20,
+        "label": "One box: describe the shot, or paste a whole prompt"
+      },
+      {
+        "n": 2,
+        "x": 15.1,
+        "y": 56.7,
+        "w": 10.1,
+        "h": 5.3,
+        "label": "Read from your words, free: click a chip to change it"
+      },
+      {
+        "n": 3,
+        "x": 2.9,
+        "y": 63.1,
+        "w": 11.1,
+        "h": 5.7,
+        "label": "Set a detail your words did not name"
+      },
+      {
+        "n": 4,
+        "x": 2.9,
+        "y": 71.7,
+        "w": 18,
+        "h": 5.7,
+        "label": "Punch it up: three sharper versions, keeping what you wrote"
+      },
+      {
+        "n": 5,
+        "x": 3,
+        "y": 80.6,
+        "w": 94,
+        "h": 13.4,
+        "label": "More control: character, account, format, places and every detail"
+      }
+    ]
+  },
+  "post-stills-start": {
+    "w": 1068,
+    "h": 954,
+    "spots": [
+      {
+        "n": 1,
+        "x": 2.9,
+        "y": 14.9,
+        "w": 94.2,
+        "h": 5.5,
+        "label": "Details: one line; change them in the Idea step"
+      },
+      {
+        "n": 2,
+        "x": 10.8,
+        "y": 32,
+        "w": 4.1,
+        "h": 8.1,
+        "label": "Attaches: face refs only for a close shot"
+      },
+      {
+        "n": 3,
+        "x": 4.9,
+        "y": 41.8,
+        "w": 90.3,
+        "h": 2,
+        "label": "GPT Image 2.5 Flare first, 4 stills, 9:16; Nano Banana 2.1 one click"
+      },
+      {
+        "n": 4,
+        "x": 26.4,
+        "y": 63.6,
+        "w": 22.9,
+        "h": 2.9,
+        "label": "Standard by default, High one click"
+      },
+      {
+        "n": 5,
+        "x": 4.9,
+        "y": 73.5,
+        "w": 32,
+        "h": 5.7,
+        "label": "The price is on the button: credits on your plan, dollars on the API"
+      }
+    ]
+  },
+  "post-stills-done": {
+    "w": 1068,
+    "h": 1921,
+    "spots": [
+      {
+        "n": 1,
+        "x": 6.3,
+        "y": 42.9,
+        "w": 87.5,
+        "h": 10.2,
+        "label": "The prompt Claude wrote. Edit it freely"
+      },
+      {
+        "n": 2,
+        "x": 3.9,
+        "y": 90.9,
+        "w": 15.7,
+        "h": 1.6,
+        "label": "Use this still: it starts the video"
+      },
+      {
+        "n": 3,
+        "x": 3.9,
+        "y": 96.5,
+        "w": 10.9,
+        "h": 1.2,
+        "label": "What was sent: the prompt, refs, model and cost"
+      },
+      {
+        "n": 4,
+        "x": 3.7,
+        "y": 72.9,
+        "w": 16.1,
+        "h": 15.9,
+        "label": "Open a still: checks, Fix one thing, crop, upscale"
+      }
+    ]
+  },
+  "still-drawer": {
+    "w": 760,
+    "h": 900,
+    "spots": [
+      {
+        "n": 1,
+        "x": 2.8,
+        "y": 81.2,
+        "w": 94.6,
+        "h": 7,
+        "label": "The free checks: face match and skin"
+      },
+      {
+        "n": 2,
+        "x": 2.8,
+        "y": 90,
+        "w": 19.7,
+        "h": 3.3,
+        "label": "Check this: Claude looks closely (priced)"
+      }
+    ]
+  },
+  "post-video-ways": {
+    "w": 1038,
+    "h": 165,
+    "spots": [
+      {
+        "n": 1,
+        "x": 1.5,
+        "y": 9.7,
+        "w": 23.5,
+        "h": 80.6,
+        "label": "A real video starting from your still"
+      },
+      {
+        "n": 2,
+        "x": 26,
+        "y": 9.7,
+        "w": 23.5,
+        "h": 80.6,
+        "label": "Rebuild a saved TikTok or Reel with your character"
+      },
+      {
+        "n": 3,
+        "x": 50.5,
+        "y": 9.7,
+        "w": 23.5,
+        "h": 80.6,
+        "label": "Use any video file you have"
+      },
+      {
+        "n": 4,
+        "x": 75,
+        "y": 9.7,
+        "w": 23.5,
+        "h": 80.6,
+        "label": "Use a clip you already kept"
+      }
+    ]
+  },
+  "post-video-still": {
+    "w": 996,
+    "h": 613,
+    "spots": [
+      {
+        "n": 1,
+        "x": 3.1,
+        "y": 10.2,
+        "w": 93.8,
+        "h": 17.7,
+        "label": "Director's notes: hook, payoff, one camera move"
+      },
+      {
+        "n": 2,
+        "x": 3.1,
+        "y": 30.2,
+        "w": 93.8,
+        "h": 35.4,
+        "label": "The video prompt in labeled lines: FORMAT to CONSTRAINTS"
+      },
+      {
+        "n": 3,
+        "x": 3.1,
+        "y": 82.2,
+        "w": 93.8,
+        "h": 3.6,
+        "label": "Directions added to every take"
+      },
+      {
+        "n": 4,
+        "x": 3.1,
+        "y": 87.1,
+        "w": 93.8,
+        "h": 3.6,
+        "label": "If a take looks off: what to change"
+      }
+    ]
+  },
+  "post-video-models": {
+    "w": 988,
+    "h": 277,
+    "spots": [
+      {
+        "n": 1,
+        "x": 1.2,
+        "y": 13.3,
+        "w": 23.8,
+        "h": 35.4,
+        "label": "The picked model, with the price of one take"
+      },
+      {
+        "n": 2,
+        "x": 50.4,
+        "y": 13.3,
+        "w": 23.8,
+        "h": 35.4,
+        "label": "Each model shows its price; your pick is remembered"
+      }
+    ]
+  },
+  "live-status": {
+    "w": 1030,
+    "h": 152,
+    "spots": [
+      {
+        "n": 1,
+        "x": 1.2,
+        "y": 50,
+        "w": 62.1,
+        "h": 23.7,
+        "label": "The live line: what is happening now, and it pulses while it works"
+      }
+    ]
+  },
+  "post-video-takes": {
+    "w": 1046,
+    "h": 436,
+    "spots": [
+      {
+        "n": 1,
+        "x": 3,
+        "y": 86,
+        "w": 16.1,
+        "h": 6.9,
+        "label": "Use this take: keeps it and puts it in the post"
+      },
+      {
+        "n": 2,
+        "x": 2.8,
+        "y": 6.7,
+        "w": 16.4,
+        "h": 70.2,
+        "label": "Open a take: checks, Upscale this take, download"
+      }
+    ]
+  },
+  "post-caption": {
+    "w": 1068,
+    "h": 590,
+    "spots": [
+      {
+        "n": 1,
+        "x": 3.3,
+        "y": 21.4,
+        "w": 7.3,
+        "h": 5.1,
+        "label": "TikTok's white box, or Outline (TikTok Classic)"
+      },
+      {
+        "n": 2,
+        "x": 16.8,
+        "y": 21.4,
+        "w": 7.7,
+        "h": 5.1,
+        "label": "No caption: none in the editor or the export; kept with this post"
+      },
+      {
+        "n": 3,
+        "x": 2.9,
+        "y": 42.7,
+        "w": 67.8,
+        "h": 15.6,
+        "label": "The words, optional: leave it empty for no caption"
+      },
+      {
+        "n": 4,
+        "x": 12.1,
+        "y": 36.6,
+        "w": 10.7,
+        "h": 5.1,
+        "label": "Pick a hook from the vault"
+      },
+      {
+        "n": 5,
+        "x": 72.8,
+        "y": 14.9,
+        "w": 24.3,
+        "h": 79.8,
+        "label": "The preview, as the export draws it"
+      }
+    ]
+  },
+  "post-finish": {
+    "w": 1068,
+    "h": 1200,
+    "spots": [
+      {
+        "n": 1,
+        "x": 4.9,
+        "y": 18.4,
+        "w": 14.5,
+        "h": 3.2,
+        "label": "Open the editor: place presets exactly where you want them"
+      },
+      {
+        "n": 2,
+        "x": 2.9,
+        "y": 24.7,
+        "w": 94.2,
+        "h": 6.1,
+        "label": "Sound: ambience, music and a voiceover, mixed for you"
+      },
+      {
+        "n": 3,
+        "x": 4.9,
+        "y": 49.9,
+        "w": 38.6,
+        "h": 5.3,
+        "label": "Voiceover: one of the character's converted voice lines"
+      },
+      {
+        "n": 4,
+        "x": 26.7,
+        "y": 70.8,
+        "w": 12.7,
+        "h": 2.5,
+        "label": "Download the finished MP4"
+      },
+      {
+        "n": 5,
+        "x": 2.9,
+        "y": 58.3,
+        "w": 25.2,
+        "h": 4.5,
+        "label": "Export again after a change (free)"
+      },
+      {
+        "n": 6,
+        "x": 2.9,
+        "y": 68.5,
+        "w": 94.2,
+        "h": 1.5,
+        "label": "Turn on the AI-generated label when you post"
+      }
+    ]
+  },
+  "post-slideshow": {
+    "w": 1068,
+    "h": 1135,
+    "spots": [
+      {
+        "n": 1,
+        "x": 2.9,
+        "y": 15.3,
+        "w": 94.2,
+        "h": 1.7,
+        "label": "The hook on the first slide"
+      },
+      {
+        "n": 2,
+        "x": 2.9,
+        "y": 7.6,
+        "w": 23.7,
+        "h": 3.3,
+        "label": "Claude writes the slides (priced)"
+      },
+      {
+        "n": 3,
+        "x": 2.9,
+        "y": 45.5,
+        "w": 10.5,
+        "h": 2.6,
+        "label": "Add or remove slides"
+      },
+      {
+        "n": 4,
+        "x": 2.9,
+        "y": 49.1,
+        "w": 94.2,
+        "h": 1.7,
+        "label": "The caption and hashtags for the post"
+      }
+    ]
+  },
+  "post-batch": {
+    "w": 1068,
+    "h": 570,
+    "spots": [
+      {
+        "n": 1,
+        "x": 2.9,
+        "y": 15.1,
+        "w": 6.7,
+        "h": 3.3,
+        "label": "How many videos"
+      },
+      {
+        "n": 2,
+        "x": 10.8,
+        "y": 20.3,
+        "w": 21.2,
+        "h": 6.7,
+        "label": "Claude writes the captions (priced)"
+      },
+      {
+        "n": 3,
+        "x": 2.9,
+        "y": 35.1,
+        "w": 67.8,
+        "h": 3.8,
+        "label": "One caption per line: one video each"
+      }
+    ]
+  },
+  "library": {
+    "w": 1140,
+    "h": 1000,
+    "spots": [
+      {
+        "n": 1,
+        "x": 4.6,
+        "y": 19.3,
+        "w": 6.5,
+        "h": 3,
+        "label": "Stills you made"
+      },
+      {
+        "n": 2,
+        "x": 11.3,
+        "y": 19.3,
+        "w": 6.5,
+        "h": 3,
+        "label": "Kept clips: takes, uploads and clones"
+      },
+      {
+        "n": 3,
+        "x": 18,
+        "y": 19.3,
+        "w": 6.8,
+        "h": 3,
+        "label": "B-roll: screen recordings and phone videos"
+      },
+      {
+        "n": 4,
+        "x": 33,
+        "y": 19.3,
+        "w": 9.6,
+        "h": 3,
+        "label": "Voice lines: your takes in the character's voice"
+      },
+      {
+        "n": 5,
+        "x": 42.7,
+        "y": 19.3,
+        "w": 7.2,
+        "h": 3,
+        "label": "Hooks: the vault, the claims sheet and buyer language"
+      },
+      {
+        "n": 6,
+        "x": 50,
+        "y": 19.3,
+        "w": 6.8,
+        "h": 3,
+        "label": "Finished posts and their exports"
+      },
+      {
+        "n": 7,
+        "x": 4.2,
+        "y": 24.5,
+        "w": 17.3,
+        "h": 45.4,
+        "label": "Open any item, or start a new post from it"
+      }
+    ]
+  },
+  "settings-general": {
+    "w": 1140,
+    "h": 1684,
+    "spots": [
+      {
+        "n": 1,
+        "x": 4.6,
+        "y": 8,
+        "w": 6.2,
+        "h": 1.8,
+        "label": "General: mode, keys, Higgsfield billing"
+      },
+      {
+        "n": 2,
+        "x": 10.9,
+        "y": 8,
+        "w": 6,
+        "h": 1.8,
+        "label": "Models: Claude per task, Higgsfield model tests"
+      },
+      {
+        "n": 3,
+        "x": 17.1,
+        "y": 8,
+        "w": 5.1,
+        "h": 1.8,
+        "label": "Rules: fixed rules and your switches"
+      },
+      {
+        "n": 4,
+        "x": 22.3,
+        "y": 8,
+        "w": 12.2,
+        "h": 1.8,
+        "label": "Budgets and usage"
+      },
+      {
+        "n": 5,
+        "x": 6.1,
+        "y": 54.6,
+        "w": 87.9,
+        "h": 1.5,
+        "label": "Plan credits (your account) or the pay-per-use API"
+      },
+      {
+        "n": 6,
+        "x": 6.1,
+        "y": 23,
+        "w": 87.9,
+        "h": 1.5,
+        "label": "Keys stay on the server, never in the browser"
+      }
+    ]
+  },
+  "settings-rules": {
+    "w": 1140,
+    "h": 1400,
+    "spots": [
+      {
+        "n": 1,
+        "x": 4.2,
+        "y": 13.5,
+        "w": 50.5,
+        "h": 3,
+        "label": "Fixed rules: realism, 21+, nothing explicit, prices first"
+      },
+      {
+        "n": 2,
+        "x": 90.1,
+        "y": 99.9,
+        "w": 3.9,
+        "h": 0.1,
+        "label": "A default: switch it off for everyone or one character"
+      }
+    ]
+  },
+  "settings-usage": {
+    "w": 1140,
+    "h": 1600,
+    "spots": [
+      {
+        "n": 1,
+        "x": 4.2,
+        "y": 75.3,
+        "w": 91.6,
+        "h": 8.7,
+        "label": "Quote against real cost, per run; more than 20% off is flagged"
+      }
+    ]
+  },
+  "activity": {
+    "w": 480,
+    "h": 900,
+    "spots": [
+      {
+        "n": 1,
+        "x": 4.4,
+        "y": 14.1,
+        "w": 91.5,
+        "h": 4,
+        "label": "Each run with its live status: running first, then the last 15 minutes"
+      }
+    ]
+  },
+  "still-fix": {
+    "w": 760,
+    "h": 900,
+    "spots": [
+      {
+        "n": 1,
+        "x": 5.5,
+        "y": 8.9,
+        "w": 89.1,
+        "h": 2.3,
+        "label": "Fix one thing: one change per edit, the rest stays"
+      },
+      {
+        "n": 2,
+        "x": 5.5,
+        "y": 17.4,
+        "w": 16.9,
+        "h": 3.1,
+        "label": "Quick fixes: look into the lens, close the mouth, remove a logo"
+      },
+      {
+        "n": 3,
+        "x": 5.5,
+        "y": 22.2,
+        "w": 15,
+        "h": 2,
+        "label": "Diagnose and revise: one-click fixes for common problems"
+      },
+      {
+        "n": 4,
+        "x": 5.5,
+        "y": 29.7,
+        "w": 89.1,
+        "h": 10.2,
+        "label": "The one change, in your words"
+      },
+      {
+        "n": 5,
+        "x": 5.5,
+        "y": 52.7,
+        "w": 18.1,
+        "h": 4.2,
+        "label": "Run the edit (priced)"
+      }
+    ]
+  },
+  "accounts": {
+    "w": 1068,
+    "h": 424,
+    "spots": [
+      {
+        "n": 1,
+        "x": 3.1,
+        "y": 33.7,
+        "w": 3.5,
+        "h": 13.3,
+        "label": "Ranked by signups, never by views"
+      },
+      {
+        "n": 2,
+        "x": 30.3,
+        "y": 36.4,
+        "w": 22.7,
+        "h": 7.9,
+        "label": "This account's tracked link (it goes in the caption or bio)"
+      },
+      {
+        "n": 3,
+        "x": 55.3,
+        "y": 36.4,
+        "w": 10.3,
+        "h": 7.9,
+        "label": "Or its promo code"
+      },
+      {
+        "n": 4,
+        "x": 77.2,
+        "y": 36.4,
+        "w": 7.5,
+        "h": 7.9,
+        "label": "Signups from your link tracker"
+      },
+      {
+        "n": 5,
+        "x": 3.1,
+        "y": 75.9,
+        "w": 24.3,
+        "h": 10.1,
+        "label": "Add an account by hand"
+      }
+    ]
+  },
+  "voice-lines": {
+    "w": 1140,
+    "h": 1151,
+    "spots": [
+      {
+        "n": 1,
+        "x": 6.1,
+        "y": 30.2,
+        "w": 17.7,
+        "h": 3.3,
+        "label": "Upload takes: one WAV per line, named by hook"
+      },
+      {
+        "n": 2,
+        "x": 7.8,
+        "y": 41.4,
+        "w": 5.9,
+        "h": 1.9,
+        "label": "The hook number, read from the file name"
+      },
+      {
+        "n": 3,
+        "x": 7.8,
+        "y": 53,
+        "w": 22.8,
+        "h": 2.8,
+        "label": "Your take"
+      },
+      {
+        "n": 4,
+        "x": 7.8,
+        "y": 58.4,
+        "w": 22.8,
+        "h": 2.8,
+        "label": "The same line in the character's voice"
+      },
+      {
+        "n": 5,
+        "x": 7.8,
+        "y": 61.7,
+        "w": 37.7,
+        "h": 1.6,
+        "label": "The words it timed, for captions"
+      },
+      {
+        "n": 6,
+        "x": 46.5,
+        "y": 40.5,
+        "w": 16.9,
+        "h": 2.6,
+        "label": "Convert (priced first)"
+      }
+    ]
+  },
+  "voice-card": {
+    "w": 560,
+    "h": 852,
+    "spots": [
+      {
+        "n": 1,
+        "x": 3.8,
+        "y": 16,
+        "w": 92.5,
+        "h": 12.9,
+        "label": "The ElevenLabs voice for voice lines"
+      },
+      {
+        "n": 2,
+        "x": 3.8,
+        "y": 40.1,
+        "w": 92.5,
+        "h": 13.7,
+        "label": "How the character talks"
+      },
+      {
+        "n": 3,
+        "x": 51.1,
+        "y": 55.5,
+        "w": 45.2,
+        "h": 10.8,
+        "label": "Never: advice for the writers, not a block"
+      },
+      {
+        "n": 4,
+        "x": 3.8,
+        "y": 89.9,
+        "w": 92.5,
+        "h": 8,
+        "label": "One line in this voice for the writers to match"
+      }
+    ]
+  },
+  "voiceover": {
+    "w": 1030,
+    "h": 509,
+    "spots": [
+      {
+        "n": 1,
+        "x": 22.8,
+        "y": 68.9,
+        "w": 20.6,
+        "h": 5.5,
+        "label": "The character's converted line"
+      },
+      {
+        "n": 2,
+        "x": 8.3,
+        "y": 76,
+        "w": 7,
+        "h": 8.5,
+        "label": "Where it starts"
+      },
+      {
+        "n": 3,
+        "x": 17.9,
+        "y": 76.5,
+        "w": 16.8,
+        "h": 7.5,
+        "label": "How loud it is (music and ambience dip under it)"
+      },
+      {
+        "n": 4,
+        "x": 36,
+        "y": 77.7,
+        "w": 4.3,
+        "h": 5.1,
+        "label": "Captions from its words, each word timed"
+      }
+    ]
+  },
+  "hooks": {
+    "w": 1140,
+    "h": 1100,
+    "spots": [
+      {
+        "n": 1,
+        "x": 4.2,
+        "y": 22.4,
+        "w": 8.8,
+        "h": 2.5,
+        "label": "The product (import another script kit any time)"
+      },
+      {
+        "n": 2,
+        "x": 6.1,
+        "y": 33.4,
+        "w": 6.6,
+        "h": 2.5,
+        "label": "Filter the vault by type"
+      },
+      {
+        "n": 3,
+        "x": 6.1,
+        "y": 37.5,
+        "w": 9.1,
+        "h": 1.7,
+        "label": "Which characters get a variant"
+      },
+      {
+        "n": 4,
+        "x": 6.1,
+        "y": 40.7,
+        "w": 87.5,
+        "h": 5.1,
+        "label": "A hook: edit its words in place"
+      }
+    ]
+  },
+  "hook-variants": {
+    "w": 1030,
+    "h": 342,
+    "spots": [
+      {
+        "n": 1,
+        "x": 6.2,
+        "y": 22.5,
+        "w": 21.3,
+        "h": 8.8,
+        "label": "Write variants: priced first"
+      },
+      {
+        "n": 2,
+        "x": 7.3,
+        "y": 39.2,
+        "w": 5.8,
+        "h": 6.4,
+        "label": "Whose voice it is in"
+      },
+      {
+        "n": 3,
+        "x": 14.1,
+        "y": 36.3,
+        "w": 41.8,
+        "h": 12.3,
+        "label": "The variant"
+      },
+      {
+        "n": 4,
+        "x": 78.2,
+        "y": 38,
+        "w": 14.5,
+        "h": 8.8,
+        "label": "Use in a new post, as the caption"
+      }
+    ]
+  },
+  "post-idea-more": {
+    "w": 1030,
+    "h": 1500,
+    "spots": [
+      {
+        "n": 1,
+        "x": 3.2,
+        "y": 6.9,
+        "w": 93.6,
+        "h": 4.2,
+        "label": "The character"
+      },
+      {
+        "n": 2,
+        "x": 3.2,
+        "y": 12.3,
+        "w": 93.6,
+        "h": 6.1,
+        "label": "Account tag"
+      },
+      {
+        "n": 3,
+        "x": 3.2,
+        "y": 25.1,
+        "w": 93.6,
+        "h": 54.3,
+        "label": "Format (an edit made by code, free)"
+      },
+      {
+        "n": 4,
+        "x": 3.2,
+        "y": 80.6,
+        "w": 93.6,
+        "h": 19.4,
+        "label": "The shot's details, moved here from Stills"
+      }
+    ]
+  },
+  "post-idea-paste": {
+    "w": 1068,
+    "h": 580,
+    "spots": [
+      {
+        "n": 1,
+        "x": 2.9,
+        "y": 26.7,
+        "w": 94.2,
+        "h": 18.3,
+        "label": "A whole prompt, pasted"
+      },
+      {
+        "n": 2,
+        "x": 2.9,
+        "y": 64.3,
+        "w": 4.1,
+        "h": 4.5,
+        "label": "Send my prompt as written: on by itself for a pasted prompt"
+      }
+    ]
+  },
+  "still-sent": {
+    "w": 760,
+    "h": 708,
+    "spots": [
+      {
+        "n": 1,
+        "x": 2.8,
+        "y": 8.9,
+        "w": 94.5,
+        "h": 15.3,
+        "label": "Model, path (your plan or the API), aspect, resolution, quality"
+      },
+      {
+        "n": 2,
+        "x": 75,
+        "y": 18.5,
+        "w": 22.2,
+        "h": 5.7,
+        "label": "Quoted next to the real cost; more than 20% off is flagged"
+      },
+      {
+        "n": 3,
+        "x": 2.8,
+        "y": 29.4,
+        "w": 5.8,
+        "h": 11,
+        "label": "The images attached, by REF id"
+      },
+      {
+        "n": 4,
+        "x": 2.8,
+        "y": 42.1,
+        "w": 94.5,
+        "h": 54.9,
+        "label": "The final prompt exactly as sent, with Copy"
+      }
+    ]
+  },
+  "post-idea-start": {
+    "w": 1068,
+    "h": 548,
+    "spots": [
+      {
+        "n": 1,
+        "x": 2.9,
+        "y": 23.7,
+        "w": 46.6,
+        "h": 17,
+        "label": "Describe it: write the shot, then stills and a video"
+      },
+      {
+        "n": 2,
+        "x": 50.5,
+        "y": 23.7,
+        "w": 46.6,
+        "h": 17,
+        "label": "Start from a real clip: your character in a TikTok or Reel"
+      }
+    ]
+  },
+  "recreate-step2": {
+    "w": 1030,
+    "h": 821,
+    "spots": [
+      {
+        "n": 1,
+        "x": 1.2,
+        "y": 28.9,
+        "w": 25.5,
+        "h": 3.4,
+        "label": "Scene to keep: the place, light and props"
+      },
+      {
+        "n": 2,
+        "x": 1.2,
+        "y": 45.3,
+        "w": 13,
+        "h": 3.4,
+        "label": "Source traits to drop: hair, eyes, piercings, makeup"
+      },
+      {
+        "n": 3,
+        "x": 1.2,
+        "y": 61.7,
+        "w": 15.7,
+        "h": 3.4,
+        "label": "The outfit: keep the clip's, or pick hers"
+      },
+      {
+        "n": 4,
+        "x": 1.2,
+        "y": 65.8,
+        "w": 97.1,
+        "h": 5.2,
+        "label": "Said like a catalog: garment, color, fabric, a style word; no fit or body words"
+      },
+      {
+        "n": 5,
+        "x": 1.2,
+        "y": 71.8,
+        "w": 97.1,
+        "h": 2.2,
+        "label": "Your own words go as typed"
+      },
+      {
+        "n": 6,
+        "x": 1.2,
+        "y": 85.1,
+        "w": 22.5,
+        "h": 3.7,
+        "label": "Read them for me: Claude fills the chips (priced)"
+      }
+    ]
+  },
+  "recreate-stills": {
+    "w": 1030,
+    "h": 1644,
+    "spots": [
+      {
+        "n": 1,
+        "x": 40.8,
+        "y": 2.2,
+        "w": 18.4,
+        "h": 32.5,
+        "label": "The face pass on the best still, made with the stills"
+      },
+      {
+        "n": 2,
+        "x": 22.2,
+        "y": 23.3,
+        "w": 15.9,
+        "h": 1.4,
+        "label": "The gate: face 0.45+, margin 0.12+, likeness under 0.45"
+      },
+      {
+        "n": 3,
+        "x": 41.8,
+        "y": 27.1,
+        "w": 17.1,
+        "h": 1.8,
+        "label": "Make the video: only on a still that passes"
+      },
+      {
+        "n": 4,
+        "x": 2.4,
+        "y": 25.1,
+        "w": 15.9,
+        "h": 2.8,
+        "label": "Refused by the filter: the likely trigger words in what was sent"
+      },
+      {
+        "n": 5,
+        "x": 2.2,
+        "y": 30.3,
+        "w": 16.3,
+        "h": 1.8,
+        "label": "Retry with safer wording: only those words change (free); the run is priced"
+      },
+      {
+        "n": 6,
+        "x": 1.2,
+        "y": 69.8,
+        "w": 62.1,
+        "h": 3.1,
+        "label": "Earlier failures in one gray line: Show them, or Clear for good"
+      },
+      {
+        "n": 7,
+        "x": 1.2,
+        "y": 73.7,
+        "w": 97.7,
+        "h": 5.5,
+        "label": "The stills model: Nano Banana 2.1 (plan) or GPT Image 2.5 (API)"
+      },
+      {
+        "n": 8,
+        "x": 1.2,
+        "y": 79.9,
+        "w": 97.7,
+        "h": 1.6,
+        "label": "Switch off to skip the face pass"
+      }
+    ]
+  },
+  "recreate-model": {
+    "w": 1030,
+    "h": 200,
+    "spots": [
+      {
+        "n": 1,
+        "x": 1.2,
+        "y": 18.4,
+        "w": 18.9,
+        "h": 63.6,
+        "label": "Each motion model with its price and billing path"
+      },
+      {
+        "n": 2,
+        "x": 2.8,
+        "y": 43.3,
+        "w": 15.6,
+        "h": 15.4,
+        "label": "The price on your plan (credits) or the API (dollars)"
+      }
+    ]
+  },
+  "recreate-review": {
+    "w": 1030,
+    "h": 1074,
+    "spots": [
+      {
+        "n": 1,
+        "x": 1.3,
+        "y": 4.4,
+        "w": 97.5,
+        "h": 4,
+        "label": "The video rule: the scores and what missed; a warning, never a reject"
+      },
+      {
+        "n": 2,
+        "x": 1.3,
+        "y": 9.5,
+        "w": 97.5,
+        "h": 38.5,
+        "label": "The take and the source, playing in sync"
+      },
+      {
+        "n": 3,
+        "x": 1.3,
+        "y": 52.3,
+        "w": 97.5,
+        "h": 2,
+        "label": "The face check every 0.5 s; red marks are drift: a face under 0.45, the same number as the video rule"
+      },
+      {
+        "n": 4,
+        "x": 1.3,
+        "y": 59.2,
+        "w": 12.8,
+        "h": 24.8,
+        "label": "Text found, each on its own frame with the words boxed"
+      },
+      {
+        "n": 5,
+        "x": 1.3,
+        "y": 89.7,
+        "w": 97.5,
+        "h": 3.5,
+        "label": "Your call: Keep this take, or Try again (nothing spends until you make the video)"
+      }
+    ]
+  },
+  "recreate-batch": {
+    "w": 1030,
+    "h": 825,
+    "spots": [
+      {
+        "n": 1,
+        "x": 7.2,
+        "y": 9.5,
+        "w": 26.8,
+        "h": 4,
+        "label": "Set all: one motion model for every row"
+      },
+      {
+        "n": 2,
+        "x": 1.2,
+        "y": 14.8,
+        "w": 97.7,
+        "h": 16.6,
+        "label": "A row: its clip, character, model and price"
+      },
+      {
+        "n": 3,
+        "x": 87.8,
+        "y": 16.1,
+        "w": 10,
+        "h": 2.7,
+        "label": "A row that waits says why"
+      },
+      {
+        "n": 4,
+        "x": 1.2,
+        "y": 87.1,
+        "w": 31.6,
+        "h": 4.6,
+        "label": "One price for every row at this step, face pass included"
+      }
+    ]
+  },
+  "library-clips": {
+    "w": 1140,
+    "h": 900,
+    "spots": [
+      {
+        "n": 1,
+        "x": 5.2,
+        "y": 77.4,
+        "w": 15.4,
+        "h": 3.3,
+        "label": "Use this clip: Recreate it with this clip's character"
+      }
+    ]
+  },
+  "gate-check": {
+    "w": 1068,
+    "h": 1334,
+    "spots": [
+      {
+        "n": 1,
+        "x": 3.1,
+        "y": 9.6,
+        "w": 93.8,
+        "h": 1.6,
+        "label": "After every 10 real recreates, a check is ready"
+      },
+      {
+        "n": 2,
+        "x": 3.1,
+        "y": 17.7,
+        "w": 93.8,
+        "h": 66.5,
+        "label": "Face, likeness and margin: stills you picked, stills you passed over"
+      },
+      {
+        "n": 3,
+        "x": 3.1,
+        "y": 85,
+        "w": 93.8,
+        "h": 9.6,
+        "label": "Suggested numbers, what they would hold, and why"
+      },
+      {
+        "n": 4,
+        "x": 3.1,
+        "y": 95.3,
+        "w": 13,
+        "h": 2.2,
+        "label": "Use these numbers or keep the current ones; nothing changes until you click"
+      }
+    ]
+  },
+  "editor-captions": {
+    "w": 1440,
+    "h": 900,
+    "spots": [
+      {
+        "n": 1,
+        "x": 46.5,
+        "y": 24.5,
+        "w": 13.1,
+        "h": 5.8,
+        "label": "Double-click a caption to change its words right here. Enter saves, Esc cancels"
+      },
+      {
+        "n": 2,
+        "x": 15.6,
+        "y": 66.2,
+        "w": 17.9,
+        "h": 6.8,
+        "label": "Or double-click its block on the timeline. Drag a shot onto another to reorder"
+      },
+      {
+        "n": 3,
+        "x": 11,
+        "y": 18.3,
+        "w": 14.6,
+        "h": 6.4,
+        "label": "Presets: one click places one at the playhead (Karaoke captions lights the caption's words)"
+      },
+      {
+        "n": 4,
+        "x": 94.7,
+        "y": 0.2,
+        "w": 4.8,
+        "h": 4,
+        "label": "Done: exports, saves to the post and comes back"
+      }
+    ]
+  },
+  "editor-resize": {
+    "w": 1440,
+    "h": 900,
+    "spots": [
+      {
+        "n": 1,
+        "x": 46.9,
+        "y": 24.7,
+        "w": 12.2,
+        "h": 3.7,
+        "label": "Drag the caption to move it. One drag is one undo step"
+      },
+      {
+        "n": 2,
+        "x": 59.2,
+        "y": 28.5,
+        "w": 1.7,
+        "h": 2.7,
+        "label": "Drag a small corner dot to make it bigger or smaller; it wraps and never grows taller than the frame. On a phone, drag with a finger"
+      },
+      {
+        "n": 3,
+        "x": 15.9,
+        "y": 82.7,
+        "w": 17.4,
+        "h": 5.9,
+        "label": "Drag its block on the timeline to show it later or sooner; drag its end to show it for less time"
+      }
+    ]
+  },
+  "price-wording": {
+    "w": 514,
+    "h": 88,
+    "spots": [
+      {
+        "n": 1,
+        "x": 2.3,
+        "y": 65.9,
+        "w": 76.1,
+        "h": 20.5,
+        "label": "A word you typed that the filter often blocks: named here, sent as typed"
+      }
+    ]
+  },
+  "run-failures": {
+    "w": 664,
+    "h": 260,
+    "spots": [
+      {
+        "n": 1,
+        "x": 1.8,
+        "y": 4.6,
+        "w": 96.4,
+        "h": 68.8,
+        "label": "Only the run you just started can be red"
+      },
+      {
+        "n": 2,
+        "x": 6.9,
+        "y": 23.2,
+        "w": 83.9,
+        "h": 10.8,
+        "label": "Refused by the filter: the likely trigger words in what was sent"
+      },
+      {
+        "n": 3,
+        "x": 25.3,
+        "y": 44.5,
+        "w": 35,
+        "h": 11.6,
+        "label": "The same run with only those words reworded (free rewording, priced run)"
+      },
+      {
+        "n": 4,
+        "x": 1.8,
+        "y": 75.7,
+        "w": 96.4,
+        "h": 19.6,
+        "label": "Earlier failures in one gray line, with what was charged (nothing)"
+      },
+      {
+        "n": 5,
+        "x": 66.1,
+        "y": 80.9,
+        "w": 7.2,
+        "h": 9.2,
+        "label": "Show them, or Clear them for good"
+      }
+    ]
+  },
+  "editor-speed": {
+    "w": 1440,
+    "h": 1180,
+    "spots": [
+      {
+        "n": 1,
+        "x": 19.3,
+        "y": 85.9,
+        "w": 4,
+        "h": 4.5,
+        "label": "Freeze and speed ramp get a marker on the Presets track: click it to open the Speed panel"
+      },
+      {
+        "n": 2,
+        "x": 27.4,
+        "y": 92,
+        "w": 5.3,
+        "h": 1.3,
+        "label": "The shot shows its speed: 2x, Ramp or Freeze"
+      },
+      {
+        "n": 3,
+        "x": 5.2,
+        "y": 92.5,
+        "w": 6.2,
+        "h": 1.7,
+        "label": "Tracks named by what they hold: Captions, Shots, B-roll, Voice, Music"
+      },
+      {
+        "n": 4,
+        "x": 40.9,
+        "y": 11.1,
+        "w": 24.4,
+        "h": 52.9,
+        "label": "A bigger preview; click anywhere empty to clear the selection"
+      }
+    ]
+  },
+  "post-caption-off": {
+    "w": 1068,
+    "h": 572,
+    "spots": [
+      {
+        "n": 1,
+        "x": 16.8,
+        "y": 22,
+        "w": 7.7,
+        "h": 5.2,
+        "label": "No caption, picked"
+      },
+      {
+        "n": 2,
+        "x": 2.9,
+        "y": 37.8,
+        "w": 67.8,
+        "h": 6.3,
+        "label": "No caption track in the editor, none in the export"
+      },
+      {
+        "n": 3,
+        "x": 2.9,
+        "y": 45.1,
+        "w": 67.8,
+        "h": 16.1,
+        "label": "Your words are kept, dimmed: pick White box or Outline to put them back"
+      },
+      {
+        "n": 4,
+        "x": 72.8,
+        "y": 15.4,
+        "w": 24.3,
+        "h": 79.2,
+        "label": "The preview shows no caption"
+      }
+    ]
+  },
+  "library-upload": {
+    "w": 1360,
+    "h": 900,
+    "spots": [
+      {
+        "n": 1,
+        "x": 49.5,
+        "y": 30.2,
+        "w": 11.1,
+        "h": 4.2,
+        "label": "Upload images: several at once; drop them here on a computer, the camera roll on a phone"
+      },
+      {
+        "n": 2,
+        "x": 27.6,
+        "y": 36.3,
+        "w": 62.8,
+        "h": 2,
+        "label": "Kept exactly as uploaded, at full resolution, as stills of this character"
+      },
+      {
+        "n": 3,
+        "x": 51.7,
+        "y": 46.4,
+        "w": 14.5,
+        "h": 47,
+        "label": "In Stills under the file name, ready for a post, a slideshow or the editor"
+      }
+    ]
+  },
+  "slideshow-upload": {
+    "w": 1068,
+    "h": 620,
+    "spots": [
+      {
+        "n": 1,
+        "x": 2.9,
+        "y": 18.5,
+        "w": 94.2,
+        "h": 35.9,
+        "label": "Uploaded straight into the slideshow, in order"
+      },
+      {
+        "n": 2,
+        "x": 42.9,
+        "y": 68.5,
+        "w": 14.1,
+        "h": 6.1,
+        "label": "Upload images: several at once, or drop them on the box"
+      },
+      {
+        "n": 3,
+        "x": 2.9,
+        "y": 57,
+        "w": 21,
+        "h": 6.1,
+        "label": "Or pick stills from the Library"
+      }
+    ]
+  },
+  "editor-take": {
+    "w": 1360,
+    "h": 900,
+    "spots": [
+      {
+        "n": 1,
+        "x": 16.8,
+        "y": 89.9,
+        "w": 18.4,
+        "h": 5.3,
+        "label": "The take you picked, on the Shots track, trimmed as you reviewed it"
+      },
+      {
+        "n": 2,
+        "x": 16.8,
+        "y": 82.7,
+        "w": 18.4,
+        "h": 5.9,
+        "label": "Its caption, when one is on"
+      },
+      {
+        "n": 3,
+        "x": 44.6,
+        "y": 14.6,
+        "w": 17.2,
+        "h": 46.3,
+        "label": "The take in the player"
+      },
+      {
+        "n": 4,
+        "x": 94.6,
+        "y": 0.6,
+        "w": 4.5,
+        "h": 3.1,
+        "label": "Done exports and saves to the post"
+      }
+    ]
+  },
+  "editor-picker": {
+    "w": 1360,
+    "h": 900,
+    "spots": [
+      {
+        "n": 1,
+        "x": 8.2,
+        "y": 7.2,
+        "w": 4.5,
+        "h": 4.9,
+        "label": "Studio first"
+      },
+      {
+        "n": 2,
+        "x": 2.1,
+        "y": 17.1,
+        "w": 27.5,
+        "h": 28.5,
+        "label": "This post's takes and stills"
+      },
+      {
+        "n": 3,
+        "x": 2.1,
+        "y": 46.9,
+        "w": 27.5,
+        "h": 1.7,
+        "label": "This character's clips and stills, then the Library"
+      },
+      {
+        "n": 4,
+        "x": 13,
+        "y": 7.2,
+        "w": 7.2,
+        "h": 4.9,
+        "label": "From computer: files on this computer or phone"
+      },
+      {
+        "n": 5,
+        "x": 16.8,
+        "y": 89.9,
+        "w": 18.4,
+        "h": 5.3,
+        "label": "Tap adds at the playhead; or drag one onto a track"
+      }
+    ]
+  },
+  "library-select": {
+    "w": 1360,
+    "h": 900,
+    "spots": [
+      {
+        "n": 1,
+        "x": 20.6,
+        "y": 26.5,
+        "w": 10,
+        "h": 3.3,
+        "label": "Select turns the tiles into checkboxes; Done selecting leaves"
+      },
+      {
+        "n": 2,
+        "x": 63.1,
+        "y": 53,
+        "w": 1.9,
+        "h": 2.9,
+        "label": "Tap a tile to pick it"
+      },
+      {
+        "n": 3,
+        "x": 27.8,
+        "y": 93.9,
+        "w": 6.7,
+        "h": 3.3,
+        "label": "Select all, or none"
+      },
+      {
+        "n": 4,
+        "x": 74,
+        "y": 93.9,
+        "w": 7,
+        "h": 3.3,
+        "label": "Delete them together: they go to the Trash for 7 days"
+      }
+    ]
+  },
+  "library-warn": {
+    "w": 568,
+    "h": 230,
+    "spots": [
+      {
+        "n": 1,
+        "x": 7.9,
+        "y": 26.9,
+        "w": 80.6,
+        "h": 17,
+        "label": "Names the post that uses it (a sheet ref names the REF)"
+      },
+      {
+        "n": 2,
+        "x": 34.3,
+        "y": 71.8,
+        "w": 13.6,
+        "h": 16.5,
+        "label": "Cancel keeps it"
+      },
+      {
+        "n": 3,
+        "x": 49.3,
+        "y": 71.8,
+        "w": 39.3,
+        "h": 16.5,
+        "label": "Or move it; nothing changes for 7 days"
+      }
+    ]
+  },
+  "library-trash": {
+    "w": 1360,
+    "h": 900,
+    "spots": [
+      {
+        "n": 1,
+        "x": 64.9,
+        "y": 21.4,
+        "w": 5.7,
+        "h": 3.3,
+        "label": "Library > Trash"
+      },
+      {
+        "n": 2,
+        "x": 21.7,
+        "y": 39.1,
+        "w": 6.3,
+        "h": 2.4,
+        "label": "Days left before it is removed for good"
+      },
+      {
+        "n": 3,
+        "x": 21.5,
+        "y": 76.8,
+        "w": 12.6,
+        "h": 2,
+        "label": "Deleted by you, or by Auto-clean"
+      },
+      {
+        "n": 4,
+        "x": 21.4,
+        "y": 79.9,
+        "w": 12.9,
+        "h": 3.3,
+        "label": "Restore puts it back where it was"
+      },
+      {
+        "n": 5,
+        "x": 20.6,
+        "y": 32.3,
+        "w": 6.2,
+        "h": 3.3,
+        "label": "Select restores many at once"
+      }
+    ]
+  },
+  "settings-storage": {
+    "w": 1068,
+    "h": 472,
+    "spots": [
+      {
+        "n": 1,
+        "x": 3.1,
+        "y": 23.8,
+        "w": 33,
+        "h": 15.6,
+        "label": "Your files in storage, in GB"
+      },
+      {
+        "n": 2,
+        "x": 37.8,
+        "y": 23.8,
+        "w": 51.9,
+        "h": 15.6,
+        "label": "The estimated monthly cost: $0.015 per GB-month, the first 10 GB free"
+      },
+      {
+        "n": 3,
+        "x": 3.1,
+        "y": 43.2,
+        "w": 11.8,
+        "h": 6.4,
+        "label": "Measure now (free, on the worker); the daily clean also does it"
+      },
+      {
+        "n": 4,
+        "x": 3.1,
+        "y": 57.8,
+        "w": 93.8,
+        "h": 8.1,
+        "label": "Auto-clean: takes never kept and stills never picked, after 3, 7, 14 or 30 days, or Off"
+      },
+      {
+        "n": 5,
+        "x": 3.1,
+        "y": 80.8,
+        "w": 15.8,
+        "h": 4.5,
+        "label": "Next auto-clean: how many items it would move"
+      },
+      {
+        "n": 6,
+        "x": 19.8,
+        "y": 79.9,
+        "w": 6.7,
+        "h": 6.4,
+        "label": "Preview: see every item before it runs"
+      },
+      {
+        "n": 7,
+        "x": 27.5,
+        "y": 81.1,
+        "w": 39.5,
+        "h": 3.8,
+        "label": "The first Auto-clean waits for you"
+      }
+    ]
+  },
+  "post-video-star": {
+    "w": 222,
+    "h": 430,
+    "spots": [
+      {
+        "n": 1,
+        "x": 27.5,
+        "y": 78.8,
+        "w": 10.8,
+        "h": 5.6,
+        "label": "Star a take: Auto-clean never moves a starred take to the Trash"
+      }
+    ]
+  },
+  "auto-clean-preview": {
+    "w": 760,
+    "h": 900,
+    "spots": [
+      {
+        "n": 1,
+        "x": 2.8,
+        "y": 10.3,
+        "w": 94.6,
+        "h": 4,
+        "label": "Only takes never kept and stills never picked, from posts finished 14 days ago"
+      },
+      {
+        "n": 2,
+        "x": 2.8,
+        "y": 15.9,
+        "w": 94.6,
+        "h": 13.9,
+        "label": "What Auto-clean never touches, whatever its age"
+      },
+      {
+        "n": 3,
+        "x": 2.8,
+        "y": 37.1,
+        "w": 30.3,
+        "h": 50.7,
+        "label": "Each item: its picture, take or still, the post it came from and when it was finished"
+      },
+      {
+        "n": 4,
+        "x": 27.7,
+        "y": 80.7,
+        "w": 3.9,
+        "h": 3.3,
+        "label": "Star one to keep it"
+      },
+      {
+        "n": 5,
+        "x": 2.8,
+        "y": 31.3,
+        "w": 21.5,
+        "h": 4.2,
+        "label": "Start Auto-clean: until you press it, Auto-clean never runs"
+      }
+    ]
+  },
+  "scene-defaults": {
+    "w": 1030,
+    "h": 555,
+    "spots": [
+      {
+        "n": 1,
+        "x": 2,
+        "y": 58.6,
+        "w": 47.2,
+        "h": 9.4,
+        "label": "Makeup by setting: No makeup at home"
+      },
+      {
+        "n": 2,
+        "x": 2,
+        "y": 69.1,
+        "w": 47.2,
+        "h": 6.4,
+        "label": "What the setting picks; your choice wins"
+      },
+      {
+        "n": 3,
+        "x": 50.8,
+        "y": 58.6,
+        "w": 47.2,
+        "h": 19.5,
+        "label": "Hair styling, rotated from the bank"
+      }
+    ]
+  }
 }

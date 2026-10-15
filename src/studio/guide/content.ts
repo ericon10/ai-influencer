@@ -199,6 +199,7 @@ export const GUIDE: GuideSection[] = [
       { id: 'post-idea', caption: 'One box, and the chips read from your words' },
       { id: 'post-idea-paste', caption: 'A pasted prompt, sent as written' },
       { id: 'post-idea-more', caption: 'More control' },
+      { id: 'scene-defaults', caption: 'Makeup by setting and the rotated hair styling, both yours to change' },
     ],
   },
   {
