@@ -88,7 +88,9 @@ export async function seedPost(opts: { caption?: string; music?: boolean; voice?
 // MP3 so the beat and the export's music can be checked.
 async function vp9Route(page: Page, opts: { mp3?: boolean } = {}) {
   await page.route(/\/api\/v1\/assets\/[^/]+\/content/, async route => {
-    const res = await route.fetch()
+    // The page may close while a file is still loading (the test is done).
+    const res = await route.fetch().catch(() => null)
+    if (!res) return route.abort().catch(() => undefined)
     const type = res.headers()['content-type'] ?? ''
     if (opts.mp3 && type.startsWith('audio/mp4')) {
       const id = route.request().url().match(/assets\/([^/]+)\/content/)![1]!

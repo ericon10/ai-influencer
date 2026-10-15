@@ -24,7 +24,8 @@ async function openStills(page: Page, post: string) {
   // Recreate panel and stays there (nothing is saved).
   await page.route(/\/api\/v1\/content(\/[^/?]+)?(\?.*)?$/, async r => {
     if (r.request().method() !== 'GET') return r.fallback()
-    const res = await r.fetch()
+    const res = await r.fetch().catch(() => null)
+    if (!res) return r.abort().catch(() => undefined)
     const body = await res.json().catch(() => null) as { items?: { id: string; spec?: Record<string, unknown> }[]; item?: { id: string; spec?: Record<string, unknown> } } | null
     for (const i of [...(body?.items ?? []), ...(body?.item ? [body.item] : [])]) if (i.id === post && i.spec) i.spec = { ...i.spec, clipId: null }
     await r.fulfill({ response: res, json: body })
@@ -117,24 +118,34 @@ async function runRows(page: Page, info: TestInfo, phone: boolean) {
 // The face strip under a Recreate take (owner, 2026-10-15): drift is marked
 // under the video rule's face number, 0.45, so the strip and the rule agree.
 // The local face models are not installed, so the test serves known scores
-// over the real take; the line itself comes from the API.
+// over the real take; the line itself comes from the API (the video rule in
+// the gate check). The take's own review may be running again when the page
+// opens (it asks for missing text frames), so the test never waits on it.
 async function faceStrip(page: Page, info: TestInfo, phone: boolean) {
-  test.setTimeout(300_000)
-  const { id } = await recreatePost()
-  type Clones = { clones: Array<{ id: string; assetId: string | null; review: { faceMin: number; step: number; duration: number; samples: Array<{ t: number; face: number | null }> } | null }> }
-  // A review may be running again (the page asks for missing text frames).
-  let real: Clones = { clones: [] }
-  await expect.poll(async () => { real = await api<Clones>('GET', `/content/${id}/clones`); return real.clones.some(c => c.assetId && c.review) }, { timeout: 180_000, intervals: [2000] }).toBe(true)
-  const take = real.clones.find(c => c.assetId && c.review)!
-  expect(take.review!.faceMin).toBe(0.45)
+  test.setTimeout(180_000)
+  const gate = await api<{ video: { current: { face_min: number } } }>('GET', '/recreate/gate-check')
+  const faceMin = gate.video.current.face_min
+  expect(faceMin).toBe(0.45)
+  type Review = { faceMin: number; step: number; duration: number; samples: Array<{ t: number; face: number | null; likeness: number | null }>; drift: Array<{ start: number; end: number }>; text: unknown[]; cuts: number[]; notes: string[] }
+  type Clones = { clones: Array<{ id: string; assetId: string | null; needsFrames?: boolean; review: Review | null }> }
+  // The oldest Recreate post with a take (copies are not set up the same way).
+  const { items } = await api<{ items: { id: string; characterId: string | null; spec?: { clone?: { assetId?: string | null } | null } }[] }>('GET', '/content')
+  let id = ''
+  let take: Clones['clones'][number] | undefined
+  for (const p of [...items].reverse().filter(i => i.spec?.clone?.assetId && i.characterId)) {
+    take = (await api<Clones>('GET', `/content/${p.id}/clones`)).clones.find(c => c.assetId)
+    if (take) { id = p.id; break }
+  }
+  if (!take) throw new Error('No Recreate post with a take. Run one in demo mode first.')
   const faces = [0.62, 0.58, 0.47, 0.45, 0.44, 0.31, 0.5, 0.6, null, 0.55, 0.52, 0.49]
+  const step = 0.5
+  const samples = faces.map((face, i) => ({ t: i * step, face, likeness: null }))
+  const review: Review = { faceMin, step, duration: faces.length * step, samples, drift: [{ start: 2, end: 3 }], text: [], cuts: [], notes: [] }
   await page.route(`**/api/v1/content/${id}/clones`, async r => {
-    const res = await r.fetch()
+    const res = await r.fetch().catch(() => null)
+    if (!res) return r.abort().catch(() => undefined)
     const body = await res.json() as Clones
-    for (const c of body.clones) if (c.id === take.id && c.review) {
-      c.review.samples = c.review.samples.map((s, i) => ({ ...s, face: faces[i % faces.length] ?? null }))
-      ;(c.review as Record<string, unknown>).drift = [{ start: 2, end: 3 }]
-    }
+    for (const c of body.clones) if (c.id === take!.id) { c.review = { ...(c.review ?? {}), ...review } as Review; c.needsFrames = false }
     await r.fulfill({ response: res, json: body })
   })
   await openStills(page, id)
@@ -142,18 +153,18 @@ async function faceStrip(page: Page, info: TestInfo, phone: boolean) {
   await strip.scrollIntoViewIfNeeded()
   await expect(strip).toBeVisible({ timeout: 30_000 })
   const cells = strip.locator('.st-strip-cell')
-  await expect(cells).toHaveCount(take.review!.samples.length)
+  await expect(cells).toHaveCount(samples.length)
   // Under 0.45 is drift; 0.45 and above match; no face found is its own mark.
-  for (const [i, f] of faces.entries()) {
-    if (i >= take.review!.samples.length) break
-    await expect(cells.nth(i)).toHaveClass(new RegExp(f == null ? 'none' : f < 0.45 ? 'drift' : 'ok'))
-  }
+  for (const [i, f] of faces.entries()) await expect(cells.nth(i)).toHaveClass(new RegExp(f == null ? 'none' : f < 0.45 ? 'drift' : 'ok'))
   await expect(page.getByText('face under 0.45 (the video rule)')).toBeVisible()
   await expect(page.getByText('Drift at 2.0 to 3.0 s')).toBeVisible()
   // A cell takes you to its moment.
   await press(cells.nth(5), phone)
   await snap(page, info, phone ? 'phone: face strip, drift under 0.45' : 'face strip, drift under 0.45')
 }
+
+// A route still answering when a test ends is not a failure of the screen.
+test.afterEach(async ({ page }) => { await page.unrouteAll({ behavior: 'ignoreErrors' }) })
 
 test('the stills grid: earlier failures fold into one gray line with Show and Clear', async ({ page }, info) => { await stillsGrid(page, info, false) })
 test('the run rows: only the run just started is red; earlier failures are one gray line', async ({ page }, info) => { await runRows(page, info, false) })
