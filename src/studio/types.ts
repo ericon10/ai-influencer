@@ -496,8 +496,14 @@ export interface StorageInfo {
   usage: { bytes: number; files: number; uploadsWaiting: number; measuredAt: string } | null
   monthlyCost: number | null; priceNote: string
   autoCleanDays: number | null; autoCleanChoices: number[]
+  autoCleanNext: number; autoCleanStarted: boolean
   trashDays: number; uploadSlotDays: number; cleanedAt: string | null; measuring: boolean
   worker: { freeDiskMb: number | null; checkedAt: string | null }
+}
+// The next Auto-clean, listed without moving anything.
+export interface AutoCleanItem {
+  id: string; kind: 'take' | 'still'; label: string; assetId: string | null; media: 'image' | 'video'
+  characterId: string; postId: string; postName: string; finishedAt: string
 }
 export interface TrashRef { kind: 'candidate' | 'broll' | 'sound' | 'render'; id: string }
 export interface TrashItem {

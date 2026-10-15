@@ -198,6 +198,11 @@ describe('Studio API', () => {
     expect((await call('PUT', '/settings/storage/auto-clean', { body: { days: 9 }, cookie: cookieA })).status).toBe(400)
     expect((await call('PUT', '/settings/storage/auto-clean', { body: { days: 14 }, cookie: cookieA })).json.autoCleanDays).toBe(14)
     expect((await call('GET', '/settings/storage', { cookie: cookieB })).json.autoCleanDays).toBe(14)
+    // The next Auto-clean, listed first; the first run waits for Start.
+    expect((await call('GET', '/settings/storage/auto-clean/preview', { cookie: cookieA })).json).toMatchObject({ days: 14, started: false, items: [] })
+    expect((await call('GET', '/settings/storage', { cookie: cookieA })).json).toMatchObject({ autoCleanNext: 0, autoCleanStarted: false })
+    expect((await call('POST', '/settings/storage/auto-clean/start', { body: {}, cookie: cookieA })).json.autoCleanStarted).toBe(true)
+    expect((await call('GET', '/settings/storage', { cookie: cookieB })).json.autoCleanStarted).toBe(false)
     await drain(h)
     expect((await call('POST', '/settings/storage/measure', { body: {}, cookie: cookieA })).json).toEqual({ queued: true })
     await drain(h)

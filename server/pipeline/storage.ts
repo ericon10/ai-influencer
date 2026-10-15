@@ -5,7 +5,7 @@ import { AppError } from '../lib/errors.js'
 import { registerLocalJob, type JobRow } from '../jobs/hooks.js'
 import { enqueueLocalJob } from '../jobs/runner.js'
 import { getSetting, putCacheSetting, setSetting } from './settings.js'
-import { autoClean, DEFAULT_AUTO_CLEAN_DAYS, purgeDue, TRASH_DAYS } from './trash.js'
+import { autoClean, autoCleanPlan, DEFAULT_AUTO_CLEAN_DAYS, purgeDue, TRASH_DAYS, type AutoCleanItem } from './trash.js'
 
 // Storage, traffic and auto-clean (owner, 2026-10-15; UX-PLAN.md section
 // 22). The daily clean runs on the worker once a day per account: upload
@@ -23,6 +23,9 @@ export const AUTO_CLEAN_CHOICES = [3, 7, 14, 30] as const
 const KEY_AUTO = 'storage.autoCleanDays'
 const KEY_USAGE = 'storage.usage'
 const KEY_RAN = 'storage.cleanedAt'
+// Auto-clean never runs until the owner has looked at its first list
+// (owner, 2026-10-15) and pressed Start Auto-clean.
+const KEY_STARTED = 'storage.autoCleanStartedAt'
 
 export interface StorageUsage { bytes: number; files: number; uploadsWaiting: number; measuredAt: string }
 export interface CleanResult { uploadsRemoved: number; purged: number; filesRemoved: number; autoCleaned: number; usage: StorageUsage; lifecycle: string | null }
@@ -67,12 +70,25 @@ export async function setAutoCleanDays(deps: Deps, ctx: Ctx, days: number | null
   await setSetting(deps, ctx, KEY_AUTO, days ?? 0)
 }
 
+export const autoCleanStarted = async (deps: Deps, ctx: Ctx) => !!(await getSetting<string | null>(deps.db, ctx.accountId, KEY_STARTED, null))
+
+// What the next Auto-clean would move to the Trash, without moving it.
+export async function autoCleanPreview(deps: Deps, ctx: Ctx): Promise<{ days: number | null; started: boolean; items: AutoCleanItem[] }> {
+  const days = await autoCleanDays(deps, ctx)
+  return { days, started: await autoCleanStarted(deps, ctx), items: await autoCleanPlan(deps, ctx, days) }
+}
+
+// The owner saw the list: from the next daily clean on, Auto-clean runs.
+export async function startAutoClean(deps: Deps, ctx: Ctx): Promise<void> {
+  await setSetting(deps, ctx, KEY_STARTED, deps.clock.now().toISOString())
+}
+
 export async function runClean(deps: Deps, ctx: Ctx): Promise<CleanResult> {
   // The bucket deletes stale upload slots itself when the key may say so.
   const lifecycle = deps.store.ensureExpiry ? (await deps.store.ensureExpiry('uploads/', UPLOAD_SLOT_DAYS)).message : null
   const uploadsRemoved = await sweepUploads(deps, ctx)
   const purge = await purgeDue(deps, ctx)
-  const auto = await autoClean(deps, ctx, await autoCleanDays(deps, ctx))
+  const auto = (await autoCleanStarted(deps, ctx)) ? await autoClean(deps, ctx, await autoCleanDays(deps, ctx)) : { moved: 0 }
   const usage = await measureUsage(deps, ctx)
   await putCacheSetting(deps.db, ctx.accountId, KEY_RAN, deps.clock.now().toISOString())
   return { uploadsRemoved, purged: purge.items, filesRemoved: purge.files, autoCleaned: auto.moved, usage, lifecycle }
@@ -105,6 +121,9 @@ export interface StorageView {
   priceNote: string
   autoCleanDays: number | null
   autoCleanChoices: number[]
+  // The next Auto-clean: how many items, and whether it has been started.
+  autoCleanNext: number
+  autoCleanStarted: boolean
   trashDays: number
   uploadSlotDays: number
   cleanedAt: string | null
@@ -119,6 +138,8 @@ export async function storageView(deps: Deps, ctx: Ctx): Promise<StorageView> {
     priceNote: `R2 storage: $${R2_PRICE_PER_GB} per GB-month; the first ${R2_FREE_GB} GB a month are free (for the whole Cloudflare account).`,
     autoCleanDays: await autoCleanDays(deps, ctx),
     autoCleanChoices: [...AUTO_CLEAN_CHOICES],
+    autoCleanNext: (await autoCleanPlan(deps, ctx, await autoCleanDays(deps, ctx))).length,
+    autoCleanStarted: await autoCleanStarted(deps, ctx),
     trashDays: TRASH_DAYS,
     uploadSlotDays: UPLOAD_SLOT_DAYS,
     cleanedAt: await getSetting<string | null>(deps.db, ctx.accountId, KEY_RAN, null),

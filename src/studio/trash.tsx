@@ -3,9 +3,9 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { AlertTriangle, AudioLines, CheckSquare, File, Loader2, RotateCcw, Square, Star, Trash2, X } from 'lucide-react'
 import { api, assetUrl } from './api'
 import { keys } from './hooks'
-import { Callout, Img, Modal, errorMessage, useToast } from './ui'
+import { Callout, Drawer, Img, Modal, errorMessage, useToast } from './ui'
 import { HowTo } from './guide/Guide'
-import type { TrashItem, TrashRef } from './types'
+import type { AutoCleanItem, TrashItem, TrashRef } from './types'
 import type { GuideId } from './guide/content'
 
 // Delete, Select and the Trash (owner, 2026-10-15; UX-PLAN.md section 22).
@@ -17,7 +17,7 @@ export interface Deletable extends TrashRef { label: string }
 type Warning = { id: string; kind: TrashRef['kind']; text: string }
 
 const refresh = (qc: ReturnType<typeof useQueryClient>) => {
-  for (const key of [['library'], keys.content, ['sounds'], ['trash'], ['scenes'], ['clones'], ['character'], ['voice-lines']]) void qc.invalidateQueries({ queryKey: key })
+  for (const key of [['library'], keys.content, ['sounds'], ['trash'], ['scenes'], ['clones'], ['character'], ['voice-lines'], ['auto-clean-preview']]) void qc.invalidateQueries({ queryKey: key })
 }
 
 export function useDelete() {
@@ -197,3 +197,76 @@ export function TrashTab({ characterId }: { characterId: string | null }) {
     </div>
   )
 }
+
+// The next Auto-clean, before it runs (owner, 2026-10-15): every item it
+// would move to the Trash, with a star to keep one. The first Auto-clean
+// waits for Start Auto-clean here.
+export function AutoCleanPreview({ open, onClose, onStarted }: { open: boolean; onClose: () => void; onStarted: () => void }) {
+  const toast = useToast()
+  const q = useQuery({ queryKey: ['auto-clean-preview'], queryFn: api.autoCleanPreview, enabled: open })
+  const [busy, setBusy] = useState(false)
+  const d = q.data
+  const items = d?.items ?? []
+  async function start() {
+    setBusy(true)
+    try {
+      await api.startAutoClean()
+      toast({ tone: 'ok', text: 'Auto-clean is on. From the next daily clean, items like these go to the Trash, where they wait 7 days.' })
+      onStarted()
+      onClose()
+    } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) } finally { setBusy(false) }
+  }
+  return (
+    <Drawer open={open} onClose={onClose} wide title={<span>Next auto-clean <span className="st-muted">{d ? `${items.length} item${items.length === 1 ? '' : 's'}` : ''}</span></span>}>
+      <div className="st-col" style={{ gap: 14 }} data-field="auto-clean-preview">
+        {!d ? <div className="st-skel" style={{ height: 200, borderRadius: 18 }} /> : (
+          <>
+            <span className="st-hint">{d.days ? `Only takes you never kept and stills you never picked, from posts finished more than ${d.days} days ago. They go to the Trash, where they wait 7 days and can be restored. Star one to keep it.` : 'Auto-clean is Off: nothing moves. Pick a number of days to turn it on.'}</span>
+            <details className="st-autoclean-never">
+              <summary>Never touched, whatever their age</summary>
+              <ul>
+                <li>Sheet refs (REF-00 to REF-11), heroes and anything in a character file</li>
+                <li>A take you kept (Keep this take or Use this take) or starred</li>
+                <li>Anything a post uses: live, posted, exported or archived, its render and its saved editor timeline</li>
+                <li>The stills, start and end frames a kept take was made from</li>
+                <li>Saved clips and images in the Library (uploads, kept clips, kept clones)</li>
+              </ul>
+            </details>
+            <div className="st-row" style={{ gap: 10, flexWrap: 'wrap' }}>
+              {!d.started && !!d.days && <button type="button" className="st-btn primary" disabled={busy} onClick={() => void start()}>{busy ? <Loader2 size={15} className="st-spin" /> : <CheckSquare size={15} />}Start Auto-clean</button>}
+              <span className="st-hint">{d.started ? 'Auto-clean is on: it runs with the daily clean, once a day.' : 'Auto-clean has not run yet. It waits until you press Start Auto-clean.'}</span>
+              <span className="st-spacer" />
+              <HowTo id="settings" label="About Auto-clean" />
+            </div>
+            {!items.length ? <Callout tone="info">Nothing to clean right now.</Callout> : (
+              <div className="st-grid scenes">
+                {items.map(x => <PreviewTile key={x.id} x={x} />)}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </Drawer>
+  )
+}
+
+function PreviewTile({ x }: { x: AutoCleanItem }) {
+  return (
+    <div className="st-tile st-scene-tile">
+      <div className="st-tile-open">
+        {x.media === 'image' ? <Img assetId={x.assetId} width={320} style={{ aspectRatio: '9 / 16' }} />
+          : x.assetId ? <video className="st-clip" src={`${assetUrl(x.assetId)}#t=0.1`} muted playsInline preload="metadata" style={{ aspectRatio: '9 / 16' }} />
+          : <div className="st-clip st-clip-empty" style={{ aspectRatio: '9 / 16' }}><File size={18} /></div>}
+        <span className="st-badge plain">{x.kind === 'take' ? 'Take never kept' : 'Still never picked'}</span>
+      </div>
+      <div className="st-tile-meta">
+        <div className="st-col" style={{ gap: 2, minWidth: 0, flex: 1 }}>
+          <span className="st-tile-label">{x.postName}</span>
+          <span className="st-hint">Finished {new Date(x.finishedAt).toLocaleDateString()}</span>
+        </div>
+        <StarButton id={x.id} on={false} />
+      </div>
+    </div>
+  )
+}
+

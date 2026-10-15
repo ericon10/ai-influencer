@@ -2,14 +2,15 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { and, eq } from 'drizzle-orm'
 import sharp from 'sharp'
 import { createHarness, type Harness } from '../testing/harness.js'
-import { assets, candidates, contentItems, jobs, refImages } from '../db/schema.js'
+import { assets, candidates, characters, contentItems, jobs, refImages } from '../db/schema.js'
 import { newId } from '../lib/ids.js'
 import { saveAsset, thumbnail, thumbKeyOf } from '../storage/assets.js'
 import { createCharacter } from './characters.js'
 import { createContent } from './content.js'
 import { libraryView } from './clips.js'
 import { createScene, sceneCandidates } from './scenes.js'
-import { autoClean, listTrash, purgeDue, restore, trash, trashWarnings, TRASH_DAYS } from './trash.js'
+import { autoClean, autoCleanPlan, listTrash, purgeDue, restore, trash, trashWarnings, TRASH_DAYS } from './trash.js'
+import { autoCleanPreview, runClean, startAutoClean, storageView } from './storage.js'
 
 // Delete and the Trash (owner, 2026-10-15): an item deleted in the Library
 // waits 7 days in the Trash, restorable, then its files leave storage for
@@ -30,15 +31,31 @@ async function still(label = '') {
 }
 
 // A take, without probing a real video (the bytes are never played here).
-async function take(opts: { sceneId?: string | null; jobId?: string | null; status?: string; favorite?: boolean; op?: string } = {}) {
+async function take(opts: { sceneId?: string | null; jobId?: string | null; status?: string; favorite?: boolean; op?: string; parentId?: string; meta?: Record<string, unknown> } = {}) {
   const aid = newId('ast')
   const key = `acct/${h.ctx.accountId}/2026/10/${aid}.mp4`
   await h.deps.store.put(key, Buffer.from('take'), 'video/mp4')
   await h.deps.db.insert(assets).values({ id: aid, accountId: h.ctx.accountId, kind: 'video', storageKey: key, mime: 'video/mp4', bytes: 4, checksumSha256: aid, origin: 'generated' })
   const id = newId('cand')
-  await h.deps.db.insert(candidates).values({ id, accountId: h.ctx.accountId, characterId: callie, target: 'scene', sceneId: opts.sceneId ?? null, jobId: opts.jobId ?? null, op: opts.op ?? 'video', assetId: aid, status: opts.status ?? 'in_review', favorite: opts.favorite ?? false })
+  await h.deps.db.insert(candidates).values({ id, accountId: h.ctx.accountId, characterId: callie, target: 'scene', sceneId: opts.sceneId ?? null, jobId: opts.jobId ?? null, op: opts.op ?? 'video', assetId: aid, status: opts.status ?? 'in_review', favorite: opts.favorite ?? false, parentId: opts.parentId ?? null, meta: opts.meta ?? {} })
   return { id, assetId: aid, key }
 }
+
+// A scene still (made, edited, cropped...), never picked unless said.
+async function sceneStill(sceneId: string, opts: { status?: string; op?: string; target?: string; parentId?: string; assetId?: string; favorite?: boolean } = {}) {
+  const assetId = opts.assetId ?? (await saveAsset(h.deps, h.ctx, { data: await sharp({ create: { width: 32, height: 48, channels: 3, background: { r: 90, g: 120, b: Math.floor(Math.random() * 255) } } }).png().toBuffer(), origin: 'generated' })).id
+  const id = newId('cand')
+  await h.deps.db.insert(candidates).values({ id, accountId: h.ctx.accountId, characterId: callie, target: opts.target ?? 'scene', sceneId, op: opts.op ?? 'generate', assetId, status: opts.status ?? 'in_review', parentId: opts.parentId ?? null, favorite: opts.favorite ?? false })
+  return { id, assetId }
+}
+
+// A post on the scene, exported now (finished), with what it uses.
+async function finished(sceneId: string | null, spec: Record<string, unknown> = {}, outputs: Record<string, unknown> = {}) {
+  const post = await createContent(h.deps, h.ctx, { kind: 'meme', characterId: callie, sceneId, spec })
+  await h.deps.db.update(contentItems).set({ status: 'ready', outputs: { renderedAt: h.clock.now().toISOString(), ...outputs } }).where(eq(contentItems.id, post.id))
+  return post.id
+}
+const plannedFor = async (postId: string, days = 14) => (await autoCleanPlan(h.deps, h.ctx, days)).filter(x => x.postId === postId).map(x => x.id).sort()
 
 beforeAll(async () => {
   h = await createHarness()
@@ -131,31 +148,146 @@ describe('delete and the Trash', () => {
 })
 
 describe('auto-clean', () => {
-  it('moves never-kept takes N days after the post is finished; starred, kept and used takes stay', async () => {
+  it('only takes never kept and stills never picked, only after N days, never when Off', async () => {
     const scene = await createScene(h.deps, h.ctx, callie, { brief: 'Balcony' })
     const loose = await take({ sceneId: scene.id })
-    const starred = await take({ sceneId: scene.id, favorite: true })
-    const kept = await take({ sceneId: scene.id, status: 'approved' })
-    const used = await take({ sceneId: scene.id })
-    const upload = await take({ sceneId: scene.id, op: 'upload' })
-    // A Recreate take, found by its run.
-    const post = await createContent(h.deps, h.ctx, { kind: 'meme', characterId: callie, sceneId: scene.id, spec: { clipId: used.id } })
-    const jobId = newId('job')
-    await h.deps.db.insert(jobs).values({ id: jobId, accountId: h.ctx.accountId, stage: 'content', purpose: `clone:${post.id}:${callie}`, provider: 'mock', model: 'mock', kind: 'video', idempotencyKey: jobId, estimateMicros: 0, status: 'completed', request: {} })
-    const recreate = await take({ jobId })
-    const finished = h.clock.now()
-    await h.deps.db.update(contentItems).set({ status: 'ready', outputs: { videoAssetId: kept.assetId, renderedAt: finished.toISOString() } }).where(eq(contentItems.id, post.id))
-
-    // Off, or not yet 14 days: nothing moves.
-    expect((await autoClean(h.deps, h.ctx, null)).moved).toBe(0)
+    const unpicked = await sceneStill(scene.id)
+    const picked = await sceneStill(scene.id, { status: 'approved' })
+    const post = await finished(scene.id, { stillId: picked.id })
     h.clock.advance(13 * DAY)
-    expect((await autoClean(h.deps, h.ctx, 14)).moved).toBe(0)
+    expect(await plannedFor(post)).toEqual([])
     h.clock.advance(1 * DAY + 1000)
-    expect((await autoClean(h.deps, h.ctx, 14)).moved).toBe(2)
-    const inTrash = await listTrash(h.deps, h.ctx)
-    expect(inTrash.filter(x => x.reason === 'auto').map(x => x.refId).sort()).toEqual([loose.id, recreate.id].sort())
-    for (const stay of [starred, kept, used, upload]) expect(inTrash.some(x => x.refId === stay.id)).toBe(false)
-    // Once in the Trash it is not moved again.
-    expect((await autoClean(h.deps, h.ctx, 14)).moved).toBe(0)
+    expect(await plannedFor(post)).toEqual([loose.id, unpicked.id].sort())
+    expect(await autoCleanPlan(h.deps, h.ctx, null)).toEqual([])
+    expect((await autoClean(h.deps, h.ctx, null)).moved).toBe(0)
+    expect((await autoClean(h.deps, h.ctx, 14)).moved).toBeGreaterThanOrEqual(2)
+    const auto = (await listTrash(h.deps, h.ctx)).filter(x => x.reason === 'auto').map(x => x.refId)
+    expect(auto).toEqual(expect.arrayContaining([loose.id, unpicked.id]))
+    expect(auto).not.toContain(picked.id)
+    // Once in the Trash it is not planned again.
+    expect(await plannedFor(post)).toEqual([])
+  })
+
+  it('1. never a sheet ref, a hero, anything in a character file, or a still sharing one of their files', async () => {
+    const scene = await createScene(h.deps, h.ctx, callie, { brief: 'Gym' })
+    const ref = await sceneStill(scene.id)
+    await h.deps.db.update(refImages).set({ status: 'approved', approvedCandidateId: ref.id }).where(and(eq(refImages.characterId, callie), eq(refImages.refId, 'REF-05')))
+    const twin = await sceneStill(scene.id, { assetId: ref.assetId, op: 'crop' })
+    const hero = await sceneStill(scene.id, { target: 'hero' })
+    const sheet = await sceneStill(scene.id, { target: 'sheet' })
+    const inFile = await sceneStill(scene.id)
+    await h.deps.db.update(characters).set({ breakdown: { portrait: inFile.assetId } }).where(eq(characters.id, callie))
+    const loose = await sceneStill(scene.id)
+    const post = await finished(scene.id)
+    h.clock.advance(15 * DAY)
+    expect(await plannedFor(post)).toEqual([loose.id])
+    for (const keep of [ref, twin, hero, sheet, inFile]) expect(await plannedFor(post)).not.toContain(keep.id)
+  })
+
+  it('2. never a take kept with Keep this take or Use this take, or starred', async () => {
+    const scene = await createScene(h.deps, h.ctx, callie, { brief: 'Kitchen' })
+    const used = await take({ sceneId: scene.id, status: 'approved' })
+    const keptOnly = await take({ sceneId: scene.id, meta: { decision: { kind: 'kept', at: h.clock.now().toISOString() } } })
+    const starred = await take({ sceneId: scene.id, favorite: true })
+    const loose = await take({ sceneId: scene.id })
+    const post = await finished(scene.id)
+    h.clock.advance(15 * DAY)
+    expect(await plannedFor(post)).toEqual([loose.id])
+    const planned = await plannedFor(post)
+    for (const keep of [used, keptOnly, starred]) expect(planned).not.toContain(keep.id)
+  })
+
+  it('3. never anything a post uses: live, exported, archived, in its render or its editor timeline', async () => {
+    const scene = await createScene(h.deps, h.ctx, callie, { brief: 'Desk' })
+    const own = await take({ sceneId: scene.id })
+    const inArchived = await take({ sceneId: scene.id })
+    const inRender = await take({ sceneId: scene.id })
+    const onTimeline = await take({ sceneId: scene.id })
+    const inSlideshow = await sceneStill(scene.id)
+    const loose = await take({ sceneId: scene.id })
+    // The editor's saved timeline (Done) lists the media picked into it.
+    const project = await saveAsset(h.deps, h.ctx, { data: Buffer.from(JSON.stringify({ tracks: [], studioMedia: { 'media-1': onTimeline.assetId } })), mime: 'application/json', origin: 'derived' })
+    const post = await finished(scene.id, { clipId: own.id, editor: { projectAssetId: project.id, savedAt: null, stack: null } }, { videos: [{ caption: '', assetId: 'ast_rendered0001', clipId: inRender.id }] })
+    const archived = await finished(null, { clipId: inArchived.id })
+    await h.deps.db.update(contentItems).set({ archivedAt: h.clock.now() }).where(eq(contentItems.id, archived))
+    await createContent(h.deps, h.ctx, { kind: 'slideshow', characterId: callie, spec: { stillIds: [inSlideshow.id] } })
+    h.clock.advance(15 * DAY)
+    const names = new Map([[own.id, 'own'], [inArchived.id, 'archived'], [inRender.id, 'render'], [onTimeline.id, 'timeline'], [inSlideshow.id, 'slideshow'], [loose.id, 'loose']])
+    expect((await plannedFor(post)).map(id => names.get(id))).toEqual(['loose'])
+  })
+
+  it('a saved timeline that cannot be read stops Auto-clean and the Trash emptying; deleting warns about a timeline', async () => {
+    const scene = await createScene(h.deps, h.ctx, callie, { brief: 'Studio' })
+    const loose = await take({ sceneId: scene.id })
+    const picked = await take({ sceneId: scene.id, status: 'approved' })
+    const project = await saveAsset(h.deps, h.ctx, { data: Buffer.from(JSON.stringify({ studioMedia: { a: picked.assetId } })), mime: 'application/json', origin: 'derived' })
+    const post = await finished(scene.id, { editor: { projectAssetId: project.id, savedAt: null, stack: null } })
+    // Deleting the take a timeline uses names the post.
+    const w = await trashWarnings(h.deps, h.ctx, [{ kind: 'candidate', id: picked.id }])
+    expect(w.some(x => /Used in 1 post/.test(x.text))).toBe(true)
+    h.clock.advance(15 * DAY)
+    expect(await plannedFor(post)).toEqual([loose.id])
+    const row = (await h.deps.db.select().from(assets).where(eq(assets.id, project.id)))[0]!
+    const broken = { ...h.deps, store: { ...h.deps.store, get: async (key: string) => { if (key === row.storageKey) throw new Error('storage timeout'); return h.deps.store.get(key) } } }
+    expect(await autoCleanPlan(broken, h.ctx, 14)).toEqual([])
+    await trash(h.deps, h.ctx, [{ kind: 'candidate', id: loose.id }])
+    h.clock.advance(8 * DAY)
+    expect(await purgeDue(broken, h.ctx)).toEqual({ items: 0, files: 0 })
+    expect(await h.deps.store.exists(loose.key)).toBe(true)
+  })
+
+  it('4. never the stills, start and end frames a kept take was made from', async () => {
+    const scene = await createScene(h.deps, h.ctx, callie, { brief: 'Park' })
+    const first = await sceneStill(scene.id)
+    const edited = await sceneStill(scene.id, { op: 'edit', parentId: first.id })
+    const end = await sceneStill(scene.id, { op: 'end_frame' })
+    const jobId = newId('job')
+    await h.deps.db.insert(jobs).values({ id: jobId, accountId: h.ctx.accountId, stage: 'scene', purpose: `scene_video:${scene.id}`, provider: 'mock', model: 'mock', kind: 'video', idempotencyKey: jobId, estimateMicros: 0, status: 'completed', request: { candidateId: edited.id, endCandidateId: end.id } })
+    const kept = await take({ sceneId: scene.id, status: 'approved', parentId: edited.id, jobId })
+    const loose = await sceneStill(scene.id)
+    const post = await finished(scene.id, { clipId: kept.id })
+    h.clock.advance(15 * DAY)
+    expect(await plannedFor(post)).toEqual([loose.id])
+  })
+
+  it('5. never saved clips and images in the Library: uploads, kept clips, kept clones', async () => {
+    const scene = await createScene(h.deps, h.ctx, callie, { brief: 'Street' })
+    const uploaded = await take({ sceneId: scene.id, op: 'upload', status: 'approved' })
+    const uploadedBroken = await take({ sceneId: scene.id, op: 'upload', status: 'failed' })
+    const clone = await take({ sceneId: scene.id, op: 'clone', status: 'approved' })
+    const image = await sceneStill(scene.id, { op: 'upload_image' })
+    const loose = await take({ sceneId: scene.id, op: 'clone' })
+    const post = await finished(scene.id)
+    h.clock.advance(15 * DAY)
+    expect(await plannedFor(post)).toEqual([loose.id])
+    for (const keep of [uploaded, uploadedBroken, clone, image]) expect(await plannedFor(post)).not.toContain(keep.id)
+  })
+
+  it('leaves a scene alone while another post on it is not finished', async () => {
+    const scene = await createScene(h.deps, h.ctx, callie, { brief: 'Beach' })
+    await take({ sceneId: scene.id })
+    const post = await finished(scene.id)
+    await createContent(h.deps, h.ctx, { kind: 'meme', characterId: callie, sceneId: scene.id, spec: {} })
+    h.clock.advance(15 * DAY)
+    expect(await plannedFor(post)).toEqual([])
+  })
+
+  it('the first Auto-clean waits until the owner has seen its list and pressed Start', async () => {
+    const scene = await createScene(h.deps, h.ctx, callie, { brief: 'Library' })
+    const loose = await take({ sceneId: scene.id })
+    await finished(scene.id)
+    h.clock.advance(15 * DAY)
+    const preview = await autoCleanPreview(h.deps, h.ctx)
+    expect(preview).toMatchObject({ days: 14, started: false })
+    expect(preview.items.map(x => x.id)).toContain(loose.id)
+    expect(preview.items.find(x => x.id === loose.id)).toMatchObject({ kind: 'take', media: 'video', postName: expect.any(String) })
+    expect((await storageView(h.deps, h.ctx)).autoCleanNext).toBe(preview.items.length)
+    // The daily clean runs, but Auto-clean does not move anything yet.
+    expect((await runClean(h.deps, h.ctx)).autoCleaned).toBe(0)
+    expect((await listTrash(h.deps, h.ctx)).some(x => x.refId === loose.id)).toBe(false)
+    await startAutoClean(h.deps, h.ctx)
+    expect((await runClean(h.deps, h.ctx)).autoCleaned).toBe(preview.items.length)
+    expect((await listTrash(h.deps, h.ctx)).find(x => x.refId === loose.id)?.reason).toBe('auto')
+    expect((await storageView(h.deps, h.ctx)).autoCleanNext).toBe(0)
   })
 })

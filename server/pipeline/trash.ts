@@ -30,6 +30,32 @@ export interface TrashView {
 }
 
 const LIVE_POST = isNull(contentItems.archivedAt)
+const GONE = ['trashed', 'purged']
+
+// Every item, file, B-roll clip or sound a post names: in its fields, its
+// render, and its saved editor timeline (a small JSON file listing the
+// media picked into it). Null when a saved timeline cannot be read: then
+// nothing is known for sure, and nothing is removed.
+const TOKEN = /\b(?:cand|ast|brl|snd)_[0-9a-z]{6,}/g
+const tokensOf = (x: unknown, into: Set<string>) => { for (const m of JSON.stringify(x ?? null).matchAll(TOKEN)) into.add(m[0]) }
+type PostRow = typeof contentItems.$inferSelect
+async function namedByPosts(deps: Deps, ctx: Ctx, posts: PostRow[]): Promise<Map<string, Set<string>> | null> {
+  const out = new Map<string, Set<string>>()
+  for (const p of posts) {
+    const names = new Set<string>()
+    tokensOf(p.spec, names)
+    tokensOf(p.outputs, names)
+    const project = (p.spec as { editor?: { projectAssetId?: string | null } | null } | null)?.editor?.projectAssetId
+    if (project) {
+      const [row] = await deps.db.select().from(assets).where(and(eq(assets.accountId, ctx.accountId), eq(assets.id, project)))
+      if (row && !row.archivedAt && (await deps.store.exists(row.storageKey))) {
+        try { tokensOf((await deps.store.get(row.storageKey)).toString('utf8'), names) } catch { return null }
+      }
+    }
+    out.set(p.id, names)
+  }
+  return out
+}
 type Spec = Record<string, unknown> & { cut?: { shots?: Array<{ kind?: string; ref?: string }> } | null; sound?: { music?: string | null; ambience?: string | null } }
 
 // Every post that uses an item: its clip or shot B, a picked still, a
@@ -59,8 +85,11 @@ export async function trashWarnings(deps: Deps, ctx: Ctx, refs: TrashRef[]): Pro
   const refRows = candIds.length ? await deps.db.select({ refId: refImages.refId, characterId: refImages.characterId, candidateId: refImages.approvedCandidateId }).from(refImages).where(eq(refImages.accountId, ctx.accountId)) : []
   const refCands = refRows.length ? await deps.db.select({ id: candidates.id, assetId: candidates.assetId }).from(candidates).where(inArray(candidates.id, refRows.map(r => r.candidateId).filter((x): x is string => !!x))) : []
   const names = new Map((await deps.db.select({ id: characters.id, name: characters.name }).from(characters).where(eq(characters.accountId, ctx.accountId))).map(c => [c.id, c.name]))
+  const fullPosts = await deps.db.select().from(contentItems).where(and(eq(contentItems.accountId, ctx.accountId), LIVE_POST))
+  const named = await namedByPosts(deps, ctx, fullPosts)
   for (const r of refs) {
-    const using = posts.filter(p => uses(p.spec as Spec, r))
+    const file = r.kind === 'candidate' ? cands.find(c => c.id === r.id)?.assetId ?? null : null
+    const using = posts.filter(p => uses(p.spec as Spec, r) || (!!named && (named.get(p.id)!.has(r.id) || (!!file && named.get(p.id)!.has(file)))))
     if (using.length) out.push({ id: r.id, kind: r.kind, text: `Used in ${using.length === 1 ? '1 post' : `${using.length} posts`}: ${using.slice(0, 3).map(postName).join(', ')}${using.length > 3 ? ' and more' : ''}. ${using.length === 1 ? 'That post loses it' : 'Those posts lose it'} if it is removed for good.` })
     if (r.kind === 'candidate') {
       const asset = cands.find(c => c.id === r.id)?.assetId
@@ -157,7 +186,10 @@ export async function listTrash(deps: Deps, ctx: Ctx): Promise<TrashView[]> {
 
 // Is a file still used by something that is not in the Trash? Then its
 // storage stays (one file can back two items, e.g. a still and its copy).
-async function assetInUse(deps: Deps, accountId: string, assetId: string, exceptTrash: string): Promise<boolean> {
+// `named`: every item and file any post (archived ones too) or character
+// names, timelines included.
+async function assetInUse(deps: Deps, accountId: string, assetId: string, exceptTrash: string, named: Set<string>): Promise<boolean> {
+  if (named.has(assetId)) return true
   const cands = await deps.db.select({ id: candidates.id, status: candidates.status }).from(candidates).where(and(eq(candidates.accountId, accountId), eq(candidates.assetId, assetId)))
   if (cands.some(c => c.status !== 'trashed' && c.status !== 'purged')) return true
   const [b] = await deps.db.select({ id: brollClips.id }).from(brollClips).where(and(eq(brollClips.accountId, accountId), eq(brollClips.assetId, assetId), isNull(brollClips.archivedAt)))
@@ -167,10 +199,19 @@ async function assetInUse(deps: Deps, accountId: string, assetId: string, except
   // Another item still in the Trash keeps it until that one goes too.
   const others = await deps.db.select({ id: trashItems.id, assetIds: trashItems.assetIds }).from(trashItems)
     .where(and(eq(trashItems.accountId, accountId), isNull(trashItems.purgedAt), isNull(trashItems.restoredAt)))
-  if (others.some(t => t.id !== exceptTrash && (t.assetIds as string[]).includes(assetId))) return true
-  // A live post's render (its outputs) keeps the file too.
-  const posts = await deps.db.select({ outputs: contentItems.outputs }).from(contentItems).where(and(eq(contentItems.accountId, accountId), LIVE_POST))
-  return posts.some(p => JSON.stringify(p.outputs ?? {}).includes(assetId))
+  return others.some(t => t.id !== exceptTrash && (t.assetIds as string[]).includes(assetId))
+}
+
+// Everything named by any post or character (null: a timeline could not be read).
+async function namedAnywhere(deps: Deps, ctx: Ctx): Promise<Set<string> | null> {
+  const posts = await deps.db.select().from(contentItems).where(eq(contentItems.accountId, ctx.accountId))
+  const byPost = await namedByPosts(deps, ctx, posts)
+  if (!byPost) return null
+  const all = new Set<string>()
+  for (const names of byPost.values()) for (const n of names) all.add(n)
+  for (const c of await deps.db.select().from(characters).where(eq(characters.accountId, ctx.accountId))) tokensOf(c, all)
+  for (const r of await deps.db.select({ candidateId: refImages.approvedCandidateId }).from(refImages).where(eq(refImages.accountId, ctx.accountId))) if (r.candidateId) all.add(r.candidateId)
+  return all
 }
 
 // Gone for good: items in the Trash past their 7 days. Their files and
@@ -178,10 +219,16 @@ async function assetInUse(deps: Deps, accountId: string, assetId: string, except
 export async function purgeDue(deps: Deps, ctx: Ctx): Promise<{ items: number; files: number }> {
   const now = deps.clock.now()
   const due = await deps.db.select().from(trashItems).where(and(eq(trashItems.accountId, ctx.accountId), isNull(trashItems.restoredAt), isNull(trashItems.purgedAt), lte(trashItems.purgeAfter, now)))
+  if (!due.length) return { items: 0, files: 0 }
+  const named = await namedAnywhere(deps, ctx)
+  if (!named) {
+    ctx.log.warn({ due: due.length }, 'trash not emptied: a saved editor timeline could not be read')
+    return { items: 0, files: 0 }
+  }
   let files = 0
   for (const t of due) {
     for (const assetId of t.assetIds as string[]) {
-      if (await assetInUse(deps, ctx.accountId, assetId, t.id)) continue
+      if (await assetInUse(deps, ctx.accountId, assetId, t.id, named)) continue
       const [a] = await deps.db.select().from(assets).where(and(eq(assets.accountId, ctx.accountId), eq(assets.id, assetId)))
       if (!a || a.archivedAt) continue
       for (const key of [a.storageKey, ...THUMB_WIDTHS.map(w => thumbKeyOf(a.storageKey, w))]) {
@@ -195,35 +242,101 @@ export async function purgeDue(deps: Deps, ctx: Ctx): Promise<{ items: number; f
   return { items: due.length, files }
 }
 
-// Auto-clean: takes never kept (not Use this take, not Keep this take) go to
-// the Trash `days` after their post was finished. Starred takes, the post's
-// own clips and anything a live post uses are never touched.
-export async function autoClean(deps: Deps, ctx: Ctx, days: number | null): Promise<{ moved: number }> {
-  if (!days) return { moved: 0 }
-  const cutoff = deps.clock.now().getTime() - days * DAY
-  const posts = await deps.db.select().from(contentItems).where(and(eq(contentItems.accountId, ctx.accountId), LIVE_POST, eq(contentItems.status, 'ready')))
-  const finished = posts.filter(p => {
+// Auto-clean (owner, 2026-10-15: "never deletes, regardless of age"). Only
+// two kinds of item are ever touched: takes never kept and stills never
+// picked, from posts finished `days` ago. Everything below is protected,
+// whatever its age:
+//  1. a character's sheet refs (REF-00 to REF-11), heroes and anything in a
+//     character file (and any item sharing one of their files);
+//  2. a take kept with Keep this take or Use this take (kept is the same
+//     as starred), and anything starred;
+//  3. anything any post uses, live, posted, exported or archived: every
+//     item or file named anywhere in a post or its render;
+//  4. the stills, start and end frames a kept, starred or used item was
+//     made from (all the way back);
+//  5. saved clips and images in the Library (kept clips, uploads, clones).
+// A scene shared by a post that is not finished yet is left alone.
+export interface AutoCleanItem {
+  id: string; kind: 'take' | 'still'; label: string; assetId: string | null; media: 'image' | 'video'
+  characterId: string; postId: string; postName: string; finishedAt: string
+}
+
+const STILL_OPS = ['generate', 'edit', 'crop', 'upscale', 'mirror', 'drift_lock', 'end_frame', 'last_frame', 'clone_still']
+type Decision = { decision?: { kind?: string } }
+
+export async function autoCleanPlan(deps: Deps, ctx: Ctx, days: number | null): Promise<AutoCleanItem[]> {
+  if (!days) return []
+  const acct = ctx.accountId
+  const now = deps.clock.now().getTime()
+  const cutoff = now - days * DAY
+  const posts = await deps.db.select().from(contentItems).where(eq(contentItems.accountId, acct))
+  const finishedAt = (p: (typeof posts)[number]) => {
     const at = (p.outputs as ContentOutputs | null)?.renderedAt
-    return (at ? Date.parse(at) : p.updatedAt.getTime()) <= cutoff
-  })
-  const usedSpecs = posts.map(p => p.spec as Spec)
-  const refs: TrashRef[] = []
+    return at ? Date.parse(at) : p.updatedAt.getTime()
+  }
+  const finished = posts.filter(p => !p.archivedAt && p.status === 'ready' && finishedAt(p) <= cutoff)
+  if (!finished.length) return []
+
+  // 3. Every item and file any post names (archived posts, renders and
+  // saved timelines included), and 1. the sheet refs and character files.
+  // A timeline that cannot be read stops this Auto-clean: nothing moves.
+  const named = await namedAnywhere(deps, ctx)
+  if (!named) return []
+
+  const all = await deps.db.select({
+    id: candidates.id, parentId: candidates.parentId, status: candidates.status, favorite: candidates.favorite, meta: candidates.meta, op: candidates.op,
+    target: candidates.target, refId: candidates.refId, assetId: candidates.assetId, jobId: candidates.jobId, sceneId: candidates.sceneId, characterId: candidates.characterId, label: candidates.label,
+  }).from(candidates).where(eq(candidates.accountId, acct))
+  const byId = new Map(all.map(c => [c.id, c]))
+  const kept = (c: (typeof all)[number]) => c.favorite || c.status === 'approved' || (c.meta as Decision | null)?.decision?.kind === 'kept'
+  const keeper = (c: (typeof all)[number]) =>
+    kept(c) || c.target === 'hero' || c.target === 'sheet' || !!c.refId || c.op === 'upload' || c.op === 'upload_image' ||
+    named.has(c.id) || (!!c.assetId && named.has(c.assetId))
+  // A file shared with a keeper is a keeper's file.
+  const keptFiles = new Set(all.filter(keeper).map(c => c.assetId).filter((x): x is string => !!x))
+  const protectedIds = new Set(all.filter(c => keeper(c) || (!!c.assetId && keptFiles.has(c.assetId))).map(c => c.id))
+  // 4. What a kept item was made from: its parents, and the start and end
+  // frames its run named.
+  const jobIds = [...new Set(all.filter(c => protectedIds.has(c.id) && c.jobId).map(c => c.jobId!))]
+  const requests = jobIds.length ? await deps.db.select({ id: jobs.id, request: jobs.request }).from(jobs).where(inArray(jobs.id, jobIds)) : []
+  const fromRuns = new Set<string>()
+  for (const j of requests) tokensOf(j.request, fromRuns)
+  const queue = [...protectedIds, ...all.filter(c => fromRuns.has(c.id) || (!!c.assetId && fromRuns.has(c.assetId))).map(c => c.id)]
+  const walked = new Set<string>()
+  while (queue.length) {
+    const c = byId.get(queue.pop()!)
+    if (!c || walked.has(c.id)) continue
+    walked.add(c.id)
+    protectedIds.add(c.id)
+    if (c.parentId) queue.push(c.parentId)
+  }
+
+  // A scene is cleaned only when every live post on it is finished.
+  const openScenes = new Set(posts.filter(p => !p.archivedAt && p.sceneId && !finished.includes(p)).map(p => p.sceneId!))
+  const out: AutoCleanItem[] = []
+  const seen = new Set<string>()
   for (const p of finished) {
-    const runs = await deps.db.select({ id: jobs.id }).from(jobs).where(and(eq(jobs.accountId, ctx.accountId), like(jobs.purpose, `clone:${p.id}:%`)))
-    const scope = [
-      ...(runs.length ? [inArray(candidates.jobId, runs.map(r => r.id))] : []),
-      ...(p.sceneId ? [eq(candidates.sceneId, p.sceneId)] : []),
-    ]
-    if (!scope.length) continue
-    const takes = await deps.db.select().from(candidates).where(and(eq(candidates.accountId, ctx.accountId), or(...scope)))
-    for (const c of takes) {
-      if (!isVideoOp(c.op) || c.op === 'upload' || !c.assetId) continue
-      if (c.favorite || c.status === 'approved' || c.status === 'trashed' || c.status === 'purged') continue
-      if (usedSpecs.some(s => uses(s, { kind: 'candidate', id: c.id }))) continue
-      if (!refs.some(r => r.id === c.id)) refs.push({ kind: 'candidate', id: c.id })
+    const runs = await deps.db.select({ id: jobs.id }).from(jobs).where(and(eq(jobs.accountId, acct), or(like(jobs.purpose, `clone:${p.id}:%`), like(jobs.purpose, `clone_still:${p.id}%`), like(jobs.purpose, `clone_face:${p.id}%`))))
+    const runIds = new Set(runs.map(r => r.id))
+    const mine = all.filter(c => (c.jobId && runIds.has(c.jobId)) || (p.sceneId && c.sceneId === p.sceneId && !openScenes.has(p.sceneId)))
+    for (const c of mine) {
+      if (seen.has(c.id) || protectedIds.has(c.id) || !c.assetId || GONE.includes(c.status)) continue
+      const take = isVideoOp(c.op)
+      if (!take && !STILL_OPS.includes(c.op)) continue
+      seen.add(c.id)
+      out.push({
+        id: c.id, kind: take ? 'take' : 'still', media: take ? 'video' : 'image', assetId: c.assetId, characterId: c.characterId,
+        label: c.label || (take ? 'Take never kept' : 'Still never picked'), postId: p.id, postName: postName(p), finishedAt: new Date(finishedAt(p)).toISOString(),
+      })
     }
   }
-  return trash(deps, ctx, refs, { reason: 'auto' })
+  return out
+}
+
+export async function autoClean(deps: Deps, ctx: Ctx, days: number | null): Promise<{ moved: number }> {
+  const plan = await autoCleanPlan(deps, ctx, days)
+  if (!plan.length) return { moved: 0 }
+  return trash(deps, ctx, plan.map(x => ({ kind: 'candidate' as const, id: x.id })), { reason: 'auto' })
 }
 
 export function parseRefs(input: unknown): TrashRef[] {

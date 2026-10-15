@@ -1,4 +1,4 @@
-import type { ActionPreview, CharacterSummary, CharacterView, HiggsfieldAccount, JobView, Me, QuoteView, RulesView, SceneFields, ScenesData, SettingsView, StudioAction, Usage, VideoPrice, BrollClip, ContentData, ContentKind, LibraryData, PostStep, WorkerStatus, CloneOptions, CloneResult, CloneSource, CloneStill, CutView, SoundItem, EditorStyle, ImportPreview, VoiceLine, ProductSummary, ProductView, ProductClaims, KitGroup, SocialAccount, SentView, RecreateBatchView, GateCheckView, StorageInfo, TrashRef, TrashItem, ContentItem } from './types'
+import type { ActionPreview, CharacterSummary, CharacterView, HiggsfieldAccount, JobView, Me, QuoteView, RulesView, SceneFields, ScenesData, SettingsView, StudioAction, Usage, VideoPrice, BrollClip, ContentData, ContentKind, LibraryData, PostStep, WorkerStatus, CloneOptions, CloneResult, CloneSource, CloneStill, CutView, SoundItem, EditorStyle, ImportPreview, VoiceLine, ProductSummary, ProductView, ProductClaims, KitGroup, SocialAccount, SentView, RecreateBatchView, GateCheckView, StorageInfo, TrashRef, TrashItem, ContentItem, AutoCleanItem } from './types'
 import { sheetRefOf, typeOf, uploadFiles } from './files'
 
 // Thin client for /api/v1. Every write sends the CSRF header the server
@@ -219,6 +219,8 @@ export const api = {
   storage: () => request<StorageInfo>('GET', '/settings/storage'),
   setAutoClean: (days: number | null) => request<StorageInfo>('PUT', '/settings/storage/auto-clean', { days }),
   measureStorage: () => request<{ queued: boolean }>('POST', '/settings/storage/measure', {}),
+  autoCleanPreview: () => request<{ days: number | null; started: boolean; items: AutoCleanItem[] }>('GET', '/settings/storage/auto-clean/preview'),
+  startAutoClean: () => request<StorageInfo>('POST', '/settings/storage/auto-clean/start', {}),
   // Delete and the Trash (owner, 2026-10-15).
   trashCheck: (items: TrashRef[]) => request<{ warnings: Array<{ id: string; kind: TrashRef['kind']; text: string }> }>('POST', '/trash/check', { items }),
   trash: (items: TrashRef[]) => request<{ moved: number; ids: string[] }>('POST', '/trash', { items }),

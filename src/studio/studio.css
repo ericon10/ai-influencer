@@ -767,6 +767,9 @@ button.st-chip:hover { color: var(--st-text); border-color: var(--st-text-3); }
 .st-postcard-select { position: absolute; inset: 0; z-index: 2; border-radius: inherit; }
 .st-postcard-select .st-check { top: 16px; right: 16px; }
 .st-sounditem.picked { border-color: rgba(63, 209, 143, 0.6); }
+.st-autoclean-never { font-size: 13px; color: var(--st-text-2); }
+.st-autoclean-never summary { cursor: pointer; font-weight: 600; color: var(--st-text); }
+.st-autoclean-never ul { margin: 8px 0 0; padding-left: 18px; line-height: 1.5; }
 .st-checkbox { width: 18px; height: 18px; accent-color: var(--st-ok); }
 
 .st-charchip { display: inline-flex; align-items: center; gap: 8px; padding: 4px 12px 4px 4px; border-radius: 999px; border: 1px solid var(--st-line-2); background: var(--st-surface-2); color: var(--st-text); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }

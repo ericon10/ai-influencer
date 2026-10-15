@@ -21,7 +21,7 @@ import { whatWasSent, whatWasSentForJob } from '../pipeline/sent.js'
 import { videoPrices } from '../pipeline/sceneActions.js'
 import { expectedVersion, readWorkerStatus } from '../jobs/workerStatus.js'
 import { addClip, addStills, libraryView } from '../pipeline/clips.js'
-import { cleanIfDue, setAutoCleanDays, storageView } from '../pipeline/storage.js'
+import { autoCleanPreview, cleanIfDue, setAutoCleanDays, startAutoClean, storageView } from '../pipeline/storage.js'
 import { listTrash, parseRefs, restore, trash, trashWarnings, TRASH_DAYS } from '../pipeline/trash.js'
 import { cancelContinue, continueShot, keepTwoShots, useChainTake } from '../pipeline/chain.js'
 import { postCutView, postEditorProject } from '../pipeline/cutView.js'
@@ -296,6 +296,15 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
     requireRole(ctx, 'member')
     const body = parse(z.object({ days: z.number().int().nullable() }), await json(c))
     await setAutoCleanDays(deps, ctx, body.days)
+    return c.json(await storageView(deps, ctx))
+  })
+  // The next Auto-clean, listed without moving anything; Start Auto-clean
+  // lets it run (it never runs before the owner has seen its list).
+  app.get('/settings/storage/auto-clean/preview', async c => c.json(await autoCleanPreview(deps, c.get('ctx'))))
+  app.post('/settings/storage/auto-clean/start', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    await startAutoClean(deps, ctx)
     return c.json(await storageView(deps, ctx))
   })
   // Measure now: the daily clean right away (free, on the worker).

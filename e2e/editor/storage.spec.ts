@@ -131,6 +131,33 @@ test('Settings > Storage: the readout, Measure now, and Auto-clean (a choice or 
   await snap(page, info, 'Settings > Storage')
 })
 
+test('Settings > Storage: Next auto-clean and its Preview; the first run waits for Start Auto-clean', async ({ page }, info) => {
+  test.setTimeout(120_000)
+  const before = await api<{ autoCleanNext: number; autoCleanStarted: boolean; autoCleanDays: number | null }>('GET', '/settings/storage')
+  const listed = await api<{ items: { id: string }[]; started: boolean }>('GET', '/settings/storage/auto-clean/preview')
+  expect(listed.items.length).toBe(before.autoCleanNext)
+  await page.goto(`${LIVE}/studio/settings`)
+  const next = page.locator('[data-field="storage-next"]')
+  await expect(next).toContainText(`Next auto-clean: ${before.autoCleanNext} item`)
+  if (!before.autoCleanStarted) await expect(next).toContainText('waits until you look at the list')
+  await next.getByRole('button', { name: 'Preview' }).click()
+  const drawer = page.locator('[data-field="auto-clean-preview"]')
+  await expect(drawer).toContainText('Only takes you never kept and stills you never picked')
+  await drawer.getByText('Never touched, whatever their age').click()
+  await expect(drawer).toContainText('Sheet refs (REF-00 to REF-11), heroes and anything in a character file')
+  await expect(drawer).toContainText('A take you kept (Keep this take or Use this take) or starred')
+  if (!listed.items.length) await expect(drawer).toContainText('Nothing to clean right now.')
+  else await expect(drawer.locator('.st-tile')).toHaveCount(listed.items.length)
+  await snap(page, info, 'Settings > Storage: the Auto-clean preview')
+  if (!before.autoCleanStarted) {
+    await drawer.getByRole('button', { name: 'Start Auto-clean' }).click()
+    await expect.poll(async () => (await api<{ autoCleanStarted: boolean }>('GET', '/settings/storage')).autoCleanStarted).toBe(true)
+    await expect(next).not.toContainText('waits until you look at the list')
+  } else {
+    await expect(drawer).toContainText('Auto-clean is on: it runs with the daily clean')
+  }
+})
+
 test('images come from storage: grids ask for thumbnails, the Studio sends no image bytes', async ({ page }, info) => {
   test.setTimeout(180_000)
   const characterId = await characterOf(await seedPost())

@@ -518,7 +518,9 @@ Decisions: `DECISIONS.md` G37 and G38. UX: `UX-PLAN.md` section 15.
 - [x] Upload slots never used deleted after 1 day (daily clean, and an R2 lifecycle rule when the key may)
 - [x] Settings > General > Storage: GB, files, estimated monthly cost ($0.015 per GB-month after 10 GB free), Measure now
 - [x] Library: Delete one, Select many, warnings for sheet refs and items a post uses, Trash with Restore (7 days), then removed for good with thumbnails
-- [x] Auto-clean of never-kept takes (14 days by default; 3, 7, 14, 30 or Off); a star on take cards keeps one out
+- [x] Auto-clean of takes never kept and stills never picked (14 days by default; 3, 7, 14, 30 or Off); never sheet refs, heroes, character files, kept or starred takes, anything any post uses (timelines and archived posts included), what a kept take was made from, or saved Library clips; one test per rule
+- [x] Next auto-clean: N items and a Preview with a star on each; the first Auto-clean waits for Start Auto-clean
+- [ ] Parked: slim the posts list (LATER.md)
 - [x] A post outside the newest 200 opens by its own address
 - [x] Tests: trash, auto-clean, daily clean, temp sweep, API routes; Playwright desktop and phone; before and after transfer for a normal session
 

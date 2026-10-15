@@ -7,6 +7,7 @@ import { keys, useHiggsfieldAccount, useSettings } from '../hooks'
 import { Callout, Field, PromptViewer, errorMessage, useToast } from '../ui'
 import { PriceButton } from '../PriceButton'
 import type { SettingsView, StorageInfo } from '../types'
+import { AutoCleanPreview } from '../trash'
 import { RulesPanel } from './Rules'
 import { UsagePanel } from './Usage'
 import { HowTo } from '../guide/Guide'
@@ -341,6 +342,7 @@ function StorageCard() {
   const [info, setInfo] = useState<StorageInfo | null>(null)
   const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
+  const [preview, setPreview] = useState(false)
   const load = () => api.storage().then(setInfo).catch(() => undefined)
   useEffect(() => { void load() }, [])
   // While a measure runs, check back every few seconds.
@@ -359,7 +361,7 @@ function StorageCard() {
   }
   async function auto(days: number | null) {
     setBusy('auto')
-    try { const next = await api.setAutoClean(days); setInfo(i => i ? { ...i, ...next } : i); toast({ tone: 'ok', text: days ? `Takes you never kept go to the Trash ${days} days after their post is finished.` : 'Auto-clean is off.' }) } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) } finally { setBusy(null) }
+    try { const next = await api.setAutoClean(days); setInfo(i => i ? { ...i, ...next } : i); toast({ tone: 'ok', text: days ? `Takes you never kept and stills you never picked go to the Trash ${days} days after their post is finished.` : 'Auto-clean is off.' }) } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) } finally { setBusy(null) }
   }
   if (!info) return null
   const r2 = info.driver === 's3'
@@ -389,7 +391,15 @@ function StorageCard() {
             {info.autoCleanChoices.map(d => <button key={d} type="button" role="radio" aria-checked={info.autoCleanDays === d} className={info.autoCleanDays === d ? 'on' : ''} disabled={!!busy} onClick={() => void auto(d)}>{d} days</button>)}
             <button type="button" role="radio" aria-checked={info.autoCleanDays == null} className={info.autoCleanDays == null ? 'on' : ''} disabled={!!busy} onClick={() => void auto(null)}>Off</button>
           </div>
-          <span className="st-hint">{info.autoCleanDays ? `Takes you never kept (not Use this take, not Keep this take) go to the Trash ${info.autoCleanDays} days after their post is finished. Starred takes and the post's own clip never do.` : 'Off: takes you never kept stay until you delete them.'} Anything in the Trash is removed for good after {info.trashDays} days; restore it from Library &gt; Trash until then. Upload slots never used are deleted after {info.uploadSlotDays} day.</span>
+          <span className="st-hint">{info.autoCleanDays ? `Takes you never kept and stills you never picked go to the Trash ${info.autoCleanDays} days after their post is finished. Never sheet refs, heroes, a character's file, kept or starred takes, anything a post uses, what a kept take was made from, or saved Library clips.` : 'Off: takes and stills stay until you delete them.'} Anything in the Trash is removed for good after {info.trashDays} days; restore it from Library &gt; Trash until then. Upload slots never used are deleted after {info.uploadSlotDays} day.</span>
+          {info.autoCleanDays != null && (
+            <div className="st-row" style={{ gap: 10, flexWrap: 'wrap', alignItems: 'center' }} data-field="storage-next">
+              <b>Next auto-clean: {info.autoCleanNext} item{info.autoCleanNext === 1 ? '' : 's'}</b>
+              <button type="button" className="st-btn sm" onClick={() => setPreview(true)}>Preview</button>
+              {!info.autoCleanStarted && <span className="st-hint st-warntext">It has not run yet: it waits until you look at the list and press Start Auto-clean.</span>}
+            </div>
+          )}
+          <AutoCleanPreview open={preview} onClose={() => { setPreview(false); void load() }} onStarted={() => void load()} />
         </div>
         <span className="st-hint" data-field="storage-clean">Daily clean: last run {when(info.cleanedAt)}. Worker free disk: {info.worker.freeDiskMb == null ? 'not reported yet' : `${(info.worker.freeDiskMb / 1024).toFixed(1)} GB`}{info.worker.checkedAt ? ` (${when(info.worker.checkedAt)})` : ''}. Temp folders a crash leaves behind are deleted when the worker starts.</span>
         {r2 && (

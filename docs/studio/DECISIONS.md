@@ -2205,10 +2205,30 @@ R2 directly; junk clears itself (UX-PLAN.md section 22).
   its thumbnails, unless another live item, a live post's render or
   another Trash entry still uses the same file.
 - **Auto-clean** (default 14 days; 3, 7, 14, 30 or Off; a default per rule
-  one): takes never kept (not Use this take, not Keep this take) of a post
-  finished that many days ago move to the Trash, marked Auto-clean.
-  Starred takes, kept takes, uploads and anything a post uses stay. Each
-  take card (Video step, Recreate review) has a star.
+  one) touches only two kinds of item: takes never kept and stills never
+  picked, from posts finished that many days ago; they move to the Trash,
+  marked Auto-clean. Never, whatever their age (owner, same day; each rule
+  has its own test in `server/pipeline/trash.test.ts`):
+  1. sheet refs (REF-00 to REF-11), heroes and anything in a character file,
+     or any item sharing one of their files;
+  2. a take kept with Keep this take or Use this take (kept counts as
+     starred), or anything starred;
+  3. anything any post names, live, posted, exported or archived: its
+     fields, its render and its saved editor timeline (the project file
+     lists the media picked into it);
+  4. the stills, start and end frames a kept, starred or used item was made
+     from, all the way back (parents, and the frames its run named);
+  5. saved clips and images in the Library (uploads, kept clips, kept
+     clones).
+  A scene that another unfinished post uses is left alone. If a saved
+  timeline cannot be read, nothing moves and the Trash is not emptied that
+  day. Each take card (Video step, Recreate review) has a star.
+- **Next auto-clean and Preview**: Settings > General > Storage shows "Next
+  auto-clean: N items" and a Preview drawer of every item it would move,
+  with a star on each to keep it. The first Auto-clean waits until the
+  owner presses Start Auto-clean there (`storage.autoCleanStartedAt`); the
+  daily clean skips Auto-clean until then.
+- **Parked**: slimming the posts list (LATER.md, Storage and traffic).
 - **Posts older than the newest 200** open by their own address now
   (`GET /content/:id`), found while testing.
 - **Measured** (locally, on the live-site path, same client, a fresh

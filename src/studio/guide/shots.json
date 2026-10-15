@@ -2111,47 +2111,63 @@
  },
  "settings-storage": {
   "w": 1068,
-  "h": 370,
+  "h": 472,
   "spots": [
    {
     "n": 1,
     "x": 3.1,
-    "y": 30.3,
-    "w": 22.4,
-    "h": 20,
+    "y": 23.8,
+    "w": 33,
+    "h": 15.6,
     "label": "Your files in storage, in GB"
    },
    {
     "n": 2,
-    "x": 27.2,
-    "y": 30.3,
+    "x": 37.8,
+    "y": 23.8,
     "w": 51.9,
-    "h": 20,
+    "h": 15.6,
     "label": "The estimated monthly cost: $0.015 per GB-month, the first 10 GB free"
    },
    {
     "n": 3,
-    "x": 80.8,
-    "y": 42.2,
-    "w": 11,
-    "h": 8.1,
+    "x": 3.1,
+    "y": 43.2,
+    "w": 11.8,
+    "h": 6.4,
     "label": "Measure now (free, on the worker); the daily clean also does it"
    },
    {
     "n": 4,
     "x": 3.1,
-    "y": 60.8,
+    "y": 57.8,
     "w": 93.8,
-    "h": 10.3,
-    "label": "Auto-clean: takes you never used go to the Trash after 3, 7, 14 or 30 days, or Off"
+    "h": 8.1,
+    "label": "Auto-clean: takes never kept and stills never picked, after 3, 7, 14 or 30 days, or Off"
    },
    {
     "n": 5,
     "x": 3.1,
-    "y": 86.2,
-    "w": 93.8,
-    "h": 4.9,
-    "label": "The daily clean, and the worker's free disk"
+    "y": 80.8,
+    "w": 15.8,
+    "h": 4.5,
+    "label": "Next auto-clean: how many items it would move"
+   },
+   {
+    "n": 6,
+    "x": 19.8,
+    "y": 79.9,
+    "w": 6.7,
+    "h": 6.4,
+    "label": "Preview: see every item before it runs"
+   },
+   {
+    "n": 7,
+    "x": 27.5,
+    "y": 81.1,
+    "w": 39.5,
+    "h": 3.8,
+    "label": "The first Auto-clean waits for you"
    }
   ]
  },
@@ -2166,6 +2182,52 @@
     "w": 10.8,
     "h": 5.6,
     "label": "Star a take: Auto-clean never moves a starred take to the Trash"
+   }
+  ]
+ },
+ "auto-clean-preview": {
+  "w": 760,
+  "h": 900,
+  "spots": [
+   {
+    "n": 1,
+    "x": 2.8,
+    "y": 10.3,
+    "w": 94.6,
+    "h": 4,
+    "label": "Only takes never kept and stills never picked, from posts finished 14 days ago"
+   },
+   {
+    "n": 2,
+    "x": 2.8,
+    "y": 15.9,
+    "w": 94.6,
+    "h": 13.9,
+    "label": "What Auto-clean never touches, whatever its age"
+   },
+   {
+    "n": 3,
+    "x": 2.8,
+    "y": 37.1,
+    "w": 30.3,
+    "h": 50.7,
+    "label": "Each item: its picture, take or still, the post it came from and when it was finished"
+   },
+   {
+    "n": 4,
+    "x": 27.7,
+    "y": 80.7,
+    "w": 3.9,
+    "h": 3.3,
+    "label": "Star one to keep it"
+   },
+   {
+    "n": 5,
+    "x": 2.8,
+    "y": 31.3,
+    "w": 21.5,
+    "h": 4.2,
+    "label": "Start Auto-clean: until you press it, Auto-clean never runs"
    }
   ]
  }

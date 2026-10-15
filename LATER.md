@@ -120,3 +120,16 @@ rule.
   ones it has not.
 - A claims check on the batch caption writer's output too (today on hook
   variants only).
+
+## Storage and traffic (parked by the owner, 2026-10-15)
+
+- **Slim the posts list.** With the files off Vercel, JSON is what is left
+  of a session's origin transfer, and most of it is the posts list
+  (`GET /content`: every post with its whole spec, polled while anything
+  runs), then a character's scenes and the Library. A measured local
+  session (`e2e/editor/storage.spec.ts`, transfer): `/content` 1.31 MB,
+  scenes 0.58 MB, library 0.33 MB of 2.46 MB. Ideas: a summary list (id,
+  title, kind, step, status, character, thumbnail) with the full post from
+  `GET /content/:id`; ETag or a `since` cursor so a poll that changed
+  nothing sends nothing; poll only the running jobs.
+
