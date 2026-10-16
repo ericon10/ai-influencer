@@ -45,8 +45,11 @@ test('the launch plan: upload the CSV, Preview (free), Make the drafts (free), G
   const preview = card.locator('[data-field="plan-preview"]')
   await expect(preview).toBeVisible({ timeout: 60_000 })
   // Every row reads: 140 posts, the 4 feeders as topic accounts, a price for all the stills.
-  await expect(card.locator('[data-field="plan-totals"]')).toContainText(/140 posts/)
-  await expect(card.locator('[data-field="plan-totals"]')).toContainText(/about \$\d+\.\d\d/)
+  // 140 in all: the ones to make, and any kept from an earlier import (they have pictures).
+  const totals = card.locator('[data-field="plan-totals"]')
+  await expect(totals).toContainText(/about \$\d+\.\d\d/)
+  const t = await totals.innerText()
+  expect(Number(t.match(/(\d+) posts/)![1]) + Number(t.match(/(\d+) already with pictures/)?.[1] ?? 0)).toBe(140)
   await expect(preview.locator('tbody tr', { hasText: 'Topic account' })).toHaveCount(4)
   await expect(preview.locator('tbody tr', { hasText: 'Character: Solei' })).toHaveCount(1)
   await expect(card.locator('[data-field="plan-grid"] .st-planchip')).toHaveCount(140)
@@ -55,7 +58,7 @@ test('the launch plan: upload the CSV, Preview (free), Make the drafts (free), G
   await snap(page, info, 'the plan preview by day and account')
 
   // Make 140 drafts (free): nothing paid runs.
-  await card.getByRole('button', { name: /^Make 140 drafts \(free\)/ }).click()
+  await card.getByRole('button', { name: /^Make \d+ drafts \(free\)/ }).click()
   await expect(card.locator('[data-field="plan-done"]')).toContainText(/drafts made/, { timeout: 120_000 })
   expect((await planPosts()).length).toBe(140)
 
@@ -177,9 +180,13 @@ test('a mock screen drawn by code and the owner\'s Product screenshot, then the 
   await page.locator('.st-step', { hasText: 'Finish' }).click()
   const exp = page.getByRole('button', { name: /^Export images/ })
   await expect(exp).toBeEnabled({ timeout: 30_000 })
+  // An earlier run may have exported this post: wait for this export's own zip.
+  const read = async () => (await api<{ item: { status: string; outputs: { zipAssetId?: string } | null } }>('GET', `/content/${id}`)).item
+  const before = (await read()).outputs?.zipAssetId ?? null
   await exp.click()
-  await expect(page.locator('[data-field="slideshow-outputs"]')).toBeVisible({ timeout: 120_000 })
-  const item = (await api<{ item: { outputs: { zipAssetId: string } } }>('GET', `/content/${id}`)).item
+  await expect.poll(async () => { const x = await read(); return x.status === 'ready' && !!x.outputs?.zipAssetId && x.outputs.zipAssetId !== before }, { timeout: 120_000, intervals: [2000] }).toBe(true)
+  await expect(page.locator('[data-field="slideshow-outputs"]')).toBeVisible({ timeout: 30_000 })
+  const item = (await read()) as { outputs: { zipAssetId: string } }
   const zip = unzipSync(new Uint8Array(await (await fetch(`${API}/assets/${item.outputs.zipAssetId}/content`)).arrayBuffer()))
   const json = JSON.parse(Buffer.from(zip['post.json']!).toString())
   expect(json.version).toBe(2)

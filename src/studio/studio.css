@@ -1367,7 +1367,9 @@ button.st-chip:hover { color: var(--st-text); border-color: var(--st-text-3); }
 .st-score { display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; font-size: 11px; font-weight: 700; background: var(--st-surface); border: 1px solid var(--st-line); }
 .st-score.s1 { background: var(--st-ok-soft); border-color: rgba(63, 209, 143, 0.5); color: var(--st-ok); }
 .st-score.s2 { background: var(--st-info-soft); color: var(--st-text); }
-@media (max-width: 720px) { .st-hookrow.card { flex-wrap: wrap; } .st-hookrow .moment { white-space: normal; } }
+/* On a phone every hook row wraps: the words take the full width, the
+   price button goes under them. */
+@media (max-width: 720px) { .st-hookrow { flex-wrap: wrap; } .st-hookrow > .st-col { flex-basis: 100% !important; } .st-hookrow .moment { white-space: normal; } }
 /* The launch plan (section 28): the preview grid by day and account. */
 .st-plangrid td { vertical-align: top; }
 .st-plangrid td.day { white-space: nowrap; font-weight: 600; }

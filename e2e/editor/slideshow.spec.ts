@@ -82,6 +82,13 @@ async function flow(page: Page, phone: boolean, info: TestInfo) {
   await press(page.locator('[data-field="slideshow-ad"] [role="switch"]'), phone)
   await expect(page.locator('[data-field="slideshow-caption"] pre')).toContainText(/^Ad: /, { timeout: 15_000 })
   await snap(page, info, `${phone ? 'phone: ' : ''}text style, dragged words, CTA and #ad`)
+  // The draft ends on its payoff, so the CTA slide is added after it
+  // (UX-PLAN.md section 28, Jenga drafts) and needs its picture.
+  const slides = async () => 1 + (await api<{ item: { spec: { slides: string[] } } }>('GET', `/content/${id}`)).item.spec.slides.length
+  await expect.poll(slides, { timeout: 15_000 }).toBe(7)
+  await press(page.locator('.st-step', { hasText: 'Stills' }), phone)
+  await pay(page, page.getByRole('button', { name: /Generate the set/ }), phone, page.locator('[data-field="slideshow-generate"]'))
+  await waitPictures(page)
 
   // Finish: Export (free), both sizes and post.json.
   await press(page.locator('.st-step', { hasText: 'Finish' }), phone)
@@ -90,8 +97,8 @@ async function flow(page: Page, phone: boolean, info: TestInfo) {
   await press(exp, phone)
   await expect(page.locator('[data-field="slideshow-outputs"]')).toBeVisible({ timeout: 120_000 })
   const item = (await api<{ item: { outputs: { zipAssetId: string; imageAssetIds: string[]; instagramAssetIds: string[] } } }>('GET', `/content/${id}`)).item
-  expect(item.outputs.imageAssetIds).toHaveLength(6)
-  expect(item.outputs.instagramAssetIds).toHaveLength(6)
+  expect(item.outputs.imageAssetIds).toHaveLength(7)
+  expect(item.outputs.instagramAssetIds).toHaveLength(7)
   const zip = unzipSync(new Uint8Array(await (await fetch(`${API}/assets/${item.outputs.zipAssetId}/content`)).arrayBuffer()))
   const json = JSON.parse(Buffer.from(zip['post.json']!).toString())
   expect(json.slideshow).toMatchObject({ text_style: 'note', cta: { text: 'Follow @e2e.slides for more' } })

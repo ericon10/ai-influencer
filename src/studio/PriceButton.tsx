@@ -85,17 +85,23 @@ export function PriceButton({ action, label, variant = 'primary', size = 'normal
   })
 
   const quote = est.data?.quote
-  // When the runs started here are all done, say so once (a fix that
-  // changes what the next price says refreshes it, however fast it ran).
+  // When the runs started here are all done, the posts are read again and
+  // onDone is called once, however fast they ran (a run that finished
+  // between two polls of the jobs list never looks busy, so nothing else
+  // would refresh the post).
   const live = useLiveJobs()
   const doneFor = useRef('')
   useEffect(() => {
-    if (!onDone || !started.length) return
+    if (!started.length) return
     const key = started.join(',')
     if (doneFor.current === key) return
     const jobs = live.data?.jobs ?? []
-    if (started.every(id => jobs.some(j => j.id === id && !isActiveJob(j)))) { doneFor.current = key; onDone() }
-  }, [live.data, started, onDone])
+    if (started.every(id => jobs.some(j => j.id === id && !isActiveJob(j)))) {
+      doneFor.current = key
+      void qc.invalidateQueries({ queryKey: keys.content })
+      onDone?.()
+    }
+  }, [live.data, started, onDone]) // eslint-disable-line react-hooks/exhaustive-deps
   // Realism warnings (smoothing or makeup words removed) are shown right
   // under the button, not only in the details; so is a word of yours the
   // provider's filter often blocks (it goes as typed, G46).

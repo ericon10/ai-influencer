@@ -26,10 +26,13 @@ export async function api<T = any>(method: string, path: string, body?: unknown)
 let basePost: string | null = process.env.E2E_POST ?? null
 async function findBasePost(): Promise<string> {
   if (basePost) return basePost
-  const { items } = await api<{ items: { id: string; spec?: { clipId?: string | null; editor?: { stack?: unknown } | null } }[] }>('GET', '/content')
+  const { items } = await api<{ items: { id: string; characterId: string | null; spec?: { clipId?: string | null; editor?: { stack?: unknown } | null } }[] }>('GET', '/content')
+  // A live character only: the character file test archives any Wren left
+  // from an earlier run, and her posts with her.
+  const live = new Set((await api<{ characters: { id: string }[] }>('GET', '/characters')).characters.map(c => c.id))
   // The oldest post with one shot and no saved editor presets, so copies
   // of posts this suite saved never leak their presets into the next test.
-  for (const p of items.filter(i => i.spec?.clipId && !i.spec?.editor?.stack).reverse()) {
+  for (const p of items.filter(i => i.spec?.clipId && !i.spec?.editor?.stack && i.characterId && live.has(i.characterId)).reverse()) {
     const m = await api<{ media: { kind: string }[] }>('GET', `/content/${p.id}/editor`).catch(() => null)
     if (m?.media.filter(x => x.kind === 'video').length === 1) return (basePost = p.id)
   }
