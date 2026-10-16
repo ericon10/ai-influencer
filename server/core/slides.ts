@@ -222,6 +222,20 @@ export function slideList(s: SlideshowSlides): Slide[] {
   })
 }
 
+// The photo behind a special slide that has none of its own: the nearest
+// slide's picture, earlier first, blurred under the mock screen, so the
+// set still reads as one camera roll.
+export function backdropFor(list: Slide[], i: number): string | null {
+  if (list[i]?.stillId) return list[i]!.stillId
+  for (let d = 1; d < list.length; d++) {
+    const before = list[i - d]?.special ? null : list[i - d]?.stillId
+    if (before) return before
+    const after = list[i + d]?.special ? null : list[i + d]?.stillId
+    if (after) return after
+  }
+  return null
+}
+
 // A slot array set at one index, padded with empty slots.
 export function setAt<T>(list: T[], i: number, value: T, empty: T): T[] {
   const out = [...list]

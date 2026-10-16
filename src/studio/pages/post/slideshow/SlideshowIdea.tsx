@@ -8,7 +8,7 @@ import { PriceButton } from '../../../PriceButton'
 import { RunStatus } from '../../../runs'
 import { AsyncButton, Field, errorMessage, useToast } from '../../../ui'
 import { HowTo } from '../../../guide/Guide'
-import { HOOK_PATTERNS, patternLabel, slideList, wordCount, type HookIdea, type HookPattern } from '../../../../../server/core/slides'
+import { HOOK_PATTERNS, backdropFor, patternLabel, slideList, wordCount, type HookIdea, type HookPattern } from '../../../../../server/core/slides'
 import { wordsNote } from '../../../../../server/core/slideSvg'
 import type { SlideBatch, SlideshowSpec } from '../../../types'
 import type { PostCtx } from '../ctx'
@@ -191,7 +191,7 @@ function BatchReview({ ctx, items, assets, refetch }: { ctx: PostCtx; items: Sli
             </div>
             {fonts && (
               <div className="st-slidestrip">
-                {list.map(s => <SlideFrame key={s.index} slide={s} assetId={s.stillId ? stills.get(s.stillId) : null} style={x.spec.textStyle} ad={x.spec.ad && s.index === 0} width={84} brands={brands} />)}
+                {list.map(s => <SlideFrame key={s.index} slide={s} assetId={(s.special ? backdropFor(list, s.index) : s.stillId) ? stills.get((s.special ? backdropFor(list, s.index) : s.stillId)!) : null} style={x.spec.textStyle} ad={x.spec.ad && s.index === 0} width={84} brands={brands} />)}
               </div>
             )}
             {state !== 'rejected' ? (

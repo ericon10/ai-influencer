@@ -17,7 +17,7 @@ import { catalogWording } from '../core/wording.js'
 import { cleanVoiceCard, voiceCardText } from '../core/voiceCard.js'
 import { claimsText, languageText } from '../core/scriptKit.js'
 import {
-  CTA_IDS, PATTERN_IDS, SPECIAL_IDS, cleanSpecial, ctaText, guessPattern, isListPattern, postCaption, reorderMiddle, setAt, slideList, trimWords, vaultHooks,
+  CTA_IDS, PATTERN_IDS, SPECIAL_IDS, backdropFor, cleanSpecial, ctaText, guessPattern, isListPattern, postCaption, reorderMiddle, setAt, slideList, trimWords, vaultHooks,
   type HookIdea, type HookPattern, type SpecialSlide,
 } from '../core/slides.js'
 import { slideshowSpecSchema, type SceneLock, type SlideshowSpec } from '../core/slideshowSpec.js'
@@ -365,6 +365,19 @@ async function stillContext(deps: Deps, ctx: Ctx, row: ContentRow, spec: Slidesh
 
 const LIGHT_WORDS = (deps: Deps, id: string) => deps.config.pipeline.scenes.lights.find(l => l.id === id)?.text ?? ''
 
+// A shot as the moment of a sentence: "sitting at her desk" becomes
+// "Callie is sitting at her desk"; a shot that already names who stays.
+export function shotMoment(shot: string, name: string | null): string {
+  const t = shot.trim().replace(/[.\s]+$/, '')
+  if (!t) return t
+  const cap = t.charAt(0).toUpperCase() + t.slice(1)
+  if (!name) return cap
+  const who = new RegExp(`^(?:${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}|she|he|they|her|his|their)\\b`, 'i')
+  if (who.test(t)) return cap
+  if (/^\w+ing\b/i.test(t)) return `${name} is ${t}`
+  return `${name}, ${t}`
+}
+
 // One slide's still request: the locked scene and this slide's shot.
 function slideRequest(deps: Deps, c: StillCtx, shot: string, seed: number, realism: RealismWarning[]): { prompt: string; request: GenRequest; warnings: RuleViolation[] } {
   const t = deps.config.pipeline.templates
@@ -376,7 +389,7 @@ function slideRequest(deps: Deps, c: StillCtx, shot: string, seed: number, reali
     const details = lock.details.map(d => d.trim()).filter(Boolean)
     const body = fill(t.slideshow_topic, {
       camera: (lock.camera && !sc.cameras.some(x => x.id === lock.camera) ? lock.camera : 'held at chest height'),
-      shot: moment.replace(/[.\s]+$/, ''), place: (lock.place || topicOf(c.row, s) || 'an ordinary place').replace(/[.\s]+$/, ''),
+      shot: shotMoment(moment, null), place: (lock.place || topicOf(c.row, s) || 'an ordinary place').replace(/[.\s]+$/, ''),
       details: details.length ? ` Also there: ${details.join(', ')}.` : '',
       light: lock.light ? `${LIGHT_WORDS(deps, lock.light) || 'Natural available light'}.` : 'Natural available light.',
       aspect: c.aspect,
@@ -390,7 +403,7 @@ function slideRequest(deps: Deps, c: StillCtx, shot: string, seed: number, reali
     const warnings = lintPrompt(rules, prompt, { stage: 'slideshow', kind: request.kind, request: { ...request, model: c.model }, switches: c.sw })
     return { prompt, request, warnings }
   }
-  const f: SceneFields = { ...c.base!, moment: moment.slice(0, 400) }
+  const f: SceneFields = { ...c.base!, moment: shotMoment(moment, c.ch.name).slice(0, 400) }
   const identity = identityForModel(c.ch.identities, c.model)
   const sceneRules = { outfitOverride: c.sw.on('scene-outfit-override'), brandFree: c.sw.on('scene-brand-free'), colors: c.sw.on('scene-colors'), referenceLine: c.sw.on('scene-reference-slot') }
   const element = c.element ? ` ${fill(t.slideshow_element, { noun: c.ch.pronouns.noun || 'person', name: c.ch.name, element: c.element })}` : ''
@@ -847,7 +860,9 @@ export async function renderSlideshow(deps: Deps, ctx: Ctx, job: JobRow, row: Co
   const files: Record<string, Uint8Array> = {}
   const slides: Parameters<typeof postExportJson>[0]['slides'] = []
   for (const s of list) {
-    const still = s.stillId ? (await readAsset(deps, ctx, await candidateAsset(deps, ctx, s.stillId, row.characterId!, 'image'))).data : null
+    // A special slide sits over the nearest slide's photo (blurred).
+    const photo = s.special ? backdropFor(list, s.index) : s.stillId
+    const still = photo ? (await readAsset(deps, ctx, await candidateAsset(deps, ctx, photo, row.characterId!, 'image'))).data : null
     const special = s.special ? cleanSpecial(s.special, cfg.slideshow.brand_names, cfg.slideshow.generic_names) : null
     const input = { still, text: s.text, style: spec.textStyle, pos: s.pos, special, ad: spec.ad && s.index === 0 }
     const nn = String(s.index + 1).padStart(2, '0')
@@ -859,7 +874,7 @@ export async function renderSlideshow(deps: Deps, ctx: Ctx, job: JobRow, row: Co
     instagram.push((await saveAsset(deps, ctx, { data: b, mime: 'image/jpeg', origin: 'derived', label: `${label} (Instagram)`, sourceJobId: job.id })).id)
     files[fileT] = a
     files[fileI] = b
-    slides.push({ index: s.index, text: s.text, shot: s.shot, picture: special ? 'special' : still ? 'still' : 'none', stillId: s.stillId, special, position: s.pos, files: { tiktok: fileT, instagram: fileI } })
+    slides.push({ index: s.index, text: s.text, shot: s.shot, picture: special ? 'special' : still ? 'still' : 'none', stillId: special ? null : s.stillId, special, position: s.pos, files: { tiktok: fileT, instagram: fileI } })
   }
   const caption = postCaption(spec.caption, spec.hashtags, { ad: spec.ad, max: cfg.slideshow.hashtags[1] })
   files['caption.txt'] = Buffer.from(`${caption}\n\nPost as a photo slideshow, images in order (tiktok/ for TikTok at 1080 x 1920, instagram/ for Instagram at 1080 x 1440). ${AI_LABEL_LINE}\n`)

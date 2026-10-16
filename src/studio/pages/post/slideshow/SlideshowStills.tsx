@@ -7,7 +7,7 @@ import { PriceButton } from '../../../PriceButton'
 import { LibraryDrawer } from '../../../library'
 import { Field, errorMessage, useToast, type TodoItem } from '../../../ui'
 import { HowTo } from '../../../guide/Guide'
-import { SPECIAL_TYPES, editSlides, emptySpecial, setAt, slideList, type SlideEdit, type SpecialType } from '../../../../../server/core/slides'
+import { SPECIAL_TYPES, backdropFor, editSlides, emptySpecial, setAt, slideList, type SlideEdit, type SpecialType } from '../../../../../server/core/slides'
 import type { SceneLock, SlideshowSpec } from '../../../types'
 import type { PostCtx } from '../ctx'
 import { SlideFrame } from './SlideFrame'
@@ -95,7 +95,8 @@ export function SlideshowStills({ ctx }: { ctx: PostCtx }) {
       {list.length > 0 && (
         <div className="st-slidecards" data-field="slide-cards">
           {list.map(s => {
-            const asset = s.stillId ? stills.get(s.stillId) : null
+            const back = s.special ? backdropFor(list, s.index) : s.stillId
+            const asset = back ? stills.get(back) : null
             return (
               <div key={s.index} className={`st-slidecard ${s.special ? 'special' : ''}`} data-field={`slide-card-${s.index}`}>
                 {fonts ? <SlideFrame slide={s} assetId={asset} style={spec.textStyle} ad={spec.ad && s.index === 0} width={156} frame={spec.made === 'instagram' ? 'instagram' : 'tiktok'} brands={brands} /> : <div className="st-skel" style={{ width: 156, height: 277 }} />}

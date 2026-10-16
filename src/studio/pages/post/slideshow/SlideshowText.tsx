@@ -5,7 +5,7 @@ import { keys } from '../../../hooks'
 import { PriceButton } from '../../../PriceButton'
 import { Field, useToast, type TodoItem } from '../../../ui'
 import { HowTo } from '../../../guide/Guide'
-import { CTA_KINDS, TEXT_STYLES, cleanSpecial, ctaText, editSlides, postCaption, setAt, slideList, type CtaKind, type SlidePos, type SpecialSlide, type TextStyleId } from '../../../../../server/core/slides'
+import { CTA_KINDS, TEXT_STYLES, backdropFor, cleanSpecial, ctaText, editSlides, postCaption, setAt, slideList, type CtaKind, type SlidePos, type SpecialSlide, type TextStyleId } from '../../../../../server/core/slides'
 import { wordsNote } from '../../../../../server/core/slideSvg'
 import type { SlideshowSpec } from '../../../types'
 import type { PostCtx } from '../ctx'
@@ -30,6 +30,8 @@ export function SlideshowText({ ctx }: { ctx: PostCtx }) {
   const [frame, setFrame] = useState<FrameId>(spec.made === 'instagram' ? 'instagram' : 'tiktok')
   const cur = list[Math.min(sel, Math.max(0, list.length - 1))]
   const asset = (id: string | null | undefined) => (id ? lib?.stills.find(s => s.id === id)?.assetId ?? null : null)
+  // A special slide shows the nearest slide's photo behind it.
+  const pic = (s: { index: number; stillId: string | null; special: unknown }) => asset(s.special ? backdropFor(list, s.index) : s.stillId)
   const brands = { names: data.options.slideshow.brandNames ?? [], generic: data.options.slideshow.genericNames ?? [] }
   const max = data.options.slideshow.hashtagsMax ?? 5
   const tags = (spec.hashtags ?? []).slice(0, max)
@@ -92,7 +94,7 @@ export function SlideshowText({ ctx }: { ctx: PostCtx }) {
             <div className="st-slidestrip" role="tablist" aria-label="Slides">
               {list.map(s => (
                 <button key={s.index} type="button" role="tab" aria-selected={cur?.index === s.index} className={cur?.index === s.index ? 'on' : ''} onClick={() => setSel(s.index)}>
-                  {fonts ? <SlideFrame slide={s} assetId={asset(s.stillId)} style={spec.textStyle} ad={spec.ad && s.index === 0} width={64} brands={brands} /> : <div className="st-skel" style={{ width: 64, height: 114 }} />}
+                  {fonts ? <SlideFrame slide={s} assetId={pic(s)} style={spec.textStyle} ad={spec.ad && s.index === 0} width={64} brands={brands} /> : <div className="st-skel" style={{ width: 64, height: 114 }} />}
                 </button>
               ))}
             </div>
@@ -115,7 +117,7 @@ export function SlideshowText({ ctx }: { ctx: PostCtx }) {
           </div>
           {cur && (
             <div className="st-col" style={{ gap: 8, alignItems: 'center' }} data-field="slide-preview">
-              {fonts ? <SlideFrame slide={cur} assetId={asset(cur.stillId)} style={spec.textStyle} ad={spec.ad && cur.index === 0} width={300} frame={frame} safe={safe} brands={brands} onMove={p => setPos(cur.index, p)} /> : <div className="st-skel" style={{ width: 300, height: 533 }} />}
+              {fonts ? <SlideFrame slide={cur} assetId={pic(cur)} style={spec.textStyle} ad={spec.ad && cur.index === 0} width={300} frame={frame} safe={safe} brands={brands} onMove={p => setPos(cur.index, p)} /> : <div className="st-skel" style={{ width: 300, height: 533 }} />}
               <div className="st-row" style={{ gap: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
                 <label className="st-row" style={{ gap: 6 }}><input type="checkbox" checked={safe} onChange={e => setSafe(e.target.checked)} />Safe zones</label>
                 <div className="st-seg sm" role="radiogroup" aria-label="Preview size">

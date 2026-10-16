@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { PATTERN_IDS, ctaText, editSlides, genericNames, guessPattern, postCaption, reorderMiddle, slideCountOf, slideList, vaultHooks, wordCount, emptySpecial } from './slides.js'
+import { PATTERN_IDS, backdropFor, ctaText, editSlides, genericNames, guessPattern, postCaption, reorderMiddle, slideCountOf, slideList, vaultHooks, wordCount, emptySpecial } from './slides.js'
 import { DEFAULT_POS, SAFE, adSvg, classicSizeFrac, slideOverlaySvg, specialSvg, textLayout, wordsNote, type Draw } from './slideSvg.js'
 import { postExportJson } from './postExport.js'
 
@@ -51,6 +51,14 @@ describe('the slides of a post', () => {
     expect(slots.map(s => [s.stillId, s.special?.type ?? null])).toEqual([['s1', null], [null, 'notification'], ['s3', null]])
     // No words: one slide per still.
     expect(slideCountOf({ hook: '', slides: [], stillIds: ['a', 'b', 'c'] })).toBe(3)
+  })
+
+  it('a special slide sits over the nearest slide\'s photo, earlier first', () => {
+    const list = slideList({ hook: 'H', slides: ['a', 'b', 'c'], stillIds: ['p1', '', '', 'p4'], specials: [null, emptySpecial('notification'), emptySpecial('job_posting')] })
+    expect(backdropFor(list, 1)).toBe('p1')
+    expect(backdropFor(list, 2)).toBe('p4')
+    expect(backdropFor(list, 3)).toBe('p4')
+    expect(backdropFor(slideList({ hook: 'H', slides: [], stillIds: [''], specials: [emptySpecial('text_thread')] }), 0)).toBeNull()
   })
 
   it('moving, removing and adding a slide keeps its words, picture, shot, special slide and place together', () => {
