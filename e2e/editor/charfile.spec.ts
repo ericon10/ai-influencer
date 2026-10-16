@@ -60,9 +60,16 @@ async function callieCheck(page: Page, info: TestInfo, phone: boolean) {
 
 async function wrenImport(page: Page, info: TestInfo, phone: boolean) {
   test.setTimeout(180_000)
-  // Start clean: a Wren left from an earlier run is archived.
+  // Start clean: a Wren left from an earlier run is archived. When she owns
+  // the post the editor tests copy (E2E_POST), she is renamed and kept
+  // instead, so the tests after this one still have their post.
   const old = await byName('Wren')
-  if (old) await api('DELETE', `/characters/${old.id}`)
+  if (old) {
+    const base = process.env.E2E_POST
+    const owner = base ? (await api<{ item: { characterId: string | null } }>('GET', `/content/${base}`).catch(() => null))?.item.characterId : null
+    if (owner === old.id) await api('PATCH', `/characters/${old.id}`, { patch: { name: 'Wren (base post)' }, reason: 'kept for the editor tests' })
+    else await api('DELETE', `/characters/${old.id}`)
+  }
   const sheet = await wrenSheet()
 
   // A new character from a v1.6 file and its folder.
