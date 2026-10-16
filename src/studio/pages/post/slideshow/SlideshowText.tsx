@@ -78,7 +78,7 @@ export function SlideshowText({ ctx }: { ctx: PostCtx }) {
       <Field label="Text style" group>
         <div className="st-stylepick" role="radiogroup" aria-label="Text style" data-field="text-style">
           {TEXT_STYLES.map(s => (
-            <button key={s.id} type="button" role="radio" aria-checked={spec.textStyle === s.id} className={spec.textStyle === s.id ? 'on' : ''} onClick={() => draft.setSpec({ textStyle: s.id } as never)} title={s.line}>
+            <button key={s.id} type="button" role="radio" aria-checked={spec.textStyle === s.id} aria-label={`${s.label}: ${s.line}`} className={spec.textStyle === s.id ? 'on' : ''} onClick={() => draft.setSpec({ textStyle: s.id } as never)} title={s.line}>
               {fonts ? <SlideFrame slide={{ ...(cur ?? SAMPLE), special: null, pos: null, text: cur?.text || SAMPLE.text }} assetId={asset(cur?.stillId)} style={s.id as TextStyleId} ad={false} width={92} /> : <div className="st-skel" style={{ width: 92, height: 164 }} />}
               <b>{s.label}</b><span className="st-muted">{s.line}</span>
             </button>

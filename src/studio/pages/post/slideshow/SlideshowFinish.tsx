@@ -21,9 +21,10 @@ export function SlideshowOutputs({ ctx, name }: { ctx: PostCtx; name: string }) 
   return (
     <div className="st-col" style={{ gap: 10 }} data-field="slideshow-outputs">
       <div className="st-row" style={{ gap: 8, flexWrap: 'wrap' }}>
-        {o.zipAssetId && <DownloadLink assetId={o.zipAssetId} name={`${name}-slides.zip`}>Download all (zip: TikTok, Instagram, caption.txt, post.json)</DownloadLink>}
+        {o.zipAssetId && <DownloadLink assetId={o.zipAssetId} name={`${name}-slides.zip`}>Download all (zip)</DownloadLink>}
         {o.jsonAssetId && <DownloadLink assetId={o.jsonAssetId} name={`${name}-post.json`}>post.json</DownloadLink>}
       </div>
+      <span className="st-hint">The zip has tiktok/ (1080 x 1920) and instagram/ (1080 x 1440), numbered in order, caption.txt and post.json.</span>
       <span className="st-label">TikTok, 1080 x 1920</span>
       <div className="st-content-strip">
         {o.imageAssetIds.map((id, i) => <a key={id} href={downloadUrl(id, `${String(i + 1).padStart(2, '0')}-${name}.jpg`)} title={`Download slide ${i + 1}`}><Img assetId={id} width={320} style={{ width: 120, aspectRatio: '9 / 16' }} /></a>)}

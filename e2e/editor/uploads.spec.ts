@@ -113,14 +113,17 @@ test('a slideshow: Upload in the Stills step adds them to the slideshow, and it 
   const stepChip = page.locator('.st-step', { hasText: 'Stills' })
   await stepChip.waitFor({ timeout: 30_000 })
   const zone = page.locator('[data-field="still-upload"]')
-  if (!(await zone.isVisible())) await stepChip.click()
+  if (!(await page.locator('[data-field="slideshow-more-stills"]').isVisible())) await stepChip.click()
+  // Several at once: under More ways to add pictures (section 27).
+  await page.locator('[data-field="slideshow-more-stills"] summary').click()
   await zone.waitFor({ timeout: 30_000 })
   const fs = (await files('slides')).slice(0, 2)
   const chooser = page.waitForEvent('filechooser')
   await zone.getByRole('button', { name: 'Upload images' }).click()
   await (await chooser).setFiles(fs.map(f => f.path))
   await expect(page.getByText(/Added 2 images .* and to this slideshow/)).toBeVisible({ timeout: 60_000 })
-  await expect(page.locator('.st-picked')).toHaveCount(2)
+  // Each upload is a slide of its own, in order.
+  await expect(page.locator('[data-field="slide-cards"] .st-slidecard')).toHaveCount(2)
   await snap(page, info, 'slideshow: uploaded into the Stills step')
   // No words needed (a caption is never required): Export images.
   await page.locator('.st-step', { hasText: 'Finish' }).click()
