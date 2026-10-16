@@ -70,15 +70,36 @@ describe('hook first', () => {
     expect(again.hookIdeas[0]!.text).not.toBe(s.hookIdeas[0]!.text)
   })
 
-  it('Write 10 with Claude: priced, the vault, buyer language and voice card in the prompt, 10 tagged hooks back', async () => {
-    const post = await createContent(h.deps, h.ctx, { kind: 'slideshow', characterId, idea: 'job hunting' })
-    const { quote, preview } = await run({ type: 'slideshow_hooks', contentId: post.id })
+  it('Write 10 with Claude, the playbook way: one price for the writer and a separate reviewer; each hook has a moment, a code, effects, an alt hook and a score; only 1s and 2s show', async () => {
+    const post = await createContent(h.deps, h.ctx, { kind: 'slideshow', characterId, accountTag: 'F2', idea: 'job hunting' })
+    const { quote, preview, jobs: ran } = await run({ type: 'slideshow_hooks', contentId: post.id })
     expect(quote.models).toEqual(['Demo mock, free'])
-    expect(preview.prompts[0]!.text).toContain('Hooks from the vault:')
-    expect(preview.prompts[0]!.text).toContain('tier_list')
+    expect(ran).toHaveLength(2)
+    expect(preview.prompts.map(p => p.label)).toEqual(['Hook writer', 'Reviewer'])
+    const writer = preview.prompts[0]!.text
+    expect(writer).toContain('Hooks from the vault')
+    expect(writer).toContain('S11 Contrast pair')
+    expect(writer).toContain('E1 "That\'s literally me"')
+    // F2's primary and backup from the playbook's fit table.
+    expect(writer).toContain('the primary is L14 Museum exhibit')
+    expect(writer).toContain('The backup is S1 Levels')
+    expect(preview.prompts[1]!.text).toContain('separate reviewer')
     const s = await spec(post.id)
+    expect(s.hookReview).toBe('done')
     expect(s.hookIdeas).toHaveLength(10)
-    expect(s.hookIdeas.every(x => x.source === 'claude')).toBe(true)
+    expect(s.hookIdeas.every(x => x.source === 'claude' && x.code && x.effectOpen && x.moment && x.alt && x.reviewed)).toBe(true)
+    // The mock reviewer gives 3 of 10 a 3 or 4: those are hidden.
+    expect(s.hookIdeas.filter(x => (x.score ?? 9) <= 2)).toHaveLength(7)
+    expect(s.hookIdeas.filter(x => x.code === 'L14').length).toBeGreaterThanOrEqual(2)
+  })
+
+  it('never the same code twice in a row: the account\'s last post\'s code is out of the writer\'s list', async () => {
+    const before = await createContent(h.deps, h.ctx, { kind: 'slideshow', characterId, accountTag: 'F6', idea: 'rounds', spec: { plan: { structure: 'S6' } } })
+    expect(before.id).toBeTruthy()
+    const post = await createContent(h.deps, h.ctx, { kind: 'slideshow', characterId, accountTag: 'F6', idea: 'rounds' })
+    const { preview } = await run({ type: 'slideshow_hooks', contentId: post.id })
+    expect(preview.prompts[0]!.text).toContain('Never use S6 Teaser: the account\'s last post used it.')
+    expect((await spec(post.id)).hookIdeas.some(x => x.code === 'S6')).toBe(false)
   })
 
   it('Use this hook: every slide drafted (6 by default), the hook word for word, a shot each, special slides never first and at most 2, the scene, the caption, at most 5 hashtags', async () => {
