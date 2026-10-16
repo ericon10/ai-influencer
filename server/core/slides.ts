@@ -186,13 +186,14 @@ export const specialLabel = (id: string) => SPECIAL_TYPES.find(t => t.id === id)
 // lines = "App · Sender · message"; profile card: title = the name, from =
 // the headline, body = the about line, lines = "Label · value", variant =
 // the banner color; product screenshot: assetId = the upload, scale = its
-// width on the slide, title = an optional line under it.
+// width on the slide, ratio = its width over its height, variant = top
+// or middle (where it sits).
 export interface SpecialSlide {
   type: SpecialType; from: string; title: string; body: string; lines: string[]; time: string
-  variant: string; count: number; blur: boolean; assetId: string | null; scale: number
+  variant: string; count: number; blur: boolean; assetId: string | null; scale: number; ratio: number
 }
 
-const base = { from: '', title: '', body: '', lines: [] as string[], time: '', variant: '', count: 0, blur: false, assetId: null as string | null, scale: 0.72 }
+const base = { from: '', title: '', body: '', lines: [] as string[], time: '', variant: '', count: 0, blur: false, assetId: null as string | null, scale: 0.72, ratio: 0.5 }
 export function emptySpecial(type: SpecialType): SpecialSlide {
   switch (type) {
     case 'notification': return { ...base, type, from: 'Messages', title: 'Jordan', body: 'did you see the email??', time: 'now' }

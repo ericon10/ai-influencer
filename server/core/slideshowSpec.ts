@@ -31,6 +31,8 @@ export const specialSchema = z.object({
   blur: z.boolean().default(false),
   assetId: id.nullable().default(null),
   scale: z.number().min(0.2).max(1).default(0.72),
+  // The screenshot's width over its height (its box on the slide).
+  ratio: z.number().min(0.1).max(10).default(0.5),
 })
 
 // A hook offered in the Idea step. From the vault: its pattern. From

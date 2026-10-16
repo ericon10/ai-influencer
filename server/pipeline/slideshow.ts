@@ -1044,7 +1044,8 @@ export async function renderSlideshow(deps: Deps, ctx: Ctx, job: JobRow, row: Co
     const photo = s.special ? backdropFor(list, s.index) : s.stillId
     const still = photo ? (await readAsset(deps, ctx, await candidateAsset(deps, ctx, photo, row.characterId!, 'image'))).data : null
     const special = s.special ? cleanSpecial(s.special, cfg.slideshow.brand_names, cfg.slideshow.generic_names) : null
-    const input = { still, text: s.text, style: spec.textStyle, pos: s.pos, special, ad: spec.ad && s.index === 0 }
+    const shot = special?.type === 'product_shot' && special.assetId ? (await readAsset(deps, ctx, special.assetId)).data : null
+    const input = { still, shot, text: s.text, style: spec.textStyle, pos: s.pos, special, ad: spec.ad && s.index === 0 }
     const nn = String(s.index + 1).padStart(2, '0')
     const fileT = `tiktok/${nn}-${name}.jpg`, fileI = `instagram/${nn}-${name}.jpg`
     const a = await renderSlide(input, tiktok, cfg, draw)

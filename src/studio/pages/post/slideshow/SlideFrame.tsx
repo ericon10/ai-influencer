@@ -23,7 +23,8 @@ export function SlideFrame({ slide, assetId, style, ad, width, frame = 'tiktok',
   const [drag, setDrag] = useState<{ pos: SlidePos; dx: number; dy: number } | null>(null)
   const special = useMemo(() => (slide.special && brands ? cleanSpecial(slide.special, brands.names, brands.generic) : slide.special), [slide.special, brands])
   const pos = drag?.pos ?? slide.pos
-  const { svg, layout } = useMemo(() => slideOverlaySvg({ style, text: slide.text, pos, special, ad }, f, browserDraw), [style, slide.text, pos, special, ad, f])
+  const shotHref = special?.type === 'product_shot' && special.assetId ? assetUrl(special.assetId, width > 300 ? 960 : 480) : null
+  const { svg, layout } = useMemo(() => slideOverlaySvg({ style, text: slide.text, pos, special, ad, shotHref }, f, browserDraw), [style, slide.text, pos, special, ad, f, shotHref])
   const own = special ? specialOwnBackground(special.type) : false
 
   const at = (e: ReactPointerEvent) => {

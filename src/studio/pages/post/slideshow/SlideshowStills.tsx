@@ -50,7 +50,23 @@ export function SlideshowStills({ ctx }: { ctx: PostCtx }) {
     if (patch.special !== undefined) out.specials = setAt(spec.specials ?? [], i, patch.special, null)
     draft.setSpec(out as never)
   }
+  // A product screenshot (section 28): the owner's upload, placed as it is.
+  async function uploadShot(i: number, files: File[]) {
+    const image = files.find(f => IMAGE.test(f.type))
+    if (!image || !item.characterId) { if (files.length) toast({ tone: 'bad', text: 'Pick a PNG, JPEG or WebP screenshot.' }); return }
+    setUploading(i)
+    try {
+      const bmp = await createImageBitmap(image).catch(() => null)
+      const ratio = bmp && bmp.height ? Math.min(10, Math.max(0.1, bmp.width / bmp.height)) : 0.5
+      bmp?.close()
+      const { stills: up } = await api.addStills(item.characterId, [image], item.id)
+      const cur = list[i]?.special
+      if (up[0]) setSlide(i, { special: { ...emptySpecial('product_shot'), ...(cur?.type === 'product_shot' ? { scale: cur.scale, variant: cur.variant } : {}), assetId: up[0].assetId, ratio } })
+      refresh(item.characterId)
+    } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) } finally { setUploading(null) }
+  }
   async function uploadInto(i: number, files: File[]) {
+    if (list[i]?.special?.type === 'product_shot') return uploadShot(i, files)
     const images = files.filter(f => IMAGE.test(f.type))
     if (!images.length || !item.characterId) { if (files.length) toast({ tone: 'bad', text: 'Pick a PNG, JPEG or WebP image.' }); return }
     setUploading(i)
@@ -103,7 +119,7 @@ export function SlideshowStills({ ctx }: { ctx: PostCtx }) {
                 <select className="st-select sm" aria-label={`Slide ${s.index + 1} picture`} value={s.special?.type ?? 'photo'}
                   onChange={e => setSlide(s.index, { special: e.target.value === 'photo' ? null : { ...emptySpecial(e.target.value as SpecialType), ...(s.special ? { from: s.special.from, title: s.special.title, body: s.special.body, lines: s.special.lines } : {}), type: e.target.value as SpecialType } })}>
                   <option value="photo">Photo</option>
-                  {SPECIAL_TYPES.map(t => <option key={t.id} value={t.id}>{t.label} (free)</option>)}
+                  {SPECIAL_TYPES.map(t => <option key={t.id} value={t.id}>{t.id === 'product_shot' ? `${t.label} (your upload)` : `${t.label} (free)`}</option>)}
                 </select>
                 {!s.special ? (
                   <>
@@ -117,6 +133,11 @@ export function SlideshowStills({ ctx }: { ctx: PostCtx }) {
                       {s.stillId && <button type="button" className="st-btn ghost xs" onClick={() => setSlide(s.index, { still: '' })} title="Take the picture out of this slide (it stays in the Library)"><X size={12} />Clear</button>}
                     </div>
                   </>
+                ) : s.special.type === 'product_shot' ? (
+                  <div className="st-col" style={{ gap: 4 }} data-field={`product-shot-${s.index}`}>
+                    <button type="button" className="st-btn ghost xs" disabled={uploading != null} onClick={() => { setUploadFor(s.index); file.current?.click() }}>{uploading === s.index ? <Loader2 size={12} className="st-spin" /> : <Upload size={12} />}{s.special.assetId ? 'Replace the screenshot' : 'Upload the screenshot'}</button>
+                    <span className="st-hint">Your own screenshot, placed as it is. The Studio never draws a product screen. Size and place it in the Slides step.</span>
+                  </div>
                 ) : <span className="st-hint">Drawn by code, free. Edit its words in the Slides step.</span>}
                 <div className="st-row" style={{ gap: 2, justifyContent: 'center' }}>
                   <button type="button" className="st-btn icon ghost sm" aria-label="Earlier" disabled={s.index === 0} onClick={() => edit({ move: [s.index, s.index - 1] })}><ArrowLeft size={13} /></button>

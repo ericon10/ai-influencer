@@ -59,6 +59,8 @@ export function fontDraw(cap: ContentConfig['caption']): Draw {
 
 export interface SlideInput {
   still: Buffer | null
+  // A product screenshot slide's upload (section 28).
+  shot?: Buffer | null
   text: string
   style: TextStyleId
   pos: SlidePos | null
@@ -79,7 +81,10 @@ export async function renderSlide(input: SlideInput, frame: Frame, content: Pick
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2b3a55"/><stop offset="1" stop-color="#0f1626"/></linearGradient></defs><rect width="${w}" height="${h}" fill="url(#g)"/></svg>`
     base = sharp(Buffer.from(svg))
   }
-  const { svg } = slideOverlaySvg({ style: input.style, text: input.text, pos: input.pos, special: input.special, ad: input.ad }, frame, draw)
+  // The owner's product screenshot goes in as it is (a data URI, so the
+  // worker draws exactly what the preview shows).
+  const shotHref = input.special?.type === 'product_shot' && input.shot ? `data:image/png;base64,${(await sharp(input.shot).rotate().png().toBuffer()).toString('base64')}` : null
+  const { svg } = slideOverlaySvg({ style: input.style, text: input.text, pos: input.pos, special: input.special, ad: input.ad, shotHref }, frame, draw)
   const overlay = await sharp(Buffer.from(svg)).png().toBuffer()
   return base.composite([{ input: overlay, top: 0, left: 0 }]).jpeg({ quality: content.slideshow.image.quality, mozjpeg: true }).toBuffer()
 }

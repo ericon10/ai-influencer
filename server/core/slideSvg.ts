@@ -316,7 +316,7 @@ export function specialSvg(sp: SpecialSlide, frame: Frame, draw: Draw): string {
       }
       y += 22 * u
     }
-  } else {
+  } else if (sp.type === 'job_posting') {
     out.push(rect(0, 0, w, h, 0, '#000000', ' fill-opacity="0.22"'))
     const cw = 0.88 * w, cx = (w - cw) / 2, pad = 40 * u
     const bullets = sp.lines.slice(0, 5).flatMap(b => wrapText(b, 34 * u, 400, cw - 2 * pad - 30 * u, draw, 2).map((l, i) => ({ l, first: i === 0 })))
@@ -342,16 +342,287 @@ export function specialSvg(sp: SpecialSlide, frame: Frame, draw: Draw): string {
     const bw = 220 * u, bh = 76 * u
     out.push(rect(cx + cw - pad - bw, cy + ch - pad - bh, bw, bh, bh / 2, '#0a66ff'))
     out.push(draw.text('Apply', cx + cw - pad - bw / 2, cy + ch - pad - bh / 2 + 12 * u, { size: 32 * u, weight: 600, fill: '#ffffff', anchor: 'middle' }))
+  } else {
+    out.push(drawnScreen(sp, frame, draw))
   }
   return out.join('')
 }
 
+// ── Section 28: the launch plan's mock screens ───────────────────────
+
+// Each on a card (or a phone screen) in the middle of the slide, under the
+// words, out of the bottom 20%. Generic names only; amounts can be shown as
+// gray bars (blur). Every field the slide leaves empty is left out.
+const split = (line: string): [string, string] => { const i = line.lastIndexOf('·'); return i < 0 ? [line.trim(), ''] : [line.slice(0, i).trim(), line.slice(i + 1).trim()] }
+const BANNERS: Record<string, string> = { blue: '#2f6fed', green: '#2e9e6b', purple: '#7a5af5', orange: '#ef7d32', gray: '#6b7280', pink: '#e2557f' }
+
+function drawnScreen(sp: SpecialSlide, frame: Frame, draw: Draw): string {
+  const w = frame.width, h = frame.height
+  const u = w / 1080
+  const out: string[] = []
+  const rect = (x: number, y: number, rw: number, rh: number, r: number, fill: string, extra = '') => `<rect x="${num(x)}" y="${num(y)}" width="${num(Math.max(0, rw))}" height="${num(Math.max(0, rh))}" rx="${num(r)}" fill="${fill}"${extra}/>`
+  const circle = (cx: number, cy: number, r: number, fill: string, extra = '') => `<circle cx="${num(cx)}" cy="${num(cy)}" r="${num(r)}" fill="${fill}"${extra}/>`
+  const line = (x1: number, y1: number, x2: number, y2: number, stroke: string, sw: number, extra = '') => `<line x1="${num(x1)}" y1="${num(y1)}" x2="${num(x2)}" y2="${num(y2)}" stroke="${stroke}" stroke-width="${num(sw)}"${extra}/>`
+  const t = (text: string, x: number, y: number, size: number, weight: number, fill: string, anchor?: 'middle' | 'end') => draw.text(text, x, y, { size: size * u, weight, fill, ...(anchor ? { anchor } : {}) })
+  const wrap = (text: string, size: number, weight: number, maxW: number, lines: number) => wrapText(text, size * u, weight, maxW, draw, lines)
+  const bottom = (1 - SAFE.bottom) * h
+  const cw = 0.88 * w, cx = (w - cw) / 2, pad = 40 * u
+  // A card of a known height, centered a little below the middle, kept out
+  // of the bottom 20% (and never above a third of the frame).
+  const place = (ch: number) => Math.max(0.33 * h, Math.min(bottom - ch, 0.56 * h - ch / 2))
+  const dim = (o: number) => out.push(rect(0, 0, w, h, 0, '#000000', ` fill-opacity="${o}"`))
+  const bar = (x: number, y: number, bw: number, size: number) => rect(x, y - size * u * 0.8, bw, size * u * 0.9, size * u * 0.3, '#c7c7cc')
+
+  if (sp.type === 'application_form') {
+    dim(0.22)
+    const fields = sp.lines.filter(Boolean).slice(0, 5).map(l => { const i = l.indexOf(':'); return sp.variant === 'filled' && i > 0 ? { label: l.slice(0, i).trim(), value: l.slice(i + 1).trim() } : { label: l.replace(/:\s*$/, '').trim(), value: '' } })
+    const total = Math.max(sp.count, fields.length)
+    const ch = pad * 2 + 40 * u + 64 * u + 70 * u + fields.length * 132 * u + 110 * u
+    const y0 = place(ch)
+    out.push(rect(cx, y0, cw, ch, 32 * u, '#ffffff'))
+    let y = y0 + pad + 26 * u
+    out.push(t(sp.from || 'Careers portal', cx + pad, y, 28, 500, '#8e8e93'))
+    y += 58 * u
+    out.push(t(wrap(sp.title || 'Application', 44, 700, cw - 2 * pad, 1)[0] ?? '', cx + pad, y, 44, 700, '#1c1c1e'))
+    y += 40 * u
+    if (total) {
+      const done = sp.variant === 'filled' ? total : 0
+      out.push(rect(cx + pad, y, cw - 2 * pad, 12 * u, 6 * u, '#e5e5ea'))
+      if (done) out.push(rect(cx + pad, y, (cw - 2 * pad) * (done / total), 12 * u, 6 * u, '#34c759'))
+      out.push(t(`${done} of ${total} fields`, cx + cw - pad, y + 46 * u, 26, 500, '#8e8e93', 'end'))
+    }
+    y += 70 * u
+    fields.forEach((f, i) => {
+      out.push(t(f.label, cx + pad, y + 28 * u, 28, 600, '#3a3a3c'))
+      const by = y + 44 * u, bh = 70 * u
+      out.push(rect(cx + pad, by, cw - 2 * pad, bh, 14 * u, sp.variant === 'filled' ? '#f2f8ff' : '#ffffff', ` stroke="${sp.variant === 'filled' ? '#8fb8ff' : '#c7c7cc'}" stroke-width="${num(2 * u)}"`))
+      if (f.value) out.push(t(wrap(f.value, 32, 400, cw - 2 * pad - 40 * u, 1)[0] ?? '', cx + pad + 22 * u, by + bh / 2 + 12 * u, 32, 400, '#1c1c1e'))
+      else if (i === 0 && sp.variant !== 'filled') out.push(rect(cx + pad + 22 * u, by + 16 * u, 4 * u, bh - 32 * u, 2 * u, '#0a84ff'))
+      y += 132 * u
+    })
+    const bw = 200 * u, bh = 72 * u
+    out.push(rect(cx + cw - pad - bw, y0 + ch - pad - bh, bw, bh, bh / 2, sp.variant === 'filled' ? '#0a84ff' : '#d1d1d6'))
+    out.push(t('Next', cx + cw - pad - bw / 2, y0 + ch - pad - bh / 2 + 11 * u, 30, 600, '#ffffff', 'middle'))
+  } else if (sp.type === 'portal_status') {
+    dim(0.22)
+    const steps = sp.lines.filter(Boolean).slice(0, 6).map(split)
+    const ch = pad * 2 + 150 * u + steps.length * 112 * u + 10 * u
+    const y0 = place(ch)
+    out.push(rect(cx, y0, cw, ch, 32 * u, '#ffffff'))
+    let y = y0 + pad + 26 * u
+    out.push(t(sp.from || 'Candidate portal', cx + pad, y, 28, 500, '#8e8e93'))
+    y += 56 * u
+    out.push(t(wrap(sp.title || 'Your application', 42, 700, cw - 2 * pad - 260 * u, 1)[0] ?? '', cx + pad, y, 42, 700, '#1c1c1e'))
+    if (sp.body) {
+      const pw = Math.min(300 * u, draw.measure(sp.body, 26 * u, 600) + 40 * u)
+      out.push(rect(cx + cw - pad - pw, y - 38 * u, pw, 50 * u, 25 * u, '#fff4d6'))
+      out.push(t(sp.body, cx + cw - pad - pw / 2, y - 4 * u, 26, 600, '#a15c00', 'middle'))
+    }
+    y += 70 * u
+    const lx = cx + pad + 18 * u
+    if (steps.length > 1) out.push(line(lx, y, lx, y + (steps.length - 1) * 112 * u, '#d1d1d6', 4 * u))
+    steps.forEach(([label, when], i) => {
+      const last = i === steps.length - 1
+      out.push(circle(lx, y, 16 * u, last ? '#ffffff' : '#34c759', last ? ` stroke="#ff9f0a" stroke-width="${num(6 * u)}"` : ''))
+      out.push(t(label || ' ', lx + 44 * u, y + 10 * u, 32, last ? 700 : 600, '#1c1c1e'))
+      if (when) out.push(t(when, lx + 44 * u, y + 52 * u, 26, 400, '#8e8e93'))
+      y += 112 * u
+    })
+  } else if (sp.type === 'calendar_invite') {
+    dim(0.22)
+    const title = wrap(sp.title || 'Quick chat', 46, 700, cw - 2 * pad - 20 * u, 2)
+    const people = sp.lines.filter(Boolean).slice(0, 8)
+    const ch = pad * 2 + title.length * 56 * u + 60 * u + (sp.body ? 50 * u : 0) + (sp.from ? 50 * u : 0) + (people.length ? 110 * u : 0) + 110 * u
+    const y0 = place(ch)
+    out.push(rect(cx, y0, cw, ch, 32 * u, '#ffffff'))
+    out.push(rect(cx, y0, 14 * u, ch, 7 * u, '#5e5ce6'))
+    let y = y0 + pad + 40 * u
+    title.forEach(l => { out.push(t(l, cx + pad + 10 * u, y, 46, 700, '#1c1c1e')); y += 56 * u })
+    if (sp.time) { out.push(t(sp.time, cx + pad + 10 * u, y + 4 * u, 30, 500, '#3a3a3c')); y += 54 * u } else y += 10 * u
+    if (sp.body) { out.push(t(wrap(sp.body, 28, 400, cw - 2 * pad, 1)[0] ?? '', cx + pad + 10 * u, y, 28, 400, '#6e6e73')); y += 50 * u }
+    if (sp.from) { out.push(t(`Organizer: ${sp.from}`, cx + pad + 10 * u, y, 28, 400, '#6e6e73')); y += 50 * u }
+    if (people.length) {
+      people.forEach((p, i) => {
+        const px = cx + pad + 10 * u + 36 * u + i * 62 * u
+        out.push(circle(px, y + 34 * u, 30 * u, hueFor(p), ` stroke="#ffffff" stroke-width="${num(4 * u)}"`))
+        out.push(t(p.slice(0, 2).toUpperCase(), px, y + 44 * u, 24, 700, '#ffffff', 'middle'))
+      })
+      y += 100 * u
+    }
+    const labels = ['Yes', 'Maybe', 'No']
+    const bw = (cw - 2 * pad - 30 * u) / 3
+    labels.forEach((l, i) => {
+      const bx = cx + pad + i * (bw + 15 * u)
+      out.push(rect(bx, y, bw, 66 * u, 33 * u, '#f2f2f7'))
+      out.push(t(l, bx + bw / 2, y + 44 * u, 28, 600, '#1c1c1e', 'middle'))
+    })
+  } else if (sp.type === 'receipt') {
+    dim(0.22)
+    const items = sp.lines.filter(Boolean).slice(0, 7).map(split)
+    const receipt = sp.variant === 'receipt'
+    const rw = receipt ? 0.72 * w : cw, rx = (w - rw) / 2
+    const ch = pad * 2 + 140 * u + items.length * 66 * u + 140 * u
+    const y0 = place(ch)
+    out.push(rect(rx, y0, rw, ch, receipt ? 6 * u : 18 * u, '#fbfaf6'))
+    let y = y0 + pad + 46 * u
+    out.push(t(sp.title || (receipt ? 'RECEIPT' : 'INVOICE'), receipt ? w / 2 : rx + pad, y, 44, 800, '#1c1c1e', receipt ? 'middle' : undefined))
+    y += 50 * u
+    if (sp.from) out.push(t(sp.from, receipt ? w / 2 : rx + pad, y, 28, 500, '#6e6e73', receipt ? 'middle' : undefined))
+    if (sp.time && !receipt) out.push(t(sp.time, rx + rw - pad, y, 26, 500, '#6e6e73', 'end'))
+    y += 44 * u
+    out.push(line(rx + pad, y, rx + rw - pad, y, '#b9b5aa', 2 * u, ` stroke-dasharray="${num(10 * u)} ${num(8 * u)}"`))
+    y += 56 * u
+    items.forEach(([item, amount]) => {
+      const iw = rw - 2 * pad - (amount ? draw.measure(amount, 30 * u, 600) + 30 * u : 0)
+      out.push(t(wrap(item, 30, 400, iw, 1)[0] ?? '', rx + pad, y, 30, 400, '#1c1c1e'))
+      if (amount) out.push(sp.blur ? bar(rx + rw - pad - 130 * u, y, 130 * u, 30) : t(amount, rx + rw - pad, y, 30, 600, '#1c1c1e', 'end'))
+      y += 66 * u
+    })
+    out.push(line(rx + pad, y - 30 * u, rx + rw - pad, y - 30 * u, '#1c1c1e', 3 * u))
+    y += 34 * u
+    const [label, amount] = split(sp.body || 'Total')
+    out.push(t(label, rx + pad, y, 34, 800, '#1c1c1e'))
+    if (amount) out.push(sp.blur ? bar(rx + rw - pad - 170 * u, y, 170 * u, 34) : t(amount, rx + rw - pad, y, 34, 800, '#1c1c1e', 'end'))
+    if (sp.time && receipt) out.push(t(sp.time, w / 2, y + 56 * u, 24, 500, '#8e8e93', 'middle'))
+  } else if (sp.type === 'bank_app') {
+    dim(0.22)
+    const rows = sp.lines.filter(Boolean).slice(0, 5).map(split)
+    const ch = 150 * u + 190 * u + rows.length * 96 * u + pad
+    const y0 = place(ch)
+    out.push(rect(cx, y0, cw, ch, 36 * u, '#ffffff'))
+    out.push(`<path d="M${num(cx)} ${num(y0 + 36 * u)} a${num(36 * u)} ${num(36 * u)} 0 0 1 ${num(36 * u)} ${num(-36 * u)} h${num(cw - 72 * u)} a${num(36 * u)} ${num(36 * u)} 0 0 1 ${num(36 * u)} ${num(36 * u)} v${num(114 * u)} h${num(-cw)} z" fill="#1f7a5c"/>`)
+    out.push(t(sp.from || 'Everyday Bank', cx + pad, y0 + 64 * u, 28, 600, '#d6f5e9'))
+    out.push(t(sp.title || 'Savings', cx + pad, y0 + 112 * u, 38, 700, '#ffffff'))
+    let y = y0 + 150 * u + 56 * u
+    out.push(t(sp.time || 'Available balance', cx + pad, y, 26, 500, '#8e8e93'))
+    y += 88 * u
+    out.push(sp.blur ? bar(cx + pad, y, 360 * u, 76) : t(sp.body || '$0.00', cx + pad, y, 76, 800, '#1c1c1e'))
+    y += 46 * u
+    rows.forEach(([label, amount]) => {
+      out.push(line(cx + pad, y, cx + cw - pad, y, '#e5e5ea', 2 * u))
+      y += 62 * u
+      out.push(t(wrap(label, 30, 500, cw - 2 * pad - 260 * u, 1)[0] ?? '', cx + pad, y, 30, 500, '#1c1c1e'))
+      if (amount) out.push(sp.blur ? bar(cx + cw - pad - 150 * u, y, 150 * u, 30) : t(amount, cx + cw - pad, y, 30, 600, /^\s*\+/.test(amount) ? '#1f7a5c' : /^\s*[-−]/.test(amount) ? '#d70015' : '#1c1c1e', 'end'))
+      y += 34 * u
+    })
+  } else if (sp.type === 'museum_placard') {
+    dim(0.18)
+    const pw = 0.78 * w, px = (w - pw) / 2, ppad = 52 * u
+    const title = wrap(sp.title || 'Untitled', 50, 800, pw - 2 * ppad, 3)
+    const body = wrap(sp.body || '', 32, 400, pw - 2 * ppad, 7)
+    const ch = ppad * 2 + title.length * 62 * u + (sp.from ? 52 * u : 0) + (sp.time ? 46 * u : 0) + (body.length ? 34 * u + body.length * 46 * u : 0)
+    const y0 = place(ch)
+    out.push(rect(px + 10 * u, y0 + 14 * u, pw, ch, 4 * u, '#000000', ' fill-opacity="0.25"'))
+    out.push(rect(px, y0, pw, ch, 4 * u, '#f6f3ec', ` stroke="#d8d2c4" stroke-width="${num(2 * u)}"`))
+    let y = y0 + ppad + 44 * u
+    title.forEach(l => { out.push(t(l, px + ppad, y, 50, 800, '#1c1c1e')); y += 62 * u })
+    if (sp.from) { out.push(t(sp.from, px + ppad, y, 34, 600, '#3a3a3c')); y += 52 * u }
+    if (sp.time) { out.push(t(sp.time, px + ppad, y - 6 * u, 28, 400, '#6e6e73')); y += 46 * u }
+    if (body.length) { y += 20 * u; body.forEach(l => { out.push(t(l, px + ppad, y, 32, 400, '#2c2c2e')); y += 46 * u }) }
+  } else if (sp.type === 'survey') {
+    dim(0.22)
+    const q = wrap(sp.title || 'How likely are you to recommend us to a friend?', 40, 700, cw - 2 * pad, 4)
+    const ch = pad * 2 + 50 * u + q.length * 52 * u + 40 * u + 90 * u + 60 * u + 100 * u
+    const y0 = place(ch)
+    out.push(rect(cx, y0, cw, ch, 32 * u, '#ffffff'))
+    let y = y0 + pad + 26 * u
+    out.push(t(sp.from || 'Candidate experience survey', cx + pad, y, 26, 500, '#8e8e93'))
+    y += 64 * u
+    q.forEach(l => { out.push(t(l, cx + pad, y, 40, 700, '#1c1c1e')); y += 52 * u })
+    y += 20 * u
+    const gap = 8 * u, bw = (cw - 2 * pad - 10 * gap) / 11
+    for (let k = 0; k <= 10; k++) {
+      const bx = cx + pad + k * (bw + gap), on = sp.count === k
+      out.push(rect(bx, y, bw, 80 * u, 12 * u, on ? '#0a84ff' : '#f2f2f7', on ? '' : ` stroke="#d1d1d6" stroke-width="${num(2 * u)}"`))
+      out.push(t(String(k), bx + bw / 2, y + 52 * u, 30, 700, on ? '#ffffff' : '#3a3a3c', 'middle'))
+    }
+    y += 80 * u + 40 * u
+    out.push(t('Not at all likely', cx + pad, y, 24, 500, '#8e8e93'))
+    out.push(t('Extremely likely', cx + cw - pad, y, 24, 500, '#8e8e93', 'end'))
+    const bw2 = 220 * u, bh = 70 * u
+    out.push(rect(cx + cw - pad - bw2, y0 + ch - pad - bh, bw2, bh, bh / 2, sp.count >= 0 ? '#0a84ff' : '#d1d1d6'))
+    out.push(t('Submit', cx + cw - pad - bw2 / 2, y0 + ch - pad - bh / 2 + 11 * u, 30, 600, '#ffffff', 'middle'))
+  } else if (sp.type === 'lock_screen') {
+    dim(0.42)
+    // The clock sits under the slide's words (they are near the top).
+    const clockY = 0.455 * h
+    if (sp.from) out.push(t(sp.from, w / 2, clockY - 132 * u, 32, 600, '#ffffff', 'middle'))
+    out.push(t(sp.time || '9:41', w / 2, clockY, 140, 700, '#ffffff', 'middle'))
+    let y = clockY + 44 * u
+    for (const raw of sp.lines.filter(Boolean).slice(0, 4)) {
+      const parts = raw.split('·').map(x => x.trim())
+      const [app, who, msg] = parts.length >= 3 ? [parts[0]!, parts[1]!, parts.slice(2).join(' · ')] : parts.length === 2 ? [parts[0]!, '', parts[1]!] : ['', '', parts[0]!]
+      const body = wrap(msg, 32, 400, cw - 2 * pad, 2)
+      const nh = pad * 1.2 + (app ? 36 * u : 0) + (who ? 42 * u : 0) + body.length * 40 * u
+      if (y + nh > bottom) break
+      out.push(rect(cx, y, cw, nh, 34 * u, '#f2f2f7', ' fill-opacity="0.88"'))
+      let ny = y + pad * 0.6 + 26 * u
+      if (app) { out.push(t(app.toUpperCase(), cx + pad, ny, 24, 600, '#6e6e73')); ny += 40 * u }
+      if (who) { out.push(t(who, cx + pad, ny, 32, 700, '#1c1c1e')); ny += 40 * u }
+      body.forEach(l => { out.push(t(l, cx + pad, ny, 32, 400, '#1c1c1e')); ny += 40 * u })
+      y += nh + 14 * u
+    }
+  } else if (sp.type === 'profile_card') {
+    dim(0.22)
+    const stats = sp.lines.filter(Boolean).slice(0, 3).map(split)
+    const about = wrap(sp.body || '', 30, 400, cw - 2 * pad, 3)
+    const ch = 170 * u + 90 * u + 60 * u + (sp.from ? 48 * u : 0) + about.length * 42 * u + (stats.length ? 120 * u : 30 * u) + pad
+    const y0 = place(ch)
+    out.push(rect(cx, y0, cw, ch, 32 * u, '#ffffff'))
+    const color = BANNERS[sp.variant] ?? BANNERS.blue!
+    out.push(`<path d="M${num(cx)} ${num(y0 + 32 * u)} a${num(32 * u)} ${num(32 * u)} 0 0 1 ${num(32 * u)} ${num(-32 * u)} h${num(cw - 64 * u)} a${num(32 * u)} ${num(32 * u)} 0 0 1 ${num(32 * u)} ${num(32 * u)} v${num(138 * u)} h${num(-cw)} z" fill="${color}"/>`)
+    const ar = 74 * u, ax = cx + pad + ar, ay = y0 + 170 * u
+    const open = /open to work/i.test(sp.from)
+    out.push(circle(ax, ay, ar + 8 * u, open ? '#2e9e6b' : '#ffffff'))
+    out.push(circle(ax, ay, ar, hueFor(sp.title || 'A')))
+    out.push(t(initial(sp.title || 'A'), ax, ay + 26 * u, 70, 700, '#ffffff', 'middle'))
+    let y = ay + ar + 64 * u
+    out.push(t(sp.title || 'Name', cx + pad, y, 44, 800, '#1c1c1e'))
+    y += 48 * u
+    if (sp.from) { out.push(t(wrap(sp.from, 30, 500, cw - 2 * pad, 1)[0] ?? '', cx + pad, y, 30, 500, '#3a3a3c')); y += 48 * u }
+    about.forEach(l => { out.push(t(l, cx + pad, y, 30, 400, '#6e6e73')); y += 42 * u })
+    if (stats.length) {
+      y += 30 * u
+      const sw = (cw - 2 * pad) / stats.length
+      stats.forEach(([label, value], i) => {
+        const sx = cx + pad + i * sw
+        out.push(t(value || label, sx, y + 20 * u, 36, 800, '#1c1c1e'))
+        if (value) out.push(t(wrap(label, 22, 500, sw - 10 * u, 1)[0] ?? '', sx, y + 58 * u, 22, 500, '#8e8e93'))
+      })
+    }
+  }
+  return out.join('')
+}
+
+// The product screenshot's box (section 28): the owner's upload as it is,
+// `scale` of the frame's width, centered under the words and kept out of
+// the bottom 20%; `ratio` is the screenshot's width over its height.
+export function productShotBox(sp: Pick<SpecialSlide, 'scale' | 'variant'> & { ratio?: number }, frame: Frame): { x: number; y: number; w: number; h: number } {
+  const ratio = sp.ratio && sp.ratio > 0 ? sp.ratio : 0.5
+  const top = (sp.variant === 'top' ? 0.12 : 0.33) * frame.height
+  const room = (1 - SAFE.bottom) * frame.height - top
+  let bw = Math.max(0.2, Math.min(1, sp.scale || 0.72)) * frame.width * 0.92
+  let bh = bw / ratio
+  if (bh > room) { bh = room; bw = bh * ratio }
+  return { x: (frame.width - bw) / 2, y: top, w: bw, h: bh }
+}
+
+export function productShotSvg(href: string, box: { x: number; y: number; w: number; h: number }, frame: Frame): string {
+  const r = 28 * (frame.width / 1080)
+  const id = 'ps'
+  return `<defs><clipPath id="${id}"><rect x="${num(box.x)}" y="${num(box.y)}" width="${num(box.w)}" height="${num(box.h)}" rx="${num(r)}"/></clipPath></defs>`
+    + `<rect x="${num(box.x + 6)}" y="${num(box.y + 14)}" width="${num(box.w)}" height="${num(box.h)}" rx="${num(r)}" fill="#000000" fill-opacity="0.35"/>`
+    + `<image href="${esc(href)}" x="${num(box.x)}" y="${num(box.y)}" width="${num(box.w)}" height="${num(box.h)}" preserveAspectRatio="xMidYMid slice" clip-path="url(#${id})"/>`
+}
+
 // The whole overlay of one slide: its special slide, its words, and Ad on
 // slide 1 when the post is an ad.
-export function slideOverlaySvg(input: { style: TextStyleId; text: string; pos: SlidePos | null; special: SpecialSlide | null; ad: boolean }, frame: Frame, draw: Draw): { svg: string; layout: TextLayout | null } {
+export function slideOverlaySvg(input: { style: TextStyleId; text: string; pos: SlidePos | null; special: SpecialSlide | null; ad: boolean; shotHref?: string | null }, frame: Frame, draw: Draw): { svg: string; layout: TextLayout | null } {
   const layout = textLayout(input.style, input.text, frame, input.pos, draw, input.special ? SPECIAL_POS : DEFAULT_POS)
+  const shot = input.special?.type === 'product_shot' && input.shotHref ? productShotSvg(input.shotHref, productShotBox(input.special, frame), frame) : ''
   const body = [
     input.special ? specialSvg(input.special, frame, draw) : '',
+    shot,
     layout ? textSvg(layout, frame, draw) : '',
     input.ad ? adSvg(layout, frame, draw) : '',
   ].join('')

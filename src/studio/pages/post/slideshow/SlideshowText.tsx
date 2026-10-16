@@ -5,7 +5,7 @@ import { keys } from '../../../hooks'
 import { PriceButton } from '../../../PriceButton'
 import { Field, useToast, type TodoItem } from '../../../ui'
 import { HowTo } from '../../../guide/Guide'
-import { CTA_KINDS, TEXT_STYLES, backdropFor, cleanSpecial, ctaText, editSlides, postCaption, setAt, slideList, type CtaKind, type SlidePos, type SpecialSlide, type TextStyleId } from '../../../../../server/core/slides'
+import { CTA_KINDS, TEXT_STYLES, backdropFor, cleanSpecial, ctaText, editSlides, fullSpecial, postCaption, setAt, slideList, type CtaKind, type SlidePos, type SpecialSlide, type TextStyleId } from '../../../../../server/core/slides'
 import { wordsNote } from '../../../../../server/core/slideSvg'
 import type { SlideshowSpec } from '../../../types'
 import type { PostCtx } from '../ctx'
@@ -179,25 +179,74 @@ const SAMPLE = { index: 0, text: 'Your hook goes right here', stillId: null, spe
 
 function SpecialEditor({ special, onChange, brands }: { special: SpecialSlide; onChange: (p: Partial<SpecialSlide>) => void; brands: { names: string[]; generic: string[] } }) {
   const cleaned = cleanSpecial(special, brands.names, brands.generic)
-  const replaced = JSON.stringify(cleaned) !== JSON.stringify(special)
+  const replaced = JSON.stringify(cleaned) !== JSON.stringify(fullSpecial(special))
   const f = (label: string, key: 'from' | 'title' | 'body' | 'time', o: { area?: boolean; ph?: string } = {}) => (
     <Field label={label}>
       {o.area ? <textarea className="st-textarea" rows={3} value={special[key]} onChange={e => onChange({ [key]: e.target.value })} placeholder={o.ph} /> : <input className="st-input" value={special[key]} onChange={e => onChange({ [key]: e.target.value })} placeholder={o.ph} />}
     </Field>
   )
-  const lines = (label: string, hint: string) => (
+  const lines = (label: string, hint: string, max = 10) => (
     <Field label={label} hint={hint}>
-      <textarea className="st-textarea" rows={4} value={special.lines.join('\n')} onChange={e => onChange({ lines: e.target.value.split('\n').slice(0, 10) })} />
+      <textarea className="st-textarea" rows={4} value={special.lines.join('\n')} onChange={e => onChange({ lines: e.target.value.split('\n').slice(0, max) })} />
     </Field>
   )
+  const seg = (label: string, value: string, options: Array<[string, string]>, set: (v: string) => void) => (
+    <Field label={label} group>
+      <div className="st-seg sm" role="radiogroup" aria-label={label}>
+        {options.map(([id, l]) => <button key={id} type="button" role="radio" aria-checked={value === id} className={value === id ? 'on' : ''} onClick={() => set(id)}>{l}</button>)}
+      </div>
+    </Field>
+  )
+  const blur = (
+    <label className="st-row" style={{ gap: 8, cursor: 'pointer' }}>
+      <button type="button" role="switch" aria-checked={special.blur} className={`st-switch ${special.blur ? 'on' : ''}`} onClick={() => onChange({ blur: !special.blur })}><span /></button>
+      <span className="st-hint">Blur the amounts</span>
+    </label>
+  )
+  const t = special.type
   return (
     <div className="st-card" style={{ marginLeft: 66 }} data-field="special-editor">
       <div className="st-card-body st-col" style={{ gap: 8 }}>
-        <span className="st-hint">A mock screen, drawn by code (free). Generic names only: a real brand is shown as a generic name.</span>
-        {special.type === 'notification' && <>{f('App', 'from', { ph: 'Messages' })}{f('From', 'title')}{f('Message', 'body', { area: true })}{f('Time', 'time', { ph: 'now' })}</>}
-        {special.type === 'text_thread' && <>{f('Contact', 'title')}{lines('Messages, one a line', 'Yours start with "me: ".')}</>}
-        {special.type === 'rejection_email' && <>{f('From', 'from')}{f('Subject', 'title')}{f('Email', 'body', { area: true })}{f('Time', 'time')}</>}
-        {special.type === 'job_posting' && <>{f('Role', 'title')}{f('Company', 'from')}{f('Place and pay', 'body')}{lines('Requirements, one a line', 'Up to 5.')}{f('Posted', 'time', { ph: '2 days ago' })}</>}
+        <span className="st-hint">{t === 'product_shot' ? 'Your own screenshot of the product, placed as it is (the Studio never draws one).' : 'A mock screen, drawn by code (free). Generic names only: a real brand is shown as a generic name.'}</span>
+        {t === 'notification' && <>{f('App', 'from', { ph: 'Messages' })}{f('From', 'title')}{f('Message', 'body', { area: true })}{f('Time', 'time', { ph: 'now' })}</>}
+        {t === 'text_thread' && <>{f('Contact', 'title')}{lines('Messages, one a line', 'Yours start with "me: ".')}</>}
+        {t === 'rejection_email' && <>{f('From', 'from')}{f('Subject', 'title')}{f('Email', 'body', { area: true })}{f('Time', 'time')}</>}
+        {t === 'job_posting' && <>{f('Role', 'title')}{f('Company', 'from')}{f('Place and pay', 'body')}{lines('Requirements, one a line', 'Up to 5.', 5)}{f('Posted', 'time', { ph: '2 days ago' })}</>}
+        {t === 'application_form' && <>
+          {seg('State', special.variant || 'empty', [['empty', 'Empty'], ['filled', 'Filled']], v => onChange({ variant: v }))}
+          {f('Portal', 'from', { ph: 'Careers portal' })}{f('Page', 'title', { ph: 'Work history, page 4 of 6' })}
+          {lines('Fields, one a line', special.variant === 'filled' ? 'Filled: "Label: value".' : 'The labels; the first box shows the cursor. Up to 5.', 5)}
+          <Field label="Fields in all" hint="The progress line: 0 of this many (empty) or all of them (filled).">
+            <input className="st-input" type="number" min={0} max={200} value={special.count} onChange={e => onChange({ count: Math.max(0, Math.min(200, Number(e.target.value) || 0)) })} />
+          </Field>
+        </>}
+        {t === 'portal_status' && <>{f('Portal', 'from')}{f('Role', 'title')}{f('Status', 'body', { ph: 'In review' })}{lines('Steps, one a line', '"Step · timestamp"; the last one is now. Up to 6.', 6)}</>}
+        {t === 'calendar_invite' && <>{f('Event', 'title')}{f('When', 'time', { ph: 'Tue, Oct 20 · 2:00 to 2:30 PM' })}{f('Where', 'body', { ph: 'Video call' })}{f('Organizer', 'from')}{lines('Attendees, one a line', 'Initials only. Up to 8.', 8)}</>}
+        {t === 'receipt' && <>
+          {seg('Kind', special.variant || 'invoice', [['invoice', 'Invoice'], ['receipt', 'Receipt']], v => onChange({ variant: v }))}
+          {f('Number', 'title', { ph: 'INVOICE No. 047' })}{f('Billed to', 'from')}{lines('Items, one a line', '"Item · amount". Up to 7.', 7)}{f('Total line', 'body', { ph: 'Total due · $685.00' })}{f('Due', 'time')}{blur}
+        </>}
+        {t === 'bank_app' && <>{f('Bank', 'from', { ph: 'Everyday Bank' })}{f('Account', 'title', { ph: 'Savings' })}{f('Label', 'time', { ph: 'Available balance' })}{f('Balance', 'body')}{lines('Rows, one a line', '"Label · amount"; + is green, - is red. Up to 5.', 5)}{blur}</>}
+        {t === 'museum_placard' && <>{f('Title', 'title')}{f('Artist', 'from')}{f('Medium and year', 'time', { ph: 'Email, 2026' })}{f('Placard text', 'body', { area: true })}</>}
+        {t === 'survey' && <>{f('Survey', 'from')}{f('Question', 'title', { area: true })}
+          <Field label="Picked score">
+            <select className="st-select" value={special.count} onChange={e => onChange({ count: Number(e.target.value) })}>
+              <option value={-1}>None yet</option>
+              {Array.from({ length: 11 }, (_, k) => <option key={k} value={k}>{k}</option>)}
+            </select>
+          </Field>
+        </>}
+        {t === 'lock_screen' && <>{f('Clock', 'time', { ph: '2:14' })}{f('Date', 'from', { ph: 'Wednesday, October 21' })}{lines('Notifications, one a line', '"App · Sender · message". Up to 4.', 4)}</>}
+        {t === 'profile_card' && <>{f('Name', 'title')}{f('Headline', 'from', { ph: 'Open to work · Class of 2026' })}{f('About', 'body', { area: true })}{lines('Stats, one a line', '"Label · value". Up to 3.', 3)}
+          {seg('Banner', special.variant || 'blue', [['blue', 'Blue'], ['green', 'Green'], ['purple', 'Purple'], ['orange', 'Orange'], ['gray', 'Gray']], v => onChange({ variant: v }))}
+        </>}
+        {t === 'product_shot' && <>
+          {!special.assetId && <span className="st-hint st-warntext">No screenshot yet: upload it on this slide's card in the Stills step.</span>}
+          <Field label={`Size (${Math.round(special.scale * 100)}% of the width)`}>
+            <input type="range" min={40} max={100} value={Math.round(special.scale * 100)} onChange={e => onChange({ scale: Number(e.target.value) / 100 })} aria-label="Screenshot size" />
+          </Field>
+          {seg('Where', special.variant === 'top' ? 'top' : 'middle', [['middle', 'Under the words'], ['top', 'At the top']], v => onChange({ variant: v }))}
+        </>}
         {replaced && <span className="st-hint st-warntext">A real brand name is replaced with a generic one on the slide.</span>}
       </div>
     </div>
