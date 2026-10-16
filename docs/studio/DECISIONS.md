@@ -2562,6 +2562,24 @@ UX-PLAN.md section 28 has the audit and the plan.
   `docs/content/viral-writing-playbook.md`; then only the template
   changes. Writers no longer cut a hook at 16 words: the lint says when
   it runs long.
+- **Writing standard v1.2 (owner, mid-build).** THE STANDARD at the top of
+  the playbook v1.2 is the spec for the writer, the reviewer and the lint:
+  the hook names the job situation, says exactly what happened, hurts 7
+  or more, in the TikTok group-chat voice; its pass and fail examples go
+  into every hook writer's prompt as the few-shot set. The reviewer's
+  stop test has five checks (stops, job, exact, pain, friend), stored on
+  each hook (`fails`) so the hidden count says how many failed. The v1.2
+  ladder replaced the interim one. Product posts end on a friend's tip
+  from four honest endings (data, `product_endings`); a pain SideStep does
+  not fix gets no mention, and the draft turns #ad off (`isProductPost`:
+  #ad, or a product row whose draft found an ending). Two more lint
+  checks: a hook with no job word, and ghosted, passed over or applies for
+  you on a product post's last slide. Slideshows are TikTok only: Export
+  makes 1080 x 1920; the 1080 x 1440 set is a per-post option, off.
+  The 15-word note stays as asked in v1.1, though four of the five v1.2
+  passing examples run 18 to 22 words (one number in content.yaml,
+  `hook_max_words`). Hooks are no longer cut at 16 words anywhere (Use
+  this hook and batch included): 30 is a cap against runaway answers.
 - **The language lint** (`server/core/copyLint.ts`) is one pure function
   for the browser and the server: free, warnings only, each check a
   default rule (area copy) switchable per account or character. It never

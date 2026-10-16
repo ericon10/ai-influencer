@@ -582,7 +582,7 @@ Decisions: `DECISIONS.md` G37 and G38. UX: `UX-PLAN.md` section 15.
 - [x] Jenga drafts: each slide opens the next, setup and punchline apart, payoff last, 4 to 14 words, the CTA line
 - [x] Language lint, free and warnings only, on every hook, slide and caption, the plan preview and Finish (eight default rules, area copy)
 - [x] Brief v1.1: THE STANDARD for slide 1 in every hook writer (one shared template), the reviewer's stop test first (a fail is a 3 at best), pain out of 10 on each card; three more hook checks (over 15 words, a label or timestamp to open, stacked quotes); the plan reader proven column-driven
-- [ ] The playbook v1.1 file (the attachment was still v1.0): replace `docs/content/viral-writing-playbook.md` and the `playbook_ladder` lines with its section 8
+- [x] Writing standard v1.2: the playbook and the brief v1.2 in `docs/content/`; THE STANDARD with its pass and fail examples in every hook writer; the five-check stop test; the v1.2 ladder; product endings from the four honest ones (no mention when SideStep does not fix the pain); two more lint checks (no job word, a dishonest product ending); TikTok-only export with the Instagram set as an option
 - [x] Import a plan CSV: Preview (free) by day and account, the drafts as written (free), the plan fields on the post and in post.json version 2
 - [x] Generate N posts: one price, ten posts at a time (job queue groups), up to 100
 - [x] Alt hook swap (slideshows and video posts); variations start from the alt hook and go to an account of the same kind

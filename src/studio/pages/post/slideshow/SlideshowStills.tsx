@@ -252,12 +252,12 @@ function SceneCard({ ctx }: { ctx: PostCtx }) {
           </Field>
         </div>
         <div className="st-row" style={{ gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-          <span className="st-label">Made for</span>
-          <div className="st-seg sm" role="radiogroup" aria-label="Made for">
-            <button type="button" role="radio" aria-checked={spec.made !== 'instagram'} className={spec.made !== 'instagram' ? 'on' : ''} onClick={() => draft.setSpec({ made: 'tiktok' } as never)}>TikTok 9:16</button>
-            <button type="button" role="radio" aria-checked={spec.made === 'instagram'} className={spec.made === 'instagram' ? 'on' : ''} onClick={() => draft.setSpec({ made: 'instagram' } as never)}>Instagram 3:4</button>
-          </div>
-          <span className="st-hint">The export makes both sizes either way.</span>
+          {spec.made === 'instagram' ? (
+            <>
+              <span className="st-hint">Made at 3:4 (an older post).</span>
+              <button type="button" className="st-btn sm ghost" onClick={() => draft.setSpec({ made: 'tiktok' } as never)}>Make the next stills 9:16 for TikTok</button>
+            </>
+          ) : <span className="st-hint" data-field="slideshow-made">Made for TikTok, 9:16. Slideshows are TikTok only; an Instagram 3:4 copy is an option in Finish.</span>}
           <span className="st-spacer" />
           {naming == null
             ? <button type="button" className="st-btn ghost sm" disabled={!lock.place.trim()} title={lock.place.trim() ? 'Save the place, light, camera and details' : 'Write the place first'} onClick={() => setNaming(lock.place.slice(0, 40))}><Bookmark size={13} />Save this scene</button>

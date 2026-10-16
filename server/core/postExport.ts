@@ -31,10 +31,10 @@ export interface PostExportInput {
     stillId: string | null
     special: { type: string; from: string; title: string; body: string; lines: string[]; time: string; variant?: string; count?: number; blur?: boolean; assetId?: string | null; scale?: number; ratio?: number } | null
     position: { x: number; y: number } | null
-    files: { tiktok: string; instagram: string }
+    files: { tiktok: string; instagram: string | null }
   }>
   files: { caption: string; tiktok: string[]; instagram: string[] }
-  sizes: { tiktok: { width: number; height: number }; instagram: { width: number; height: number } }
+  sizes: { tiktok: { width: number; height: number }; instagram?: { width: number; height: number } }
   aiLabel: string
   exportedAt: string
   // What the post keeps from its plan row or its hook (section 28).

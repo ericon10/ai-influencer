@@ -124,15 +124,18 @@ test('Write 10 with Claude to THE STANDARD: a moment, a code, effects, pain, an 
   await expect(notes).toContainText(/Opens with "Exhibit"/)
   await expect(notes).toContainText(/2 quoted phrases/)
   await expect(notes).toContainText(/\d+ words\. Slide 1 reads in one go/)
+  // THE STANDARD v1.2: a hook with no job word.
+  await hook.fill('set a 6am alarm to apply in the first hour. 100+ people already beat me')
+  await expect(notes).toContainText(/No job word/)
 
   // Swap with the alt hook (free).
-  await hook.fill('Applied 11:52pm. Rejected 2:14am.')
-  await page.getByLabel('Alt hook').fill('Exhibit 1: a rejection received at 2:14am.')
+  await hook.fill('applied for the job at 11:52pm. rejected at 2:14am.')
+  await page.getByLabel('Alt hook').fill('job rejection at 2:14am. who is up doing this')
   await expect(notes).toHaveCount(0)
   await page.getByRole('button', { name: /Swap with the alt hook/ }).click()
-  await expect(hook).toHaveValue('Exhibit 1: a rejection received at 2:14am.')
-  await expect(page.getByLabel('Alt hook')).toHaveValue('Applied 11:52pm. Rejected 2:14am.')
-  await expect.poll(async () => (await api<{ item: { spec: { hook: string; plan: { altHook: string } } } }>('GET', `/content/${id}`)).item.spec.plan.altHook, { timeout: 15_000 }).toBe('Applied 11:52pm. Rejected 2:14am.')
+  await expect(hook).toHaveValue('job rejection at 2:14am. who is up doing this')
+  await expect(page.getByLabel('Alt hook')).toHaveValue('applied for the job at 11:52pm. rejected at 2:14am.')
+  await expect.poll(async () => (await api<{ item: { spec: { hook: string; plan: { altHook: string } } } }>('GET', `/content/${id}`)).item.spec.plan.altHook, { timeout: 15_000 }).toBe('applied for the job at 11:52pm. rejected at 2:14am.')
 })
 
 test('a mock screen drawn by code and the owner\'s Product screenshot, then the export: post.json with the plan and "Ad:" first', async ({ page }, info) => {

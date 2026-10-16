@@ -17,7 +17,7 @@ import { catalogWording } from '../core/wording.js'
 import { cleanVoiceCard, voiceCardText } from '../core/voiceCard.js'
 import { claimsText, languageText } from '../core/scriptKit.js'
 import {
-  CTA_IDS, DRAWN_SPECIAL_IDS, PATTERN_IDS, backdropFor, cleanSpecial, emptySpecial, fullSpecial, ctaText, guessPattern, isListPattern, postCaption, reorderMiddle, setAt, slideList, trimWords, vaultHooks,
+  CTA_IDS, DRAWN_SPECIAL_IDS, PATTERN_IDS, backdropFor, cleanSpecial, emptySpecial, fullSpecial, ctaText, guessPattern, isListPattern, isProductPost, postCaption, reorderMiddle, setAt, slideList, trimWords, vaultHooks,
   type HookIdea, type HookPattern, type SpecialSlide,
 } from '../core/slides.js'
 import { slideshowSpecSchema, type SceneLock, type SlideshowSpec } from '../core/slideshowSpec.js'
@@ -141,26 +141,27 @@ export const hooksJsonSchema = (n: number) => ({
 })
 export const reviewJsonSchema = (n: number) => ({
   type: 'object', additionalProperties: false, required: ['reviews'],
-  properties: { reviews: { type: 'array', minItems: n, maxItems: n, items: { type: 'object', additionalProperties: false, required: ['n', 'stops', 'clear', 'pain', 'score', 'note'], properties: { n: { type: 'integer', minimum: 1, maximum: n }, stops: { type: 'boolean' }, clear: { type: 'boolean' }, pain: { type: 'integer', minimum: 1, maximum: 10 }, score: { type: 'integer', minimum: 1, maximum: 5 }, note: { type: 'string' } } } } },
+  properties: { reviews: { type: 'array', minItems: n, maxItems: n, items: { type: 'object', additionalProperties: false, required: ['n', 'stops', 'job', 'exact', 'pain', 'friend', 'score', 'note'], properties: { n: { type: 'integer', minimum: 1, maximum: n }, stops: { type: 'boolean' }, job: { type: 'boolean' }, exact: { type: 'boolean' }, pain: { type: 'integer', minimum: 1, maximum: 10 }, friend: { type: 'boolean' }, score: { type: 'integer', minimum: 1, maximum: 5 }, note: { type: 'string' } } } } },
 })
 
 interface HookOut { effect_open?: unknown; effect_payoff?: unknown; moment?: unknown; code?: unknown; pain?: unknown; hook?: unknown; alt_hook?: unknown; rank?: unknown }
 
 // A free stand-in for demo mode and tests: hooks written to THE STANDARD
-// (the pain plainly, in the group-chat voice, 15 words or fewer) with
-// codes (the account's primary and backup first, never its last), effects,
-// a moment, a pain score and an alt hook each.
+// v1.2 (the job situation named, exactly what happened, pain 7 or more, the
+// group-chat voice, about 15 words) with codes (the account's primary and
+// backup first, never its last), effects, a moment, a pain score and an
+// alt hook each.
 const MOCK_HOOKS: Array<[string, string]> = [
-  ['man, 300 apps since grad and not one human email back. is it me fam?', 'ok so 300 applications and the only reply was a newsletter'],
-  ['uggh the portal wants my whole resume typed out again. on page 4 of 6', 'why does every portal make me retype the resume i just uploaded'],
-  ['ok so they said talk friday. it has been six fridays', 'they said talk friday. i have stopped counting fridays'],
-  ['applied before midnight and got rejected before i woke up. who is up doing this', 'rejected while i was asleep. somebody was up at 2am for this'],
-  ['entry level role wants 5 years. i graduated in may. be so for real', 'entry level but make it 5 years. i am 23'],
-  ['round 5 interview for a job that pays less than my last one. why', 'five rounds for less money than my old job. fam what'],
-  ['rent is due in 9 days. recruiter said end of week three weeks ago', 'rent in 9 days. recruiter in three weeks. same energy'],
-  ['rewrote my resume 40 times and still no callback. is it the font??', 'resume version 40 and still nothing. losing my mind fr'],
-  ['they ghosted me after the final round then reposted the job. cool cool cool', 'final round, then silence, then the same job reposted'],
-  ['a free 6 hour take-home for one interview. is this normal or am i cooked', 'six unpaid hours on a take-home. is this a job or a hobby'],
+  ['man the job app wanted my resume typed out AGAIN. 47 boxes fam??????', 'uploaded the resume then the job app made me retype ALL of it bro'],
+  ['5 job interviews for one role and they hired internal. FIVE. make it make sense', 'five rounds of job interviews just to hear they went internal'],
+  ['recruiter said talk friday. it has been 6 fridays bro i am not ok', 'the recruiter said friday. six fridays ago. still nothing'],
+  ['entry level job wants 5 yrs experience. i graduated in MAY. be so fr', 'entry level job posting wants 5 yrs. i am 23 fam'],
+  ['took a job offer 8k under my ask bc rent was due. i am crying', 'took 8k less on the job offer bc of rent. it hits different'],
+  ['applied to 300 jobs since grad and got 2 replies. both were scams 💀', '300 job applications. 2 replies. both scams. we are cooked'],
+  ['rewrote my resume for every job app this week. 23 versions. no callbacks', '23 versions of my resume this week and not one recruiter call'],
+  ['the salary range said competitive. it was 41k for a masters job bro', 'job post said competitive salary. it was 41k. with a masters'],
+  ['interviewer asked my 5 yr plan. bro my plan is getting ONE job offer', 'job interview asked my 5 yr plan. my plan is rent'],
+  ['unpaid 6 hour take-home for a job interview. they never even opened it', 'did a 6 hour take-home for the job. they never opened the file'],
 ]
 export function mockHooks(n: number, _vault: string[], topic: string, st: { primary: string | null; backup: string | null; last: string | null }): { hooks: Array<Required<{ [K in keyof HookOut]: string | number }>> } {
   const pool = [st.primary, st.primary, st.primary, st.backup, st.backup, ...STRUCTURE_CODES].filter((c): c is StructureCode => !!c && c !== st.last)
@@ -181,12 +182,12 @@ export function mockHooks(n: number, _vault: string[], topic: string, st: { prim
 // or 2; the rest score 3 to 5 or fail the stop test (hook 7 is a 2 on the
 // ladder with pain 6, so the stop test hides it) and are hidden.
 const MOCK_SCORES = [1, 2, 2, 3, 1, 4, 2, 3, 1, 2]
-const MOCK_NOTES = ['A stranger stops on the first words; the turn waits for slide 2.', 'The pain is plain and clear on one read; the loop could pull harder.', 'Clear, but it closes its own loop.', 'Needs the photo to land.']
+const MOCK_NOTES = ['A stranger stops on the job word and the number; the turn waits for slide 2.', 'Plain, about a job, pain 8; the loop could pull harder.', 'Clear, but mild pain and no open loop.', 'A punchline that needs the slides to land.']
 export const mockReview = (n: number) => ({
   reviews: Array.from({ length: n }, (_, i) => {
     const score = MOCK_SCORES[i % 10]!
     const pain = i % 10 === 6 ? 6 : score <= 2 ? 8 : 6
-    return { n: i + 1, stops: score <= 3, clear: score !== 4, pain, score, note: i % 10 === 6 ? 'A real tell, but the pain is a 6: a stranger scrolls past.' : MOCK_NOTES[score - 1]! }
+    return { n: i + 1, stops: score <= 3, job: true, exact: score !== 4, pain, friend: true, score, note: i % 10 === 6 ? 'About a job and exact, but the pain is a 6: a stranger scrolls past.' : MOCK_NOTES[score - 1]! }
   }),
 })
 
@@ -201,10 +202,23 @@ async function hookWriterVars(deps: Deps, ctx: Ctx, row: ContentRow, spec: Slide
     vars: {
       ...pronounVars(ch.pronouns), name: w.name || 'the account', who: w.who, count: String(cfgOf(deps).hooks), topic, account: row.accountTag || 'not given', voice: w.voice,
       structures: structuresLine(st), tension: spec.plan.tension ? `Tension (a tag, never the subject): ${spec.plan.tension}` : '',
+      product: isProductPost(spec)
+        ? `This is a product post: its last slide will be a friend's tip that fixes the hook's pain, so pick pains SideStep really fixes: ${productEndings(deps).map(e => e.pain).join('; ')}. Ghosting, fake jobs, layoffs, salary games, scams and interview rounds stay pure pain. The product is never in the hook.`
+        : '',
       vault: kit.vault.length ? kit.vault.slice(0, 30).map(h => `- ${h.text}${h.kind ? ` (${h.kind})` : ''}`).join('\n') : 'None yet.',
       language: kit.language || 'No buyer language collected yet.', claims: kit.claims || '', ...standardVars(deps),
     },
   }
+}
+
+// The honest SideStep endings (THE STANDARD v1.2): the pain each one fixes
+// and its line, from config/templates.yaml (product_endings).
+export function productEndings(deps: Deps): Array<{ pain: string; line: string }> {
+  return deps.config.pipeline.templates.product_endings.split(/\n(?=\s*-\s)/).map(item => {
+    const t = item.replace(/^\s*-\s*/, '').replace(/\s+/g, ' ').trim()
+    const i = t.indexOf(':')
+    return i > 0 ? { pain: t.slice(0, i).trim(), line: t.slice(i + 1).trim().replace(/^"|"$/g, '') } : null
+  }).filter((e): e is { pain: string; line: string } => !!e && !!e.pain && !!e.line)
 }
 
 // THE STANDARD for slide 1, the ladder and the playbook's menu (with the
@@ -286,19 +300,21 @@ async function onHooksReviewed(deps: Deps, ctx: Ctx, postId: string, out: JobOut
   if (!post) return
   const spec = parse(post)
   if (out.status !== 'completed') { await updateContent(deps, ctx, postId, { spec: { hookReview: 'failed' } }); return }
-  const d = (out.data ?? {}) as { reviews?: Array<{ n?: unknown; stops?: unknown; clear?: unknown; pain?: unknown; score?: unknown; note?: unknown }> }
+  const d = (out.data ?? {}) as { reviews?: Array<{ n?: unknown; stops?: unknown; job?: unknown; exact?: unknown; pain?: unknown; friend?: unknown; clear?: unknown; score?: unknown; note?: unknown }> }
   const byN = new Map((Array.isArray(d.reviews) ? d.reviews : []).map(r => [Math.round(Number(r.n)), r]))
   const ideas = spec.hookIdeas.map((h, i) => {
     if (h.source !== 'claude') return h
     const r = byN.get(i + 1)
     if (!r) return h
-    // The stop test first (THE STANDARD): a hook that would not stop a
-    // stranger, is not clear on one read, or hurts under 7 is a 3 at best,
-    // so it is hidden whatever its other marks.
+    // The stop test first (THE STANDARD v1.2, five checks): a hook that
+    // would not stop a stranger, is not clearly about a job, does not say
+    // exactly what happened, hurts under 7 or reads like a brand is a 3 at
+    // best, so it is hidden whatever its other marks.
     const p = pain(r.pain) ?? h.pain ?? null
-    const stops = r.stops !== false && r.clear !== false && (p == null || p >= 7)
+    const fails = ([['stops', r.stops === false], ['job', r.job === false || r.clear === false], ['exact', r.exact === false], ['pain', p != null && p < 7], ['friend', r.friend === false]] as const).filter(([, f]) => f).map(([k]) => k)
+    const stops = fails.length === 0
     const s = rank(r.score)
-    return { ...h, score: s == null ? null : stops ? s : Math.max(3, s), note: clean(r.note, 300), reviewed: true, pain: p, stops }
+    return { ...h, score: s == null ? null : stops ? s : Math.max(3, s), note: clean(r.note, 300), reviewed: true, pain: p, stops, fails: [...fails] }
   })
   await updateContent(deps, ctx, postId, { spec: { hookIdeas: ideas, hookReview: 'done' } })
 }
@@ -310,9 +326,9 @@ const specialJson = {
   properties: { type: { type: 'string', enum: ['none', ...DRAWN_SPECIAL_IDS] }, from: { type: 'string' }, title: { type: 'string' }, body: { type: 'string' }, lines: { type: 'array', items: { type: 'string' } }, time: { type: 'string' } },
 }
 
-export function draftJsonSchema(n: number, tagsMax: number, lights: string[], cameras: string[] | null) {
+export function draftJsonSchema(n: number, tagsMax: number, lights: string[], cameras: string[] | null, endings: string[] = []) {
   return {
-    type: 'object', additionalProperties: false, required: ['slides', 'scene', 'caption', 'cta', 'hashtags'],
+    type: 'object', additionalProperties: false, required: ['slides', 'scene', 'caption', 'cta', 'hashtags', 'product_ending'],
     properties: {
       slides: { type: 'array', minItems: n, maxItems: n, items: { type: 'object', additionalProperties: false, required: ['text', 'shot', 'special'], properties: { text: { type: 'string' }, shot: { type: 'string' }, special: specialJson } } },
       scene: {
@@ -322,6 +338,7 @@ export function draftJsonSchema(n: number, tagsMax: number, lights: string[], ca
       caption: { type: 'string' },
       cta: { type: 'string' },
       hashtags: { type: 'array', items: { type: 'string' }, minItems: 0, maxItems: tagsMax },
+      product_ending: { type: 'string', enum: ['none', ...endings] },
     },
   }
 }
@@ -332,26 +349,31 @@ interface DraftOut {
   caption?: unknown
   cta?: unknown
   hashtags?: unknown
+  product_ending?: unknown
 }
 
-// A free stand-in for demo mode and tests: the hook, slides that each open
-// the next, the payoff last, one special slide, and a home-office scene.
-export function mockDraft(hook: string, n: number, mode: 'character' | 'topic'): Required<DraftOut> {
-  const base = ['It started with one email at 2:14am', 'The subject line said "Quick question!"', 'The question was on page 4 of 6', 'Page 4 wanted the resume from page 1', 'So I typed it again, line by line', 'Then the CAPTCHA asked if I was human', 'Honestly? Some days, unclear']
+// A free stand-in for demo mode and tests: the hook, the story (setup,
+// turn, payoff, relief) in the group-chat voice, one special slide, a
+// home-office scene; on a product post the last slide is the first honest
+// SideStep ending.
+export function mockDraft(hook: string, n: number, mode: 'character' | 'topic', ending: { pain: string; line: string } | null = null): Required<DraftOut> {
+  const base = ['ok so it started with one email at 2:14am', 'subject line said quick question. it was NOT quick', 'my roommate goes bro... page 4 wants page 1 again', 'so i typed the whole resume again. line by line', 'then the captcha asked if i was human 💀', 'honestly? some days, unclear']
   const shots = mode === 'topic'
     ? ['the desk with the laptop open', 'a coffee mug beside the keyboard', 'the window view at lunch', 'a notepad with a to-do list', 'the monitor glowing at dusk', 'the empty chair at the end of the day', 'the hallway by the elevators', 'a phone face down on the desk', 'the door on the way out']
     : ['looking at the laptop with a coffee mug', 'leaning back in the chair, thinking', 'reading something on the phone', 'writing a list on a notepad', 'smiling at the screen', 'packing the laptop into a tote bag', 'standing by the window', 'checking the phone again', 'walking out the door']
+  const last = ending ? `my friend told me about SideStep fr fr. ${ending.line}` : 'which page broke u? asking for page 4'
   const slides = Array.from({ length: n }, (_, i) => ({
-    text: i === 0 ? hook : i === n - 1 ? 'Which page broke you? Asking for page 4' : base[(i - 1) % base.length]!,
+    text: i === 0 ? hook : i === n - 1 ? last : base[(i - 1) % base.length]!,
     shot: shots[i % shots.length]!,
     special: i === 2 && n >= 4 ? { type: 'notification', from: 'Mail', title: 'Hiring Team', body: 'We would love to set up a call this week.', lines: [], time: 'now' } : { type: 'none', from: '', title: '', body: '', lines: [], time: '' },
   }))
   return {
     slides,
     scene: { place: 'a small home office by a window', light: 'window', camera: mode === 'topic' ? 'phone held at chest height' : 'friend_phone', outfit: mode === 'topic' ? '' : 'a gray cotton crewneck sweater', details: ['a mug of coffee', 'a sticky note on the monitor'] },
-    caption: `Not me thinking this would take a week. ${hook.replace(/[.!?]*$/, '.')}`,
-    cta: 'Which page broke you?',
+    caption: `not me thinking this would take a week. ${hook.replace(/[.!?]*$/, '.')}`,
+    cta: 'which page broke u?',
     hashtags: ['jobsearch', 'careertok', 'storytime'],
+    product_ending: ending ? ending.pain : 'none',
   }
 }
 
@@ -372,7 +394,8 @@ async function draftRequest(deps: Deps, ctx: Ctx, row: ContentRow, spec: Slidesh
   const lock = spec.lock
   const given = [lock.place && `place: ${lock.place}`, lock.light && `light: ${lock.light}`, lock.camera && `camera: ${lock.camera}`, !topicMode && lock.outfit && `outfit: ${lock.outfit}`, lock.details.length && `details: ${lock.details.join('; ')}`].filter(Boolean)
   const product = kit.product?.name ?? ''
-  const isProduct = spec.ad || spec.plan.product
+  const isProduct = isProductPost(spec)
+  const endings = productEndings(deps)
   const structure = h.code
     ? `Pour it into ${codeLabel(h.code)}.${h.effectOpen ? ` The viewer feels ${effectLabel(h.effectOpen)} on slide 1` : ''}${h.effectPayoff ? `${h.effectOpen ? ' and' : ' The viewer feels'} ${effectLabel(h.effectPayoff)} at the end` : ''}${h.effectOpen || h.effectPayoff ? '.' : ''}`
     : 'Pick the structure or lens that fits the hook (S1 to S12, L13 to L25).'
@@ -383,18 +406,22 @@ async function draftRequest(deps: Deps, ctx: Ctx, row: ContentRow, spec: Slidesh
     outfit_rule: topicMode ? 'leave it empty' : `what ${pv.subj} wears in every photo`, tags_max: String(cfgOf(deps).hashtags[1]),
     caption_voice: w.captionVoice, voice: w.voice,
     scene: given.length ? `The scene is set: ${given.join('; ')}. Keep it.` : '',
-    product_rule: !product ? '' : isProduct
-      ? `This is a product post: name ${product} once, on slide 5 or 6 only, inside its claims sheet (what it does, never a result for anyone), and start the caption with "Ad:" naming it.`
-      : `This is not a product post: never name ${product}.`,
+    product_rule: !product ? 'This is not a product post: product_ending is "none".' : isProduct
+      ? [
+        `This is a product post (an ad). The last slide is a friend's tip that fixes the exact pain from slide 1, in the same voice ("my friend told me about ${product} fr fr..."), using only one of these honest endings, and only when ${product} really fixes that pain:`,
+        ...endings.map(e => `- ${e.pain}: "${e.line}"`),
+        `product_ending is that ending's pain, word for word. Ghosting, fake jobs, layoffs, salary games, scams and interview rounds stay pure pain: if the hook's pain is one of those, or no ending above fixes it, never name ${product} anywhere, the last slide is relief or a question, and product_ending is "none". Never "stop getting ghosted", "stop getting passed over" or "it applies for you": ${product} cannot promise replies and never submits for anyone. ${product} is never in the hook or slides 1 to 5. Inside its claims sheet only. When it is named, the caption starts with "Ad:" naming it.`,
+      ].join('\n')
+      : `This is not a product post: never name ${product}, and product_ending is "none".`,
     language: kit.language, claims: kit.claims,
   }
   const system = fill(t.system, vars), prompt = fill(t.prompt, vars)
-  return { system, prompt, route, schema: draftJsonSchema(n, cfgOf(deps).hashtags[1], lights, cameras), mock: mockDraft(h.hook, n, spec.mode) }
+  return { system, prompt, route, schema: draftJsonSchema(n, cfgOf(deps).hashtags[1], lights, cameras, isProduct ? endings.map(e => e.pain) : []), mock: mockDraft(h.hook, n, spec.mode, isProduct ? endings[0] ?? null : null) }
 }
 
 export async function buildSlideshowDraft(deps: Deps, ctx: Ctx, input: { contentId: string; hook: string; pattern?: HookPattern | null; code?: StructureCode | null; effectOpen?: EffectCode | null; effectPayoff?: EffectCode | null; moment?: string; alt?: string; score?: number | null }): Promise<Built> {
   const { row, spec } = await slideshowPost(deps, ctx, input.contentId)
-  const hook = trimWords(clean(input.hook, 200), 16)
+  const hook = trimWords(clean(input.hook, 200), 30)
   if (hook.length < 3) throw new AppError('invalid_request', 'Write or pick the hook first.')
   const n = spec.slideCount
   const info: HookInfo = { hook, pattern: input.pattern ?? null, code: input.code ?? null, effectOpen: input.effectOpen ?? null, effectPayoff: input.effectPayoff ?? null, moment: clean(input.moment, 400), alt: clean(input.alt, 200), score: input.score ?? null }
@@ -459,7 +486,18 @@ export function draftPatch(deps: Deps, spec: SlideshowSpec, d: DraftOut, meta: H
     caption: clean(d.caption, 2200), hashtags: tags(d.hashtags, cfg.hashtags[1]), ctaLine: clean(d.cta, 300),
     cta: { ...spec.cta, kind: 'own' },
     plan,
+    ...endingPatch(deps, spec, d.product_ending),
   }
+}
+
+// THE STANDARD v1.2 on a product post: the honest ending the draft used, or
+// "none" when the hook's pain is not one SideStep fixes: then there is no
+// product mention, so #ad goes off (the plan row keeps its product tag).
+function endingPatch(deps: Deps, spec: SlideshowSpec, v: unknown): Partial<SlideshowSpec> {
+  if (!isProductPost(spec)) return { productEnding: null }
+  const pain = String(v ?? '').trim()
+  const known = productEndings(deps).find(e => e.pain.toLowerCase() === pain.toLowerCase())
+  return known ? { productEnding: known.pain } : { productEnding: 'none', ad: false }
 }
 
 // ── Stills: one locked scene, one still a slide (priced) ───────────────
@@ -892,7 +930,7 @@ async function onSlideshowVariations(deps: Deps, ctx: Ctx, job: JobRow, out: Job
 export async function buildSlideshowBatch(deps: Deps, ctx: Ctx, input: { contentId: string }): Promise<Built> {
   const { row, spec } = await slideshowPost(deps, ctx, input.contentId)
   const max = cfgOf(deps).batch_max
-  const hooks = spec.batchHooks.map(h => trimWords(clean(h, 200), 14)).filter(h => h.length >= 3).slice(0, max)
+  const hooks = spec.batchHooks.map(h => trimWords(clean(h, 200), 30)).filter(h => h.length >= 3).slice(0, max)
   if (!hooks.length) throw new AppError('invalid_request', 'Paste the hooks first, one a line.')
   const n = spec.slideCount
   const specs: JobSpec[] = []
@@ -1085,7 +1123,9 @@ export async function renderSlideshow(deps: Deps, ctx: Ctx, job: JobRow, row: Co
   const spec = parse(row)
   const cfg = deps.config.pipeline.content
   const tiktok = { width: cfg.canvas.width, height: cfg.canvas.height }
-  const insta = { width: cfg.slideshow.instagram.width, height: cfg.slideshow.instagram.height }
+  // Slideshows are TikTok only (THE STANDARD v1.2): the 1080 x 1440 set is
+  // made only when the post asks for it (off by default).
+  const insta = spec.instagramSet ? { width: cfg.slideshow.instagram.width, height: cfg.slideshow.instagram.height } : null
   const list = slideList(spec)
   const draw = fontDraw(cfg.caption)
   const images: string[] = [], instagram: string[] = []
@@ -1099,30 +1139,32 @@ export async function renderSlideshow(deps: Deps, ctx: Ctx, job: JobRow, row: Co
     const shot = special?.type === 'product_shot' && special.assetId ? (await readAsset(deps, ctx, special.assetId)).data : null
     const input = { still, shot, text: s.text, style: spec.textStyle, pos: s.pos, special, ad: spec.ad && s.index === 0 }
     const nn = String(s.index + 1).padStart(2, '0')
-    const fileT = `tiktok/${nn}-${name}.jpg`, fileI = `instagram/${nn}-${name}.jpg`
+    const fileT = `tiktok/${nn}-${name}.jpg`, fileI = insta ? `instagram/${nn}-${name}.jpg` : null
     const a = await renderSlide(input, tiktok, cfg, draw)
-    const b = await renderSlide(input, insta, cfg, draw)
     const label = s.text ? `Slide ${s.index + 1}: ${s.text.slice(0, 60)}` : `Slide ${s.index + 1}`
     images.push((await saveAsset(deps, ctx, { data: a, mime: 'image/jpeg', origin: 'derived', label, sourceJobId: job.id })).id)
-    instagram.push((await saveAsset(deps, ctx, { data: b, mime: 'image/jpeg', origin: 'derived', label: `${label} (Instagram)`, sourceJobId: job.id })).id)
     files[fileT] = a
-    files[fileI] = b
+    if (insta && fileI) {
+      const b = await renderSlide(input, insta, cfg, draw)
+      instagram.push((await saveAsset(deps, ctx, { data: b, mime: 'image/jpeg', origin: 'derived', label: `${label} (Instagram)`, sourceJobId: job.id })).id)
+      files[fileI] = b
+    }
     slides.push({ index: s.index, text: s.text, shot: s.shot, picture: special ? 'special' : still ? 'still' : 'none', stillId: special ? null : s.stillId, special, position: s.pos, files: { tiktok: fileT, instagram: fileI } })
   }
-  const caption = postCaption(spec.caption, spec.hashtags, { ad: spec.ad || spec.plan.product, max: cfg.slideshow.hashtags[1], cta: spec.ctaLine })
-  files['caption.txt'] = Buffer.from(`${caption}\n\nPost as a photo slideshow, images in order (tiktok/ for TikTok at 1080 x 1920, instagram/ for Instagram at 1080 x 1440). ${AI_LABEL_LINE}\n`)
+  const caption = postCaption(spec.caption, spec.hashtags, { ad: isProductPost(spec), max: cfg.slideshow.hashtags[1], cta: spec.ctaLine })
+  files['caption.txt'] = Buffer.from(`${caption}\n\nPost on TikTok as a photo slideshow, the images in tiktok/ in order (1080 x 1920).${insta ? ' The instagram/ set (1080 x 1440) is the same slides in 3:4.' : ''} ${AI_LABEL_LINE}\n`)
   const character = row.characterId ? toData(await getCharacter(deps, ctx, row.characterId)) : null
   const json = postExportJson({
     post: { id: row.id, kind: row.kind, title: row.title, idea: row.idea, accountTag: row.accountTag, characterId: row.characterId, characterName: character?.name ?? null, variationOf: row.variationOf, batchOf: row.batchOf, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString() },
     slideshow: {
       mode: spec.mode, pattern: spec.pattern, hook: spec.hook, textStyle: spec.textStyle, made: spec.made,
-      caption: spec.caption, postCaption: caption, hashtags: spec.hashtags.slice(0, cfg.slideshow.hashtags[1]), ad: spec.ad || spec.plan.product,
+      caption: spec.caption, postCaption: caption, hashtags: spec.hashtags.slice(0, cfg.slideshow.hashtags[1]), ad: isProductPost(spec),
       cta: { kind: spec.cta.kind, handle: spec.cta.handle, word: spec.cta.word, text: ctaText(spec.cta.kind, spec.cta) },
       scene: { place: spec.lock.place, light: spec.lock.light, camera: spec.lock.camera, phone: spec.lock.phone, outfit: spec.lock.outfit, details: spec.lock.details, savedId: spec.lock.savedId },
     },
     slides,
-    files: { caption: 'caption.txt', tiktok: slides.map(s => s.files.tiktok), instagram: slides.map(s => s.files.instagram) },
-    sizes: { tiktok, instagram: insta },
+    files: { caption: 'caption.txt', tiktok: slides.map(s => s.files.tiktok), instagram: slides.map(s => s.files.instagram).filter((f): f is string => !!f) },
+    sizes: { tiktok, ...(insta ? { instagram: insta } : {}) },
     aiLabel: character?.disclosure ?? 'Label all posts as AI-generated',
     exportedAt: deps.clock.now().toISOString(),
     plan: spec.plan, ctaLine: spec.ctaLine,

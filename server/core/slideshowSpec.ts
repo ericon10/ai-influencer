@@ -50,9 +50,12 @@ export const hookIdeaSchema = z.object({
   score: z.number().int().min(1).max(5).nullable().default(null),
   note: z.string().max(300).default(''),
   reviewed: z.boolean().default(false),
-  // The reviewer's stop test (THE STANDARD, post writer brief v1.1).
+  // The reviewer's stop test (THE STANDARD v1.2, five checks): pain 1 to
+  // 10, whether it passed, and the checks it failed (stops, job, exact,
+  // pain, friend).
   pain: z.number().int().min(1).max(10).nullable().default(null),
   stops: z.boolean().nullable().default(null),
+  fails: z.array(z.enum(['stops', 'job', 'exact', 'pain', 'friend'])).max(5).default([]),
 })
 
 // The locked scene: one place, light and phone for every slide, so the set
@@ -116,6 +119,13 @@ export const slideshowSpecSchema = z.object({
   // what the post keeps from its plan row or its hook (post.json).
   ctaLine: str(300),
   plan: planMetaSchema,
+  // THE STANDARD v1.2. The honest SideStep ending the draft used on a
+  // product post (its pain), or "none" when the hook's pain is not one
+  // SideStep fixes (then there is no product mention and no Ad label).
+  productEnding: z.string().max(200).nullable().default(null),
+  // Slideshows are TikTok only: the export makes 1080 x 1920; the
+  // 1080 x 1440 set is an option, off by default.
+  instagramSet: z.boolean().default(false),
 })
 export type SlideshowSpec = z.infer<typeof slideshowSpecSchema>
 export type SpecialSlideSpec = z.infer<typeof specialSchema>

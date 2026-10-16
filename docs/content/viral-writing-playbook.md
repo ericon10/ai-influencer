@@ -1,6 +1,8 @@
-# Viral Writing Playbook v1.0
+# Viral Writing Playbook v1.2
 
 How we write hooks, slides, clips and captions for every SideStep account (mother characters and feeders). Built Oct 16, 2026 from a full read of Brendan Kane's "The Guide to Going Viral" (all three parts), rewritten in our own words and mapped to our system. Kane's examples are summarized for learning; none of his lines or anyone else's go into our posts.
+
+v1.1 and v1.2 (Oct 16, Eric's review): v1.0 told writers to "never state the problem," and the launch hooks came out as clever punchlines nobody could decode without the slides, about a 2 out of 10 on pain. The standard below replaces that rule and wins over anything later in this doc.
 
 Where this sits:
 - `claude/sidestep-social-strategy.md` says WHAT to talk about (tensions T1 to T13, audiences A1 to A6, pillars P1 to P4, accounts F1 to F9).
@@ -9,9 +11,82 @@ Where this sits:
 
 ---
 
+## THE STANDARD (read this first, v1.2, Oct 16)
+
+This section wins over everything later in the playbook. It comes from Eric's line-by-line review of the launch posts.
+
+**Why we post.** Most posts are not ads. They show people that someone else feels their pain, and they name it so exactly that people share it with others who feel it too. The reaction we want on slide 1: "HOLY SHIT, THEY KNOW ME." Shares and follows come from that, not from clever.
+
+**Where:** slideshows are TikTok only. Instagram gets short reels later (parked). Write for TikTok.
+
+**The hook (slide 1)**
+- **Names the job situation, every time.** A job application, a job interview, a job offer, a recruiter, a salary, a resume. "Applied," "round 5" or "took $9,000 less" alone could be anything. If a stranger can't tell it's about the job hunt, they swipe.
+- **Says exactly what happened:** the number, the thing, the moment. Never a pointer like "how bad it is" or "it did not go how i thought."
+- **Hurts.** 7 or higher out of 10: money, rent, years lost, shame, family asking, feeling like it's you. Mild annoyance is a 2.
+- **Reads in one second, with no image.** About 15 words or fewer. No labels or stage directions ("Exhibit 3:", "Levels of...", "Calendar invite, 4:55pm"), no stacked quotes.
+- **Opens a loop** the slides close. The punchline never sits on slide 1.
+
+**The voice: your friend in the group chat, fr fr.** This is TikTok, not a court of law. We are not marketing; we are the peer group, frustrated together.
+- **Type like people text:** "man 54 f'ing boxes to fill on that job app fam?????????? 54!!!!!! that wuz AFTER i gave the resume" (Eric, the reference line).
+- Open with a feeling or sound: man, uggh, yo, bro, ok so, not me.
+- Lowercase, fragments, run-ons. CAPS for the shock word. Stacked ?????? and !!!!!! when it's outrageous. Repeat the number in disbelief ("FOUR.").
+- Texting spellings: wuz, ur, u, rn, ngl, fr, bc, ppl, yrs, $.
+- Censored swearing is fine: f'ing.
+- Slang where it lands naturally, one or two per post: no cap, NPC, mid, an L / a W, bet, salty, lowkey, bestie, fam, make it make sense, we're cooked, i'm crying, hits different, that's crazy work.
+- Self-roast, system rage. The joke is on me; the anger is at the process. Never at the viewer.
+- People talk like people: the roommate goes "bro... this resume isn't for any job."
+- Boomer test: if it could run on LinkedIn or in a print ad, rewrite it.
+- Older job seekers (later, for Instagram and Facebook reels): the same pain in Facebook-comment voice ("Is it just me or...", full sentences, "Anyone else??"). Not for TikTok slideshows.
+
+**The story (slides 2 to 6)**
+- One thread: every slide stays on the hook's story. No side jokes from other pains.
+- Slide 2: the setup that raises the stakes. Slide 3 or 4: the turn, often a person reacting (mom, roommate, recruiter, a friend in HR). Slide 5: the payoff (the truth, the twist, the absurd detail; this is where the clever jokes and moments go). Slide 6: relief or recognition ("it's not you") or a question the comments answer.
+- Every slide makes sense to a stranger with no backstory (the clarity test).
+- 4 to 14 words a slide, same voice as the hook.
+- Every slide gets its own image line that shows that beat. The picture carries half the story. Feeder accounts show hands, screens, rooms and objects, never faces.
+
+**The feeling test (every post).** It must hit at least one hard: super painful, super frustrating, shows how bad work and job hunting are right now, or super annoying. If all four are "kind of," it doesn't run.
+
+**The stop test (every hook, before anything else).** Any "no" means rewrite.
+1. Would a stranger scrolling past stop on this line alone?
+2. Is it clearly about a job, on one read, with no image?
+3. Does it say exactly what happened?
+4. Is the pain 7 or higher?
+5. Does it sound like a text from a friend, not a brand?
+
+**SideStep endings (the 20% product posts)**
+- Most posts never mention SideStep. On product posts, slide 6 is a friend's tip that fixes the exact pain from slide 1: "my friend told me about SideStep fr fr..."
+- Only use it when SideStep really fixes that pain. The honest endings:
+  - retyping the resume into boxes: "one click fills the whole app. i just check it and hit submit"
+  - hours on jobs you don't fit: "it shows how u match before u apply"
+  - rewriting the resume for every job: "it shows exactly what to add from stuff i actually did"
+  - paying monthly for job tools: "$99 once. no subscription"
+- Never: "stop getting ghosted," "stop getting passed over," "it applies for you." SideStep can't promise replies, and it never submits for you.
+- Ghosting, fake jobs, layoffs, salary games, scams and interview rounds stay pure pain. No SideStep on those.
+- "Ad:" opens the caption. Claims sheet only.
+
+**Examples that pass**
+- man 54 f'ing boxes to fill on that job app fam?????????? 54!!!!!! that wuz AFTER i gave the resume
+- a guy at my bar is on round 6 for a job that pays less than my tips
+- this job's been "actively hiring" since JANUARY. i applied 3 times. hiring WHO bro
+- 4 rounds of job interviews and they ghosted me. FOUR. not even a "no thx" ngl i'm tight
+- took a job offer for 9k less than i wanted bc i had like 5 weeks of $ left. i hate it here
+
+**Examples that fail, and why**
+- "set a 6am alarm to apply in the first hour. 100+ people already beat me" (apply for what? no job word)
+- "5 months since i graduated and i still haven't told my family how bad it is" (how bad what? says nothing)
+- "I've applied to 300 jobs since graduation and I'm starting to think it's me." (clear, but copywriter voice)
+- "Levels of ghosted after a final round. Level 5 asks for feedback." (a label plus a punchline)
+- "My diploma arrived in May. It's still in the tube. It's scared." (a joke you have to decode)
+- "the 'casual' final round at a bar is NOT casual" (the setup is never explained)
+
+**Where the rest of this playbook fits now:** moments, structures, lenses and Kane's techniques shape slides 2 to 6 and the payoff. They never replace a plain, painful slide 1.
+
+---
+
 ## 0. The one-page version
 
-1. **Never state the problem. Show it happening.** "Ghosting is bad" is a topic. "Recruiter said 'talk Friday.' This is Friday number 6." is a moment. Every hook is a moment caught in flight.
+1. **Say the pain plainly on slide 1; show it happening on slides 2 to 6.** "Ghosting is bad" is a topic with no pain and no loop. "They ghosted me after 5 interviews. Then they reposted the same job." is a hook. The moment ("Friday number 6") is the story behind it. (v1.1: replaces "never state the problem.")
 2. **Pick the effect first.** Before a word is written, name what the viewer should feel in the first second: "that's literally me," "wait, what?", "I need to know how this ends." No named effect, no post.
 3. **Pour the moment into a proven structure.** A format (Levels, Two Characters, Untold Story, Teaser, Jenga) carries the story; the topic doesn't.
 4. **Run it through a lens.** A frame from somewhere else (nature documentary, Yelp review, delivery tracker, invoice) makes the familiar feel new. Kane: clever = smart + unexpected.
@@ -22,7 +97,7 @@ Where this sits:
 
 The brief formula that replaces "tension + angle":
 
-> **EFFECT + MOMENT + LENS + STRUCTURE + production format.** The tension code (T1 to T13) is a tag on the row, never a word in the hook.
+> **PAIN HOOK (plain, 7+ out of 10, opens a loop) + 6-SLIDE STORY (moment, structure or lens, turn on 3 or 4, payoff on 5) + EFFECT + production format.** The tension code (T1 to T13) is a tag on the row.
 
 ---
 
@@ -299,18 +374,17 @@ Kane's ratio is about 100 ideas for every one made. At our volume, Claude does t
 5. Fill the week's slots from the ranked backlog. Slots are fixed; ideas aren't (Kane's "triangle, not set plays": choose each day from the best available given news and results).
 6. Audit the shortlist for over-concentration: if every hook is a roast, force in a lens, a perspective flip and a Levels.
 
-**The 1 to 5 ladder** (Kane's example: "outfits for travel" is a 5, "outfits for a five-hour flight" is a 3, a specific outfit tied to something everyone knows is a 1):
-- **5:** a topic or a restated pain. "Ghosting is bad."
-- **4:** a sourced stat with nothing around it. "53% of seekers got ghosted."
-- **3:** a real moment, no frame. "Ghosted after the final round."
-- **2:** a moment plus a tell. "Final round was Tuesday. 'Talk Friday.' It's been six Fridays."
-- **1:** a moment, a tell and a lens, with a clear payoff. "Recruiter said 'talk Friday.' I've been making tally marks like it's a prison wall. Week 6."
+**The 1 to 5 ladder** (v1.1: scores stopping power and pain first, cleverness last):
+- **5:** a topic, a label or a news-style headline. "Ghosting is bad." "Levels of ghosted."
+- **4:** a punchline or joke that needs the slides or an image to make sense. "My diploma is still in the tube. It's scared."
+- **3:** plain and clear, but mild pain or no open loop. "Got ghosted after a final round."
+- **2:** plain, painful (7+), with an open loop. "They ghosted me after 5 interviews and I still don't know why."
+- **1:** all of 2, plus a sharp specific or twist that makes it shareable. "They ghosted me after 5 interviews. Then they reposted the same job."
 
-**The kill test** (two questions, any "none" kills it):
-1. What does the viewer get at the end (a laugh, a reveal, a usable thing)?
-2. Where is the surprise?
-
-Plus a third for us: **Could this be a news headline about the job market?** If yes, it's a 5.
+**The kill test** (any "no" kills it):
+1. The stop test (THE STANDARD above): would a stranger stop, is it clear on one read with no image, is the pain 7+?
+2. What does the viewer get at the end (relief, recognition, a laugh, a usable thing)?
+3. Where is the turn?
 
 ---
 
@@ -319,7 +393,7 @@ Plus a third for us: **Could this be a news headline about the job market?** If 
 Kane checks every video side by side with a proven hit in the same format before posting. Our version, for every slideshow and clip:
 
 Required (all four):
-1. **First second:** grabs attention and makes clear where this is going.
+1. **First second:** passes the stop test: plain words, the pain is clear on one read with no image, 7+ on pain, and a loop only swiping closes.
 2. **Effect named:** the brief lists the slide 1 effect and the payoff effect, and the post delivers them.
 3. **Tension:** a question is open on every slide until the payoff, and the payoff completes the scale.
 4. **Viewer connection:** singular "you," head-voice language, at least one validating line, mute-readable.
@@ -397,6 +471,8 @@ Never on any product post: a character's personal hiring result, "beats the ATS,
 ---
 
 ## 14. Before and after (our own launch posts)
+
+v1.1 note: these rewrites fixed v1.0's generic hooks but still put the joke on slide 1. Under THE STANDARD, slide 1 says the pain plainly and these jokes move to slide 5. Use them as story material, not as hook examples.
 
 **1. F6, day 13 AM (T6).**
 - Before (rank 4): "About 254 people apply to the average job posting now." Stat first, answer given away.

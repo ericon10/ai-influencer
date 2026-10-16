@@ -137,11 +137,10 @@ describe('content builder (demo mode)', () => {
     const first = await sharp((await readAsset(h.deps, h.ctx, out.imageAssetIds![0]!)).data).metadata()
     expect(first).toMatchObject({ width: 1080, height: 1920, format: 'jpeg' })
     const zip = unzipSync(new Uint8Array((await readAsset(h.deps, h.ctx, out.zipAssetId!)).data))
-    // Both sizes (UX-PLAN.md section 27): TikTok and Instagram, numbered,
-    // with caption.txt and post.json.
+    // TikTok only (THE STANDARD v1.2): 1080 x 1920, numbered, with
+    // caption.txt and post.json; the Instagram set is an option, off.
     const names = [1, 2, 3, 4, 5, 6].map(i => `0${i}-slideshow.jpg`)
-    expect(Object.keys(zip).sort()).toEqual([...names.map(n => `tiktok/${n}`), ...names.map(n => `instagram/${n}`), 'caption.txt', 'post.json'].sort())
-    expect(await sharp(Buffer.from(zip['instagram/01-slideshow.jpg']!)).metadata()).toMatchObject({ width: 1080, height: 1440 })
+    expect(Object.keys(zip).sort()).toEqual([...names.map(n => `tiktok/${n}`), 'caption.txt', 'post.json'].sort())
     const caption = Buffer.from(zip['caption.txt']!).toString()
     expect(caption).toContain('#fyp')
     expect(caption).toContain('AI-generated content label')

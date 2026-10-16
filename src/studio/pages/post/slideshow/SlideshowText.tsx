@@ -5,7 +5,7 @@ import { keys } from '../../../hooks'
 import { PriceButton } from '../../../PriceButton'
 import { Field, useToast, type TodoItem } from '../../../ui'
 import { HowTo } from '../../../guide/Guide'
-import { CTA_KINDS, TEXT_STYLES, backdropFor, cleanSpecial, ctaText, editSlides, fullSpecial, postCaption, setAt, slideList, type CtaKind, type SlidePos, type SpecialSlide, type TextStyleId } from '../../../../../server/core/slides'
+import { CTA_KINDS, TEXT_STYLES, backdropFor, cleanSpecial, ctaText, editSlides, fullSpecial, isProductPost, postCaption, setAt, slideList, type CtaKind, type SlidePos, type SpecialSlide, type TextStyleId } from '../../../../../server/core/slides'
 import { wordsNote } from '../../../../../server/core/slideSvg'
 import type { SlideshowSpec } from '../../../types'
 import type { PostCtx } from '../ctx'
@@ -39,7 +39,7 @@ export function SlideshowText({ ctx }: { ctx: PostCtx }) {
   const texts = [spec.hook, ...spec.slides]
   const hasWords = texts.some(t => t.trim())
   const lint = useLint(item.characterId)
-  const product = !!(spec.ad || spec.plan?.product)
+  const product = isProductPost(spec)
   const cta = spec.ctaLine ?? ''
 
   const setText = (i: number, value: string) => draft.setSpec((i === 0 ? { hook: value } : { slides: setAt(spec.slides, i - 1, value, '') }) as never)
@@ -62,7 +62,7 @@ export function SlideshowText({ ctx }: { ctx: PostCtx }) {
     else { const added = editSlides(spec, { add: list.length }); draft.setSpec({ ...added, cta, slides: setAt(added.slides, list.length - 1, text, '') } as never) }
   }
   async function copyCaption() {
-    try { await navigator.clipboard.writeText(postCaption(spec.caption, tags, { ad: spec.ad, max, cta })); toast({ tone: 'ok', text: 'Caption copied.' }) } catch { toast({ tone: 'bad', text: 'Could not copy. Select the text and copy it.' }) }
+    try { await navigator.clipboard.writeText(postCaption(spec.caption, tags, { ad: product, max, cta })); toast({ tone: 'ok', text: 'Caption copied.' }) } catch { toast({ tone: 'bad', text: 'Could not copy. Select the text and copy it.' }) }
   }
   const writeTodo: TodoItem[] = [...(!spec.hook.trim() && (draft.fields.idea.trim() || spec.topic.trim()).length < 3 ? [{ label: 'A hook or the idea (Idea step)', target: 'slideshow-hook', onGo: () => ctx.open('idea', { field: 'slideshow-hook' }) }] : [])]
 
@@ -113,7 +113,7 @@ export function SlideshowText({ ctx }: { ctx: PostCtx }) {
                     {list.length > 1 && <button type="button" className="st-btn ghost sm" aria-label={`Remove slide ${s.index + 1}`} onClick={() => { draft.setSpec(editSlides(spec, { remove: s.index }) as never); setSel(0) }}><X size={14} /></button>}
                   </div>
                   {note && <span className="st-hint" style={{ marginLeft: 66 }}>{note}</span>}
-                  <div style={{ marginLeft: 66 }}><LintNote hits={lint(texts[s.index] ?? '', s.index === 0 ? 'hook' : 'slide', { product })} field={`slide-lint-${s.index}`} /></div>
+                  <div style={{ marginLeft: 66 }}><LintNote hits={lint(texts[s.index] ?? '', s.index === 0 ? 'hook' : 'slide', { product, last: s.index > 0 && s.index === list.length - 1 })} field={`slide-lint-${s.index}`} /></div>
                   {s.special && cur?.index === s.index && <SpecialEditor special={s.special} onChange={p => setSpecial(s.index, p)} brands={brands} />}
                 </div>
               )
@@ -127,7 +127,7 @@ export function SlideshowText({ ctx }: { ctx: PostCtx }) {
                 <label className="st-row" style={{ gap: 6 }}><input type="checkbox" checked={safe} onChange={e => setSafe(e.target.checked)} />Safe zones</label>
                 <div className="st-seg sm" role="radiogroup" aria-label="Preview size">
                   <button type="button" role="radio" aria-checked={frame === 'tiktok'} className={frame === 'tiktok' ? 'on' : ''} onClick={() => setFrame('tiktok')}>TikTok</button>
-                  <button type="button" role="radio" aria-checked={frame === 'instagram'} className={frame === 'instagram' ? 'on' : ''} onClick={() => setFrame('instagram')}>Instagram</button>
+                  {(spec.instagramSet || spec.made === 'instagram') && <button type="button" role="radio" aria-checked={frame === 'instagram'} className={frame === 'instagram' ? 'on' : ''} onClick={() => setFrame('instagram')}>Instagram</button>}
                 </div>
               </div>
               <span className="st-hint" style={{ maxWidth: 300, textAlign: 'center' }}>Drag the words (or use the arrow keys) to move them on this slide. They stay out of the top 10% and the bottom 20%. Exactly this goes into the JPEG.</span>
@@ -151,7 +151,7 @@ export function SlideshowText({ ctx }: { ctx: PostCtx }) {
           hint="A first-person story in the account's voice. Rewrite the caption has Claude write a new one from the slides.">
           <textarea className="st-textarea" rows={3} maxLength={2200} value={spec.caption} onChange={e => draft.setSpec({ caption: e.target.value } as never)} />
         </Field>
-        <LintNote hits={lint(spec.caption, 'caption', { product, hashtags: spec.hashtags ?? [] })} field="caption-lint" />
+        <LintNote hits={lint(postCaption(spec.caption, [], { ad: product, max: 0, cta }), 'caption', { product, hashtags: spec.hashtags ?? [] })} field="caption-lint" />
         <Field label="CTA line" hint="One line under the caption: a question, a warm offer or a shrug, never an order. Added to the caption as posted when it is not already in it.">
           <input className="st-input" maxLength={300} value={cta} onChange={e => draft.setSpec({ ctaLine: e.target.value } as never)} placeholder="e.g. What time did yours arrive?" />
         </Field>
@@ -162,10 +162,12 @@ export function SlideshowText({ ctx }: { ctx: PostCtx }) {
           <button type="button" role="switch" aria-checked={spec.ad} className={`st-switch ${spec.ad ? 'on' : ''}`} onClick={() => draft.setSpec({ ad: !spec.ad } as never)}><span /></button>
           <span className="st-col" style={{ gap: 2 }}><b>#ad</b><span className="st-hint">{spec.ad ? 'On: "Ad" on slide 1, and "Ad:" first in the caption.' : 'Off. Turn it on for a product post, a paid post or a brand deal.'}</span></span>
         </label>
+        {spec.productEnding && spec.productEnding !== 'none' && <span className="st-hint" data-field="product-ending">The last slide is the SideStep tip for: {spec.productEnding}. Only the honest endings: never "stop getting ghosted", "passed over" or "it applies for you".</span>}
+        {spec.productEnding === 'none' && spec.plan?.product && <span className="st-hint st-warntext" data-field="product-ending">No SideStep ending: this hook's pain is not one SideStep fixes (ghosting, fake jobs, layoffs, salary games, scams and interview rounds stay pure pain), so the draft left the product out and #ad is off. For a product post, use a hook about retyping the resume, jobs that don't fit, rewriting the resume for every job, or paying monthly for job tools.</span>}
         {(spec.caption.trim() || tags.length > 0 || cta.trim()) && (
           <div className="st-col" style={{ gap: 6 }}>
             <span className="st-label">As posted</span>
-            <pre className="st-license" style={{ whiteSpace: 'pre-wrap', maxHeight: 160 }}>{postCaption(spec.caption, tags, { ad: spec.ad, max, cta })}</pre>
+            <pre className="st-license" style={{ whiteSpace: 'pre-wrap', maxHeight: 160 }}>{postCaption(spec.caption, tags, { ad: product, max, cta })}</pre>
             <button type="button" className="st-btn ghost sm" style={{ alignSelf: 'flex-start' }} onClick={copyCaption}><Copy size={14} />Copy caption and hashtags</button>
           </div>
         )}

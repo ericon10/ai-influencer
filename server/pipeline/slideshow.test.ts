@@ -9,7 +9,7 @@ import { registerPipelineHooks } from './hooks.js'
 import { buildAction, estimateAction, runAction, type StudioAction } from './actions.js'
 import { importCharacter } from './files.js'
 import { createContent, getContent, startRender, updateContent, type ContentOutputs } from './content.js'
-import { batchView, familyView, listSlideScenes, reuseReport, reviewBatchItem, saveSlideScene, archiveSlideScene, slideStillChoices, vaultHookIdeas } from './slideshow.js'
+import { batchView, draftPatch, familyView, listSlideScenes, mockDraft, productEndings, reuseReport, reviewBatchItem, saveSlideScene, archiveSlideScene, slideStillChoices, vaultHookIdeas } from './slideshow.js'
 import { importKit, starterKit } from './scaleKit.js'
 import { setSetting } from './settings.js'
 import { saveCredential } from '../providers/credentials.js'
@@ -17,8 +17,8 @@ import { setRuleSwitch } from './rules.js'
 import { renderPlaceholderPortrait } from '../providers/mock.js'
 import { readAsset, saveAsset } from '../storage/assets.js'
 import { candidates, contentItems, jobs } from '../db/schema.js'
-import { emptySpecial, slideList } from '../core/slides.js'
-import { lintCopy } from '../core/copyLint.js'
+import { emptySpecial, isProductPost, slideList } from '../core/slides.js'
+import { lintCopy, lintPost } from '../core/copyLint.js'
 import { productShotBox } from '../core/slideSvg.js'
 import type { SlideshowSpec } from '../core/slideshowSpec.js'
 import type { GenRequest } from '../providers/types.js'
@@ -85,16 +85,20 @@ describe('hook first', () => {
     // F2's primary and backup from the playbook's fit table.
     expect(writer).toContain('the primary is L14 Museum exhibit')
     expect(writer).toContain('The backup is S1 Levels')
-    // THE STANDARD (post writer brief v1.1), in the writer and the reviewer.
-    expect(writer).toContain('It says the pain plainly')
-    expect(writer).toContain('is it me fam?')
-    expect(writer).toContain('About 15 words or fewer')
-    expect(writer).toContain('shape slides 2 to 6 and the payoff')
+    // THE STANDARD v1.2 (the playbook's top section), in the writer and the
+    // reviewer, with its pass and fail examples as the few-shot set.
+    expect(writer).toContain('Names the job situation, every time')
+    expect(writer).toContain('Says exactly what happened')
+    expect(writer).toContain("man 54 f'ing boxes to fill on that job app")
+    expect(writer).toContain('Examples that fail, and why')
+    expect(writer).toContain('(apply for what? no job word)')
+    expect(writer).toContain('about 15 words or fewer')
     const reviewer = preview.prompts[1]!.text
     expect(reviewer).toContain('separate reviewer')
-    expect(reviewer.indexOf('run the stop test first')).toBeGreaterThan(0)
-    expect(reviewer.indexOf('run the stop test first')).toBeLessThan(reviewer.indexOf('ladder'))
-    expect(reviewer).toContain('a 2 in the group-chat voice, pain 8 or more')
+    expect(reviewer.indexOf('run the stop test first, all five checks')).toBeGreaterThan(0)
+    for (const k of ['- stops:', '- job:', '- exact:', '- pain:', '- friend:']) expect(reviewer, k).toContain(k)
+    expect(reviewer.indexOf('run the stop test first')).toBeLessThan(reviewer.indexOf('on the ladder'))
+    expect(reviewer).toContain('all of 2, plus a sharp specific or twist that makes it shareable')
     const s = await spec(post.id)
     expect(s.hookReview).toBe('done')
     expect(s.hookIdeas).toHaveLength(10)
@@ -104,7 +108,8 @@ describe('hook first', () => {
     // The mock reviewer gives 3 of 10 a 3 or 4, and hook 7 a 2 with pain 6:
     // the stop test makes that one a 3. All four are hidden.
     expect(s.hookIdeas.filter(x => (x.score ?? 9) <= 2)).toHaveLength(6)
-    expect(s.hookIdeas[6]).toMatchObject({ score: 3, pain: 6, stops: false })
+    expect(s.hookIdeas[6]).toMatchObject({ score: 3, pain: 6, stops: false, fails: ['pain'] })
+    expect(s.hookIdeas[5]!.fails).toEqual(['stops', 'exact', 'pain'])
     expect(s.hookIdeas.filter(x => x.stops === false)).toHaveLength(4)
     expect(s.hookIdeas.filter(x => x.code === 'L14').length).toBeGreaterThanOrEqual(2)
   })
@@ -132,6 +137,34 @@ describe('hook first', () => {
     expect(s.caption).toContain('My manager said')
     expect(s.hashtags.length).toBeLessThanOrEqual(5)
     expect(s.pattern).toBe('doubt')
+  })
+
+  it('a product post (THE STANDARD v1.2): the last slide is a friend\'s tip from the honest endings only; when the pain is not one SideStep fixes, no mention and no Ad', async () => {
+    const id = await drafted({ ad: true, mode: 'topic' }, 'F3')
+    const s = await spec(id)
+    const last = s.slides[s.slides.length - 1]!
+    expect(last).toMatch(/^my friend told me about SideStep fr fr\. one click fills the whole app/)
+    expect(s.productEnding).toBe('retyping the resume into boxes')
+    expect(s.ad).toBe(true)
+    expect(isProductPost(s)).toBe(true)
+    // The writer's prompt lists the four honest endings and the never list.
+    const { preview } = await estimateAction(h.deps, h.ctx, { type: 'slideshow_draft', contentId: id, hook: s.hook, pattern: 'doubt' })
+    const text = preview.prompts[0]!.text
+    for (const e of productEndings(h.deps)) expect(text).toContain(e.line)
+    expect(productEndings(h.deps).map(e => e.pain)).toEqual(['retyping the resume into boxes', "hours on jobs you don't fit", 'rewriting the resume for every job', 'paying monthly for job tools'])
+    expect(text).toContain('Never "stop getting ghosted", "stop getting passed over" or "it applies for you"')
+    // The slides read clean, the ending included.
+    expect(lintPost({ texts: [s.hook, ...s.slides], caption: s.caption, hashtags: s.hashtags, product: true }).filter(x => x.rule === 'lint-product-ending')).toEqual([])
+    // A pain SideStep does not fix: the draft says "none", so no product mention and #ad goes off.
+    const patch = draftPatch(h.deps, s, { ...mockDraft('4 rounds of job interviews and they ghosted me', 6, 'topic'), product_ending: 'none' }, { hook: '4 rounds of job interviews and they ghosted me', pattern: null, n: 6 })
+    expect(patch).toMatchObject({ productEnding: 'none', ad: false })
+    expect(isProductPost({ ...s, ...patch, plan: { ...s.plan, product: true } })).toBe(false)
+    // Not a product post: no ending at all.
+    const plain = await drafted()
+    expect((await spec(plain)).productEnding).toBeNull()
+    // (Its own caption, so the no-reuse test later sees no shared caption.)
+    await updateContent(h.deps, h.ctx, id, { spec: { caption: 'Ad: the product test\'s own caption' } })
+    await updateContent(h.deps, h.ctx, plain, { spec: { caption: 'the plain test\'s own caption' } })
   })
 
   it('a scene field the owner typed is never replaced by a draft', async () => {
@@ -223,8 +256,25 @@ describe('stills in one locked scene', () => {
 })
 
 describe('export', () => {
-  it('both sizes, numbered, caption.txt with Ad: first, post.json with every field, the dragged place and the CTA', async () => {
-    const id = await drafted({ ad: true, textStyle: 'note' })
+  it('TikTok only by default: 1080 x 1920, numbered, caption.txt and post.json with no Instagram set', async () => {
+    const id = await drafted()
+    await run({ type: 'slideshow_stills', contentId: id })
+    await startRender(h.deps, h.ctx, id)
+    await drain(h, 30)
+    const o = (await getContent(h.deps, h.ctx, id)).outputs as ContentOutputs
+    expect(o.imageAssetIds).toHaveLength(6)
+    expect(o.instagramAssetIds ?? []).toHaveLength(0)
+    const zip = unzipSync(new Uint8Array((await readAsset(h.deps, h.ctx, o.zipAssetId!)).data))
+    expect(Object.keys(zip).filter(k => k.startsWith('tiktok/'))).toHaveLength(6)
+    expect(Object.keys(zip).filter(k => k.startsWith('instagram/'))).toHaveLength(0)
+    const json = JSON.parse(Buffer.from(zip['post.json']!).toString())
+    expect(json.sizes).toEqual({ tiktok: { width: 1080, height: 1920 } })
+    expect(json.files.instagram).toEqual([])
+    expect(Buffer.from(zip['caption.txt']!).toString()).toContain('Post on TikTok as a photo slideshow')
+  })
+
+  it('the Instagram set (an option, off by default): both sizes, numbered, caption.txt with Ad: first, post.json with every field, the dragged place and the CTA', async () => {
+    const id = await drafted({ ad: true, textStyle: 'note', instagramSet: true })
     await run({ type: 'slideshow_stills', contentId: id })
     await updateContent(h.deps, h.ctx, id, { spec: { textPos: [{ x: 0.5, y: 0.7 }], cta: { kind: 'handle', handle: 'callie.jobs', word: '' } } })
     await startRender(h.deps, h.ctx, id)
@@ -255,7 +305,7 @@ describe('export', () => {
   })
 
   it('a Product screenshot slide: the owner\'s upload as it is, in both sizes; with no upload the export waits for it', async () => {
-    const id = await drafted()
+    const id = await drafted({ instagramSet: true })
     await run({ type: 'slideshow_stills', contentId: id })
     const s = await spec(id)
     const specials = [...s.specials]

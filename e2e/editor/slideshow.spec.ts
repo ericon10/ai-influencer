@@ -97,8 +97,10 @@ async function flow(page: Page, phone: boolean, info: TestInfo) {
   await press(exp, phone)
   await expect(page.locator('[data-field="slideshow-outputs"]')).toBeVisible({ timeout: 120_000 })
   const item = (await api<{ item: { outputs: { zipAssetId: string; imageAssetIds: string[]; instagramAssetIds: string[] } } }>('GET', `/content/${id}`)).item
+  // TikTok only (THE STANDARD v1.2): the Instagram set is an option, off.
   expect(item.outputs.imageAssetIds).toHaveLength(7)
-  expect(item.outputs.instagramAssetIds).toHaveLength(7)
+  expect(item.outputs.instagramAssetIds ?? []).toHaveLength(0)
+  await expect(page.locator('[data-field="slideshow-instagram"] [role="switch"]')).toHaveAttribute('aria-checked', 'false')
   const zip = unzipSync(new Uint8Array(await (await fetch(`${API}/assets/${item.outputs.zipAssetId}/content`)).arrayBuffer()))
   const json = JSON.parse(Buffer.from(zip['post.json']!).toString())
   expect(json.slideshow).toMatchObject({ text_style: 'note', cta: { text: 'Follow @e2e.slides for more' } })

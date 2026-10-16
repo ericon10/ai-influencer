@@ -45,16 +45,23 @@ describe('copy lint', () => {
 
   it('a check switched off says nothing; lintPost names the slide', () => {
     expect(rules('Every resume should sound like you', 'slide', { off: ['lint-values'] })).toEqual([])
-    const hits = lintPost({ texts: ['Hook', 'Slide two should land'], caption: 'Caption', hashtags: [], product: false })
+    const hits = lintPost({ texts: ['the job app hook', 'Slide two should land'], caption: 'Caption', hashtags: [], product: false })
     expect(hits.map(h => [h.rule, h.slide])).toEqual([['lint-values', 1]])
   })
 
   it('THE STANDARD on a hook: 15 words or fewer, no label or timestamp to open, one quoted phrase at most', () => {
-    // The owner's example reads clean.
-    expect(rules('man, uggh, 300 apps already since grad.....is it me fam?', 'hook')).toEqual([])
+    // The owner's examples that pass (THE STANDARD v1.2): no notes but the
+    // length one, which four of them get (18 to 22 words against "about 15
+    // words or fewer"; hook_max_words in config/content.yaml).
+    expect(rules("man 54 f'ing boxes to fill on that job app fam?????????? 54!!!!!! that wuz AFTER i gave the resume", 'hook')).toEqual(['lint-hook-long'])
+    expect(rules('a guy at my bar is on round 6 for a job that pays less than my tips', 'hook')).toEqual(['lint-hook-long'])
+    expect(rules('this job\'s been "actively hiring" since JANUARY. i applied 3 times. hiring WHO bro', 'hook')).toEqual([])
+    expect(rules('4 rounds of job interviews and they ghosted me. FOUR. not even a "no thx" ngl i\'m tight', 'hook')).toEqual(['lint-hook-long'])
+    expect(rules('took a job offer for 9k less than i wanted bc i had like 5 weeks of $ left. i hate it here', 'hook')).toEqual(['lint-hook-long'])
     // Labels and stage directions from the launch plan's own hooks.
-    expect(rules('Exhibit 1: a rejection received at 2:14am. Artist unknown.', 'hook')).toEqual(['lint-hook-label'])
-    expect(rules('Levels of ghosted after a final round. Level 5 asks for feedback.', 'hook')).toEqual(['lint-hook-label'])
+    // (Both also name no job situation: THE STANDARD v1.2's note too.)
+    expect(rules('Exhibit 1: a rejection received at 2:14am. Artist unknown.', 'hook')).toEqual(['lint-hook-label', 'lint-hook-nojob'])
+    expect(rules('Levels of ghosted after a final round. Level 5 asks for feedback.', 'hook')).toEqual(['lint-hook-label', 'lint-hook-nojob'])
     expect(rules("Calendar invite, 4:55pm Thursday: 'Round 7: Final conversation (part 2).'", 'hook')).toContain('lint-hook-label')
     expect(rules('Previously on my job hunt: two CEOs, one reorg, zero offers.', 'hook')).toContain('lint-hook-label')
     // A timestamp or a date to open.
@@ -70,11 +77,32 @@ describe('copy lint', () => {
     // Over 15 words.
     expect(rules('one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen', 'hook')).toContain('lint-hook-long')
     expect(rules('one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen', 'hook')).not.toContain('lint-hook-long')
-    expect(lintCopy('one two three four five six seven eight nine ten', { kind: 'hook', lists: { hookMaxWords: 8 } }).map(h => h.match)).toEqual(['10 words'])
+    expect(lintCopy('one two three four five six seven eight nine job', { kind: 'hook', lists: { hookMaxWords: 8 } }).map(h => h.match)).toEqual(['10 words'])
     // Only on a hook: a slide may open with a label.
     expect(rules('Exhibit 2: the follow-up that never came. 2:14am. "a" "b"', 'slide')).toEqual([])
     // Each is a default: switched off, it says nothing.
-    expect(rules('Exhibit 1: a rejection.', 'hook', { off: ['lint-hook-label'] })).toEqual([])
+    expect(rules('Exhibit 1: a rejection for the job.', 'hook', { off: ['lint-hook-label'] })).toEqual([])
+  })
+
+  it('THE STANDARD v1.2: a hook names the job situation; a product post\'s last slide never promises replies or applying', () => {
+    // The owner's failing example: apply for what?
+    expect(rules('set a 6am alarm to apply in the first hour. 100+ people already beat me', 'hook')).toContain('lint-hook-nojob')
+    expect(rules('5 months since i graduated and i still haven\'t told my family how bad it is', 'hook')).toContain('lint-hook-nojob')
+    for (const t of ['the recruiter ghosted me', 'my resume got rejected', 'the salary was 41k', 'got the offer then it vanished', 'they are hiring WHO', '300 job applications, 2 replies', 'interviews for 6 weeks', "jobs that don't fit"]) expect(rules(t, 'hook'), t).not.toContain('lint-hook-nojob')
+    // Only on a hook.
+    expect(rules('set a 6am alarm', 'slide')).not.toContain('lint-hook-nojob')
+    // The product ending: on a product post's last slide only.
+    const ending = (t: string, o: { product?: boolean; last?: boolean } = { product: true, last: true }) => rules(t, 'slide', o)
+    expect(ending('my friend told me about SideStep fr fr. no more getting ghosted')).toContain('lint-product-ending')
+    expect(ending('SideStep so u stop getting passed over')).toContain('lint-product-ending')
+    expect(ending('it literally applies for you while u sleep')).toContain('lint-product-ending')
+    expect(ending('my friend told me about SideStep fr fr. one click fills the whole app')).toEqual([])
+    expect(ending('it shows how u match before u apply')).toEqual([])
+    expect(ending('they ghosted me after round 4', { product: true, last: false })).toEqual([])
+    expect(ending('they ghosted me after round 4', { product: false, last: true })).toEqual([])
+    // lintPost marks the last slide.
+    const hits = lintPost({ texts: ['the job app wanted my resume typed out AGAIN', 'two', 'three', 'and SideStep applies for you'], caption: 'Ad: it fills the app', hashtags: [], product: true })
+    expect(hits.map(h => [h.rule, h.slide])).toEqual([['lint-product-ending', 3]])
   })
 })
 

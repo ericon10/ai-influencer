@@ -11,6 +11,7 @@ import type { SlideshowSpec } from '../../../types'
 import type { PostCtx } from '../ctx'
 import { DownloadLink } from '../parts'
 import { useLint } from '../../../lint'
+import { isProductPost, postCaption } from '../../../../../server/core/slides'
 
 // The slideshow's Finish step (UX-PLAN.md section 27): the export (both
 // sizes, caption.txt and post.json in one zip), the warning when a picture
@@ -25,7 +26,7 @@ export function SlideshowOutputs({ ctx, name }: { ctx: PostCtx; name: string }) 
         {o.zipAssetId && <DownloadLink assetId={o.zipAssetId} name={`${name}-slides.zip`}>Download all (zip)</DownloadLink>}
         {o.jsonAssetId && <DownloadLink assetId={o.jsonAssetId} name={`${name}-post.json`}>post.json</DownloadLink>}
       </div>
-      <span className="st-hint">The zip has tiktok/ (1080 x 1920) and instagram/ (1080 x 1440), numbered in order, caption.txt and post.json.</span>
+      <span className="st-hint">The zip has tiktok/ (1080 x 1920, numbered in order){o.instagramAssetIds?.length ? ', instagram/ (1080 x 1440)' : ''}, caption.txt and post.json.</span>
       <span className="st-label">TikTok, 1080 x 1920</span>
       <div className="st-content-strip">
         {o.imageAssetIds.map((id, i) => <a key={id} href={downloadUrl(id, `${String(i + 1).padStart(2, '0')}-${name}.jpg`)} title={`Download slide ${i + 1}`}><Img assetId={id} width={320} style={{ width: 120, aspectRatio: '9 / 16' }} /></a>)}
@@ -39,6 +40,23 @@ export function SlideshowOutputs({ ctx, name }: { ctx: PostCtx; name: string }) 
         </>
       )}
     </div>
+  )
+}
+
+// Slideshows are TikTok only (THE STANDARD v1.2): the export makes the
+// 1080 x 1920 set; the 1080 x 1440 Instagram set is an option, off by
+// default, and Export makes it next time.
+export function InstagramSet({ ctx }: { ctx: PostCtx }) {
+  const spec = ctx.draft.spec as unknown as SlideshowSpec
+  const on = !!spec.instagramSet
+  return (
+    <label className="st-row" style={{ gap: 10, cursor: 'pointer', alignItems: 'flex-start' }} data-field="slideshow-instagram">
+      <button type="button" role="switch" aria-checked={on} aria-label="Also make the Instagram set" className={`st-switch ${on ? 'on' : ''}`} onClick={() => ctx.draft.setSpec({ instagramSet: !on } as never)}><span /></button>
+      <span className="st-col" style={{ gap: 2 }}>
+        <span>Also make the Instagram set (1080 x 1440)</span>
+        <span className="st-hint">Slideshows are TikTok only: Export makes 1080 x 1920. Turn this on for a 3:4 copy of the same slides. Free.</span>
+      </span>
+    </label>
   )
 }
 
@@ -117,11 +135,12 @@ export function LintSummary({ ctx }: { ctx: PostCtx }) {
   const { item, draft } = ctx
   const lint = useLint(item.characterId)
   const spec = draft.spec as unknown as SlideshowSpec
-  const product = !!(spec.ad || spec.plan?.product)
+  const product = isProductPost(spec)
   const texts = [spec.hook ?? '', ...(spec.slides ?? [])]
   const hits = [
-    ...texts.flatMap((t, i) => lint(t, i === 0 ? 'hook' : 'slide', { product }).map(h => ({ ...h, where: i === 0 ? 'Hook' : `Slide ${i + 1}` }))),
-    ...lint(spec.caption ?? '', 'caption', { product, hashtags: spec.hashtags ?? [] }).map(h => ({ ...h, where: 'Caption' })),
+    ...texts.flatMap((t, i) => lint(t, i === 0 ? 'hook' : 'slide', { product, last: i > 0 && i === texts.length - 1 }).map(h => ({ ...h, where: i === 0 ? 'Hook' : `Slide ${i + 1}` }))),
+    // The caption as posted: the export puts "Ad:" first on a product post.
+    ...lint(postCaption(spec.caption ?? '', [], { ad: product, max: 0, cta: spec.ctaLine ?? '' }), 'caption', { product, hashtags: spec.hashtags ?? [] }).map(h => ({ ...h, where: 'Caption' })),
   ]
   if (!hits.length) return null
   return (

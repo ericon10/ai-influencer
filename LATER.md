@@ -218,19 +218,19 @@ first.
   for one feeder row on GPT Image 2.5 Flare on the Higgsfield API (6
   stills, about $0.36) and 1 post for a Callie slideshow row (6 stills).
   The first real API-path run.
-- **Write 10 with Claude to THE STANDARD, on a real account:** the
-  writer and the reviewer on F2 and on CALLIE, to see the group-chat
-  voice land, the pain scores, and how many the stop test hides. Two
-  Claude calls each (a few cents).
+- **Write 10 with Claude to THE STANDARD v1.2, on a real account:** the
+  writer and the reviewer on F2 and on CALLIE, to see the job words, the
+  group-chat voice and the pain scores land, and how many the five-check
+  stop test hides. Two Claude calls each (a few cents). Then Use this
+  hook on a product row, to see the honest ending.
 
-### Waiting on the owner
+### Asked of the owner
 
-- **The playbook v1.1 file.** The attachment of 2026-10-16 was still v1.0
-  (byte for byte the one in `docs/content/`). When v1.1 arrives, it
-  replaces `docs/content/viral-writing-playbook.md`, and its section 8
-  ladder replaces the lines of `playbook_ladder` in
-  `config/templates.yaml` (today they follow the brief v1.1's statement
-  of THE STANDARD).
+- **The 15-word note.** Four of THE STANDARD v1.2's five passing examples
+  run 18 to 22 words, so they get the "over 15 words" note. If they are
+  the bar, `hook_max_words` in `config/content.yaml` could be 22.
+- Instagram reels for older job seekers in Facebook-comment voice (the
+  playbook v1.2 parks them).
 
 ### Small ideas (not built)
 

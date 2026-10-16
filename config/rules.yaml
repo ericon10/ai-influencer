@@ -514,6 +514,20 @@ rules:
     title: 'One quoted phrase at most in a hook'
     check: { type: behavior }
     message: 'A hook with more than one quoted phrase gets a free warning, so it is clear on one read.'
+  - id: lint-hook-nojob
+    bucket: default
+    area: copy
+    spec: "28"
+    title: 'A hook names the job situation'
+    check: { type: behavior }
+    message: 'A hook with no job word (job, interview, recruiter, offer, salary, resume, hiring, application) gets a free warning: a stranger cannot tell it is about the job hunt (THE STANDARD v1.2).'
+  - id: lint-product-ending
+    bucket: default
+    area: copy
+    spec: "28"
+    title: 'A product post''s last slide never promises replies or applying'
+    check: { type: behavior }
+    message: 'On a product post, a last slide that says ghosted, passed over or applies for you gets a free warning: SideStep cannot promise replies and never submits for anyone. The honest endings are in THE STANDARD.'
   - id: structure-repeat
     bucket: default
     area: copy

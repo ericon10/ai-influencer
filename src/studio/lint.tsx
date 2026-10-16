@@ -7,7 +7,7 @@ import { useContent } from './hooks'
 // the server, with the account's word lists and the checks switched off for
 // this character (Settings > Rules). Free; warnings only, never a block.
 
-export type Lint = (text: string, kind: LintKind, o?: { product?: boolean; hashtags?: string[] }) => LintHit[]
+export type Lint = (text: string, kind: LintKind, o?: { product?: boolean; hashtags?: string[]; last?: boolean }) => LintHit[]
 
 export function useLint(characterId?: string | null): Lint {
   const lint = useContent().data?.options.lint

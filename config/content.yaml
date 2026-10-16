@@ -101,6 +101,10 @@ copy_lint:
   # or date is found by code).
   hook_max_words: 15
   hook_labels: [Exhibit, Levels of, Previously on, Calendar invite]
+  # THE STANDARD v1.2: every hook names the job situation (one of these, or
+  # a word starting with one); a product post's last slide never says these.
+  job_words: [job, interview, recruiter, offer, salary, salaries, resume, résumé, hiring, application]
+  ending_never: [ghosted, ghosting, passed over, applies for you, apply for you, applies for me, applying for you, auto-apply, auto apply]
 
 batch:
   # Up to 50 videos (Phase 4: batch at scale); each is its own short job on

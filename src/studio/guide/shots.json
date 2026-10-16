@@ -2452,13 +2452,13 @@
         "x": 1.7,
         "y": 6.8,
         "w": 96.6,
-        "h": 5.9,
+        "h": 7,
         "label": "The hook: slide 1, to THE STANDARD (the pain said plainly, 15 words or fewer)"
       },
       {
         "n": 2,
         "x": 1.7,
-        "y": 13.6,
+        "y": 14.6,
         "w": 96.6,
         "h": 3.2,
         "label": "Language notes as you type: free, never a block"
@@ -2466,7 +2466,7 @@
       {
         "n": 3,
         "x": 1.7,
-        "y": 17.6,
+        "y": 18.7,
         "w": 96.6,
         "h": 2,
         "label": "The alt hook, and Swap with the alt hook (free)"
@@ -2474,7 +2474,7 @@
       {
         "n": 4,
         "x": 1.7,
-        "y": 32.8,
+        "y": 34.9,
         "w": 96.6,
         "h": 1.1,
         "label": "This account's primary and backup; never the last post's code"
@@ -2482,7 +2482,7 @@
       {
         "n": 5,
         "x": 1.7,
-        "y": 36.8,
+        "y": 38.9,
         "w": 96.3,
         "h": 6.1,
         "label": "A hook card: the moment, its code and effects, the alt hook, the reviewer's score and pain out of 10"
@@ -2490,7 +2490,7 @@
       {
         "n": 6,
         "x": 1.7,
-        "y": 74.3,
+        "y": 76.4,
         "w": 96.6,
         "h": 1.1,
         "label": "The reviewer runs the stop test first, then scores 1 to 5; only the 1s and 2s show"
@@ -2519,16 +2519,16 @@
       },
       {
         "n": 3,
-        "x": 9.4,
-        "y": 27.2,
-        "w": 17.3,
-        "h": 2,
-        "label": "Made for TikTok 9:16 or Instagram 3:4; the export makes both"
+        "x": 3.6,
+        "y": 27.5,
+        "w": 45.7,
+        "h": 0.9,
+        "label": "TikTok only: the stills are made at 9:16"
       },
       {
         "n": 4,
         "x": 1.7,
-        "y": 31.2,
+        "y": 30.8,
         "w": 96.6,
         "h": 1.5,
         "label": "The stills model: Nano Banana 2.1 on your plan, GPT Image 2.5 Flare on the API"
@@ -2536,7 +2536,7 @@
       {
         "n": 5,
         "x": 1.7,
-        "y": 33.1,
+        "y": 32.6,
         "w": 25.2,
         "h": 2,
         "label": "Generate the set: one price for every slide without a picture"
@@ -2544,7 +2544,7 @@
       {
         "n": 6,
         "x": 21.2,
-        "y": 37.3,
+        "y": 36.9,
         "w": 18.5,
         "h": 27.9,
         "label": "A slide: its shot, Reroll, Library or Upload, and the picture menu for special slides"
@@ -2553,92 +2553,92 @@
   },
   "slideshow-slides": {
     "w": 1124,
-    "h": 1775,
+    "h": 1911,
     "spots": [
       {
         "n": 1,
         "x": 1.7,
-        "y": 11.5,
+        "y": 10.7,
         "w": 46.3,
-        "h": 13.5,
+        "h": 12.5,
         "label": "Text styles: Classic, Text box, Minimal, Note"
       },
       {
         "n": 2,
         "x": 71.6,
-        "y": 26.1,
+        "y": 24.2,
         "w": 26.7,
-        "h": 30.1,
+        "h": 27.9,
         "label": "The slide as exported: drag the words; the safe zones shade the top 10% and bottom 20%"
       },
       {
         "n": 3,
         "x": 1.7,
-        "y": 33.5,
+        "y": 31.1,
         "w": 68.3,
-        "h": 2.4,
-        "label": "Each slide's words (4 to 12 reads best)"
+        "h": 2.6,
+        "label": "Each slide's words (4 to 14 a slide), with its language notes"
       },
       {
         "n": 4,
         "x": 1.7,
-        "y": 63.2,
+        "y": 58.7,
         "w": 96.6,
-        "h": 8,
+        "h": 7.5,
         "label": "The CTA slide, with your handle typed"
       },
       {
         "n": 5,
         "x": 1.7,
-        "y": 88.2,
+        "y": 87.3,
         "w": 96.6,
-        "h": 2.3,
-        "label": "#ad: Ad on slide 1 and #ad first in the caption"
+        "h": 2.1,
+        "label": "#ad: Ad on slide 1 and \"Ad:\" first in the caption"
       }
     ]
   },
   "slideshow-finish": {
     "w": 1124,
-    "h": 1259,
+    "h": 1327,
     "spots": [
       {
         "n": 1,
         "x": 1.7,
-        "y": 18,
+        "y": 37.6,
         "w": 96.6,
-        "h": 2.4,
-        "label": "Download all: TikTok and Instagram sizes, caption.txt and post.json"
+        "h": 2.3,
+        "label": "Download all: the TikTok set, caption.txt and post.json"
       },
       {
         "n": 2,
         "x": 1.7,
-        "y": 25.6,
+        "y": 44.9,
         "w": 96.6,
-        "h": 17.4,
+        "h": 16.5,
         "label": "TikTok, 1080 x 1920"
       },
       {
         "n": 3,
         "x": 1.7,
-        "y": 46.1,
+        "y": 22,
         "w": 96.6,
-        "h": 13.2,
-        "label": "Instagram, 1080 x 1440"
+        "h": 3.1,
+        "label": "The Instagram set (1080 x 1440): an option, off by default"
       },
       {
         "n": 4,
         "x": 3.6,
-        "y": 69.4,
+        "y": 71,
         "w": 92.9,
-        "h": 11.8,
+        "h": 11.2,
         "label": "Make variations: new words, a new image set, a new caption (priced)"
       },
       {
         "n": 5,
         "x": 3.6,
-        "y": 84.2,
+        "y": 85,
         "w": 92.9,
-        "h": 8.3,
+        "h": 7.9,
         "label": "The family: each variation, its account and pictures"
       }
     ]

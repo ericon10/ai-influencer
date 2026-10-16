@@ -18,6 +18,10 @@ export const LINT_RULES = [
   { id: 'lint-hook-long', title: 'A hook is 15 words or fewer' },
   { id: 'lint-hook-label', title: 'A hook never opens with a label or stage direction' },
   { id: 'lint-hook-quotes', title: 'One quoted phrase at most in a hook' },
+  // THE STANDARD v1.2: the hook names the job situation; a product post's
+  // last slide is an honest ending.
+  { id: 'lint-hook-nojob', title: 'A hook names the job situation' },
+  { id: 'lint-product-ending', title: 'A product post\'s last slide never promises replies or applying' },
 ] as const
 export type LintRuleId = (typeof LINT_RULES)[number]['id']
 export const LINT_RULE_IDS = LINT_RULES.map(r => r.id) as unknown as readonly [LintRuleId, ...LintRuleId[]]
@@ -31,6 +35,10 @@ export interface LintLists {
   // hook never opens with (a timestamp is found by code).
   hookMaxWords: number
   hookLabels: string[]
+  // THE STANDARD v1.2: one of these words (or a word starting with one) in
+  // every hook; and what a product post's last slide never says.
+  jobWords: string[]
+  endingNever: string[]
 }
 export const DEFAULT_LINT_LISTS: LintLists = {
   values: ['should', 'need to', 'needs to', 'must', 'ought'],
@@ -39,6 +47,8 @@ export const DEFAULT_LINT_LISTS: LintLists = {
   maxHashtags: 5,
   hookMaxWords: 15,
   hookLabels: ['Exhibit', 'Levels of', 'Previously on', 'Calendar invite'],
+  jobWords: ['job', 'interview', 'recruiter', 'offer', 'salary', 'salaries', 'resume', 'résumé', 'hiring', 'application'],
+  endingNever: ['ghosted', 'ghosting', 'passed over', 'applies for you', 'apply for you', 'applies for me', 'applying for you', 'auto-apply', 'auto apply'],
 }
 
 // hook: slide 1 or a video's on-screen hook; slide: any other slide;
@@ -51,6 +61,8 @@ export interface LintOptions {
   off?: Iterable<string>
   // A product post (product = yes, or #ad on).
   product?: boolean
+  // The post's last slide (slide 6 of a product post: its SideStep ending).
+  last?: boolean
   hashtags?: string[]
 }
 
@@ -116,9 +128,17 @@ export function lintCopy(text: string, o: LintOptions): LintHit[] {
     }
     const quotes = t.match(QUOTED) ?? []
     if (quotes.length > 1) hit('lint-hook-quotes', `${quotes.length} quotes`, `${quotes.length} quoted phrases. One at most, so it is clear on one read.`)
+    const job = lists.jobWords.map(w => w.trim()).filter(Boolean)
+    if (job.length && !job.some(w => new RegExp(`(^|[^\\p{L}\\p{N}])${esc(w)}`, 'iu').test(t))) hit('lint-hook-nojob', 'no job word', `No job word. Name the job situation (${job.slice(0, 8).join(', ')}): a stranger can't tell it's about the job hunt.`)
     for (const p of lists.products) {
       const m = p.trim() && t.match(phrase(p))
       if (m) { hit('lint-product-hook', m[2]!, `${m[2]!} is in the hook. Name it on slide 5 or 6, or late in the caption.`); break }
+    }
+  }
+  if (o.kind === 'slide' && o.product && o.last) {
+    for (const w of lists.endingNever) {
+      const m = w.trim() && t.match(phrase(w))
+      if (m) { hit('lint-product-ending', m[2]!, `"${m[2]!}" on the product ending. SideStep can't promise replies and never applies for anyone: use an honest ending (it fills the app, shows the match, shows what to add, $99 once).`); break }
     }
   }
   if (o.kind === 'caption') {
@@ -135,7 +155,7 @@ export function lintCopy(text: string, o: LintOptions): LintHit[] {
 export function lintPost(p: { texts: string[]; caption: string; hashtags: string[]; product: boolean }, o: { lists?: Partial<LintLists>; off?: Iterable<string> } = {}): Array<LintHit & { slide: number | null }> {
   const off = [...(o.off ?? [])]
   return [
-    ...p.texts.flatMap((t, i) => lintCopy(t, { kind: i === 0 ? 'hook' : 'slide', lists: o.lists, off }).map(h => ({ ...h, slide: i }))),
+    ...p.texts.flatMap((t, i) => lintCopy(t, { kind: i === 0 ? 'hook' : 'slide', lists: o.lists, off, product: p.product, last: i > 0 && i === p.texts.length - 1 }).map(h => ({ ...h, slide: i }))),
     ...lintCopy(p.caption, { kind: 'caption', lists: o.lists, off, product: p.product, hashtags: p.hashtags }).map(h => ({ ...h, slide: null })),
   ]
 }

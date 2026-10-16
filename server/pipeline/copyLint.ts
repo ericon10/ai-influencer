@@ -12,7 +12,7 @@ export const LINT_SWITCH_IDS = [...LINT_RULE_IDS, 'structure-repeat'] as const
 
 export function lintLists(deps: Deps): LintLists {
   const cl = deps.config.pipeline.content.copy_lint
-  return { values: cl.values, hype: cl.hype, products: cl.products, maxHashtags: cl.max_hashtags, hookMaxWords: cl.hook_max_words, hookLabels: cl.hook_labels }
+  return { values: cl.values, hype: cl.hype, products: cl.products, maxHashtags: cl.max_hashtags, hookMaxWords: cl.hook_max_words, hookLabels: cl.hook_labels, jobWords: cl.job_words, endingNever: cl.ending_never }
 }
 
 export async function lintSettings(deps: Deps, ctx: Ctx): Promise<{ lists: LintLists; off: string[]; offFor: Record<string, string[]> }> {

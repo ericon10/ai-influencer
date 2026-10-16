@@ -9,7 +9,7 @@ import { editOf } from './EditStyles'
 import { EditorCard } from './EditorCard'
 import { BatchStyle } from './BatchStyle'
 import { CoverCard, ExportFor, HookVariants } from './ExportExtras'
-import { LintSummary, ReuseWarning, SlideshowOutputs, VariationsCard } from './slideshow/SlideshowFinish'
+import { InstagramSet, LintSummary, ReuseWarning, SlideshowOutputs, VariationsCard } from './slideshow/SlideshowFinish'
 import { slideshowProblemsClient } from './slideshow/problems'
 import { PostCaptionFields } from './TextStep'
 import { useLint } from '../../lint'
@@ -68,6 +68,7 @@ export function FinishStep({ ctx }: { ctx: PostCtx }) {
       {item.kind === 'meme' && <EditorCard ctx={ctx} />}
       {item.kind === 'slideshow' && <ReuseWarning ctx={ctx} />}
       {item.kind === 'slideshow' && <LintSummary ctx={ctx} />}
+      {item.kind === 'slideshow' && <InstagramSet ctx={ctx} />}
       {item.kind !== 'slideshow' && <SoundRow ctx={ctx} />}
       {item.kind === 'batch' && <BatchStyle ctx={ctx} />}
       {item.kind !== 'slideshow' && <ExportFor ctx={ctx} />}

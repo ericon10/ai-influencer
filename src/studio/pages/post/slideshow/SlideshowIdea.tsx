@@ -8,7 +8,7 @@ import { PriceButton } from '../../../PriceButton'
 import { RunStatus } from '../../../runs'
 import { AsyncButton, Field, errorMessage, useToast } from '../../../ui'
 import { HowTo } from '../../../guide/Guide'
-import { HOOK_PATTERNS, backdropFor, patternLabel, slideList, wordCount, type HookIdea, type HookPattern } from '../../../../../server/core/slides'
+import { HOOK_PATTERNS, backdropFor, isProductPost, patternLabel, slideList, wordCount, type HookIdea, type HookPattern } from '../../../../../server/core/slides'
 import { SHIPS, codeLabel, effectLabel } from '../../../../../server/core/playbook'
 import { LintNote, useLint } from '../../../lint'
 import { wordsNote } from '../../../../../server/core/slideSvg'
@@ -48,7 +48,7 @@ export function SlideshowIdea({ ctx }: { ctx: PostCtx }) {
   const alt = spec.plan?.altHook ?? ''
   const note = wordsNote(hook)
   const name = ctx.v?.data.name ?? 'the character'
-  const product = !!(spec.ad || spec.plan?.product)
+  const product = isProductPost(spec)
   const last = account?.lastCode ?? null
 
   async function fromVault() {
@@ -66,7 +66,7 @@ export function SlideshowIdea({ ctx }: { ctx: PostCtx }) {
   return (
     <div className="st-col" style={{ gap: 14 }} data-field="slideshow-hook">
       <Field id="post-hook" label="Hook (slide 1)" extra={<HowTo id="slideshow" label="Hook first, how it works" />}
-        hint={note ?? 'The words on the first slide, to THE STANDARD: the pain said plainly, like a friend in the group chat, 15 words or fewer, with a loop only swiping closes. Type your own, or write 10 below and pick one.'}>
+        hint={note ?? 'The words on the first slide, to THE STANDARD: name the job situation, say exactly what happened, pain 7 or more, like a text from a friend in the group chat, about 15 words, with a loop the slides close. Type your own, or write 10 below and pick one.'}>
         <input className="st-input" maxLength={200} value={hook} onChange={e => draft.setSpec({ hook: e.target.value } as never)} placeholder="e.g. Recruiter said &quot;talk Friday.&quot; This is Friday number 6" />
       </Field>
       <LintNote hits={lint(hook, 'hook', { product })} field="hook-lint" />
@@ -87,7 +87,7 @@ export function SlideshowIdea({ ctx }: { ctx: PostCtx }) {
               watch={j => j.purpose.startsWith(`slideshow_hooks:${item.id}`)} onDone={() => void qc.invalidateQueries({ queryKey: keys.content })} />
           )}
         </div>
-        <span className="st-hint">From the vault: the kit's own hooks and the buyers' words, recast into patterns by code (press again for more). With Claude, to THE STANDARD: slide 1 says the pain plainly, in the voice of a friend in the group chat, 15 words or fewer, with a loop only swiping closes; each with its moment and structure or lens for slides 2 to 6, its effects, and the runner-up as the alt hook. Then a separate reviewer runs the stop test (would a stranger stop, clear on one read, pain 7 or more) and scores each 1 to 5; only the 1s and 2s show.{spec.mode === 'topic' ? '' : ` ${name}'s voice card goes in.`}</span>
+        <span className="st-hint">From the vault: the kit's own hooks and the buyers' words, recast into patterns by code (press again for more). With Claude, to THE STANDARD (playbook v1.2, its pass and fail examples as the guide): each hook names the job situation and says exactly what happened, pain 7 or more, in the group-chat voice; each with its moment and structure or lens for slides 2 to 6, its effects, and the runner-up as the alt hook. Then a separate reviewer runs the five-check stop test (stops a stranger, clearly a job, exactly what happened, pain 7 or more, sounds like a friend) and scores each 1 to 5; only the 1s and 2s show.{spec.mode === 'topic' ? '' : ` ${name}'s voice card goes in.`}</span>
         {(account?.primary || account?.backup || last) && (
           <span className="st-hint" data-field="account-structures">{item.accountTag || 'This account'}: {[account?.primary && `primary ${codeLabel(account.primary)}`, account?.backup && `backup ${codeLabel(account.backup)}`, last && `last post ${codeLabel(last)} (not again)`].filter(Boolean).join(', ')}. Change them on Posts, Accounts.</span>
         )}
@@ -144,7 +144,7 @@ export function SlideshowIdea({ ctx }: { ctx: PostCtx }) {
         <PriceButton label={`Draft ${n} slides from this hook`} variant="secondary" action={draft.saving ? null : { type: 'slideshow_draft', contentId: item.id, hook: hook.trim(), pattern: null, ...(alt.trim() ? { alt: alt.trim() } : {}) }} waiting={draft.saving ? 'Saving...' : undefined} />
       )}
       <RunStatus match={j => j.purpose === `slide_draft:${item.id}:self`} />
-      <span className="st-hint">Use this hook drafts every slide the Jenga way: each slide opens the next, a setup and its punchline never share a slide, the payoff lands last. 4 to 14 words a slide, each with the shot its photo shows and, where it helps, a mock screen. Plus the caption, a CTA line and 3 to 5 hashtags. Edit anything after.</span>
+      <span className="st-hint">Use this hook drafts its story in the same voice: the setup, the turn (often a person reacting), the payoff, then relief or a question; 4 to 14 words a slide, each with the image line its photo shows and, where it helps, a mock screen. On a product post the last slide is a friend's SideStep tip from the honest endings only. Plus the caption, a CTA line and 3 to 5 hashtags. Edit anything after.</span>
 
       <div className="st-row" style={{ gap: 16, flexWrap: 'wrap', alignItems: 'flex-end' }}>
         <Field id="slideshow-who" label="Who is in the photos" group>

@@ -29,7 +29,7 @@ export interface HookIdea {
   moment?: string; alt?: string; selfScore?: number | null; score?: number | null; note?: string; reviewed?: boolean
   // The reviewer's stop test (THE STANDARD): pain 1 to 10, and whether it
   // passed (stops a stranger, clear on one read, pain 7 or more).
-  pain?: number | null; stops?: boolean | null
+  pain?: number | null; stops?: boolean | null; fails?: string[]
 }
 
 // The pattern a hook reads as, from its words (free). Listicles and tier
@@ -322,6 +322,13 @@ export function reorderMiddle<T>(items: T[], seed: number, keepEnd = 1): T[] {
   if (shuffled.every((v, i) => v === mid[i])) shuffled.push(shuffled.shift()!)
   return [...head, ...shuffled, ...tail]
 }
+
+// A product post (an ad): #ad on, or a plan row with product = yes whose
+// draft found an honest SideStep ending (THE STANDARD v1.2: when the hook's
+// pain is not one SideStep fixes, the draft says "none" and there is no
+// product mention, so no Ad label).
+export const isProductPost = (s: { ad?: boolean; plan?: { product?: boolean } | null; productEnding?: string | null }) =>
+  !!(s.ad || (s.plan?.product && s.productEnding !== 'none'))
 
 // The caption as posted: "Ad:" first when the post is an ad (the post
 // writer brief; a caption that already opens with "Ad:" or "#ad" stays as

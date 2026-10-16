@@ -705,15 +705,16 @@ slideshow_hooks:
        payoff (S1 to S12, L13 to L25).
     4. pain: how much the hook's pain hurts for someone job hunting right
        now, 1 to 10. Keep only 7 or more.
-    5. Write 3 hooks in different proven shapes, rank them on the ladder,
-       keep the best as hook and the runner-up as alt_hook. rank is your
-       own score of the kept hook.
-    The stop test first: would a stranger scrolling past stop, is it clear
-    on one read with no image, is the pain 7 or more? Then what the viewer
-    gets at the end and where the turn is. Only keep hooks you would rank
-    1 or 2.
+    5. Write 3 hooks, each naming the job situation and saying exactly
+       what happened, in the group-chat voice; run the stop test on all
+       three, keep the best as hook and the runner-up as alt_hook. rank is
+       your own score of the kept hook on the ladder.
+    The stop test first (its five checks), then what the viewer gets at
+    the end and where the turn is. Only keep hooks you would rank 1 or 2.
     This account: {structures}
-    Language: plain text, no emoji, no quotation marks around the hook.
+    {product}
+    Language: no quotation marks around the hook; an emoji only where a
+    person would text it (💀 😭).
     No should, need to, must, ought, "just" before an instruction, or
     hustle words (dream job, unlock, level up, game-changer, supercharge).
     No sentence starts with "You" (a "POV:" opener is fine). No em or en
@@ -749,25 +750,28 @@ slideshow_hooks_review:
     You are a separate reviewer: you did not write these hooks. Every hook
     is measured against this standard:
     {standard}
-    For every hook, run the stop test first:
-    - stops: would a stranger scrolling past stop on these words alone?
-    - clear: is it clear on one read, with no image?
+    For every hook, run the stop test first, all five checks:
+    - stops: would a stranger scrolling past stop on this line alone?
+    - job: is it clearly about a job (an application, an interview, an
+      offer, a recruiter, a salary, a resume), on one read, with no image?
+    - exact: does it say exactly what happened (the number, the thing, the
+      moment), not a pointer like "how bad it is"?
     - pain: how much it hurts for someone job hunting right now, 1 to 10.
-    A hook that fails the stop test (it would not stop a stranger, it is
-    not clear on one read, or its pain is under 7) scores 3 or worse,
+    - friend: does it sound like a text from a friend, not a brand?
+    Any "no", or pain under 7, means rewrite: that hook scores 3 or worse,
     whatever else it does well.
-    Then score it 1 to 5 on the playbook's ladder (1 is best):
+    Then score it on the ladder (1 is best):
     {ladder}
-    Then the kill test: what does the viewer get at the end (a laugh, a
-    reveal, a usable thing), and where is the turn? Score down a hook that
-    breaks the claims sheet, opens with a label, a stage direction or a
-    timestamp, stacks quotes, reads like marketing copy or a news headline,
-    starts a sentence with "You", uses should, need to or must, names the
-    product, or nearly copies another hook in the list. Be strict: most
-    first drafts are a 3.
-    For each hook give its number, stops, clear, pain, the score, and one
-    short line: what stops a stranger and where the turn is, or what
-    breaks it. No em or en dashes.
+    Then the kill test: what does the viewer get at the end (relief,
+    recognition, a laugh, a usable thing), and where is the turn? Score
+    down a hook that breaks the claims sheet, opens with a label, a stage
+    direction or a timestamp, stacks quotes, reads like marketing copy or
+    a news headline, starts a sentence with "You", uses should, need to or
+    must, names the product, or nearly copies another hook in the list or
+    an example. Be strict: most first drafts are a 3.
+    For each hook give its number, the five checks (stops, job, exact,
+    pain, friend), the score, and one short line: what stops a stranger
+    and where the turn is, or which check it fails. No em or en dashes.
   prompt: |
     {claims}
 
@@ -775,40 +779,88 @@ slideshow_hooks_review:
     {hooks}
 
     Score every hook.
-# THE STANDARD for slide 1 (post writer brief v1.1; the playbook v1.1's
-# opening section), shared by every hook writer: Write 10 with Claude and
-# its reviewer, Make variations and the kit's hook variants.
+# THE STANDARD (viral writing playbook v1.2, the top section; post writer
+# brief v1.2), shared by every hook writer: Write 10 with Claude and its
+# reviewer, Make variations and the kit's hook variants. Its pass and fail
+# examples are the writers' few-shot set.
 hook_standard: |
-  - It says the pain plainly, in the viewer's own words: 7 or more out
-    of 10 on pain for someone job hunting right now.
-  - It is clear on one read with no image: a stranger gets it from the
-    words alone.
-  - It opens a loop that only swiping closes: the answer, the turn and
-    the payoff are never on slide 1.
-  - About 15 words or fewer. It never opens with a label or a stage
-    direction (Exhibit, Levels of, Previously on, a timestamp, Calendar
-    invite), and it has one quoted phrase at most.
-  - The voice: a friend in the group chat, not marketing copy. Open with
-    a feeling (man, uggh, ok so), fragments are fine, ask the group ("is
-    it me fam?"), one or two real slang words. Like: "man, uggh, 300 apps
-    already since grad.....is it me fam?" Never a line that could run on
-    LinkedIn.
-  - Moments, structures and lenses shape slides 2 to 6 and the payoff,
-    not the hook.
-# The 1 to 5 ladder (1 is best; only a 1 or 2 ships). Until the playbook
-# v1.1's own section 8 is in docs/content, this follows THE STANDARD as the
-# post writer brief v1.1 states it; replace the lines with the playbook's.
+  Why we post: most posts are not ads. They show people that someone else
+  feels their pain, and name it so exactly that people share it with
+  others who feel it too. The reaction on slide 1: "HOLY SHIT, THEY KNOW
+  ME." Shares and follows come from that, not from clever. TikTok only.
+  The hook (slide 1):
+  - Names the job situation, every time: a job application, a job
+    interview, a job offer, a recruiter, a salary, a resume. "Applied",
+    "round 5" or "took $9,000 less" alone could be anything. If a stranger
+    can't tell it's about the job hunt, they swipe.
+  - Says exactly what happened: the number, the thing, the moment. Never a
+    pointer like "how bad it is" or "it did not go how i thought".
+  - Hurts: 7 or higher out of 10 (money, rent, years lost, shame, family
+    asking, feeling like it's you). Mild annoyance is a 2.
+  - Reads in one second, with no image: about 15 words or fewer. No labels
+    or stage directions ("Exhibit 3:", "Levels of...", "Calendar invite,
+    4:55pm"), no stacked quotes.
+  - Opens a loop the slides close. The punchline never sits on slide 1.
+  The voice: your friend in the group chat, fr fr. Not marketing; the peer
+  group, frustrated together.
+  - Type like people text. Open with a feeling or a sound: man, uggh, yo,
+    bro, ok so, not me.
+  - Lowercase, fragments, run-ons. CAPS for the shock word. Stacked ??????
+    and !!!!!! when it's outrageous. Repeat the number in disbelief
+    ("FOUR.").
+  - Texting spellings: wuz, ur, u, rn, ngl, fr, bc, ppl, yrs, $. Censored
+    swearing is fine: f'ing.
+  - Slang where it lands naturally, one or two a post: no cap, NPC, mid,
+    an L or a W, bet, salty, lowkey, bestie, fam, make it make sense,
+    we're cooked, i'm crying, hits different, that's crazy work.
+  - Self-roast, system rage: the joke is on me, the anger is at the
+    process, never at the viewer. People talk like people: the roommate
+    goes "bro... this resume isn't for any job."
+  - Boomer test: if it could run on LinkedIn or in a print ad, rewrite it.
+  The stop test (every hook, before anything else; any "no" means rewrite):
+  1. Would a stranger scrolling past stop on this line alone?
+  2. Is it clearly about a job, on one read, with no image?
+  3. Does it say exactly what happened?
+  4. Is the pain 7 or higher?
+  5. Does it sound like a text from a friend, not a brand?
+  Examples that pass:
+  - man 54 f'ing boxes to fill on that job app fam?????????? 54!!!!!! that wuz AFTER i gave the resume
+  - a guy at my bar is on round 6 for a job that pays less than my tips
+  - this job's been "actively hiring" since JANUARY. i applied 3 times. hiring WHO bro
+  - 4 rounds of job interviews and they ghosted me. FOUR. not even a "no thx" ngl i'm tight
+  - took a job offer for 9k less than i wanted bc i had like 5 weeks of $ left. i hate it here
+  Examples that fail, and why:
+  - set a 6am alarm to apply in the first hour. 100+ people already beat me (apply for what? no job word)
+  - 5 months since i graduated and i still haven't told my family how bad it is (how bad what? says nothing)
+  - I've applied to 300 jobs since graduation and I'm starting to think it's me. (clear, but copywriter voice)
+  - Levels of ghosted after a final round. Level 5 asks for feedback. (a label plus a punchline)
+  - My diploma arrived in May. It's still in the tube. It's scared. (a joke you have to decode)
+  - the 'casual' final round at a bar is NOT casual (the setup is never explained)
+  The examples teach the standard; never copy one. Moments, structures,
+  lenses and effects shape slides 2 to 6 and the payoff; they never
+  replace a plain, painful slide 1.
+# The 1 to 5 ladder (playbook v1.2 section 8: stopping power and pain
+# first, cleverness last). 1 is best; only a 1 or 2 ships.
 playbook_ladder: |
-  5: a topic, a label or a stage direction: nothing a stranger feels
-     ("Let's talk about ghosting", "Exhibit 1: a rejection").
-  4: a stat, a clever frame or a scene that needs the photo or a second
-     read to land.
-  3: a real pain, but flat: it restates what they already know, says it
-     in marketing words, or closes its own loop.
-  2: the pain said plainly in the viewer's words, clear on one read,
-     pain 7 or more, a loop open.
-  1: a 2 in the group-chat voice, pain 8 or more, and a loop only
-     swiping closes.
+  5: a topic, a label or a news-style headline. "Ghosting is bad." "Levels
+     of ghosted."
+  4: a punchline or joke that needs the slides or an image to make sense.
+     "My diploma is still in the tube. It's scared."
+  3: plain and clear, but mild pain or no open loop. "Got ghosted after a
+     final round."
+  2: plain, painful (7+), with an open loop. "They ghosted me after 5
+     interviews and I still don't know why."
+  1: all of 2, plus a sharp specific or twist that makes it shareable.
+     "They ghosted me after 5 interviews. Then they reposted the same job."
+# SideStep endings on product posts (THE STANDARD, v1.2): the last slide is
+# a friend's tip that fixes the exact slide 1 pain, from these only.
+product_endings: |
+  - retyping the resume into boxes: "one click fills the whole app. i just
+    check it and hit submit"
+  - hours on jobs you don't fit: "it shows how u match before u apply"
+  - rewriting the resume for every job: "it shows exactly what to add from
+    stuff i actually did"
+  - paying monthly for job tools: "$99 once. no subscription"
 # The playbook's menu, given to every writer (docs/content/viral-writing-
 # playbook.md sections 2, 4, 5 and 8).
 playbook_menu: |
@@ -847,19 +899,32 @@ playbook_menu: |
 # scene; special slides where they fit.
 slideshow_draft:
   system: |
-    You draft a photo slideshow for TikTok and Instagram for {who}.
+    You draft a TikTok photo slideshow for {who}.
     {photos}
-    Write exactly {n} slides, the Jenga way. Slide 1 is the hook given
-    below, word for word: it says the pain; the moment and the structure
-    or lens carry slides 2 to 6 and the payoff. Each slide answers one
-    small question and opens the next; a setup and its punchline are never on the same slide; the
-    reveal waits; the last slide pays off the hook's promise and completes
-    the scale (a laugh counts). {structure}
+    Write exactly {n} slides. Slide 1 is the hook given below, word for
+    word. The other slides tell its story: one thread, every slide on the
+    hook's story (no side jokes from other pains), in the same voice as
+    the hook. With 6 slides: slide 2 is the setup that raises the stakes;
+    slide 3 or 4 the turn, often a person reacting (mom, roommate,
+    recruiter, a friend in HR); slide 5 the payoff (the truth, the twist,
+    the absurd detail: the clever jokes and moments go here); slide 6
+    relief or recognition ("it's not you"), or a question the comments
+    answer. With more or fewer slides keep that shape: the setup first,
+    the turn in the middle, the payoff second to last, relief or a
+    question last. Every slide makes sense to a stranger with no
+    backstory. Each slide opens the next; a setup and its punchline are
+    never on the same slide. {structure}
+    The voice of every slide (THE STANDARD): your friend in the group
+    chat, fr fr. Lowercase, fragments, CAPS for the shock word, texting
+    spellings (u, ur, rn, ngl, fr, bc, ppl), one or two slang words in the
+    whole post, self-roast and system rage, never at the viewer. Boomer
+    test: if a line could run on LinkedIn or in a print ad, rewrite it.
     For every slide write:
-    - text: 4 to 14 words, plain text, no emoji, one idea a slide;
-    - shot: what that slide's photo shows, one short sentence. Every photo
-      is in the same place, light and phone, like one camera roll from one
-      day: only the moment changes;
+    - text: 4 to 14 words, one beat a slide; an emoji only where a person
+      would text it (💀 😭);
+    - shot: the image line, what that slide's photo shows: that beat, one
+      short sentence. Every photo is in the same place, light and phone,
+      like one camera roll from one day: only the moment changes;
     - special: "none", or a mock screen drawn by code where it tells the
       story better than a photo. Never on slide 1, at most 2 in a
       slideshow. Invent generic names: never a real company, app or brand.
@@ -869,23 +934,24 @@ slideshow_draft:
     - scene: the one place of the whole set: place (where, specific),
       light (one of: {lights}), camera ({cameras}), outfit ({outfit_rule}),
       and details: 2 small things in the place that show up again;
-    - caption: 1 to 3 short sentences that add a layer (never a repeat of
-      the slides), {caption_voice};
+    - caption: one line in the same voice that adds a layer, never a
+      repeat of the slides; a source for any market stat goes here;
+      {caption_voice};
     - cta: one line, a question, a warm offer or a shrug, never an order;
     - hashtags: 3 to {tags_max}: one broad, one niche, one community, lower
-      case, without #.
-    Language: at least two of Feelings (one line that validates before it
-    jokes), Facts (one sourced number or specific) and Fun. No should, need
-    to, must, ought, "just" before an instruction, or hustle words. No
-    sentence starts with "You" (a "POV:" opener is fine). No em or en
-    dashes, no quotation marks around a slide. Roast the system, never the
-    viewer. Outfits in catalog terms (the garment, its color and fabric),
+      case, without #;
+    - product_ending: which honest ending the last slide uses, or "none".
+    {product_rule}
+    Language: no should, need to, must, ought, "just" before an
+    instruction, or hustle words. No sentence starts with "You" (a "POV:"
+    opener is fine). No em or en dashes, no quotation marks around a
+    slide. Outfits in catalog terms (the garment, its color and fabric),
     never fit or body words. Story details can be invented; a number that
     reads like a market stat comes from the claims sheet, with a short
-    source on the slide or in the caption. {product_rule}
-    No real people, celebrities, named shows, songs, creators, logos or
-    real companies by name. Nothing sexual, no medical or money promises.
-    Never say the photos are real or that anyone in them is a real person.
+    source in the caption. No real people, celebrities, named shows,
+    songs, creators, logos or real companies by name. Nothing sexual, no
+    medical or money promises. Never say the photos are real or that
+    anyone in them is a real person.
   prompt: |
     Hook (slide 1): {hook}
     {moment}
