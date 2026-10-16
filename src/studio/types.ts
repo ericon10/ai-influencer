@@ -297,7 +297,7 @@ export interface MemeSpec extends BrollTiming {
   // No caption on this post (owner, 2026-10-15); the words are kept.
   captionOff?: boolean
   // Long run part 4: Export for, hook variants, the cover.
-  exportPreset?: string; hookVariants?: string[]; cover?: { at: number; text: string } | null
+  exportPreset?: string; hookVariants?: string[]; hookShots?: Array<string | null>; hookEdits?: Array<string | null>; cover?: { at: number; text: string } | null
   // The OpenReel editor's saved timeline (G29).
   editor?: { projectAssetId: string | null; savedAt: string | null } | null
 }
@@ -449,7 +449,7 @@ export interface ContentOutputs {
   fromEditor?: boolean; fromTimeline?: boolean; editorOnly?: string[]
   // Long run part 4: the export preset, hook variants and the cover.
   preset?: string; capped?: boolean
-  variants?: Array<{ hook: string; assetId: string; durationSec: number }>; variantsRunning?: boolean; variantsError?: string | null
+  variants?: Array<{ hook: string; shot?: string | null; edit?: string | null; letter?: string; assetId: string; durationSec: number }>; variantsRunning?: boolean; variantsError?: string | null
   cover?: { assetId: string; at: number; text: string }; coverRunning?: boolean
 }
 export interface ContentItem {
@@ -464,6 +464,7 @@ export interface ContentData {
     canvas: { width: number; height: number; fps: number }
     exportPresets?: Array<{ id: string; label: string; max_seconds: number; video_kbps: number; lufs: number; true_peak: number }>
     hookVariants?: { max: number; seconds: number }
+    hookEdits?: Array<{ id: string; label: string }>
     meme: { max_clip_seconds: number; broll_seconds: number; max_broll_seconds: number; order: 'clip_first' | 'broll_first' }
     slideshow: { slides: [number, number]; maxStills: number }
     batch: { max: number; default_count: number }

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Check, Clapperboard, Image as ImageIcon, Loader2, Sparkles, Split } from 'lucide-react'
 import { api, assetUrl } from '../../api'
 import { keys, useWorkerGate } from '../../hooks'
@@ -55,13 +55,23 @@ export function HookVariants({ ctx }: { ctx: PostCtx }) {
   const opts = data.options.hookVariants ?? { max: 3, seconds: 2 }
   const spec = draft.spec as unknown as MemeSpec
   const hooks = Array.from({ length: opts.max }, (_, i) => spec.hookVariants?.[i] ?? '')
+  const shotsOf = Array.from({ length: opts.max }, (_, i) => spec.hookShots?.[i] ?? null)
+  const editsOf = Array.from({ length: opts.max }, (_, i) => spec.hookEdits?.[i] ?? null)
+  const editOptions = data.options.hookEdits ?? []
+  // The first shot comes from the Studio's own media for this post.
+  const media = useQuery({ queryKey: ['editor-media', item.id], queryFn: () => api.editorMedia(item.id), staleTime: 60_000 })
+  const groups = (media.data?.groups ?? []).map(g => ({ ...g, items: g.items.filter(x => x.kind !== 'audio') })).filter(g => g.items.length)
+  const shotName = (id: string | null | undefined) => (id ? groups.flatMap(g => g.items).find(x => x.id === id)?.name ?? 'another shot' : null)
+  const editName = (id: string | null | undefined) => (id ? editOptions.find(e => e.id === id)?.label ?? id : null)
   const [picking, setPicking] = useState<number | null>(null)
   const [starting, setStarting] = useState(false)
   const o = item.outputs
   usePoll(!!o.variantsRunning)
-  const filled = hooks.filter(h => h.trim()).length
+  const filled = hooks.filter((h, i) => h.trim() || shotsOf[i] || editsOf[i]).length
   const name = fileSlug(postName({ ...item, title: draft.fields.title, idea: draft.fields.idea }))
   const set = (i: number, text: string) => { const next = [...hooks]; next[i] = text; draft.setSpec({ hookVariants: next }) }
+  const setShot = (i: number, id: string | null) => { const next = [...shotsOf]; next[i] = id; draft.setSpec({ hookShots: next }) }
+  const setEdit = (i: number, id: string | null) => { const next = [...editsOf]; next[i] = id; draft.setSpec({ hookEdits: next }) }
   async function go() {
     setStarting(true)
     try {
@@ -76,24 +86,46 @@ export function HookVariants({ ctx }: { ctx: PostCtx }) {
         <Split size={16} />
         <div className="grow">
           <div className="st-h3 st-row" style={{ gap: 10 }}>Hook variants<HowTo id="post-finish" /></div>
-          <div className="st-hint">The same video with a different first {opts.seconds} seconds: each hook shows over 0 to {opts.seconds} s in place of a caption there. Post them to see which hook holds people.</div>
+          <div className="st-hint">The same video with a different first {opts.seconds} seconds: a hook line over 0 to {opts.seconds} s (in place of a caption there), a different first shot, a camera preset as the first edit, or any of them. The rest is identical. Post them to see which opening holds people.</div>
         </div>
       </div>
       <div className="st-card-body st-col" style={{ gap: 10 }}>
-        {hooks.map((h, i) => (
-          <div key={i} className="st-row" style={{ gap: 8, flexWrap: 'nowrap', alignItems: 'center' }}>
-            <span className="st-badge plain" style={{ flex: 'none' }}>{String.fromCharCode(65 + i)}</span>
-            <input className="st-input grow" value={h} maxLength={200} aria-label={`Hook ${String.fromCharCode(65 + i)}`} placeholder={i === 0 ? 'e.g. nobody warned me about this part' : 'Another opening line'} onChange={e => set(i, e.target.value)} />
-            <button type="button" className="st-btn sm ghost" onClick={() => setPicking(i)} title="Pick from the character's saved hooks"><Sparkles size={13} />Pick</button>
-          </div>
-        ))}
+        {hooks.map((h, i) => {
+          const L = String.fromCharCode(65 + i)
+          return (
+            <div key={i} className="st-col" style={{ gap: 6 }} data-field={`hook-variant-${L.toLowerCase()}`}>
+              <div className="st-row" style={{ gap: 8, flexWrap: 'nowrap', alignItems: 'center' }}>
+                <span className="st-badge plain" style={{ flex: 'none' }}>{L}</span>
+                <input className="st-input grow" value={h} maxLength={200} aria-label={`Hook ${L}`} placeholder={i === 0 ? 'e.g. nobody warned me about this part' : 'Another opening line'} onChange={e => set(i, e.target.value)} />
+                <button type="button" className="st-btn sm ghost" onClick={() => setPicking(i)} title="Pick from the character's saved hooks"><Sparkles size={13} />Pick</button>
+              </div>
+              <div className="st-row st-hook-opts" style={{ gap: 8, flexWrap: 'wrap', paddingLeft: 30 }}>
+                <label className="st-row st-hint" style={{ gap: 6, flex: '1 1 200px', minWidth: 0 }}>
+                  <span style={{ flex: 'none' }}>First shot</span>
+                  <select className="st-input sm grow" style={{ minWidth: 0 }} aria-label={`First shot ${L}`} value={shotsOf[i] ?? ''} onChange={e => setShot(i, e.target.value || null)}>
+                    <option value="">Same as the video</option>
+                    {groups.map(g => <optgroup key={g.id} label={g.label}>{g.items.map(x => <option key={x.id} value={x.id}>{x.name}{x.kind === 'image' ? ' (still)' : ''}</option>)}</optgroup>)}
+                    {shotsOf[i] && !groups.some(g => g.items.some(x => x.id === shotsOf[i])) && <option value={shotsOf[i]!}>{media.isLoading ? 'Loading...' : 'A shot no longer listed'}</option>}
+                  </select>
+                </label>
+                <label className="st-row st-hint" style={{ gap: 6, flex: '1 1 200px', minWidth: 0 }}>
+                  <span style={{ flex: 'none' }}>First edit</span>
+                  <select className="st-input sm grow" style={{ minWidth: 0 }} aria-label={`First edit ${L}`} value={editsOf[i] ?? ''} onChange={e => setEdit(i, e.target.value || null)}>
+                    <option value="">None</option>
+                    {editOptions.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
+                  </select>
+                </label>
+              </div>
+            </div>
+          )
+        })}
         <div className="st-row" style={{ gap: 10, flexWrap: 'wrap' }}>
           <button type="button" className="st-btn" disabled={!filled || starting || !!o.variantsRunning || !worker.ready || draft.saving || item.status === 'rendering'} onClick={() => void go()}>
             {starting || o.variantsRunning ? <Loader2 size={15} className="st-spin" /> : <Clapperboard size={15} />}
             {o.variantsRunning ? `Making ${Math.min((o.variants?.length ?? 0) + 1, Math.max(filled, 1))} of ${Math.max(filled, 1)}...` : filled ? `Export ${filled} version${filled === 1 ? '' : 's'}` : 'Export versions'}
             {!o.variantsRunning && <span className="st-price">Free</span>}
           </button>
-          {!filled && <span className="st-hint">Write a hook to export its version.</span>}
+          {!filled && <span className="st-hint">Write a hook, or pick a first shot or a first edit, to export its version.</span>}
         </div>
         <RunStatus match={j => j.purpose === `content_variants:${item.id}`} pending={starting} />
         {o.variantsError && <span className="st-hint st-warntext">The variants stopped: {o.variantsError}</span>}
@@ -102,8 +134,8 @@ export function HookVariants({ ctx }: { ctx: PostCtx }) {
             {o.variants!.map((v, i) => (
               <div key={v.assetId} className="st-col" style={{ gap: 6 }}>
                 <video className="st-content-result sm" src={assetUrl(v.assetId)} controls playsInline preload="metadata" />
-                <span className="st-hint"><b>{String.fromCharCode(65 + i)}.</b> {v.hook}</span>
-                <DownloadLink assetId={v.assetId} name={`${name}-hook-${String.fromCharCode(97 + i)}.mp4`}>Download {String.fromCharCode(65 + i)}</DownloadLink>
+                <span className="st-hint"><b>{v.letter ?? String.fromCharCode(65 + i)}.</b> {[v.hook, v.shot ? `First shot: ${shotName(v.shot)}` : null, v.edit ? `First edit: ${editName(v.edit)}` : null].filter(Boolean).join(' · ')}</span>
+                <DownloadLink assetId={v.assetId} name={`${name}-hook-${(v.letter ?? String.fromCharCode(65 + i)).toLowerCase()}.mp4`}>Download {v.letter ?? String.fromCharCode(65 + i)}</DownloadLink>
               </div>
             ))}
           </div>

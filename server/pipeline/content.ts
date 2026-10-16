@@ -15,7 +15,7 @@ import { captionPng, captionWords, slideImage, type CaptionLook } from '../core/
 import { fill, hardWrap } from '../core/text.js'
 import { pronounVars } from '../core/prompts.js'
 import { transcodeBroll } from '../media/meme.js'
-import { renderTimeline, type TimelineCaption, type TimelineShot } from '../media/timeline.js'
+import { planShots, renderTimeline, type TimelineCaption, type TimelineShot } from '../media/timeline.js'
 import { applySoundBed, type SoundBedResult } from '../media/sound.js'
 import { cutProblems, cutSchema, effectiveCut, type Cut } from '../core/cut.js'
 import { stackSchema } from '../core/editorStyle.js'
@@ -31,9 +31,10 @@ import type { CameraBlock } from '../core/camera.js'
 import { normalizeForRender, NORMALIZE_VERSION } from '../media/normalize.js'
 import { makeScratch } from '../media/sound.js'
 import { extractFrameAt } from '../media/frames.js'
-import { withTempDir } from '../media/ffmpeg.js'
+import { probeFile, withTempDir } from '../media/ffmpeg.js'
 import { capBitrate } from '../media/bitrate.js'
-import { hookCaptions, presetFor, type ExportPreset } from '../core/exportPresets.js'
+import { headBlocks, hookCaptions, presetFor, replaceHead, type ExportPreset } from '../core/exportPresets.js'
+import type { PresetInfo } from '../core/timelinePlan.js'
 import { getAsset, readAsset, saveAsset } from '../storage/assets.js'
 import { uploadKey } from '../storage/uploads.js'
 import { getCharacter, toData, type CharacterRow } from './characters.js'
@@ -273,6 +274,11 @@ const memeSpec = z.object({
   // Hook variants: up to 3 lines, each over the first seconds of its own
   // version of the same timeline.
   hookVariants: z.array(z.string().max(200)).max(5).default([]),
+  // Per version, an optional first shot (an asset of this account: one of
+  // the post's takes or stills, or a clip) and an optional first edit (a
+  // camera preset), over the same first seconds.
+  hookShots: z.array(z.string().max(40).nullable()).max(5).default([]),
+  hookEdits: z.array(z.string().max(40).nullable()).max(5).default([]),
   // The cover: a frame of the export and its text.
   cover: z.object({ at: z.number().min(0).max(600), text: z.string().max(200).default('') }).nullable().default(null),
 })
@@ -367,7 +373,7 @@ export interface ContentOutputs {
   preset?: string
   capped?: boolean
   // Hook variants (long run part 4): one video per hook, same timeline.
-  variants?: Array<{ hook: string; assetId: string; durationSec: number }>
+  variants?: Array<{ hook: string; shot?: string | null; edit?: string | null; letter?: string; assetId: string; durationSec: number }>
   variantsRunning?: boolean
   variantsError?: string | null
   // The cover image and the frame and text it was made from.
@@ -596,7 +602,7 @@ export interface RenderPlan {
 }
 type CaptionPosition = 'top' | 'upper_third' | 'middle' | 'bottom'
 
-async function renderCut(deps: Deps, ctx: Ctx, job: JobRow, fullCut: Cut, input: { characterId: string; caption: string; sound: SoundSpec; label: string; edit?: EditSpec; captionStyle?: 'box' | 'outline' | null; plan?: RenderPlan; preset?: ExportPreset; hook?: string }) {
+async function renderCut(deps: Deps, ctx: Ctx, job: JobRow, fullCut: Cut, input: { characterId: string; caption: string; sound: SoundSpec; label: string; edit?: EditSpec; captionStyle?: 'box' | 'outline' | null; plan?: RenderPlan; preset?: ExportPreset; hook?: string; head?: string | null; firstEdit?: string | null }) {
   const base0 = deps.config.pipeline.content
   // The export preset's length cap (never past the Studio's own).
   const base = input.preset ? { ...base0, cut: { ...base0.cut, max_seconds: Math.min(base0.cut.max_seconds, input.preset.max_seconds) } } : base0
@@ -608,7 +614,11 @@ async function renderCut(deps: Deps, ctx: Ctx, job: JobRow, fullCut: Cut, input:
       ? { ...(input.edit ?? editSpec.parse({})), style: plan.edit.style as EditSpec['style'], strength: plan.edit.strength, payoff: plan.edit.at }
       : { ...(input.edit ?? editSpec.parse({})), style: 'none' } }
   }
-  const blocks = plan?.blocks ?? []
+  // A hook variant's first edit: a camera preset at 0 s (part 4).
+  const seconds = base.hook_variants.seconds
+  const firstDef = input.firstEdit ? (deps.config.pipeline.presets.presets as PresetInfo[]).find(p => p.id === input.firstEdit && p.kind === 'camera' && p.keys?.length) : null
+  const firstBlock: CameraBlock | null = firstDef ? { start: 0, duration: Math.min(firstDef.duration, seconds), strength: 'normal', keys: firstDef.keys!, preset: firstDef.id } : null
+  const blocks = headBlocks(plan?.blocks ?? [], seconds, firstBlock)
   // The post's caption look (box or outline) over the account's default.
   const cfg = { ...base, caption: { ...base.caption, style: input.captionStyle ?? base.caption.style } }
   const style = input.edit?.style ?? 'none'
@@ -642,6 +652,20 @@ async function renderCut(deps: Deps, ctx: Ctx, job: JobRow, fullCut: Cut, input:
         await normalizeForRender(raw, path, { canvas: cfg.canvas, keepSound: false })
         shots.push({ path, in: sh.in, out: sh.out, maxSeconds: cfg.meme.max_broll_seconds })
       }
+    }
+    // A hook variant's first shot: the first seconds of picture come from
+    // another take, still or clip; the timeline carries on from there.
+    if (input.head) {
+      const a = await readAsset(deps, ctx, input.head)
+      const raw = join(dir, 'head.raw'), path = join(dir, 'head.mp4')
+      await writeFile(raw, a.data)
+      if (a.row.mime.startsWith('image/')) {
+        const still = join(dir, 'head-still.mp4')
+        await transcodeBroll(raw, still, { maxSeconds: seconds + 1, fps: cfg.canvas.fps, stillSeconds: seconds + 0.5 })
+        await normalizeForRender(still, path, { canvas: cfg.canvas, keepSound: false })
+      } else await normalizeForRender(raw, path, { canvas: cfg.canvas, keepSound: input.sound.clipSound })
+      const placed = await Promise.all(shots.map(async sh => ({ shot: sh, length: planShots([sh], [await probeFile(sh.path)])[0]?.durationSec ?? 0 })))
+      shots.splice(0, shots.length, ...replaceHead(placed, seconds, { path, in: 0, out: null }))
     }
     const captions: TimelineCaption[] = []
     const dropped: string[] = []
@@ -984,20 +1008,32 @@ export async function startVariants(deps: Deps, ctx: Ctx, itemId: string): Promi
   const row = await getContent(deps, ctx, itemId)
   if (row.kind !== 'meme') throw new AppError('bad_request', 'Hook variants are for video posts.')
   const s = memeSpec.parse(row.spec)
-  const hooks = s.hookVariants.map(h => h.trim()).filter(Boolean).slice(0, deps.config.pipeline.content.hook_variants.max)
-  if (!hooks.length) throw new AppError('bad_request', 'Write at least one hook first.')
+  // Each version: a hook line, a first shot, a first edit, or any of them.
+  const camera = new Set((deps.config.pipeline.presets.presets as PresetInfo[]).filter(p => p.kind === 'camera').map(p => p.id))
+  const variants = Array.from({ length: deps.config.pipeline.content.hook_variants.max }, (_, i) => ({
+    letter: String.fromCharCode(65 + i), hook: (s.hookVariants[i] ?? '').trim(),
+    shot: s.hookShots[i] || null, edit: s.hookEdits[i] && camera.has(s.hookEdits[i]!) ? s.hookEdits[i]! : null,
+  })).filter(v => v.hook || v.shot || v.edit)
+  if (!variants.length) throw new AppError('bad_request', 'Write a hook, or pick a first shot or a first edit, first.')
+  for (const v of variants) {
+    if (!v.shot) continue
+    const a = await getAsset(deps, ctx, v.shot)
+    if (!a.mime.startsWith('video/') && !a.mime.startsWith('image/')) throw new AppError('bad_request', `Version ${v.letter}: the first shot must be a video or a still.`)
+  }
   const problems = renderProblems(deps, row)
   if (problems.length) throw new AppError('bad_request', `${problems.join('; ')}.`)
   const outputs = (row.outputs ?? {}) as ContentOutputs
   if (outputs.variantsRunning) throw new AppError('bad_request', 'The hook variants are already being made.')
   await setOutputs(deps, row.id, { ...outputs, variants: [], variantsRunning: true, variantsError: null })
-  const job = await enqueueLocalJob(deps, ctx, { stage: 'content', purpose: `content_variants:${row.id}`, label: `Export ${hooks.length} hook variant${hooks.length === 1 ? '' : 's'}`, characterId: row.characterId, request: { hooks } })
+  const job = await enqueueLocalJob(deps, ctx, { stage: 'content', purpose: `content_variants:${row.id}`, label: `Export ${variants.length} hook variant${variants.length === 1 ? '' : 's'}`, characterId: row.characterId, request: { variants } })
   return { jobId: job.id }
 }
 
 async function runContentVariants(deps: Deps, ctx: Ctx, job: JobRow): Promise<unknown> {
   const itemId = job.purpose.split(':')[1]!
-  const { hooks } = job.request as { hooks: string[] }
+  // Older jobs carry hook lines only.
+  const req = job.request as { variants?: Array<{ letter: string; hook: string; shot: string | null; edit: string | null }>; hooks?: string[] }
+  const list = req.variants ?? (req.hooks ?? []).map((hook, i) => ({ letter: String.fromCharCode(65 + i), hook, shot: null, edit: null }))
   const merge = async (patch: Partial<ContentOutputs>) => {
     const fresh = await getContent(deps, ctx, itemId)
     await setOutputs(deps, itemId, { ...((fresh.outputs ?? {}) as ContentOutputs), ...patch })
@@ -1010,12 +1046,12 @@ async function runContentVariants(deps: Deps, ctx: Ctx, job: JobRow): Promise<un
     const cut = effectiveCut(s, deps.config.pipeline.content.meme.max_broll_seconds, voicePhrases(deps))
     const preset = presetFor(deps.config.pipeline.content.export_presets, s.exportPreset)
     const variants: NonNullable<ContentOutputs['variants']> = []
-    for (const [i, hook] of hooks.entries()) {
+    for (const it of list) {
       const v = await withTempDir(async dir => {
         const tl = await workerTimeline(deps, ctx, { characterId: row.characterId!, cut, sound: s.sound, edit: s.edit, editor: s.editor ? { projectAssetId: s.editor.projectAssetId, stack: s.editor.stack } : null, captionOff: s.captionOff, dir })
-        return renderCut(deps, ctx, job, tl.cut, { characterId: row.characterId!, caption: s.caption, sound: tl.sound, edit: s.edit, captionStyle: s.captionStyle, label: `Hook ${String.fromCharCode(65 + i)}: ${hook.slice(0, 60)}`, plan: tl.plan, preset, hook })
+        return renderCut(deps, ctx, job, tl.cut, { characterId: row.characterId!, caption: s.caption, sound: tl.sound, edit: s.edit, captionStyle: s.captionStyle, label: `Hook ${it.letter}: ${(it.hook || 'first shot or edit').slice(0, 60)}`, plan: tl.plan, preset, hook: it.hook, head: it.shot, firstEdit: it.edit })
       })
-      variants.push({ hook, assetId: v.assetId, durationSec: v.durationSec })
+      variants.push({ hook: it.hook, shot: it.shot, edit: it.edit, letter: it.letter, assetId: v.assetId, durationSec: v.durationSec })
       await merge({ variants: [...variants] })
     }
     await merge({ variants, variantsRunning: false, variantsError: null })
@@ -1315,6 +1351,8 @@ export async function contentView(deps: Deps, ctx: Ctx) {
       chain: { maxParts: cfg.chain.max_parts },
       // Export for (long run part 4) and hook variants.
       exportPresets: cfg.export_presets, hookVariants: cfg.hook_variants,
+      // The camera presets a version can open with (its first edit).
+      hookEdits: (deps.config.pipeline.presets.presets as PresetInfo[]).filter(p => p.kind === 'camera' && p.keys?.length).map(p => ({ id: p.id, label: p.label })),
       edits: { styles: deps.config.pipeline.edits.styles.map(e => ({ id: e.id, label: e.label, line: e.line, shots: e.shots, anchor: e.anchor, slots: e.slots ?? null, params: e.params, stage: e.stage, needs: e.needs, variants: e.variants ?? null, text: e.text ?? null })), payoffFromEnd: deps.config.pipeline.edits.payoff_from_end },
     },
   }

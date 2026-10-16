@@ -2391,16 +2391,29 @@ in the browser, never a provider.
   only when the file is over it), the editor's Done (length and bitrate
   caps in the one normalize encode, then a loudness pass) and the hook
   variants. Batches take the preset too.
-- **Hook variants.** Up to 3 hooks per video post (`hookVariants`), typed or
-  picked with the existing hook picker. Export renders the post's timeline
-  once per hook on the worker; each hook sits over 0 to 2 s (`hook_variants`
-  in config) in place of a caption there: a caption that ends inside those
-  seconds goes, one that runs past them starts at 2 s, the rest is
-  identical. Calls: the variants live beside the post's own export
-  (`outputs.variants`), never replace it; a hook is a caption over the
-  same picture rather than a different opening shot (one timeline, three
-  hooks, as asked); an editor-only effect is listed as for any worker
-  render.
+- **Hook variants.** Up to 3 versions per video post, each changing only
+  the first 2 seconds (`hook_variants` in config), as the owner listed
+  them: a caption, a first shot or a first edit, or any mix.
+  - Caption: a hook line (`hookVariants`), typed or picked with the
+    existing hook picker, over 0 to 2 s in place of a caption there: a
+    caption that ends inside those seconds goes, one that runs past them
+    starts at 2 s.
+  - First shot (`hookShots`): any of the Studio's own media for the post
+    (the editor's Add media list: this post's takes and stills, the
+    character's clips and stills, Library B-roll). The first 2 seconds of
+    picture come from it (a still is held for 2 seconds); the timeline
+    carries on from 2 s, so the length, the captions and the presets stay
+    where they were. Only this account's files are accepted.
+  - First edit (`hookEdits`): a camera preset from the editor's library
+    at 0 s, in place of any camera preset that started in the first 2
+    seconds. Time, text and layout presets are not offered there: the
+    worker draws one of those per video, and swapping it would change the
+    whole video, not its opening.
+  Calls: the variants live beside the post's own export
+  (`outputs.variants`), never replace it; they render on the worker with
+  the post's Export for preset; an editor-only effect is listed as for any
+  worker render. A version with a camera preset goes through the camera
+  pass like any post with one (one more encode of the picture).
 - **Cover.** After an export: scrub to a frame, add optional cover text,
   Make the cover. The worker takes that frame of the exported video and
   draws the text in the caption look, centered, as a 1080 x 1920 JPEG

@@ -14,7 +14,7 @@ async function openFinish(page: Page, post: string) {
 }
 
 async function finishExtras(page: Page, info: TestInfo, phone: boolean) {
-  test.setTimeout(420_000)
+  test.setTimeout(600_000)
   const post = await seedPost({ caption: 'the payoff line' })
   await openFinish(page, post)
 
@@ -38,24 +38,33 @@ async function finishExtras(page: Page, info: TestInfo, phone: boolean) {
   await expect(cover.locator('[data-field="cover-result"]')).toContainText('At 1.00 s: day 1 of trying')
   await snap(page, info, phone ? 'phone: the cover' : 'the cover')
 
-  // Hook variants: two hooks, two versions.
+  // Hook variants: A and B change the words, B also opens with a crash
+  // zoom, C opens on another shot.
   const hooks = page.locator('[data-field="hook-variants"]')
   await hooks.scrollIntoViewIfNeeded()
   await hooks.getByRole('textbox', { name: 'Hook A' }).fill('nobody warned me about this part')
   await hooks.getByRole('textbox', { name: 'Hook B' }).fill('day 1 of acting normal')
-  const go = hooks.getByRole('button', { name: /Export 2 versions/ })
+  await hooks.getByRole('combobox', { name: 'First edit B' }).selectOption({ label: 'Crash zoom cut' })
+  const shotC = hooks.getByRole('combobox', { name: 'First shot C' })
+  await expect(shotC.locator('optgroup')).not.toHaveCount(0, { timeout: 20_000 })
+  const firstShot = await shotC.locator('option').nth(1).textContent()
+  await shotC.selectOption({ index: 1 })
+  const go = hooks.getByRole('button', { name: /Export 3 versions/ })
   await expect(go).toBeEnabled({ timeout: 10_000 })
   await press(go, phone)
   const results = hooks.locator('[data-field="hook-variant-results"] video')
-  await expect(results).toHaveCount(2, { timeout: 300_000 })
-  await expect(hooks.locator('[data-field="hook-variant-results"]')).toContainText('A. nobody warned me about this part')
-  await expect(hooks.getByRole('link', { name: 'Download B' })).toBeVisible()
+  await expect(results).toHaveCount(3, { timeout: 400_000 })
+  const list = hooks.locator('[data-field="hook-variant-results"]')
+  await expect(list).toContainText('A. nobody warned me about this part')
+  await expect(list).toContainText('B. day 1 of acting normal · First edit: Crash zoom cut')
+  await expect(list).toContainText(`C. First shot: ${firstShot!.replace(/ \(still\)$/, '')}`)
+  await expect(hooks.getByRole('link', { name: 'Download C' })).toBeVisible()
   await snap(page, info, phone ? 'phone: hook variants' : 'hook variants')
   // The post's own export is still there.
   const item = (await api<{ item: { outputs: { videoAssetId?: string; variants?: unknown[]; preset?: string } } }>('GET', `/content/${post}`)).item
   expect(item.outputs.videoAssetId).toBeTruthy()
   expect(item.outputs.preset).toBe('shorts')
-  expect(item.outputs.variants).toHaveLength(2)
+  expect(item.outputs.variants).toHaveLength(3)
 }
 
 async function safeZones(page: Page, info: TestInfo, phone: boolean) {
@@ -88,7 +97,7 @@ async function safeZones(page: Page, info: TestInfo, phone: boolean) {
   await expect(page.locator('[data-studio="safe-zones"]')).toHaveCount(0)
 }
 
-test('Export for Shorts, a cover with text, and two hook variants from one timeline', async ({ page }, info) => { await finishExtras(page, info, false) })
+test('Export for Shorts, a cover with text, and three hook variants (words, a first edit, a first shot) from one timeline', async ({ page }, info) => { await finishExtras(page, info, false) })
 test('the editor draws TikTok or Reels safe zones over the preview, remembered, never exported', async ({ page }, info) => { await safeZones(page, info, false) })
 
 test.describe('phone', () => {

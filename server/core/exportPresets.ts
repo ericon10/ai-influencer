@@ -25,6 +25,33 @@ export function hookCaptions<T extends { text?: string | null; start: number; en
   return [make(h, 0, seconds), ...rest]
 }
 
+// A hook variant's first shot: the first `seconds` of picture come from
+// another shot, and the timeline carries on from there (same length, same
+// captions and presets). Each shot is given with its length on the timeline;
+// a shot that ends inside those seconds goes, the one that runs past them
+// starts later in its source.
+export function replaceHead<T extends { in: number; out: number | null }>(shots: Array<{ shot: T; length: number }>, seconds: number, head: T): T[] {
+  const out: T[] = [{ ...head, in: 0, out: seconds }]
+  let at = 0
+  for (const { shot, length } of shots) {
+    const start = at, end = at + length
+    at = end
+    if (end <= seconds + 1e-6) continue
+    if (start < seconds) {
+      const cut = seconds - start
+      out.push({ ...shot, in: Math.round((shot.in + cut) * 1000) / 1000, out: Math.round((shot.in + length) * 1000) / 1000 })
+    } else out.push(shot)
+  }
+  return out
+}
+
+// A hook variant's first edit: a camera preset at 0 s, in place of any
+// camera preset that started inside the first seconds.
+export function headBlocks<B extends { start: number }>(blocks: B[], seconds: number, first: B | null): B[] {
+  if (!first) return blocks
+  return [first, ...blocks.filter(b => b.start >= seconds)]
+}
+
 // The video bitrate (kbps) from a probe: the stream's own, else the file's
 // size over its length minus the sound.
 export function videoKbps(streamBitRate: number | null, sizeBytes: number, durationSec: number, audioKbps = 192): number | null {

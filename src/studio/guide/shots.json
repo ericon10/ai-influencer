@@ -2377,47 +2377,47 @@
   },
   "finish-extras": {
     "w": 1030,
-    "h": 2100,
+    "h": 2290,
     "spots": [
       {
         "n": 1,
         "x": 1.4,
-        "y": 0.7,
+        "y": 0.6,
         "w": 97.1,
-        "h": 4.4,
+        "h": 4.1,
         "label": "Export for: TikTok, Reels or Shorts, with the numbers"
       },
       {
         "n": 2,
         "x": 3.3,
-        "y": 51.2,
+        "y": 46.8,
         "w": 75.8,
-        "h": 3.2,
+        "h": 2.8,
         "label": "Scrub to the cover frame"
       },
       {
         "n": 3,
         "x": 80.6,
-        "y": 36.2,
+        "y": 33.2,
         "w": 16.1,
-        "h": 16.7,
+        "h": 15.3,
         "label": "The cover with its text, to download"
       },
       {
         "n": 4,
-        "x": 6.2,
-        "y": 67.8,
-        "w": 83.4,
-        "h": 1.9,
-        "label": "Up to 3 hooks, typed or picked"
+        "x": 3.3,
+        "y": 67.5,
+        "w": 93.4,
+        "h": 4.3,
+        "label": "A hook line, a first shot, a first edit, or any of them"
       },
       {
         "n": 5,
         "x": 3.3,
-        "y": 79.4,
+        "y": 81.1,
         "w": 93.4,
-        "h": 19,
-        "label": "One version per hook, the same video after 2 s"
+        "h": 17.4,
+        "label": "One version each; the same video after 2 s"
       }
     ]
   }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { loadConfig } from '../config/load.js'
-import { hookCaptions, presetFor, presetLine, videoKbps } from './exportPresets.js'
+import { headBlocks, hookCaptions, presetFor, presetLine, replaceHead, videoKbps } from './exportPresets.js'
 
 // Export for TikTok, Reels or Shorts, and hook variants (long run part 4).
 
@@ -46,5 +46,26 @@ describe('hook variants: a different first 2 seconds', () => {
     expect(hookCaptions(caps, '  ', 2, make)).toBe(caps)
     expect(hookCaptions([], 'hi', 2, make)).toEqual([{ text: 'hi', start: 0, end: 2 }])
     expect(cfg.hook_variants).toEqual({ max: 3, seconds: 2 })
+  })
+})
+
+describe('a hook variant\'s first shot and first edit', () => {
+  type S = { path: string; in: number; out: number | null }
+  const shot = (path: string, inP: number, out: number | null): S => ({ path, in: inP, out })
+  it('the first 2 seconds come from the other shot; the timeline carries on from 2 s, same length', () => {
+    const shots = [{ shot: shot('a', 0.5, null), length: 1.5 }, { shot: shot('b', 1, 5), length: 4 }, { shot: shot('c', 0, null), length: 3 }]
+    const out = replaceHead(shots, 2, shot('head', 0, null))
+    // a (0 to 1.5 s) is gone; b started at 1.5 s, so it now starts 0.5 s later in its source.
+    expect(out).toEqual([shot('head', 0, 2), shot('b', 1.5, 5), shot('c', 0, null)])
+    const total = (xs: S[]) => xs.reduce((n, s, i) => n + (s.out ?? (i === 2 ? 3 : 0)) - s.in, 0)
+    expect(total(out)).toBeCloseTo(1.5 + 4 + 3)
+  })
+  it('a long first shot is trimmed, never dropped', () => {
+    expect(replaceHead([{ shot: shot('a', 0, null), length: 6 }], 2, shot('head', 3, 9))).toEqual([shot('head', 0, 2), shot('a', 2, 6)])
+  })
+  it('a first edit replaces the camera presets that started in the first seconds', () => {
+    const blocks = [{ start: 0.4, preset: 'shake' }, { start: 3, preset: 'snap_zoom' }]
+    expect(headBlocks(blocks, 2, { start: 0, preset: 'crash_zoom' })).toEqual([{ start: 0, preset: 'crash_zoom' }, { start: 3, preset: 'snap_zoom' }])
+    expect(headBlocks(blocks, 2, null)).toBe(blocks)
   })
 })

@@ -14,7 +14,7 @@ import { makeClip } from '../media/testClips.js'
 import { ffmpeg, probeFile } from '../media/ffmpeg.js'
 import { capBitrate } from '../media/bitrate.js'
 import { measureLoudness, normalizeLoudness } from '../media/sound.js'
-import { readAsset } from '../storage/assets.js'
+import { readAsset, saveAsset } from '../storage/assets.js'
 import { uploadKey } from '../storage/uploads.js'
 
 // Long run part 4 on the worker (free): Export for (length, bitrate,
@@ -96,8 +96,34 @@ describe('Export for, hook variants and the cover (a video post)', () => {
     expect(diff(await frame(a!.path, 3.5), await frame(b!.path, 3.5))).toBeLessThan(1)
     // Nothing to export without a hook.
     await updateContent(h.deps, h.ctx, postId, { spec: { hookVariants: [] } })
-    await expect(startVariants(h.deps, h.ctx, postId)).rejects.toThrow(/Write at least one hook first/)
+    await expect(startVariants(h.deps, h.ctx, postId)).rejects.toThrow(/Write a hook, or pick a first shot or a first edit/)
   }, 240_000)
+  it('a version can open on another shot (a still here) or with a camera preset, the rest unchanged', async () => {
+    const still = await saveAsset(h.deps, h.ctx, { data: await renderPlaceholderPortrait('another shot'), mime: 'image/png', origin: 'derived', label: 'Another shot' })
+    await updateContent(h.deps, h.ctx, postId, { spec: { hookVariants: ['', ''], hookShots: [still.id, null], hookEdits: [null, 'crash_zoom'] } })
+    await startVariants(h.deps, h.ctx, postId)
+    await drain(h, 30)
+    const out = (await getContent(h.deps, h.ctx, postId)).outputs as ContentOutputs
+    expect(out.variants!.map(v => [v.letter, v.shot, v.edit])).toEqual([['A', still.id, null], ['B', null, 'crash_zoom']])
+    const [own, a, b] = await Promise.all([probe(out.videoAssetId!), ...out.variants!.map(v => probe(v.assetId))])
+    expect(Math.abs(a!.durationSec! - own.durationSec!)).toBeLessThan(0.15)
+    expect(Math.abs(b!.durationSec! - own.durationSec!)).toBeLessThan(0.15)
+    const frame = async (path: string, t: number) => { const f = `${path}.h${t}.png`; await ffmpeg(['-ss', String(t), '-i', path, '-frames:v', '1', f]); return sharp(f).raw().toBuffer() }
+    const diff = (x: Buffer, y: Buffer) => { let d = 0; for (let i = 0; i < x.length; i += 97) d += Math.abs(x[i]! - y[i]!); return d / (x.length / 97) }
+    // A: the still for the first 2 seconds, then the same video.
+    expect(diff(await frame(a!.path, 1), await frame(own.path, 1))).toBeGreaterThan(5)
+    expect(diff(await frame(a!.path, 3.5), await frame(own.path, 3.5))).toBeLessThan(1.5)
+    // B: the crash zoom at the start, then the same video. A camera preset
+    // sends the whole picture through the camera pass (one more encode), so
+    // the later frames are compared with that small loss as the baseline.
+    const early = diff(await frame(b!.path, 0.3), await frame(own.path, 0.3))
+    const later = diff(await frame(b!.path, 3.5), await frame(own.path, 3.5))
+    expect(later).toBeLessThan(10)
+    expect(early).toBeGreaterThan(later * 2)
+    // Another account's asset is refused.
+    await updateContent(h.deps, h.ctx, postId, { spec: { hookShots: ['ast_' + 'x'.repeat(22)], hookEdits: [] } })
+    await expect(startVariants(h.deps, h.ctx, postId)).rejects.toThrow(/not found/i)
+  }, 300_000)
   it('the cover is a 1080 x 1920 JPEG of the chosen frame with its text', async () => {
     await startCover(h.deps, h.ctx, postId, { at: 1.2, text: 'day 1 of trying' })
     await drain(h, 10)

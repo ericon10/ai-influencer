@@ -68,6 +68,9 @@ export const api = {
   importCheck: (markdown: string) => request<{ report: TemplateReport; name: string; match: { id: string; name: string } | null }>('POST', '/characters/import/check', { markdown }),
   updateBrand: (id: string, patch: Partial<BrandLayer>) => request<{ brand: BrandLayer }>('PUT', `/characters/${id}/brand`, patch),
   // Long run part 4: hook variants and the cover (free, on the worker).
+  // The Studio's media for a post (the editor's Add media list), used by
+  // the hook variants' first shot.
+  editorMedia: (id: string) => request<{ groups: Array<{ id: string; label: string; items: Array<{ id: string; name: string; kind: 'video' | 'image' | 'audio'; thumb: string | null; duration: number | null }> }> }>('GET', `/content/${id}/editor/media`),
   postVariants: (id: string) => request<{ jobId: string }>('POST', `/content/${id}/variants`, {}),
   postCover: (id: string, body: { at: number; text: string }) => request<{ jobId: string }>('POST', `/content/${id}/cover`, body),
   exportUrl: (id: string) => `/api/v1/characters/${id}/export`,
