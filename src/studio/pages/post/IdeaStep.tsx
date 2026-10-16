@@ -15,6 +15,7 @@ import { looksLikePrompt, readShot } from '../../../../server/core/shotParse'
 import type { CloneSource, SceneView, ScenesData } from '../../types'
 import { SourceBox } from './ClonePanel'
 import { HowTo } from '../../guide/Guide'
+import { SlideshowIdea } from './slideshow/SlideshowIdea'
 
 // Step 1 (UX-PLAN.md section 15): one box by default. "Describe the shot or
 // paste a prompt"; what the words already say (camera, framing, outfit,
@@ -24,13 +25,14 @@ import { HowTo } from '../../guide/Guide'
 
 const IDEA: Record<string, { label: string; placeholder: string }> = {
   meme: { label: 'Describe the shot or paste a prompt', placeholder: 'e.g. Front-camera selfie in a black tank at a packed rave, phone a little above her' },
-  slideshow: { label: 'What is the slideshow about?', placeholder: 'e.g. 5 apps that saved my semester' },
+  slideshow: { label: 'What is it about? (optional)', placeholder: 'e.g. my first year after college, job hunting' },
   batch: { label: 'What are the captions about?', placeholder: 'e.g. studying with AI the night before an exam' },
 }
 
 export function ideaSummary(ctx: PostCtx) {
   const name = ctx.characters.find(c => c.id === ctx.item.characterId)?.name ?? 'No character'
-  return [ctx.item.accountTag || 'No account tag', name, ctx.item.idea.trim() ? `"${ctx.item.idea.trim().slice(0, 90)}"` : 'No idea written'].join(' · ')
+  const hook = ctx.item.kind === 'slideshow' ? String((ctx.draft.spec as { hook?: string }).hook ?? '').trim() : ''
+  return [ctx.item.accountTag || 'No account tag', name, hook ? `Hook: "${hook.slice(0, 90)}"` : ctx.item.idea.trim() ? `"${ctx.item.idea.trim().slice(0, 90)}"` : 'No idea written'].join(' · ')
 }
 
 export function IdeaStep({ ctx }: { ctx: PostCtx }) {
@@ -147,8 +149,10 @@ export function IdeaStep({ ctx }: { ctx: PostCtx }) {
         </div>
       )}
 
+      {item.kind === 'slideshow' && <SlideshowIdea ctx={ctx} />}
+
       {meme && start === 'clip' ? <StartFromClip ctx={ctx} /> : (<>
-      <Field id="post-idea" label={copy.label} hint={meme ? 'In your own words, or a whole prompt. Nothing you write is rewritten: what it says about the camera, outfit and light is kept.' : 'In your own words. It feeds the slides or the captions; change it any time.'}>
+      <Field id="post-idea" label={copy.label} hint={meme ? 'In your own words, or a whole prompt. Nothing you write is rewritten: what it says about the camera, outfit and light is kept.' : item.kind === 'slideshow' ? 'The topic, in your own words. It feeds the hooks, the draft and the scene; change it any time.' : 'In your own words. It feeds the slides or the captions; change it any time.'}>
         <textarea className="st-textarea" rows={meme ? 4 : 3} maxLength={2000} value={idea} onChange={e => draft.setFields({ idea: e.target.value })} placeholder={copy.placeholder} />
       </Field>
 

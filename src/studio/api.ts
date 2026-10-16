@@ -1,4 +1,4 @@
-import type { ActionPreview, CharacterSummary, CharacterView, HiggsfieldAccount, JobView, Me, QuoteView, RulesView, SceneFields, ScenesData, SettingsView, StudioAction, Usage, VideoPrice, BrollClip, ContentData, ContentKind, LibraryData, PostStep, WorkerStatus, CloneOptions, CloneResult, CloneSource, CloneStill, CutView, SoundItem, EditorStyle, ImportPreview, VoiceLine, ProductSummary, ProductView, ProductClaims, KitGroup, SocialAccount, SentView, RecreateBatchView, GateCheckView, StorageInfo, TrashRef, TrashItem, ContentItem, AutoCleanItem, BrandLayer, TemplateReport } from './types'
+import type { ActionPreview, CharacterSummary, CharacterView, HiggsfieldAccount, JobView, Me, QuoteView, RulesView, SceneFields, ScenesData, SettingsView, StudioAction, Usage, VideoPrice, BrollClip, ContentData, ContentKind, LibraryData, PostStep, WorkerStatus, CloneOptions, CloneResult, CloneSource, CloneStill, CutView, SoundItem, EditorStyle, ImportPreview, VoiceLine, ProductSummary, ProductView, ProductClaims, KitGroup, SocialAccount, SentView, RecreateBatchView, GateCheckView, StorageInfo, TrashRef, TrashItem, ContentItem, AutoCleanItem, BrandLayer, TemplateReport, SlideFamily, ReuseReport, SlideBatch, StillChoice, SlideScene } from './types'
 import { sheetRefOf, typeOf, uploadFiles } from './files'
 
 // Thin client for /api/v1. Every write sends the CSRF header the server
@@ -160,6 +160,17 @@ export const api = {
   trimClone: (candidateId: string, start: number, end: number) => request<{ ok: true }>('POST', `/clones/${candidateId}/trim`, { start, end }),
   archiveContent: (id: string) => request<{ ok: true }>('DELETE', `/content/${id}`),
   renderContent: (id: string) => request<{ id: string; status: string }>('POST', `/content/${id}/render`, {}),
+  // The slideshow power-up (UX-PLAN.md section 27): the free parts.
+  vaultHooks: (id: string, body: { offset?: number; patterns?: string[] } = {}) => request<{ item: ContentItem }>('POST', `/content/${id}/slideshow/vault-hooks`, body),
+  slideFamily: (id: string) => request<SlideFamily>('GET', `/content/${id}/slideshow/family`),
+  slideReuse: (id: string) => request<ReuseReport>('GET', `/content/${id}/slideshow/reuse`),
+  slideBatch: (id: string) => request<SlideBatch>('GET', `/content/${id}/slideshow/batch`),
+  reviewSlideBatch: (id: string, child: string, decision: 'approve' | 'reject' | 'pending') => request<SlideBatch>('POST', `/content/${id}/slideshow/batch/${child}`, { decision }),
+  slideStillModels: () => request<{ choices: StillChoice[]; pick: string }>('GET', '/slideshow/still-models'),
+  saveSlideStillModel: (model: string) => request<{ ok: true }>('PUT', '/slideshow/still-model', { model }),
+  slideScenes: () => request<{ scenes: SlideScene[] }>('GET', '/slide-scenes'),
+  saveSlideScene: (body: { name: string; characterId?: string | null; topic?: string; place: string; light?: string; camera?: string; phone?: string; details?: string[]; lookAssetId?: string | null }) => request<SlideScene>('POST', '/slide-scenes', body),
+  deleteSlideScene: (id: string) => request<{ ok: true }>('DELETE', `/slide-scenes/${id}`),
   cloneCleanup: (id: string, on: boolean) => request<CloneSource>('POST', `/content/${id}/clone-source/cleanup`, { on }),
   importPreview: (id: string, csv: string) => request<ImportPreview>('POST', `/content/${id}/import/preview`, { csv }),
   importRun: (id: string, csv: string, exportFree: boolean) => request<{ created: Array<{ line: number; id: string; status: 'reuse' | 'generate' }>; exporting: number; skipped: number; notExported: Array<{ line: number; id: string; reason: string }> }>('POST', `/content/${id}/import`, { csv, exportFree }),

@@ -60,7 +60,7 @@ export function RunStatus({ ids = [], match, pending = false, className = '', hi
   // started from here, or the newest run, can show its failures red.
   const newestAt = Math.max(0, ...list.map(j => Date.parse(j.createdAt)))
   const fresh = (j: JobView) => ids.includes(j.id) || newestAt - Date.parse(j.createdAt) < 5000
-  const failedOld = (j: JobView) => (j.phase === 'failed' || j.phase === 'canceled') && !fresh(j)
+  const failedOld = (j: JobView) => (j.phase === 'failed' || j.phase === 'canceled') && !fresh(j) && !notNeeded(j)
   const old = hideEarlier ? [] : list.filter(j => failedOld(j) && !cleared.has(j.id))
   const current = list.filter(j => !failedOld(j))
   const missing = ids.filter(id => !all.some(j => j.id === id))
@@ -115,10 +115,23 @@ export function SaferRetry({ jobId, onStarted }: { jobId: string; onStarted?: (i
   return <PriceButton action={{ type: 'retry_safer', jobId }} label="Retry with safer wording" size="sm" variant="secondary" icon={false} compact onStarted={onStarted} />
 }
 
+// A run released before it started because it was not needed (a slideshow
+// slide that became a special slide): neither done nor failed, never red.
+export const notNeeded = (j: JobView) => j.phase === 'canceled' && j.charged !== 'yes' && /^Not needed:/.test(j.error ?? '')
+
 export function RunRow({ j, onDismiss, showLabel = true }: { j: JobView; onDismiss?: () => void; showLabel?: boolean }) {
   const active = ACTIVE.includes(j.status)
   const now = useNow(active)
   const elapsed = (now - Date.parse(j.since)) / 1000
+  if (notNeeded(j)) {
+    return (
+      <div className="st-run">
+        <Info size={15} />
+        <span className="st-run-text">{showLabel ? <b>{j.label}: </b> : null}{(j.error ?? '').replace(/^Not needed:\s*/, 'not needed, ')}</span>
+        {onDismiss && <button type="button" className="st-btn icon ghost sm" aria-label="Hide" onClick={onDismiss}><X size={13} /></button>}
+      </div>
+    )
+  }
   if (j.phase === 'failed' || j.phase === 'canceled' || j.phase === 'needs_attention') {
     const attention = j.phase === 'needs_attention'
     return (
@@ -182,7 +195,8 @@ export function FailureLine({ text, open, onToggle, onClear }: { text: string; o
 
 function RunGroup({ jobs, onDismiss }: { jobs: JobView[]; onDismiss: () => void }) {
   const done = jobs.filter(j => j.phase === 'done').length
-  const failed = jobs.filter(j => ['failed', 'canceled', 'needs_attention'].includes(j.phase))
+  const released = jobs.filter(notNeeded).length
+  const failed = jobs.filter(j => ['failed', 'canceled', 'needs_attention'].includes(j.phase) && !notNeeded(j))
   const running = jobs.filter(j => ACTIVE.includes(j.status))
   const label = jobs[0]!.label.replace(/\s*\d+\s+of\s+\d+.*$|,\s*still\s+\d+$/i, '')
   const lead = running.find(j => j.phase === 'generating') ?? running[0]
@@ -190,7 +204,7 @@ function RunGroup({ jobs, onDismiss }: { jobs: JobView[]; onDismiss: () => void 
     <div className="st-col" style={{ gap: 6 }}>
       <div className={`st-run ${running.length ? 'live' : failed.length ? 'bad' : 'ok'}`} data-live={running.length ? 'true' : undefined}>
         {running.length ? <Loader2 size={15} className="st-spin" /> : failed.length ? <XCircle size={15} /> : <CheckCircle2 size={15} />}
-        <span className="st-run-text"><b>{label}: </b>{done} of {jobs.length} done{failed.length ? `, ${failed.length} failed` : ''}{lead ? `; ${lead.phaseLabel.toLowerCase()}` : ''}.</span>
+        <span className="st-run-text"><b>{label}: </b>{done} of {jobs.length - released} done{released ? ` (${released} not needed)` : ''}{failed.length ? `, ${failed.length} failed` : ''}{lead ? `; ${lead.phaseLabel.toLowerCase()}` : ''}.</span>
         {!running.length && <button type="button" className="st-btn icon ghost sm" aria-label="Hide" onClick={onDismiss}><X size={13} /></button>}
       </div>
       {failed.map(j => <RunRow key={j.id} j={j} />)}

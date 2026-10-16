@@ -255,3 +255,22 @@ export function postCaption(caption: string, hashtags: string[], o: { ad: boolea
   const body = caption.trim().replace(/^#ad\b\s*/i, '')
   return [o.ad ? `#ad ${body}`.trim() : body, tags.join(' ')].filter(Boolean).join('\n\n')
 }
+
+// Editing the slides keeps their parallel lists together: the words, the
+// picture, the shot, the special slide and the dragged place of a slide
+// move, go or arrive as one. A repeated picture of an older post becomes
+// its own slot first.
+export type SlideEdit = { move: [number, number] } | { remove: number } | { add: number }
+export function editSlides(s: SlideshowSlides, op: SlideEdit): { hook: string; slides: string[]; stillIds: string[]; shots: string[]; specials: Array<SpecialSlide | null>; textPos: Array<SlidePos | null> } {
+  const list = slideList(s)
+  let rows = list.map(x => ({ text: [s.hook, ...s.slides][x.index] ?? '', still: x.stillId ?? '', shot: s.shots?.[x.index] ?? '', special: s.specials?.[x.index] ?? null, pos: s.textPos?.[x.index] ?? null }))
+  if ('move' in op) {
+    const [from, to] = op.move
+    if (from >= 0 && from < rows.length && to >= 0 && to < rows.length && from !== to) { const [r] = rows.splice(from, 1); rows.splice(to, 0, r!) }
+  } else if ('remove' in op) rows = rows.filter((_, i) => i !== op.remove)
+  else rows.splice(Math.min(Math.max(0, op.add), rows.length), 0, { text: '', still: '', shot: '', special: null, pos: null })
+  return {
+    hook: rows[0]?.text ?? '', slides: rows.slice(1).map(r => r.text),
+    stillIds: rows.map(r => r.still), shots: rows.map(r => r.shot), specials: rows.map(r => r.special), textPos: rows.map(r => r.pos),
+  }
+}

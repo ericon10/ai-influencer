@@ -9,6 +9,8 @@ import { editOf } from './EditStyles'
 import { EditorCard } from './EditorCard'
 import { BatchStyle } from './BatchStyle'
 import { CoverCard, ExportFor, HookVariants } from './ExportExtras'
+import { ReuseWarning, SlideshowOutputs, VariationsCard } from './slideshow/SlideshowFinish'
+import { slideshowProblemsClient } from './slideshow/problems'
 import { keys, useSounds } from '../../hooks'
 import { useQueryClient } from '@tanstack/react-query'
 
@@ -44,8 +46,7 @@ export function FinishStep({ ctx }: { ctx: PostCtx }) {
     if (style?.shots === 2 && cut.shots.filter(x => x.kind === 'clip').length < 2) todo.push({ label: `Add shot B for the ${style.label.toLowerCase()}`, onGo: inStep('video', 'shot-b') })
     if (style?.needs?.includes('background') && !cut.shots.some(x => x.kind === 'broll')) todo.push({ label: `Pick B-roll or a screenshot for the ${style.label.toLowerCase()} background`, onGo: inStep('video', 'post-broll') })
   } else if (item.kind === 'slideshow') {
-    const s = draft.spec as unknown as SlideshowSpec
-    todo = !s.stillIds.length ? [{ label: 'Pick stills', target: 'step-stills' }] : []
+    todo = slideshowProblemsClient(draft.spec as unknown as SlideshowSpec)
     label = 'Export images'
   } else {
     const s = draft.spec as unknown as BatchSpec
@@ -61,6 +62,7 @@ export function FinishStep({ ctx }: { ctx: PostCtx }) {
   return (
     <div className="st-col" style={{ gap: 16 }}>
       {item.kind === 'meme' && <EditorCard ctx={ctx} />}
+      {item.kind === 'slideshow' && <ReuseWarning ctx={ctx} />}
       {item.kind !== 'slideshow' && <SoundRow ctx={ctx} />}
       {item.kind === 'batch' && <BatchStyle ctx={ctx} />}
       {item.kind !== 'slideshow' && <ExportFor ctx={ctx} />}
@@ -78,14 +80,7 @@ export function FinishStep({ ctx }: { ctx: PostCtx }) {
             </div>
           </div>
         )}
-        {item.kind === 'slideshow' && item.status === 'ready' && o.imageAssetIds && (
-          <div className="st-col" style={{ gap: 10 }}>
-            <div className="st-row" style={{ gap: 8 }}>{o.zipAssetId && <DownloadLink assetId={o.zipAssetId} name={`${name}-slides.zip`}>Download all, in order (zip)</DownloadLink>}</div>
-            <div className="st-content-strip">
-              {o.imageAssetIds.map((id, i) => <a key={id} href={downloadUrl(id, `${String(i + 1).padStart(2, '0')}-${name}.jpg`)} title={`Download slide ${i + 1}`}><Img assetId={id} width={320} style={{ width: 150, aspectRatio: '9 / 16' }} /></a>)}
-            </div>
-          </div>
-        )}
+        {item.kind === 'slideshow' && <SlideshowOutputs ctx={ctx} name={name} />}
         {item.kind === 'batch' && (o.videos?.length ?? 0) > 0 && (
           <div className="st-col" style={{ gap: 10 }}>
             {(o.zipParts?.length ?? 0) > 1
@@ -112,6 +107,7 @@ export function FinishStep({ ctx }: { ctx: PostCtx }) {
       </ExportPanel>
       {item.kind === 'meme' && <CoverCard ctx={ctx} />}
       {item.kind === 'meme' && <HookVariants ctx={ctx} />}
+      {item.kind === 'slideshow' && <VariationsCard ctx={ctx} />}
       <div className="st-row" style={{ gap: 8, flexWrap: 'wrap' }}>
         <button type="button" className="st-btn" onClick={() => void duplicate(item.id)}><CopyPlus size={15} />Make another like this</button>
       </div>

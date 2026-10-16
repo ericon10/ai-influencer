@@ -7,6 +7,8 @@ import { HowTo } from '../../guide/Guide'
 import type { BatchSpec, CaptionStyle, MemeSpec, SlideshowSpec } from '../../types'
 import { CaptionPreview, CaptionStylePick } from './parts'
 import type { PostCtx } from './ctx'
+import { SlideshowText } from './slideshow/SlideshowText'
+import { TEXT_STYLES, slideList } from '../../../../server/core/slides'
 
 // The Text step: the caption of a video post, the hook and slides of a
 // slideshow (Claude writes them, priced), or the captions of a batch (pasted,
@@ -20,7 +22,9 @@ export function textSummary(ctx: PostCtx) {
   }
   if (ctx.item.kind === 'slideshow') {
     const s = ctx.draft.spec as unknown as SlideshowSpec
-    return s.hook?.trim() ? `Hook: ${s.hook.trim().slice(0, 80)} (+${s.slides.filter(x => x.trim()).length} slides)` : 'No words on the slides (optional)'
+    const style = TEXT_STYLES.find(x => x.id === s.textStyle)?.label ?? 'Classic'
+    const n = slideList(s).length
+    return s.hook?.trim() ? `${style} · ${n} slides · Hook: ${s.hook.trim().slice(0, 70)}${s.ad ? ' · #ad' : ''}` : 'No words on the slides (optional)'
   }
   const bs = ctx.draft.spec as unknown as BatchSpec
   const n = (bs.captions ?? []).filter(c => c.trim()).length
@@ -29,7 +33,7 @@ export function textSummary(ctx: PostCtx) {
 }
 
 export function TextStep({ ctx }: { ctx: PostCtx }) {
-  if (ctx.item.kind === 'slideshow') return <Slides ctx={ctx} />
+  if (ctx.item.kind === 'slideshow') return <SlideshowText ctx={ctx} />
   if (ctx.item.kind === 'batch') return <Captions ctx={ctx} />
   return <Caption ctx={ctx} />
 }
@@ -59,58 +63,6 @@ function Caption({ ctx }: { ctx: PostCtx }) {
         <HookPicker open={hooks} onClose={() => setHooks(false)} characterId={ctx.item.characterId} onPick={t => { draft.setSpec({ caption: t.slice(0, data.options.caption.maxChars) }); setHooks(false) }} />
       </div>
       <div className="st-content-side"><CaptionPreview text={spec.captionOff ? '' : spec.caption ?? ''} data={data} video={clip?.assetId} look={spec.captionStyle} /><span className="st-hint">{spec.captionOff ? 'Preview: no caption.' : 'Preview. The export uses the same font, style and safe zones.'}</span></div>
-    </div>
-  )
-}
-
-function Slides({ ctx }: { ctx: PostCtx }) {
-  const { item, data, draft, lib } = ctx
-  const toast = useToast()
-  const spec = draft.spec as unknown as SlideshowSpec
-  const picked = spec.stillIds.map(id => lib?.stills.find(s => s.id === id)).filter(s => !!s)
-  const texts = [spec.hook, ...spec.slides]
-  const topic = draft.fields.idea.trim() || spec.topic.trim()
-  const writeTodo: TodoItem[] = [
-    ...(!spec.stillIds.length ? [{ label: 'Pick stills', target: 'step-stills' }] : []),
-    ...(topic.length < 3 ? [{ label: 'What it is about (the idea)', target: 'post-idea', onGo: () => void draft.go('idea') }] : []),
-  ]
-  const tags = spec.hashtags.map(h => `#${h}`).join(' ')
-  async function copyCaption() {
-    try { await navigator.clipboard.writeText(`${spec.caption}${tags ? `\n\n${tags}` : ''}`); toast({ tone: 'ok', text: 'Caption copied.' }) } catch { toast({ tone: 'bad', text: 'Could not copy. Select the text and copy it.' }) }
-  }
-  return (
-    <div className="st-col" style={{ gap: 16 }}>
-      <PriceButton
-        label={texts.some(t => t.trim()) ? 'Rewrite the slides' : 'Write the slides'}
-        variant={texts.some(t => t.trim()) ? 'secondary' : 'primary'}
-        todo={writeTodo}
-        waiting={draft.saving ? 'Saving...' : undefined}
-        action={writeTodo.length || draft.saving || !item.characterId ? null : { type: 'content_slides', characterId: item.characterId, contentId: item.id }}
-        watch={j => j.purpose === `content_slides:${item.id}`}
-        onStarted={() => void ctx.advance('text')}
-      />
-      <span className="st-hint">Claude writes a hook and {data.options.slideshow.slides[0]} to {data.options.slideshow.slides[1]} slides about "{topic || 'your idea'}", plus a caption and hashtags. Edit anything after. Words are optional: with none, the stills go out as they are.</span>
-      <div className="st-col" data-field="slides-text" style={{ gap: 10 }}>
-        <Field label="Hook (slide 1)"><input className="st-input" maxLength={200} value={spec.hook} onChange={e => draft.setSpec({ hook: e.target.value })} placeholder="e.g. POV: you finally found apps that actually help" /></Field>
-        {spec.slides.map((t, i) => (
-          <div key={i} className="st-row" style={{ gap: 8, flexWrap: 'nowrap' }}>
-            <span className="st-hint" style={{ width: 54, flex: 'none' }}>Slide {i + 2}</span>
-            <input className="st-input" style={{ flex: 1, minWidth: 0 }} maxLength={300} value={t} onChange={e => draft.setSpec({ slides: spec.slides.map((x, j) => (j === i ? e.target.value : x)) })} />
-            <button type="button" className="st-btn ghost sm" aria-label={`Remove slide ${i + 2}`} onClick={() => draft.setSpec({ slides: spec.slides.filter((_, j) => j !== i) })}><X size={14} /></button>
-          </div>
-        ))}
-        {spec.slides.length < 10 && <button type="button" className="st-btn ghost sm" style={{ alignSelf: 'flex-start' }} onClick={() => draft.setSpec({ slides: [...spec.slides, ''] })}><Plus size={14} />Add a slide</button>}
-        <Field label="Post caption"><textarea className="st-textarea" rows={2} maxLength={2200} value={spec.caption} onChange={e => draft.setSpec({ caption: e.target.value })} /></Field>
-        <Field label="Hashtags" hint="Separated by spaces, without #.">
-          <input className="st-input" value={spec.hashtags.join(' ')} onChange={e => draft.setSpec({ hashtags: e.target.value.split(/[\s,]+/).map(h => h.replace(/^#+/, '')).filter(Boolean) })} />
-        </Field>
-        {(spec.caption || tags) && <button type="button" className="st-btn ghost sm" style={{ alignSelf: 'flex-start' }} onClick={copyCaption}><Copy size={14} />Copy caption and hashtags</button>}
-      </div>
-      {picked.length > 0 && texts.some(t => t.trim()) && (
-        <div className="st-content-strip">
-          {texts.filter(t => t.trim()).map((t, i) => <CaptionPreview key={i} text={t} data={data} image={picked[i % picked.length]!.assetId} width={150} />)}
-        </div>
-      )}
     </div>
   )
 }

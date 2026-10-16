@@ -318,7 +318,7 @@ export async function autoCleanPlan(deps: Deps, ctx: Ctx, days: number | null): 
   const out: AutoCleanItem[] = []
   const seen = new Set<string>()
   for (const p of finished) {
-    const runs = await deps.db.select({ id: jobs.id }).from(jobs).where(and(eq(jobs.accountId, acct), or(like(jobs.purpose, `clone:${p.id}:%`), like(jobs.purpose, `clone_still:${p.id}%`), like(jobs.purpose, `clone_face:${p.id}%`), like(jobs.purpose, `slide_still:${p.id}:%`))))
+    const runs = await deps.db.select({ id: jobs.id }).from(jobs).where(and(eq(jobs.accountId, acct), or(like(jobs.purpose, `clone:${p.id}:%`), like(jobs.purpose, `clone_still:${p.id}%`), like(jobs.purpose, `clone_face:${p.id}%`), like(jobs.purpose, `slide_still:${p.id}%`))))
     const runIds = new Set(runs.map(r => r.id))
     const mine = all.filter(c => (c.jobId && runIds.has(c.jobId)) || (p.sceneId && c.sceneId === p.sceneId && !openScenes.has(p.sceneId)))
     for (const c of mine) {

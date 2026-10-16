@@ -9,7 +9,7 @@ export type GuideColor = 'orange' | 'pink' | 'violet' | 'blue' | 'teal' | 'green
 export type GuideId =
   | 'big-picture' | 'posts' | 'characters' | 'setup-start' | 'setup-face' | 'setup-sheet' | 'setup-file'
   | 'post-idea' | 'post-stills' | 'post-video' | 'post-clone' | 'post-text' | 'post-finish'
-  | 'library' | 'settings' | 'feedback' | 'realism' | 'voice' | 'hooks'
+  | 'library' | 'settings' | 'feedback' | 'realism' | 'voice' | 'hooks' | 'slideshow'
 
 export interface GuideSection {
   id: GuideId
@@ -221,7 +221,7 @@ export const GUIDE: GuideSection[] = [
       'Edit the Director\'s notes or the prompt if you like, then Rewrite or Generate again.',
       'Open a still to look closely: Check this (Claude), Fix one thing, crop closer, upscale.',
       'Press Use this still on the best one. It moves you to the Video step and Claude writes the video prompt from it.',
-      'Slideshow: Upload images (beside Pick stills from the Library) takes several at once: drop them on the box on a computer, or pick them from the camera roll on a phone. Each one joins the slideshow and Library > Stills for this character, kept exactly as uploaded (the same file, full resolution; PNG, JPEG or WebP).',
+      'Slideshow: one card per slide, all in one locked scene (see Slideshows, hook first): Generate the set, Reroll one slide, or put in a picture from the Library or an upload. Under More ways to add pictures, Upload images takes several at once (drop them on the box on a computer, or pick them from the camera roll on a phone), each one a new slide at the end and in Library > Stills, kept exactly as uploaded (the same file, full resolution; PNG, JPEG or WebP).',
     ],
     tips: [
       'Fix one thing makes one change and keeps the rest of the still. Diagnose and revise has one-click fixes: plastic face, staged pose, morphing hands, synchronized background, fake low light, overprocessed.',
@@ -317,7 +317,7 @@ export const GUIDE: GuideSection[] = [
     steps: [
       'Video post: type the caption and watch the preview, or press Pick a hook to use one from the vault (this character\'s own variants come first). Pick White box or Outline (white text with a black stroke, TikTok Classic). It sits in the upper third, off her mouth and hands.',
       'No caption (next to White box and Outline, on every video post, Recreate included, and every batch): the editor opens with no caption track and the export has none. It is kept with the post; the words you typed stay, dimmed, and come back when you pick White box or Outline again. A video exported before the switch keeps its caption until you export again.',
-      'Slideshow: press Write the slides (or type them), add or remove slides, then the caption and hashtags. With no words, the stills go out as they are.',
+      'Slideshow: the hook and the slides (drafted from the hook, or typed), the text style with a big preview where you drag the words, the CTA slide, the caption, at most 5 hashtags and #ad (see Slideshows, hook first). With no words, the stills go out as they are.',
       'Batch: set How many, press Write, and edit the list. The clips rotate across the captions. With no captions, How many videos are made with none.',
     ],
     tips: [
@@ -329,8 +329,42 @@ export const GUIDE: GuideSection[] = [
     shots: [
       { id: 'post-caption', caption: 'Video post: the caption (optional), with No caption beside the styles' },
       { id: 'post-caption-off', caption: 'No caption: kept with the post, the words dimmed until you switch back' },
-      { id: 'post-slideshow', caption: 'Slideshow: the hook and slides' },
+      { id: 'slideshow-slides', caption: 'Slideshow: the text style, the slides and the caption' },
       { id: 'post-batch', caption: 'Batch: one caption per video' },
+    ],
+  },
+  {
+    id: 'slideshow', group: 'Make a post', title: 'Slideshows, hook first', color: 'teal',
+    tagline: 'From a hook to a finished slideshow in minutes, at volume.',
+    where: 'New post > Slideshow: Idea, Stills, Slides, Finish',
+    intro: 'A slideshow starts from its hook: the words on slide 1. Write 10 hooks (free from the vault, or with Claude), press Use this hook, and every slide is drafted: a setup, the reveal on slide 3 or 4, the payoff and a soft CTA, 4 to 12 words a slide, each with the shot its photo shows. The stills are made in one locked scene, so the set reads like one camera roll. The words are drawn in a text style you can drag, exactly as they go into the JPEGs. Make variations for your other accounts, or paste 10 hooks and make 10 at once.',
+    steps: [
+      'Idea: type a hook, or press 10 from the vault (free) or Write 10 with Claude (priced). Each hook carries its pattern: someone doubts or reacts, POV, things nobody tells you, red flags, listicle, storytime, myth vs fact, tier list. The chips filter them.',
+      'Press Use this hook (priced) on one: every slide is drafted (6 by default; Slides sets 3 to 10), with the caption and the scene. Edit anything after.',
+      'Who is in the photos: the character (the sheet refs, or the Higgsfield element on your plan; the same outfit in every photo), or No one, a topic, for a feeder account (offices, skylines, commutes, desk setups, interview lobbies).',
+      'Stills: One camera roll holds the place, the light, the phone, the outfit and 2 details for every photo. Save this scene keeps them in the Scene library; pick a saved scene in any slideshow so the same room looks the same every time.',
+      'Made for: TikTok 9:16 or Instagram 3:4, the shape the stills are made in. The export makes both sizes either way.',
+      'Pick the stills model (Nano Banana 2.1 on your Higgsfield plan, or GPT Image 2.5 Flare on the Higgsfield API) and press Generate the set: one price for every slide without a picture. Each still lands in its own slide.',
+      'Each slide card: Reroll (priced) makes a new picture for that slide only; the rest of the set stays. Library and Upload put your own picture in it. The picture menu turns a slide into a special slide: a phone notification, a text thread, a rejection email or a job posting, drawn by code for free, with generic names only.',
+      'Slides: pick the text style (Classic, Text box, Minimal, Note). Drag the words on the big preview, or use the arrow keys; the safe zones shade the top 10% and the bottom 20%, and the words stay out of them.',
+      'Set the CTA slide (Follow for part 2, Save this, Follow @handle with your handle typed, Comment a word, More on my page), the caption (Rewrite the caption is priced), at most 5 hashtags, and #ad: Ad on slide 1 and #ad first in the caption.',
+      'Finish: Export images (free) makes numbered JPEGs at 1080 x 1920 for TikTok and 1080 x 1440 for Instagram, caption.txt and post.json (every field of the post), all in one zip.',
+      'Make variations (priced): a new hook in new words, a new image set, the list reordered for listicles, tier lists and red flags, a new caption. Each is a new slideshow in the same family, with another account tag when you have one.',
+      'Batch from hooks (Idea step): paste up to 10 hooks and press Make 10 (one price: each drafted, then its stills). The review shows every slideshow with Approve (exports it, free), Reroll (a new set, priced) and Reject.',
+    ],
+    tips: [
+      'Classic is bold white with a black outline at 15% of the font size, sized by the word count (5 to 7.5% of the width), about 28% from the top, 4 to 6 words a line.',
+      'The export warns when a picture or the exact caption is also in another account\'s slideshow, with Reroll as the fix. Variations never reuse either.',
+      'A topic slideshow has no face to check; every prompt still carries the REALISM line.',
+      'post.json keeps every field of the post, mapped in one place, so the posting engine can read it later.',
+    ],
+    cost: 'Hooks from the vault, special slides, text styles and the export are free. Write 10 with Claude, Use this hook and Rewrite the caption are small Claude calls (about a cent each). Each still is one image on the model shown on the button (Nano Banana 2.1 at 1k: 1.5 plan credits; GPT Image 2.5 Flare at Standard: 1 plan credit, about $0.06 on the API). Variations and a batch add up their Claude calls and stills; the total is on the button before anything runs.',
+    shots: [
+      { id: 'slideshow-hooks', caption: 'Idea: the hook box, Write 10 hooks, and Use this hook on each' },
+      { id: 'slideshow-stills', caption: 'Stills: one camera roll, the Scene library, Generate the set and a card per slide' },
+      { id: 'slideshow-slides', caption: 'Slides: the text styles, the big preview with the safe zones, the CTA, caption and #ad' },
+      { id: 'slideshow-finish', caption: 'Finish: both sizes, post.json, and Make variations' },
+      { id: 'slideshow-batch', caption: 'Batch from hooks: paste, Make 10, review' },
     ],
   },
   {
@@ -578,6 +612,14 @@ export const GLOSSARY: Array<[string, string]> = [
   ['Voice line', 'One line you performed, turned into the character\'s voice with every word timed. Library > Voice lines.'],
   ['Voiceover', 'A voice line laid over a video post, with the music and ambience dipping under it and captions from its words.'],
   ['Hook vault', 'A product\'s numbered opening lines, grouped by type. Library > Hooks.'],
+  ['Hook pattern', 'What kind of hook it is: someone doubts or reacts, POV, things nobody tells you, red flags, listicle, storytime, myth vs fact, tier list. Every hook a slideshow writes is tagged with one.'],
+  ['Use this hook', 'On a slideshow: drafts every slide from the hook (hook, setup, the reveal on slide 3 or 4, payoff, a soft CTA last), each with the shot its photo shows, plus the caption. Priced, a small Claude call.'],
+  ['One camera roll', 'A slideshow\'s locked scene: the same place, light, phone, outfit and 2 details in every photo, so the set looks like one day\'s photos.'],
+  ['Scene library', 'Saved slideshow scenes (place, light, camera, 2 details) for a character or a topic. Pick one in any slideshow and the same room looks the same every time.'],
+  ['Special slide', 'A mock phone screen drawn by code, free: a notification, a text thread, a rejection email or a job posting. Generic names only; a real brand becomes a generic name.'],
+  ['Text style', 'How a slideshow\'s words look: Classic (bold white, black outline), Text box, Minimal or Note. Dragged words keep their place, and the export draws exactly what the preview shows.'],
+  ['Variation family', 'A slideshow and the variations made from it (variation_of), each with new words, new pictures and a new caption for another account.'],
+  ['post.json', 'In every slideshow zip: every field of the post (slides, words, pictures, scene, caption, hashtags, #ad, account, family), for the posting engine.'],
   ['Variant', 'A hook rewritten in one character\'s voice, so accounts never post the same line.'],
   ['Claims sheet', 'What you can say about a product, and what never to say. Anything about the product stays inside it.'],
   ['Buyer language', 'Real phrases buyers use, collected from comments and reviews. The writers use them instead of marketing words.'],

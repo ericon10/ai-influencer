@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, ArrowRight, CheckCircle2, Images, Minus, Plus, SkipForward, X } from 'lucide-react'
+import { CheckCircle2, Images, Minus, Plus, SkipForward } from 'lucide-react'
 import { api, ApiError } from '../../api'
 import { keys, useRefresh } from '../../hooks'
 import { PriceButton } from '../../PriceButton'
@@ -10,6 +10,8 @@ import { AsyncButton, Callout, Img, errorMessage, useToast } from '../../ui'
 import type { SceneStill, SlideshowSpec } from '../../types'
 import { SceneStills } from '../character/SceneStills'
 import type { PostCtx } from './ctx'
+import { SlideshowStills } from './slideshow/SlideshowStills'
+import { editSlides, slideList } from '../../../../server/core/slides'
 
 // The Stills step: make stills from the idea right here (Write and
 // generate), or pick them from the Library drawer. A video post uses one
@@ -18,8 +20,9 @@ import type { PostCtx } from './ctx'
 
 export function stillsSummary(ctx: PostCtx) {
   if (ctx.item.kind === 'slideshow') {
-    const n = (ctx.draft.spec as unknown as SlideshowSpec).stillIds?.length ?? 0
-    return n ? `${n} still${n > 1 ? 's' : ''}, in order` : 'No stills picked'
+    const list = slideList(ctx.draft.spec as unknown as SlideshowSpec)
+    const pictured = list.filter(x => x.stillId || x.special).length
+    return list.length ? `${pictured} of ${list.length} slides have a picture` : 'No slides yet'
   }
   const id = (ctx.draft.spec as { stillId?: string | null }).stillId
   const still = id ? ctx.lib?.stills.find(s => s.id === id) : undefined
@@ -60,51 +63,50 @@ export function StillsStep({ ctx }: { ctx: PostCtx }) {
       await ctx.advance('video', { stillId: id })
     } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) }
   }
+  // A slideshow: picking adds a slide at the end with that picture (the
+  // words, shots and places of the slides before it stay with them);
+  // picking it again takes it out.
   function toggle(id: string) {
     const max = ctx.data.options.slideshow.maxStills
-    draft.setSpec({ stillIds: stillIds.includes(id) ? stillIds.filter(x => x !== id) : [...stillIds, id].slice(0, max) })
-  }
-  function move(id: string, by: number) {
-    const i = stillIds.indexOf(id), j = i + by
-    if (i < 0 || j < 0 || j >= stillIds.length) return
-    const next = [...stillIds]
-    ;[next[i], next[j]] = [next[j]!, next[i]!]
-    draft.setSpec({ stillIds: next })
+    const s = draft.spec as unknown as SlideshowSpec
+    const list = slideList(s)
+    const at = list.findIndex(x => x.stillId === id)
+    if (at >= 0) { draft.setSpec(editSlides(s, { remove: at }) as never); return }
+    if (list.length >= max) return
+    const added = editSlides(s, { add: list.length })
+    draft.setSpec({ ...added, stillIds: added.stillIds.map((x, i) => (i === list.length ? id : x)) } as never)
   }
 
   const name = v?.data.name ?? 'this character'
-  return (
+  if (slideshow) return (
     <div className="st-col" style={{ gap: 16 }}>
-      {slideshow && stillIds.length > 0 && (
-        <div className="st-col" style={{ gap: 8 }}>
-          <span className="st-label">In the slideshow, in order <span className="st-muted">(the hook goes on the first)</span></span>
-          <div className="st-picked-strip">
-            {stillIds.map((id, i) => {
-              const s = lib?.stills.find(x => x.id === id)
-              return (
-                <div key={id} className="st-picked">
-                  <Img assetId={s?.assetId} width={200} style={{ aspectRatio: '9 / 16' }} />
-                  <span className="st-picked-n">{i + 1}</span>
-                  <div className="st-row" style={{ gap: 2, justifyContent: 'center' }}>
-                    <button type="button" className="st-btn icon ghost sm" aria-label="Earlier" disabled={i === 0} onClick={() => move(id, -1)}><ArrowLeft size={13} /></button>
-                    <button type="button" className="st-btn icon ghost sm" aria-label="Remove" onClick={() => toggle(id)}><X size={13} /></button>
-                    <button type="button" className="st-btn icon ghost sm" aria-label="Later" disabled={i === stillIds.length - 1} onClick={() => move(id, 1)}><ArrowRight size={13} /></button>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      )}
+      <SlideshowStills ctx={ctx} />
+      <details className="st-card st-more" data-field="slideshow-more-stills">
+        <summary className="st-card-head st-row st-more-head" style={{ cursor: 'pointer' }}><Images size={15} /><div className="grow"><div className="st-h3">More ways to add pictures</div><div className="st-hint">Pick several from the Library, upload several, or make stills of the post's scene and add them. Each adds a slide at the end.</div></div></summary>
+        <div className="st-card-body st-col" style={{ gap: 12 }}>{legacy()}</div>
+      </details>
+    </div>
+  )
+  return legacy()
 
+  function legacy() { return (
+    <div className="st-col" style={{ gap: 16 }}>
       <div className="st-row" style={{ gap: 8, flexWrap: 'wrap' }}>
         <button type="button" className="st-btn" onClick={() => setLibrary(true)} disabled={!item.characterId}><Images size={15} />Pick {slideshow ? 'stills' : 'a still'} from the Library</button>
         {!slideshow && <button type="button" className="st-btn ghost" onClick={() => void ctx.advance('video')}><SkipForward size={15} />Skip: I have a clip</button>}
-        {slideshow && stillIds.length > 0 && ctx.current === 'stills' && <button type="button" className="st-btn ghost" onClick={() => void ctx.advance('text')}>Continue to the slides<ArrowRight size={15} /></button>}
       </div>
       {slideshow && item.characterId && (
         <StillUpload characters={v ? [{ id: v.id, name: v.data.name }] : []} characterId={item.characterId} contentId={item.id}
-          onUploaded={ids => draft.setSpec({ stillIds: [...stillIds, ...ids.filter(id => !stillIds.includes(id))].slice(0, ctx.data.options.slideshow.maxStills) })} />
+          onUploaded={ids => {
+            let s = draft.spec as unknown as SlideshowSpec
+            for (const id of ids) {
+              const list = slideList(s)
+              if (list.length >= ctx.data.options.slideshow.maxStills || list.some(x => x.stillId === id)) continue
+              const added = editSlides(s, { add: list.length })
+              s = { ...s, ...added, stillIds: added.stillIds.map((x, i) => (i === list.length ? id : x)) }
+            }
+            draft.setSpec({ hook: s.hook, slides: s.slides, stillIds: s.stillIds, shots: s.shots, specials: s.specials, textPos: s.textPos } as never)
+          }} />
       )}
 
       {!ready ? (
@@ -128,7 +130,7 @@ export function StillsStep({ ctx }: { ctx: PostCtx }) {
         <LibraryDrawer open={library} onClose={() => setLibrary(false)} kind="stills" characterId={item.characterId} characterName={name} picked={slideshow ? stillIds : stillId ? [stillId] : []} multi={slideshow} onPick={id => void pickFromLibrary(id)} />
       )}
     </div>
-  )
+  ) }
 }
 
 function AddToSlideshow({ on, n, toggle }: { c: SceneStill; on: boolean; n: number; toggle: () => void }) {

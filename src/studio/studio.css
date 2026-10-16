@@ -1310,3 +1310,45 @@ button.st-chip:hover { color: var(--st-text); border-color: var(--st-text-3); }
 .st-checklist li.missing > svg { color: var(--st-warn); }
 .st-growth { font-size: 13px; line-height: 1.45; padding: 8px 10px; border: 1px solid var(--st-line); border-radius: 8px; background: var(--st-surface-2); overflow-wrap: anywhere; }
 .st-idea-brand { color: var(--st-warn); }
+
+/* ── The slideshow power-up (UX-PLAN.md section 27) ─────────────────── */
+.st-slideframe { position: relative; flex: none; overflow: hidden; border-radius: 12px; background: #1a1d24; user-select: none; touch-action: none; outline: none; }
+.st-slideframe.movable { cursor: grab; }
+.st-slideframe.dragging { cursor: grabbing; }
+.st-slideframe:focus-visible { box-shadow: var(--st-ring); }
+.st-slideframe > img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
+.st-slideframe-svg { position: absolute; inset: 0; pointer-events: none; }
+.st-slideframe-svg > svg { width: 100%; height: 100%; display: block; }
+.st-slideframe-empty { position: absolute; inset: 0; display: grid; place-items: center; color: rgba(255, 255, 255, 0.45); font-size: 12px; background: repeating-linear-gradient(135deg, #20232b 0 12px, #1b1e25 12px 24px); }
+.st-slideframe-plain { position: absolute; inset: 0; background: linear-gradient(180deg, #2b3a55, #0f1626); }
+.st-slideframe-n { position: absolute; left: 6px; bottom: 6px; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; background: rgba(0, 0, 0, 0.6); color: #fff; font: 600 11px/20px var(--st-font); text-align: center; pointer-events: none; }
+.st-safe { position: absolute; left: 0; right: 0; background: rgba(255, 64, 64, 0.16); border: 0 dashed rgba(255, 90, 90, 0.8); pointer-events: none; display: flex; align-items: center; justify-content: center; }
+.st-safe.top { top: 0; border-bottom-width: 1px; }
+.st-safe.bottom { bottom: 0; border-top-width: 1px; }
+.st-safe span { font: 600 10px/1 var(--st-font); color: rgba(255, 200, 200, 0.95); text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6); letter-spacing: 0.3px; }
+.st-hooklist { display: flex; flex-direction: column; gap: 6px; }
+.st-hookrow { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: var(--st-r); border: 1px solid var(--st-line); background: var(--st-surface-2); }
+.st-hookrow.on { border-color: rgba(255, 106, 61, 0.55); background: var(--st-accent-soft); }
+.st-hookrow .text { flex: 1; min-width: 0; font-size: 14px; }
+.st-hookrow .tag { flex: none; font-size: 11px; color: var(--st-text-3); }
+.st-slidecards { display: grid; grid-template-columns: repeat(auto-fill, minmax(172px, 1fr)); gap: 12px; }
+.st-slidecard { display: flex; flex-direction: column; gap: 6px; padding: 8px; border-radius: var(--st-r); border: 1px solid var(--st-line); background: var(--st-surface-2); }
+.st-slidecard.special { border-color: rgba(130, 188, 255, 0.4); }
+.st-slidecard textarea { min-height: 52px; font-size: 12.5px; }
+.st-slidestrip { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; }
+.st-slidestrip > button { padding: 0; border: 2px solid transparent; border-radius: 14px; background: none; cursor: pointer; }
+.st-slidestrip > button.on { border-color: var(--st-accent); }
+.st-stylepick { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; max-width: 520px; }
+.st-stylepick button { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px; border-radius: var(--st-r); border: 1px solid var(--st-line-2); background: var(--st-surface-2); color: var(--st-text-2); cursor: pointer; font-size: 12px; }
+.st-stylepick button.on { border-color: rgba(255, 106, 61, 0.7); background: var(--st-accent-soft); color: var(--st-text); }
+.st-slides-editor { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 18px; align-items: start; }
+.st-lockgrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 14px; }
+.st-batchrow { display: flex; flex-direction: column; gap: 8px; padding: 10px; border-radius: var(--st-r); border: 1px solid var(--st-line); background: var(--st-surface-2); }
+.st-batchrow.approved { border-color: rgba(63, 209, 143, 0.5); }
+.st-batchrow.rejected { opacity: 0.55; }
+@media (max-width: 860px) {
+  .st-slides-editor { grid-template-columns: minmax(0, 1fr); }
+  .st-lockgrid { grid-template-columns: minmax(0, 1fr); }
+  .st-slidecards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .st-stylepick { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

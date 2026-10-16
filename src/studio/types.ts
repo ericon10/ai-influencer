@@ -219,6 +219,12 @@ export type StudioAction =
   | { type: 'clone_outfit'; contentId: string; characterId: string }
   | { type: 'voice_convert'; soundIds: string[] }
   | { type: 'hook_variants'; hookId: string; characterIds: string[]; perCharacter?: number }
+  | { type: 'slideshow_hooks'; contentId: string }
+  | { type: 'slideshow_draft'; contentId: string; hook: string; pattern?: string | null }
+  | { type: 'slideshow_stills'; contentId: string; slides?: number[]; stillModel?: string }
+  | { type: 'slideshow_caption'; contentId: string }
+  | { type: 'slideshow_variations'; contentId: string; count: number }
+  | { type: 'slideshow_batch'; contentId: string }
 
 // A run's live status (server/jobs/jobView.ts).
 export type JobPhase = 'waiting' | 'queued' | 'submitting' | 'working' | 'sent' | 'provider_queued' | 'generating' | 'downloading' | 'checking' | 'done' | 'failed' | 'canceled' | 'needs_attention'
@@ -338,7 +344,14 @@ export interface CutView {
   limits: { maxSeconds: number; maxShots: number; maxCaptions: number }
   sound: { spec: SoundSpec; sounds: SoundItem[]; hasClipSound: boolean; targetLufs: number; levels: Record<SoundLevel, number>; maxUploadMb: number }
 }
-export interface SlideshowSpec { stillIds: string[]; topic: string; hook: string; slides: string[]; caption: string; hashtags: string[] }
+// A slideshow's spec is the server's (server/core/slideshowSpec.ts).
+export type { SlideshowSpec, SceneLock, SpecialSlideSpec } from '../../server/core/slideshowSpec'
+// The slideshow power-up (UX-PLAN.md section 27): the Scene library, a
+// post's family and batch, and the no-reuse check.
+export interface SlideScene { id: string; characterId: string | null; topic: string; name: string; place: string; light: string; camera: string; phone: string; details: string[]; lookAssetId: string | null; createdAt: string }
+export interface SlideFamily { root: string; items: Array<{ id: string; hook: string; accountTag: string; status: string; stills: number; isThis: boolean; variationOf: string | null }> }
+export interface SlideBatch { assets: Record<string, string>; items: Array<{ id: string; archived: boolean; status: string; spec: import('../../server/core/slideshowSpec').SlideshowSpec; outputs: ContentOutputs; accountTag: string; idea: string }> }
+export interface ReuseReport { on: boolean; hits: Array<{ kind: 'image' | 'caption'; slide: number | null; postId: string; postName: string; accountTag: string }> }
 // A batch rotates its clips and B-roll across the captions.
 export interface BatchSpec extends BrollTiming { clipIds: string[]; brollIds: string[]; topic: string; count: number; captions: string[]; clone: CloneSource | null; sound?: Partial<SoundSpec>; edit?: Partial<EditSpec>; captionStyle?: CaptionStyle | null; captionOff?: boolean; stack?: StyleItem[] | null; styleName?: string | null; exportPreset?: string }
 
@@ -452,11 +465,15 @@ export interface ContentOutputs {
   preset?: string; capped?: boolean
   variants?: Array<{ hook: string; shot?: string | null; edit?: string | null; letter?: string; assetId: string; durationSec: number }>; variantsRunning?: boolean; variantsError?: string | null
   cover?: { assetId: string; at: number; text: string }; coverRunning?: boolean
+  // A slideshow (section 27): the Instagram set and post.json.
+  instagramAssetIds?: string[]; jsonAssetId?: string
 }
 export interface ContentItem {
   id: string; kind: ContentKind; characterId: string | null; title: string; spec: Record<string, unknown>
   idea: string; sceneId: string | null; accountTag: string; step: PostStep
   status: 'draft' | 'rendering' | 'ready' | 'failed'; outputs: ContentOutputs; error: string | null; createdAt: string; updatedAt: string
+  // A slideshow's family and batch (section 27).
+  variationOf?: string | null; batchOf?: string | null
 }
 export interface ContentData {
   broll: BrollClip[]; products: string[]; items: ContentItem[]; accountTags: string[]
@@ -467,7 +484,7 @@ export interface ContentData {
     hookVariants?: { max: number; seconds: number }
     hookEdits?: Array<{ id: string; label: string }>
     meme: { max_clip_seconds: number; broll_seconds: number; max_broll_seconds: number; order: 'clip_first' | 'broll_first' }
-    slideshow: { slides: [number, number]; maxStills: number }
+    slideshow: { slides: [number, number]; maxStills: number; draftSlides?: number; hashtagsMax?: number; maxVariations?: number; batchMax?: number; hooks?: number; instagram?: { width: number; height: number }; brandNames?: string[]; genericNames?: string[] }
     batch: { max: number; default_count: number }
     maxUploadMb: number
     cut?: { max_seconds: number; max_shots: number; max_captions: number }

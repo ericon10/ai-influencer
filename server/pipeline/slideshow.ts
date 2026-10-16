@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, isNull, ne, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, inArray, isNull, ne, sql } from 'drizzle-orm'
 import { zipSync } from 'fflate'
 import { candidates, contentItems, hooks as hookRows, slideScenes } from '../db/schema.js'
 import type { Ctx, Deps } from '../context.js'
@@ -49,6 +49,9 @@ import { candidateAsset, getContent, postScene, updateContent, type ContentOutpu
 type Built = { purpose: string; characterId: string | null; specs: JobSpec[]; preview: { title: string; prompts: Array<{ label: string; text: string; wrapped: string }>; warnings: RuleViolation[]; invalidates: string[] } }
 type Ch = ReturnType<typeof toData>
 
+// A still released because its slide became a special slide: not a failure
+// (the run list shows it as "not needed").
+export const NOT_NEEDED = 'Not needed:'
 const warn = (ruleId: string, title: string, message: string): RuleViolation => ({ ruleId, spec: '27', title, severity: 'warning', message })
 const parse = (row: ContentRow): SlideshowSpec => slideshowSpecSchema.parse(row.spec ?? {})
 const cfgOf = (deps: Deps) => deps.config.pipeline.content.slideshow
@@ -167,10 +170,12 @@ interface DraftOut {
 // the payoff and a soft CTA, one special slide, and a home-office scene.
 export function mockDraft(hook: string, n: number, mode: 'character' | 'topic'): Required<DraftOut> {
   const base = ['Here is what nobody saw coming', 'I almost gave up on this', 'Then this landed in my inbox', 'It changed how I do everything', 'The part that actually worked', 'What I would tell myself now', 'One small habit made the difference', 'And the results kept coming', 'Follow for part 2']
-  const shots = ['looking at the laptop with a coffee mug', 'leaning back in the chair, thinking', 'reading something on the phone', 'writing a list on a notepad', 'smiling at the screen', 'packing the laptop into a tote bag', 'standing by the window', 'checking the phone again', 'walking out the door']
+  const shots = mode === 'topic'
+    ? ['the desk with the laptop open', 'a coffee mug beside the keyboard', 'the window view at lunch', 'a notepad with a to-do list', 'the monitor glowing at dusk', 'the empty chair at the end of the day', 'the hallway by the elevators', 'a phone face down on the desk', 'the door on the way out']
+    : ['looking at the laptop with a coffee mug', 'leaning back in the chair, thinking', 'reading something on the phone', 'writing a list on a notepad', 'smiling at the screen', 'packing the laptop into a tote bag', 'standing by the window', 'checking the phone again', 'walking out the door']
   const slides = Array.from({ length: n }, (_, i) => ({
     text: i === 0 ? hook : i === n - 1 ? 'Follow for part 2' : base[(i - 1) % base.length]!,
-    shot: mode === 'topic' ? `the desk from a new angle, ${shots[i % shots.length]!.replace(/ing\b.*/, 'ing')} light` : shots[i % shots.length]!,
+    shot: shots[i % shots.length]!,
     special: i === 2 && n >= 4 ? { type: 'notification', from: 'Mail', title: 'Hiring Team', body: 'We would love to set up a call this week.', lines: [] } : { type: 'none', from: '', title: '', body: '', lines: [] },
   }))
   return {
@@ -424,6 +429,7 @@ export async function buildSlideshowStills(deps: Deps, ctx: Ctx, input: { conten
   const prompts: Built['preview']['prompts'] = []
   const specs: JobSpec[] = []
   const stage = spec.mode === 'topic' ? 'slideshow' : 'scene'
+  const total = wanted.filter(i => !list[i]?.special).length
   const [{ n: made } = { n: 0 }] = await deps.db.select({ n: sql<number>`count(*)::int` }).from(candidates).where(and(eq(candidates.accountId, ctx.accountId), sql`${candidates.meta}->>'slideshow' = ${row.id}`))
   for (const i of wanted) {
     const slide = list[i]
@@ -434,7 +440,7 @@ export async function buildSlideshowStills(deps: Deps, ctx: Ctx, input: { conten
     const r = slideRequest(deps, c, shot, 1 + i + 37 * made, realism)
     warnings.push(...checked(r.warnings, `Slide ${i + 1}`))
     if (prompts.length < 2) prompts.push({ label: `Slide ${i + 1} prompt`, text: r.prompt, wrapped: hardWrap(r.prompt) })
-    specs.push({ type: 'gen', stage, purpose: `slide_still:${row.id}:${i}`, label: `Slide ${i + 1} still, ${c.label}`, request: { ...r.request, slide: { slide: i, postId: row.id, sceneId: c.row.sceneId ?? null } } })
+    specs.push({ type: 'gen', stage, purpose: `slide_still:${row.id}`, label: `Slideshow still ${specs.length + 1} of ${total} (slide ${i + 1}), ${c.label}`, request: { ...r.request, slide: { slide: i, postId: row.id, sceneId: c.row.sceneId ?? null } } })
   }
   if (!specs.length) throw new AppError('bad_request', 'Those slides are special slides; they are drawn for free.')
   if (spec.mode === 'topic') warnings.push(warn('slideshow-topic', 'No one in these photos', 'A topic slideshow has no character: no face check runs. The REALISM line is in every prompt.'))
@@ -565,7 +571,7 @@ export async function buildSlideshowVariations(deps: Deps, ctx: Ctx, input: { co
         const r = slideRequest(deps, c, s.shot || s.text, 101 + k * 31 + to, realism)
         warnings.push(...checked(r.warnings, `Variation ${k + 1}, slide ${to + 1}`))
         if (prompts.length < 2) prompts.push({ label: `Variation 1, slide ${to + 1} prompt`, text: r.prompt, wrapped: hardWrap(r.prompt) })
-        specs.push({ type: 'gen', stage, purpose: `slide_still:${row.id}:v${k}.${to}`, label: `Variation ${k + 1}, slide ${to + 1}, ${c.label}`, parentIndex: 0, request: { ...r.request, slide: { slide: to, variant: k, sceneId: c.row.sceneId ?? null } } })
+        specs.push({ type: 'gen', stage, purpose: `slide_still:${row.id}:v`, label: `Variation still ${specs.length} of ${count * photos.length} (variation ${k + 1}, slide ${to + 1}), ${c.label}`, parentIndex: 0, request: { ...r.request, slide: { slide: to, variant: k, sceneId: c.row.sceneId ?? null } } })
       })
     }
   }
@@ -657,7 +663,7 @@ export async function buildSlideshowBatch(deps: Deps, ctx: Ctx, input: { content
     const r = await draftRequest(deps, ctx, row, spec, hook, guessPattern(hook), n)
     if (!b) prompts.push({ label: 'Slideshow writer (the first hook)', text: `${r.system}\n${r.prompt}`, wrapped: hardWrap(`${r.system}\n${r.prompt}`) })
     const parent = specs.length
-    specs.push({ type: 'llm', stage: 'content', purpose: `slide_draft:${row.id}:b${b}`, label: `Slideshow ${b + 1} of ${hooks.length}: draft`, request: { model: r.route.model, system: r.system, prompt: r.prompt, schema: r.schema, schemaName: 'slideshow_draft', maxTokens: 900 + 220 * n, effort: r.route.effort ?? 'low', meta: { itemId: row.id, hook, pattern: guessPattern(hook), n, row: b, mockDraft: r.mock } } })
+    specs.push({ type: 'llm', stage: 'content', purpose: `slide_draft:${row.id}:batch`, label: `Batch draft ${b + 1} of ${hooks.length}`, request: { model: r.route.model, system: r.system, prompt: r.prompt, schema: r.schema, schemaName: 'slideshow_draft', maxTokens: 900 + 220 * n, effort: r.route.effort ?? 'low', meta: { itemId: row.id, hook, pattern: guessPattern(hook), n, row: b, mockDraft: r.mock } } })
     // Every slide's still waits for the draft (its shot comes from it);
     // until then each holds a prompt from the hook, which the price and
     // the checks see. A slide the draft makes special is released.
@@ -665,7 +671,7 @@ export async function buildSlideshowBatch(deps: Deps, ctx: Ctx, input: { content
       const p = slideRequest(deps, c, i === 0 ? hook : `${hook}, moment ${i + 1}`, 201 + b * 17 + i, realism)
       warnings.push(...checked(p.warnings, `Slideshow ${b + 1}, slide ${i + 1}`))
       if (prompts.length < 2) prompts.push({ label: 'A still prompt (its shot comes from the draft)', text: p.prompt, wrapped: hardWrap(p.prompt) })
-      specs.push({ type: 'gen', stage, purpose: `slide_still:${row.id}:b${b}.${i}`, label: `Slideshow ${b + 1}, slide ${i + 1}, ${c.label}`, parentIndex: parent, request: { ...p.request, slide: { slide: i, row: b, sceneId: c.row.sceneId ?? null } } })
+      specs.push({ type: 'gen', stage, purpose: `slide_still:${row.id}:b`, label: `Batch still ${b * n + i + 1} of ${hooks.length * n} (slideshow ${b + 1}, slide ${i + 1}), ${c.label}`, parentIndex: parent, request: { ...p.request, slide: { slide: i, row: b, sceneId: c.row.sceneId ?? null } } })
     }
   }
   warnings.push(warn('slideshow-batch-specials', 'Special slides are not charged', 'A slide the draft makes a mock screen gets no still: its part of the price is released.'))
@@ -686,7 +692,7 @@ async function onSlideDraft(deps: Deps, ctx: Ctx, job: JobRow, out: JobOutcome):
   if (!anchor) { await cancelChildren(deps, job.id, 'The slideshow is gone.'); return }
   const d = (out.data ?? {}) as DraftOut
   const hook = meta.hook ?? ''
-  if (tag === 'self') {
+  if (tag !== 'batch') {
     const spec = parse(anchor)
     await updateContent(deps, ctx, anchor.id, { spec: { ...draftPatch(deps, spec, d, { hook, pattern: meta.pattern ?? null, n: meta.n ?? spec.slideCount }) } })
     return
@@ -713,7 +719,7 @@ async function onSlideDraft(deps: Deps, ctx: Ctx, job: JobRow, out: JobOutcome):
   for (const ch of children) {
     const i = (ch.request as GenRequest).slide?.slide ?? 0
     const s = list[i]
-    if (!s || s.special) { await cancelWaiting(deps, ch.id, 'This slide became a special slide (drawn free), so no still was made. Nothing was charged for it.'); continue }
+    if (!s || s.special) { await cancelWaiting(deps, ch.id, `${NOT_NEEDED} this slide became a special slide (drawn free), so no still was made. Nothing was charged for it.`); continue }
     const r = slideRequest(deps, c, s.shot || s.text, (ch.request as GenRequest).seed ?? i + 1, [])
     const problems = [...realismBlockers(r.prompt, { kind: r.request.kind, stage: ch.stage }), ...(findExplicitTerms(r.prompt).length ? [EXPLICIT_MESSAGE] : [])]
     if (problems.length) { await cancelWaiting(deps, ch.id, `The written shot was refused: ${problems.join(' ')} Nothing was charged for this still.`); continue }
@@ -728,8 +734,16 @@ async function onSlideDraft(deps: Deps, ctx: Ctx, job: JobRow, out: JobOutcome):
 // The batch's slideshows, for the review screen.
 export async function batchView(deps: Deps, ctx: Ctx, contentId: string) {
   const { row } = await slideshowPost(deps, ctx, contentId)
-  const kids = await deps.db.select().from(contentItems).where(and(eq(contentItems.accountId, ctx.accountId), eq(contentItems.batchOf, row.id))).orderBy(asc(contentItems.createdAt))
-  return { items: kids.map(k => ({ id: k.id, archived: !!k.archivedAt, status: k.status, spec: parse(k), outputs: k.outputs as ContentOutputs, accountTag: k.accountTag, idea: k.idea })) }
+  const kids0 = await deps.db.select().from(contentItems).where(and(eq(contentItems.accountId, ctx.accountId), eq(contentItems.batchOf, row.id))).orderBy(asc(contentItems.createdAt))
+  // In the order the hooks were pasted (drafts land in any order).
+  const order = parse(row).batchHooks.map(h => h.trim().toLowerCase())
+  const at = (k: ContentRow) => { const i = order.indexOf(k.idea.trim().toLowerCase()); return i < 0 ? order.length : i }
+  const kids = [...kids0].sort((a, b) => at(a) - at(b))
+  // Each slideshow's pictures, so the review shows them as they land.
+  const ids = [...new Set(kids.flatMap(k => parse(k).stillIds.filter(Boolean)))]
+  const rows = ids.length ? await deps.db.select({ id: candidates.id, assetId: candidates.assetId }).from(candidates).where(and(eq(candidates.accountId, ctx.accountId), inArray(candidates.id, ids))) : []
+  const assets = Object.fromEntries(rows.filter(r => r.assetId).map(r => [r.id, r.assetId!]))
+  return { items: kids.map(k => ({ id: k.id, archived: !!k.archivedAt, status: k.status, spec: parse(k), outputs: k.outputs as ContentOutputs, accountTag: k.accountTag, idea: k.idea })), assets }
 }
 
 // Approve (export it, free), or Reject (archived). Reroll is priced: the
