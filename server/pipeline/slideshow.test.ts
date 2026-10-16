@@ -183,7 +183,8 @@ describe('stills in one locked scene', () => {
     expect(built.specs).toHaveLength(photos)
     for (const sp of built.specs) {
       const req = sp.request as GenRequest
-      expect(req.prompt).toContain('a small home office by a window')
+      // The place starts its own sentence.
+      expect(req.prompt).toContain('A small home office by a window.')
       expect(req.prompt).toContain('one camera roll')
       expect(req.prompt).toContain('a gray cotton crewneck sweater')
       expect(req.prompt).toMatch(/REALISM:/)
@@ -228,6 +229,8 @@ describe('stills in one locked scene', () => {
       expect(req.refs ?? []).toHaveLength(0)
       expect(req.prompt).toContain('No one in focus and no faces')
       expect(req.prompt).toMatch(/REALISM: A real phone photo/)
+      // The light sentence ends with one period.
+      expect(req.prompt).not.toMatch(/\.\./)
       expect(req.prompt).not.toContain('Callie')
     }
     await run({ type: 'slideshow_stills', contentId: id })

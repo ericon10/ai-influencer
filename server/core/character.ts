@@ -136,7 +136,8 @@ export function adultProblem(age: number | null | undefined, minAge = DEFAULT_MI
 }
 
 // Body terms the models exaggerate (SPEC 5.1 rule 9).
-const SIZE_TERMS = /\b(?:[A-H]|AA|DD|DDD)[- ]?cups?\b|cup size|bust size|measurements|\b\d{2}-\d{2}-\d{2}\b/i
+// "A cup" is an article and "a cup of tea" is a cup, not a size.
+const SIZE_TERMS = /\b(?:[B-H]|AA|DD|DDD)[- ]?cups?\b(?!\s+of\b)|cup size|bust size|measurements|\b\d{2}-\d{2}-\d{2}\b/i
 
 export interface ValidationIssue { field: string; message: string; severity: 'error' | 'warning' }
 

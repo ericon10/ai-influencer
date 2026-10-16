@@ -101,6 +101,8 @@ describe('video from a picked still (Stage 9, demo mode)', () => {
   it('the end frame helper inpaints only the head: a mask, REF-00 for the face, and QA', async () => {
     const { preview, jobs } = await run({ type: 'scene_end_frame', characterId, candidateId: stillId, change: 'she turns her head toward the camera and looks into the lens', withQa: true })
     expect(preview.prompts[0]!.text).toMatch(/Edit only the masked area, her head and face/)
+    // Her own skin mark by name, from the character file.
+    expect(preview.prompts[0]!.text).toContain('skin texture, the mole and everything outside the mask exactly the same.')
     const req = (await getJob(h.deps, h.ctx, jobs[0]!.id)).request as GenRequest
     const stillAsset = (await sceneCandidates(h.deps, h.ctx, [sceneId])).find(c => c.id === stillId)!.assetId!
     // The quote names the still to mask; the worker made the mask at submit.

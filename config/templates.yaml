@@ -144,8 +144,9 @@ video:
   # Chaining (Phase 3, "Continue this shot"): added to a take that starts
   # from the last frame of a kept clip.
   continue: "Continues the previous shot from this exact frame: the same place, the same light from the same direction, the same wardrobe and hair, the same camera position."
-  # The end frame helper: only the masked head and face change.
-  end_frame: "Edit only the masked area, {poss} head and face: {change}. Keep {poss} identity, hair, skin texture, the mole and everything outside the mask exactly the same."
+  # The end frame helper: only the masked head and face change. {marks} is
+  # the character's own skin marks (", the mole"), empty when there are none.
+  end_frame: "Edit only the masked area, {poss} head and face: {change}. Keep {poss} identity, hair, skin texture{marks} and everything outside the mask exactly the same."
 
 # Clone Video (SPEC 13.1 R1), for the models that take a prompt. "swap"
 # keeps the source clip's place and changes only the person; "image" puts
@@ -183,8 +184,9 @@ clone:
   # The motion step (owner's proven motion prompt, the kitchen clip on Wan
   # 3.0, 2026-10-14), for every motion model on both paths. @Image1 is the
   # chosen still, @Video1 the cleaned clip. {scene} lists what to keep from
-  # the still; {motion} says what happens in the clip.
-  motion: "Motion transfer. @Image1 defines everything you see: this exact {noun}, {poss} face, {hair_color} hair, {scene}, exactly as in @Image1 for the whole clip. The first frame matches @Image1. @Video1 is used ONLY for motion: copy its body movement, head turns, facial expressions, timing and handheld phone camera movement exactly, beat for beat. Never copy the person, the room, the caption text or the logo from @Video1.{motion} {Poss} face stays the same person from every angle. {Poss} outfit stays exactly as in @Image1 for the whole clip, same cut, length and fit. One continuous take, no cuts. No text, no captions, no logos, no watermark. Silent. Candid phone video, natural skin, not retouched."
+  # the still; {motion} says what happens in the clip. The silent line
+  # ("Silent, no audio, no dialogue.") is added after it by code.
+  motion: "Motion transfer. @Image1 defines everything you see: this exact {noun}, {poss} face, {hair_color} hair, {scene}, exactly as in @Image1 for the whole clip. The first frame matches @Image1. @Video1 is used ONLY for motion: copy its body movement, head turns, facial expressions, timing and handheld phone camera movement exactly, beat for beat. Never copy the person, the room, the caption text or the logo from @Video1.{motion} {Poss} face stays the same person from every angle. {Poss} outfit stays exactly as in @Image1 for the whole clip, same cut, length and fit. One continuous take, no cuts. No text, no captions, no logos, no watermark. Candid phone video, natural skin, not retouched."
   motion_scene: "{poss} outfit, the place and the light"
   motion_what: " The motion: {motion}."
   outfit_source: "Keep the clothes, shoes and accessories that person wears in the source exactly the same."
