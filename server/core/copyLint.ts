@@ -46,12 +46,12 @@ export interface LintOptions {
 
 const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 const phrase = (w: string) => new RegExp(`(^|[^A-Za-z0-9])(${esc(w).replace(/\\?[\s-]+/g, '[\\s-]+')})(?=$|[^A-Za-z0-9])`, 'i')
-const LONG_DASH = /[–—]/
+const LONG_DASH = /[\u2013\u2014]/
 
 // "just" opening a clause and followed by a verb reads as an order ("Just
-// apply early", "you can just ask"); "I just applied" and "just because"
+// apply early", "you can just ask", "you should just unlock"); "I just applied" and "just because"
 // do not.
-const JUST = /(?:^|[.!?:;,"“(]\s*|\b(?:and|so|then|can|could|gotta|simply)\s+)(just\s+(?!because\b|kidding\b|like\b|in\b|now\b|a\b|an\b|the\b|my\b|me\b|one\b|two\b|that\b|this\b|for\b|to\b|as\b|not\b|about\b|enough\b|another\b|some\b|got\b|had\b|was\b|did\b|said\b)[a-z]+)/i
+const JUST = /(?:^|[.!?:;,"“(]\s*|\b(?:and|so|then|can|could|gotta|simply|should|must|will|need\s+to|have\s+to|has\s+to|ought\s+to)\s+|\w'll\s+)(just\s+(?!because\b|kidding\b|like\b|in\b|now\b|a\b|an\b|the\b|my\b|me\b|one\b|two\b|that\b|this\b|for\b|to\b|as\b|not\b|about\b|enough\b|another\b|some\b|got\b|had\b|was\b|did\b|said\b)[a-z]+)/i
 
 // The sentences of a text: split at . ! ? and line breaks.
 const sentences = (t: string) => t.split(/(?<=[.!?])\s+|\n+/).map(s => s.trim()).filter(Boolean)

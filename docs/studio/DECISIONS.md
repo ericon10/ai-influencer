@@ -2527,3 +2527,58 @@ audit and the plan.
 - **Paid test.** One capped real test, under $1, price shown first (the
   report has the numbers).
 
+
+### G56. Slideshow power-up 2: launch ready (owner, 2026-10-16)
+
+The owner: "The 140-post launch plan (starts Mon Oct 19) goes from CSV to
+finished posts in the existing flows, and new hooks get written the new
+way. No new pages." The spec is four files in `docs/content/` (the
+playbook, the post writer brief, the claims sheet and the plan CSV);
+UX-PLAN.md section 28 has the audit and the plan.
+
+- **The playbook is data.** The structure and lens codes (S1 to S12, L13
+  to L25), the effects (E1 to E8) and the score ladder are in
+  `server/core/playbook.ts`; the fit table (each account's primary and
+  backup) and the lint's word lists are in `config/content.yaml`. Accounts
+  keep the owner's own primary and backup (migration 0016) over the fit
+  table.
+- **Write 10 with Claude is two calls under one price**: the writer
+  (`slideshow_hooks`) and a separate reviewer (`slideshow_hooks_review`,
+  a waiting child activated with the writer's hooks). Only scores 1 and 2
+  show; the rest are counted, not lost. When the reviewer fails, the
+  writer's own ranks show, marked "(writer)". The writer never gets the
+  code of the account's last post in schedule order (`structure-repeat`,
+  a default).
+- **The language lint** (`server/core/copyLint.ts`) is one pure function
+  for the browser and the server: free, warnings only, each check a
+  default rule (area copy) switchable per account or character. It never
+  blocks a run or an export.
+- **The plan import is code, not Claude.** Every word is kept as written;
+  the scene is split by "Slide N:" into each slide's shot and the rest is
+  the locked scene. Drafts are matched by account and row_id, so an import
+  again updates instead of doubling and never touches a post with
+  pictures. Feeders are topic slideshows filed under a character for
+  storage only. "Draw mock screens by code" starts off: the plan's scenes
+  put screens on laptops and phones in real places, so every slide is a
+  photo as written unless the owner turns it on or switches a slide.
+- **Generate N posts is one quote**, with the job runner's new queue
+  groups: ten posts at a time, the next group activated when the one
+  before has no job running or waiting on a parent (`advanceQueue`). Up to
+  100 posts in one click. A clip row gets its opening still only; its take
+  waits for the owner in the post, with its own price.
+- **The plan row travels with the post** (`spec.plan`, `planMetaSchema`):
+  the Plan line on the post, and post.json version 2's `plan` section with
+  the CSV's own names. Video posts now save a post.json too.
+- **"Ad:" replaces "#ad"** first in the caption (the brief's rule); a
+  product row turns it on. The CTA line is added under the caption when
+  it is not already in it.
+- **Nine more mock screens** are drawn by `drawnScreen` in
+  `server/core/slideSvg.ts` for the preview and the export alike, generic
+  names only. The **Product screenshot** is never drawn: it is the
+  owner's upload, placed as uploaded (its own aspect, sized and placed
+  Top or Middle, out of the bottom 20%), and the export waits for it.
+- **Variations go to an account of the same kind**: a character post's to
+  that character's other accounts, a topic post's to another topic
+  account. Variation 1 uses the alt hook word for word.
+- **Paid test.** One capped real test under $1, price first, on the
+  Higgsfield API path (GPT Image 2.5 Flare); see LATER.md for what ran.

@@ -20,6 +20,9 @@ describe('copy lint', () => {
   it('"just" before an instruction, but not "I just applied"', () => {
     expect(rules('Just apply in the first hour')).toContain('lint-just')
     expect(rules('Easy. You can just ask the recruiter')).toContain('lint-just')
+    expect(rules('You should just unlock it')).toContain('lint-just')
+    expect(rules('Honestly you\'ll just send it')).toContain('lint-just')
+    expect(rules('It will just sit there')).toContain('lint-just')
     expect(rules('I just applied at 11:52pm')).not.toContain('lint-just')
     expect(rules('It was just a quick chat')).not.toContain('lint-just')
   })

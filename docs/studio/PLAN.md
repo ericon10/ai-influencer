@@ -574,6 +574,22 @@ Decisions: `DECISIONS.md` G37 and G38. UX: `UX-PLAN.md` section 15.
 - [x] Guide section "Slideshows, hook first", glossary, five annotated screenshots, How this works on each new panel
 - [x] Tests: unit (layout, clamping, patterns, vault hooks, CTA, brand names, slide edits, post.json), pipeline (every action priced, both modes, the API path, export, variations, batch, no-reuse, Scene library), Playwright desktop, batch and phone
 
+### Slideshow power-up 2: launch ready (G56, UX-PLAN.md section 28)
+
+- [x] The four spec files in `docs/content/` (playbook, post writer brief, claims sheet, the plan CSV)
+- [x] Write 10 with Claude the playbook way: a moment, a code (S1 to S12, L13 to L25), effects (E1 to E8), an alt hook, then a separate reviewer; only 1s and 2s show
+- [x] Per account: a primary and a backup structure (Accounts, migration 0016, the fit table as data); never the last post's code (`structure-repeat`)
+- [x] Jenga drafts: each slide opens the next, setup and punchline apart, payoff last, 4 to 14 words, the CTA line
+- [x] Language lint, free and warnings only, on every hook, slide and caption, the plan preview and Finish (eight default rules, area copy)
+- [x] Import a plan CSV: Preview (free) by day and account, the drafts as written (free), the plan fields on the post and in post.json version 2
+- [x] Generate N posts: one price, ten posts at a time (job queue groups), up to 100
+- [x] Alt hook swap (slideshows and video posts); variations start from the alt hook and go to an account of the same kind
+- [x] Nine more mock screens drawn by code, and the Product screenshot (the owner's upload only; the export waits for it)
+- [x] "Ad:" first in the caption for an ad or a product row
+- [x] Guide: the launch plan section, the slideshow section updated, new glossary terms, six new or refreshed screenshots; How this works on the Launch plan card
+- [x] Tests: unit (lint, playbook codes, the plan reader, the screens, the screenshot box), pipeline (hook writer and reviewer, never twice, the plan import and Generate N posts on the real CSV, the screenshot in both export sizes), Playwright (the plan, the hook cards, the lint, the swap, a lock screen and a product screenshot to export)
+- [ ] The capped real test on the API path (production, the owner's click)
+
 ## Roadmap after Phase 4 (owner, 2026-10-13; not started)
 
 SPEC 13.1, R1 to R7: Clone Video (first after Phase 3), Inspo board

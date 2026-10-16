@@ -1047,7 +1047,7 @@ batch's own spreadsheet import, every price button.
 | Generate | The Launch plan card, after the drafts | Tick rows (or a day, or an account) and **Generate N posts** (one price first, the stills model and billing path on the button: Nano Banana 2.1 on the plan or GPT Image 2.5 Flare on the API). A slideshow gets a still for every photo slide; a clip gets its opening still, and its take is made in the post with its own price after the owner picks the still. More than 10 rows queue in tens: ten posts run, then the next ten; built for 100 in one click | 1 |
 | Alt hook swap | Idea step (slideshows) and the Caption step (video posts), next to the hook | **Swap with the alt hook** (free): the hook and the alt hook trade places in one tap. **Make variations** starts from the alt hook: variation 1 uses it word for word, the others reword it | 1 |
 | More special slides | Each slide card's picture menu, and the Slides step's editor | Nine more, drawn by code, generic, no real brands or logos: application form (empty or filled, with a field count), portal status timeline with timestamps, calendar invite, itemized invoice or receipt, bank or savings app (amounts can be blurred), museum placard, 0 to 10 survey, lock screen with a notification stack, profile card with a banner | 1 |
-| Product screenshot | The same picture menu: **Product screenshot** | Upload a real SideStep screenshot; it is placed on the slide as uploaded (drag it, size it), over the slide's photo or a plain background. The Studio never draws a SideStep screen | 2 |
+| Product screenshot | The same picture menu: **Product screenshot** | **Upload the screenshot** on the slide card (a real SideStep screenshot); it is placed as uploaded, never stretched, over the slide's blurred photo; the Slides step sets its size and its place (Top or Middle) and keeps it out of the bottom 20%. Export waits until it is uploaded. The Studio never draws a SideStep screen | 2 |
 
 Every paid step shows its price and model and waits for the click: Write 10
 with Claude (writer and reviewer), Use this hook, Generate N posts, and
@@ -1066,4 +1066,10 @@ CTA line that is not already in the caption is added after it in "As
 posted". A topic account needs no character, but its posts are filed under
 one (the account's character on the Accounts card, else the first
 character) because pictures are stored per character; nothing of that
-character (face, voice, name) goes into a topic post.
+character (face, voice, name) goes into a topic post. The Idea step of a
+topic post says so ("F2 · a topic account, no one in the photos (pictures
+filed under Callie)") instead of "For Callie". Make variations sends each
+variation to another account of the same kind: a character post's to
+that character's other accounts, a topic post's to another topic account,
+never a face onto a faceless account. post.json lists each special
+slide's own fields, and a product screenshot's asset, width and place.

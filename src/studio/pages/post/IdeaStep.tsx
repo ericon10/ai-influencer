@@ -112,12 +112,20 @@ export function IdeaStep({ ctx }: { ctx: PostCtx }) {
     </div>
   )
 
+  // A topic slideshow is faceless: its character only stores the pictures.
+  const topic = item.kind === 'slideshow' && (item.spec as { mode?: string } | null)?.mode === 'topic'
   return (
     <div className="st-col" style={{ gap: 16 }}>
       {current ? (
         <div className="st-row st-forline" style={{ gap: 8 }}>
-          <Img assetId={current.portraitAssetId} width={64} className="st-forline-img" />
-          <span>For <b>{current.name}</b>{item.accountTag ? <span className="st-muted"> · {item.accountTag}</span> : null}</span>
+          {topic ? (
+            <span><b>{item.accountTag || 'Topic account'}</b><span className="st-muted"> · a topic account, no one in the photos (pictures filed under {current.name})</span></span>
+          ) : (
+            <>
+              <Img assetId={current.portraitAssetId} width={64} className="st-forline-img" />
+              <span>For <b>{current.name}</b>{item.accountTag ? <span className="st-muted"> · {item.accountTag}</span> : null}</span>
+            </>
+          )}
           <button type="button" className="st-btn xs ghost" onClick={() => openMore('post-character')}>Change</button>
         </div>
       ) : (

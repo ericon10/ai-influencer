@@ -208,3 +208,30 @@ first.
 - Batch review: approve all that have every picture in one click.
 - Export straight into the posting engine once its format is fixed (the
   mapping already lives in server/core/postExport.ts).
+
+## Slideshow power-up 2: launch ready (2026-10-16)
+
+### Paid tests queued for the owner
+
+- **The capped real test (under $1, the owner's click in production):**
+  Posts > Launch plan, import the plan CSV (free), then Generate 1 post
+  for one feeder row on GPT Image 2.5 Flare on the Higgsfield API (6
+  stills, about $0.36) and 1 post for a Callie slideshow row (6 stills).
+  The first real API-path run.
+- **Write 10 with Claude, the playbook way, on a real account:** the
+  writer and the reviewer on F2 and on CALLIE, to see the codes, moments
+  and scores land and how many the reviewer hides. Two Claude calls each
+  (a few cents).
+
+### Small ideas (not built)
+
+- The Accounts card could show a topic account as "Topic" in its
+  character column (today it shows the character its pictures are filed
+  under).
+- The plan grid could open a row's post on a click (today: the list below
+  the import).
+- Drag the product screenshot freely (today: Top or Middle and a size).
+- A "Generate the rest of this day" button on the plan list.
+- Read stat_source into a small source line on the last slide of a stat
+  post, when the owner wants one.
+

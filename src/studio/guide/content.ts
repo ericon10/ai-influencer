@@ -347,7 +347,7 @@ export const GUIDE: GuideSection[] = [
       'Stills: One camera roll holds the place, the light, the phone, the outfit and 2 details for every photo. Save this scene keeps them in the Scene library; pick a saved scene in any slideshow so the same room looks the same every time.',
       'Made for: TikTok 9:16 or Instagram 3:4, the shape the stills are made in. The export makes both sizes either way.',
       'Pick the stills model (Nano Banana 2.1 on your Higgsfield plan, or GPT Image 2.5 Flare on the Higgsfield API) and press Generate the set: one price for every slide without a picture. Each still lands in its own slide.',
-      'Each slide card: Reroll (priced) makes a new picture for that slide only; the rest of the set stays. Library and Upload put your own picture in it. The picture menu turns a slide into a special slide drawn by code for free, with generic names only: a phone notification, a text thread, a rejection email, a job posting, an application form (empty or filled, with its field count), a portal status timeline, a calendar invite, an invoice or receipt, a bank or savings app (amounts can be blurred), a museum placard, a 0 to 10 survey, a lock screen with notifications, or a profile card. Product screenshot places your own uploaded screenshot of the product; the Studio never draws one.',
+      'Each slide card: Reroll (priced) makes a new picture for that slide only; the rest of the set stays. Library and Upload put your own picture in it. The picture menu turns a slide into a special slide drawn by code for free, with generic names only: a phone notification, a text thread, a rejection email, a job posting, an application form (empty or filled, with its field count), a portal status timeline, a calendar invite, an invoice or receipt, a bank or savings app (amounts can be blurred), a museum placard, a 0 to 10 survey, a lock screen with notifications, or a profile card. Product screenshot places your own screenshot of the product, as uploaded: press Upload the screenshot on its card, then set its size and place (Top or Middle) in the Slides step. The Studio never draws a product screen, and Export waits until the screenshot is uploaded.',
       'Slides: pick the text style (Classic, Text box, Minimal, Note). Drag the words on the big preview, or use the arrow keys; the safe zones shade the top 10% and the bottom 20%, and the words stay out of them.',
       'Set the CTA slide (Follow for part 2, Save this, Follow @handle with your handle typed, Comment a word, More on my page), the caption (Rewrite the caption is priced), the CTA line under it, at most 5 hashtags, and #ad: Ad on slide 1 and "Ad:" first in the caption.',
       'Language notes show under every hook, slide and caption as you type, free and never a block: long dashes; should, need to, must, ought; "just" before an instruction; dream job, unlock, level up, game-changer, supercharge; a sentence that starts with "You" ("POV:" is fine); more than 5 hashtags; the product in a hook; a product post whose caption does not start with "Ad:". Each is a default in Settings, Rules. The Finish step lists them all.',
@@ -363,8 +363,10 @@ export const GUIDE: GuideSection[] = [
     ],
     cost: 'Hooks from the vault, special slides, the language notes, the alt hook swap, text styles and the export are free. Write 10 with Claude (writer and reviewer), Use this hook and Rewrite the caption are small Claude calls (a few cents at most). Each still is one image on the model shown on the button (Nano Banana 2.1 at 1k: 1.5 plan credits; GPT Image 2.5 Flare at Standard: 1 plan credit, about $0.06 on the API). Variations and a batch add up their Claude calls and stills; the total is on the button before anything runs.',
     shots: [
-      { id: 'slideshow-hooks', caption: 'Idea: the hook box, Write 10 hooks, and Use this hook on each' },
+      { id: 'slideshow-hooks', caption: 'Idea: the hook box with its language notes, the alt hook, and the playbook hook cards' },
       { id: 'slideshow-stills', caption: 'Stills: one camera roll, the Scene library, Generate the set and a card per slide' },
+      { id: 'slideshow-screens', caption: 'Slides drawn by code (a lock screen, a museum placard) and a Product screenshot you upload' },
+      { id: 'slideshow-screen-editor', caption: 'Slides: a drawn screen\'s own fields, next to the big preview' },
       { id: 'slideshow-slides', caption: 'Slides: the text styles, the big preview with the safe zones, the CTA, caption and #ad' },
       { id: 'slideshow-finish', caption: 'Finish: both sizes, post.json, and Make variations' },
       { id: 'slideshow-batch', caption: 'Batch from hooks: paste, Make 10, review' },
@@ -391,7 +393,10 @@ export const GUIDE: GuideSection[] = [
       'The plan\'s CTA line is added under the caption as posted when it is not already in it.',
     ],
     cost: 'The preview, the import and the drafts are free. Generate N posts is one priced run: one still per photo slide (and one per clip) on the model on the button; the total shows before anything runs.',
-    shots: [],
+    shots: [
+      { id: 'launch-plan-preview', caption: 'Posts > Launch plan: the CSV, Preview (free), each account, the rows by day, the price' },
+      { id: 'launch-plan-posts', caption: 'The plan\'s posts: filter, tick, pick the stills model, Generate N posts' },
+    ],
   },
   {
     id: 'post-finish', group: 'Make a post', title: 'Step 5: Finish', color: 'green',
@@ -458,6 +463,7 @@ export const GUIDE: GuideSection[] = [
       'Edit anything in place: a hook\'s words, a new hook, the claims sheet or the buyer language (Edit, one item per line; a line ending in a colon starts a group).',
       'In a video post, press Pick a hook next to Caption: this character\'s variants come first under each hook.',
       'On Posts home, open Accounts: add each account, its character, its tracked link or promo code, and type its signups from your link tracker. The table re-ranks itself.',
+      'Primary and backup (Accounts): the two structures from the playbook this account leans on (about 35% and 20% of its posts), filled from the playbook\'s fit table and editable. Under them, the code of the account\'s last post; the hook writer never uses it twice in a row.',
     ],
     tips: [
       'Keep the 80/20 mix: about 80% pure value and relatable posts, 20% soft product mentions.',
@@ -469,7 +475,7 @@ export const GUIDE: GuideSection[] = [
     shots: [
       { id: 'hooks', caption: 'Library > Hooks' },
       { id: 'hook-variants', caption: 'A hook with a variant in Callie\'s voice' },
-      { id: 'accounts', caption: 'Posts home > Accounts' },
+      { id: 'accounts', caption: 'Posts home > Accounts, with each account\'s primary and backup structure' },
     ],
   },
   {

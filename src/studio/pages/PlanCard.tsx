@@ -214,8 +214,8 @@ function PlanPosts({ posts }: { posts: PlanPostView[] }) {
   return (
     <div className="st-col" style={{ gap: 10 }} data-field="plan-posts">
       <div className="st-row" style={{ gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-        <select className="st-select" value={day} onChange={e => setDay(e.target.value)} aria-label="Day"><option value="">Every day</option>{days.map(d => <option key={d} value={d}>{dayLabel(d)}</option>)}</select>
-        <select className="st-select" value={account} onChange={e => setAccount(e.target.value)} aria-label="Account"><option value="">Every account</option>{accounts.map(a => <option key={a} value={a}>{a}</option>)}</select>
+        <select className="st-select" style={{ width: 'auto' }} value={day} onChange={e => setDay(e.target.value)} aria-label="Day"><option value="">Every day</option>{days.map(d => <option key={d} value={d}>{dayLabel(d)}</option>)}</select>
+        <select className="st-select" style={{ width: 'auto' }} value={account} onChange={e => setAccount(e.target.value)} aria-label="Account"><option value="">Every account</option>{accounts.map(a => <option key={a} value={a}>{a}</option>)}</select>
         <button type="button" className="st-btn sm ghost" disabled={!needing.length} onClick={() => setPicked(s => new Set([...s, ...needing.map(p => p.id)]))}>Tick the {needing.length} shown that need pictures</button>
         {picked.size > 0 && <button type="button" className="st-btn sm ghost" onClick={() => setPicked(new Set())}>Clear</button>}
       </div>

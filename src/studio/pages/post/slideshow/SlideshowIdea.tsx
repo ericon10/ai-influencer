@@ -97,7 +97,6 @@ export function SlideshowIdea({ ctx }: { ctx: PostCtx }) {
           </div>
         )}
       </div>
-      <RunStatus match={j => j.purpose.startsWith(`slideshow_hooks:${item.id}`)} />
       {reviewing && <span className="st-hint" role="status">The reviewer is scoring the hooks; only the 1s and 2s will show.</span>}
 
       {visible.length > 0 && (

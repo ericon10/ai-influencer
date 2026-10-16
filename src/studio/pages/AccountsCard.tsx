@@ -87,7 +87,7 @@ function AccountRow({ r, characters }: { r: SocialAccount; characters: Character
         </select>
       </td>
       <td data-field={`account-structures-${r.tag}`}>
-        <div className="st-row" style={{ gap: 4, flexWrap: 'nowrap' }}>
+        <div className="st-col" style={{ gap: 4 }}>
           <CodePick value={r.primary ?? null} label={`Primary structure for ${r.tag}`} onChange={v => void save({ primaryCode: v, backupCode: r.backup ?? null })} />
           <CodePick value={r.backup ?? null} label={`Backup structure for ${r.tag}`} onChange={v => void save({ backupCode: v, primaryCode: r.primary ?? null })} />
         </div>
@@ -105,7 +105,7 @@ function AccountRow({ r, characters }: { r: SocialAccount; characters: Character
 // A structure or lens code (S1 to S12, L13 to L25).
 function CodePick({ value, label, onChange }: { value: string | null; label: string; onChange: (v: string | null) => void }) {
   return (
-    <select className="st-input sm" style={{ width: 92 }} value={value ?? ''} onChange={e => onChange(e.target.value || null)} aria-label={label} title={value ? codeLabel(value) : 'Not set'}>
+    <select className="st-input sm" style={{ width: 190 }} value={value ?? ''} onChange={e => onChange(e.target.value || null)} aria-label={label} title={value ? codeLabel(value) : 'Not set'}>
       <option value="">None</option>
       {STRUCTURES.map(c => <option key={c.code} value={c.code}>{codeLabel(c.code)}</option>)}
     </select>

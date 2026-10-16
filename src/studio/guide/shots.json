@@ -994,48 +994,40 @@
     ]
   },
   "accounts": {
-    "w": 1068,
-    "h": 424,
+    "w": 1124,
+    "h": 700,
     "spots": [
       {
         "n": 1,
-        "x": 3.1,
-        "y": 33.7,
-        "w": 3.5,
-        "h": 13.3,
+        "x": 1.9,
+        "y": 13.3,
+        "w": 96.3,
+        "h": 5.4,
         "label": "Ranked by signups, never by views"
       },
       {
         "n": 2,
-        "x": 30.3,
-        "y": 36.4,
-        "w": 22.7,
-        "h": 7.9,
-        "label": "This account's tracked link (it goes in the caption or bio)"
+        "x": 22.2,
+        "y": 18.7,
+        "w": 19.6,
+        "h": 16.1,
+        "label": "Primary and backup: the structures the hook writer leans on; never the last post's code again"
       },
       {
         "n": 3,
-        "x": 55.3,
-        "y": 36.4,
-        "w": 10.3,
-        "h": 7.9,
-        "label": "Or its promo code"
+        "x": 42.8,
+        "y": 24.3,
+        "w": 18.6,
+        "h": 4.8,
+        "label": "This account's tracked link (it goes in the caption or bio)"
       },
       {
         "n": 4,
-        "x": 77.2,
-        "y": 36.4,
-        "w": 7.5,
-        "h": 7.9,
-        "label": "Signups from your link tracker"
-      },
-      {
-        "n": 5,
-        "x": 3.1,
-        "y": 75.9,
-        "w": 24.3,
-        "h": 10.1,
-        "label": "Add an account by hand"
+        "x": 63.6,
+        "y": 24.3,
+        "w": 9.8,
+        "h": 4.8,
+        "label": "Or its promo code"
       }
     ]
   },
@@ -2453,55 +2445,55 @@
   },
   "slideshow-hooks": {
     "w": 1124,
-    "h": 1375,
+    "h": 1700,
     "spots": [
       {
         "n": 1,
         "x": 1.7,
-        "y": 8.6,
+        "y": 6.8,
         "w": 96.6,
-        "h": 7.3,
-        "label": "The hook: slide 1, 4 to 12 words. Type your own or pick one"
+        "h": 5.9,
+        "label": "The hook: slide 1, 4 to 14 words. Type your own or pick one"
       },
       {
         "n": 2,
         "x": 1.7,
-        "y": 17,
+        "y": 13.6,
         "w": 96.6,
-        "h": 2.2,
-        "label": "Write 10 hooks: from the vault (free) or with Claude (priced)"
+        "h": 3.2,
+        "label": "Language notes as you type: free, never a block"
       },
       {
         "n": 3,
         "x": 1.7,
-        "y": 23.4,
+        "y": 17.6,
         "w": 96.6,
         "h": 2,
-        "label": "Each hook tagged by pattern; the chips filter them"
+        "label": "The alt hook, and Swap with the alt hook (free)"
       },
       {
         "n": 4,
         "x": 1.7,
-        "y": 26,
-        "w": 96.3,
-        "h": 3.5,
-        "label": "Use this hook drafts every slide (priced, the model named)"
+        "y": 31.7,
+        "w": 96.6,
+        "h": 1.1,
+        "label": "This account's primary and backup; never the last post's code"
       },
       {
         "n": 5,
         "x": 1.7,
-        "y": 69.8,
-        "w": 14.9,
-        "h": 4.6,
-        "label": "Who is in the photos: the character, or no one (a topic)"
+        "y": 35.7,
+        "w": 96.3,
+        "h": 6.1,
+        "label": "A hook card: the moment, its code and effects, the alt hook, the reviewer's score"
       },
       {
         "n": 6,
         "x": 1.7,
-        "y": 75.4,
+        "y": 73.2,
         "w": 96.6,
-        "h": 5.3,
-        "label": "Batch from hooks: paste up to 10, make them all, review"
+        "h": 1.1,
+        "label": "The reviewer scores each 1 to 5; only the 1s and 2s show"
       }
     ]
   },
@@ -2686,6 +2678,166 @@
         "w": 21.8,
         "h": 2,
         "label": "Reroll (a new set, priced) or Reject"
+      }
+    ]
+  },
+  "launch-plan-preview": {
+    "w": 1124,
+    "h": 1550,
+    "spots": [
+      {
+        "n": 1,
+        "x": 1.9,
+        "y": 9,
+        "w": 96.3,
+        "h": 5.9,
+        "label": "Paste the plan, or Upload the CSV"
+      },
+      {
+        "n": 2,
+        "x": 28.2,
+        "y": 15.7,
+        "w": 3.9,
+        "h": 1.7,
+        "label": "Draw mock screens by code (off: every slide a photo, as written)"
+      },
+      {
+        "n": 3,
+        "x": 1.9,
+        "y": 18.1,
+        "w": 96.3,
+        "h": 22.3,
+        "label": "Each account: a character, or a topic account (no one in the photos)"
+      },
+      {
+        "n": 4,
+        "x": 1.9,
+        "y": 42.9,
+        "w": 96.3,
+        "h": 47.1,
+        "label": "The rows by day and account; hover a chip for its hook and price"
+      },
+      {
+        "n": 5,
+        "x": 1.9,
+        "y": 90.7,
+        "w": 96.3,
+        "h": 1.8,
+        "label": "The stills model the price is for"
+      },
+      {
+        "n": 6,
+        "x": 1.9,
+        "y": 93.1,
+        "w": 96.3,
+        "h": 2.3,
+        "label": "What it is and what generating every picture would cost"
+      }
+    ]
+  },
+  "launch-plan-posts": {
+    "w": 1124,
+    "h": 696,
+    "spots": [
+      {
+        "n": 1,
+        "x": 1.9,
+        "y": 1.4,
+        "w": 10.9,
+        "h": 6.2,
+        "label": "Filter by day or account"
+      },
+      {
+        "n": 2,
+        "x": 26.2,
+        "y": 2.4,
+        "w": 21.1,
+        "h": 4.3,
+        "label": "Tick every post shown that still needs pictures"
+      },
+      {
+        "n": 3,
+        "x": 1.9,
+        "y": 14.5,
+        "w": 96.3,
+        "h": 6.8,
+        "label": "A post: its day and slot, account, format, hook and pictures; open it from its row id"
+      },
+      {
+        "n": 4,
+        "x": 1.9,
+        "y": 83.4,
+        "w": 96.3,
+        "h": 4,
+        "label": "The stills model: your plan or the Higgsfield API"
+      },
+      {
+        "n": 5,
+        "x": 1.9,
+        "y": 88.8,
+        "w": 20.5,
+        "h": 5.5,
+        "label": "Generate N posts: one price first, ten posts at a time"
+      }
+    ]
+  },
+  "slideshow-screens": {
+    "w": 1086,
+    "h": 1045,
+    "spots": [
+      {
+        "n": 1,
+        "x": 21,
+        "y": 28,
+        "w": 17.5,
+        "h": 2.9,
+        "label": "The picture menu: a photo, or a screen drawn by code (free)"
+      },
+      {
+        "n": 2,
+        "x": 20.2,
+        "y": 0,
+        "w": 19.1,
+        "h": 53.5,
+        "label": "A lock screen with its notification stack"
+      },
+      {
+        "n": 3,
+        "x": 40.4,
+        "y": 0,
+        "w": 19.1,
+        "h": 53.5,
+        "label": "A museum placard"
+      },
+      {
+        "n": 4,
+        "x": 0.8,
+        "y": 86,
+        "w": 17.5,
+        "h": 9.6,
+        "label": "Product screenshot: your own upload, placed as it is; never drawn"
+      }
+    ]
+  },
+  "slideshow-screen-editor": {
+    "w": 1086,
+    "h": 1100,
+    "spots": [
+      {
+        "n": 1,
+        "x": 6.1,
+        "y": 15.7,
+        "w": 64.6,
+        "h": 34,
+        "label": "The screen's own fields: the clock, the date, one notification a line"
+      },
+      {
+        "n": 2,
+        "x": 72.4,
+        "y": 0,
+        "w": 27.6,
+        "h": 41.9,
+        "label": "The big preview, exactly as it goes into the JPEG"
       }
     ]
   }
