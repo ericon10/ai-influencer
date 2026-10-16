@@ -948,3 +948,52 @@ step.
 
 A default rule in Settings > Rules: "Name the garment in the clip's outfit"
 (`outfit-garment`), on to start, off for one character or all.
+
+## 27. Slideshow power-up: hook first, one camera roll, text styles, variations, batch (owner, 2026-10-16)
+
+Goal: from a hook to a finished slideshow in minutes, at volume. Everything
+is built inside the slideshow's own four steps (Idea, Stills, Slides,
+Finish). No new page, no new step.
+
+**What the slideshow did before this (the audit):**
+
+| Step | Before |
+|---|---|
+| Idea | One box, "What is the slideshow about?", and More control (character, account). No hooks |
+| Stills | Pick from the Library (several at once), Upload images, or Write and generate stills of the post's one scene (the video post's machinery: 1 to 4 stills of one moment, Add to the slideshow); reorder with arrows; up to 10. No per-slide shots, no reroll of one slide, no topic stills, 9:16 only |
+| Slides | Write the slides (Claude, priced): a hook, 5 to 7 slides, a caption and 3 to 6 hashtags, all editable; a preview strip in TikTok's white box |
+| Finish | Export images (free): 1080 x 1920 JPEGs with the words in the white box, a zip with caption.txt, each slide downloadable. No Instagram size, no JSON, no variations, no batch |
+
+Kept as they were: Pick from the Library, Upload images, the arrows, the
+free export on the worker, Make another like this, captions optional.
+
+**What it does now:**
+
+| Piece | Where | How it works | Clicks |
+|---|---|---|---|
+| Hook box | Idea step, at the top (slideshows) | One line, the hook (slide 1). Typing your own works; nothing is required | 0 |
+| Write 10 hooks | Under the hook box | Two buttons. **10 from the vault** (free, code only): hooks from the product's hook vault and buyer language, recast into the patterns below. **Write 10 with Claude** (priced on the button, the model named): the vault, the buyer language and the character's voice card go in; 10 come back. Each hook carries its pattern tag: someone doubts or reacts, POV, things nobody tells you, red flags, listicle, storytime, myth vs fact, tier list. Pattern chips filter the list. The product is the account's first kit unless another is picked | 1 |
+| Draft every slide | Each hook in the list: **Use this hook** (priced, Claude) | The hook becomes slide 1 and every slide is drafted (6 by default, 4 to 10 in Slides): hook, setup, the reveal on slide 3 or 4, the payoff, a soft CTA last. 4 to 12 words a slide. Each slide also gets the shot its photo shows (inside the locked scene) and, where it helps, a special slide (below). The caption and hashtags come with it. All editable | 1 |
+| Who is in the photos | Idea step, under the hook | **The character** (refs or the Element, the REALISM block, the outfit locked across the slides) or **No one, a topic** (feeder accounts: offices, skylines, commutes, desk setups, interview lobbies). Topic photos have no person and no face check; the REALISM block is still in every prompt | 1 |
+| One camera roll (the locked scene) | Stills step, top card | One scene for the whole slideshow so the set reads like one camera roll: place, light, phone camera, outfit (character only) and 2 details. Every slide's prompt carries the same lines; only the shot changes. Filled from the draft, editable | 0 |
+| Made for | Stills step, beside the scene | **TikTok 9:16** (default) or **Instagram 3:4**: the shape the stills are made in. The export makes both sizes either way (the other by a center crop) | 1 |
+| Generate the set | Stills step | One price for every slide that has no picture yet (model and billing path on the button: Nano Banana 2.1 on the Higgsfield plan, GPT Image 2.5 Flare on the Higgsfield API; whichever is connected, the last pick kept). Each still lands in its slide, with the free face and skin checks in character mode | 1 |
+| Reroll one slide | Each slide card | **Reroll** (priced, one still): a new picture for that slide only, the rest of the set untouched. **Library** and **Upload** put your own picture in that slide; the old multi-pick and upload still add to the end | 1 |
+| Scene library | Stills step, the scene card: **Save this scene** and the chips above it | A saved scene is the place, light, camera and 2 details, for one character or one topic, with the set's first picture as its look. Pick it in any slideshow and the same room looks the same every time (its picture goes with each still as a "same place" reference) | 1 |
+| Text styles | Slides step, top | **Classic** (default): bold white, a black outline at 15% of the font size, the size scaled to the word count (5 to 7.5% of the image width), centered about 28% from the top, 4 to 6 words a line, nothing in the top 10% or the bottom 20%. **Text box** (TikTok's white box), **Minimal** (smaller, plain white with a soft shadow) and **Note** (a notes-app card). The safe-zone overlay is on in the preview; drag the words to move them (kept per slide, inside the safe area). The style and positions are burned into the exported JPEGs exactly as previewed | 1 to 2 |
+| Special slides | Any slide card: **Make it a special slide** | Drawn by code, free: a phone notification, a text thread, a rejection email, a job posting. Clean, generic, no real brand names or logos (a name that looks like a real brand is replaced). The draft can suggest one; every field is editable | 1 |
+| Caption and tags | Slides step, under the slides | A first-person story caption in the account's voice (from the draft, or **Rewrite the caption**, priced), at most 5 hashtags. **CTA slide**: Follow for part 2, Save this, Follow @handle (you type the handle), Comment a word, More on my page, or your own words; it sets the last slide. **#ad**: puts "Ad" on slide 1 and #ad first in the caption | 1 to 2 |
+| Export | Finish step | **Export images** (free, on the worker): numbered JPEGs at 1080 x 1920 (TikTok) and 1080 x 1440 (Instagram), caption.txt, and post.json (every field of the post, mapped in one module, `server/core/postExport.ts`, so the posting engine can read it later), all in one zip | 1 |
+| Make variations | Finish step | Pick how many (1 to 5) and one priced button makes them: new hook wording, a new image set, the list reordered (listicles and tier lists), a new caption. Each is a new slideshow in the same family (`variation_of`), listed under the button. A picture or an exact caption is never reused across accounts: the export warns when one is, with Reroll as the fix | 2 |
+| Batch | Idea step: **Batch from hooks** | Paste up to 10 hooks (one a line), **Make 10** (one price: each drafted and its set generated). One review screen in the same post: each slideshow's slides in a strip with **Approve** (exports it, free), **Reroll** (a new set, priced) and **Reject** (archived) | 2, then 1 a slideshow |
+
+Every paid step shows its price and model and waits for the click: the
+hook writer, Use this hook, Generate the set, Reroll, Rewrite the caption,
+Make variations and Make 10. Everything else (the vault hooks, special
+slides, text styles, export) is free and says so. Each works on the
+Higgsfield API as well as the plan.
+
+Defaults in Settings > Rules (rule one): "Never reuse a picture or caption
+across accounts" (`slideshow-no-reuse`, a warning on the export),
+"Slideshow hashtags, at most 5" (`slideshow-hashtags`). The REALISM block,
+banned words, no nudity and the price before every run stay fixed.
