@@ -6,6 +6,7 @@ import { useSocialAccounts } from '../hooks'
 import { errorMessage, useToast } from '../ui'
 import type { CharacterSummary, SocialAccount } from '../types'
 import { HowTo } from '../guide/Guide'
+import { STRUCTURES, codeLabel } from '../../../server/core/playbook'
 
 // Posts home > Accounts (UX-PLAN.md section 14): one row per account tag
 // with its tracked link or promo code and its signups, ranked by signups
@@ -43,7 +44,7 @@ export function AccountsCard({ characters }: { characters: CharacterSummary[] })
           {rows.length > 0 && (
             <div className="st-tablewrap">
               <table className="st-table">
-                <thead><tr><th>#</th><th>Account</th><th>Character</th><th>Tracked link</th><th>Promo code</th><th>Posts</th><th>Signups</th><th>Per post</th></tr></thead>
+                <thead><tr><th>#</th><th>Account</th><th>Character</th><th title="The playbook's structures for this account: the primary (about 35% of posts) and the backup (about 20%)">Primary and backup</th><th>Tracked link</th><th>Promo code</th><th>Posts</th><th>Signups</th><th>Per post</th></tr></thead>
                 <tbody>{rows.map(r => <AccountRow key={r.tag} r={r} characters={characters} />)}</tbody>
               </table>
             </div>
@@ -85,11 +86,28 @@ function AccountRow({ r, characters }: { r: SocialAccount; characters: Character
           {characters.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
       </td>
+      <td data-field={`account-structures-${r.tag}`}>
+        <div className="st-row" style={{ gap: 4, flexWrap: 'nowrap' }}>
+          <CodePick value={r.primary ?? null} label={`Primary structure for ${r.tag}`} onChange={v => void save({ primaryCode: v, backupCode: r.backup ?? null })} />
+          <CodePick value={r.backup ?? null} label={`Backup structure for ${r.tag}`} onChange={v => void save({ backupCode: v, primaryCode: r.primary ?? null })} />
+        </div>
+        <span className="st-hint" style={{ fontSize: 11 }}>{r.lastCode ? `Last post: ${codeLabel(r.lastCode)}` : r.structuresSet ? 'Set here' : r.primary ? 'From the playbook' : 'Not set'}</span>
+      </td>
       <td><input className="st-input sm" value={link} placeholder="https://..." onChange={e => setLink(e.target.value)} onBlur={() => link !== r.link && void save({ link })} aria-label={`Tracked link for ${r.tag}`} /></td>
       <td><input className="st-input sm st-mono" style={{ width: 110 }} value={code} placeholder="e.g. CALLIE10" onChange={e => setCode(e.target.value)} onBlur={() => code !== r.code && void save({ code })} aria-label={`Promo code for ${r.tag}`} /></td>
       <td title={`${r.exported} exported`}>{r.posts}</td>
       <td><input className="st-input sm" style={{ width: 80 }} inputMode="numeric" value={signups} onChange={e => setSignups(e.target.value.replace(/\D/g, ''))} onBlur={() => Number(signups) !== r.signups && void save({ signups: Number(signups) || 0 })} aria-label={`Signups for ${r.tag}`} /></td>
       <td>{r.perPost ?? 'n/a'}</td>
     </tr>
+  )
+}
+
+// A structure or lens code (S1 to S12, L13 to L25).
+function CodePick({ value, label, onChange }: { value: string | null; label: string; onChange: (v: string | null) => void }) {
+  return (
+    <select className="st-input sm" style={{ width: 92 }} value={value ?? ''} onChange={e => onChange(e.target.value || null)} aria-label={label} title={value ? codeLabel(value) : 'Not set'}>
+      <option value="">None</option>
+      {STRUCTURES.map(c => <option key={c.code} value={c.code}>{codeLabel(c.code)}</option>)}
+    </select>
   )
 }

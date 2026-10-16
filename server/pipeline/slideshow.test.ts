@@ -186,7 +186,7 @@ describe('stills in one locked scene', () => {
 })
 
 describe('export', () => {
-  it('both sizes, numbered, caption.txt with #ad first, post.json with every field, the dragged place and the CTA', async () => {
+  it('both sizes, numbered, caption.txt with Ad: first, post.json with every field, the dragged place and the CTA', async () => {
     const id = await drafted({ ad: true, textStyle: 'note' })
     await run({ type: 'slideshow_stills', contentId: id })
     await updateContent(h.deps, h.ctx, id, { spec: { textPos: [{ x: 0.5, y: 0.7 }], cta: { kind: 'handle', handle: 'callie.jobs', word: '' } } })
@@ -203,7 +203,7 @@ describe('export', () => {
     expect(Object.keys(zip).filter(k => k.startsWith('tiktok/'))).toHaveLength(6)
     expect(Object.keys(zip).filter(k => k.startsWith('instagram/'))).toHaveLength(6)
     const caption = Buffer.from(zip['caption.txt']!).toString()
-    expect(caption.startsWith('#ad ')).toBe(true)
+    expect(caption.startsWith('Ad: ')).toBe(true)
     expect(caption).toContain('AI-generated content label')
     const json = JSON.parse(Buffer.from(zip['post.json']!).toString())
     expect(json).toMatchObject({ format: 'character-studio.post', post: { id, account: 'callie.jobs' }, slideshow: { text_style: 'note', cta: { kind: 'handle', handle: 'callie.jobs', text: 'Follow @callie.jobs for more' } }, caption: { ad: true } })

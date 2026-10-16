@@ -9,7 +9,7 @@ import { editOf } from './EditStyles'
 import { EditorCard } from './EditorCard'
 import { BatchStyle } from './BatchStyle'
 import { CoverCard, ExportFor, HookVariants } from './ExportExtras'
-import { ReuseWarning, SlideshowOutputs, VariationsCard } from './slideshow/SlideshowFinish'
+import { LintSummary, ReuseWarning, SlideshowOutputs, VariationsCard } from './slideshow/SlideshowFinish'
 import { slideshowProblemsClient } from './slideshow/problems'
 import { keys, useSounds } from '../../hooks'
 import { useQueryClient } from '@tanstack/react-query'
@@ -63,6 +63,7 @@ export function FinishStep({ ctx }: { ctx: PostCtx }) {
     <div className="st-col" style={{ gap: 16 }}>
       {item.kind === 'meme' && <EditorCard ctx={ctx} />}
       {item.kind === 'slideshow' && <ReuseWarning ctx={ctx} />}
+      {item.kind === 'slideshow' && <LintSummary ctx={ctx} />}
       {item.kind !== 'slideshow' && <SoundRow ctx={ctx} />}
       {item.kind === 'batch' && <BatchStyle ctx={ctx} />}
       {item.kind !== 'slideshow' && <ExportFor ctx={ctx} />}

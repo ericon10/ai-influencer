@@ -98,10 +98,13 @@ describe('CTA, caption and brand names', () => {
     expect(ctaText('own')).toBeNull()
   })
 
-  it('#ad goes first in the caption; at most 5 hashtags; no second #ad', () => {
+  it('"Ad:" goes first in the caption; at most 5 hashtags; no ad tag; the CTA line after the caption', () => {
     const c = postCaption('My first week was wild.', ['jobs', '#careertok', 'ad', 'a', 'b', 'c', 'd'], { ad: true, max: 5 })
-    expect(c).toBe('#ad My first week was wild.\n\n#jobs #careertok #a #b #c')
+    expect(c).toBe('Ad: My first week was wild.\n\n#jobs #careertok #a #b #c')
     expect(postCaption('#ad already there', [], { ad: true, max: 5 })).toBe('#ad already there')
+    expect(postCaption('Ad: SideStep shows how you match.', [], { ad: true, max: 5 })).toBe('Ad: SideStep shows how you match.')
+    expect(postCaption('Our first acquisition.', ['jobtok'], { ad: false, max: 5, cta: 'What time did yours arrive?' })).toBe('Our first acquisition.\n\nWhat time did yours arrive?\n\n#jobtok')
+    expect(postCaption('Want the day 7 count? Link in bio', [], { ad: false, max: 5, cta: 'Want the day 7 count?' })).toBe('Want the day 7 count? Link in bio')
     expect(postCaption('Plain.', ['x'], { ad: false, max: 5 })).toBe('Plain.\n\n#x')
   })
 
@@ -167,7 +170,7 @@ describe('post.json', () => {
   it('maps every field in one place', () => {
     const j = postExportJson({
       post: { id: 'cnt_1', kind: 'slideshow', title: '', idea: 'jobs', accountTag: 'callie.jobs', characterId: 'chr_1', characterName: 'Callie', variationOf: 'cnt_0', batchOf: null, createdAt: 'a', updatedAt: 'b' },
-      slideshow: { mode: 'character', pattern: 'doubt', hook: 'Hook', textStyle: 'classic', made: 'tiktok', caption: 'Cap', postCaption: '#ad Cap', hashtags: ['x'], ad: true, cta: { kind: 'handle', handle: 'c', word: '', text: 'Follow @c for more' }, scene: { place: 'office', light: 'window', camera: 'friend_phone', phone: '', outfit: 'tee', details: ['mug'], savedId: null } },
+      slideshow: { mode: 'character', pattern: 'doubt', hook: 'Hook', textStyle: 'classic', made: 'tiktok', caption: 'Cap', postCaption: 'Ad: Cap', hashtags: ['x'], ad: true, cta: { kind: 'handle', handle: 'c', word: '', text: 'Follow @c for more' }, scene: { place: 'office', light: 'window', camera: 'friend_phone', phone: '', outfit: 'tee', details: ['mug'], savedId: null } },
       slides: [{ index: 0, text: 'Hook', shot: 'desk', picture: 'still', stillId: 'cand_1', special: null, position: { x: 0.5, y: 0.3 }, files: { tiktok: 'tiktok/01.jpg', instagram: 'instagram/01.jpg' } }],
       files: { caption: 'caption.txt', tiktok: ['tiktok/01.jpg'], instagram: ['instagram/01.jpg'] },
       sizes: { tiktok: { width: 1080, height: 1920 }, instagram: { width: 1080, height: 1440 } },
@@ -176,7 +179,7 @@ describe('post.json', () => {
     expect(j.format).toBe('character-studio.post')
     expect(j.post).toMatchObject({ account: 'callie.jobs', variation_of: 'cnt_0', character: { name: 'Callie' } })
     expect(j.slideshow.hook_pattern).toEqual({ id: 'doubt', label: 'Someone doubts or reacts' })
-    expect(j.caption).toMatchObject({ ad: true, as_posted: '#ad Cap', hashtags: ['x'] })
+    expect(j.caption).toMatchObject({ ad: true, as_posted: 'Ad: Cap', hashtags: ['x'] })
     expect(j.slides[0]).toMatchObject({ number: 1, picture: 'still', text_position: { x: 0.5, y: 0.3 } })
     expect(j.sizes.instagram).toEqual({ width: 1080, height: 1440 })
   })

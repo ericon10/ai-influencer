@@ -1042,6 +1042,7 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
     const body = parse(z.object({
       link: z.string().max(400).optional(), code: z.string().max(60).optional(), signups: z.number().int().min(0).max(10_000_000).optional(),
       views: z.number().int().min(0).nullable().optional(), characterId: z.string().max(60).nullable().optional(), productId: z.string().max(60).nullable().optional(), notes: z.string().max(400).optional(),
+      primaryCode: z.string().max(4).nullable().optional(), backupCode: z.string().max(4).nullable().optional(),
     }), await json(c))
     return c.json(await saveSocialAccount(deps, ctx, decodeURIComponent(c.req.param('tag')), body))
   })

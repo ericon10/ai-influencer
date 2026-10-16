@@ -1,5 +1,8 @@
 // Response shapes from /api/v1 (see server/api/views.ts).
 
+import type { LintLists } from '../../server/core/copyLint'
+import type { PlanMeta } from '../../server/core/planMeta'
+
 export type Side = 'LEFT' | 'RIGHT'
 
 export interface Mark { name: string; description: string; side: Side; region: string; kind: 'skin' | 'jewelry'; subtle: boolean }
@@ -220,7 +223,7 @@ export type StudioAction =
   | { type: 'voice_convert'; soundIds: string[] }
   | { type: 'hook_variants'; hookId: string; characterIds: string[]; perCharacter?: number }
   | { type: 'slideshow_hooks'; contentId: string }
-  | { type: 'slideshow_draft'; contentId: string; hook: string; pattern?: string | null }
+  | { type: 'slideshow_draft'; contentId: string; hook: string; pattern?: string | null; code?: string | null; effectOpen?: string | null; effectPayoff?: string | null; moment?: string; alt?: string; score?: number | null }
   | { type: 'slideshow_stills'; contentId: string; slides?: number[]; stillModel?: string }
   | { type: 'slideshow_caption'; contentId: string }
   | { type: 'slideshow_variations'; contentId: string; count: number }
@@ -307,6 +310,8 @@ export interface MemeSpec extends BrollTiming {
   exportPreset?: string; hookVariants?: string[]; hookShots?: Array<string | null>; hookEdits?: Array<string | null>; cover?: { at: number; text: string } | null
   // The OpenReel editor's saved timeline (G29).
   editor?: { projectAssetId: string | null; savedAt: string | null } | null
+  // Section 28: the plan row's fields, the post caption and the alt hook.
+  plan?: PlanMeta
 }
 // Phase 5: Amazing Edits (config/edits.yaml).
 export type EditStyleId = 'crash_zoom' | 'speed_ramp' | 'punch_in' | 'freeze_pop' | 'flash_shake' | 'seamless_loop' | 'word_pop' | 'whip_pan' | 'hand_lens' | 'zoom_reveal'
@@ -346,6 +351,7 @@ export interface CutView {
 }
 // A slideshow's spec is the server's (server/core/slideshowSpec.ts).
 export type { SlideshowSpec, SceneLock, SpecialSlideSpec } from '../../server/core/slideshowSpec'
+export type { PlanMeta } from '../../server/core/planMeta'
 // The slideshow power-up (UX-PLAN.md section 27): the Scene library, a
 // post's family and batch, and the no-reuse check.
 export interface SlideScene { id: string; characterId: string | null; topic: string; name: string; place: string; light: string; camera: string; phone: string; details: string[]; lookAssetId: string | null; createdAt: string }
@@ -491,6 +497,8 @@ export interface ContentData {
     sound?: { defaultAmbience: 'none' | 'room'; targetLufs: number; maxUploadMb: number }
     chain?: { maxParts: number }
     edits?: { styles: EditStyleView[]; payoffFromEnd: number }
+    // The language lint (section 28): word lists and switched-off checks.
+    lint?: { lists: LintLists; off: string[]; offFor: Record<string, string[]> }
   }
 }
 
@@ -533,6 +541,9 @@ export interface ProductView {
 export interface SocialAccount {
   tag: string; characterId: string | null; productId: string | null; link: string; code: string; signups: number; views: number | null; notes: string
   posts: number; exported: number; perPost: number | null; updatedAt: string | null; rank: number
+  // The playbook (section 28): primary and backup codes, whether the owner
+  // set them (else the fit table's), and the last post's code.
+  primary?: string | null; backup?: string | null; structuresSet?: boolean; lastCode?: string | null
 }
 
 // Storage, traffic and auto-clean (owner, 2026-10-15; UX-PLAN.md section 22).

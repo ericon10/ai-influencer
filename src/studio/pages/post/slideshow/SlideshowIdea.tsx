@@ -1,14 +1,16 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Check, ChevronDown, ChevronRight, ExternalLink, Layers, RefreshCw, ThumbsDown, ThumbsUp } from 'lucide-react'
+import { ArrowLeftRight, Check, ChevronDown, ChevronRight, ExternalLink, Layers, RefreshCw, ThumbsDown, ThumbsUp } from 'lucide-react'
 import { api } from '../../../api'
-import { keys, useProducts } from '../../../hooks'
+import { keys, useProducts, useSocialAccounts } from '../../../hooks'
 import { PriceButton } from '../../../PriceButton'
 import { RunStatus } from '../../../runs'
 import { AsyncButton, Field, errorMessage, useToast } from '../../../ui'
 import { HowTo } from '../../../guide/Guide'
 import { HOOK_PATTERNS, backdropFor, patternLabel, slideList, wordCount, type HookIdea, type HookPattern } from '../../../../../server/core/slides'
+import { SHIPS, codeLabel, effectLabel } from '../../../../../server/core/playbook'
+import { LintNote, useLint } from '../../../lint'
 import { wordsNote } from '../../../../../server/core/slideSvg'
 import type { SlideBatch, SlideshowSpec } from '../../../types'
 import type { PostCtx } from '../ctx'
@@ -24,32 +26,56 @@ export function SlideshowIdea({ ctx }: { ctx: PostCtx }) {
   const { item, draft } = ctx
   const qc = useQueryClient()
   const toast = useToast()
+  const lint = useLint(item.characterId)
   const spec = draft.spec as unknown as SlideshowSpec
-  const [filter, setFilter] = useState<HookPattern | null>(null)
+  const [filter, setFilter] = useState<string | null>(null)
   const [offset, setOffset] = useState(0)
   const products = useProducts().data?.products ?? []
+  const account = useSocialAccounts().data?.accounts.find(a => a.tag === item.accountTag)
   const ideas = (spec.hookIdeas ?? []) as HookIdea[]
-  const shown = filter ? ideas.filter(h => h.pattern === filter) : ideas
+  // Claude's hooks show once the reviewer has scored them, and only the 1s
+  // and 2s (the writer's own rank when the review did not come back).
+  const reviewing = spec.hookReview === 'pending'
+  const ships = (h: HookIdea) => h.source !== 'claude' || (h.reviewed ? SHIPS(h.score) : spec.hookReview === 'failed' && SHIPS(h.selfScore ?? null))
+  const visible = reviewing ? ideas.filter(h => h.source !== 'claude') : ideas.filter(ships)
+  const hidden = reviewing ? 0 : ideas.filter(h => h.source === 'claude' && !ships(h)).length
+  const byCode = visible.some(h => h.code)
+  const tagOf = (h: HookIdea) => (byCode ? h.code ?? '' : h.pattern)
+  const shown = filter ? visible.filter(h => tagOf(h) === filter) : visible
   const n = spec.slideCount ?? ctx.data.options.slideshow.draftSlides ?? 6
   const hook = spec.hook ?? ''
+  const alt = spec.plan?.altHook ?? ''
   const note = wordsNote(hook)
   const name = ctx.v?.data.name ?? 'the character'
+  const product = !!(spec.ad || spec.plan?.product)
+  const last = account?.lastCode ?? null
 
   async function fromVault() {
     try {
       await draft.flush()
-      await api.vaultHooks(item.id, { offset, ...(filter ? { patterns: [filter] } : {}) })
+      await api.vaultHooks(item.id, { offset, ...(filter && !byCode ? { patterns: [filter as HookPattern] } : {}) })
       setOffset(o => o + 5)
       await qc.invalidateQueries({ queryKey: keys.content })
     } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) }
   }
+  // The alt hook swap (free): the hook and the alt hook trade places.
+  const swap = () => draft.setSpec({ hook: alt, plan: { ...spec.plan, altHook: hook } } as never)
+  const use = (h: HookIdea) => ({ type: 'slideshow_draft' as const, contentId: item.id, hook: h.text, pattern: h.pattern, ...(h.code ? { code: h.code, effectOpen: h.effectOpen ?? null, effectPayoff: h.effectPayoff ?? null, moment: h.moment ?? '', alt: h.alt ?? '', score: h.score ?? h.selfScore ?? null } : {}) })
 
   return (
     <div className="st-col" style={{ gap: 14 }} data-field="slideshow-hook">
       <Field id="post-hook" label="Hook (slide 1)" extra={<HowTo id="slideshow" label="Hook first, how it works" />}
-        hint={note ?? 'The words on the first slide: 4 to 12 words that stop the scroll. Type your own, or write 10 below and pick one.'}>
-        <input className="st-input" maxLength={200} value={hook} onChange={e => draft.setSpec({ hook: e.target.value } as never)} placeholder="e.g. My manager said I would never get promoted" />
+        hint={note ?? 'The words on the first slide: 4 to 14 words that stop the scroll. Type your own, or write 10 below and pick one.'}>
+        <input className="st-input" maxLength={200} value={hook} onChange={e => draft.setSpec({ hook: e.target.value } as never)} placeholder="e.g. Recruiter said &quot;talk Friday.&quot; This is Friday number 6" />
       </Field>
+      <LintNote hits={lint(hook, 'hook', { product })} field="hook-lint" />
+      {(alt.trim() || hook.trim()) && (
+        <div className="st-row" style={{ gap: 8, flexWrap: 'wrap' }} data-field="alt-hook">
+          <span className="st-hint">Alt hook:</span>
+          <input className="st-input sm" style={{ flex: '1 1 220px', minWidth: 0 }} maxLength={200} value={alt} onChange={e => draft.setSpec({ plan: { ...spec.plan, altHook: e.target.value } } as never)} placeholder="The runner-up hook (optional)" aria-label="Alt hook" />
+          <button type="button" className="st-btn sm secondary" disabled={!alt.trim()} title={alt.trim() ? 'The hook and the alt hook trade places (free)' : 'Write an alt hook first'} onClick={swap}><ArrowLeftRight size={13} />Swap with the alt hook</button>
+        </div>
+      )}
 
       <div className="st-col" style={{ gap: 8 }}>
         <div className="st-row" style={{ gap: 8, flexWrap: 'wrap', alignItems: 'flex-start' }}>
@@ -57,10 +83,13 @@ export function SlideshowIdea({ ctx }: { ctx: PostCtx }) {
           <AsyncButton className="st-btn sm" onClick={fromVault} icon={<Layers size={14} />}>10 from the vault<span className="st-price">Free</span></AsyncButton>
           {item.characterId && (
             <PriceButton size="sm" variant="secondary" label="Write 10 with Claude" action={draft.saving ? null : { type: 'slideshow_hooks', contentId: item.id }} waiting={draft.saving ? 'Saving...' : undefined}
-              watch={j => j.purpose === `slideshow_hooks:${item.id}`} onDone={() => void qc.invalidateQueries({ queryKey: keys.content })} />
+              watch={j => j.purpose.startsWith(`slideshow_hooks:${item.id}`)} onDone={() => void qc.invalidateQueries({ queryKey: keys.content })} />
           )}
         </div>
-        <span className="st-hint">From the vault: the kit's own hooks and the buyers' words, recast into the patterns by code (press again for more). With Claude: the vault, the buyers' words and {name}'s voice card go in. Each hook is tagged with its pattern.</span>
+        <span className="st-hint">From the vault: the kit's own hooks and the buyers' words, recast into patterns by code (press again for more). With Claude, the playbook way: a moment, a structure or lens, the effects, 3 written and the best kept with its runner-up as the alt hook; then a separate reviewer scores each 1 to 5 and only the 1s and 2s show.{spec.mode === 'topic' ? '' : ` ${name}'s voice card goes in.`}</span>
+        {(account?.primary || account?.backup || last) && (
+          <span className="st-hint" data-field="account-structures">{item.accountTag || 'This account'}: {[account?.primary && `primary ${codeLabel(account.primary)}`, account?.backup && `backup ${codeLabel(account.backup)}`, last && `last post ${codeLabel(last)} (not again)`].filter(Boolean).join(', ')}. Change them on Posts, Accounts.</span>
+        )}
         {products.length > 1 && (
           <div className="st-row" style={{ gap: 6, flexWrap: 'wrap' }}>
             <span className="st-hint">Kit:</span>
@@ -68,39 +97,53 @@ export function SlideshowIdea({ ctx }: { ctx: PostCtx }) {
           </div>
         )}
       </div>
+      <RunStatus match={j => j.purpose.startsWith(`slideshow_hooks:${item.id}`)} />
+      {reviewing && <span className="st-hint" role="status">The reviewer is scoring the hooks; only the 1s and 2s will show.</span>}
 
-      {ideas.length > 0 && (
+      {visible.length > 0 && (
         <div className="st-col" style={{ gap: 8 }} data-field="hook-ideas">
           <div className="st-row" style={{ gap: 6, flexWrap: 'wrap' }}>
-            <button type="button" className={`st-chip ${!filter ? 'on' : ''}`} onClick={() => setFilter(null)}>All ({ideas.length})</button>
-            {HOOK_PATTERNS.filter(p => ideas.some(h => h.pattern === p.id)).map(p => (
-              <button key={p.id} type="button" className={`st-chip ${filter === p.id ? 'on' : ''}`} onClick={() => setFilter(filter === p.id ? null : p.id)}>{p.label}</button>
-            ))}
+            <button type="button" className={`st-chip ${!filter ? 'on' : ''}`} onClick={() => setFilter(null)}>All ({visible.length})</button>
+            {(byCode ? [...new Set(visible.map(h => h.code).filter((c): c is string => !!c))].sort((a, b) => a.localeCompare(b, undefined, { numeric: true })).map(c => ({ id: c, label: codeLabel(c) })) : HOOK_PATTERNS.filter(p => visible.some(h => h.pattern === p.id)))
+              .map(p => <button key={p.id} type="button" className={`st-chip ${filter === p.id ? 'on' : ''}`} onClick={() => setFilter(filter === p.id ? null : p.id)}>{p.label}</button>)}
           </div>
           <div className="st-hooklist">
             {shown.map((h, i) => {
               const on = hook.trim() === h.text.trim()
+              const score = h.reviewed ? h.score : h.selfScore
               return (
-                <div key={`${h.text}-${i}`} className={`st-hookrow ${on ? 'on' : ''}`}>
-                  <span className="text">{h.text}</span>
-                  <span className="tag">{patternLabel(h.pattern)}{h.source === 'claude' ? ' · Claude' : ' · vault'}</span>
+                <div key={`${h.text}-${i}`} className={`st-hookrow ${on ? 'on' : ''} ${h.code ? 'card' : ''}`} data-field="hook-card">
+                  <div className="st-col" style={{ gap: 3, flex: 1, minWidth: 0 }}>
+                    <span className="text">{h.text}</span>
+                    {h.moment && <span className="st-hint moment">Moment: {h.moment}</span>}
+                    {h.alt && <span className="st-hint">Alt: {h.alt}</span>}
+                    <span className="st-row" style={{ gap: 6, flexWrap: 'wrap' }}>
+                      {h.code ? <span className="st-chip xs on" title="Structure or lens">{codeLabel(h.code)}</span> : <span className="tag">{patternLabel(h.pattern)} · vault</span>}
+                      {h.effectOpen && <span className="st-chip xs" title="The effect: first second, then the payoff">{effectLabel(h.effectOpen)}{h.effectPayoff ? ` to ${effectLabel(h.effectPayoff)}` : ''}</span>}
+                      {score != null && h.source === 'claude' && <span className={`st-score s${score}`} title={h.note || (h.reviewed ? 'The reviewer\'s score' : 'The writer\'s own rank (not reviewed)')}>{score}{h.reviewed ? '' : ' (writer)'}</span>}
+                      {h.note && <span className="st-hint" style={{ fontSize: 11.5 }}>{h.note}</span>}
+                      {h.code && last && h.code === last && <span className="st-lint compact" title="Never the same structure twice in a row">Same code as the last post</span>}
+                      <LintNote compact hits={lint(h.text, 'hook', { product })} />
+                    </span>
+                  </div>
                   {item.characterId && (
                     <PriceButton size="sm" variant={on ? 'primary' : 'secondary'} icon={false} compact label={on ? 'Draft again' : 'Use this hook'}
-                      action={{ type: 'slideshow_draft', contentId: item.id, hook: h.text, pattern: h.pattern }}
-                      onStarted={() => draft.setSpec({ hook: h.text, pattern: h.pattern } as never)} />
+                      action={use(h)}
+                      onStarted={() => draft.setSpec({ hook: h.text, pattern: h.pattern, ...(h.alt ? { plan: { ...spec.plan, altHook: h.alt } } : {}) } as never)} />
                   )}
                 </div>
               )
             })}
           </div>
+          {hidden > 0 && <span className="st-hint" data-field="hooks-hidden">{hidden} scored 3 to 5 and are hidden (only a 1 or 2 ships).</span>}
         </div>
       )}
 
       {hook.trim().length >= 3 && !ideas.some(h => h.text.trim() === hook.trim()) && item.characterId && (
-        <PriceButton label={`Draft ${n} slides from this hook`} variant="secondary" action={draft.saving ? null : { type: 'slideshow_draft', contentId: item.id, hook: hook.trim(), pattern: null }} waiting={draft.saving ? 'Saving...' : undefined} />
+        <PriceButton label={`Draft ${n} slides from this hook`} variant="secondary" action={draft.saving ? null : { type: 'slideshow_draft', contentId: item.id, hook: hook.trim(), pattern: null, ...(alt.trim() ? { alt: alt.trim() } : {}) }} waiting={draft.saving ? 'Saving...' : undefined} />
       )}
       <RunStatus match={j => j.purpose === `slide_draft:${item.id}:self`} />
-      <span className="st-hint">Use this hook drafts every slide: the hook, a setup, the reveal on slide 3 or 4, the payoff, and a soft CTA last, 4 to 12 words a slide, each with the shot its photo shows and, where it helps, a mock phone screen. Plus the caption. Edit anything after.</span>
+      <span className="st-hint">Use this hook drafts every slide the Jenga way: each slide opens the next, a setup and its punchline never share a slide, the payoff lands last. 4 to 14 words a slide, each with the shot its photo shows and, where it helps, a mock screen. Plus the caption, a CTA line and 3 to 5 hashtags. Edit anything after.</span>
 
       <div className="st-row" style={{ gap: 16, flexWrap: 'wrap', alignItems: 'flex-end' }}>
         <Field id="slideshow-who" label="Who is in the photos" group>

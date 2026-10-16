@@ -210,7 +210,7 @@ export const api = {
   useKitVoice: (productId: string, voice: string, characterId: string) => request<{ ok: true }>('POST', `/products/${productId}/voices/use`, { voice, characterId }),
   // Accounts: tracked link or promo code, signups (ranked by signups).
   socialAccounts: () => request<{ accounts: SocialAccount[]; totalSignups: number }>('GET', '/social-accounts'),
-  saveSocialAccount: (tag: string, patch: Partial<Pick<SocialAccount, 'link' | 'code' | 'signups' | 'views' | 'characterId' | 'productId' | 'notes'>>) => request<SocialAccount>('PUT', `/social-accounts/${encodeURIComponent(tag)}`, patch),
+  saveSocialAccount: (tag: string, patch: Partial<Pick<SocialAccount, 'link' | 'code' | 'signups' | 'views' | 'characterId' | 'productId' | 'notes'>> & { primaryCode?: string | null; backupCode?: string | null }) => request<SocialAccount>('PUT', `/social-accounts/${encodeURIComponent(tag)}`, patch),
   archiveScene: (sceneId: string) => request<{ ok: true }>('DELETE', `/scenes/${sceneId}`),
   crop: (candidateId: string, rect: { x: number; y: number; w: number; h: number }) => request<{ candidateId: string; width: number; height: number }>('POST', `/candidates/${candidateId}/crop`, rect),
 

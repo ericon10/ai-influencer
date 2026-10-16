@@ -437,6 +437,69 @@ rules:
     title: Never reuse a picture or caption across accounts
     check: { type: behavior }
     message: A slideshow's Finish step warns when one of its pictures, or its exact caption, is also in a slideshow of another account (another account tag), and offers Reroll for the picture. Make variations always makes new pictures and new captions.
+  - id: lint-dashes
+    bucket: default
+    area: copy
+    spec: "28"
+    title: 'No em or en dashes'
+    check: { type: behavior }
+    message: 'Hooks, slides and captions with a long dash (em or en) get a free warning as they are typed, with a comma, a period or "to" as the fix.'
+  - id: lint-values
+    bucket: default
+    area: copy
+    spec: "28"
+    title: 'No should, need to, must, ought'
+    check: { type: behavior }
+    message: 'Values words in a hook, slide or caption get a free warning: turn them into a feeling, a fact or a joke (playbook section 7).'
+  - id: lint-just
+    bucket: default
+    area: copy
+    spec: "28"
+    title: 'No "just" before an instruction'
+    check: { type: behavior }
+    message: '"Just apply", "you can just ask": a free warning that it reads as an order; drop "just" or ask a question.'
+  - id: lint-hype
+    bucket: default
+    area: copy
+    spec: "28"
+    title: 'No hustle words'
+    check: { type: behavior }
+    message: 'dream job, unlock, level up, game-changer, supercharge: a free warning to say what actually happens instead.'
+  - id: lint-you-start
+    bucket: default
+    area: copy
+    spec: "28"
+    title: 'No sentence starts with "You"'
+    check: { type: behavior }
+    message: 'A sentence that starts with "You" gets a free warning (move "you" to the middle or the end); a "POV:" opener is fine.'
+  - id: lint-hashtags
+    bucket: default
+    area: copy
+    spec: "28"
+    title: 'At most 5 hashtags'
+    check: { type: behavior }
+    message: 'A caption with more than 5 hashtags (in the text and the tags) gets a free warning.'
+  - id: lint-product-hook
+    bucket: default
+    area: copy
+    spec: "28"
+    title: 'The product is never in the hook'
+    check: { type: behavior }
+    message: 'SideStep in a hook gets a free warning: a product post names it on slide 5 or 6, or late in the caption.'
+  - id: lint-ad-caption
+    bucket: default
+    area: copy
+    spec: "28"
+    title: 'A product post''s caption starts with "Ad:"'
+    check: { type: behavior }
+    message: 'A product post (product = yes, or #ad on) whose caption does not start with "Ad:" gets a free warning.'
+  - id: structure-repeat
+    bucket: default
+    area: copy
+    spec: "28"
+    title: 'Never the same structure twice in a row'
+    check: { type: behavior }
+    message: 'Per account, the hook writer never uses the structure or lens code of the account''s last post, and a hook card or a plan row with the same code as the post before it gets a warning.'
   - id: wording-risky
     bucket: default
     area: scene

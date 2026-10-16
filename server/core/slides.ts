@@ -20,7 +20,14 @@ export type HookPattern = (typeof HOOK_PATTERNS)[number]['id']
 export const PATTERN_IDS = HOOK_PATTERNS.map(p => p.id) as unknown as readonly [HookPattern, ...HookPattern[]]
 export const patternLabel = (id: string) => HOOK_PATTERNS.find(p => p.id === id)?.label ?? id
 
-export interface HookIdea { text: string; pattern: HookPattern; source: 'vault' | 'claude' | 'typed' }
+// A hook offered in the Idea step. A vault hook has its pattern; a Claude
+// hook (section 28) also has its moment, structure or lens code, effects,
+// alt hook, the writer's rank and the reviewer's score and note.
+export interface HookIdea {
+  text: string; pattern: HookPattern; source: 'vault' | 'claude' | 'typed'
+  code?: string | null; effectOpen?: string | null; effectPayoff?: string | null
+  moment?: string; alt?: string; selfScore?: number | null; score?: number | null; note?: string; reviewed?: boolean
+}
 
 // The pattern a hook reads as, from its words (free). Listicles and tier
 // lists are the ones whose middle slides can be reordered.
@@ -138,25 +145,75 @@ export const SPECIAL_TYPES = [
   { id: 'text_thread', label: 'Text thread' },
   { id: 'rejection_email', label: 'Rejection email' },
   { id: 'job_posting', label: 'Job posting' },
+  // Section 28 (the launch plan's mock screens).
+  { id: 'application_form', label: 'Application form' },
+  { id: 'portal_status', label: 'Portal status timeline' },
+  { id: 'calendar_invite', label: 'Calendar invite' },
+  { id: 'receipt', label: 'Invoice or receipt' },
+  { id: 'bank_app', label: 'Bank or savings app' },
+  { id: 'museum_placard', label: 'Museum placard' },
+  { id: 'survey', label: '0 to 10 survey' },
+  { id: 'lock_screen', label: 'Lock screen' },
+  { id: 'profile_card', label: 'Profile card' },
+  // The owner's own screenshot of the product, placed as uploaded. The
+  // Studio never draws a product screen.
+  { id: 'product_shot', label: 'Product screenshot' },
 ] as const
 export type SpecialType = (typeof SPECIAL_TYPES)[number]['id']
 export const SPECIAL_IDS = SPECIAL_TYPES.map(s => s.id) as unknown as readonly [SpecialType, ...SpecialType[]]
+// The ones a writer may suggest (a screenshot is only ever uploaded).
+export const DRAWN_SPECIAL_IDS = SPECIAL_IDS.filter(id => id !== 'product_shot') as unknown as readonly [SpecialType, ...SpecialType[]]
+export const specialLabel = (id: string) => SPECIAL_TYPES.find(t => t.id === id)?.label ?? id
 
 // One shape for every type (what the writer returns and the form edits):
 // notification: from = app, title, body, time; text thread: title = the
 // contact, lines = messages, "me: " marks yours; rejection email: from,
 // title = subject, body; job posting: title, from = company, body = the
-// place and pay line, lines = requirements.
-export interface SpecialSlide { type: SpecialType; from: string; title: string; body: string; lines: string[]; time: string }
+// place and pay line, lines = requirements. Section 28: application form:
+// from = the portal, title = the page, lines = fields ("Label" empty, or
+// "Label: value" filled), variant empty or filled, count = fields in all;
+// portal status: from = the portal, title = the role, body = the status,
+// lines = "Step · timestamp" (the last is the current one); calendar
+// invite: title = event, from = organizer, time = when, body = where,
+// lines = attendees; invoice or receipt: variant invoice or receipt,
+// title = its number, from = billed to, lines = "Item · amount", body =
+// the total line, time = the due line; bank or savings app: from = the
+// bank, title = the account, body = the balance, lines = "Label · amount",
+// time = a label above the balance, blur hides the amounts; museum
+// placard: title, from = artist, time = medium and year, body = the text;
+// survey: title = the question, from = the survey's name, count = the
+// picked score (-1 none); lock screen: time = the clock, from = the date,
+// lines = "App · Sender · message"; profile card: title = the name, from =
+// the headline, body = the about line, lines = "Label · value", variant =
+// the banner color; product screenshot: assetId = the upload, scale = its
+// width on the slide, title = an optional line under it.
+export interface SpecialSlide {
+  type: SpecialType; from: string; title: string; body: string; lines: string[]; time: string
+  variant: string; count: number; blur: boolean; assetId: string | null; scale: number
+}
 
+const base = { from: '', title: '', body: '', lines: [] as string[], time: '', variant: '', count: 0, blur: false, assetId: null as string | null, scale: 0.72 }
 export function emptySpecial(type: SpecialType): SpecialSlide {
   switch (type) {
-    case 'notification': return { type, from: 'Messages', title: 'Jordan', body: 'did you see the email??', lines: [], time: 'now' }
-    case 'text_thread': return { type, from: '', title: 'Mom', body: '', lines: ['how did the interview go', 'me: they said they will let me know', 'thats good right?'], time: '9:41' }
-    case 'rejection_email': return { type, from: 'Recruiting Team', title: 'Update on your application', body: 'Thank you for your interest. After careful consideration, we have decided to move forward with other candidates.', lines: [], time: '8:02 AM' }
-    case 'job_posting': return { type, from: 'Northwind Studio', title: 'Junior Product Designer', body: 'Remote · $68k to $80k', lines: ['2+ years of experience', 'A portfolio of shipped work', 'Comfortable presenting ideas'], time: '2 days ago' }
+    case 'notification': return { ...base, type, from: 'Messages', title: 'Jordan', body: 'did you see the email??', time: 'now' }
+    case 'text_thread': return { ...base, type, title: 'Mom', lines: ['how did the interview go', 'me: they said they will let me know', 'thats good right?'], time: '9:41' }
+    case 'rejection_email': return { ...base, type, from: 'Recruiting Team', title: 'Update on your application', body: 'Thank you for your interest. After careful consideration, we have decided to move forward with other candidates.', time: '8:02 AM' }
+    case 'job_posting': return { ...base, type, from: 'Northwind Studio', title: 'Junior Product Designer', body: 'Remote · $68k to $80k', lines: ['2+ years of experience', 'A portfolio of shipped work', 'Comfortable presenting ideas'], time: '2 days ago' }
+    case 'application_form': return { ...base, type, from: 'Careers portal', title: 'Work history, page 4 of 6', lines: ['Job title', 'Company', 'Start date (MM/YYYY)', 'End date (MM/YYYY)', 'Describe your responsibilities'], variant: 'empty', count: 40 }
+    case 'portal_status': return { ...base, type, from: 'Candidate portal', title: 'Junior Coordinator', body: 'In review', lines: ['Submitted · Oct 2, 11:52 PM', 'Received · Oct 2, 11:52 PM', 'In review · Oct 3, 9:00 AM', 'Still in review · day 41'] }
+    case 'calendar_invite': return { ...base, type, title: 'Quick chat', from: 'Talent Team', time: 'Tue, Oct 20 · 2:00 to 2:30 PM', body: 'Video call', lines: ['JR', 'MK', 'You'] }
+    case 'receipt': return { ...base, type, variant: 'invoice', title: 'INVOICE No. 047', from: 'Bill to: The Talent Team', lines: ['Round 4 deck · $640.00', 'Retyping my resume · $45.00', 'Emotional damages · TBD'], body: 'Total due · $685.00', time: 'Due on receipt' }
+    case 'bank_app': return { ...base, type, from: 'Everyday Bank', title: 'Savings', time: 'Available balance', body: '$1,204.18', lines: ['Rent · -$1,450.00', 'Groceries · -$62.40', 'Transfer in · +$200.00'] }
+    case 'museum_placard': return { ...base, type, title: "'Warm Regards.'", from: 'Autoresponder', time: 'Email, 2026', body: 'Received at 2:14 AM. The only warm thing in the building at 2am.' }
+    case 'survey': return { ...base, type, from: 'Candidate experience survey', title: 'How likely are you to recommend our hiring process to a friend?', count: -1 }
+    case 'lock_screen': return { ...base, type, time: '2:14', from: 'Wednesday, October 21', lines: ['Mail · Talent Team · Thank you for your interest in the...', 'Messages · Mom · did you hear back??', 'Calendar · Rent due in 9 days'] }
+    case 'profile_card': return { ...base, type, title: 'Jordan Lee', from: 'Open to work · Class of 2026', body: 'Recent grad. 147 applications and counting.', lines: ['Connections · 212', 'Profile views this week · 3'], variant: 'blue' }
+    case 'product_shot': return { ...base, type }
   }
 }
+
+// An older special slide (before section 28) read with the new fields.
+export const fullSpecial = (s: Partial<SpecialSlide> & { type: SpecialType }): SpecialSlide => ({ ...base, ...s, lines: s.lines ?? [] })
 
 // A thread line: whose message it is, and the words.
 export function threadLine(line: string): { me: boolean; text: string } {
@@ -183,7 +240,7 @@ export function genericNames(text: string, brands: string[], generic: string[]):
 
 export function cleanSpecial(s: SpecialSlide, brands: string[], generic: string[]): SpecialSlide {
   const g = (t: string) => genericNames(t, brands, generic)
-  return { ...s, from: g(s.from), title: g(s.title), body: g(s.body), lines: s.lines.map(g), time: s.time }
+  return { ...fullSpecial(s), from: g(s.from), title: g(s.title), body: g(s.body), lines: s.lines.map(g), time: g(s.time) }
 }
 
 // ── The slides of a post ──────────────────────────────────────────────
@@ -262,12 +319,17 @@ export function reorderMiddle<T>(items: T[], seed: number, keepEnd = 1): T[] {
   return [...head, ...shuffled, ...tail]
 }
 
-// The caption as posted: #ad first when the post is an ad, then the
-// caption, then at most `max` hashtags (without a second #ad).
-export function postCaption(caption: string, hashtags: string[], o: { ad: boolean; max: number }): string {
+// The caption as posted: "Ad:" first when the post is an ad (the post
+// writer brief; a caption that already opens with "Ad:" or "#ad" stays as
+// it is), then the caption, the CTA line when it is not already in the
+// caption, and at most `max` hashtags (without an "ad" tag).
+export function postCaption(caption: string, hashtags: string[], o: { ad: boolean; max: number; cta?: string }): string {
   const tags = hashtags.map(h => h.replace(/^#+/, '').replace(/\s+/g, '')).filter(h => h && h.toLowerCase() !== 'ad').slice(0, o.max).map(h => `#${h}`)
-  const body = caption.trim().replace(/^#ad\b\s*/i, '')
-  return [o.ad ? `#ad ${body}`.trim() : body, tags.join(' ')].filter(Boolean).join('\n\n')
+  let body = caption.trim()
+  if (o.ad && !/^(?:ad:|#ad\b)/i.test(body)) body = `Ad: ${body}`.trim()
+  const cta = (o.cta ?? '').trim()
+  const withCta = cta && !body.toLowerCase().includes(cta.toLowerCase()) ? [body, cta] : [body]
+  return [...withCta, tags.join(' ')].filter(Boolean).join('\n\n')
 }
 
 // Editing the slides keeps their parallel lists together: the words, the

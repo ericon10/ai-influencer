@@ -17,11 +17,14 @@ import { catalogWording } from '../core/wording.js'
 import { cleanVoiceCard, voiceCardText } from '../core/voiceCard.js'
 import { claimsText, languageText } from '../core/scriptKit.js'
 import {
-  CTA_IDS, PATTERN_IDS, SPECIAL_IDS, backdropFor, cleanSpecial, ctaText, guessPattern, isListPattern, postCaption, reorderMiddle, setAt, slideList, trimWords, vaultHooks,
+  CTA_IDS, DRAWN_SPECIAL_IDS, PATTERN_IDS, backdropFor, cleanSpecial, emptySpecial, fullSpecial, ctaText, guessPattern, isListPattern, postCaption, reorderMiddle, setAt, slideList, trimWords, vaultHooks,
   type HookIdea, type HookPattern, type SpecialSlide,
 } from '../core/slides.js'
 import { slideshowSpecSchema, type SceneLock, type SlideshowSpec } from '../core/slideshowSpec.js'
 import { postExportJson } from '../core/postExport.js'
+import { EFFECT_CODES, STRUCTURE_CODES, codeLabel, effectLabel, readCode, readEffect, type EffectCode, type StructureCode } from '../core/playbook.js'
+import type { PlanMeta } from '../core/planMeta.js'
+import { accountStructures } from './playbook.js'
 import { renderSlide, fontDraw } from '../media/slideRender.js'
 import type { GenRequest } from '../providers/types.js'
 import { listCredentials } from '../providers/credentials.js'
@@ -94,59 +97,180 @@ export async function vaultHookIdeas(deps: Deps, ctx: Ctx, contentId: string, in
   const { row, spec } = await slideshowPost(deps, ctx, contentId)
   const kit = await kitFor(deps, ctx, spec.productId)
   const ideas = vaultHooks({ vault: kit.vault, phrases: kit.phrases, topic: topicOf(row, spec) || 'my job search', n: cfgOf(deps).hooks, offset: input.offset ?? 0, patterns: input.patterns })
-  return updateContent(deps, ctx, row.id, { spec: { hookIdeas: ideas, ...(kit.product && !spec.productId ? { productId: kit.product.id } : {}) } })
+  return updateContent(deps, ctx, row.id, { spec: { hookIdeas: ideas, hookReview: null, ...(kit.product && !spec.productId ? { productId: kit.product.id } : {}) } })
+}
+
+// Who the words are for: the character, or a faceless topic account (a
+// feeder: nothing of the character it is filed under goes in).
+function writerFor(ch: Ch, row: ContentRow, spec: SlideshowSpec) {
+  if (spec.mode === 'topic') {
+    const acct = row.accountTag ? ` (${row.accountTag})` : ''
+    return { who: `a faceless topic account${acct}: no person in the photos, only places, things and mock screens`, voice: '', name: '', captionVoice: 'plain words, no emoji or one', photos: 'The photos show no one: places, things and mock screens only.' }
+  }
+  return { who: `${ch.name}, an original, fictional adult character`, voice: voiceOf(ch), name: ch.name, captionVoice: `the way ${ch.name} talks (the voice card), emoji as the voice card says`, photos: `The photos show ${ch.name}.` }
+}
+
+// The account's structures for the writer: the primary for about a third
+// of the candidates, the backup for about a fifth, never the last code.
+export function structuresLine(st: { primary: string | null; backup: string | null; last: string | null }): string {
+  const parts = [
+    st.primary ? `the primary is ${codeLabel(st.primary)}: use it for about a third of the candidates.` : '',
+    st.backup ? `The backup is ${codeLabel(st.backup)}: about a fifth.` : '',
+    st.primary || st.backup ? 'Spread the rest over at least 3 other codes.' : 'No primary or backup is set: use at least 5 different codes.',
+    st.last ? `Never use ${codeLabel(st.last)}: the account's last post used it.` : '',
+  ]
+  return parts.filter(Boolean).join(' ')
 }
 
 export const hooksJsonSchema = (n: number) => ({
   type: 'object', additionalProperties: false, required: ['hooks'],
-  properties: { hooks: { type: 'array', minItems: n, maxItems: n, items: { type: 'object', additionalProperties: false, required: ['text', 'pattern'], properties: { text: { type: 'string' }, pattern: { type: 'string', enum: [...PATTERN_IDS] } } } } },
+  properties: {
+    hooks: {
+      type: 'array', minItems: n, maxItems: n,
+      items: {
+        type: 'object', additionalProperties: false, required: ['effect_open', 'effect_payoff', 'moment', 'code', 'hook', 'alt_hook', 'rank'],
+        properties: {
+          effect_open: { type: 'string', enum: [...EFFECT_CODES] }, effect_payoff: { type: 'string', enum: [...EFFECT_CODES] },
+          moment: { type: 'string' }, code: { type: 'string', enum: [...STRUCTURE_CODES] },
+          hook: { type: 'string' }, alt_hook: { type: 'string' }, rank: { type: 'integer', minimum: 1, maximum: 5 },
+        },
+      },
+    },
+  },
+})
+export const reviewJsonSchema = (n: number) => ({
+  type: 'object', additionalProperties: false, required: ['reviews'],
+  properties: { reviews: { type: 'array', minItems: n, maxItems: n, items: { type: 'object', additionalProperties: false, required: ['n', 'score', 'note'], properties: { n: { type: 'integer', minimum: 1, maximum: n }, score: { type: 'integer', minimum: 1, maximum: 5 }, note: { type: 'string' } } } } },
 })
 
-export async function buildSlideshowHooks(deps: Deps, ctx: Ctx, contentId: string): Promise<Built> {
-  const { row, spec } = await slideshowPost(deps, ctx, contentId)
+interface HookOut { effect_open?: unknown; effect_payoff?: unknown; moment?: unknown; code?: unknown; hook?: unknown; alt_hook?: unknown; rank?: unknown }
+
+// A free stand-in for demo mode and tests: the vault's hooks with codes
+// (the account's primary and backup first, never its last), effects, a
+// moment and an alt hook each.
+export function mockHooks(n: number, vault: string[], topic: string, st: { primary: string | null; backup: string | null; last: string | null }): { hooks: Array<Required<{ [K in keyof HookOut]: string | number }>> } {
+  const pool = [st.primary, st.primary, st.primary, st.backup, st.backup, ...STRUCTURE_CODES].filter((c): c is StructureCode => !!c && c !== st.last)
+  const codes: StructureCode[] = []
+  for (const c of pool) if (codes.length < n && (codes.filter(x => x === c).length < (c === st.primary ? 3 : c === st.backup ? 2 : 1))) codes.push(c)
+  const fallback = [`Recruiter said "talk Friday." This is Friday number 6`, `Page 4 of 6 wants the resume from page 1`, `Applied 11:52pm. Rejected 2:14am. Same night`, `The posting says entry level. Requirement 4 says mentoring`, `Round 5 was a take-home. It took my Saturday`]
+  return {
+    hooks: Array.from({ length: n }, (_, i) => {
+      const hook = trimWords(vault[i] ?? fallback[i % fallback.length]!, 14)
+      return {
+        effect_open: EFFECT_CODES[i % 3]!, effect_payoff: (['E4', 'E6', 'E7'] as const)[i % 3]!,
+        moment: `${['Sunday 9:40pm', 'Tuesday 2:14am', 'Friday 4pm'][i % 3]}, ${topic || 'the job search'}: the tell is on the screen`,
+        code: codes[i % Math.max(1, codes.length)] ?? 'S7', hook, alt_hook: `${hook.replace(/[.!?]*$/, '')}, take two`, rank: i % 3 === 2 ? 2 : 1,
+      }
+    }),
+  }
+}
+// The reviewer's stand-in: most are a 1 or 2, some are hidden.
+export const mockReview = (n: number) => ({ reviews: Array.from({ length: n }, (_, i) => ({ n: i + 1, score: [1, 2, 2, 3, 1, 4, 2, 3, 1, 2][i % 10]!, note: ['A tell and a lens, and the payoff lands.', 'A real tell; the lens could be sharper.', 'A moment, no frame yet.', 'Reads like a headline.'][[1, 2, 2, 3, 1, 4, 2, 3, 1, 2][i % 10]! - 1]! })) })
+
+async function hookWriterVars(deps: Deps, ctx: Ctx, row: ContentRow, spec: SlideshowSpec) {
   const ch = toData(await getCharacter(deps, ctx, row.characterId!))
   const kit = await kitFor(deps, ctx, spec.productId)
-  const n = cfgOf(deps).hooks
-  const t = deps.config.pipeline.templates.slideshow_hooks
-  const route = await resolveRoute(deps, ctx, 'content_writer')
-  const topic = topicOf(row, spec) || 'everyday life'
-  const vars = {
-    ...pronounVars(ch.pronouns), name: ch.name, count: String(n), topic, account: row.accountTag || 'not given', vibe: ch.persona.vibe ?? 'not given', voice: voiceOf(ch),
-    vault: kit.vault.length ? kit.vault.slice(0, 30).map(h => `- ${h.text}${h.kind ? ` (${h.kind})` : ''}`).join('\n') : 'None yet.',
-    language: kit.language || 'No buyer language collected yet.', claims: kit.claims || '',
-  }
-  const system = fill(t.system, vars), prompt = fill(t.prompt, vars)
-  const mock = { hooks: vaultHooks({ vault: kit.vault, phrases: kit.phrases, topic, n }).map(h => ({ text: h.text, pattern: h.pattern })) }
-  while (mock.hooks.length < n) mock.hooks.push({ text: `POV: ${topic} hits different now (${mock.hooks.length + 1})`, pattern: 'pov' })
-  const purpose = `slideshow_hooks:${row.id}`
+  const st = await accountStructures(deps, ctx, row.accountTag, { postId: row.id, characterId: row.characterId })
+  const w = writerFor(ch, row, spec)
+  const topic = topicOf(row, spec) || 'the job search'
   return {
-    purpose, characterId: row.characterId,
-    preview: { title: `Write ${n} hooks`, prompts: [{ label: 'Hook writer', text: `${system}\n${prompt}`, wrapped: hardWrap(`${system}\n${prompt}`) }], warnings: [], invalidates: [] },
-    specs: [{ type: 'llm', stage: 'content', purpose, label: `${n} slideshow hooks`, request: { model: route.model, system, prompt, schema: hooksJsonSchema(n), schemaName: 'slideshow_hooks', maxTokens: 1500, effort: route.effort ?? 'low', meta: { itemId: row.id, mockHooks: mock } } }],
+    ch, kit, st, w, topic,
+    vars: {
+      ...pronounVars(ch.pronouns), name: w.name || 'the account', who: w.who, count: String(cfgOf(deps).hooks), topic, account: row.accountTag || 'not given', voice: w.voice,
+      structures: structuresLine(st), tension: spec.plan.tension ? `Tension (a tag, never the subject): ${spec.plan.tension}` : '',
+      vault: kit.vault.length ? kit.vault.slice(0, 30).map(h => `- ${h.text}${h.kind ? ` (${h.kind})` : ''}`).join('\n') : 'None yet.',
+      language: kit.language || 'No buyer language collected yet.', claims: kit.claims || '', menu: deps.config.pipeline.templates.playbook_menu,
+    },
   }
 }
 
+// "Write 10 with Claude" (section 28): the writer, then a separate reviewer
+// that scores every hook on the ladder (waiting for the writer, one price
+// for both). Only the 1s and 2s are shown.
+export async function buildSlideshowHooks(deps: Deps, ctx: Ctx, contentId: string): Promise<Built> {
+  const { row, spec } = await slideshowPost(deps, ctx, contentId)
+  const n = cfgOf(deps).hooks
+  const t = deps.config.pipeline.templates.slideshow_hooks
+  const rt = deps.config.pipeline.templates.slideshow_hooks_review
+  const route = await resolveRoute(deps, ctx, 'content_writer')
+  const { kit, st, topic, vars } = await hookWriterVars(deps, ctx, row, spec)
+  const system = fill(t.system, vars), prompt = fill(t.prompt, vars)
+  const reviewPrompt = fill(rt.prompt, { claims: kit.claims || '', hooks: `(the ${n} hooks the writer returns, numbered 1 to ${n})` })
+  const purpose = `slideshow_hooks:${row.id}`
+  const mock = mockHooks(n, kit.vault.map(h => h.text), topic, st)
+  return {
+    purpose, characterId: row.characterId,
+    preview: {
+      title: `Write ${n} hooks, then a reviewer scores them`,
+      prompts: [
+        { label: 'Hook writer', text: `${system}\n${prompt}`, wrapped: hardWrap(`${system}\n${prompt}`) },
+        { label: 'Reviewer', text: `${rt.system}\n${reviewPrompt}`, wrapped: hardWrap(`${rt.system}\n${reviewPrompt}`) },
+      ],
+      warnings: [], invalidates: [],
+    },
+    specs: [
+      { type: 'llm', stage: 'content', purpose, label: `${n} slideshow hooks`, request: { model: route.model, system, prompt, schema: hooksJsonSchema(n), schemaName: 'slideshow_hooks', maxTokens: 400 + 170 * n, effort: route.effort ?? 'low', meta: { itemId: row.id, mockHooks: mock } } },
+      { type: 'llm', stage: 'content', purpose: `${purpose}:review`, label: `Review of ${n} hooks`, parentIndex: 0, request: { model: route.model, system: rt.system, prompt: reviewPrompt, schema: reviewJsonSchema(n), schemaName: 'slideshow_hooks_review', maxTokens: 200 + 60 * n, effort: route.effort ?? 'low', meta: { itemId: row.id, mockReview: mockReview(n) } } },
+    ],
+  }
+}
+
+const code = (v: unknown) => (STRUCTURE_CODES as readonly string[]).includes(String(v)) ? String(v) as StructureCode : readCode(String(v ?? ''))
+const effect = (v: unknown) => (EFFECT_CODES as readonly string[]).includes(String(v)) ? String(v) as EffectCode : readEffect(String(v ?? ''))
+const rank = (v: unknown) => { const x = Math.round(Number(v)); return x >= 1 && x <= 5 ? x : null }
+
 async function onSlideshowHooks(deps: Deps, ctx: Ctx, job: JobRow, out: JobOutcome): Promise<void> {
-  if (out.status !== 'completed') return
-  const d = (out.data ?? {}) as { hooks?: Array<{ text?: unknown; pattern?: unknown }> }
+  const [, postId, part] = job.purpose.split(':') as [string, string, string | undefined]
+  if (part === 'review') return onHooksReviewed(deps, ctx, postId, out)
+  if (out.status !== 'completed') { await cancelChildren(deps, job.id, 'The hooks were not written, so there was nothing to review. Nothing was charged for the review.'); return }
+  const d = (out.data ?? {}) as { hooks?: HookOut[] }
   const ideas: HookIdea[] = (Array.isArray(d.hooks) ? d.hooks : []).map(h => {
-    const text = trimWords(clean(h.text, 200), 14)
-    const pattern = (PATTERN_IDS as readonly string[]).includes(String(h.pattern)) ? h.pattern as HookPattern : guessPattern(text)
-    return { text, pattern, source: 'claude' as const }
+    const text = trimWords(clean(h.hook, 200), 16)
+    return {
+      text, pattern: guessPattern(text), source: 'claude' as const,
+      code: code(h.code), effectOpen: effect(h.effect_open), effectPayoff: effect(h.effect_payoff),
+      moment: clean(h.moment, 400), alt: trimWords(clean(h.alt_hook, 200), 16), selfScore: rank(h.rank), score: null, note: '', reviewed: false,
+    }
   }).filter(h => h.text.length >= 3)
-  if (ideas.length) await updateContent(deps, ctx, job.purpose.split(':')[1]!, { spec: { hookIdeas: ideas } })
+  if (!ideas.length) { await cancelChildren(deps, job.id, 'No hooks came back, so there was nothing to review. Nothing was charged for the review.'); return }
+  await updateContent(deps, ctx, postId, { spec: { hookIdeas: ideas, hookReview: 'pending' } })
+  const post = await getContent(deps, ctx, postId).catch(() => null)
+  const kit = post ? await kitFor(deps, ctx, parse(post).productId) : null
+  const listed = ideas.map((h, i) => `${i + 1}. Moment: ${h.moment || 'not given'}. Code: ${h.code ? codeLabel(h.code) : 'not given'}. Hook: ${h.text}`).join('\n')
+  await activateChildren(deps, job.id, c => ({
+    prompt: fill(deps.config.pipeline.templates.slideshow_hooks_review.prompt, { claims: kit?.claims ?? '', hooks: listed }),
+    schema: reviewJsonSchema(ideas.length),
+    meta: { ...((c.request as { meta?: Record<string, unknown> }).meta ?? {}), mockReview: mockReview(ideas.length) },
+  }))
+}
+
+// The reviewer's scores land on the hooks; a failed review leaves the
+// writer's own ranks (marked not reviewed).
+async function onHooksReviewed(deps: Deps, ctx: Ctx, postId: string, out: JobOutcome): Promise<void> {
+  const post = await getContent(deps, ctx, postId).catch(() => null)
+  if (!post) return
+  const spec = parse(post)
+  if (out.status !== 'completed') { await updateContent(deps, ctx, postId, { spec: { hookReview: 'failed' } }); return }
+  const d = (out.data ?? {}) as { reviews?: Array<{ n?: unknown; score?: unknown; note?: unknown }> }
+  const byN = new Map((Array.isArray(d.reviews) ? d.reviews : []).map(r => [Math.round(Number(r.n)), r]))
+  const ideas = spec.hookIdeas.map((h, i) => {
+    if (h.source !== 'claude') return h
+    const r = byN.get(i + 1)
+    return r ? { ...h, score: rank(r.score), note: clean(r.note, 300), reviewed: true } : h
+  })
+  await updateContent(deps, ctx, postId, { spec: { hookIdeas: ideas, hookReview: 'done' } })
 }
 
 // ── The draft: every slide from one hook (priced) ──────────────────────
 
 const specialJson = {
-  type: 'object', additionalProperties: false, required: ['type', 'from', 'title', 'body', 'lines'],
-  properties: { type: { type: 'string', enum: ['none', ...SPECIAL_IDS] }, from: { type: 'string' }, title: { type: 'string' }, body: { type: 'string' }, lines: { type: 'array', items: { type: 'string' } } },
+  type: 'object', additionalProperties: false, required: ['type', 'from', 'title', 'body', 'lines', 'time'],
+  properties: { type: { type: 'string', enum: ['none', ...DRAWN_SPECIAL_IDS] }, from: { type: 'string' }, title: { type: 'string' }, body: { type: 'string' }, lines: { type: 'array', items: { type: 'string' } }, time: { type: 'string' } },
 }
 
 export function draftJsonSchema(n: number, tagsMax: number, lights: string[], cameras: string[] | null) {
   return {
-    type: 'object', additionalProperties: false, required: ['slides', 'scene', 'caption', 'hashtags'],
+    type: 'object', additionalProperties: false, required: ['slides', 'scene', 'caption', 'cta', 'hashtags'],
     properties: {
       slides: { type: 'array', minItems: n, maxItems: n, items: { type: 'object', additionalProperties: false, required: ['text', 'shot', 'special'], properties: { text: { type: 'string' }, shot: { type: 'string' }, special: specialJson } } },
       scene: {
@@ -154,39 +278,45 @@ export function draftJsonSchema(n: number, tagsMax: number, lights: string[], ca
         properties: { place: { type: 'string' }, light: { type: 'string', enum: lights }, camera: cameras ? { type: 'string', enum: cameras } : { type: 'string' }, outfit: { type: 'string' }, details: { type: 'array', items: { type: 'string' }, minItems: 2, maxItems: 2 } },
       },
       caption: { type: 'string' },
+      cta: { type: 'string' },
       hashtags: { type: 'array', items: { type: 'string' }, minItems: 0, maxItems: tagsMax },
     },
   }
 }
 
 interface DraftOut {
-  slides?: Array<{ text?: unknown; shot?: unknown; special?: { type?: unknown; from?: unknown; title?: unknown; body?: unknown; lines?: unknown } }>
+  slides?: Array<{ text?: unknown; shot?: unknown; special?: { type?: unknown; from?: unknown; title?: unknown; body?: unknown; lines?: unknown; time?: unknown } }>
   scene?: { place?: unknown; light?: unknown; camera?: unknown; outfit?: unknown; details?: unknown }
   caption?: unknown
+  cta?: unknown
   hashtags?: unknown
 }
 
-// A free stand-in for demo mode and tests: the hook, a setup, the reveal,
-// the payoff and a soft CTA, one special slide, and a home-office scene.
+// A free stand-in for demo mode and tests: the hook, slides that each open
+// the next, the payoff last, one special slide, and a home-office scene.
 export function mockDraft(hook: string, n: number, mode: 'character' | 'topic'): Required<DraftOut> {
-  const base = ['Here is what nobody saw coming', 'I almost gave up on this', 'Then this landed in my inbox', 'It changed how I do everything', 'The part that actually worked', 'What I would tell myself now', 'One small habit made the difference', 'And the results kept coming', 'Follow for part 2']
+  const base = ['It started with one email at 2:14am', 'The subject line said "Quick question!"', 'The question was on page 4 of 6', 'Page 4 wanted the resume from page 1', 'So I typed it again, line by line', 'Then the CAPTCHA asked if I was human', 'Honestly? Some days, unclear']
   const shots = mode === 'topic'
     ? ['the desk with the laptop open', 'a coffee mug beside the keyboard', 'the window view at lunch', 'a notepad with a to-do list', 'the monitor glowing at dusk', 'the empty chair at the end of the day', 'the hallway by the elevators', 'a phone face down on the desk', 'the door on the way out']
     : ['looking at the laptop with a coffee mug', 'leaning back in the chair, thinking', 'reading something on the phone', 'writing a list on a notepad', 'smiling at the screen', 'packing the laptop into a tote bag', 'standing by the window', 'checking the phone again', 'walking out the door']
   const slides = Array.from({ length: n }, (_, i) => ({
-    text: i === 0 ? hook : i === n - 1 ? 'Follow for part 2' : base[(i - 1) % base.length]!,
+    text: i === 0 ? hook : i === n - 1 ? 'Which page broke you? Asking for page 4' : base[(i - 1) % base.length]!,
     shot: shots[i % shots.length]!,
-    special: i === 2 && n >= 4 ? { type: 'notification', from: 'Mail', title: 'Hiring Team', body: 'We would love to set up a call this week.', lines: [] } : { type: 'none', from: '', title: '', body: '', lines: [] },
+    special: i === 2 && n >= 4 ? { type: 'notification', from: 'Mail', title: 'Hiring Team', body: 'We would love to set up a call this week.', lines: [], time: 'now' } : { type: 'none', from: '', title: '', body: '', lines: [], time: '' },
   }))
   return {
     slides,
     scene: { place: 'a small home office by a window', light: 'window', camera: mode === 'topic' ? 'phone held at chest height' : 'friend_phone', outfit: mode === 'topic' ? '' : 'a gray cotton crewneck sweater', details: ['a mug of coffee', 'a sticky note on the monitor'] },
-    caption: `Not me thinking this would take a year. ${hook.replace(/[.!?]*$/, '.')} What would you do?`,
+    caption: `Not me thinking this would take a week. ${hook.replace(/[.!?]*$/, '.')}`,
+    cta: 'Which page broke you?',
     hashtags: ['jobsearch', 'careertok', 'storytime'],
   }
 }
 
-async function draftRequest(deps: Deps, ctx: Ctx, row: ContentRow, spec: SlideshowSpec, hook: string, pattern: HookPattern | null, n: number) {
+// What the writer is given about the hook (from a hook card, or none).
+export interface HookInfo { hook: string; pattern: HookPattern | null; code?: StructureCode | null; effectOpen?: EffectCode | null; effectPayoff?: EffectCode | null; moment?: string; alt?: string; score?: number | null }
+
+async function draftRequest(deps: Deps, ctx: Ctx, row: ContentRow, spec: SlideshowSpec, h: HookInfo, n: number) {
   const ch = toData(await getCharacter(deps, ctx, row.characterId!))
   const kit = await kitFor(deps, ctx, spec.productId)
   const sc = deps.config.pipeline.scenes
@@ -196,57 +326,68 @@ async function draftRequest(deps: Deps, ctx: Ctx, row: ContentRow, spec: Slidesh
   const lights = sc.lights.filter(l => l.id !== 'as_written').map(l => l.id)
   const cameras = topicMode ? null : sc.cameras.map(c => c.id)
   const pv = pronounVars(ch.pronouns)
+  const w = writerFor(ch, row, spec)
   const lock = spec.lock
   const given = [lock.place && `place: ${lock.place}`, lock.light && `light: ${lock.light}`, lock.camera && `camera: ${lock.camera}`, !topicMode && lock.outfit && `outfit: ${lock.outfit}`, lock.details.length && `details: ${lock.details.join('; ')}`].filter(Boolean)
+  const product = kit.product?.name ?? ''
+  const isProduct = spec.ad || spec.plan.product
+  const structure = h.code
+    ? `Pour it into ${codeLabel(h.code)}.${h.effectOpen ? ` The viewer feels ${effectLabel(h.effectOpen)} on slide 1` : ''}${h.effectPayoff ? `${h.effectOpen ? ' and' : ' The viewer feels'} ${effectLabel(h.effectPayoff)} at the end` : ''}${h.effectOpen || h.effectPayoff ? '.' : ''}`
+    : 'Pick the structure or lens that fits the hook (S1 to S12, L13 to L25).'
   const vars = {
-    ...pv, name: ch.name, n: String(n), hook, pattern: pattern ?? guessPattern(hook), topic: topicOf(row, spec) || hook,
-    who: topicMode ? `The photos show no one: places and things only, for a topic account about ${topicOf(row, spec) || 'this topic'}.` : `The photos show ${ch.name}.`,
+    ...pv, name: w.name || 'the account', who: w.who, photos: w.photos, n: String(n), hook: h.hook, topic: topicOf(row, spec) || h.hook,
+    structure, moment: h.moment ? `Moment: ${h.moment}` : '', specials: deps.config.pipeline.templates.slideshow_special_menu,
     lights: lights.join(', '), cameras: cameras ? `one of: ${cameras.join(', ')}` : 'a few words: how the phone is held',
     outfit_rule: topicMode ? 'leave it empty' : `what ${pv.subj} wears in every photo`, tags_max: String(cfgOf(deps).hashtags[1]),
-    vibe: ch.persona.vibe ?? 'not given', voice: voiceOf(ch),
+    caption_voice: w.captionVoice, voice: w.voice,
     scene: given.length ? `The scene is set: ${given.join('; ')}. Keep it.` : '',
+    product_rule: !product ? '' : isProduct
+      ? `This is a product post: name ${product} once, on slide 5 or 6 only, inside its claims sheet (what it does, never a result for anyone), and start the caption with "Ad:" naming it.`
+      : `This is not a product post: never name ${product}.`,
     language: kit.language, claims: kit.claims,
   }
   const system = fill(t.system, vars), prompt = fill(t.prompt, vars)
-  return { system, prompt, route, schema: draftJsonSchema(n, cfgOf(deps).hashtags[1], lights, cameras), mock: mockDraft(hook, n, spec.mode) }
+  return { system, prompt, route, schema: draftJsonSchema(n, cfgOf(deps).hashtags[1], lights, cameras), mock: mockDraft(h.hook, n, spec.mode) }
 }
 
-export async function buildSlideshowDraft(deps: Deps, ctx: Ctx, input: { contentId: string; hook: string; pattern?: HookPattern | null }): Promise<Built> {
+export async function buildSlideshowDraft(deps: Deps, ctx: Ctx, input: { contentId: string; hook: string; pattern?: HookPattern | null; code?: StructureCode | null; effectOpen?: EffectCode | null; effectPayoff?: EffectCode | null; moment?: string; alt?: string; score?: number | null }): Promise<Built> {
   const { row, spec } = await slideshowPost(deps, ctx, input.contentId)
-  const hook = trimWords(clean(input.hook, 200), 14)
+  const hook = trimWords(clean(input.hook, 200), 16)
   if (hook.length < 3) throw new AppError('invalid_request', 'Write or pick the hook first.')
   const n = spec.slideCount
-  const r = await draftRequest(deps, ctx, row, spec, hook, input.pattern ?? null, n)
+  const info: HookInfo = { hook, pattern: input.pattern ?? null, code: input.code ?? null, effectOpen: input.effectOpen ?? null, effectPayoff: input.effectPayoff ?? null, moment: clean(input.moment, 400), alt: clean(input.alt, 200), score: input.score ?? null }
+  const r = await draftRequest(deps, ctx, row, spec, info, n)
   const purpose = `slide_draft:${row.id}:self`
   return {
     purpose, characterId: row.characterId,
     preview: { title: `Draft ${n} slides from the hook`, prompts: [{ label: 'Slideshow writer', text: `${r.system}\n${r.prompt}`, wrapped: hardWrap(`${r.system}\n${r.prompt}`) }], warnings: [], invalidates: [] },
-    specs: [{ type: 'llm', stage: 'content', purpose, label: `Slideshow draft, ${n} slides`, request: { model: r.route.model, system: r.system, prompt: r.prompt, schema: r.schema, schemaName: 'slideshow_draft', maxTokens: 900 + 220 * n, effort: r.route.effort ?? 'low', meta: { itemId: row.id, hook, pattern: input.pattern ?? guessPattern(hook), n, mockDraft: r.mock } } }],
+    specs: [{ type: 'llm', stage: 'content', purpose, label: `Slideshow draft, ${n} slides`, request: { model: r.route.model, system: r.system, prompt: r.prompt, schema: r.schema, schemaName: 'slideshow_draft', maxTokens: 1000 + 220 * n, effort: r.route.effort ?? 'low', meta: { itemId: row.id, ...info, pattern: info.pattern ?? guessPattern(hook), n, mockDraft: r.mock } } }],
   }
 }
 
 // What a draft writes into a post: the slides (the hook word for word), each
 // slide's shot (Claude's words in catalog terms), special slides (generic
 // names only, never on slide 1, at most 2), the scene fields the owner did
-// not set, the caption and at most 5 hashtags. The pictures already picked
-// stay; dragged positions reset with the new words.
-export function draftPatch(deps: Deps, spec: SlideshowSpec, d: DraftOut, meta: { hook: string; pattern: HookPattern | null; n: number }): Partial<SlideshowSpec> {
+// not set, the caption, the CTA line and at most 5 hashtags; and what the
+// hook brought (its code, effects, moment, alt hook and score). The
+// pictures already picked stay; dragged positions reset with the new words.
+export function draftPatch(deps: Deps, spec: SlideshowSpec, d: DraftOut, meta: HookInfo & { n: number }): Partial<SlideshowSpec> {
   const cfg = cfgOf(deps)
   const wording = deps.config.pipeline.wording
   const catalog = (s: string) => catalogWording(s, wording).text
   const sc = deps.config.pipeline.scenes
   const raw = (Array.isArray(d.slides) ? d.slides : []).slice(0, 10)
   const n = Math.max(1, raw.length || meta.n)
-  const texts = Array.from({ length: n }, (_, i) => (i === 0 ? meta.hook : trimWords(clean(raw[i]?.text, 300), 16)))
+  const texts = Array.from({ length: n }, (_, i) => (i === 0 ? meta.hook : trimWords(clean(raw[i]?.text, 300), 18)))
   const shots = Array.from({ length: n }, (_, i) => catalog(clean(raw[i]?.shot, 300)))
   let specialsLeft = 2
   const specials = Array.from({ length: n }, (_, i): SpecialSlide | null => {
     const sp = raw[i]?.special
     const type = String(sp?.type ?? 'none')
-    if (i === 0 || !specialsLeft || !(SPECIAL_IDS as readonly string[]).includes(type)) return null
+    if (i === 0 || !specialsLeft || !(DRAWN_SPECIAL_IDS as readonly string[]).includes(type)) return null
     specialsLeft--
     const lines = (Array.isArray(sp?.lines) ? sp!.lines as unknown[] : []).map(l => clean(l, 300)).filter(Boolean).slice(0, 10)
-    return cleanSpecial({ type: type as SpecialSlide['type'], from: clean(sp?.from, 80), title: clean(sp?.title, 200), body: clean(sp?.body, 600), lines, time: '' }, cfg.brand_names, cfg.generic_names)
+    return cleanSpecial(fullSpecial({ ...emptySpecial(type as SpecialSlide['type']), from: clean(sp?.from, 80), title: clean(sp?.title, 200), body: clean(sp?.body, 600), lines, time: clean(sp?.time, 40) }), cfg.brand_names, cfg.generic_names)
   })
   const own = new Set(spec.lock.ownerSet)
   const scene = d.scene ?? {}
@@ -260,12 +401,22 @@ export function draftPatch(deps: Deps, spec: SlideshowSpec, d: DraftOut, meta: {
     outfit: own.has('outfit') || spec.mode === 'topic' ? spec.lock.outfit : catalog(clean(scene.outfit, 300)) || spec.lock.outfit,
     details: own.has('details') ? spec.lock.details : (Array.isArray(scene.details) ? scene.details : []).map(x => catalog(clean(x, 160))).filter(Boolean).slice(0, 2),
   }
+  const plan: PlanMeta = {
+    ...spec.plan,
+    ...(meta.code ? { structure: meta.code } : {}),
+    ...(meta.effectOpen ? { effectOpen: meta.effectOpen } : {}),
+    ...(meta.effectPayoff ? { effectPayoff: meta.effectPayoff } : {}),
+    ...(meta.moment ? { moment: meta.moment } : {}),
+    ...(meta.alt ? { altHook: meta.alt } : {}),
+    ...(meta.score ? { hookScore: meta.score } : {}),
+  }
   return {
     hook: texts[0]!, slides: texts.slice(1), shots, specials, textPos: [], lock,
     pattern: meta.pattern, slideCount: Math.min(10, Math.max(3, n)),
     stillIds: spec.stillIds.slice(0, n),
-    caption: clean(d.caption, 2200), hashtags: tags(d.hashtags, cfg.hashtags[1]),
+    caption: clean(d.caption, 2200), hashtags: tags(d.hashtags, cfg.hashtags[1]), ctaLine: clean(d.cta, 300),
     cta: { ...spec.cta, kind: 'own' },
+    plan,
   }
 }
 
@@ -562,10 +713,16 @@ export async function buildSlideshowVariations(deps: Deps, ctx: Ctx, input: { co
   const t = deps.config.pipeline.templates.slideshow_variations
   const route = await resolveRoute(deps, ctx, 'content_writer')
   const n = list.length
-  const vars = { ...pronounVars(ch.pronouns), name: ch.name, count: String(count), rest: String(n - 1), tags_max: String(cfgOf(deps).hashtags[1]), voice: voiceOf(ch), slides: list.map(s => `${s.index + 1}. ${s.text || '(no words)'}`).join('\n'), caption: spec.caption.trim() || 'none' }
+  // Variations start from the alt hook (section 28): variation 1 uses it
+  // word for word, the others reword it.
+  const alt = spec.plan.altHook.trim()
+  const vars = {
+    ...pronounVars(ch.pronouns), name: ch.name, count: String(count), rest: String(n - 1), tags_max: String(cfgOf(deps).hashtags[1]), voice: voiceOf(ch), slides: list.map(s => `${s.index + 1}. ${s.text || '(no words)'}`).join('\n'), caption: spec.caption.trim() || 'none',
+    alt: alt ? `Start from the alt hook: variation 1's hook is "${alt}" word for word; the other variations reword it.` : '',
+  }
   const system = fill(t.system, vars), prompt = fill(t.prompt, vars)
   const purpose = `slide_vars:${row.id}`
-  const mock = { variations: Array.from({ length: count }, (_, k) => ({ hook: `${spec.hook.trim().replace(/[.!?]*$/, '')} (take ${k + 2})`, slides: list.slice(1).map(s => `${s.text || 'More of this'} (take ${k + 2})`), caption: `${spec.caption.trim() || spec.hook.trim()} Take ${k + 2}.`, hashtags: spec.hashtags.slice(0, 3) })) }
+  const mock = { variations: Array.from({ length: count }, (_, k) => ({ hook: k === 0 && alt ? alt : `${(alt || spec.hook.trim()).replace(/[.!?]*$/, '')} (take ${k + 2})`, slides: list.slice(1).map(s => `${s.text || 'More of this'} (take ${k + 2})`), caption: `${spec.caption.trim() || spec.hook.trim()} Take ${k + 2}.`, hashtags: spec.hashtags.slice(0, 3) })) }
   const specs: JobSpec[] = [{ type: 'llm', stage: 'content', purpose, label: `${count} variation${count === 1 ? '' : 's'} of the slideshow`, request: { model: route.model, system, prompt, schema: variationsJsonSchema(count, n - 1, cfgOf(deps).hashtags[1]), schemaName: 'slideshow_variations', maxTokens: 500 + count * (250 + 60 * n), effort: route.effort ?? 'low', meta: { itemId: row.id, count, n, mockVariations: mock } } }]
   // A new image set for each: the same shots in the same locked scene, new
   // seeds, made when the words come back (one price for all).
@@ -624,7 +781,8 @@ async function onSlideshowVariations(deps: Deps, ctx: Ctx, job: JobRow, out: Job
   const made: string[] = []
   for (const [k, v] of vars.entries()) {
     const order = variationOrder(spec, n, k)
-    const words = [clean(v.hook, 200) || spec.hook, ...(Array.isArray(v.slides) ? v.slides : []).map(x => clean(x, 300))]
+    const alt = spec.plan.altHook.trim()
+    const words = [(k === 0 && alt ? alt : clean(v.hook, 200)) || spec.hook, ...(Array.isArray(v.slides) ? v.slides : []).map(x => clean(x, 300))]
     let caption = clean(v.caption, 2200)
     // Never the exact caption of another account's post.
     if (!caption || seenCaptions.has(caption.toLowerCase())) caption = `${caption || spec.caption} (${k + 2})`.trim()
@@ -636,7 +794,9 @@ async function onSlideshowVariations(deps: Deps, ctx: Ctx, job: JobRow, out: Job
       hook: texts[0]!, slides: texts.slice(1),
       shots: order.map(from => list[from]?.shot ?? ''),
       specials: order.map(from => list[from]?.special ?? null),
-      stillIds: [], textPos: [], hookIdeas: [], review: null, batchHooks: [],
+      stillIds: [], textPos: [], hookIdeas: [], hookReview: null, review: null, batchHooks: [],
+      // The variation's own alt hook is the source's hook (one tap swaps back).
+      plan: { ...spec.plan, rowId: '', planId: '', altHook: spec.hook },
       caption, hashtags: tags(v.hashtags, cfgOf(deps).hashtags[1]),
     }
     await deps.db.insert(contentItems).values({
@@ -673,7 +833,7 @@ export async function buildSlideshowBatch(deps: Deps, ctx: Ctx, input: { content
   const c = await stillContext(deps, ctx, row, spec)
   const stage = spec.mode === 'topic' ? 'slideshow' : 'scene'
   for (const [b, hook] of hooks.entries()) {
-    const r = await draftRequest(deps, ctx, row, spec, hook, guessPattern(hook), n)
+    const r = await draftRequest(deps, ctx, row, spec, { hook, pattern: guessPattern(hook) }, n)
     if (!b) prompts.push({ label: 'Slideshow writer (the first hook)', text: `${r.system}\n${r.prompt}`, wrapped: hardWrap(`${r.system}\n${r.prompt}`) })
     const parent = specs.length
     specs.push({ type: 'llm', stage: 'content', purpose: `slide_draft:${row.id}:batch`, label: `Batch draft ${b + 1} of ${hooks.length}`, request: { model: r.route.model, system: r.system, prompt: r.prompt, schema: r.schema, schemaName: 'slideshow_draft', maxTokens: 900 + 220 * n, effort: r.route.effort ?? 'low', meta: { itemId: row.id, hook, pattern: guessPattern(hook), n, row: b, mockDraft: r.mock } } })
@@ -699,7 +859,7 @@ export async function buildSlideshowBatch(deps: Deps, ctx: Ctx, input: { content
 // slideshow of the batch, whose stills then start with their own shots.
 async function onSlideDraft(deps: Deps, ctx: Ctx, job: JobRow, out: JobOutcome): Promise<void> {
   const [, anchorId, tag] = job.purpose.split(':') as [string, string, string]
-  const meta = ((job.request as { meta?: { hook?: string; pattern?: HookPattern; n?: number } }).meta ?? {})
+  const meta = ((job.request as { meta?: Partial<HookInfo> & { n?: number } }).meta ?? {})
   if (out.status !== 'completed') { await cancelChildren(deps, job.id, 'The draft was not written, so its stills were not made. Nothing was charged for them.'); return }
   const anchor = await getContent(deps, ctx, anchorId).catch(() => null)
   if (!anchor) { await cancelChildren(deps, job.id, 'The slideshow is gone.'); return }
@@ -707,13 +867,13 @@ async function onSlideDraft(deps: Deps, ctx: Ctx, job: JobRow, out: JobOutcome):
   const hook = meta.hook ?? ''
   if (tag !== 'batch') {
     const spec = parse(anchor)
-    await updateContent(deps, ctx, anchor.id, { spec: { ...draftPatch(deps, spec, d, { hook, pattern: meta.pattern ?? null, n: meta.n ?? spec.slideCount }) } })
+    await updateContent(deps, ctx, anchor.id, { spec: { ...draftPatch(deps, spec, d, { ...meta, hook, pattern: meta.pattern ?? null, n: meta.n ?? spec.slideCount }) } })
     return
   }
   // A batch row: its own slideshow, the batch's scene and settings.
   const parentSpec = parse(anchor)
   const id = batchChildId(job.id)
-  const base: SlideshowSpec = { ...parentSpec, hook: '', slides: [], stillIds: [], shots: [], specials: [], textPos: [], hookIdeas: [], batchHooks: [], caption: '', hashtags: [], review: 'pending' }
+  const base: SlideshowSpec = { ...parentSpec, hook: '', slides: [], stillIds: [], shots: [], specials: [], textPos: [], hookIdeas: [], hookReview: null, batchHooks: [], caption: '', ctaLine: '', hashtags: [], review: 'pending' }
   const spec = { ...base, ...draftPatch(deps, base, d, { hook, pattern: meta.pattern ?? null, n: meta.n ?? parentSpec.slideCount }), review: 'pending' as const }
   await deps.db.insert(contentItems).values({
     id, accountId: ctx.accountId, characterId: anchor.characterId, kind: 'slideshow', title: '', idea: hook,
@@ -876,7 +1036,7 @@ export async function renderSlideshow(deps: Deps, ctx: Ctx, job: JobRow, row: Co
     files[fileI] = b
     slides.push({ index: s.index, text: s.text, shot: s.shot, picture: special ? 'special' : still ? 'still' : 'none', stillId: special ? null : s.stillId, special, position: s.pos, files: { tiktok: fileT, instagram: fileI } })
   }
-  const caption = postCaption(spec.caption, spec.hashtags, { ad: spec.ad, max: cfg.slideshow.hashtags[1] })
+  const caption = postCaption(spec.caption, spec.hashtags, { ad: spec.ad || spec.plan.product, max: cfg.slideshow.hashtags[1], cta: spec.ctaLine })
   files['caption.txt'] = Buffer.from(`${caption}\n\nPost as a photo slideshow, images in order (tiktok/ for TikTok at 1080 x 1920, instagram/ for Instagram at 1080 x 1440). ${AI_LABEL_LINE}\n`)
   const character = row.characterId ? toData(await getCharacter(deps, ctx, row.characterId)) : null
   const json = postExportJson({

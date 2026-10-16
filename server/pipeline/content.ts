@@ -43,6 +43,8 @@ import { getCharacter, toData, type CharacterRow } from './characters.js'
 import { createScene, getScene, updateScene } from './scenes.js'
 import { resolveRoute } from './settings.js'
 import type { SceneBuilt } from './sceneActions.js'
+import { lintSettings } from './copyLint.js'
+import { planMetaSchema } from '../core/planMeta.js'
 
 // Posts (UX-PLAN.md; the content builder of 2026-10-13): the owner's B-roll
 // library, video posts (kind "meme": a kept clip, optional B-roll cut in
@@ -283,6 +285,10 @@ const memeSpec = z.object({
   hookEdits: z.array(z.string().max(40).nullable()).max(5).default([]),
   // The cover: a frame of the export and its text.
   cover: z.object({ at: z.number().min(0).max(600), text: z.string().max(200).default('') }).nullable().default(null),
+  // Section 28: what the post keeps from its plan row (the on-screen text
+  // is the caption above; the post's own caption, hashtags and CTA line
+  // are in plan), and its alt hook.
+  plan: planMetaSchema,
 })
 // A slideshow (server/core/slideshowSpec.ts; UX-PLAN.md section 27).
 const slideshowSpec = slideshowSpecSchema
@@ -1318,7 +1324,7 @@ export async function contentItemView(deps: Deps, ctx: Ctx, itemId: string) {
 }
 
 export async function contentView(deps: Deps, ctx: Ctx) {
-  const [broll, items] = await Promise.all([listBroll(deps, ctx), listContent(deps, ctx)])
+  const [broll, items, lint] = await Promise.all([listBroll(deps, ctx), listContent(deps, ctx), lintSettings(deps, ctx)])
   const assetIds = broll.map(b => b.assetId).filter((x): x is string => !!x)
   const durations = new Map<string, number | null>()
   for (const a of assetIds) durations.set(a, (await getAsset(deps, ctx, a).catch(() => null))?.durationMs ?? null)
@@ -1337,6 +1343,8 @@ export async function contentView(deps: Deps, ctx: Ctx) {
         maxVariations: cfg.slideshow.max_variations, batchMax: cfg.slideshow.batch_max, hooks: cfg.slideshow.hooks, instagram: cfg.slideshow.instagram,
         brandNames: cfg.slideshow.brand_names, genericNames: cfg.slideshow.generic_names,
       },
+      // The language lint (section 28): word lists and switched-off checks.
+      lint,
       maxUploadMb: cfg.broll.max_upload_mb,
       cut: cfg.cut,
       sound: { defaultAmbience: cfg.sound.default_ambience, targetLufs: cfg.sound.target_lufs, maxUploadMb: cfg.sound.max_upload_mb },

@@ -10,6 +10,7 @@ import { HowTo } from '../../../guide/Guide'
 import type { SlideshowSpec } from '../../../types'
 import type { PostCtx } from '../ctx'
 import { DownloadLink } from '../parts'
+import { useLint } from '../../../lint'
 
 // The slideshow's Finish step (UX-PLAN.md section 27): the export (both
 // sizes, caption.txt and post.json in one zip), the warning when a picture
@@ -107,5 +108,30 @@ export function VariationsCard({ ctx }: { ctx: PostCtx }) {
         )}
       </div>
     </section>
+  )
+}
+
+// The language lint over every slide and the caption (section 28): free,
+// a note with the slide it is on; export still works.
+export function LintSummary({ ctx }: { ctx: PostCtx }) {
+  const { item, draft } = ctx
+  const lint = useLint(item.characterId)
+  const spec = draft.spec as unknown as SlideshowSpec
+  const product = !!(spec.ad || spec.plan?.product)
+  const texts = [spec.hook ?? '', ...(spec.slides ?? [])]
+  const hits = [
+    ...texts.flatMap((t, i) => lint(t, i === 0 ? 'hook' : 'slide', { product }).map(h => ({ ...h, where: i === 0 ? 'Hook' : `Slide ${i + 1}` }))),
+    ...lint(spec.caption ?? '', 'caption', { product, hashtags: spec.hashtags ?? [] }).map(h => ({ ...h, where: 'Caption' })),
+  ]
+  if (!hits.length) return null
+  return (
+    <div data-field="slideshow-lint" role="status"><Callout tone="warn">
+      <div className="st-col" style={{ gap: 4 }}>
+        <span className="st-row" style={{ gap: 6 }}><AlertTriangle size={15} /><b>Language notes ({hits.length})</b></span>
+        {hits.slice(0, 6).map((h, i) => <span key={i} className="st-hint"><b>{h.where}:</b> {h.message}</span>)}
+        {hits.length > 6 && <span className="st-hint">And {hits.length - 6} more, under the words in the Slides step.</span>}
+        <span className="st-hint">Defaults (Settings, Rules, area Copy). Export still works.</span>
+      </div>
+    </Callout></div>
   )
 }

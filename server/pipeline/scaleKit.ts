@@ -13,6 +13,8 @@ import { claimFlags, claimsText, languageText, parseScriptKit, type Claims, type
 import { cleanVoiceCard, voiceCardText, type VoiceCard } from '../core/voiceCard.js'
 import { getCharacter, listCharacters, toData, updateCharacter } from './characters.js'
 import { resolveRoute } from './settings.js'
+import { codeBefore, fitFor, placedPosts } from './playbook.js'
+import { STRUCTURE_CODES } from '../core/playbook.js'
 
 // The scale kit (overnight item 5, DECISIONS G35; UX-PLAN.md section 14):
 // per product, the hook vault, the claims sheet and the buyer-language
@@ -263,6 +265,9 @@ export async function scoreboard(deps: Deps, ctx: Ctx) {
     .from(contentItems).where(and(eq(contentItems.accountId, ctx.accountId), isNull(contentItems.archivedAt)))
     .groupBy(contentItems.accountTag, contentItems.characterId, contentItems.status, contentItems.kind)
   const tags = new Set<string>([...saved.map(s => s.tag), ...posts.map(p => p.tag).filter(Boolean)])
+  const names = new Map((await listCharacters(deps, ctx)).map(c => [c.id, c.name]))
+  const lastCodes = new Map<string, string | null>()
+  for (const tag of tags) lastCodes.set(tag, codeBefore(await placedPosts(deps, ctx, tag), null))
   const rows = [...tags].map(tag => {
     const s = saved.find(x => x.tag === tag)
     const mine = posts.filter(p => p.tag === tag && p.kind !== 'batch')
@@ -272,8 +277,12 @@ export async function scoreboard(deps: Deps, ctx: Ctx) {
     for (const p of mine) if (p.characterId) byChar.set(p.characterId, (byChar.get(p.characterId) ?? 0) + Number(p.n))
     const characterId = s?.characterId ?? [...byChar.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null
     const signups = s?.signups ?? 0
+    // The playbook (section 28): the account's own primary and backup, else
+    // the fit table's for its tag or its character; and its last code.
+    const fit = fitFor(deps, [tag, characterId ? names.get(characterId) : null])
     return {
       tag, characterId, productId: s?.productId ?? null, link: s?.link ?? '', code: s?.code ?? '', signups, views: s?.views ?? null, notes: s?.notes ?? '',
+      primary: s?.primaryCode ?? fit.primary, backup: s?.backupCode ?? fit.backup, structuresSet: !!(s?.primaryCode || s?.backupCode), lastCode: lastCodes.get(tag) ?? null,
       posts: made, exported: ready, perPost: ready ? Math.round((signups / ready) * 100) / 100 : null, updatedAt: s?.updatedAt.toISOString() ?? null,
     }
   })
@@ -284,12 +293,13 @@ export async function scoreboard(deps: Deps, ctx: Ctx) {
 
 const cleanTag = (s: string) => s.trim().replace(/^@+/, '').replace(/\s+/g, ' ').slice(0, 60)
 
-export async function saveSocialAccount(deps: Deps, ctx: Ctx, rawTag: string, patch: { link?: string; code?: string; signups?: number; views?: number | null; characterId?: string | null; productId?: string | null; notes?: string }) {
+export async function saveSocialAccount(deps: Deps, ctx: Ctx, rawTag: string, patch: { link?: string; code?: string; signups?: number; views?: number | null; characterId?: string | null; productId?: string | null; notes?: string; primaryCode?: string | null; backupCode?: string | null }) {
   const tag = cleanTag(rawTag)
   if (!tag) throw new AppError('bad_request', 'Name the account first.')
   if (patch.characterId) await getCharacter(deps, ctx, patch.characterId)
   if (patch.productId) await getProduct(deps, ctx, patch.productId)
   if (patch.link && !/^https?:\/\/\S+$/i.test(patch.link.trim())) throw new AppError('bad_request', 'A tracked link starts with https://')
+  for (const c of [patch.primaryCode, patch.backupCode]) if (c && !(STRUCTURE_CODES as readonly string[]).includes(c)) throw new AppError('bad_request', `"${c}" is not a structure or lens code (S1 to S12, L13 to L25).`)
   const [cur] = await deps.db.select().from(socialAccounts).where(and(eq(socialAccounts.accountId, ctx.accountId), eq(socialAccounts.tag, tag)))
   const values = {
     link: patch.link !== undefined ? patch.link.trim().slice(0, 400) : cur?.link ?? '',
@@ -299,6 +309,8 @@ export async function saveSocialAccount(deps: Deps, ctx: Ctx, rawTag: string, pa
     characterId: patch.characterId !== undefined ? patch.characterId : cur?.characterId ?? null,
     productId: patch.productId !== undefined ? patch.productId : cur?.productId ?? null,
     notes: patch.notes !== undefined ? patch.notes.slice(0, 400) : cur?.notes ?? '',
+    primaryCode: patch.primaryCode !== undefined ? patch.primaryCode : cur?.primaryCode ?? null,
+    backupCode: patch.backupCode !== undefined ? patch.backupCode : cur?.backupCode ?? null,
     updatedBy: ctx.userId, updatedAt: deps.clock.now(),
   }
   if (cur) await deps.db.update(socialAccounts).set(values).where(eq(socialAccounts.id, cur.id))

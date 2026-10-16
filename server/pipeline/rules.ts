@@ -40,6 +40,12 @@ export async function ruleSwitches(deps: Deps, ctx: Ctx, characterId?: string | 
   return makeSwitches(deps.config.pipeline.rules, await readStored(deps, ctx), characterId)
 }
 
+// The switches for several characters from one read of the settings.
+export async function switchesReader(deps: Deps, ctx: Ctx): Promise<(characterId?: string | null) => RuleSwitches> {
+  const stored = await readStored(deps, ctx)
+  return characterId => makeSwitches(deps.config.pipeline.rules, stored, characterId)
+}
+
 // `on: null` (or `value: null`) clears the setting, so it follows global
 // (for a character) or the built-in default (for global).
 export async function setRuleSwitch(deps: Deps, ctx: Ctx, input: { ruleId: string; characterId?: string | null; on?: boolean | null; value?: string | null }): Promise<void> {

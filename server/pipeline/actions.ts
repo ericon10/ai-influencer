@@ -34,6 +34,7 @@ import { buildVoiceConvert, markConverting } from './voiceLines.js'
 import { buildHookVariants } from './scaleKit.js'
 import { buildSlideshowBatch, buildSlideshowCaption, buildSlideshowDraft, buildSlideshowHooks, buildSlideshowStills, buildSlideshowVariations, saveSlideStillModel } from './slideshow.js'
 import { PATTERN_IDS } from '../core/slides.js'
+import { EFFECT_CODES, STRUCTURE_CODES } from '../core/playbook.js'
 import { saferPrompt } from '../core/wording.js'
 
 // Every paid step is an action. The same builder produces the job specs for
@@ -142,7 +143,12 @@ export const actionSchema = z.discriminatedUnion('type', [
   // slide drafted from a hook, the stills of a locked scene (all empty
   // slides, or one rerolled), the caption, variations, a batch.
   z.object({ type: z.literal('slideshow_hooks'), contentId: z.string().max(60) }),
-  z.object({ type: z.literal('slideshow_draft'), contentId: z.string().max(60), hook: z.string().trim().min(3).max(200), pattern: z.enum(PATTERN_IDS).nullable().optional() }),
+  z.object({
+    type: z.literal('slideshow_draft'), contentId: z.string().max(60), hook: z.string().trim().min(3).max(200), pattern: z.enum(PATTERN_IDS).nullable().optional(),
+    // A Claude hook card (section 28): its code, effects, moment, alt hook and score.
+    code: z.enum(STRUCTURE_CODES).nullable().optional(), effectOpen: z.enum(EFFECT_CODES).nullable().optional(), effectPayoff: z.enum(EFFECT_CODES).nullable().optional(),
+    moment: z.string().max(400).optional(), alt: z.string().max(200).optional(), score: z.number().int().min(1).max(5).nullable().optional(),
+  }),
   z.object({ type: z.literal('slideshow_stills'), contentId: z.string().max(60), slides: z.array(z.number().int().min(0).max(11)).max(12).optional(), stillModel: z.string().max(80).optional() }),
   z.object({ type: z.literal('slideshow_caption'), contentId: z.string().max(60) }),
   z.object({ type: z.literal('slideshow_variations'), contentId: z.string().max(60), count: z.number().int().min(1).max(10) }),

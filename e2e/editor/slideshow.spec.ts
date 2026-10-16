@@ -80,7 +80,7 @@ async function flow(page: Page, phone: boolean, info: TestInfo) {
   await page.locator('[data-field="slideshow-cta"] select').selectOption('handle')
   await page.getByLabel('Handle').fill('e2e.slides')
   await press(page.locator('[data-field="slideshow-ad"] [role="switch"]'), phone)
-  await expect(page.locator('[data-field="slideshow-caption"] pre')).toContainText(/^#ad /, { timeout: 15_000 })
+  await expect(page.locator('[data-field="slideshow-caption"] pre')).toContainText(/^Ad: /, { timeout: 15_000 })
   await snap(page, info, `${phone ? 'phone: ' : ''}text style, dragged words, CTA and #ad`)
 
   // Finish: Export (free), both sizes and post.json.
@@ -96,7 +96,7 @@ async function flow(page: Page, phone: boolean, info: TestInfo) {
   const json = JSON.parse(Buffer.from(zip['post.json']!).toString())
   expect(json.slideshow).toMatchObject({ text_style: 'note', cta: { text: 'Follow @e2e.slides for more' } })
   expect(json.slides[3].special.type).toBe('text_thread')
-  expect(Buffer.from(zip['caption.txt']!).toString().startsWith('#ad ')).toBe(true)
+  expect(Buffer.from(zip['caption.txt']!).toString().startsWith('Ad: ')).toBe(true)
   await snap(page, info, `${phone ? 'phone: ' : ''}exported, both sizes`)
   return id
 }

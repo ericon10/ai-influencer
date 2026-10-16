@@ -164,6 +164,11 @@ const templatesSchema = z.object({
   hook_variants: z.object({ system: z.string(), prompt: z.string() }),
   slideshow_hooks: z.object({ system: z.string(), prompt: z.string() }),
   slideshow_draft: z.object({ system: z.string(), prompt: z.string() }),
+  // Section 28: the hook reviewer, the playbook's menu and the mock screens a
+  // writer may use.
+  slideshow_hooks_review: z.object({ system: z.string(), prompt: z.string() }),
+  playbook_menu: z.string(),
+  slideshow_special_menu: z.string(),
   slideshow_caption: z.object({ system: z.string(), prompt: z.string() }),
   slideshow_variations: z.object({ system: z.string(), prompt: z.string() }),
   slideshow_topic: z.string(),
@@ -297,6 +302,12 @@ const contentSchema = z.object({
     brand_names: z.array(z.string()).default([]),
     generic_names: z.array(z.string()).default([]),
   }),
+  // The playbook's fit table (section 28): a primary and a backup code per
+  // account tag or character name.
+  playbook: z.object({ fit: z.record(z.string(), z.tuple([z.string(), z.string()])).default({}) }).default({ fit: {} }),
+  // The language lint's word lists (section 28; the checks are rules).
+  copy_lint: z.object({ values: z.array(z.string()), hype: z.array(z.string()), products: z.array(z.string()), max_hashtags: z.number().int().min(0).max(30) })
+    .default({ values: ['should', 'need to', 'needs to', 'must', 'ought'], hype: ['dream job', 'unlock', 'level up', 'game-changer', 'game changer', 'supercharge'], products: ['SideStep'], max_hashtags: 5 }),
   batch: z.object({ max: z.number().int().positive(), default_count: z.number().int().positive(), zip_part_mb: z.number().positive().default(150) }),
   clone: z.object({
     mode: z.enum(['replace', 'motion']).default('replace'),

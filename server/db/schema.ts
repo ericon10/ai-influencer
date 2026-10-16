@@ -579,6 +579,11 @@ export const socialAccounts = pgTable('social_accounts', {
   signups: integer('signups').notNull().default(0),
   views: integer('views'),
   notes: text('notes').notNull().default(''),
+  // The playbook's structures for this account (section 28): a primary
+  // (about 35% of posts) and a backup (about 20%), codes S1 to S12 or L13
+  // to L25. Null: the playbook's fit table for the tag (config).
+  primaryCode: text('primary_code'),
+  backupCode: text('backup_code'),
   updatedBy: text('updated_by'),
   createdAt: createdAt(),
   updatedAt: updatedAt(),

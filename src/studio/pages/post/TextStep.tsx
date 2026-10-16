@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Copy, Plus, Sparkles, X } from 'lucide-react'
+import { ArrowLeftRight, Copy, Plus, Sparkles, X } from 'lucide-react'
 import { PriceButton } from '../../PriceButton'
 import { Drawer, Field, useToast, type TodoItem } from '../../ui'
 import { useProduct, useProducts } from '../../hooks'
@@ -8,7 +8,8 @@ import type { BatchSpec, CaptionStyle, MemeSpec, SlideshowSpec } from '../../typ
 import { CaptionPreview, CaptionStylePick } from './parts'
 import type { PostCtx } from './ctx'
 import { SlideshowText } from './slideshow/SlideshowText'
-import { TEXT_STYLES, slideList } from '../../../../server/core/slides'
+import { TEXT_STYLES, postCaption, slideList } from '../../../../server/core/slides'
+import { LintNote, useLint } from '../../lint'
 
 // The Text step: the caption of a video post, the hook and slides of a
 // slideshow (Claude writes them, priced), or the captions of a batch (pasted,
@@ -43,6 +44,11 @@ function Caption({ ctx }: { ctx: PostCtx }) {
   const spec = draft.spec as unknown as MemeSpec
   const clip = lib?.clips.find(c => c.id === spec.clipId && c.status === 'approved')
   const [hooks, setHooks] = useState(false)
+  const lint = useLint(item.characterId)
+  const plan = spec.plan
+  const product = !!plan?.product
+  const setPlan = (patch: Record<string, unknown>) => draft.setSpec({ plan: { ...(plan ?? {}), ...patch } } as never)
+  const alt = plan?.altHook ?? ''
   return (
     <div className="st-content-grid">
       <div className="st-col" style={{ gap: 14 }}>
@@ -58,8 +64,18 @@ function Caption({ ctx }: { ctx: PostCtx }) {
           <Field id="post-caption" group label="Words (optional)" hint={`Leave it empty for a video with no caption; you can add text in the editor. In the upper third, kept clear of her mouth and hands and of TikTok's buttons. Up to ${data.options.caption.maxChars} characters; emoji work.`}
             extra={<button type="button" className="st-btn sm ghost" onClick={() => setHooks(true)}><Sparkles size={13} />Pick a hook</button>}>
             <textarea className="st-textarea" rows={3} aria-label="Caption" maxLength={data.options.caption.maxChars} value={spec.caption ?? ''} onChange={e => draft.setSpec({ caption: e.target.value })} placeholder="e.g. me when the code finally works and I have no idea why 💀" />
+            <LintNote hits={lint(spec.caption ?? '', 'hook', { product })} field="hook-lint" />
           </Field>
         )}
+        {(alt.trim() || (spec.caption ?? '').trim()) && (
+          <div className="st-row" style={{ gap: 8, flexWrap: 'wrap' }} data-field="alt-hook">
+            <span className="st-hint">Alt hook:</span>
+            <input className="st-input sm" style={{ flex: '1 1 220px', minWidth: 0 }} maxLength={200} value={alt} onChange={e => setPlan({ altHook: e.target.value })} placeholder="The runner-up hook (optional)" aria-label="Alt hook" />
+            <button type="button" className="st-btn sm secondary" disabled={!alt.trim()} title={alt.trim() ? 'The words on the video and the alt hook trade places (free)' : 'Write an alt hook first'}
+              onClick={() => draft.setSpec({ caption: alt.slice(0, data.options.caption.maxChars), plan: { ...(plan ?? {}), altHook: spec.caption ?? '' } } as never)}><ArrowLeftRight size={13} />Swap with the alt hook</button>
+          </div>
+        )}
+        <PostCaptionFields plan={plan} product={product} lint={lint} onChange={setPlan} max={data.options.slideshow.hashtagsMax ?? 5} />
         <HookPicker open={hooks} onClose={() => setHooks(false)} characterId={ctx.item.characterId} onPick={t => { draft.setSpec({ caption: t.slice(0, data.options.caption.maxChars) }); setHooks(false) }} />
       </div>
       <div className="st-content-side"><CaptionPreview text={spec.captionOff ? '' : spec.caption ?? ''} data={data} video={clip?.assetId} look={spec.captionStyle} /><span className="st-hint">{spec.captionOff ? 'Preview: no caption.' : 'Preview. The export uses the same font, style and safe zones.'}</span></div>
@@ -141,5 +157,34 @@ export function HookPicker({ open, onClose, characterId, onPick }: { open: boole
         )}
       </div>
     </Drawer>
+  )
+}
+
+// A video post's own caption for TikTok or Instagram (not the words on the
+// video): from its plan row or typed here, with its hashtags and CTA line,
+// linted, and copied as posted (section 28).
+export function PostCaptionFields({ plan, product, lint, onChange, max }: { plan: MemeSpec['plan']; product: boolean; lint: ReturnType<typeof useLint>; onChange: (patch: Record<string, unknown>) => void; max: number }) {
+  const toast = useToast()
+  const caption = plan?.caption ?? ''
+  const tags = plan?.hashtags ?? []
+  const cta = plan?.cta ?? ''
+  const posted = postCaption(caption, tags, { ad: product, max, cta })
+  return (
+    <div className="st-col" style={{ gap: 8 }} data-field="post-caption-to-post">
+      <Field label="Caption to post (not on the video)" hint="What goes under the video on TikTok or Instagram: 1 to 3 short sentences that add a layer. Optional.">
+        <textarea className="st-textarea" rows={2} maxLength={2200} value={caption} onChange={e => onChange({ caption: e.target.value })} placeholder="e.g. the junior staff would like to be mentored first. by anyone." />
+      </Field>
+      <LintNote hits={lint(caption, 'caption', { product, hashtags: tags })} field="post-caption-lint" />
+      <div className="st-row" style={{ gap: 8, flexWrap: 'wrap' }}>
+        <input className="st-input" style={{ flex: '2 1 220px', minWidth: 0 }} value={tags.join(' ')} onChange={e => onChange({ hashtags: e.target.value.split(/[\s,]+/).map(h => h.replace(/^#+/, '')).filter(Boolean).slice(0, 15) })} aria-label="Hashtags" placeholder={`Hashtags, at most ${max}, without #`} />
+        <input className="st-input" style={{ flex: '3 1 260px', minWidth: 0 }} maxLength={300} value={cta} onChange={e => onChange({ cta: e.target.value })} aria-label="CTA line" placeholder="CTA line: a question, a warm offer or a shrug" />
+      </div>
+      {posted && (
+        <div className="st-row" style={{ gap: 8, alignItems: 'flex-start' }}>
+          <pre className="st-license" style={{ whiteSpace: 'pre-wrap', maxHeight: 120, flex: 1, margin: 0 }}>{posted}</pre>
+          <button type="button" className="st-btn ghost sm" onClick={async () => { try { await navigator.clipboard.writeText(posted); toast({ tone: 'ok', text: 'Caption copied.' }) } catch { toast({ tone: 'bad', text: 'Could not copy. Select the text and copy it.' }) } }}><Copy size={14} />Copy</button>
+        </div>
+      )}
+    </div>
   )
 }

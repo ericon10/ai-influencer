@@ -689,85 +689,166 @@ qa_perception:
 # account's voice card go in; 10 hooks come back, each tagged by pattern.
 slideshow_hooks:
   system: |
-    You write hooks for TikTok and Instagram photo slideshows posted by
-    {name}, an original, fictional adult character. A hook is the words on
-    slide 1: 4 to 12 words that make someone stop scrolling.
-    Write exactly {count} different hooks, spread across these patterns,
-    each tagged with its pattern id:
-    - doubt: someone else doubts or reacts ("My manager said I would never...");
-    - pov: a POV line;
-    - nobody_tells: things nobody tells you;
-    - red_flags: red flags;
-    - listicle: a numbered list promise;
-    - storytime: the start of a story;
-    - myth_fact: myth vs fact;
-    - tier_list: a ranking or a tier list.
-    Rules: 4 to 12 words each. The plain words buyers use (their own
-    language, when given), never marketing words. When a voice card is
-    given, write the way {name} talks. No hashtags, no quotation marks
-    around the hook, no long dashes, at most one emoji. Learn from the
-    vault's hooks; never copy one word for word. Nothing sexual, no claims
-    about real people, no medical or money promises; a product named stays
-    inside its claims sheet. Never say the photos are real or that {name}
-    is a real person.
-  prompt: |
-    Topic: {topic}
-    Account: {account}
-    {name}'s persona: {vibe}
-    {voice}
+    You write hooks for TikTok and Instagram photo slideshows for {who},
+    the way the viral writing playbook says (the method below). A hook is
+    the words on slide 1.
+    Write exactly {count} candidates for this account's next post. For each
+    one, in this order:
+    1. effect_open: what the viewer feels in the first second (an E code
+       from the menu), and effect_payoff: what they feel at the end.
+    2. moment: one specific scene of the problem happening, in one line:
+       when, where, what is on screen, and the tell (one detail only a
+       real job seeker knows). The tension is a tag, never the hook's
+       subject.
+    3. code: the structure or lens it is poured into (S1 to S12, L13 to
+       L25).
+    4. Write 3 hooks for the moment with different lenses or tells, rank
+       them on the ladder, keep the best as hook and the runner-up as
+       alt_hook. rank is your own score of the kept hook.
+    Kill test: what does the viewer get at the end, where is the surprise,
+    and could it be a news headline about the job market (then it is a 5).
+    Only keep hooks you would rank 1 or 2.
+    This account: {structures}
+    Language: 4 to 14 words a hook, plain text, no emoji, no quotation
+    marks around the hook. Show the problem happening, never state it: no
+    topic labels, no stat first, no restated pain. No should, need to,
+    must, ought, "just" before an instruction, or hustle words (dream job,
+    unlock, level up, game-changer, supercharge). No sentence starts with
+    "You" (a "POV:" opener is fine). No em or en dashes. Roast the system,
+    never the viewer. The product is never in a hook. No real people,
+    celebrities, named shows, songs, creators, logos or real companies by
+    name. Adults only. Original words only: learn from the vault's hooks,
+    never copy one. A product named stays inside its claims sheet. Story
+    details (times, rounds, tallies) can be invented; a number that reads
+    like a market stat comes from the claims sheet, with its source.
 
-    Hooks from the vault:
+    {menu}
+  prompt: |
+    Account: {account}
+    Who posts it: {who}
+    {voice}
+    Topic: {topic}
+    {tension}
+
+    Hooks from the vault (learn from them, never copy one):
     {vault}
 
     {language}
 
     {claims}
 
-    Write {count} hooks.
-# "Use this hook": every slide drafted from the hook (6 by default): the
-# hook, a setup, the reveal on slide 3 or 4, the payoff, a soft CTA last;
-# each slide's photo inside one locked scene; special slides where they fit.
+    Write {count} candidates.
+# The second Claude call of "Write 10 with Claude" (section 28): a reviewer
+# that did not write the hooks scores each one on the playbook's ladder.
+# Only a 1 or a 2 is shown.
+slideshow_hooks_review:
+  system: |
+    You are a separate reviewer: you did not write these hooks. Score every
+    hook 1 to 5 on the viral writing playbook's ladder:
+    5: a topic or a restated pain ("Ghosting is bad").
+    4: a sourced stat with nothing around it.
+    3: a real moment, no frame.
+    2: a moment plus a tell.
+    1: a moment, a tell and a lens, with a clear payoff.
+    Run the kill test on each: what does the viewer get at the end (a
+    laugh, a reveal, a usable thing), where is the surprise, and could it
+    be a news headline about the job market (then it is a 5). Score down a
+    hook that breaks the claims sheet, states the problem instead of
+    showing it, opens on a stat, is a flat joke, starts a sentence with
+    "You", uses should, need to or must, names the product, or nearly
+    copies another hook in the list. Be strict: most first drafts are a 3.
+    For each hook give its number, the score, and one short line: what the
+    viewer gets and where the surprise is, or what breaks it. No em or en
+    dashes.
+  prompt: |
+    {claims}
+
+    The hooks, numbered (the moment, the code, then the hook):
+    {hooks}
+
+    Score every hook.
+# The playbook's menu, given to every writer (docs/content/viral-writing-
+# playbook.md sections 2, 4, 5 and 8).
+playbook_menu: |
+  Effects (what the viewer feels):
+  E1 "That's literally me": a detail only a job seeker would know.
+  E2 "Wait, what?": a hidden layer under something familiar.
+  E3 "I need to know how this ends": an end state shown first, or a countdown.
+  E4 "LMAO": the familiar pushed one notch too far.
+  E5 "Sending this to someone": a line about a person they know.
+  E6 "So it's not me": a fact that moves blame from the viewer to the system.
+  E7 "I never saw it that way": a belief flipped.
+  E8 "Screenshotting this": one usable thing, doable tonight.
+  Structures:
+  S1 Levels: the same thing at rising levels; the top level or a twist last.
+  S2 Two Characters: a novice's belief, an insider's correction, one lightbulb.
+  S3 Untold Story: start on something everyone knows, peel a layer a slide.
+  S4 Is It Worth It?: imply they are overpaying or fooled; verdict last.
+  S5 Testing Viral Hacks: try popular advice under clear rules, keep a scorecard.
+  S6 Teaser: open on the end state, cut, rewind, pay off at the end.
+  S7 Jenga carousel: one big question; each slide opens the next.
+  S8 Visual Metaphor: an everyday object acts out the problem, then the reframe.
+  S9 Man on the Street: several people, one question, the best answer last.
+  S10 Challenge series: a set-length challenge, organized by obstacles.
+  S11 Contrast pair: what they say vs what they mean, side by side.
+  S12 Countdown: a clock, meter or draining bar the viewer watches run.
+  Lenses (a frame from somewhere else):
+  L13 Nature documentary. L14 Museum exhibit. L15 Review and rating.
+  L16 Dating parallel. L17 Delivery tracker. L18 Fine print. L19 Breakup
+  text. L20 Personification. L21 Invoice and timesheet. L22 "Previously
+  on" recap. L23 Subtitles. L24 Forecast and horoscope. L25 Group chat.
+  The ladder (1 is best; only a 1 or 2 ships):
+  5 a topic or a restated pain; 4 a sourced stat with nothing around it;
+  3 a real moment, no frame; 2 a moment plus a tell; 1 a moment, a tell
+  and a lens, with a clear payoff.
+# "Use this hook": every slide drafted from the hook, the Jenga way (the
+# post writer brief): each slide opens the next, setup and punchline never
+# on one slide, the payoff last; each slide's photo inside one locked
+# scene; special slides where they fit.
 slideshow_draft:
   system: |
-    You draft a photo slideshow for TikTok and Instagram posted by {name},
-    an original, fictional adult character. {who}
-    Write exactly {n} slides. Slide 1 is the hook given below, word for
-    word. Then a setup slide, the reveal on slide 3 or 4, the payoff, and a
-    soft CTA on the last slide (an invitation, never pushy, for example
-    follow for part 2, save this, more on my page).
+    You draft a photo slideshow for TikTok and Instagram for {who}.
+    {photos}
+    Write exactly {n} slides, the Jenga way. Slide 1 is the hook given
+    below, word for word. Each slide answers one small question and opens
+    the next; a setup and its punchline are never on the same slide; the
+    reveal waits; the last slide pays off the hook's promise and completes
+    the scale (a laugh counts). {structure}
     For every slide write:
-    - text: 4 to 12 words, casual and specific, one idea a slide, the way
-      {name} talks;
+    - text: 4 to 14 words, plain text, no emoji, one idea a slide;
     - shot: what that slide's photo shows, one short sentence. Every photo
       is in the same place, light and phone, like one camera roll from one
       day: only the moment changes;
-    - special: "none", or a mock phone screen where it tells the story
-      better than a photo: "notification" (from = the app, title = the
-      sender, body = the message), "text_thread" (title = the contact,
-      lines = the messages, yours start with "me: "), "rejection_email"
-      (from = the sender, title = the subject, body = the email),
-      "job_posting" (title = the role, from = the company, body = the
-      place and pay, lines = 3 requirements). Never on slide 1, at most 2
-      in a slideshow. Invent generic names: never a real company, app or
-      brand. Leave the fields you do not use empty.
+    - special: "none", or a mock screen drawn by code where it tells the
+      story better than a photo. Never on slide 1, at most 2 in a
+      slideshow. Invent generic names: never a real company, app or brand.
+      Leave the fields you do not use empty. The screens:
+      {specials}
     Also write:
     - scene: the one place of the whole set: place (where, specific),
       light (one of: {lights}), camera ({cameras}), outfit ({outfit_rule}),
       and details: 2 small things in the place that show up again;
-    - caption: a first-person story caption the way {name} talks, 2 to 4
-      short sentences, ending with a light question or nudge;
-    - hashtags: 3 to {tags_max} relevant hashtags, lower case, without #.
-    Rules: plain words, no quotation marks around a slide, no long dashes,
-    at most one emoji a slide. Outfits in catalog terms (the garment, its
-    color and fabric), never fit or body words. Nothing sexual, no claims
-    about real people, no medical or money promises; a product named stays
-    inside its claims sheet. Never say the photos are real or that {name}
-    is a real person.
+    - caption: 1 to 3 short sentences that add a layer (never a repeat of
+      the slides), {caption_voice};
+    - cta: one line, a question, a warm offer or a shrug, never an order;
+    - hashtags: 3 to {tags_max}: one broad, one niche, one community, lower
+      case, without #.
+    Language: at least two of Feelings (one line that validates before it
+    jokes), Facts (one sourced number or specific) and Fun. No should, need
+    to, must, ought, "just" before an instruction, or hustle words. No
+    sentence starts with "You" (a "POV:" opener is fine). No em or en
+    dashes, no quotation marks around a slide. Roast the system, never the
+    viewer. Outfits in catalog terms (the garment, its color and fabric),
+    never fit or body words. Story details can be invented; a number that
+    reads like a market stat comes from the claims sheet, with a short
+    source on the slide or in the caption. {product_rule}
+    No real people, celebrities, named shows, songs, creators, logos or
+    real companies by name. Nothing sexual, no medical or money promises.
+    Never say the photos are real or that anyone in them is a real person.
   prompt: |
     Hook (slide 1): {hook}
-    Pattern: {pattern}
+    {moment}
     Topic: {topic}
-    {name}'s persona: {vibe}
     {voice}
     {scene}
 
@@ -775,7 +856,28 @@ slideshow_draft:
 
     {claims}
 
-    Write {n} slides, the scene, the caption and the hashtags.
+    Write {n} slides, the scene, the caption, the CTA and the hashtags.
+# The mock screens a writer may put on a slide (fields of each).
+slideshow_special_menu: |
+  "notification" (from = the app, title = the sender, body = the message,
+  time); "text_thread" (title = the contact, lines = the messages, yours
+  start with "me: "); "rejection_email" (from = the sender, title = the
+  subject, body = the email, time); "job_posting" (title = the role, from =
+  the company, body = the place and pay, lines = up to 5 requirements,
+  time = when posted); "application_form" (from = the portal, title = the
+  page, lines = the fields, "Label: value" when filled); "portal_status"
+  (from = the portal, title = the role, body = the status, lines = "Step ·
+  timestamp", the last is now); "calendar_invite" (title = the event, from
+  = the organizer, time = when, body = where, lines = attendee initials);
+  "receipt" (title = the invoice or receipt number, from = billed to, lines
+  = "Item · amount", body = the total line, time = when due);
+  "bank_app" (from = the bank, title = the account, time = a label, body =
+  the balance, lines = "Label · amount"); "museum_placard" (title, from =
+  the artist, time = medium and year, body = the placard text); "survey"
+  (from = the survey, title = the 0 to 10 question); "lock_screen" (time =
+  the clock, from = the date, lines = "App · Sender · message");
+  "profile_card" (title = the name, from = the headline, body = the about
+  line, lines = "Label · value").
 # "Rewrite the caption": a first-person story caption, at most 5 hashtags.
 slideshow_caption:
   system: |
@@ -814,6 +916,7 @@ slideshow_variations:
     The caption: {caption}
     {voice}
 
+    {alt}
     Write {count} variations, each with {rest} slides after the hook.
 # A topic slideshow's photo (feeder accounts): no character, the locked
 # scene in every photo, the REALISM line still in every prompt (rule zero).

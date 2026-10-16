@@ -10,6 +10,7 @@ import { wordsNote } from '../../../../../server/core/slideSvg'
 import type { SlideshowSpec } from '../../../types'
 import type { PostCtx } from '../ctx'
 import { SlideFrame, type FrameId } from './SlideFrame'
+import { LintNote, useLint } from '../../../lint'
 import { useSlideFonts } from './draw'
 
 // The slideshow's Slides step (UX-PLAN.md section 27): the text style
@@ -37,6 +38,9 @@ export function SlideshowText({ ctx }: { ctx: PostCtx }) {
   const tags = (spec.hashtags ?? []).slice(0, max)
   const texts = [spec.hook, ...spec.slides]
   const hasWords = texts.some(t => t.trim())
+  const lint = useLint(item.characterId)
+  const product = !!(spec.ad || spec.plan?.product)
+  const cta = spec.ctaLine ?? ''
 
   const setText = (i: number, value: string) => draft.setSpec((i === 0 ? { hook: value } : { slides: setAt(spec.slides, i - 1, value, '') }) as never)
   const setPos = (i: number, pos: SlidePos | null) => draft.setSpec({ textPos: setAt(spec.textPos ?? [], i, pos, null) } as never)
@@ -58,7 +62,7 @@ export function SlideshowText({ ctx }: { ctx: PostCtx }) {
     else { const added = editSlides(spec, { add: list.length }); draft.setSpec({ ...added, cta, slides: setAt(added.slides, list.length - 1, text, '') } as never) }
   }
   async function copyCaption() {
-    try { await navigator.clipboard.writeText(postCaption(spec.caption, tags, { ad: spec.ad, max })); toast({ tone: 'ok', text: 'Caption copied.' }) } catch { toast({ tone: 'bad', text: 'Could not copy. Select the text and copy it.' }) }
+    try { await navigator.clipboard.writeText(postCaption(spec.caption, tags, { ad: spec.ad, max, cta })); toast({ tone: 'ok', text: 'Caption copied.' }) } catch { toast({ tone: 'bad', text: 'Could not copy. Select the text and copy it.' }) }
   }
   const writeTodo: TodoItem[] = [...(!spec.hook.trim() && (draft.fields.idea.trim() || spec.topic.trim()).length < 3 ? [{ label: 'A hook or the idea (Idea step)', target: 'slideshow-hook', onGo: () => ctx.open('idea', { field: 'slideshow-hook' }) }] : [])]
 
@@ -109,6 +113,7 @@ export function SlideshowText({ ctx }: { ctx: PostCtx }) {
                     {list.length > 1 && <button type="button" className="st-btn ghost sm" aria-label={`Remove slide ${s.index + 1}`} onClick={() => { draft.setSpec(editSlides(spec, { remove: s.index }) as never); setSel(0) }}><X size={14} /></button>}
                   </div>
                   {note && <span className="st-hint" style={{ marginLeft: 66 }}>{note}</span>}
+                  <div style={{ marginLeft: 66 }}><LintNote hits={lint(texts[s.index] ?? '', s.index === 0 ? 'hook' : 'slide', { product })} field={`slide-lint-${s.index}`} /></div>
                   {s.special && cur?.index === s.index && <SpecialEditor special={s.special} onChange={p => setSpecial(s.index, p)} brands={brands} />}
                 </div>
               )
@@ -146,17 +151,21 @@ export function SlideshowText({ ctx }: { ctx: PostCtx }) {
           hint="A first-person story in the account's voice. Rewrite the caption has Claude write a new one from the slides.">
           <textarea className="st-textarea" rows={3} maxLength={2200} value={spec.caption} onChange={e => draft.setSpec({ caption: e.target.value } as never)} />
         </Field>
+        <LintNote hits={lint(spec.caption, 'caption', { product, hashtags: spec.hashtags ?? [] })} field="caption-lint" />
+        <Field label="CTA line" hint="One line under the caption: a question, a warm offer or a shrug, never an order. Added to the caption as posted when it is not already in it.">
+          <input className="st-input" maxLength={300} value={cta} onChange={e => draft.setSpec({ ctaLine: e.target.value } as never)} placeholder="e.g. What time did yours arrive?" />
+        </Field>
         <Field label={`Hashtags (${tags.length} of ${max} at most)`} hint="Separated by spaces, without #. Only the first 5 are used.">
           <input className="st-input" value={(spec.hashtags ?? []).join(' ')} onChange={e => draft.setSpec({ hashtags: e.target.value.split(/[\s,]+/).map(h => h.replace(/^#+/, '')).filter(Boolean).slice(0, max) } as never)} />
         </Field>
         <label className="st-row" style={{ gap: 10, cursor: 'pointer', alignItems: 'flex-start' }} data-field="slideshow-ad">
           <button type="button" role="switch" aria-checked={spec.ad} className={`st-switch ${spec.ad ? 'on' : ''}`} onClick={() => draft.setSpec({ ad: !spec.ad } as never)}><span /></button>
-          <span className="st-col" style={{ gap: 2 }}><b>#ad</b><span className="st-hint">{spec.ad ? 'On: "Ad" on slide 1, and #ad first in the caption.' : 'Off. Turn it on for a paid post or a brand deal.'}</span></span>
+          <span className="st-col" style={{ gap: 2 }}><b>#ad</b><span className="st-hint">{spec.ad ? 'On: "Ad" on slide 1, and "Ad:" first in the caption.' : 'Off. Turn it on for a product post, a paid post or a brand deal.'}</span></span>
         </label>
-        {(spec.caption.trim() || tags.length > 0) && (
+        {(spec.caption.trim() || tags.length > 0 || cta.trim()) && (
           <div className="st-col" style={{ gap: 6 }}>
             <span className="st-label">As posted</span>
-            <pre className="st-license" style={{ whiteSpace: 'pre-wrap', maxHeight: 160 }}>{postCaption(spec.caption, tags, { ad: spec.ad, max })}</pre>
+            <pre className="st-license" style={{ whiteSpace: 'pre-wrap', maxHeight: 160 }}>{postCaption(spec.caption, tags, { ad: spec.ad, max, cta })}</pre>
             <button type="button" className="st-btn ghost sm" style={{ alignSelf: 'flex-start' }} onClick={copyCaption}><Copy size={14} />Copy caption and hashtags</button>
           </div>
         )}
