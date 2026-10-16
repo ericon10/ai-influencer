@@ -413,7 +413,7 @@ async function onAccount(deps: Deps, ctx: Ctx): Promise<boolean> {
 
 // A Higgsfield API key: the account's own in Settings, or the server's
 // (HF_CREDENTIALS, the owner's account only). Nothing is decrypted.
-async function apiKeyReady(deps: Deps, ctx: Ctx): Promise<boolean> {
+export async function apiKeyReady(deps: Deps, ctx: Ctx): Promise<boolean> {
   if ((await listCredentials(deps.db, ctx.accountId)).some(c => c.provider === 'higgsfield')) return true
   return !!deps.env.HF_CREDENTIALS?.trim() && await isOwnerAccount(deps.db, ctx.accountId, deps.env.STUDIO_OWNER_EMAIL || 'owner@studio.local')
 }

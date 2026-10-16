@@ -426,6 +426,17 @@ rules:
     title: Name the garment in the clip's outfit
     check: { type: behavior }
     message: When the outfit the clip reader wrote names no garment type ("black top"), the Recreate price says "name the garment, tank top, t-shirt..." and offers Read the outfit again (one Claude call, priced on the button). Never on your own words.
+  - id: slideshow-no-reuse
+    bucket: default
+    area: copy
+    spec: "27"
+    # Owner, 2026-10-16: "Never reuse an image or exact caption across
+    # accounts." UX-PLAN section 27. Variations are made with new images and
+    # new captions; this warns on the export when a slideshow still shares
+    # one with another account's slideshow.
+    title: Never reuse a picture or caption across accounts
+    check: { type: behavior }
+    message: A slideshow's Finish step warns when one of its pictures, or its exact caption, is also in a slideshow of another account (another account tag), and offers Reroll for the picture. Make variations always makes new pictures and new captions.
   - id: wording-risky
     bucket: default
     area: scene

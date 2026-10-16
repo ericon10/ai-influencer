@@ -36,6 +36,8 @@ import { addCloneSource, cloneOptions, cloneStills, keepClone, pickCloneStill, p
 import { editorLibrary } from '../pipeline/editorMedia.js'
 import { addRecreateRow, recreateBatch, recreateFor, reviewTakeAgain, setRecreateRows, startRecreate, useCloneTake } from '../pipeline/recreate.js'
 import { jobViews } from '../jobs/jobView.js'
+import { archiveSlideScene, batchView, familyView, listSlideScenes, reuseReport, reviewBatchItem, saveSlideScene, saveSlideStillModel, slideStillChoices, vaultHookIdeas } from '../pipeline/slideshow.js'
+import { PATTERN_IDS } from '../core/slides.js'
 import { POST_STEPS, addBroll, archiveBroll, archiveContent, contentItemView, contentView, createContent, duplicateContent, postScene, retryFailedBatch, startCover, startRender, startVariants, updateBroll, updateContent } from '../pipeline/content.js'
 import { rulesView, setRuleSwitch } from '../pipeline/rules.js'
 import { chooseConcept } from '../pipeline/concepts.js'
@@ -1050,6 +1052,50 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
     const row = await retryFailedBatch(deps, ctx, c.req.param('id'))
     return c.json({ id: row.id, status: row.status }, 202)
   })
+  // ── The slideshow power-up (UX-PLAN.md section 27). Free parts only;
+  // the paid ones are actions with a price (POST /actions/estimate).
+  app.post('/content/:id/slideshow/vault-hooks', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    const body = parse(z.object({ offset: z.number().int().min(0).max(10_000).default(0), patterns: z.array(z.enum(PATTERN_IDS)).max(8).optional() }), await json(c))
+    const row = await vaultHookIdeas(deps, ctx, c.req.param('id'), body)
+    return c.json(await contentItemView(deps, ctx, row.id))
+  })
+  app.get('/content/:id/slideshow/family', async c => c.json(await familyView(deps, c.get('ctx'), c.req.param('id'))))
+  app.get('/content/:id/slideshow/reuse', async c => c.json(await reuseReport(deps, c.get('ctx'), c.req.param('id'))))
+  app.get('/content/:id/slideshow/batch', async c => c.json(await batchView(deps, c.get('ctx'), c.req.param('id'))))
+  app.post('/content/:id/slideshow/batch/:child', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    const body = parse(z.object({ decision: z.enum(['approve', 'reject', 'pending']) }), await json(c))
+    return c.json(await reviewBatchItem(deps, ctx, c.req.param('id'), c.req.param('child'), body.decision, id => startRender(deps, ctx, id)))
+  })
+  app.get('/slideshow/still-models', async c => c.json(await slideStillChoices(deps, c.get('ctx'))))
+  app.put('/slideshow/still-model', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    const body = parse(z.object({ model: z.string().max(80) }), await json(c))
+    await saveSlideStillModel(deps, ctx, body.model)
+    return c.json({ ok: true })
+  })
+  app.get('/slide-scenes', async c => c.json({ scenes: await listSlideScenes(deps, c.get('ctx')) }))
+  app.post('/slide-scenes', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    const body = parse(z.object({
+      name: z.string().max(80), characterId: z.string().max(60).nullable().optional(), topic: z.string().max(120).optional(),
+      place: z.string().max(300), light: z.string().max(40).optional(), camera: z.string().max(60).optional(), phone: z.string().max(10).optional(),
+      details: z.array(z.string().max(160)).max(2).optional(), lookAssetId: z.string().max(60).nullable().optional(),
+    }), await json(c))
+    return c.json(await saveSlideScene(deps, ctx, body), 201)
+  })
+  app.delete('/slide-scenes/:id', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    await archiveSlideScene(deps, ctx, c.req.param('id'))
+    return c.json({ ok: true })
+  })
+
   // Rendering is local and free (ffmpeg and sharp on the worker).
   app.post('/content/:id/render', async c => {
     const ctx = c.get('ctx')

@@ -162,6 +162,15 @@ const templatesSchema = z.object({
   content_captions: z.object({ system: z.string(), prompt: z.string() }),
   clone_caption: z.object({ system: z.string(), prompt: z.string() }),
   hook_variants: z.object({ system: z.string(), prompt: z.string() }),
+  slideshow_hooks: z.object({ system: z.string(), prompt: z.string() }),
+  slideshow_draft: z.object({ system: z.string(), prompt: z.string() }),
+  slideshow_caption: z.object({ system: z.string(), prompt: z.string() }),
+  slideshow_variations: z.object({ system: z.string(), prompt: z.string() }),
+  slideshow_topic: z.string(),
+  slideshow_topic_realism: z.string(),
+  slideshow_same_place: z.string(),
+  slideshow_set: z.string(),
+  slideshow_element: z.string(),
   prompt_writer: z.object({
     still_system: z.string(), still_prompt: z.string(), video_system: z.string(), video_prompt: z.string(),
     end_frame: z.string(),
@@ -273,7 +282,21 @@ const contentSchema = z.object({
   }),
   meme: z.object({ max_clip_seconds: z.number().positive(), broll_seconds: z.number().positive(), max_broll_seconds: z.number().positive(), order: z.enum(['clip_first', 'broll_first']) }),
   broll: z.object({ max_upload_mb: z.number().positive(), max_seconds: z.number().positive(), products: z.array(z.string()).default([]) }),
-  slideshow: z.object({ slides: z.tuple([z.number().int().positive(), z.number().int().positive()]), hashtags: z.tuple([z.number().int().min(0), z.number().int().positive()]), max_stills: z.number().int().positive(), image: z.object({ quality: z.number().int().min(50).max(100) }) }),
+  slideshow: z.object({
+    slides: z.tuple([z.number().int().positive(), z.number().int().positive()]), hashtags: z.tuple([z.number().int().min(0), z.number().int().positive()]), max_stills: z.number().int().positive(), image: z.object({ quality: z.number().int().min(50).max(100) }),
+    // Section 27 (the power-up): slides a draft makes, the Instagram size,
+    // the stills models (plan, API), variations, batch and the mock-screen
+    // names (a real brand on a mock screen becomes a generic name).
+    draft_slides: z.number().int().min(3).max(10).default(6),
+    instagram: z.object({ width: z.number().int().positive(), height: z.number().int().positive() }).default({ width: 1080, height: 1440 }),
+    still_model: z.string().default('higgsfield/nano-banana-2.1'),
+    api_still_model: z.string().default('higgsfield/gpt-image-2.5-flare'),
+    max_variations: z.number().int().min(1).max(10).default(5),
+    batch_max: z.number().int().min(1).max(20).default(10),
+    hooks: z.number().int().min(3).max(20).default(10),
+    brand_names: z.array(z.string()).default([]),
+    generic_names: z.array(z.string()).default([]),
+  }),
   batch: z.object({ max: z.number().int().positive(), default_count: z.number().int().positive(), zip_part_mb: z.number().positive().default(150) }),
   clone: z.object({
     mode: z.enum(['replace', 'motion']).default('replace'),

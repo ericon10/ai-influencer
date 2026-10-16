@@ -1,0 +1,257 @@
+// The slideshow power-up (owner, 2026-10-16; UX-PLAN.md section 27): hook
+// patterns, the free hooks from the vault, the slide list a post renders,
+// CTA lines, special slides and their generic names, and the list reorder
+// for variations. Pure: no config, no imports, so the browser uses the same
+// file as the worker.
+
+// ── Hook patterns ─────────────────────────────────────────────────────
+
+export const HOOK_PATTERNS = [
+  { id: 'doubt', label: 'Someone doubts or reacts' },
+  { id: 'pov', label: 'POV' },
+  { id: 'nobody_tells', label: 'Things nobody tells you' },
+  { id: 'red_flags', label: 'Red flags' },
+  { id: 'listicle', label: 'Listicle' },
+  { id: 'storytime', label: 'Storytime' },
+  { id: 'myth_fact', label: 'Myth vs fact' },
+  { id: 'tier_list', label: 'Tier list' },
+] as const
+export type HookPattern = (typeof HOOK_PATTERNS)[number]['id']
+export const PATTERN_IDS = HOOK_PATTERNS.map(p => p.id) as unknown as readonly [HookPattern, ...HookPattern[]]
+export const patternLabel = (id: string) => HOOK_PATTERNS.find(p => p.id === id)?.label ?? id
+
+export interface HookIdea { text: string; pattern: HookPattern; source: 'vault' | 'claude' | 'typed' }
+
+// The pattern a hook reads as, from its words (free). Listicles and tier
+// lists are the ones whose middle slides can be reordered.
+export function guessPattern(text: string): HookPattern {
+  const t = ` ${text.toLowerCase()} `
+  if (/\bpov\b/.test(t)) return 'pov'
+  if (/\btier\b|\branking\b|\branked\b/.test(t)) return 'tier_list'
+  if (/\bmyths?\b|\bvs\.? fact\b|\bfact\b.*\bfiction\b/.test(t)) return 'myth_fact'
+  if (/red flags?/.test(t)) return 'red_flags'
+  if (/nobody (?:tells|told|talks)|no one (?:tells|told|talks)|wish (?:i|someone) (?:knew|told)/.test(t)) return 'nobody_tells'
+  if (/\b(?:said|told me|laughed|thought i|doubted|didn't believe|did not believe|reacts?|reaction)\b/.test(t)) return 'doubt'
+  if (/\bstorytime\b|\bstory time\b|^ ?(?:so )?i (?:got|was|quit|left|almost|finally)\b/.test(t)) return 'storytime'
+  if (/^\s*(?:\d+|three|four|five|six|seven|eight|nine|ten)\b/.test(t) || /\b\d+ (?:things|ways|apps|tips|signs|mistakes|habits|tools)\b/.test(t)) return 'listicle'
+  return 'storytime'
+}
+
+export const isListPattern = (p: string | null | undefined) => p === 'listicle' || p === 'tier_list' || p === 'red_flags'
+
+const words = (s: string) => s.trim().split(/\s+/).filter(Boolean)
+export const wordCount = (s: string) => words(s).length
+
+// "Write 10 hooks" for free: the vault's own hooks first (rotated by the
+// offset so another press shows others), then each pattern recast with the
+// buyer's own words or the topic. Deterministic for the same inputs.
+export function vaultHooks(input: { vault: Array<{ text: string; kind?: string }>; phrases: string[]; topic: string; n?: number; offset?: number; patterns?: HookPattern[] }): HookIdea[] {
+  const n = input.n ?? 10
+  const off = Math.max(0, input.offset ?? 0)
+  const allow = new Set<HookPattern>(input.patterns?.length ? input.patterns : PATTERN_IDS)
+  const topic = cleanTopic(input.topic) || 'this'
+  const phrases = input.phrases.map(p => p.trim().replace(/^["“]+|["”.]+$/g, '')).filter(p => p.length >= 3 && wordCount(p) <= 8)
+  const phrase = (i: number) => phrases.length ? phrases[(i + off) % phrases.length]!.toLowerCase() : topic
+  const out: HookIdea[] = []
+  const seen = new Set<string>()
+  const push = (text: string, pattern: HookPattern) => {
+    const clean = trimWords(text.replace(/\s+/g, ' ').trim(), 12)
+    const key = clean.toLowerCase()
+    if (!clean || seen.has(key) || !allow.has(pattern)) return
+    seen.add(key)
+    out.push({ text: clean, pattern, source: 'vault' })
+  }
+  const vault = input.vault.filter(h => h.text.trim().length >= 3)
+  const fromVault = Math.min(vault.length, Math.ceil(n / 2))
+  for (let i = 0; i < vault.length && out.length < fromVault; i++) {
+    const h = vault[(i + off) % vault.length]!
+    push(h.text, guessPattern(h.text))
+  }
+  const recast: Record<HookPattern, (i: number) => string> = {
+    doubt: i => `My friend laughed when I said ${phrase(i)}`,
+    pov: i => `POV: you finally figured out ${phrase(i)}`,
+    nobody_tells: () => `Things nobody tells you about ${topic}`,
+    red_flags: () => `Red flags about ${topic} I ignored`,
+    listicle: () => `5 ${topic} things I wish I knew sooner`,
+    storytime: i => `Storytime: how ${phrase(i)} changed everything`,
+    myth_fact: () => `Myth vs fact: ${topic}`,
+    tier_list: () => `Ranking every ${topic} tip I tried`,
+  }
+  const order = PATTERN_IDS.filter(p => allow.has(p))
+  for (let round = 0; out.length < n && round < 4; round++) {
+    for (const [i, p] of order.entries()) {
+      if (out.length >= n) break
+      push(recast[p](i + round * order.length), p)
+    }
+  }
+  return out.slice(0, n)
+}
+
+const cleanTopic = (s: string) => trimWords(s.trim().replace(/^(?:a |an |the )/i, '').replace(/[.!?]+$/, ''), 6).toLowerCase()
+export function trimWords(s: string, max: number): string {
+  const w = words(s)
+  return w.length <= max ? w.join(' ') : w.slice(0, max).join(' ')
+}
+
+// ── Text styles ───────────────────────────────────────────────────────
+
+export const TEXT_STYLES = [
+  { id: 'classic', label: 'Classic', line: 'Bold white, black outline' },
+  { id: 'box', label: 'Text box', line: "TikTok's white box" },
+  { id: 'minimal', label: 'Minimal', line: 'Smaller, plain white' },
+  { id: 'note', label: 'Note', line: 'A notes-app card' },
+] as const
+export type TextStyleId = (typeof TEXT_STYLES)[number]['id']
+export const TEXT_STYLE_IDS = TEXT_STYLES.map(s => s.id) as unknown as readonly [TextStyleId, ...TextStyleId[]]
+
+// ── CTA (the last slide) ──────────────────────────────────────────────
+
+export const CTA_KINDS = [
+  { id: 'part2', label: 'Follow for part 2' },
+  { id: 'save', label: 'Save this' },
+  { id: 'handle', label: 'Follow @handle' },
+  { id: 'comment', label: 'Comment a word' },
+  { id: 'page', label: 'More on my page' },
+  { id: 'own', label: 'As written' },
+  { id: 'none', label: 'No CTA slide' },
+] as const
+export type CtaKind = (typeof CTA_KINDS)[number]['id']
+export const CTA_IDS = CTA_KINDS.map(c => c.id) as unknown as readonly [CtaKind, ...CtaKind[]]
+
+export function ctaText(kind: CtaKind, o: { handle?: string; word?: string } = {}): string | null {
+  const handle = (o.handle ?? '').trim().replace(/^@+/, '').replace(/\s+/g, '')
+  const word = (o.word ?? '').trim().replace(/^["']+|["']+$/g, '') || 'more'
+  switch (kind) {
+    case 'part2': return 'Follow for part 2'
+    case 'save': return 'Save this for later'
+    case 'handle': return handle ? `Follow @${handle} for more` : 'Follow for more'
+    case 'comment': return `Comment "${word}" and I'll send it`
+    case 'page': return 'More like this on my page'
+    default: return null
+  }
+}
+
+// ── Special slides: mock UI drawn by code ─────────────────────────────
+
+export const SPECIAL_TYPES = [
+  { id: 'notification', label: 'Phone notification' },
+  { id: 'text_thread', label: 'Text thread' },
+  { id: 'rejection_email', label: 'Rejection email' },
+  { id: 'job_posting', label: 'Job posting' },
+] as const
+export type SpecialType = (typeof SPECIAL_TYPES)[number]['id']
+export const SPECIAL_IDS = SPECIAL_TYPES.map(s => s.id) as unknown as readonly [SpecialType, ...SpecialType[]]
+
+// One shape for every type (what the writer returns and the form edits):
+// notification: from = app, title, body, time; text thread: title = the
+// contact, lines = messages, "me: " marks yours; rejection email: from,
+// title = subject, body; job posting: title, from = company, body = the
+// place and pay line, lines = requirements.
+export interface SpecialSlide { type: SpecialType; from: string; title: string; body: string; lines: string[]; time: string }
+
+export function emptySpecial(type: SpecialType): SpecialSlide {
+  switch (type) {
+    case 'notification': return { type, from: 'Messages', title: 'Jordan', body: 'did you see the email??', lines: [], time: 'now' }
+    case 'text_thread': return { type, from: '', title: 'Mom', body: '', lines: ['how did the interview go', 'me: they said they will let me know', 'thats good right?'], time: '9:41' }
+    case 'rejection_email': return { type, from: 'Recruiting Team', title: 'Update on your application', body: 'Thank you for your interest. After careful consideration, we have decided to move forward with other candidates.', lines: [], time: '8:02 AM' }
+    case 'job_posting': return { type, from: 'Northwind Studio', title: 'Junior Product Designer', body: 'Remote · $68k to $80k', lines: ['2+ years of experience', 'A portfolio of shipped work', 'Comfortable presenting ideas'], time: '2 days ago' }
+  }
+}
+
+// A thread line: whose message it is, and the words.
+export function threadLine(line: string): { me: boolean; text: string } {
+  const m = line.match(/^\s*(me|you)\s*:\s*/i)
+  return m ? { me: true, text: line.slice(m[0].length).trim() } : { me: false, text: line.replace(/^\s*(?:them|they|[a-z]{1,20})\s*:\s*/i, '').trim() || line.trim() }
+}
+
+// Real brand names never appear on a mock screen: each becomes a generic
+// name (the lists are data, config/content.yaml). Whole words, as the
+// brand writes itself or in capitals, so "target" or "indeed" in a
+// sentence stays.
+export function genericNames(text: string, brands: string[], generic: string[]): string {
+  if (!brands.length || !text) return text
+  let out = text
+  brands.forEach((b, i) => {
+    const name = b.trim()
+    if (!name) return
+    const quoted = [name, name.toUpperCase()].map(n => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')
+    const re = new RegExp(`(^|[^A-Za-z0-9])(?:${quoted})(?=$|[^A-Za-z0-9])`, 'g')
+    out = out.replace(re, (_m, pre: string) => `${pre}${generic.length ? generic[i % generic.length]! : 'the company'}`)
+  })
+  return out
+}
+
+export function cleanSpecial(s: SpecialSlide, brands: string[], generic: string[]): SpecialSlide {
+  const g = (t: string) => genericNames(t, brands, generic)
+  return { ...s, from: g(s.from), title: g(s.title), body: g(s.body), lines: s.lines.map(g), time: s.time }
+}
+
+// ── The slides of a post ──────────────────────────────────────────────
+
+export interface SlidePos { x: number; y: number }
+export interface SlideshowSlides {
+  hook: string
+  slides: string[]
+  stillIds: string[]
+  shots?: string[]
+  specials?: Array<SpecialSlide | null>
+  textPos?: Array<SlidePos | null>
+}
+export interface Slide { index: number; text: string; stillId: string | null; special: SpecialSlide | null; shot: string; pos: SlidePos | null }
+
+// How many slides a post has: the hook and its slides when there are words,
+// else one per picked still (the words are optional).
+export function slideCountOf(s: SlideshowSlides): number {
+  const words = s.hook.trim() || s.slides.length ? 1 + s.slides.length : 0
+  const lastSpecial = (s.specials ?? []).reduce((m, x, i) => (x ? i + 1 : m), 0)
+  return Math.max(words, s.stillIds.length, lastSpecial)
+}
+
+// Each slide's picture: its own still, or its special slide. An older post
+// with fewer stills than slides (and no empty slots) repeats them in order.
+export function slideList(s: SlideshowSlides): Slide[] {
+  const n = slideCountOf(s)
+  const filled = s.stillIds.filter(Boolean)
+  const legacy = filled.length > 0 && filled.length === s.stillIds.length && s.stillIds.length < n
+  const texts = [s.hook, ...s.slides]
+  return Array.from({ length: n }, (_, i) => {
+    const special = s.specials?.[i] ?? null
+    const own = s.stillIds[i] || null
+    const stillId = special ? null : own ?? (legacy ? filled[i % filled.length]! : null)
+    return { index: i, text: (texts[i] ?? '').trim(), stillId, special, shot: (s.shots?.[i] ?? '').trim(), pos: s.textPos?.[i] ?? null }
+  })
+}
+
+// A slot array set at one index, padded with empty slots.
+export function setAt<T>(list: T[], i: number, value: T, empty: T): T[] {
+  const out = [...list]
+  while (out.length <= i) out.push(empty)
+  out[i] = value
+  return out
+}
+
+// Variations of a list post: the middle slides (between the hook and the
+// payoff and CTA) in another order, by a seeded shuffle that never returns
+// the same order when another exists.
+export function reorderMiddle<T>(items: T[], seed: number, keepEnd = 1): T[] {
+  if (items.length < 4) return [...items]
+  const head = items.slice(0, 1), tail = items.slice(items.length - keepEnd), mid = items.slice(1, items.length - keepEnd)
+  if (mid.length < 2) return [...items]
+  const shuffled = [...mid]
+  let x = (seed * 2654435761) >>> 0 || 1
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    x = (x * 1103515245 + 12345) >>> 0
+    const j = x % (i + 1)
+    ;[shuffled[i], shuffled[j]] = [shuffled[j]!, shuffled[i]!]
+  }
+  if (shuffled.every((v, i) => v === mid[i])) shuffled.push(shuffled.shift()!)
+  return [...head, ...shuffled, ...tail]
+}
+
+// The caption as posted: #ad first when the post is an ad, then the
+// caption, then at most `max` hashtags (without a second #ad).
+export function postCaption(caption: string, hashtags: string[], o: { ad: boolean; max: number }): string {
+  const tags = hashtags.map(h => h.replace(/^#+/, '').replace(/\s+/g, '')).filter(h => h && h.toLowerCase() !== 'ad').slice(0, o.max).map(h => `#${h}`)
+  const body = caption.trim().replace(/^#ad\b\s*/i, '')
+  return [o.ad ? `#ad ${body}`.trim() : body, tags.join(' ')].filter(Boolean).join('\n\n')
+}

@@ -185,10 +185,11 @@ async function startWrittenStills(deps: Deps, ctx: Ctx, job: JobRow, text: strin
 // The free local checks on a still when no Claude check runs (owner,
 // 2026-10-13: Claude checks are on demand). Face match against REF-00 and
 // the closest-angle refs, plus a skin note against REF-00; a person decides.
-async function localStillChecks(deps: Deps, ctx: Ctx, job: JobRow, assetId: string, extra: QaReport['findings'] = []): Promise<QaReport> {
+// A slideshow still (UX-PLAN.md section 27) names its post's scene itself.
+export async function localStillChecks(deps: Deps, ctx: Ctx, job: JobRow, assetId: string, extra: QaReport['findings'] = [], sceneId = sceneIdOf(job)): Promise<QaReport> {
   const findings: QaReport['findings'] = [...extra]
   try {
-    const scene = await getScene(deps, ctx, sceneIdOf(job))
+    const scene = await getScene(deps, ctx, sceneId)
     const f = await sceneFieldsFor(deps, ctx, scene)
     const { views, scenes: sc } = deps.config.pipeline
     const framing = sc.framings.find(x => x.id === f.framing)

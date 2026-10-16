@@ -32,6 +32,8 @@ import { readBilling } from '../providers/billing.js'
 import { effectiveModel, readModelOverrides } from '../providers/modelOverrides.js'
 import { buildVoiceConvert, markConverting } from './voiceLines.js'
 import { buildHookVariants } from './scaleKit.js'
+import { buildSlideshowBatch, buildSlideshowCaption, buildSlideshowDraft, buildSlideshowHooks, buildSlideshowStills, buildSlideshowVariations, saveSlideStillModel } from './slideshow.js'
+import { PATTERN_IDS } from '../core/slides.js'
 import { saferPrompt } from '../core/wording.js'
 
 // Every paid step is an action. The same builder produces the job specs for
@@ -136,6 +138,15 @@ export const actionSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('voice_convert'), soundIds: z.array(z.string().max(60)).min(1).max(50) }),
   // Scale kit: one hook rewritten in each picked character's voice.
   z.object({ type: z.literal('hook_variants'), hookId: z.string().max(60), characterIds: z.array(z.string().max(60)).min(1).max(30), perCharacter: z.number().int().min(1).max(3).optional() }),
+  // The slideshow power-up (UX-PLAN.md section 27): hooks by Claude, every
+  // slide drafted from a hook, the stills of a locked scene (all empty
+  // slides, or one rerolled), the caption, variations, a batch.
+  z.object({ type: z.literal('slideshow_hooks'), contentId: z.string().max(60) }),
+  z.object({ type: z.literal('slideshow_draft'), contentId: z.string().max(60), hook: z.string().trim().min(3).max(200), pattern: z.enum(PATTERN_IDS).nullable().optional() }),
+  z.object({ type: z.literal('slideshow_stills'), contentId: z.string().max(60), slides: z.array(z.number().int().min(0).max(11)).max(12).optional(), stillModel: z.string().max(80).optional() }),
+  z.object({ type: z.literal('slideshow_caption'), contentId: z.string().max(60) }),
+  z.object({ type: z.literal('slideshow_variations'), contentId: z.string().max(60), count: z.number().int().min(1).max(10) }),
+  z.object({ type: z.literal('slideshow_batch'), contentId: z.string().max(60) }),
 ])
 
 export type StudioAction = z.infer<typeof actionSchema>
@@ -236,6 +247,12 @@ export async function buildAction(deps: Deps, ctx: Ctx, action: StudioAction): P
   if (action.type === 'recreate_batch') return buildRecreateBatch(deps, ctx, action)
   if (action.type === 'voice_convert') return buildVoiceConvert(deps, ctx, action.soundIds)
   if (action.type === 'hook_variants') return buildHookVariants(deps, ctx, action)
+  if (action.type === 'slideshow_hooks') return buildSlideshowHooks(deps, ctx, action.contentId)
+  if (action.type === 'slideshow_draft') return buildSlideshowDraft(deps, ctx, action)
+  if (action.type === 'slideshow_stills') return buildSlideshowStills(deps, ctx, action)
+  if (action.type === 'slideshow_caption') return buildSlideshowCaption(deps, ctx, action.contentId)
+  if (action.type === 'slideshow_variations') return buildSlideshowVariations(deps, ctx, action)
+  if (action.type === 'slideshow_batch') return buildSlideshowBatch(deps, ctx, action)
   const row = await getCharacter(deps, ctx, action.characterId)
   const ch = toData(row)
   const tpl = deps.config.pipeline.templates
@@ -515,6 +532,8 @@ async function afterStart(deps: Deps, ctx: Ctx, action: StudioAction, built: Bui
   // The video model picked last is the next take's default.
   if (action.type === 'scene_video' && !action.test && action.model) await saveVideoModel(deps, ctx, action.model)
   if (action.type === 'clone' && action.model) await saveCloneModel(deps, ctx, action.model)
+  // The slideshow stills model picked last is the next run's default.
+  if (action.type === 'slideshow_stills' && action.stillModel) await saveSlideStillModel(deps, ctx, action.stillModel).catch(() => undefined)
   // "Make the video" on a still keeps that still; "Fix this face" picks the
   // still it fixes (the same click).
   if (action.type === 'clone' && action.stills) for (const id of Object.values(action.stills)) await useCloneStill(deps, ctx, action.contentId, id)

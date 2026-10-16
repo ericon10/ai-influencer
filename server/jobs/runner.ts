@@ -614,6 +614,13 @@ export async function activateChildren(deps: Deps, parentJobId: string, patch: (
   return children
 }
 
+// One waiting job canceled with its hold released (a slideshow slide that
+// became a special slide needs no still).
+export async function cancelWaiting(deps: Deps, jobId: string, reason: string): Promise<void> {
+  const [c] = await deps.db.select().from(jobs).where(eq(jobs.id, jobId))
+  if (c?.status === 'waiting') await finishWithoutCharge(deps, c, 'canceled', reason)
+}
+
 export async function cancelChildren(deps: Deps, parentJobId: string, reason: string): Promise<void> {
   for (const c of await childJobs(deps, parentJobId)) {
     if (c.status === 'waiting') await finishWithoutCharge(deps, c, 'canceled', reason)

@@ -370,11 +370,36 @@ export const contentItems = pgTable('content_items', {
   status: text('status').notNull().default('draft'), // draft | rendering | ready | failed
   outputs: jsonb('outputs').notNull().default({}),
   error: text('error'),
+  // A slideshow's family (UX-PLAN.md section 27): the post a variation was
+  // made from (the family's first post), and the batch post that made it.
+  variationOf: text('variation_of'),
+  batchOf: text('batch_of'),
   createdBy: text('created_by'),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
   archivedAt: timestamp('archived_at', { withTimezone: true }),
-}, t => [index('content_account_idx').on(t.accountId, t.createdAt)])
+}, t => [index('content_account_idx').on(t.accountId, t.createdAt), index('content_family_idx').on(t.accountId, t.variationOf), index('content_batch_idx').on(t.accountId, t.batchOf)])
+
+// The Scene library (UX-PLAN.md section 27): a saved slideshow scene (the
+// place, light, camera and 2 details) for one character or one topic, with
+// the picture it was saved from, so the same room looks the same every time.
+export const slideScenes = pgTable('slide_scenes', {
+  id: text('id').primaryKey(),
+  accountId: text('account_id').notNull().references(() => accounts.id),
+  characterId: text('character_id'),
+  topic: text('topic').notNull().default(''),
+  name: text('name').notNull(),
+  place: text('place').notNull().default(''),
+  light: text('light').notNull().default(''),
+  camera: text('camera').notNull().default(''),
+  phone: text('phone').notNull().default(''),
+  details: jsonb('details').notNull().default([]),
+  lookAssetId: text('look_asset_id'),
+  createdBy: text('created_by'),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+  archivedAt: timestamp('archived_at', { withTimezone: true }),
+}, t => [index('slide_scenes_account_idx').on(t.accountId, t.createdAt)])
 
 // ── Jobs and money ───────────────────────────────────────────────
 

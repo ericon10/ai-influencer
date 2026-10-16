@@ -11,7 +11,9 @@ import { AppError, notFound } from '../lib/errors.js'
 import { newId } from '../lib/ids.js'
 import { registerJobHook, registerLocalJob, type JobOutcome, type JobRow } from '../jobs/hooks.js'
 import { enqueueLocalJob, type JobSpec } from '../jobs/runner.js'
-import { captionPng, captionWords, slideImage, type CaptionLook } from '../core/overlay.js'
+import { captionPng, captionWords, type CaptionLook } from '../core/overlay.js'
+import { slideshowSpecSchema } from '../core/slideshowSpec.js'
+import { renderSlideshow, slideshowProblems } from './slideshow.js'
 import { fill, hardWrap } from '../core/text.js'
 import { pronounVars } from '../core/prompts.js'
 import { transcodeBroll } from '../media/meme.js'
@@ -282,14 +284,8 @@ const memeSpec = z.object({
   // The cover: a frame of the export and its text.
   cover: z.object({ at: z.number().min(0).max(600), text: z.string().max(200).default('') }).nullable().default(null),
 })
-const slideshowSpec = z.object({
-  stillIds: z.array(id).max(20).default([]),
-  topic: z.string().max(400).default(''),
-  hook: z.string().max(200).default(''),
-  slides: z.array(z.string().max(300)).max(10).default([]),
-  caption: z.string().max(2200).default(''),
-  hashtags: z.array(z.string().max(60)).max(15).default([]),
-})
+// A slideshow (server/core/slideshowSpec.ts; UX-PLAN.md section 27).
+const slideshowSpec = slideshowSpecSchema
 // A batch rotates its clips and B-roll clips across the captions (owner,
 // 2026-10-13): video i uses clip i mod n and B-roll i mod m. Older drafts
 // with one clipId and brollId read as lists of one.
@@ -347,6 +343,10 @@ export type PostStep = (typeof POST_STEPS)[number]
 export interface ContentOutputs {
   videoAssetId?: string
   imageAssetIds?: string[]
+  // A slideshow's Instagram set (1080 x 1440), in the same order, and its
+  // post.json (UX-PLAN.md section 27).
+  instagramAssetIds?: string[]
+  jsonAssetId?: string
   // A batch, by caption order (a failed video leaves a gap), with the clip
   // and B-roll each one used (they rotate).
   videos?: Array<{ caption: string; assetId: string; clipId?: string; brollId?: string | null } | null>
@@ -509,7 +509,10 @@ export async function duplicateContent(deps: Deps, ctx: Ctx, itemId: string): Pr
 export async function postScene(deps: Deps, ctx: Ctx, itemId: string): Promise<ContentRow> {
   const row = await getContent(deps, ctx, itemId)
   if (row.sceneId) return row
-  const scene = await createScene(deps, ctx, row.characterId!, { brief: row.idea.trim(), title: row.title || undefined })
+  // A slideshow's scene starts from its idea, else its hook (hook first,
+  // UX-PLAN.md section 27).
+  const hook = row.kind === 'slideshow' ? String((row.spec as { hook?: string } | null)?.hook ?? '').trim() : ''
+  const scene = await createScene(deps, ctx, row.characterId!, { brief: row.idea.trim() || hook, title: row.title || undefined })
   return updateContent(deps, ctx, row.id, { sceneId: scene.id })
 }
 
@@ -549,8 +552,7 @@ function renderProblems(deps: Deps, row: ContentRow): string[] {
     if (bs?.shots === 2) out.push('A batch takes one-shot edits only; pick another edit style')
     if (bs?.needs.includes('background')) out.push(`A batch cannot use the ${bs.label.toLowerCase()} yet; pick another edit style`)
   } else {
-    const s = slideshowSpec.parse(row.spec)
-    if (!s.stillIds.length) out.push('Pick stills')
+    out.push(...slideshowProblems(slideshowSpec.parse(row.spec)))
   }
   return out
 }
@@ -972,28 +974,12 @@ async function runContentRender(deps: Deps, ctx: Ctx, job: JobRow): Promise<unkn
       return outputs
     }
     if (row.kind === 'batch') return await renderBatchVideo(deps, ctx, job, row, name)
-    // Slideshow: the hook on the first image, then one slide per image. With
-    // fewer stills than slides, the stills repeat in order. The words are
-    // optional (owner, 2026-10-15): with none, each still goes out as it is.
-    const s = slideshowSpec.parse(row.spec)
-    const stills = await Promise.all(s.stillIds.map(sid => candidateAsset(deps, ctx, sid, row.characterId!, 'image')))
-    const words = [s.hook, ...s.slides].map(t => t.trim()).filter(Boolean)
-    const texts = words.length ? words : stills.map(() => '')
-    const images: string[] = []
-    const files: Record<string, Uint8Array> = {}
-    for (const [i, text] of texts.entries()) {
-      const still = (await readAsset(deps, ctx, stills[i % stills.length]!)).data
-      const jpg = await slideImage(still, text, deps.config.pipeline.content)
-      const asset = await saveAsset(deps, ctx, { data: jpg, mime: 'image/jpeg', origin: 'derived', label: text ? `Slide ${i + 1}: ${text.slice(0, 60)}` : `Slide ${i + 1}`, sourceJobId: job.id })
-      images.push(asset.id)
-      files[`${String(i + 1).padStart(2, '0')}-${name}.jpg`] = jpg
-    }
-    const tags = s.hashtags.map(h => `#${h.replace(/^#+/, '').replace(/\s+/g, '')}`).filter(h => h.length > 1).join(' ')
-    files['caption.txt'] = Buffer.from(`${s.caption.trim()}${tags ? `\n\n${tags}` : ''}\n\nPost as a photo slideshow, images in order. Turn on TikTok's AI-generated content label.\n`)
-    const zip = await saveAsset(deps, ctx, { data: Buffer.from(zipSync(files, { level: 0 })), mime: 'application/zip', origin: 'derived', label: `Slideshow ${name} (zip)`, sourceJobId: job.id })
-    const outputs: ContentOutputs = { imageAssetIds: images, zipAssetId: zip.id, renderedAt: deps.clock.now().toISOString() }
+    // Slideshow (UX-PLAN.md section 27): each slide's picture or special
+    // slide, its words in the post's text style, both sizes, caption.txt
+    // and post.json in one zip.
+    const outputs = await renderSlideshow(deps, ctx, job, row, name)
     await setOutputs(deps, itemId, outputs, 'ready')
-    return { images: images.length }
+    return { images: outputs.imageAssetIds?.length ?? 0 }
   } catch (e) {
     if (row.kind === 'batch') throw e
     await deps.db.update(contentItems).set({ status: 'failed', error: (e as Error).message.slice(0, 400), updatedAt: deps.clock.now() }).where(eq(contentItems.id, itemId))
@@ -1321,6 +1307,7 @@ async function onContentCaptions(deps: Deps, ctx: Ctx, job: JobRow, out: JobOutc
 
 const itemView = (i: ContentRow) => ({
   id: i.id, kind: i.kind as ContentKind, characterId: i.characterId, title: i.title, idea: i.idea, sceneId: i.sceneId, accountTag: i.accountTag, step: i.step,
+  variationOf: i.variationOf, batchOf: i.batchOf,
   spec: i.kind === 'batch' ? batchSpec.parse(i.spec) : i.spec, status: i.status, outputs: i.outputs as ContentOutputs, error: i.error, createdAt: i.createdAt.toISOString(), updatedAt: i.updatedAt.toISOString(),
 })
 
@@ -1344,7 +1331,12 @@ export async function contentView(deps: Deps, ctx: Ctx) {
     accountTags: [...new Set(items.map(i => i.accountTag).filter(Boolean))],
     options: {
       caption: { size: cfg.caption.size, safe: cfg.caption.safe, position: cfg.caption.position, maxChars: cfg.caption.max_chars, box: cfg.caption.box, style: cfg.caption.style, outline: cfg.caption.outline, karaoke: cfg.caption.karaoke },
-      canvas: cfg.canvas, meme: cfg.meme, slideshow: { slides: cfg.slideshow.slides, maxStills: cfg.slideshow.max_stills }, batch: cfg.batch,
+      canvas: cfg.canvas, meme: cfg.meme, batch: cfg.batch,
+      slideshow: {
+        slides: cfg.slideshow.slides, maxStills: cfg.slideshow.max_stills, draftSlides: cfg.slideshow.draft_slides, hashtagsMax: cfg.slideshow.hashtags[1],
+        maxVariations: cfg.slideshow.max_variations, batchMax: cfg.slideshow.batch_max, hooks: cfg.slideshow.hooks, instagram: cfg.slideshow.instagram,
+        brandNames: cfg.slideshow.brand_names, genericNames: cfg.slideshow.generic_names,
+      },
       maxUploadMb: cfg.broll.max_upload_mb,
       cut: cfg.cut,
       sound: { defaultAmbience: cfg.sound.default_ambience, targetLufs: cfg.sound.target_lufs, maxUploadMb: cfg.sound.max_upload_mb },

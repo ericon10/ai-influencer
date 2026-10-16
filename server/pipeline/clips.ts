@@ -93,7 +93,7 @@ export interface LibraryStill { id: string; assetId: string; characterId: string
 export interface LibraryClip extends LibraryStill { posterId: string | null; durationSec: number | null; title: string; error: string | null }
 
 const STILL_STATUSES = ['in_review', 'approved']
-const IMAGE_OPS = ['generate', 'edit', 'crop', 'upscale', 'mirror', 'drift_lock', 'end_frame', 'upload_image']
+const IMAGE_OPS = ['generate', 'edit', 'crop', 'upscale', 'mirror', 'drift_lock', 'end_frame', 'upload_image', 'slide_topic']
 
 export async function libraryView(deps: Deps, ctx: Ctx, opts: { characterId?: string | null } = {}): Promise<{ stills: LibraryStill[]; clips: LibraryClip[] }> {
   const charRows = await deps.db.select({ id: characters.id, name: characters.name }).from(characters).where(eq(characters.accountId, ctx.accountId))
@@ -126,7 +126,7 @@ export async function libraryView(deps: Deps, ctx: Ctx, opts: { characterId?: st
   }
   const base = (c: (typeof stillRows)[number]) => ({
     id: c.id, assetId: c.assetId!, characterId: c.characterId, characterName: names.get(c.characterId) ?? '',
-    sceneId: c.sceneId, sceneTitle: c.op === 'upload_image' ? c.label || 'Uploaded image' : c.sceneId ? sceneTitle.get(c.sceneId) ?? 'Scene' : '', status: c.status, op: c.op, createdAt: c.createdAt.toISOString(),
+    sceneId: c.sceneId, sceneTitle: c.op === 'upload_image' ? c.label || 'Uploaded image' : c.op === 'slide_topic' ? 'Slideshow topic photo' : c.sceneId ? sceneTitle.get(c.sceneId) ?? 'Scene' : '', status: c.status, op: c.op, createdAt: c.createdAt.toISOString(),
   })
   const clips: LibraryClip[] = []
   for (const c of clipsShown) {

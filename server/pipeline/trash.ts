@@ -1,6 +1,6 @@
 import { and, desc, eq, inArray, isNull, lte, or, like } from 'drizzle-orm'
 import type { Ctx, Deps } from '../context.js'
-import { assets, brollClips, candidates, characters, contentItems, jobs, refImages, sounds, trashItems } from '../db/schema.js'
+import { assets, brollClips, candidates, characters, contentItems, jobs, refImages, slideScenes, sounds, trashItems } from '../db/schema.js'
 import { AppError } from '../lib/errors.js'
 import { newId } from '../lib/ids.js'
 import { isVideoOp } from '../core/clips.js'
@@ -211,6 +211,8 @@ async function namedAnywhere(deps: Deps, ctx: Ctx): Promise<Set<string> | null> 
   for (const names of byPost.values()) for (const n of names) all.add(n)
   for (const c of await deps.db.select().from(characters).where(eq(characters.accountId, ctx.accountId))) tokensOf(c, all)
   for (const r of await deps.db.select({ candidateId: refImages.approvedCandidateId }).from(refImages).where(eq(refImages.accountId, ctx.accountId))) if (r.candidateId) all.add(r.candidateId)
+  // A saved slideshow scene's look picture (the Scene library).
+  for (const r of await deps.db.select({ look: slideScenes.lookAssetId }).from(slideScenes).where(and(eq(slideScenes.accountId, ctx.accountId), isNull(slideScenes.archivedAt)))) if (r.look) all.add(r.look)
   return all
 }
 
@@ -261,7 +263,7 @@ export interface AutoCleanItem {
   characterId: string; postId: string; postName: string; finishedAt: string
 }
 
-const STILL_OPS = ['generate', 'edit', 'crop', 'upscale', 'mirror', 'drift_lock', 'end_frame', 'last_frame', 'clone_still']
+const STILL_OPS = ['generate', 'edit', 'crop', 'upscale', 'mirror', 'drift_lock', 'end_frame', 'last_frame', 'clone_still', 'slide_topic']
 type Decision = { decision?: { kind?: string } }
 
 export async function autoCleanPlan(deps: Deps, ctx: Ctx, days: number | null): Promise<AutoCleanItem[]> {
@@ -316,7 +318,7 @@ export async function autoCleanPlan(deps: Deps, ctx: Ctx, days: number | null): 
   const out: AutoCleanItem[] = []
   const seen = new Set<string>()
   for (const p of finished) {
-    const runs = await deps.db.select({ id: jobs.id }).from(jobs).where(and(eq(jobs.accountId, acct), or(like(jobs.purpose, `clone:${p.id}:%`), like(jobs.purpose, `clone_still:${p.id}%`), like(jobs.purpose, `clone_face:${p.id}%`))))
+    const runs = await deps.db.select({ id: jobs.id }).from(jobs).where(and(eq(jobs.accountId, acct), or(like(jobs.purpose, `clone:${p.id}:%`), like(jobs.purpose, `clone_still:${p.id}%`), like(jobs.purpose, `clone_face:${p.id}%`), like(jobs.purpose, `slide_still:${p.id}:%`))))
     const runIds = new Set(runs.map(r => r.id))
     const mine = all.filter(c => (c.jobId && runIds.has(c.jobId)) || (p.sceneId && c.sceneId === p.sceneId && !openScenes.has(p.sceneId)))
     for (const c of mine) {

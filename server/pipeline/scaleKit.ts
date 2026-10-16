@@ -27,11 +27,11 @@ const KIT_DIR = join(process.cwd(), 'config', 'kits')
 // The owner's starter kit (the SideStep script kit, 2026-10-13).
 const STARTER = 'sidestep-script-kit.md'
 
-const claimsOf = (r: ProductRow): Claims => {
+export const claimsOf = (r: ProductRow): Claims => {
   const c = (r.claims ?? {}) as Partial<Claims>
   return { groups: c.groups ?? [], lines: c.lines ?? [], watch: c.watch ?? [], mentions: c.mentions ?? [r.name.toLowerCase()] }
 }
-const languageOf = (r: ProductRow): Language => ({ groups: ((r.language ?? {}) as Partial<Language>).groups ?? [] })
+export const languageOf = (r: ProductRow): Language => ({ groups: ((r.language ?? {}) as Partial<Language>).groups ?? [] })
 const voicesOf = (r: ProductRow): KitVoice[] => (Array.isArray(r.voices) ? r.voices as KitVoice[] : [])
 
 export async function listProducts(deps: Deps, ctx: Ctx): Promise<ProductRow[]> {

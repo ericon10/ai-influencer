@@ -69,6 +69,10 @@ export interface GenRequest {
   // Account path: the credits quoted for this job, recorded when the job is
   // created. Never sent to the provider.
   quotedCredits?: number
+  // A slideshow still (UX-PLAN.md section 27): the post and the slide it
+  // lands in, the scene it belongs to, and which variation or batch row
+  // made it. Never sent to a provider.
+  slide?: { slide: number; postId?: string; sceneId?: string | null; variant?: number; row?: number }
 }
 
 export interface ModelInfo {

@@ -46,9 +46,27 @@ broll:
 
 slideshow:
   slides: [5, 7]
-  hashtags: [3, 6]
+  # At most 5 hashtags (owner, 2026-10-16).
+  hashtags: [3, 5]
   max_stills: 10
   image: { quality: 90 }
+  # The power-up (owner, 2026-10-16; UX-PLAN.md section 27). A draft makes
+  # 6 slides by default (3 to 10 in the Slides step). Stills are made at
+  # 9:16 (TikTok) or 3:4 (Instagram); the export makes both sizes.
+  draft_slides: 6
+  hooks: 10
+  instagram: { width: 1080, height: 1440 }
+  # The stills: Nano Banana 2.1 on the Higgsfield plan (the API does not
+  # offer it), GPT Image 2.5 Flare on the Higgsfield API. The last pick is
+  # kept; the plan when it is connected.
+  still_model: higgsfield/nano-banana-2.1
+  api_still_model: higgsfield/gpt-image-2.5-flare
+  max_variations: 5
+  batch_max: 10
+  # Mock screens (special slides) never show a real brand: each name here
+  # becomes the generic name at the same place in the second list.
+  brand_names: [Google, Gmail, Amazon, Meta, Facebook, Apple, iMessage, Microsoft, Outlook, LinkedIn, Indeed, Glassdoor, WhatsApp, Instagram, TikTok, Snapchat, Netflix, Spotify, Uber, Tesla, Slack, Zoom, Deloitte, McKinsey, Goldman Sachs, JPMorgan, Starbucks, Walmart, Target, Nike, Adidas, Airbnb, Stripe, Shopify, Salesforce, Oracle, IBM, Intel, Nvidia, OpenAI, Notion, Workday, ZipRecruiter, Handshake]
+  generic_names: [Northwind, Mail, Bluepeak, Brightline, Harbor, Messages, Cobalt, Inbox, Careerline, Jobfinder, Workwise, Chat, Photos, Social, Video, Snaps, Streamline, Music, Rides, Volt, Team Chat, Meetings, Crestview Partners, Summit Advisory, Oakridge Capital, Granite Bank, Corner Coffee, Everyday Mart, Bullseye Goods, Stride, Motion, Stayhost, Payflow, Shopsmith, Cloudline, Datacore, Bluechip, Chipworks, Pixelcore, Thinkbox, Notes, Peopleworks, Jobmatch, Campus Jobs]
 
 batch:
   # Up to 50 videos (Phase 4: batch at scale); each is its own short job on

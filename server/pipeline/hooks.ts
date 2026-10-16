@@ -23,6 +23,7 @@ import { registerOpenReel } from './openreel.js'
 import { registerChain } from './chain.js'
 import { registerSounds } from './sounds.js'
 import { registerVoiceLines } from './voiceLines.js'
+import { registerSlideshow } from './slideshow.js'
 import { registerScaleKit } from './scaleKit.js'
 import { registerCloseup } from './closeup.js'
 import { registerStorage } from './storage.js'
@@ -209,6 +210,7 @@ export function registerPipelineHooks(): void {
   registerSounds()
   registerVoiceLines()
   registerScaleKit()
+  registerSlideshow()
   registerCloseup()
   registerStorage()
 }
