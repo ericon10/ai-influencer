@@ -26,7 +26,7 @@ import { buildSceneEndFrame, buildSceneIdeas, buildScenePlan, buildScenePromptWr
 import { markSceneBusy, saveVideoModel } from './scenes.js'
 import { buildContentCaptions, buildContentSlides } from './content.js'
 import { afterRecreateBatch, buildRecreateBatch } from './recreate.js'
-import { addCloneSpend, buildClone, buildCloneCaption, buildCloneFace, buildCloneStill, buildCloneTraits, checkCloneCap, saveCloneModel, useCloneStill } from './clone.js'
+import { addCloneSpend, buildClone, buildCloneCaption, buildCloneFace, buildCloneOutfit, buildCloneStill, buildCloneTraits, checkCloneCap, saveCloneModel, useCloneStill } from './clone.js'
 import { ruleSwitches } from './rules.js'
 import { readBilling } from '../providers/billing.js'
 import { effectiveModel, readModelOverrides } from '../providers/modelOverrides.js'
@@ -128,6 +128,7 @@ export const actionSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('clone_still'), contentId: z.string(), characterId: z.string().max(60), outfit: z.enum(['source', 'hers']).optional(), look: z.string().max(60).optional(), takes: z.number().int().min(1).max(4).optional(), facePass: z.boolean().optional(), stillModel: z.string().max(80).optional() }),
   z.object({ type: z.literal('clone_face'), contentId: z.string(), characterId: z.string().max(60), candidateId: z.string().max(60), takes: z.number().int().min(1).max(4).optional() }),
   z.object({ type: z.literal('clone_traits'), characterId: z.string(), contentId: z.string() }),
+  z.object({ type: z.literal('clone_outfit'), characterId: z.string(), contentId: z.string() }),
   // A batch of recreates: one priced run for every row at the step.
   z.object({ type: z.literal('recreate_batch'), contentId: z.string(), step: z.enum(['stills', 'face', 'video']), facePass: z.boolean().optional() }),
   // Voice lines: the owner's takes in the character's voice, with word
@@ -254,6 +255,7 @@ export async function buildAction(deps: Deps, ctx: Ctx, action: StudioAction): P
     case 'content_captions': return scene(await buildContentCaptions(deps, ctx, row, action.contentId))
     case 'clone_caption': return scene(await buildCloneCaption(deps, ctx, row, action.contentId))
     case 'clone_traits': return scene(await buildCloneTraits(deps, ctx, row, action.contentId))
+    case 'clone_outfit': return scene(await buildCloneOutfit(deps, ctx, row, action.contentId))
     case 'scene_video': return scene(await buildSceneVideo(deps, ctx, row, action))
     case 'scene_video_upscale': return scene(await buildVideoUpscale(deps, ctx, row, action.candidateId))
     case 'scene_end_frame': return scene(await buildSceneEndFrame(deps, ctx, row, { ...action, withQa: action.withQa ?? autoQa }))

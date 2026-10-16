@@ -415,6 +415,17 @@ rules:
     title: Check concepts against the brand statement
     check: { type: behavior }
     message: Punch it up checks each of its three moments against the brand statement; one that does not fit says "Off brand" and why. Advice only; any moment can still be used.
+  - id: outfit-garment
+    bucket: default
+    area: scene
+    spec: "13.1"
+    # Owner, 2026-10-16: "Only for outfits the clip reader wrote, never
+    # mine: if the outfit names no garment type, show name the garment on
+    # the price, with a one-tap fix that reruns the reader for the outfit
+    # only." UX-PLAN section 26.
+    title: Name the garment in the clip's outfit
+    check: { type: behavior }
+    message: When the outfit the clip reader wrote names no garment type ("black top"), the Recreate price says "name the garment, tank top, t-shirt..." and offers Read the outfit again (one Claude call, priced on the button). Never on your own words.
   - id: wording-risky
     bucket: default
     area: scene

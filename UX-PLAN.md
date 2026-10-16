@@ -929,3 +929,22 @@ page. Everything here is free: it runs on the worker or in the browser.
 | Hook variants | Finish step > Hook variants card (video posts) | Up to 3 versions (A, B, C), each changing only the first 2 seconds: a hook line (typed, or picked from the character's saved hooks) over 0 to 2 s in place of a caption there; under it, First shot (a select: Same as the video, or this post's takes and stills, the character's clips and stills, Library B-roll) and First edit (a select: None, or a camera preset). Any one is enough. Export N versions renders the post's timeline once per version on the worker; the rest of the video is the same. Each version plays and downloads, with what it changed under it | 1 plus typing, or 2 (a select) |
 | Safe zones | Editor top bar: Safe zones (Off, TikTok, Reels) | The app's top bar, buttons and caption area drawn over the preview in red, with names. Preview only, never exported. Remembered in this browser | 1 |
 | Cover | Finish step > Cover card, once the video is exported | Scrub the video to a frame, type cover text (optional), Make the cover: a 1080 x 1920 JPEG of that frame with the text in the caption look. Download it for the app's cover upload | 2 |
+
+## 26. Name the garment: a warning on the Recreate price (owner, 2026-10-16)
+
+The clip reader is asked to name the garment, but nothing checked it: an
+answer like "black top" went into the still prompt as it was, and a bare
+"top" gets drawn as a plain tee. Now the Studio checks the outfit the clip
+reader wrote, for free, against a list of garment types (`garments` in
+`config/wording.yaml`: tank top, t-shirt, cami, halter top, slip dress,
+bodysuit, jeans and the rest). Never the outfit you typed. No new page or
+step.
+
+| Piece | Where | How it works | Clicks |
+|---|---|---|---|
+| The warning | Recreate, under the stills price ("Make 4 new stills"), when the outfit came from the clip reader and names no garment type | "No garment type in "black top": name the garment: tank top, t-shirt...". The run is not blocked; the outfit goes as it is if you go ahead | 0 |
+| The fix | Next to the warning | **Read the outfit again**, a small price button (one Claude call, its price on the button like every run): the reader looks at the frame again for the outfit only, with its last answer, and must name the garment. The new outfit fills the Outfit box; the chips, the traits and the motion line stay. The warning clears when the new outfit names a garment | 1 |
+| Your words | The Outfit box | Typing in the box makes the outfit yours: no warning, and the reread never replaces it | 0 |
+
+A default rule in Settings > Rules: "Name the garment in the clip's outfit"
+(`outfit-garment`), on to start, off for one character or all.

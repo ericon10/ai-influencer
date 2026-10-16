@@ -57,6 +57,9 @@ const wordingSchema = z.object({
   // Cup sizes and the like: case-sensitive regular expressions, taken out
   // like a fit word.
   patterns: z.array(z.string().min(1).refine(p => { try { new RegExp(p); return true } catch { return false } }, 'Not a valid pattern')).default([]),
+  // Garment types: the outfit the clip reader writes names at least one
+  // (rule outfit-garment, UX-PLAN section 26).
+  garments: z.array(z.string().min(1)).default([]),
 })
 
 const ruleCheck = z.discriminatedUnion('type', [
@@ -154,6 +157,7 @@ const templatesSchema = z.object({
   video: z.object({ base: z.string(), silent: z.string(), end_frame: z.string(), continue: z.string() }),
   clone: z.object({ swap: z.string(), image: z.string(), replace: z.string(), scene_still: z.string(), recreate_still: z.string(), recreate_not_like: z.string(), recreate_element_api: z.string(), recreate_realism: z.string(), face_pass: z.string(), face_pass_refs: z.string().default(" (the face in the other images)"), recreate_keep: z.string(), outfit_keep_named: z.string(), outfit_hers_named: z.string(), motion: z.string(), motion_scene: z.string(), motion_what: z.string(), outfit_source: z.string(), outfit_hers: z.string(), target_main: z.string(), target_at: z.string() }),
   clone_traits: z.object({ system: z.string(), prompt: z.string() }),
+  clone_outfit: z.object({ system: z.string(), prompt: z.string() }),
   content_slides: z.object({ system: z.string(), prompt: z.string() }),
   content_captions: z.object({ system: z.string(), prompt: z.string() }),
   clone_caption: z.object({ system: z.string(), prompt: z.string() }),

@@ -134,6 +134,15 @@ export function findRiskyWords(text: string, w: WordingConfig): string[] {
   return found
 }
 
+// Whether an outfit names a garment type ("black ribbed tank top" does,
+// "black top" does not), plurals included ("jeans", "tank tops"). An empty
+// outfit or an empty list says yes: nothing to warn about.
+export function namesGarment(outfit: string, w: Pick<WordingConfig, 'garments'>): boolean {
+  const text = outfit.trim()
+  if (!text || !w.garments?.length) return true
+  return w.garments.some(g => new RegExp(`\\b${termSource(g)}(?:e?s)?\\b`, 'i').test(text))
+}
+
 // "Retry with safer wording": the prompt that was sent, every risky word
 // reworded (the owner's too; the owner asked). Free: code only.
 export function saferPrompt(prompt: string, w: WordingConfig): WordingResult {

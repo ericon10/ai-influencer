@@ -12,7 +12,7 @@ import { isVideoOp, GONE_STATUSES } from '../core/clips.js'
 import { capitalize, fill, hardWrap } from '../core/text.js'
 import { buildEditPrompt, hairColorFrom } from '../core/scenes.js'
 import { adultProblem, cardForPhotoEdit } from '../core/character.js'
-import { catalogWording, findRiskyWords } from '../core/wording.js'
+import { catalogWording, findRiskyWords, namesGarment } from '../core/wording.js'
 import { pickPerson, targetWords, type Point } from '../core/cloneTarget.js'
 import type { RealismWarning } from '../core/realism.js'
 import { lintPrompt, type RuleViolation } from '../core/rules.js'
@@ -905,6 +905,12 @@ export async function buildCloneStill(deps: Deps, ctx: Ctx, input: CloneStillInp
   const frame = await getAsset(deps, ctx, frameId)
   const portrait = (frame.height ?? 16) >= (frame.width ?? 9)
   const sw = await ruleSwitches(deps, ctx, row.id)
+  // Name the garment (UX-PLAN section 26): the outfit the clip reader wrote
+  // names a garment type, or the price says so and offers to read the
+  // outfit again (priced on its own button). Never the owner's own words.
+  if (named && !source.typed.outfit && (choice !== 'hers' || !look) && sw.on('outfit-garment') && !namesGarment(named, wording)) {
+    warnings.push({ ...warn('outfit-garment', `No garment type in "${named}"`, 'name the garment: tank top, t-shirt...'), fix: { label: 'Read the outfit again', action: { type: 'clone_outfit', contentId: post.id, characterId: row.id } } })
+  }
   const realism: RealismWarning[] = []
   const { face, hair } = faceWords(ch)
   const notLike = source.notLike.trim()
@@ -1025,6 +1031,27 @@ export async function buildCloneTraits(deps: Deps, ctx: Ctx, row: { id: string }
   }
 }
 
+// "Read the outfit again" (UX-PLAN section 26): the clip reader's outfit
+// named no garment type, so it looks at the frame again for the outfit
+// only, with its last answer. Priced on the button.
+export async function buildCloneOutfit(deps: Deps, ctx: Ctx, row: { id: string }, contentId: string): Promise<SceneBuilt> {
+  const post = await getContent(deps, ctx, contentId)
+  const source = readySource(post)
+  const frameId = source.rawFrameId ?? source.firstFrameId
+  if (!frameId) throw new AppError('bad_request', 'The frame of the clip is still being prepared. Try again in a moment.')
+  if (source.typed.outfit) throw new AppError('bad_request', 'The outfit is yours (typed in the box); it is used as you wrote it.')
+  const t = deps.config.pipeline.templates.clone_outfit
+  const prompt = fill(t.prompt, { target: cloneTargetWords(deps, source), previous: source.outfit.text || 'nothing' })
+  const route = await resolveRoute(deps, ctx, 'content_writer')
+  const purpose = `clone_outfit:${post.id}`
+  const schema = { type: 'object', additionalProperties: false, required: ['outfit'], properties: { outfit: { type: 'string' } } }
+  return {
+    purpose,
+    preview: { title: 'Read the outfit again', prompts: [{ label: 'Outfit reader', text: `${t.system}\n${prompt}`, wrapped: hardWrap(`${t.system}\n${prompt}`) }], warnings: [], invalidates: [] },
+    specs: [{ type: 'llm', stage: 'content', purpose, label: 'Read the outfit again', characterId: row.id, request: { model: route.model, system: t.system, prompt, schema, schemaName: 'clone_outfit', maxTokens: 200, effort: 'low', imageAssetIds: [frameId], meta: { itemId: post.id } } } satisfies JobSpec],
+  }
+}
+
 const oneLine = (v: unknown, max: number) => (typeof v === 'string' ? v.replace(/\s+/g, ' ').trim().replace(/[.]+$/, '').slice(0, max) : '')
 const chipList = (v: unknown, max = 8) => [...new Set((Array.isArray(v) ? v : []).map(x => oneLine(x, 80)).filter(Boolean))].slice(0, max)
 
@@ -1050,6 +1077,18 @@ async function onCloneTraits(deps: Deps, ctx: Ctx, job: JobRow, out: JobOutcome)
     // Claude's chips replace the list, so none of them is typed.
     typed: { outfit: src.typed.outfit && !!src.outfit.text, keep: keep.length ? [] : src.typed.keep },
   } } })
+}
+
+// "Read the outfit again" lands: the outfit only, in catalog terms. An
+// outfit the owner typed meanwhile is never replaced.
+async function onCloneOutfit(deps: Deps, ctx: Ctx, job: JobRow, out: JobOutcome): Promise<void> {
+  if (out.status !== 'completed') return
+  const post = await getContent(deps, ctx, job.purpose.split(':')[1]!)
+  const src = cloneOf(post)
+  if (!src || src.typed.outfit) return
+  const outfit = catalogWording(oneLine((out.data as { outfit?: unknown } | null)?.outfit, 160), deps.config.pipeline.wording).text
+  if (!outfit) return
+  await updateContent(deps, ctx, post.id, { spec: { clone: { ...src, outfit: { ...src.outfit, text: outfit }, typed: { ...src.typed, outfit: false } } } })
 }
 
 // Step 2 as the owner sets it: the chips (what to keep, the traits to
@@ -1572,5 +1611,6 @@ export function registerClone(): void {
   registerJobHook('clone_still', onCloneStill)
   registerJobHook('clone_face', onCloneStill)
   registerJobHook('clone_traits', onCloneTraits)
+  registerJobHook('clone_outfit', onCloneOutfit)
   registerLocalJob('clone_trim', runCloneTrim)
 }

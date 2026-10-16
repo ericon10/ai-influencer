@@ -2429,3 +2429,38 @@ in the browser, never a provider.
   bitrate cap and the loudness pass), pipeline (Shorts, three hooks from one
   timeline with different first seconds and the same rest, the cover), the
   fork's zone test, and Playwright desktop and phone.
+
+### G54. Name the garment in the clip reader's outfit (owner, 2026-10-16)
+
+UX-PLAN.md section 26. The owner: "Only for outfits the clip reader wrote,
+never mine: if the outfit names no garment type ("black top"), show "name
+the garment: tank top, t-shirt..." on the price, with a one-tap fix that
+reruns the reader for the outfit only."
+
+- **The check is free and code only.** `namesGarment` looks for a garment
+  type from a list in `config/wording.yaml` (`garments`: tank top, cami,
+  t-shirt, slip dress, bodysuit, jeans, shorts and the rest, plurals
+  included, whole words only). Calls: compound tops count as garment types
+  (crop top, tube top, wrap top, off-the-shoulder top); a bare "top",
+  "outfit" or "look" does not; "uniform" is left out of the list (it is
+  also an adjective).
+- **Only the clip reader's outfit, only where it is used.** The warning
+  shows on the Recreate stills price when the outfit in the prompt is the
+  reader's (Keep the clip's outfit, or Pick hers named in words), never
+  when the owner typed it and never when one of her stills carries the
+  outfit. It is a default rule (`outfit-garment`), a warning that never
+  blocks: the stills can still run with the outfit as it is.
+- **The fix is priced.** "Read the outfit again" is one Claude call (the
+  fixed rule: no paid call without a quote), so it is a small price button
+  beside the warning: one tap runs it at the price shown. The reader looks
+  at the frame again with its last answer and must name the garment; its
+  answer is cleaned into catalog terms and replaces only the outfit (the
+  chips, the traits and the motion line stay). An outfit the owner typed
+  meanwhile is never replaced, and the button refuses to run on one.
+- **The price refreshes when the fix lands.** A price button can now say
+  when its own runs are done (`onDone`), so the stills price is fetched
+  again however fast the reread ran, and the warning clears.
+- **Tests:** unit (the garment check), pipeline (the warning and its fix
+  on the price, the reread replaces the outfit only, typed words never
+  warn and are never replaced, the rule switch), Playwright desktop and
+  phone.

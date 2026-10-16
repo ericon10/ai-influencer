@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { loadConfig } from '../config/load.js'
 import { lintPrompt } from './rules.js'
-import { catalogWording, findRiskyWords, saferPrompt } from './wording.js'
+import { catalogWording, findRiskyWords, namesGarment, saferPrompt } from './wording.js'
 
 // Catalog wording (owner, 2026-10-15; DECISIONS G46): only the words
 // change, never what she wears, and the owner's own words go as typed.
@@ -100,5 +100,16 @@ describe('risky words and the safer retry', () => {
     const r = saferPrompt('Callie in a tight black tank top and boy shorts by the sink. REALISM: Natural skin texture, not retouched.', w)
     expect(r.text).toBe('Callie in a black tank top and bike shorts by the sink. REALISM: Natural skin texture, not retouched.')
     expect(r.changed.sort()).toEqual(['boy shorts', 'tight'])
+  })
+})
+
+describe('name the garment (UX-PLAN section 26)', () => {
+  it('an outfit that names no garment type is caught; garment names, plurals and compounds pass', () => {
+    for (const bare of ['black top', 'a cute black top, going-out look', 'white outfit', 'dark green ribbed top with thin straps']) expect(namesGarment(bare, w), bare).toBe(false)
+    for (const ok of ['dark green ribbed tank top with thin straps, going-out look', 'white t-shirt and light wash jeans', 'black cami', 'sage ribbed sports bra and bike shorts', 'red slip dress', 'two crop tops', 'oversized hoodie', 'off-the-shoulder top in cream linen']) expect(namesGarment(ok, w), ok).toBe(true)
+    // Nothing to check: no warning.
+    expect(namesGarment('', w)).toBe(true)
+    // Whole words only: "wardrobe" is not a robe, "settee" is not a tee.
+    expect(namesGarment('a black top by the wardrobe and the settee', w)).toBe(false)
   })
 })

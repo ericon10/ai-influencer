@@ -548,9 +548,14 @@ Decisions: `DECISIONS.md` G37 and G38. UX: `UX-PLAN.md` section 15.
 ### Long run, part 4: editor polish (G53, UX-PLAN.md section 25)
 
 - [x] Export for TikTok, Reels, Shorts: length cap, bitrate cap, loudness; Export, the editor's Done, hook variants, batches
-- [x] Hook variants: up to 3 hooks, one timeline, a different first 2 seconds each, on the worker
+- [x] Hook variants: up to 3 versions, one timeline, a different first 2 seconds each (a hook line, a first shot, a first edit), on the worker
 - [x] Cover frame picker with cover text, a 1080 x 1920 JPEG
 - [x] Safe zones (TikTok, Reels) over the editor's preview
+
+### Name the garment (G54, UX-PLAN.md section 26)
+
+- [x] The clip reader's outfit names a garment type, or the Recreate stills price warns ("name the garment: tank top, t-shirt..."); never on the owner's words
+- [x] Read the outfit again: priced, the outfit only, beside the warning
 
 ## Roadmap after Phase 4 (owner, 2026-10-13; not started)
 

@@ -88,3 +88,105 @@ pose:
 patterns:
   - "\\b(?:[B-H]|DD|DDD)[- ]?cups?\\b(?!\\s+of\\b)"
   - "\\b(?:2[89]|3[0-9]|4[0-6])(?:AA|DDD|DD|[B-H])\\b"
+
+# Garment types (owner, 2026-10-16; UX-PLAN section 26). The outfit the
+# clip reader writes must name at least one; "black top" names none (a bare
+# "top" gets drawn as a plain tee), so the Recreate price warns and offers
+# "Read the outfit again" (rule outfit-garment). Never checked on the
+# owner's own words. Plurals ("jeans", "tank tops") match too.
+garments:
+  # Tops
+  - tank top
+  - tank
+  - cami
+  - camisole
+  - halter top
+  - halter
+  - crop top
+  - tube top
+  - bandeau
+  - wrap top
+  - peplum top
+  - corset top
+  - off-the-shoulder top
+  - off-shoulder top
+  - one-shoulder top
+  - bikini top
+  - bra top
+  - bodysuit
+  - leotard
+  - t-shirt
+  - tee
+  - shirt
+  - blouse
+  - button-down
+  - polo
+  - henley
+  - turtleneck
+  - sweater
+  - jumper
+  - cardigan
+  - hoodie
+  - sweatshirt
+  - pullover
+  - vest
+  - waistcoat
+  - corset
+  - bustier
+  - bralette
+  - sports bra
+  - tunic
+  - kimono
+  # Outerwear
+  - jacket
+  - blazer
+  - coat
+  - trench
+  - parka
+  - puffer
+  - windbreaker
+  - bomber
+  - shacket
+  - overshirt
+  - poncho
+  - cape
+  # Dresses and skirts
+  - dress
+  - sundress
+  - slip dress
+  - gown
+  - skirt
+  - miniskirt
+  - skort
+  # Bottoms
+  - jeans
+  - pants
+  - trousers
+  - slacks
+  - chinos
+  - leggings
+  - joggers
+  - sweatpants
+  - shorts
+  - culottes
+  - cargos
+  - capris
+  # One-piece and sets
+  - jumpsuit
+  - romper
+  - playsuit
+  - overalls
+  - dungarees
+  - swimsuit
+  - one-piece
+  - bikini
+  - unitard
+  - catsuit
+  - tracksuit
+  - co-ord
+  - pajamas
+  - pyjamas
+  - robe
+  - bathrobe
+  - nightgown
+  - scrubs

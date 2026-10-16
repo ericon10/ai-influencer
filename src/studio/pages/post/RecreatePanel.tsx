@@ -145,7 +145,7 @@ function StepTwo({ ctx, source }: { ctx: PostCtx; source: CloneSource }) {
           </div>
           <input className="st-input" value={outfitText} maxLength={160} onChange={e => setOutfitText(e.target.value)} onBlur={() => { if (outfitText.trim() !== outfit.text) void save({ outfit: { text: outfitText.trim() } }) }}
             placeholder={outfit.choice === 'source' ? "Name it (optional), e.g. dark green ribbed tank top with thin straps" : `What ${name} wears instead, e.g. black ribbed tank and jeans`} aria-label="The outfit" />
-          <span className="st-hint" data-field="outfit-wording">Claude names it like a shop catalog (garment, color, fabric, a style word), never with fit or body words. What you type goes as typed; a word the filter often blocks is named on the price.</span>
+          <span className="st-hint" data-field="outfit-wording">Claude names it like a shop catalog (garment, color, fabric, a style word), never with fit or body words; if it names no garment type, the stills price says so and offers Read the outfit again. What you type goes as typed; a word the filter often blocks is named on the price.</span>
           {outfit.choice === 'hers' && stillId && (
             <label className="st-row" style={{ gap: 8, cursor: 'pointer' }}>
               <input type="checkbox" checked={outfit.lookId === stillId} onChange={e => void save({ outfit: { lookId: e.target.checked ? stillId : null } })} />

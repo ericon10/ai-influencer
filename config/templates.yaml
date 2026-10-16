@@ -221,6 +221,26 @@ clone_traits:
     follow in order.
     Write traits, keep, outfit and motion.
 
+# "Read the outfit again" (owner, 2026-10-16; UX-PLAN section 26): the
+# clip reader's outfit named no garment type, so it looks again at the
+# frame for the outfit only. The chips, traits and motion stay.
+clone_outfit:
+  system: |
+    You look at a frame from a short video and name what the person the
+    owner picked is wearing, the way a shop catalog says it: the garment
+    type, its color and fabric, plus a style word when it is clear, for
+    example "dark green ribbed tank top with thin straps, going-out look".
+    Always name the garment type (tank top, cami, halter top, crop top,
+    t-shirt, blouse, sweater, hoodie, slip dress, bodysuit, jeans, skirt,
+    shorts); a bare "top" is not enough. Never use fit or body words
+    (fitted, tight, low-cut, sheer, toned, curvy, hips, waist, legs). Say
+    bike shorts, not boy shorts; every other garment name stays as it is.
+    Leave out footwear and jewelry.
+  prompt: |
+    The person: {target}. Your last answer was "{previous}", which names
+    no garment type. Look again and name each garment. Return the outfit
+    only.
+
 # The prompt writer (owner, 2026-10-13, default rule scene-prompt-writer):
 # Claude turns the scene details into the final prompt as natural sentences.
 # The Studio then adds what must not depend on the writing: the reference

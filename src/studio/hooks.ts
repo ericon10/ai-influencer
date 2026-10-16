@@ -215,11 +215,11 @@ export function useClones(contentId: string) {
 }
 
 // A post's stills for "Recreate from a real clip" (and their face passes,
-// and the trait reader): looks again when one ends.
+// the trait reader and the outfit reread): looks again when one ends.
 export function useCloneStills(contentId: string) {
   const qc = useQueryClient()
   const active = useActiveJobs()
-  const busy = (active.data?.jobs ?? []).some(j => j.purpose.startsWith(`clone_still:${contentId}:`) || j.purpose.startsWith(`clone_face:${contentId}:`) || j.purpose === `clone_traits:${contentId}`)
+  const busy = (active.data?.jobs ?? []).some(j => j.purpose.startsWith(`clone_still:${contentId}:`) || j.purpose.startsWith(`clone_face:${contentId}:`) || j.purpose === `clone_traits:${contentId}` || j.purpose === `clone_outfit:${contentId}`)
   const wasBusy = useRef(false)
   useEffect(() => {
     // What landed changes the next prompts (the chips, the stills), so the

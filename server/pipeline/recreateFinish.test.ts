@@ -8,7 +8,7 @@ import { createHarness, drain, type Harness } from '../testing/harness.js'
 import { registerPipelineHooks } from './hooks.js'
 import { estimateAction, runAction, type StudioAction } from './actions.js'
 import { importCharacter } from './files.js'
-import { createContent, getContent, type MemeSpec } from './content.js'
+import { createContent, getContent, updateContent, type MemeSpec } from './content.js'
 import { addCloneSource, buildCloneFace, buildCloneStill, checkCloneCap, cloneOptions, failureKind, recreateGate, saveRecreateStillModel, setRecreateGate, cloneStills, gateFor, postClones, setCloneChoices } from './clone.js'
 import { addRecreateRow, recreateBatch, recreateFor, setRecreateRows, startRecreate, useCloneTake } from './recreate.js'
 import { createScene } from './scenes.js'
@@ -21,6 +21,7 @@ import { mapInput, createHiggsfieldAdapter } from '../providers/higgsfield.js'
 import { classifyText } from '../qa/ocr.js'
 import { answerGateCheck, gateCheck, suggestGate } from './gateCheck.js'
 import { setSetting } from './settings.js'
+import { setRuleSwitch } from './rules.js'
 import { makeClip } from '../media/testClips.js'
 import { uploadKey } from '../storage/uploads.js'
 import type { GenRequest } from '../providers/types.js'
@@ -161,6 +162,39 @@ describe('step 2, the stills and the gates', () => {
       expect(face.trim().endsWith('REALISM: Natural skin texture, not retouched.')).toBe(true)
     }
     await setCloneChoices(h.deps, h.ctx, postId, { outfit: { text: '' }, keep: c.keep.slice(0, 3) })
+  }, 120_000)
+
+  it('an outfit the clip reader wrote with no garment type warns on the price, and Read the outfit again fixes it; never on your words', async () => {
+    const src = (await spec(postId)).clone!
+    // The reader answered "black top" (not typed by the owner).
+    await updateContent(h.deps, h.ctx, postId, { spec: { clone: { ...src, outfit: { ...src.outfit, choice: 'source', text: 'black top', lookId: null }, typed: { ...src.typed, outfit: false } } } })
+    const still = { type: 'clone_still', contentId: postId, characterId: callie } as StudioAction
+    const before = (await estimateAction(h.deps, h.ctx, still)).preview
+    const w = before.warnings.find(x => x.ruleId === 'outfit-garment')
+    expect(w).toMatchObject({ severity: 'warning', title: 'No garment type in "black top"', message: 'name the garment: tank top, t-shirt...', fix: { label: 'Read the outfit again', action: { type: 'clone_outfit', contentId: postId, characterId: callie } } })
+    // A warning, never a block: the stills can still run as they are.
+    expect(before.prompts[0]!.text).toContain('Black top, same as in the photo.')
+    // The one-tap fix: priced like any run, the outfit only, with the last answer.
+    const fix = await estimateAction(h.deps, h.ctx, w!.fix!.action as StudioAction)
+    expect(fix.quote.status).toBe('open')
+    expect(fix.preview.prompts[0]!.text).toContain('Your last answer was "black top", which names')
+    const keepBefore = (await spec(postId)).clone!.keep
+    await run(w!.fix!.action as StudioAction)
+    const after = (await spec(postId)).clone!
+    expect(after.outfit.text).toBe('black ribbed tank top with thin straps, going-out look')
+    expect(after.typed.outfit).toBe(false)
+    expect(after.keep).toEqual(keepBefore)
+    expect((await estimateAction(h.deps, h.ctx, still)).preview.warnings.some(x => x.ruleId === 'outfit-garment')).toBe(false)
+    // The owner's own words: never a warning, and the reread will not replace them.
+    await setCloneChoices(h.deps, h.ctx, postId, { outfit: { text: 'black top' } })
+    expect((await estimateAction(h.deps, h.ctx, still)).preview.warnings.some(x => x.ruleId === 'outfit-garment')).toBe(false)
+    await expect(estimateAction(h.deps, h.ctx, { type: 'clone_outfit', contentId: postId, characterId: callie } as StudioAction)).rejects.toThrow(/The outfit is yours/)
+    // A default: switched off, no warning on the reader's words either.
+    await updateContent(h.deps, h.ctx, postId, { spec: { clone: { ...after, outfit: { ...after.outfit, text: 'black top' }, typed: { ...after.typed, outfit: false } } } })
+    await setRuleSwitch(h.deps, h.ctx, { ruleId: 'outfit-garment', on: false })
+    expect((await estimateAction(h.deps, h.ctx, still)).preview.warnings.some(x => x.ruleId === 'outfit-garment')).toBe(false)
+    await setRuleSwitch(h.deps, h.ctx, { ruleId: 'outfit-garment', on: null })
+    await setCloneChoices(h.deps, h.ctx, postId, { outfit: { text: '' } })
   }, 120_000)
 
   it('What was sent shows on a failed run too: the prompt, the frame, the element, the model and why it failed', async () => {

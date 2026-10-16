@@ -38,6 +38,9 @@ export interface RuleViolation {
   severity: 'error' | 'warning'
   message: string
   match?: string
+  // A one-tap fix next to the warning: an action, priced on its own button
+  // like any run (UX-PLAN section 26).
+  fix?: { label: string; action: { type: string } & Record<string, unknown> }
 }
 
 function applies(rule: Rule, ctx: RuleContext): boolean {

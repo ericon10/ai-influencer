@@ -2420,5 +2420,35 @@
         "label": "One version each; the same video after 2 s"
       }
     ]
+  },
+  "recreate-garment": {
+    "w": 980,
+    "h": 202,
+    "spots": [
+      {
+        "n": 1,
+        "x": 0,
+        "y": 0,
+        "w": 56.9,
+        "h": 38,
+        "label": "The stills price: the run is not blocked"
+      },
+      {
+        "n": 2,
+        "x": 0,
+        "y": 46,
+        "w": 89.3,
+        "h": 18,
+        "label": "No garment type in the outfit the clip reader wrote"
+      },
+      {
+        "n": 3,
+        "x": 0,
+        "y": 70,
+        "w": 46.2,
+        "h": 30,
+        "label": "Read the outfit again: priced, the outfit only"
+      }
+    ]
   }
 }

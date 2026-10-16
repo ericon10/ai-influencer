@@ -1,8 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { AlertTriangle, Info, Loader2, Receipt, RotateCcw, Sparkles } from 'lucide-react'
 import { api, ApiError } from './api'
-import { useRefresh, useWorkerGate } from './hooks'
+import { isActiveJob, keys, useLiveJobs, useRefresh, useWorkerGate } from './hooks'
 import type { JobView, StudioAction } from './types'
 import { Callout, Modal, PromptViewer, Todo, errorMessage, useToast, type TodoItem } from './ui'
 import { RunStatus } from './runs'
@@ -39,6 +39,8 @@ interface Props {
   noStatus?: boolean
   // A small button inside a status line (Retry): no details or notes.
   compact?: boolean
+  // Called once when every run this button started has finished.
+  onDone?: () => void
 }
 
 async function estimateWithin(action: StudioAction, outer?: AbortSignal) {
@@ -59,7 +61,7 @@ async function estimateWithin(action: StudioAction, outer?: AbortSignal) {
   }
 }
 
-export function PriceButton({ action, label, variant = 'primary', size = 'normal', todo = [], disabledReason, waiting, onStarted, icon = true, watch, noStatus = false, compact = false, hideEarlier = false }: Props) {
+export function PriceButton({ action, label, variant = 'primary', size = 'normal', todo = [], disabledReason, waiting, onStarted, icon = true, watch, noStatus = false, compact = false, hideEarlier = false, onDone }: Props) {
   const qc = useQueryClient()
   const refresh = useRefresh()
   const toast = useToast()
@@ -83,11 +85,25 @@ export function PriceButton({ action, label, variant = 'primary', size = 'normal
   })
 
   const quote = est.data?.quote
+  // When the runs started here are all done, say so once (a fix that
+  // changes what the next price says refreshes it, however fast it ran).
+  const live = useLiveJobs()
+  const doneFor = useRef('')
+  useEffect(() => {
+    if (!onDone || !started.length) return
+    const key = started.join(',')
+    if (doneFor.current === key) return
+    const jobs = live.data?.jobs ?? []
+    if (started.every(id => jobs.some(j => j.id === id && !isActiveJob(j)))) { doneFor.current = key; onDone() }
+  }, [live.data, started, onDone])
   // Realism warnings (smoothing or makeup words removed) are shown right
   // under the button, not only in the details; so is a word of yours the
   // provider's filter often blocks (it goes as typed, G46).
   const realism = (est.data?.preview.warnings ?? []).filter(w => (w as { ruleId?: string }).ruleId?.startsWith('realism'))
   const risky = (est.data?.preview.warnings ?? []).filter(w => (w as { ruleId?: string }).ruleId === 'wording-risky')
+  // The clip reader's outfit names no garment type (UX-PLAN section 26):
+  // the warning, with its one-tap fix priced on its own button.
+  const garment = (est.data?.preview.warnings ?? []).filter(w => w.ruleId === 'outfit-garment')
   const blocked = quote?.status === 'blocked'
   const estimateError = est.error ? errorMessage(est.error) : null
   const disabled = held || !action || est.isLoading || !!estimateError || blocked || running
@@ -171,6 +187,12 @@ export function PriceButton({ action, label, variant = 'primary', size = 'normal
       {!noStatus && !compact && <RunStatus ids={started} match={watch} pending={running} hideEarlier={hideEarlier} />}
       {realism.map((w, i) => <span key={i} className="st-hint" style={{ color: 'var(--st-warn)' }}><AlertTriangle size={12} style={{ verticalAlign: -2 }} /> {w.message}</span>)}
       {risky.map((w, i) => <span key={`r${i}`} className="st-hint" data-field="wording-risky" style={{ color: 'var(--st-warn)' }}><AlertTriangle size={12} style={{ verticalAlign: -2 }} /> {w.title}: {w.message}</span>)}
+      {!compact && garment.map((w, i) => (
+        <div key={`g${i}`} className="st-col" style={{ gap: 6 }} data-field="outfit-garment">
+          <span className="st-hint" style={{ color: 'var(--st-warn)' }}><AlertTriangle size={12} style={{ verticalAlign: -2 }} /> {w.title}: {w.message}</span>
+          {w.fix && <PriceButton action={w.fix.action} label={w.fix.label} size="sm" variant="secondary" icon={false} watch={j => 'contentId' in w.fix!.action && j.purpose === `${w.fix!.action.type}:${w.fix!.action.contentId}`} onDone={() => { void qc.invalidateQueries({ queryKey: keys.content }); void qc.invalidateQueries({ queryKey: ['estimate'] }) }} />}
+        </div>
+      ))}
       {quote && !quote.verified && !blocked && !compact && <span className="st-hint"><Info size={12} style={{ verticalAlign: -2 }} /> Uses a price that is not confirmed with the provider yet.</span>}
       {(est.data?.preview.invalidates.length ?? 0) > 0 && (
         <span className="st-hint" style={{ color: 'var(--st-warn)' }}><AlertTriangle size={12} style={{ verticalAlign: -2 }} /> Will mark {est.data!.preview.invalidates.join(' and ')} for re-check.</span>

@@ -184,7 +184,7 @@ export interface QuoteView {
   budget: { ok: boolean; blocks: Array<{ scope: string; capMicros: number; afterMicros: number }>; warnings: Array<{ scope: string; capMicros: number; afterMicros: number }> }
 }
 
-export interface ActionPreview { title: string; prompts: Array<{ label: string; text: string; wrapped: string }>; warnings: Array<{ title: string; message: string; spec: string }>; invalidates: string[]; followUp?: { label: string; display: string; verified: boolean; models: string[] } }
+export interface ActionPreview { title: string; prompts: Array<{ label: string; text: string; wrapped: string }>; warnings: Array<{ title: string; message: string; spec: string; ruleId?: string; fix?: { label: string; action: StudioAction } }>; invalidates: string[]; followUp?: { label: string; display: string; verified: boolean; models: string[] } }
 
 export type StudioAction =
   | { type: 'breakdown'; characterId: string; notes?: string }
@@ -216,6 +216,7 @@ export type StudioAction =
   | { type: 'clone_still'; contentId: string; characterId: string; outfit?: 'source' | 'hers'; look?: string; takes?: number; facePass?: boolean; stillModel?: string }
   | { type: 'clone_face'; contentId: string; characterId: string; candidateId: string; takes?: number }
   | { type: 'clone_traits'; contentId: string; characterId: string }
+  | { type: 'clone_outfit'; contentId: string; characterId: string }
   | { type: 'voice_convert'; soundIds: string[] }
   | { type: 'hook_variants'; hookId: string; characterIds: string[]; perCharacter?: number }
 
