@@ -979,7 +979,7 @@ free export on the worker, Make another like this, captions optional.
 | Made for | Stills step, beside the scene | **TikTok 9:16** (default) or **Instagram 3:4**: the shape the stills are made in. The export makes both sizes either way (the other by a center crop) | 1 |
 | Generate the set | Stills step | One price for every slide that has no picture yet (model and billing path on the button: Nano Banana 2.1 on the Higgsfield plan, GPT Image 2.5 Flare on the Higgsfield API; whichever is connected, the last pick kept). Each still lands in its slide, with the free face and skin checks in character mode | 1 |
 | Reroll one slide | Each slide card | **Reroll** (priced, one still): a new picture for that slide only, the rest of the set untouched. **Library** and **Upload** put your own picture in that slide; the old multi-pick and upload still add to the end | 1 |
-| Scene library | Stills step, the scene card: **Save this scene** and the chips above it | A saved scene is the place, light, camera and 2 details, for one character or one topic, with the set's first picture as its look. Pick it in any slideshow and the same room looks the same every time (its picture goes with each still as a "same place" reference) | 1 |
+| Scene library | Stills step, the scene card: **Save this scene** and the chips above it | A saved scene is the place, light, camera and 2 details, for one character or one topic, with the set's first picture as its look. Pick it in any slideshow and the same room looks the same every time: the words go in every prompt, and in a topic slideshow its picture also goes with each still as a "same place" reference (a character's stills attach the sheet only, so the face holds) | 1 |
 | Text styles | Slides step, top | **Classic** (default): bold white, a black outline at 15% of the font size, the size scaled to the word count (5 to 7.5% of the image width), centered about 28% from the top, 4 to 6 words a line, nothing in the top 10% or the bottom 20%. **Text box** (TikTok's white box), **Minimal** (smaller, plain white with a soft shadow) and **Note** (a notes-app card). The safe-zone overlay is on in the preview; drag the words to move them (kept per slide, inside the safe area). The style and positions are burned into the exported JPEGs exactly as previewed | 1 to 2 |
 | Special slides | Any slide card: **Make it a special slide** | Drawn by code, free: a phone notification, a text thread, a rejection email, a job posting. Clean, generic, no real brand names or logos (a name that looks like a real brand is replaced). The draft can suggest one; every field is editable | 1 |
 | Caption and tags | Slides step, under the slides | A first-person story caption in the account's voice (from the draft, or **Rewrite the caption**, priced), at most 5 hashtags. **CTA slide**: Follow for part 2, Save this, Follow @handle (you type the handle), Comment a word, More on my page, or your own words; it sets the last slide. **#ad**: puts "Ad" on slide 1 and #ad first in the caption | 1 to 2 |
@@ -993,7 +993,12 @@ Make variations and Make 10. Everything else (the vault hooks, special
 slides, text styles, export) is free and says so. Each works on the
 Higgsfield API as well as the plan.
 
-Defaults in Settings > Rules (rule one): "Never reuse a picture or caption
-across accounts" (`slideshow-no-reuse`, a warning on the export),
-"Slideshow hashtags, at most 5" (`slideshow-hashtags`). The REALISM block,
-banned words, no nudity and the price before every run stay fixed.
+A default in Settings > Rules (rule one): "Never reuse a picture or caption
+across accounts" (`slideshow-no-reuse`, a warning on the export with
+Reroll or Rewrite the caption as the fix). At most 5 hashtags is a setting
+(`config/content.yaml`, slideshow hashtags). The REALISM block, banned
+words, no nudity and the price before every run stay fixed.
+
+Built details: a run's stills read as one line in the run list ("Slideshow
+still: 3 of 5 done"); a still released because its slide became a special
+slide reads "not needed", never as a failure, and is not charged.

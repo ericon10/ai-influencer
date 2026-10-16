@@ -322,7 +322,7 @@ export function ExportPanel({ item, todo, saving, flush, label, onStart, childre
       </div>
       {!worker.ready && <span className="st-hint st-warntext" role="status">{worker.reason}</span>}
       <RunStatus match={j => j.purpose === `content_render:${item.id}` || j.purpose === `editor_save:${item.id}`} pending={starting} />
-      <span className="st-hint">Renders on the Studio's worker: no provider, no cost. 9:16, silent unless the clip kept its original sound. {AI_LABEL}</span>
+      <span className="st-hint">{item.kind === 'slideshow' ? `Renders on the Studio's worker: no provider, no cost. JPEGs at 1080 x 1920 (TikTok) and 1080 x 1440 (Instagram). ${AI_LABEL}` : `Renders on the Studio's worker: no provider, no cost. 9:16, silent unless the clip kept its original sound. ${AI_LABEL}`}</span>
       {item.status === 'failed' && item.error && (() => {
         const why = renderFailure(item.error)
         return (

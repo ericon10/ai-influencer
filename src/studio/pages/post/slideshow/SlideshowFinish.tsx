@@ -52,7 +52,7 @@ export function ReuseWarning({ ctx }: { ctx: PostCtx }) {
     <div data-field="slideshow-reuse" role="status"><Callout tone="warn">
       <div className="st-col" style={{ gap: 6 }}>
         <span className="st-row" style={{ gap: 6 }}><AlertTriangle size={15} /><b>Also in another account's slideshow</b></span>
-        {hits.map((h, i) => (
+        {hits.slice(0, 3).map((h, i) => (
           <div key={i} className="st-row" style={{ gap: 8, flexWrap: 'wrap' }}>
             <span className="st-hint">{h.kind === 'image' ? `Slide ${(h.slide ?? 0) + 1}'s picture` : 'The exact caption'} is in "{h.postName}" ({h.accountTag}).</span>
             <Link to={`/studio/posts/${h.postId}`} className="st-btn ghost xs"><ExternalLink size={12} />Open</Link>
@@ -60,6 +60,7 @@ export function ReuseWarning({ ctx }: { ctx: PostCtx }) {
             {h.kind === 'caption' && item.characterId && <PriceButton size="sm" variant="secondary" icon={false} compact label="Rewrite the caption" action={{ type: 'slideshow_caption', contentId: item.id }} />}
           </div>
         ))}
+        {hits.length > 3 && <span className="st-hint">And {hits.length - 3} more in other accounts' slideshows.</span>}
         <span className="st-hint">A default (Settings, Rules: Never reuse a picture or caption across accounts). Export still works.</span>
       </div>
     </Callout></div>

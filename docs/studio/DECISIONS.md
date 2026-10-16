@@ -2464,3 +2464,66 @@ reruns the reader for the outfit only."
   on the price, the reread replaces the outfit only, typed words never
   warn and are never replaced, the rule switch), Playwright desktop and
   phone.
+
+### G55. The slideshow power-up: hook first, one camera roll, text styles, variations, batch (owner, 2026-10-16)
+
+The owner: "Hook to finished slideshow in minutes, at volume, with an edge
+no other creator has. Build inside the existing Slideshow flow (Idea,
+Stills, Slides, Finish). No new pages." UX-PLAN.md section 27 has the
+audit and the plan.
+
+- **Built on what was there.** Pick from the Library, Upload images, the
+  scene stills of the post's scene and the free export stay; they now add
+  slides at the end, under "More ways to add pictures". A slideshow's
+  slides are parallel lists by slide number (words, picture, shot, special
+  slide, dragged place), so the owner's edits and a still landing never
+  undo each other; a slot is written under a row lock. Older slideshows
+  read as before (stills repeat when there are fewer than slides).
+- **Hooks.** "10 from the vault" is code only and free: the kit's hooks
+  first (rotated by each press), then each pattern recast with the
+  buyers' words or the topic. "Write 10 with Claude" is priced. Every hook
+  carries one of the eight patterns the owner named.
+- **The draft.** One Claude call per hook writes every slide, its shot,
+  special slides (never slide 1, at most 2), the scene, the caption and at
+  most 5 hashtags. Claude's shot and outfit words go through catalog
+  wording; a scene field the owner typed is never replaced.
+- **One camera roll.** Character stills reuse the post's scene (makeup by
+  setting, the rotated hair, catalog wording, the REALISM block, the lint)
+  with the locked place, light, camera, outfit and details over it and
+  the slide's shot as the moment, plus one line saying the set is one
+  day's camera roll. On the plan the character's Higgsfield element goes
+  with the refs. Topic stills have no person, no refs (a saved scene's
+  picture as the place reference when the model takes refs) and the
+  short REALISM line; they are kept as `slide_topic` candidates, so the
+  face checks and gate checks never see them.
+- **API path.** The stills model is chosen like Recreate's: Nano Banana
+  2.1 on the plan, GPT Image 2.5 Flare on the Higgsfield API, the last
+  pick kept; with only an API key the API model is picked and billed to
+  the API. Every Claude step uses the content writer route.
+- **One renderer.** `server/core/slideSvg.ts` lays out the text styles,
+  the Ad label and the four mock screens for a frame; the browser draws it
+  as SVG text (TikTok Sans measured in a canvas) and the worker as
+  outlines from the same fonts, so the preview's line breaks and places
+  are the export's. Classic follows the owner's numbers (bold white, a
+  black stroke at 15% of the font size, 5 to 7.5% of the width by word
+  count, about 28% from the top, 4 to 6 words a line); every style stays
+  out of the top 10% and the bottom 20%.
+- **Special slides** are free and generic: a real brand name on a mock
+  screen is replaced with a generic one (both lists in
+  `config/content.yaml`, matched as the brand writes itself, so "target"
+  in a sentence stays).
+- **Export.** Both sizes (the other one a center crop of the stills), a
+  caption.txt with #ad first when on, and post.json, whose field names are
+  mapped in `server/core/postExport.ts` only, for the posting engine.
+- **Variations and batch.** Both are one priced run: the Claude call first,
+  then the stills as its waiting children (released, not charged, when the
+  words do not come back, or when a slide became a special slide: those
+  rows read "not needed", never as failures). Variation and batch posts
+  get ids derived from their run, so a still never lands before its post
+  exists. `variation_of` (the family's first post) and `batch_of` are
+  columns (migration 0015). "Never reuse a picture or caption across
+  accounts" is a default rule (`slideshow-no-reuse`): variations always
+  make new pictures and captions, and the export warns with the fix.
+- **Paid test.** One capped real test, under $1, price shown first (the
+  report has the numbers).
+

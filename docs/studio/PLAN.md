@@ -557,6 +557,23 @@ Decisions: `DECISIONS.md` G37 and G38. UX: `UX-PLAN.md` section 15.
 - [x] The clip reader's outfit names a garment type, or the Recreate stills price warns ("name the garment: tank top, t-shirt..."); never on the owner's words
 - [x] Read the outfit again: priced, the outfit only, beside the warning
 
+### Slideshow power-up (G55, UX-PLAN.md section 27)
+
+- [x] Audit of the slideshow flow (UX-PLAN.md section 27, the table "before")
+- [x] Hook first: the hook box, 10 from the vault (free), Write 10 with Claude (priced), each tagged by pattern, filtered by chips
+- [x] Use this hook: every slide drafted (6 by default, 3 to 10), the reveal on slide 3 or 4, a soft CTA last, 4 to 12 words, a shot each, special slides where they fit, the caption, at most 5 hashtags
+- [x] Stills in one locked scene: the character (refs, or the element on the plan; the outfit locked) or a topic (no one, no face check, REALISM still in every prompt); 9:16 or 3:4; Generate the set and Reroll one slide, priced; Library and Upload per slide
+- [x] The stills model on the plan (Nano Banana 2.1) or the API (GPT Image 2.5 Flare), the last pick kept
+- [x] The Scene library (`slide_scenes`, migration 0015): save, pick, delete; a topic scene's picture as the place reference
+- [x] Text styles (Classic, Text box, Minimal, Note) from one shared layout for the preview and the export; safe zones; drag or arrow keys to move; burned into the JPEGs
+- [x] Special slides drawn by code, free: notification, text thread, rejection email, job posting; generic names only (`brand_names` in content.yaml)
+- [x] CTA slide (a typeable handle), the caption (Rewrite, priced), #ad (Ad on slide 1, #ad first in the caption)
+- [x] Export: numbered JPEGs at 1080 x 1920 and 1080 x 1440, caption.txt, post.json (`server/core/postExport.ts`), one zip
+- [x] Make variations: new words, new image set, list reordered, new caption; a family (`variation_of`); the no-reuse warning (`slideshow-no-reuse`)
+- [x] Batch from hooks: paste up to 10, Make 10 (one price, special slides released), one review with Approve, Reroll, Reject (`batch_of`)
+- [x] Guide section "Slideshows, hook first", glossary, five annotated screenshots, How this works on each new panel
+- [x] Tests: unit (layout, clamping, patterns, vault hooks, CTA, brand names, slide edits, post.json), pipeline (every action priced, both modes, the API path, export, variations, batch, no-reuse, Scene library), Playwright desktop, batch and phone
+
 ## Roadmap after Phase 4 (owner, 2026-10-13; not started)
 
 SPEC 13.1, R1 to R7: Clone Video (first after Phase 3), Inspo board

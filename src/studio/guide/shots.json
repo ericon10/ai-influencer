@@ -2450,5 +2450,243 @@
         "label": "Read the outfit again: priced, the outfit only"
       }
     ]
+  },
+  "slideshow-hooks": {
+    "w": 1124,
+    "h": 1375,
+    "spots": [
+      {
+        "n": 1,
+        "x": 1.7,
+        "y": 8.6,
+        "w": 96.6,
+        "h": 7.3,
+        "label": "The hook: slide 1, 4 to 12 words. Type your own or pick one"
+      },
+      {
+        "n": 2,
+        "x": 1.7,
+        "y": 17,
+        "w": 96.6,
+        "h": 2.2,
+        "label": "Write 10 hooks: from the vault (free) or with Claude (priced)"
+      },
+      {
+        "n": 3,
+        "x": 1.7,
+        "y": 23.4,
+        "w": 96.6,
+        "h": 2,
+        "label": "Each hook tagged by pattern; the chips filter them"
+      },
+      {
+        "n": 4,
+        "x": 1.7,
+        "y": 26,
+        "w": 96.3,
+        "h": 3.5,
+        "label": "Use this hook drafts every slide (priced, the model named)"
+      },
+      {
+        "n": 5,
+        "x": 1.7,
+        "y": 69.8,
+        "w": 14.9,
+        "h": 4.6,
+        "label": "Who is in the photos: the character, or no one (a topic)"
+      },
+      {
+        "n": 6,
+        "x": 1.7,
+        "y": 75.4,
+        "w": 96.6,
+        "h": 5.3,
+        "label": "Batch from hooks: paste up to 10, make them all, review"
+      }
+    ]
+  },
+  "slideshow-stills": {
+    "w": 1124,
+    "h": 1900,
+    "spots": [
+      {
+        "n": 1,
+        "x": 3.6,
+        "y": 11,
+        "w": 92.9,
+        "h": 15.6,
+        "label": "One camera roll: the same place, light, phone, outfit and 2 details in every photo"
+      },
+      {
+        "n": 2,
+        "x": 3.6,
+        "y": 8.9,
+        "w": 92.9,
+        "h": 1.5,
+        "label": "The Scene library: a saved scene, picked in any slideshow"
+      },
+      {
+        "n": 3,
+        "x": 9.4,
+        "y": 27.2,
+        "w": 17.3,
+        "h": 2,
+        "label": "Made for TikTok 9:16 or Instagram 3:4; the export makes both"
+      },
+      {
+        "n": 4,
+        "x": 1.7,
+        "y": 31.2,
+        "w": 96.6,
+        "h": 1.5,
+        "label": "The stills model: Nano Banana 2.1 on your plan, GPT Image 2.5 Flare on the API"
+      },
+      {
+        "n": 5,
+        "x": 1.7,
+        "y": 33.1,
+        "w": 25.2,
+        "h": 2,
+        "label": "Generate the set: one price for every slide without a picture"
+      },
+      {
+        "n": 6,
+        "x": 21.2,
+        "y": 37.3,
+        "w": 18.5,
+        "h": 27.9,
+        "label": "A slide: its shot, Reroll, Library or Upload, and the picture menu for special slides"
+      }
+    ]
+  },
+  "slideshow-slides": {
+    "w": 1124,
+    "h": 1775,
+    "spots": [
+      {
+        "n": 1,
+        "x": 1.7,
+        "y": 11.5,
+        "w": 46.3,
+        "h": 13.5,
+        "label": "Text styles: Classic, Text box, Minimal, Note"
+      },
+      {
+        "n": 2,
+        "x": 71.6,
+        "y": 26.1,
+        "w": 26.7,
+        "h": 30.1,
+        "label": "The slide as exported: drag the words; the safe zones shade the top 10% and bottom 20%"
+      },
+      {
+        "n": 3,
+        "x": 1.7,
+        "y": 33.5,
+        "w": 68.3,
+        "h": 2.4,
+        "label": "Each slide's words (4 to 12 reads best)"
+      },
+      {
+        "n": 4,
+        "x": 1.7,
+        "y": 63.2,
+        "w": 96.6,
+        "h": 8,
+        "label": "The CTA slide, with your handle typed"
+      },
+      {
+        "n": 5,
+        "x": 1.7,
+        "y": 88.2,
+        "w": 96.6,
+        "h": 2.3,
+        "label": "#ad: Ad on slide 1 and #ad first in the caption"
+      }
+    ]
+  },
+  "slideshow-finish": {
+    "w": 1124,
+    "h": 1259,
+    "spots": [
+      {
+        "n": 1,
+        "x": 1.7,
+        "y": 18,
+        "w": 96.6,
+        "h": 2.4,
+        "label": "Download all: TikTok and Instagram sizes, caption.txt and post.json"
+      },
+      {
+        "n": 2,
+        "x": 1.7,
+        "y": 25.6,
+        "w": 96.6,
+        "h": 17.4,
+        "label": "TikTok, 1080 x 1920"
+      },
+      {
+        "n": 3,
+        "x": 1.7,
+        "y": 46.1,
+        "w": 96.6,
+        "h": 13.2,
+        "label": "Instagram, 1080 x 1440"
+      },
+      {
+        "n": 4,
+        "x": 3.6,
+        "y": 69.4,
+        "w": 92.9,
+        "h": 11.8,
+        "label": "Make variations: new words, a new image set, a new caption (priced)"
+      },
+      {
+        "n": 5,
+        "x": 3.6,
+        "y": 84.2,
+        "w": 92.9,
+        "h": 8.3,
+        "label": "The family: each variation, its account and pictures"
+      }
+    ]
+  },
+  "slideshow-batch": {
+    "w": 1086,
+    "h": 1520,
+    "spots": [
+      {
+        "n": 1,
+        "x": 1.9,
+        "y": 10.3,
+        "w": 96.1,
+        "h": 9.7,
+        "label": "Paste up to 10 hooks, one a line"
+      },
+      {
+        "n": 2,
+        "x": 1.9,
+        "y": 22.4,
+        "w": 22.3,
+        "h": 2.5,
+        "label": "Make 10: one price, each drafted, then its stills"
+      },
+      {
+        "n": 3,
+        "x": 1.9,
+        "y": 44,
+        "w": 96.1,
+        "h": 20.2,
+        "label": "Approve exports it (free)"
+      },
+      {
+        "n": 4,
+        "x": 17.3,
+        "y": 78.7,
+        "w": 21.8,
+        "h": 2,
+        "label": "Reroll (a new set, priced) or Reject"
+      }
+    ]
   }
 }
