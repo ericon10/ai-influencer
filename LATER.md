@@ -176,3 +176,35 @@ first.
 - A cover chosen in the editor, on its own timeline frame, with the safe
   zones on.
 - Safe zones for YouTube Shorts.
+
+## Slideshow power-up (2026-10-16)
+
+### Real test made
+
+- **One camera roll, Nano Banana 2.1 on the plan:** 4 stills of Callie at
+  1k 9:16 with her element and the exact Studio prompts. Quoted 1.5
+  credits a still first, charged 6.0 credits in all (31.2 to 25.2), about
+  $0.38 at the API rate. Same office, the same gray crewneck, blue mug and
+  sticky notes on every slide.
+
+### Paid tests queued for the owner
+
+- **Topic mode on Flare (API path):** one feeder set of 6 stills (an
+  office, a skyline, a commute) on GPT Image 2.5 Flare with an API key, to
+  check no person creeps in and the place holds. About 6 stills.
+- **Claude hooks and drafts:** Write 10 with Claude and Use this hook on a
+  real account voice card, to see the patterns land and the reveal sit on
+  slide 3 or 4. About 2 Claude calls (a few cents).
+- **Make 3 variations:** to check the new wording and new pictures read as
+  new posts and the no-reuse warning stays quiet. About 18 stills.
+
+### Small ideas (not built)
+
+- A per-slide font size nudge on top of the style's own size.
+- Drag the words on the slide strip thumbnails too (today: the big
+  preview).
+- More special slides: a calendar invite, a bank alert, a step counter.
+- A "Same scene as last post" chip in the Scene library.
+- Batch review: approve all that have every picture in one click.
+- Export straight into the posting engine once its format is fixed (the
+  mapping already lives in server/core/postExport.ts).
