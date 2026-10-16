@@ -45,6 +45,8 @@ import { resolveRoute } from './settings.js'
 import type { SceneBuilt } from './sceneActions.js'
 import { lintSettings } from './copyLint.js'
 import { planMetaSchema } from '../core/planMeta.js'
+import { videoPostExportJson } from '../core/postExport.js'
+import { postCaption } from '../core/slides.js'
 
 // Posts (UX-PLAN.md; the content builder of 2026-10-13): the owner's B-roll
 // library, video posts (kind "meme": a kept clip, optional B-roll cut in
@@ -975,7 +977,18 @@ async function runContentRender(deps: Deps, ctx: Ctx, job: JobRow): Promise<unkn
         const v = await renderCut(deps, ctx, job, tl.cut, { characterId: row.characterId!, caption: s.caption, sound: tl.sound, edit: s.edit, captionStyle: s.captionStyle, label: `Video post: ${s.caption.slice(0, 60)}`, plan: tl.plan, preset })
         return { v, notes: tl.notes, timeline: !!tl.plan }
       })
-      const outputs: ContentOutputs = { videoAssetId: v.assetId, dropped: v.dropped, durationSec: v.durationSec, sound: v.sound, editNote: v.editNote, renderedAt: deps.clock.now().toISOString(), preset: preset.id, ...(v.capped ? { capped: true } : {}), ...(timeline ? { fromTimeline: true } : {}), ...(notes.length ? { editorOnly: notes } : {}) }
+      // post.json (section 28): the caption to post, its hashtags and CTA
+      // line, and the plan's fields, next to the MP4.
+      const ch = row.characterId ? toData(await getCharacter(deps, ctx, row.characterId)) : null
+      const plan = s.plan
+      const json = videoPostExportJson({
+        post: { id: row.id, kind: row.kind, title: row.title, idea: row.idea, accountTag: row.accountTag, characterId: row.characterId, characterName: ch?.name ?? null, variationOf: row.variationOf, batchOf: row.batchOf, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString() },
+        video: { file: `${name}.mp4`, assetId: v.assetId, durationSec: v.durationSec ?? null, onScreenText: s.caption, captionOff: s.captionOff },
+        caption: { text: plan.caption, hashtags: plan.hashtags.slice(0, deps.config.pipeline.content.slideshow.hashtags[1]), ctaLine: plan.cta, ad: plan.product, asPosted: postCaption(plan.caption, plan.hashtags, { ad: plan.product, max: deps.config.pipeline.content.slideshow.hashtags[1], cta: plan.cta }) },
+        plan, aiLabel: ch?.disclosure ?? 'Label all posts as AI-generated', exportedAt: deps.clock.now().toISOString(),
+      })
+      const jsonAsset = await saveAsset(deps, ctx, { data: Buffer.from(`${JSON.stringify(json, null, 2)}\n`), mime: 'application/json', origin: 'derived', label: `Video post ${name} (post.json)`, sourceJobId: job.id })
+      const outputs: ContentOutputs = { videoAssetId: v.assetId, jsonAssetId: jsonAsset.id, dropped: v.dropped, durationSec: v.durationSec, sound: v.sound, editNote: v.editNote, renderedAt: deps.clock.now().toISOString(), preset: preset.id, ...(v.capped ? { capped: true } : {}), ...(timeline ? { fromTimeline: true } : {}), ...(notes.length ? { editorOnly: notes } : {}) }
       await setOutputs(deps, itemId, outputs, 'ready')
       return outputs
     }

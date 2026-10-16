@@ -36,6 +36,7 @@ import { addCloneSource, cloneOptions, cloneStills, keepClone, pickCloneStill, p
 import { editorLibrary } from '../pipeline/editorMedia.js'
 import { addRecreateRow, recreateBatch, recreateFor, reviewTakeAgain, setRecreateRows, startRecreate, useCloneTake } from '../pipeline/recreate.js'
 import { jobViews } from '../jobs/jobView.js'
+import { importPlan, planView, previewPlan } from '../pipeline/planImport.js'
 import { archiveSlideScene, batchView, familyView, listSlideScenes, reuseReport, reviewBatchItem, saveSlideScene, saveSlideStillModel, slideStillChoices, vaultHookIdeas } from '../pipeline/slideshow.js'
 import { PATTERN_IDS } from '../core/slides.js'
 import { POST_STEPS, addBroll, archiveBroll, archiveContent, contentItemView, contentView, createContent, duplicateContent, postScene, retryFailedBatch, startCover, startRender, startVariants, updateBroll, updateContent } from '../pipeline/content.js'
@@ -121,6 +122,9 @@ async function fileBundle(deps: Deps, c: Context, ctx: Ctx): Promise<{ markdown:
   const md = ([] as unknown[]).concat(body.file ?? [])[0]
   return { markdown: md instanceof File ? await md.text() : null, files: await multipartFiles(body.images) }
 }
+
+// The plan routes' body as the import functions take it.
+const planArgs = (b: { csv: string; drawSpecials?: boolean; store?: Record<string, string>; stillModel?: string | null }) => [b.csv, { drawSpecials: b.drawSpecials, store: b.store, stillModel: b.stillModel }] as const
 
 export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
   const app = new Hono<Env>().basePath('/api/v1')
@@ -1072,6 +1076,16 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
     return c.json(await reviewBatchItem(deps, ctx, c.req.param('id'), c.req.param('child'), body.decision, id => startRender(deps, ctx, id)))
   })
   app.get('/slideshow/still-models', async c => c.json(await slideStillChoices(deps, c.get('ctx'))))
+  // The launch plan (section 28): the free preview, the drafts (free), and
+  // the plan's posts in schedule order.
+  const planBody = z.object({ csv: z.string().max(400_000), drawSpecials: z.boolean().optional(), store: z.record(z.string().max(60), z.string().max(60)).optional(), stillModel: z.string().max(80).nullable().optional() })
+  app.post('/plan/preview', async c => c.json(await previewPlan(deps, c.get('ctx'), ...planArgs(parse(planBody, await json(c))))))
+  app.post('/plan/import', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    return c.json(await importPlan(deps, ctx, ...planArgs(parse(planBody, await json(c)))))
+  })
+  app.get('/plan', async c => c.json(await planView(deps, c.get('ctx'))))
   app.put('/slideshow/still-model', async c => {
     const ctx = c.get('ctx')
     requireRole(ctx, 'member')

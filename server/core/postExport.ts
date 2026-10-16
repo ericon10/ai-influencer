@@ -1,11 +1,15 @@
 import { patternLabel, type HookPattern } from './slides.js'
+import { effectName, structureName } from './playbook.js'
+import type { PlanMeta } from './planMeta.js'
 
 // post.json (UX-PLAN.md section 27): every field of an exported slideshow,
 // one file per post in its zip. The posting engine's format is coming
 // later; this module is the only place that maps the Studio's fields to
 // the file's, so changing the format means changing this file only.
 
-export const POST_EXPORT_VERSION = 1
+// Version 2 (section 28): the plan's fields, the CTA line, and a post.json
+// for video posts too.
+export const POST_EXPORT_VERSION = 2
 
 export interface PostExportInput {
   post: {
@@ -32,6 +36,24 @@ export interface PostExportInput {
   sizes: { tiktok: { width: number; height: number }; instagram: { width: number; height: number } }
   aiLabel: string
   exportedAt: string
+  // What the post keeps from its plan row or its hook (section 28).
+  plan?: PlanMeta | null
+  ctaLine?: string
+}
+
+// The plan's fields as the plan's CSV names them (section 28).
+export function planJson(p: PlanMeta | null | undefined): Record<string, unknown> | null {
+  if (!p || !(p.rowId || p.structure || p.moment || p.altHook)) return null
+  return {
+    row_id: p.rowId || null, plan_id: p.planId || null, date: p.date || null, slot: p.slot || null, format: p.format || null,
+    tension: p.tension || null, pillar: p.pillar || null, audience: p.audience || null,
+    product: p.product, mention_mother: p.mentionMother,
+    structure: p.structure ? { code: p.structure, name: structureName(p.structure) } : null,
+    effect_open: p.effectOpen ? { code: p.effectOpen, name: effectName(p.effectOpen) } : null,
+    effect_payoff: p.effectPayoff ? { code: p.effectPayoff, name: effectName(p.effectPayoff) } : null,
+    hook_score: p.hookScore, moment_id: p.momentId || null, moment: p.moment || null, alt_hook: p.altHook || null,
+    scene: p.scene || null, clip_action: p.clipAction || null, cta: p.cta || null, stat_source: p.statSource || null, notes: p.notes || null,
+  }
 }
 
 export function postExportJson(i: PostExportInput): Record<string, unknown> {
@@ -65,10 +87,13 @@ export function postExportJson(i: PostExportInput): Record<string, unknown> {
       text: s.caption,
       hashtags: s.hashtags,
       ad: s.ad,
-      // What to paste: #ad first on an ad, then the caption and hashtags.
+      cta_line: i.ctaLine || null,
+      // What to paste: "Ad:" first on an ad, then the caption, the CTA line
+      // and the hashtags.
       as_posted: s.postCaption,
       file: i.files.caption,
     },
+    plan: planJson(i.plan),
     slides: i.slides.map(x => ({
       number: x.index + 1,
       text: x.text,
@@ -81,6 +106,33 @@ export function postExportJson(i: PostExportInput): Record<string, unknown> {
     })),
     files: { tiktok: i.files.tiktok, instagram: i.files.instagram, caption: i.files.caption },
     sizes: i.sizes,
+    ai_label: i.aiLabel,
+  }
+}
+
+// A video post's post.json (section 28): the post, the words on the video,
+// the caption to post with its hashtags and CTA line, and the plan.
+export interface VideoExportInput {
+  post: PostExportInput['post']
+  video: { file: string; assetId: string; durationSec: number | null; onScreenText: string; captionOff: boolean }
+  caption: { text: string; hashtags: string[]; ctaLine: string; ad: boolean; asPosted: string }
+  plan: PlanMeta | null
+  aiLabel: string
+  exportedAt: string
+}
+export function videoPostExportJson(i: VideoExportInput): Record<string, unknown> {
+  return {
+    format: 'character-studio.post',
+    version: POST_EXPORT_VERSION,
+    exported_at: i.exportedAt,
+    post: {
+      id: i.post.id, kind: i.post.kind, title: i.post.title, idea: i.post.idea, account: i.post.accountTag || null,
+      character: i.post.characterId ? { id: i.post.characterId, name: i.post.characterName } : null,
+      variation_of: i.post.variationOf, batch_of: i.post.batchOf, created_at: i.post.createdAt, updated_at: i.post.updatedAt,
+    },
+    video: { file: i.video.file, asset_id: i.video.assetId, duration_sec: i.video.durationSec, on_screen_text: i.video.captionOff ? null : i.video.onScreenText || null },
+    caption: { text: i.caption.text, hashtags: i.caption.hashtags, ad: i.caption.ad, cta_line: i.caption.ctaLine || null, as_posted: i.caption.asPosted },
+    plan: planJson(i.plan),
     ai_label: i.aiLabel,
   }
 }

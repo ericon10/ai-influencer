@@ -49,8 +49,8 @@ export interface LlmJobRequest extends Omit<LlmRequest, 'images'> {
 // `characterId` names the character a job belongs to when one run covers
 // several (Clone Video across characters); otherwise the run's character.
 export type JobSpec =
-  | { type: 'gen'; stage: string; purpose: string; label: string; request: GenRequest; parentIndex?: number; characterId?: string }
-  | { type: 'llm'; stage: string; purpose: string; label: string; request: LlmJobRequest; parentIndex?: number; characterId?: string }
+  | { type: 'gen'; stage: string; purpose: string; label: string; request: GenRequest; parentIndex?: number; characterId?: string; queue?: { group: number } }
+  | { type: 'llm'; stage: string; purpose: string; label: string; request: LlmJobRequest; parentIndex?: number; characterId?: string; queue?: { group: number } }
 
 const ACTIVE: JobStatusName[] = ['waiting', 'queued', 'submitting', 'running', 'ingesting']
 
@@ -149,6 +149,9 @@ async function createJobs(deps: Deps, ctx: Ctx, input: { quoteId?: string; confi
     const quote = await consumeQuote(tx as unknown as Db, deps, ctx, input.quoteId, input.purpose, input.characterId, items, !!input.confirmed)
     const quotedItems = quote.items as Array<{ amountMicros: number; priceVersion: string }>
     const rows: JobRow[] = []
+    // A queue (the plan's Generate N posts, section 28): group 0 starts now,
+    // each later group waits until the group before it is done.
+    const queueId = input.specs.some(sp => sp.queue) ? newId('que') : null
     for (const [i, spec] of input.specs.entries()) {
       const estimate = quotedItems[i]?.amountMicros ?? items[i]!.estimate.totalMicros
       const credits = items[i]!.estimate.credits
@@ -166,9 +169,9 @@ async function createJobs(deps: Deps, ctx: Ctx, input: { quoteId?: string; confi
         id, accountId: ctx.accountId, userId: ctx.userId, characterId,
         stage: spec.stage, purpose: spec.purpose, provider, model,
         kind: spec.type === 'gen' ? spec.request.kind : 'llm',
-        request: parent ? { ...request, parentJobId: parent.id } : request,
+        request: { ...request, ...(parent ? { parentJobId: parent.id } : {}), ...(queueId && spec.queue ? { queue: { id: queueId, group: spec.queue.group } } : {}) },
         idempotencyKey: `${quote.id}:${i}`, quoteId: quote.id,
-        estimateMicros: estimate, status: parent ? 'waiting' : 'queued', nextPollAt: parent ? null : deps.clock.now(),
+        estimateMicros: estimate, status: parent || (spec.queue?.group ?? 0) > 0 ? 'waiting' : 'queued', nextPollAt: parent || (spec.queue?.group ?? 0) > 0 ? null : deps.clock.now(),
       }).returning()
       await appendLedger(tx as unknown as Db, [{
         accountId: ctx.accountId, userId: ctx.userId, characterId, jobId: id, quoteId: quote.id,
@@ -588,13 +591,36 @@ async function needsAttention(deps: Deps, job: JobRow, message: string): Promise
 
 async function runHook(deps: Deps, ctx: Ctx, job: JobRow, outcome: JobOutcome): Promise<void> {
   const hook = hookFor(job.purpose)
-  if (!hook) return
-  try {
-    await hook(deps, ctx, job, outcome)
-  } catch (e) {
-    ctx.log.error({ err: e }, 'job hook failed')
-    await event(deps.db, job, 'hook_failed', { message: (e as Error).message })
+  if (hook) {
+    try {
+      await hook(deps, ctx, job, outcome)
+    } catch (e) {
+      ctx.log.error({ err: e }, 'job hook failed')
+      await event(deps.db, job, 'hook_failed', { message: (e as Error).message })
+    }
   }
+  await advanceQueue(deps, job).catch(e => ctx.log.error({ err: e }, 'queue not advanced'))
+}
+
+// A queue's next group starts when nothing of the group before it is still
+// to run: no job queued or running, and none waiting on a parent.
+const RUNNING: JobStatusName[] = ['queued', 'submitting', 'running', 'ingesting']
+export async function advanceQueue(deps: Deps, job: JobRow): Promise<string[]> {
+  const q = (job.request as { queue?: { id: string; group: number } }).queue
+  if (!q) return []
+  const rows = await deps.db.select({ id: jobs.id, status: jobs.status, request: jobs.request }).from(jobs)
+    .where(and(eq(jobs.accountId, job.accountId), sql`${jobs.request}->'queue'->>'id' = ${q.id}`))
+  const info = rows.map(r => { const req = r.request as { queue: { group: number }; parentJobId?: string }; return { id: r.id, status: r.status as JobStatusName, group: req.queue.group, child: !!req.parentJobId } })
+  const pending = (g: number) => info.some(r => r.group <= g && (RUNNING.includes(r.status) || (r.status === 'waiting' && r.child)))
+  const held = info.filter(r => r.status === 'waiting' && !r.child)
+  if (!held.length) return []
+  const next = Math.min(...held.map(r => r.group))
+  if (pending(next - 1)) return []
+  const ids = held.filter(r => r.group === next).map(r => r.id)
+  await deps.db.update(jobs).set({ status: 'queued', nextPollAt: deps.clock.now(), updatedAt: deps.clock.now() }).where(and(inArray(jobs.id, ids), eq(jobs.status, 'waiting')))
+  for (const r of rows.filter(x => ids.includes(x.id))) await event(deps.db, r as unknown as JobRow, 'activated', { queue: q.id, group: next })
+  await wakeWorker(deps)
+  return ids
 }
 
 // ── Dependent jobs ───────────────────────────────────────────────

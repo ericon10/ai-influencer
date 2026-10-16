@@ -27,6 +27,7 @@ import type { PlanMeta } from '../core/planMeta.js'
 import { accountStructures } from './playbook.js'
 import { renderSlide, fontDraw } from '../media/slideRender.js'
 import type { GenRequest } from '../providers/types.js'
+import { estimateGen } from '../costs/pricebook.js'
 import { listCredentials } from '../providers/credentials.js'
 import { ACCOUNT_PROVIDER } from '../providers/higgsfieldOAuth.js'
 import { readAsset, saveAsset } from '../storage/assets.js'
@@ -442,6 +443,24 @@ export async function slideStillChoices(deps: Deps, ctx: Ctx): Promise<{ choices
   return { choices, pick }
 }
 
+// One still's price with the picked model and path (the plan import's
+// preview): a character still attaches the sheet, a topic still does not.
+export async function slideStillPrice(deps: Deps, ctx: Ctx, want: string | null, mode: 'character' | 'topic'): Promise<{ micros: number; model: string; label: string; path: StillChoice['path']; problem: string | null }> {
+  const { choices, pick } = await slideStillChoices(deps, ctx)
+  const choice = choices.find(c => c.ref === want) ?? choices.find(c => c.ref === pick)!
+  const entry = deps.config.models.models.find(m => m.ref === choice.ref)
+  const kind: GenRequest['kind'] = mode === 'character' && (entry?.max_refs ?? 0) > 0 ? 'image_edit' : 'image'
+  const base = await runModel(deps, ctx, choice.ref, kind)
+  const run = choice.path === 'api' && base.model.startsWith('higgsfield/') ? { ...base, billing: 'api' as const } : base
+  const level = stillLevelFor(deps, choice.ref)
+  try {
+    const est = estimateGen(deps.config, { kind, model: run.model, modelRef: choice.ref, prompt: '', aspect: '9:16', quality: level.quality, resolution: level.resolution, ...(run.billing ? { billing: run.billing } : {}) })
+    return { micros: est.totalMicros, model: choice.ref, label: choice.label, path: choice.path, problem: choice.problem }
+  } catch {
+    return { micros: 0, model: choice.ref, label: choice.label, path: choice.path, problem: choice.problem ?? 'The price book has no price for it yet.' }
+  }
+}
+
 export async function saveSlideStillModel(deps: Deps, ctx: Ctx, ref: string): Promise<void> {
   const cfg = cfgOf(deps)
   if (ref !== cfg.still_model && ref !== cfg.api_still_model) throw new AppError('invalid_request', `"${ref}" is not one of the slideshow stills models.`)
@@ -498,6 +517,7 @@ async function stillContext(deps: Deps, ctx: Ctx, row: ContentRow, spec: Slidesh
     ...(lock.camera ? { camera: lock.camera } : {}),
     ...(lock.phone ? { phone: lock.phone } : {}),
     ...(lock.outfit.trim() ? { outfit: lock.outfit.trim() } : {}),
+    ...(lock.hair.trim() ? { hair: lock.hair.trim().slice(0, 160) } : {}),
     destination: aspect === '3:4' ? 'portrait' : 'vertical',
     task: '', trigger: '', asWritten: false,
   })
@@ -1043,7 +1063,7 @@ export async function renderSlideshow(deps: Deps, ctx: Ctx, job: JobRow, row: Co
     post: { id: row.id, kind: row.kind, title: row.title, idea: row.idea, accountTag: row.accountTag, characterId: row.characterId, characterName: character?.name ?? null, variationOf: row.variationOf, batchOf: row.batchOf, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString() },
     slideshow: {
       mode: spec.mode, pattern: spec.pattern, hook: spec.hook, textStyle: spec.textStyle, made: spec.made,
-      caption: spec.caption, postCaption: caption, hashtags: spec.hashtags.slice(0, cfg.slideshow.hashtags[1]), ad: spec.ad,
+      caption: spec.caption, postCaption: caption, hashtags: spec.hashtags.slice(0, cfg.slideshow.hashtags[1]), ad: spec.ad || spec.plan.product,
       cta: { kind: spec.cta.kind, handle: spec.cta.handle, word: spec.cta.word, text: ctaText(spec.cta.kind, spec.cta) },
       scene: { place: spec.lock.place, light: spec.lock.light, camera: spec.lock.camera, phone: spec.lock.phone, outfit: spec.lock.outfit, details: spec.lock.details, savedId: spec.lock.savedId },
     },
@@ -1052,6 +1072,7 @@ export async function renderSlideshow(deps: Deps, ctx: Ctx, job: JobRow, row: Co
     sizes: { tiktok, instagram: insta },
     aiLabel: character?.disclosure ?? 'Label all posts as AI-generated',
     exportedAt: deps.clock.now().toISOString(),
+    plan: spec.plan, ctaLine: spec.ctaLine,
   })
   const jsonBuf = Buffer.from(`${JSON.stringify(json, null, 2)}\n`)
   files['post.json'] = jsonBuf

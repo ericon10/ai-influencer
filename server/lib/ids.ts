@@ -7,7 +7,7 @@ const ALPHABET = '0123456789abcdefghjkmnpqrstvwxyz'
 export type IdPrefix =
   | 'acct' | 'usr' | 'ses' | 'cred' | 'chr' | 'rev' | 'cpt' | 'ast' | 'ref'
   | 'cand' | 'job' | 'jev' | 'led' | 'bud' | 'qte' | 'aud' | 'req' | 'lga' | 'scn' | 'brl' | 'cnt' | 'snd' | 'sty'
-  | 'prd' | 'hok' | 'hvr' | 'soc' | 'prep' | 'trash' | 'ssc'
+  | 'prd' | 'hok' | 'hvr' | 'soc' | 'prep' | 'trash' | 'ssc' | 'que'
 
 export function newId(prefix: IdPrefix, now = Date.now()): string {
   let time = ''

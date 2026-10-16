@@ -35,6 +35,7 @@ import { buildHookVariants } from './scaleKit.js'
 import { buildSlideshowBatch, buildSlideshowCaption, buildSlideshowDraft, buildSlideshowHooks, buildSlideshowStills, buildSlideshowVariations, saveSlideStillModel } from './slideshow.js'
 import { PATTERN_IDS } from '../core/slides.js'
 import { EFFECT_CODES, STRUCTURE_CODES } from '../core/playbook.js'
+import { buildPlanGenerate } from './planImport.js'
 import { saferPrompt } from '../core/wording.js'
 
 // Every paid step is an action. The same builder produces the job specs for
@@ -149,6 +150,8 @@ export const actionSchema = z.discriminatedUnion('type', [
     code: z.enum(STRUCTURE_CODES).nullable().optional(), effectOpen: z.enum(EFFECT_CODES).nullable().optional(), effectPayoff: z.enum(EFFECT_CODES).nullable().optional(),
     moment: z.string().max(400).optional(), alt: z.string().max(200).optional(), score: z.number().int().min(1).max(5).nullable().optional(),
   }),
+  // The launch plan (section 28): stills for the ticked posts, ten at a time.
+  z.object({ type: z.literal('plan_generate'), postIds: z.array(z.string().max(60)).min(1).max(100), stillModel: z.string().max(80).nullable().optional() }),
   z.object({ type: z.literal('slideshow_stills'), contentId: z.string().max(60), slides: z.array(z.number().int().min(0).max(11)).max(12).optional(), stillModel: z.string().max(80).optional() }),
   z.object({ type: z.literal('slideshow_caption'), contentId: z.string().max(60) }),
   z.object({ type: z.literal('slideshow_variations'), contentId: z.string().max(60), count: z.number().int().min(1).max(10) }),
@@ -256,6 +259,7 @@ export async function buildAction(deps: Deps, ctx: Ctx, action: StudioAction): P
   if (action.type === 'slideshow_hooks') return buildSlideshowHooks(deps, ctx, action.contentId)
   if (action.type === 'slideshow_draft') return buildSlideshowDraft(deps, ctx, action)
   if (action.type === 'slideshow_stills') return buildSlideshowStills(deps, ctx, action)
+  if (action.type === 'plan_generate') return buildPlanGenerate(deps, ctx, action)
   if (action.type === 'slideshow_caption') return buildSlideshowCaption(deps, ctx, action.contentId)
   if (action.type === 'slideshow_variations') return buildSlideshowVariations(deps, ctx, action)
   if (action.type === 'slideshow_batch') return buildSlideshowBatch(deps, ctx, action)
@@ -540,6 +544,10 @@ async function afterStart(deps: Deps, ctx: Ctx, action: StudioAction, built: Bui
   if (action.type === 'clone' && action.model) await saveCloneModel(deps, ctx, action.model)
   // The slideshow stills model picked last is the next run's default.
   if (action.type === 'slideshow_stills' && action.stillModel) await saveSlideStillModel(deps, ctx, action.stillModel).catch(() => undefined)
+  if (action.type === 'plan_generate') {
+    if (action.stillModel) await saveSlideStillModel(deps, ctx, action.stillModel).catch(() => undefined)
+    for (const j of jobs) if (/^scene:/.test(j.purpose)) await markSceneBusy(deps, ctx, j.purpose.split(':')[1]!).catch(() => undefined)
+  }
   // "Make the video" on a still keeps that still; "Fix this face" picks the
   // still it fixes (the same click).
   if (action.type === 'clone' && action.stills) for (const id of Object.values(action.stills)) await useCloneStill(deps, ctx, action.contentId, id)
