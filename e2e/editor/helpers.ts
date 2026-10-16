@@ -75,8 +75,10 @@ export async function seedPost(opts: { caption?: string; music?: boolean; voice?
   const music = opts.music ? await musicSound() : null
   let voice: { id: string; at: number; captions: boolean } | null = null
   if (opts.voice) {
-    const { lines } = await api<{ lines: { id: string; status: string }[] }>('GET', '/voice-lines')
-    const ready = lines.find(l => l.status === 'ready')
+    // A voice line of this post's own character (another's is refused).
+    const characterId = (await api<{ item: { characterId: string | null } }>('GET', `/content/${id}`)).item.characterId
+    const { lines } = await api<{ lines: { id: string; status: string; characterId: string | null }[] }>('GET', '/voice-lines')
+    const ready = lines.find(l => l.status === 'ready' && l.characterId === characterId)
     if (ready) voice = { id: ready.id, at: 0.5, captions: true }
   }
   await api('PATCH', `/content/${id}`, {
