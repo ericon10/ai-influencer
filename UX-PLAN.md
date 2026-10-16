@@ -1002,3 +1002,68 @@ words, no nudity and the price before every run stay fixed.
 Built details: a run's stills read as one line in the run list ("Slideshow
 still: 3 of 5 done"); a still released because its slide became a special
 slide reads "not needed", never as a failure, and is not charged.
+
+## 28. Slideshow power-up 2: launch ready (owner, 2026-10-16)
+
+Goal: the 140-post launch plan (starting Monday, October 19) goes from its
+CSV to finished posts in the flows that exist, and new hooks are written
+the playbook way. No new page, no new step. The spec is four files in
+`docs/content/`: `viral-writing-playbook.md` (the method),
+`post-writer-brief.md` (the procedure), `sidestep-script-kit.md` (the
+claims sheet, which wins over everything) and `launch-plan-v2-posts.csv`
+(the plan: 140 rows, 30 columns, six accounts).
+
+**What the Studio did before this (the audit):**
+
+| Piece | Before |
+|---|---|
+| Write 10 with Claude | One Claude call; each hook tagged with one of 8 patterns (doubt, POV, nobody tells, red flags, listicle, storytime, myth vs fact, tier list). No moment, effect, alt hook or score; no reviewer; nothing per account |
+| Use this hook | Every slide drafted: hook, setup, the reveal on slide 3 or 4, payoff, soft CTA; 4 to 12 words a slide |
+| Language checks | Only the long-dash clean-up in the writers' output. Nothing on what the owner types |
+| Spreadsheet import | Inside a batch only: one video post per row (character, account, clip or "still:", video, caption, style). No slideshows, no photos, no plan columns, one character's batch at a time, at most a batch's size |
+| Alt hook | None |
+| Special slides | Four, drawn by code: phone notification, text thread, rejection email, job posting |
+| Accounts | Posts home > Accounts: tag, character, product, tracked link or code, signups. No structures |
+| post.json | Slideshows only; no plan fields |
+| #ad | "Ad" on slide 1 and "#ad" first in the caption |
+
+Kept as they were: 10 from the vault (free), the four special slides, the
+batch's own spreadsheet import, every price button.
+
+**What it does now:**
+
+| Piece | Where | How it works | Clicks |
+|---|---|---|---|
+| Write 10 with Claude, the playbook way | Idea step (slideshows), under the hook box | Follows `post-writer-brief.md`: for each of 10 slots Claude picks the effect, writes the moment first, pours it into a structure or lens, writes 3 and keeps 1 plus the runner-up as the alt hook. Then a second Claude call, a separate reviewer that did not write them, scores every hook 1 to 5 on the playbook ladder with the kill test; only the 1s and 2s are shown ("4 scored 3 to 5 and are hidden"). One price on the button covers both calls, models named | 1 |
+| A hook card | The hook list | The hook; one line for the moment; the code as the tag (S1 to S12, L13 to L25, with its name); the target effect (E1 to E8); the alt hook; the reviewer's score (1 or 2) and its note. Chips filter by code. 10 from the vault stays free and keeps its pattern tags | 0 |
+| Per account | Posts home > Accounts, each row | A **primary** and a **backup** structure (filled from the playbook's fit table: F1 S3 and S11, F2 L14 and S1, F3 S11 and L20, F4 S11 and S3, F5 S3 and L18, F6 S6 and S1, F7 S12 and S4, F8 S9 and L24, F9 S2 and L21, Callie S5 and S10, Solei S2 and S6; editable, a default). The writer leans on them and never repeats the account's last code; a hook with the last post's code carries a warning | 1 per edit |
+| Jenga drafts | Use this hook | The draft follows the brief: 6 slides, 4 to 14 words, each slide answers one small question and opens the next, setup and punchline never on one slide, the reveal waits, the payoff completes the scale on the last slide. The moment, code and effects of the hook go in; the alt hook is kept on the post; a product post names SideStep only on slide 5 or 6 and starts its caption with "Ad:" | 1 |
+| Language lint | Every hook card, the hook box, every slide's words, the caption (slideshows), the on-screen text (video posts), the plan import's preview and the Finish step | Free, as you type, warnings only: em or en dashes; should, need to, must, ought; "just" before an instruction; dream job, unlock, level up, game-changer, supercharge; a sentence that starts with "You" ("POV:" is fine); more than 5 hashtags; SideStep in a hook; a product post whose caption does not start with "Ad:". Each is a default in Settings > Rules (on or off, per account or character); the word lists are data (`config/content.yaml`) | 0 |
+| Import a plan | Posts home, the **Launch plan** card (under Accounts, collapsed when empty) | Upload or paste a CSV with the plan's columns. **Preview (free)**: the rows in a grid by day and account (format, the hook's first words), each row's errors and lint warnings, what each slide becomes (photo or special slide), the character each account's posts are filed under, and the total price to generate everything with the picked stills model. **Make 140 drafts** (free): every row becomes a draft in its flow. Importing the same file again updates the drafts that have not been generated yet (matched by row_id) instead of doubling them | 2 |
+| Slideshow rows | Feeders (list, story, mock UI, stat) and character slideshows | A slideshow draft with the hook, slides 2 to 6, the scene, caption, hashtags and CTA as written (no redraft). The scene's "Slide N:" parts become each slide's shot; the rest is the locked scene. A part that describes a mock screen the Studio draws (calendar invite, email, lock screen, placard, invoice, bank app, portal timeline, form, survey, profile card, text thread, notification, posting) becomes that special slide with its quoted words filled in (a switch in the preview, on by default, keeps them all as photos instead). Feeders are topic slideshows (no one in the photos); Callie's and Solei's are character slideshows. product = yes turns on #ad | 0 |
+| Photo rows | Character photos | A one-slide character slideshow: the hook is the on-screen text, the scene is the locked scene, the export is one 1080 x 1920 JPEG (and the 3:4 crop) with caption.txt and post.json | 0 |
+| Clip rows | Character clips | A video post at its Stills step: the hook is the on-screen text, the scene as written is the post's idea (read for free into the scene fields), clip_action is "What happens in the video". Caption, hashtags and CTA wait in the Finish step to copy | 0 |
+| What a plan row keeps | Every imported post | structure, effect_open, effect_payoff, hook_score, moment_id, moment, alt_hook, tension, pillar, audience, mention_mother (and row_id, date, slot, format, product, stat_source, notes, the scene and clip_action as written), shown in a small Plan line on the post and written into post.json | 0 |
+| Generate | The Launch plan card, after the drafts | Tick rows (or a day, or an account) and **Generate N posts** (one price first, the stills model and billing path on the button: Nano Banana 2.1 on the plan or GPT Image 2.5 Flare on the API). A slideshow gets a still for every photo slide; a clip gets its opening still, and its take is made in the post with its own price after the owner picks the still. More than 10 rows queue in tens: ten posts run, then the next ten; built for 100 in one click | 1 |
+| Alt hook swap | Idea step (slideshows) and the Caption step (video posts), next to the hook | **Swap with the alt hook** (free): the hook and the alt hook trade places in one tap. **Make variations** starts from the alt hook: variation 1 uses it word for word, the others reword it | 1 |
+| More special slides | Each slide card's picture menu, and the Slides step's editor | Nine more, drawn by code, generic, no real brands or logos: application form (empty or filled, with a field count), portal status timeline with timestamps, calendar invite, itemized invoice or receipt, bank or savings app (amounts can be blurred), museum placard, 0 to 10 survey, lock screen with a notification stack, profile card with a banner | 1 |
+| Product screenshot | The same picture menu: **Product screenshot** | Upload a real SideStep screenshot; it is placed on the slide as uploaded (drag it, size it), over the slide's photo or a plain background. The Studio never draws a SideStep screen | 2 |
+
+Every paid step shows its price and model and waits for the click: Write 10
+with Claude (writer and reviewer), Use this hook, Generate N posts, and
+every step that was paid before. The lint, the import, the preview, the
+drafts, the swap and the special slides are free and say so. Generation
+works on the Higgsfield API as well as the plan.
+
+Defaults in Settings > Rules (rule one): one rule per lint check (area
+copy), "never the same structure twice in a row" (`structure-repeat`).
+The claims sheet, the price before every run, the REALISM block, banned
+words and no nudity stay fixed.
+
+Built details: "#ad" becomes "Ad:" first in the caption (the brief's
+rule), and a caption that already starts with "Ad:" is left as it is. A
+CTA line that is not already in the caption is added after it in "As
+posted". A topic account needs no character, but its posts are filed under
+one (the account's character on the Accounts card, else the first
+character) because pictures are stored per character; nothing of that
+character (face, voice, name) goes into a topic post.
