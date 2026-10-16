@@ -292,7 +292,8 @@ const contentSchema = z.object({
     still_model: z.string().default('higgsfield/nano-banana-2.1'),
     api_still_model: z.string().default('higgsfield/gpt-image-2.5-flare'),
     max_variations: z.number().int().min(1).max(10).default(5),
-    batch_max: z.number().int().min(1).max(20).default(10),
+    // A batch post stores at most 10 hooks (slideshowSpec batchHooks).
+    batch_max: z.number().int().min(1).max(10).default(10),
     hooks: z.number().int().min(3).max(20).default(10),
     brand_names: z.array(z.string()).default([]),
     generic_names: z.array(z.string()).default([]),

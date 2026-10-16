@@ -199,7 +199,9 @@ rules:
     area: character
     spec: "5.1.9"
     title: No cup sizes
-    check: { type: forbid_pattern, pattern: "\\b(?:[A-H]|AA|DD|DDD)[- ]?cups?\\b" }
+    # Not "A cup" (an article) and not "C cup of coffee", like the cup-size
+    # patterns in config/wording.yaml.
+    check: { type: forbid_pattern, pattern: "\\b(?:[B-H]|AA|DD|DDD)[- ]?cups?\\b(?!\\s+of\\b)" }
     message: Neutral body terms work better than cup sizes; models exaggerate them.
   - id: neutral-body-measurements
     bucket: default

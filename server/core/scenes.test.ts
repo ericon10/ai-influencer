@@ -57,6 +57,12 @@ describe('scene prompts (SPEC 5.2 and 10)', () => {
   const p = buildScenePrompt(templates, scenes, views, market, callie, 'refs')
   const request = { kind: 'image_edit' as const, model: 'higgsfield/nano-banana-2.1', prompt: p, refs: [{ assetId: 'a' }, { assetId: 'b' }], aspect: '9:16' }
 
+  it('starts the moment and the setting as sentences, whatever their first letter', () => {
+    const lower = buildScenePrompt(templates, scenes, views, { ...market, moment: 'picking out peaches at a stall', setting: 'a busy farmers market' }, callie, 'refs')
+    expect(lower).toContain('She is an adult, 21 or older. Picking out peaches at a stall.')
+    expect(lower).toContain(' A busy farmers market.')
+  })
+
   it('opens with the fixed REFERENCE line and replaces the sheet outfit (rules 14 and 15)', () => {
     expect(p.startsWith("Using the attached reference images, keep this woman's face, hair, and features exactly the same.")).toBe(true)
     expect(p).toContain('wearing this outfit instead of the white t-shirt, jeans and sneakers in the reference images')

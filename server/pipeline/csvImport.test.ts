@@ -78,6 +78,8 @@ describe('importing a spreadsheet into a batch', () => {
 
   it('refuses when no row is ready, and only from a batch', async () => {
     await expect(runImport(h.deps, h.ctx, batchId, { csv: 'character,clip,caption\nMara,x,y' })).rejects.toThrow(/No row is ready/)
+    // A body without the CSV is a 400, not a server error.
+    await expect(runImport(h.deps, h.ctx, batchId, {})).rejects.toMatchObject({ code: 'bad_request', status: 400 })
     const post = (await createContent(h.deps, h.ctx, { kind: 'meme', characterId })).id
     await expect(previewImport(h.deps, h.ctx, post, CSV)).rejects.toThrow(/from a batch/)
   })

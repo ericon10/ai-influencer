@@ -175,6 +175,27 @@ describe("Callie's character file", () => {
   })
 })
 
+// Character template v1.6 (docs/character-template.md): the Models section
+// carries a longer title and names two video roles in one line.
+describe('a character file from template v1.6', () => {
+  const md = readFileSync(join(process.cwd(), 'fixtures/template/character-wren.md'), 'utf8')
+  const c = importCharacterFile(md, { models: loadConfig().models.models }).character
+
+  it('reads the models from the "Models (UNIVERSAL defaults ...)" section', () => {
+    expect(c.preferredModels).toEqual({
+      sheet: 'higgsfield/gpt-image-2.5-flare',
+      scene_still: 'higgsfield/gpt-image-2.5-flare',
+      edit: 'higgsfield/gpt-image-2.5-flare',
+      // "Video from stills: Seedance 2.5 for finals, Kling 3.0 Pro as the
+      // cheaper default": one line, two roles, never a still model.
+      video_final: 'higgsfield/seedance-2.5',
+      video_test: 'higgsfield/kling-3.0-pro',
+    })
+    expect(c.avoidModels).toEqual([])
+    expect(c.sections.map(s => s.title)).toContain('Models (UNIVERSAL defaults, update as tests change)')
+  })
+})
+
 // Rule zero: a file's Realism section feeds the REALISM and AVOID blocks.
 describe('a Realism section', () => {
   const md = [

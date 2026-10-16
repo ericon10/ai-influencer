@@ -288,9 +288,10 @@ function fillSceneBase(t: TemplatesConfig, f: SceneFields, p: Parts, o: { scaffo
     ...p.pv,
     reference: o.scaffold ? p.reference : '',
     adult: o.scaffold ? p.adult : '',
-    moment: sentence(f.moment),
+    // Each starts its own sentence in the template.
+    moment: capitalize(sentence(f.moment)),
     task_line: taskLine(f, p.pv),
-    setting: sentence(f.setting),
+    setting: capitalize(sentence(f.setting)),
     wearing: wearingLine(t, f, p, { jewelry: o.scaffold, override: o.scaffold }),
     makeup: p.makeup,
     hair: sentence(f.hair) || 'as usual',

@@ -391,7 +391,8 @@ function slideRequest(deps: Deps, c: StillCtx, shot: string, seed: number, reali
       camera: (lock.camera && !sc.cameras.some(x => x.id === lock.camera) ? lock.camera : 'held at chest height'),
       shot: shotMoment(moment, null), place: (lock.place || topicOf(c.row, s) || 'an ordinary place').replace(/[.\s]+$/, ''),
       details: details.length ? ` Also there: ${details.join(', ')}.` : '',
-      light: lock.light ? `${LIGHT_WORDS(deps, lock.light) || 'Natural available light'}.` : 'Natural available light.',
+      // The template ends the light sentence with its own period.
+      light: ((lock.light && LIGHT_WORDS(deps, lock.light)) || 'Natural available light').replace(/[.\s]+$/, ''),
       aspect: c.aspect,
     })
     const look = s.lock.lookAssetId && c.entry.max_refs > 0 ? s.lock.lookAssetId : null

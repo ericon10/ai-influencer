@@ -273,6 +273,9 @@ describe('step 2, the stills and the gates', () => {
     expect(text).toContain('@Video1 is used ONLY for motion')
     expect(text).toContain('The motion: she looks into the lens with a skeptical squint')
     expect(text).toContain('Her outfit stays exactly as in @Image1 for the whole clip, same cut, length and fit.')
+    // Sound off is said once, by the Studio's silent line.
+    expect(text.match(/\bSilent\b/g)).toHaveLength(1)
+    expect(text).toContain('Silent, no audio, no dialogue.')
     expect(text).toMatch(/REALISM/)
   }, 60_000)
 
