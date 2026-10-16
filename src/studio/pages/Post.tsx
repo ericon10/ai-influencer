@@ -5,7 +5,8 @@ import { Archive, ArrowLeft, Check, CopyPlus, Loader2 } from 'lucide-react'
 import { api } from '../api'
 import { keys, useCharacter, useCharacters, useContent, useLibrary, useScenes } from '../hooks'
 import { Callout, errorMessage, scrollToField, useToast } from '../ui'
-import type { ContentData, ContentItem, PostStep } from '../types'
+import type { ContentData, ContentItem, PlanMeta, PostStep } from '../types'
+import { codeLabel } from '../../../server/core/playbook'
 import { KIND_LABEL, STEPS, postName, useDuplicate, usePostDraft } from './post/parts'
 import { IdeaStep, ideaSummary } from './post/IdeaStep'
 import { StillsStep, stillsSummary } from './post/StillsStep'
@@ -135,6 +136,7 @@ function Workspace({ item, data }: { item: ContentItem; data: ContentData }) {
         <div className="grow" style={{ minWidth: 0 }}>
           <div className="st-kicker">{KIND_LABEL[item.kind]}{item.accountTag ? ` · ${item.accountTag}` : ''}</div>
           <input className="st-input st-scene-title" value={draft.fields.title} placeholder={postName({ ...item, title: '' })} maxLength={120} onChange={e => draft.setFields({ title: e.target.value })} aria-label="Post name" />
+          <PlanLine plan={(draft.spec as { plan?: PlanMeta }).plan} />
         </div>
       </div>
       <nav className="st-steps st-poststeps" aria-label="Steps">
@@ -168,6 +170,36 @@ function Workspace({ item, data }: { item: ContentItem; data: ContentData }) {
           )
         })}
       </div>
+    </div>
+  )
+}
+
+// What the post keeps from its plan row or its hook (UX-PLAN.md section 28):
+// one small line, the moment and notes behind a click.
+function PlanLine({ plan }: { plan?: PlanMeta | null }) {
+  const [open, setOpen] = useState(false)
+  if (!plan || !(plan.rowId || plan.structure || plan.moment)) return null
+  const bits = [
+    plan.rowId && `Plan ${plan.rowId}`,
+    plan.date && `${plan.date}${plan.slot ? ` ${plan.slot}` : ''}`,
+    plan.structure && codeLabel(plan.structure),
+    (plan.effectOpen || plan.effectPayoff) && [plan.effectOpen, plan.effectPayoff].filter(Boolean).join(' to '),
+    plan.hookScore && `score ${plan.hookScore}`,
+    [plan.tension, plan.pillar, plan.audience].filter(Boolean).join(' '),
+    plan.product && 'product',
+    plan.mentionMother && 'mentions the mother account',
+  ].filter(Boolean)
+  return (
+    <div className="st-col" style={{ gap: 4, marginTop: 4 }} data-field="plan-line">
+      <button type="button" className="st-hint" style={{ background: 'none', border: 0, padding: 0, cursor: 'pointer', textAlign: 'left', color: 'inherit' }} onClick={() => setOpen(!open)} aria-expanded={open}>{bits.join(' · ')} {open ? '(less)' : '(more)'}</button>
+      {open && (
+        <div className="st-col st-hint" style={{ gap: 2 }}>
+          {plan.moment && <span><b>Moment{plan.momentId ? ` ${plan.momentId}` : ''}:</b> {plan.moment}</span>}
+          {plan.altHook && <span><b>Alt hook:</b> {plan.altHook}</span>}
+          {plan.statSource && <span><b>Stat source:</b> {plan.statSource}</span>}
+          {plan.notes && <span><b>Notes:</b> {plan.notes}</span>}
+        </div>
+      )}
     </div>
   )
 }

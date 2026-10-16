@@ -223,6 +223,7 @@ export type StudioAction =
   | { type: 'voice_convert'; soundIds: string[] }
   | { type: 'hook_variants'; hookId: string; characterIds: string[]; perCharacter?: number }
   | { type: 'slideshow_hooks'; contentId: string }
+  | { type: 'plan_generate'; postIds: string[]; stillModel?: string | null }
   | { type: 'slideshow_draft'; contentId: string; hook: string; pattern?: string | null; code?: string | null; effectOpen?: string | null; effectPayoff?: string | null; moment?: string; alt?: string; score?: number | null }
   | { type: 'slideshow_stills'; contentId: string; slides?: number[]; stillModel?: string }
   | { type: 'slideshow_caption'; contentId: string }
@@ -352,6 +353,8 @@ export interface CutView {
 // A slideshow's spec is the server's (server/core/slideshowSpec.ts).
 export type { SlideshowSpec, SceneLock, SpecialSlideSpec } from '../../server/core/slideshowSpec'
 export type { PlanMeta } from '../../server/core/planMeta'
+export type { PlanPreview, PlanPreviewRow, PlanPostView, PlanAccountView } from '../../server/pipeline/planImport'
+export interface PlanImportResult { created: number; updated: number; kept: number; skipped: number; posts: Array<{ rowId: string; id: string; state: 'new' | 'update' }> }
 // The slideshow power-up (UX-PLAN.md section 27): the Scene library, a
 // post's family and batch, and the no-reuse check.
 export interface SlideScene { id: string; characterId: string | null; topic: string; name: string; place: string; light: string; camera: string; phone: string; details: string[]; lookAssetId: string | null; createdAt: string }

@@ -920,7 +920,7 @@ slideshow_variations:
     Write {count} variations, each with {rest} slides after the hook.
 # A topic slideshow's photo (feeder accounts): no character, the locked
 # scene in every photo, the REALISM line still in every prompt (rule zero).
-slideshow_topic: "A candid phone photo for a photo slideshow, {camera}. {shot}. The place: {place}.{details} {light}. Every photo of the set is in this same place, light and phone, like one camera roll from one day. No one in focus and no faces; no readable text, logos or brand names on anything. A {aspect} vertical frame."
+slideshow_topic: "A candid phone photo for a photo slideshow, {camera}. {shot}. The place: {place}.{details} {light}. Every photo of the set is in this same place, light and phone, like one camera roll from one day. No one in focus and no faces; no logos or real brand names on anything; text on a screen or paper only where the shot quotes it, word for word. A {aspect} vertical frame."
 slideshow_topic_realism: "A real phone photo with natural grain, real textures and uneven everyday light, not retouched or polished."
 slideshow_same_place: " The attached photo shows the place: keep its room, its light and its objects, and change only the moment."
 # A character slideshow's photo: the post's scene with the locked lines;

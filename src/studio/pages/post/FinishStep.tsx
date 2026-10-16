@@ -11,6 +11,8 @@ import { BatchStyle } from './BatchStyle'
 import { CoverCard, ExportFor, HookVariants } from './ExportExtras'
 import { LintSummary, ReuseWarning, SlideshowOutputs, VariationsCard } from './slideshow/SlideshowFinish'
 import { slideshowProblemsClient } from './slideshow/problems'
+import { PostCaptionFields } from './TextStep'
+import { useLint } from '../../lint'
 import { keys, useSounds } from '../../hooks'
 import { useQueryClient } from '@tanstack/react-query'
 
@@ -20,6 +22,8 @@ import { useQueryClient } from '@tanstack/react-query'
 
 export function FinishStep({ ctx }: { ctx: PostCtx }) {
   const { item, draft, lib } = ctx
+  const lint = useLint(item.characterId)
+  const memePlan = item.kind === 'meme' ? (draft.spec as unknown as MemeSpec).plan : undefined
   const duplicate = useDuplicate()
   const qc = useQueryClient()
   const toast = useToast()
@@ -73,6 +77,7 @@ export function FinishStep({ ctx }: { ctx: PostCtx }) {
             <video className="st-content-result" src={assetUrl(o.videoAssetId)} controls playsInline />
             <div className="st-col" style={{ gap: 6 }}>
               <DownloadLink assetId={o.videoAssetId} name={`${name}.mp4`}>Download MP4</DownloadLink>
+              {o.jsonAssetId && <DownloadLink assetId={o.jsonAssetId} name={`${name}.post.json`}>post.json</DownloadLink>}
               {o.fromEditor && <span className="st-hint">Exported from the editor.</span>}
               {o.fromTimeline && <span className="st-hint">Rendered from your timeline on the worker.</span>}
               {o.preset && <span className="st-hint" data-field="export-made-for">Made for {(ctx.data.options.exportPresets ?? []).find(p => p.id === o.preset)?.label ?? o.preset}{o.capped ? ', the bitrate capped' : ''}.</span>}
@@ -106,6 +111,9 @@ export function FinishStep({ ctx }: { ctx: PostCtx }) {
           </div>
         )}
       </ExportPanel>
+      {item.kind === 'meme' && (memePlan?.caption || memePlan?.cta) && (
+        <section className="st-card" data-field="post-caption-finish"><div className="st-card-body"><PostCaptionFields plan={memePlan} product={!!memePlan?.product} lint={lint} onChange={patch => draft.setSpec({ plan: { ...(memePlan ?? {}), ...patch } } as never)} max={ctx.data.options.slideshow.hashtagsMax ?? 5} /></div></section>
+      )}
       {item.kind === 'meme' && <CoverCard ctx={ctx} />}
       {item.kind === 'meme' && <HookVariants ctx={ctx} />}
       {item.kind === 'slideshow' && <VariationsCard ctx={ctx} />}

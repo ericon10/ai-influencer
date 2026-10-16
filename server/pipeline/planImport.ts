@@ -69,7 +69,8 @@ function accountsFor(rows: CheckedRow[], chars: CharacterRow[], store: Record<st
     const character = mine.some(r => r.kind && isCharacterKind(r.kind))
     const named = charByName(chars, tag)
     if (character) return { tag, kind: 'character' as const, characterId: named?.id ?? null, characterName: named?.name ?? '', rows: mine.length, problem: named ? null : `No character named "${tag}". Import the character first.` }
-    const pick = chars.find(c => c.id === store[tag]) ?? named ?? chars[0]
+    const oldest = [...chars].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())[0]
+    const pick = chars.find(c => c.id === store[tag]) ?? named ?? oldest
     return { tag, kind: 'topic' as const, characterId: pick?.id ?? null, characterName: pick?.name ?? '', rows: mine.length, problem: pick ? null : 'Make or import a character first: pictures are filed under one.' }
   })
 }

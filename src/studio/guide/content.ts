@@ -9,7 +9,7 @@ export type GuideColor = 'orange' | 'pink' | 'violet' | 'blue' | 'teal' | 'green
 export type GuideId =
   | 'big-picture' | 'posts' | 'characters' | 'setup-start' | 'setup-face' | 'setup-sheet' | 'setup-file'
   | 'post-idea' | 'post-stills' | 'post-video' | 'post-clone' | 'post-text' | 'post-finish'
-  | 'library' | 'settings' | 'feedback' | 'realism' | 'voice' | 'hooks' | 'slideshow'
+  | 'library' | 'settings' | 'feedback' | 'realism' | 'voice' | 'hooks' | 'slideshow' | 'launch-plan'
 
 export interface GuideSection {
   id: GuideId

@@ -1367,3 +1367,11 @@ button.st-chip:hover { color: var(--st-text); border-color: var(--st-text-3); }
 .st-score.s1 { background: var(--st-ok-soft); border-color: rgba(63, 209, 143, 0.5); color: var(--st-ok); }
 .st-score.s2 { background: var(--st-info-soft); color: var(--st-text); }
 @media (max-width: 720px) { .st-hookrow.card { flex-wrap: wrap; } .st-hookrow .moment { white-space: normal; } }
+/* The launch plan (section 28): the preview grid by day and account. */
+.st-plangrid td { vertical-align: top; }
+.st-plangrid td.day { white-space: nowrap; font-weight: 600; }
+.st-planchip { display: inline-flex; gap: 4px; align-items: center; margin: 0 4px 4px 0; padding: 2px 7px; border-radius: 999px; font-size: 11px; white-space: nowrap; background: var(--st-surface-2); border: 1px solid var(--st-line); }
+.st-planchip.update { background: var(--st-info-soft); }
+.st-planchip.kept { opacity: 0.6; }
+.st-planchip.problem { background: var(--st-bad-soft); border-color: rgba(255, 93, 93, 0.4); }
+.st-clamp1 { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
