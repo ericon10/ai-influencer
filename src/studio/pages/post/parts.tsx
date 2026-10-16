@@ -115,12 +115,14 @@ export function useNewPost() {
   const [busy, setBusy] = useState<ContentKind | null>(null)
   // `open` adds to the post's link, e.g. "?clone=1" opens Clone Video.
   async function create(kind: ContentKind, extra: { characterId?: string; sceneId?: string | null; idea?: string; step?: PostStep; spec?: Record<string, unknown> } = {}, open = '') {
-    const list = chars.data?.characters ?? []
-    if (!list.length) { nav('/studio/characters'); return }
-    const last = read(LAST_CHARACTER)
-    const characterId = extra.characterId ?? (list.find(c => c.id === last) ?? list.find(c => c.progress.approved > 0) ?? list[0]!).id
     setBusy(kind)
     try {
+      // Tapped before the characters loaded: wait for them, never read
+      // "still loading" as "no characters" (that sent a phone to Characters).
+      const list = (chars.data ?? await qc.fetchQuery({ queryKey: keys.characters, queryFn: api.characters }))?.characters ?? []
+      if (!list.length) { nav('/studio/characters'); return }
+      const last = read(LAST_CHARACTER)
+      const characterId = extra.characterId ?? (list.find(c => c.id === last) ?? list.find(c => c.progress.approved > 0) ?? list[0]!).id
       const { id } = await api.createContent({ kind, characterId, accountTag: read(LAST_TAG) ?? '', ...extra })
       await qc.invalidateQueries({ queryKey: keys.content })
       nav(`/studio/posts/${id}${open}`)
