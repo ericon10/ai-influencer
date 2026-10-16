@@ -219,6 +219,7 @@ export async function buildHookVariants(deps: Deps, ctx: Ctx, a: { hookId: strin
     hook: hook.text, kind: hook.kind || 'not given',
     claims: claimsText(product.name, claimsOf(product)),
     language: languageText(languageOf(product)) || 'None collected yet.',
+    standard: deps.config.pipeline.templates.hook_standard.trim(),
     voices,
   }
   const system = fill(t.system, vars)

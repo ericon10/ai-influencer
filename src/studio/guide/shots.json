@@ -2453,7 +2453,7 @@
         "y": 6.8,
         "w": 96.6,
         "h": 5.9,
-        "label": "The hook: slide 1, 4 to 14 words. Type your own or pick one"
+        "label": "The hook: slide 1, to THE STANDARD (the pain said plainly, 15 words or fewer)"
       },
       {
         "n": 2,
@@ -2474,7 +2474,7 @@
       {
         "n": 4,
         "x": 1.7,
-        "y": 31.7,
+        "y": 32.8,
         "w": 96.6,
         "h": 1.1,
         "label": "This account's primary and backup; never the last post's code"
@@ -2482,18 +2482,18 @@
       {
         "n": 5,
         "x": 1.7,
-        "y": 35.7,
+        "y": 36.8,
         "w": 96.3,
         "h": 6.1,
-        "label": "A hook card: the moment, its code and effects, the alt hook, the reviewer's score"
+        "label": "A hook card: the moment, its code and effects, the alt hook, the reviewer's score and pain out of 10"
       },
       {
         "n": 6,
         "x": 1.7,
-        "y": 73.2,
+        "y": 74.3,
         "w": 96.6,
         "h": 1.1,
-        "label": "The reviewer scores each 1 to 5; only the 1s and 2s show"
+        "label": "The reviewer runs the stop test first, then scores 1 to 5; only the 1s and 2s show"
       }
     ]
   },
@@ -2683,44 +2683,44 @@
   },
   "launch-plan-preview": {
     "w": 1124,
-    "h": 1550,
+    "h": 1588,
     "spots": [
       {
         "n": 1,
         "x": 1.9,
-        "y": 9,
+        "y": 8.8,
         "w": 96.3,
-        "h": 5.9,
+        "h": 5.8,
         "label": "Paste the plan, or Upload the CSV"
       },
       {
         "n": 2,
         "x": 28.2,
-        "y": 15.7,
+        "y": 15.3,
         "w": 3.9,
-        "h": 1.7,
+        "h": 1.6,
         "label": "Draw mock screens by code (off: every slide a photo, as written)"
       },
       {
         "n": 3,
         "x": 1.9,
-        "y": 18.1,
+        "y": 17.7,
         "w": 96.3,
-        "h": 22.3,
+        "h": 21.8,
         "label": "Each account: a character, or a topic account (no one in the photos)"
       },
       {
         "n": 4,
         "x": 1.9,
-        "y": 42.9,
+        "y": 41.9,
         "w": 96.3,
-        "h": 47.1,
+        "h": 46,
         "label": "The rows by day and account; hover a chip for its hook and price"
       },
       {
         "n": 5,
         "x": 1.9,
-        "y": 90.7,
+        "y": 90.9,
         "w": 96.3,
         "h": 1.8,
         "label": "The stills model the price is for"
@@ -2728,7 +2728,7 @@
       {
         "n": 6,
         "x": 1.9,
-        "y": 93.1,
+        "y": 93.3,
         "w": 96.3,
         "h": 2.3,
         "label": "What it is and what generating every picture would cost"

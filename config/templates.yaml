@@ -478,9 +478,10 @@ hook_variants:
       approved phrasings only, no promise of results, nothing it does not
       do, no made-up results from the character. Tips and observations,
       not results claims.
-    - Under 25 words, plain text, no hashtags, no quotation marks around
-      the line, no em-dashes. Nothing sexual, no claims about real
-      people.
+    - Every variant follows this standard:
+      {standard}
+    - Plain text, no hashtags, no quotation marks around the line, no
+      em-dashes. Nothing sexual, no claims about real people.
     Return each variant with the character's name exactly as given.
   prompt: |
     The hook: {hook}
@@ -689,38 +690,40 @@ qa_perception:
 # account's voice card go in; 10 hooks come back, each tagged by pattern.
 slideshow_hooks:
   system: |
-    You write hooks for TikTok and Instagram photo slideshows for {who},
-    the way the viral writing playbook says (the method below). A hook is
-    the words on slide 1.
+    You write hooks for TikTok and Instagram photo slideshows for {who}.
+    A hook is the words on slide 1, and every hook follows this standard:
+    {standard}
     Write exactly {count} candidates for this account's next post. For each
     one, in this order:
     1. effect_open: what the viewer feels in the first second (an E code
        from the menu), and effect_payoff: what they feel at the end.
     2. moment: one specific scene of the problem happening, in one line:
        when, where, what is on screen, and the tell (one detail only a
-       real job seeker knows). The tension is a tag, never the hook's
-       subject.
-    3. code: the structure or lens it is poured into (S1 to S12, L13 to
-       L25).
-    4. Write 3 hooks for the moment with different lenses or tells, rank
-       them on the ladder, keep the best as hook and the runner-up as
-       alt_hook. rank is your own score of the kept hook.
-    Kill test: what does the viewer get at the end, where is the surprise,
-    and could it be a news headline about the job market (then it is a 5).
-    Only keep hooks you would rank 1 or 2.
+       real job seeker knows). It feeds slides 2 to 6; the tension is a
+       tag, never the hook's subject.
+    3. code: the structure or lens that carries slides 2 to 6 and the
+       payoff (S1 to S12, L13 to L25).
+    4. pain: how much the hook's pain hurts for someone job hunting right
+       now, 1 to 10. Keep only 7 or more.
+    5. Write 3 hooks in different proven shapes, rank them on the ladder,
+       keep the best as hook and the runner-up as alt_hook. rank is your
+       own score of the kept hook.
+    The stop test first: would a stranger scrolling past stop, is it clear
+    on one read with no image, is the pain 7 or more? Then what the viewer
+    gets at the end and where the turn is. Only keep hooks you would rank
+    1 or 2.
     This account: {structures}
-    Language: 4 to 14 words a hook, plain text, no emoji, no quotation
-    marks around the hook. Show the problem happening, never state it: no
-    topic labels, no stat first, no restated pain. No should, need to,
-    must, ought, "just" before an instruction, or hustle words (dream job,
-    unlock, level up, game-changer, supercharge). No sentence starts with
-    "You" (a "POV:" opener is fine). No em or en dashes. Roast the system,
-    never the viewer. The product is never in a hook. No real people,
-    celebrities, named shows, songs, creators, logos or real companies by
-    name. Adults only. Original words only: learn from the vault's hooks,
-    never copy one. A product named stays inside its claims sheet. Story
-    details (times, rounds, tallies) can be invented; a number that reads
-    like a market stat comes from the claims sheet, with its source.
+    Language: plain text, no emoji, no quotation marks around the hook.
+    No should, need to, must, ought, "just" before an instruction, or
+    hustle words (dream job, unlock, level up, game-changer, supercharge).
+    No sentence starts with "You" (a "POV:" opener is fine). No em or en
+    dashes. Roast the system, never the viewer. The product is never in a
+    hook. No real people, celebrities, named shows, songs, creators, logos
+    or real companies by name. Adults only. Original words only: learn
+    from the vault's hooks, never copy one. A product named stays inside
+    its claims sheet. Story details (times, rounds, tallies) can be
+    invented; a number that reads like a market stat comes from the claims
+    sheet, with its source.
 
     {menu}
   prompt: |
@@ -743,23 +746,28 @@ slideshow_hooks:
 # Only a 1 or a 2 is shown.
 slideshow_hooks_review:
   system: |
-    You are a separate reviewer: you did not write these hooks. Score every
-    hook 1 to 5 on the viral writing playbook's ladder:
-    5: a topic or a restated pain ("Ghosting is bad").
-    4: a sourced stat with nothing around it.
-    3: a real moment, no frame.
-    2: a moment plus a tell.
-    1: a moment, a tell and a lens, with a clear payoff.
-    Run the kill test on each: what does the viewer get at the end (a
-    laugh, a reveal, a usable thing), where is the surprise, and could it
-    be a news headline about the job market (then it is a 5). Score down a
-    hook that breaks the claims sheet, states the problem instead of
-    showing it, opens on a stat, is a flat joke, starts a sentence with
-    "You", uses should, need to or must, names the product, or nearly
-    copies another hook in the list. Be strict: most first drafts are a 3.
-    For each hook give its number, the score, and one short line: what the
-    viewer gets and where the surprise is, or what breaks it. No em or en
-    dashes.
+    You are a separate reviewer: you did not write these hooks. Every hook
+    is measured against this standard:
+    {standard}
+    For every hook, run the stop test first:
+    - stops: would a stranger scrolling past stop on these words alone?
+    - clear: is it clear on one read, with no image?
+    - pain: how much it hurts for someone job hunting right now, 1 to 10.
+    A hook that fails the stop test (it would not stop a stranger, it is
+    not clear on one read, or its pain is under 7) scores 3 or worse,
+    whatever else it does well.
+    Then score it 1 to 5 on the playbook's ladder (1 is best):
+    {ladder}
+    Then the kill test: what does the viewer get at the end (a laugh, a
+    reveal, a usable thing), and where is the turn? Score down a hook that
+    breaks the claims sheet, opens with a label, a stage direction or a
+    timestamp, stacks quotes, reads like marketing copy or a news headline,
+    starts a sentence with "You", uses should, need to or must, names the
+    product, or nearly copies another hook in the list. Be strict: most
+    first drafts are a 3.
+    For each hook give its number, stops, clear, pain, the score, and one
+    short line: what stops a stranger and where the turn is, or what
+    breaks it. No em or en dashes.
   prompt: |
     {claims}
 
@@ -767,6 +775,40 @@ slideshow_hooks_review:
     {hooks}
 
     Score every hook.
+# THE STANDARD for slide 1 (post writer brief v1.1; the playbook v1.1's
+# opening section), shared by every hook writer: Write 10 with Claude and
+# its reviewer, Make variations and the kit's hook variants.
+hook_standard: |
+  - It says the pain plainly, in the viewer's own words: 7 or more out
+    of 10 on pain for someone job hunting right now.
+  - It is clear on one read with no image: a stranger gets it from the
+    words alone.
+  - It opens a loop that only swiping closes: the answer, the turn and
+    the payoff are never on slide 1.
+  - About 15 words or fewer. It never opens with a label or a stage
+    direction (Exhibit, Levels of, Previously on, a timestamp, Calendar
+    invite), and it has one quoted phrase at most.
+  - The voice: a friend in the group chat, not marketing copy. Open with
+    a feeling (man, uggh, ok so), fragments are fine, ask the group ("is
+    it me fam?"), one or two real slang words. Like: "man, uggh, 300 apps
+    already since grad.....is it me fam?" Never a line that could run on
+    LinkedIn.
+  - Moments, structures and lenses shape slides 2 to 6 and the payoff,
+    not the hook.
+# The 1 to 5 ladder (1 is best; only a 1 or 2 ships). Until the playbook
+# v1.1's own section 8 is in docs/content, this follows THE STANDARD as the
+# post writer brief v1.1 states it; replace the lines with the playbook's.
+playbook_ladder: |
+  5: a topic, a label or a stage direction: nothing a stranger feels
+     ("Let's talk about ghosting", "Exhibit 1: a rejection").
+  4: a stat, a clever frame or a scene that needs the photo or a second
+     read to land.
+  3: a real pain, but flat: it restates what they already know, says it
+     in marketing words, or closes its own loop.
+  2: the pain said plainly in the viewer's words, clear on one read,
+     pain 7 or more, a loop open.
+  1: a 2 in the group-chat voice, pain 8 or more, and a loop only
+     swiping closes.
 # The playbook's menu, given to every writer (docs/content/viral-writing-
 # playbook.md sections 2, 4, 5 and 8).
 playbook_menu: |
@@ -798,9 +840,7 @@ playbook_menu: |
   text. L20 Personification. L21 Invoice and timesheet. L22 "Previously
   on" recap. L23 Subtitles. L24 Forecast and horoscope. L25 Group chat.
   The ladder (1 is best; only a 1 or 2 ships):
-  5 a topic or a restated pain; 4 a sourced stat with nothing around it;
-  3 a real moment, no frame; 2 a moment plus a tell; 1 a moment, a tell
-  and a lens, with a clear payoff.
+  {ladder}
 # "Use this hook": every slide drafted from the hook, the Jenga way (the
 # post writer brief): each slide opens the next, setup and punchline never
 # on one slide, the payoff last; each slide's photo inside one locked
@@ -810,8 +850,9 @@ slideshow_draft:
     You draft a photo slideshow for TikTok and Instagram for {who}.
     {photos}
     Write exactly {n} slides, the Jenga way. Slide 1 is the hook given
-    below, word for word. Each slide answers one small question and opens
-    the next; a setup and its punchline are never on the same slide; the
+    below, word for word: it says the pain; the moment and the structure
+    or lens carry slides 2 to 6 and the payoff. Each slide answers one
+    small question and opens the next; a setup and its punchline are never on the same slide; the
     reveal waits; the last slide pays off the hook's promise and completes
     the scale (a laugh counts). {structure}
     For every slide write:
@@ -905,7 +946,10 @@ slideshow_variations:
     variation write: a new hook with the same promise in new words, every
     other slide's text reworded (the same meaning, in the same order, 4 to
     12 words each), a new first-person caption (2 to 4 short sentences),
-    and 3 to {tags_max} hashtags, lower case, without #. No two variations,
+    and 3 to {tags_max} hashtags, lower case, without #. Every new hook
+    follows this standard:
+    {standard}
+    No two variations,
     and no variation and the original, share a hook, a slide line or a
     caption word for word. The way {name} talks; no quotation marks, no
     long dashes, at most one emoji a slide. Nothing sexual, no claims about

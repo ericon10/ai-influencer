@@ -27,6 +27,9 @@ export interface HookIdea {
   text: string; pattern: HookPattern; source: 'vault' | 'claude' | 'typed'
   code?: string | null; effectOpen?: string | null; effectPayoff?: string | null
   moment?: string; alt?: string; selfScore?: number | null; score?: number | null; note?: string; reviewed?: boolean
+  // The reviewer's stop test (THE STANDARD): pain 1 to 10, and whether it
+  // passed (stops a stranger, clear on one read, pain 7 or more).
+  pain?: number | null; stops?: boolean | null
 }
 
 // The pattern a hook reads as, from its words (free). Listicles and tier

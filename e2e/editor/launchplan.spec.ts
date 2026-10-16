@@ -81,7 +81,7 @@ test('the launch plan: upload the CSV, Preview (free), Make the drafts (free), G
   await snap(page, info, 'an imported post with its Plan line')
 })
 
-test('Write 10 with Claude, the playbook way: a moment, a code, effects, an alt hook and a score each; the reviewer hides 3s to 5s; language notes; Swap with the alt hook', async ({ page }, info) => {
+test('Write 10 with Claude to THE STANDARD: a moment, a code, effects, pain, an alt hook and a score each; the reviewer\'s stop test and ladder hide the rest; language notes; Swap with the alt hook', async ({ page }, info) => {
   test.setTimeout(300_000)
   const p = (await planPosts()).find(x => x.account === 'F2')
   expect(p, 'import the plan first (the test above)').toBeTruthy()
@@ -94,13 +94,16 @@ test('Write 10 with Claude, the playbook way: a moment, a code, effects, an alt 
 
   await pay(page, page.getByRole('button', { name: /Write 10 with Claude/ }))
   const cards = page.locator('[data-field="hook-ideas"] [data-field="hook-card"]')
-  await expect(page.locator('[data-field="hooks-hidden"]')).toContainText(/3 scored 3 to 5 and are hidden/, { timeout: 120_000 })
-  await expect(cards).toHaveCount(7)
+  await expect(page.locator('[data-field="hooks-hidden"]')).toContainText(/4 scored 3 to 5 and are hidden \(only a 1 or 2 ships\); 4 of them failed the stop test/, { timeout: 120_000 })
+  await expect(cards).toHaveCount(6)
   const first = cards.first()
   await expect(first.locator('.st-score')).toHaveText(/^[12]$/)
   await expect(first).toContainText(/[SL]\d{1,2} /)
   await expect(first).toContainText(/E\d/)
   await expect(first).toContainText(/Alt:/)
+  await expect(first).toContainText(/Pain [78]\/10/)
+  // Every hook shown reads to THE STANDARD: no language notes on the cards.
+  await expect(page.locator('[data-field="hook-ideas"] [data-field="lint"]')).toHaveCount(0)
   await snap(page, info, 'the playbook hook cards, reviewed')
 
   // The language notes as you type (free, warnings only).
@@ -113,6 +116,11 @@ test('Write 10 with Claude, the playbook way: a moment, a code, effects, an alt 
   await expect(notes).toContainText(/unlock|dream job/)
   await expect(notes).toContainText(/You/)
   await snap(page, info, 'language notes under the hook')
+  // THE STANDARD's three: a label to open, stacked quotes, over 15 words.
+  await hook.fill("Exhibit 1: recruiter said 'talk Friday' and then 'end of week' and then nothing at all for weeks")
+  await expect(notes).toContainText(/Opens with "Exhibit"/)
+  await expect(notes).toContainText(/2 quoted phrases/)
+  await expect(notes).toContainText(/\d+ words\. Slide 1 reads in one go/)
 
   // Swap with the alt hook (free).
   await hook.fill('Applied 11:52pm. Rejected 2:14am.')

@@ -493,6 +493,27 @@ rules:
     title: 'A product post''s caption starts with "Ad:"'
     check: { type: behavior }
     message: 'A product post (product = yes, or #ad on) whose caption does not start with "Ad:" gets a free warning.'
+  - id: lint-hook-long
+    bucket: default
+    area: copy
+    spec: "28"
+    title: 'A hook is 15 words or fewer'
+    check: { type: behavior }
+    message: 'A hook over 15 words gets a free warning: slide 1 reads in one go (THE STANDARD, post writer brief v1.1).'
+  - id: lint-hook-label
+    bucket: default
+    area: copy
+    spec: "28"
+    title: 'A hook never opens with a label or stage direction'
+    check: { type: behavior }
+    message: 'A hook that opens with Exhibit, Levels of, Previously on, Calendar invite or a timestamp gets a free warning: say the pain plainly first, the frame can wait for slide 2.'
+  - id: lint-hook-quotes
+    bucket: default
+    area: copy
+    spec: "28"
+    title: 'One quoted phrase at most in a hook'
+    check: { type: behavior }
+    message: 'A hook with more than one quoted phrase gets a free warning, so it is clear on one read.'
   - id: structure-repeat
     bucket: default
     area: copy

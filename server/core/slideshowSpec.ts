@@ -50,6 +50,9 @@ export const hookIdeaSchema = z.object({
   score: z.number().int().min(1).max(5).nullable().default(null),
   note: z.string().max(300).default(''),
   reviewed: z.boolean().default(false),
+  // The reviewer's stop test (THE STANDARD, post writer brief v1.1).
+  pain: z.number().int().min(1).max(10).nullable().default(null),
+  stops: z.boolean().nullable().default(null),
 })
 
 // The locked scene: one place, light and phone for every slide, so the set

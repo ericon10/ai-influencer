@@ -96,6 +96,11 @@ copy_lint:
   # Never in a hook (a product post names it on slide 5 or 6).
   products: [SideStep]
   max_hashtags: 5
+  # THE STANDARD (post writer brief v1.1): slide 1 is about 15 words or
+  # fewer and never opens with a label or a stage direction (a timestamp
+  # or date is found by code).
+  hook_max_words: 15
+  hook_labels: [Exhibit, Levels of, Previously on, Calendar invite]
 
 batch:
   # Up to 50 videos (Phase 4: batch at scale); each is its own short job on

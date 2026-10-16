@@ -18,6 +18,7 @@ import { renderPlaceholderPortrait } from '../providers/mock.js'
 import { readAsset, saveAsset } from '../storage/assets.js'
 import { candidates, contentItems, jobs } from '../db/schema.js'
 import { emptySpecial, slideList } from '../core/slides.js'
+import { lintCopy } from '../core/copyLint.js'
 import { productShotBox } from '../core/slideSvg.js'
 import type { SlideshowSpec } from '../core/slideshowSpec.js'
 import type { GenRequest } from '../providers/types.js'
@@ -71,7 +72,7 @@ describe('hook first', () => {
     expect(again.hookIdeas[0]!.text).not.toBe(s.hookIdeas[0]!.text)
   })
 
-  it('Write 10 with Claude, the playbook way: one price for the writer and a separate reviewer; each hook has a moment, a code, effects, an alt hook and a score; only 1s and 2s show', async () => {
+  it('Write 10 with Claude to THE STANDARD: one price for the writer and a separate reviewer that runs the stop test first; each hook has a moment, a code, effects, pain, an alt hook and a score; only 1s and 2s that pass the stop test show', async () => {
     const post = await createContent(h.deps, h.ctx, { kind: 'slideshow', characterId, accountTag: 'F2', idea: 'job hunting', spec: { mode: 'topic' } })
     const { quote, preview, jobs: ran } = await run({ type: 'slideshow_hooks', contentId: post.id })
     expect(quote.models).toEqual(['Demo mock, free'])
@@ -84,13 +85,27 @@ describe('hook first', () => {
     // F2's primary and backup from the playbook's fit table.
     expect(writer).toContain('the primary is L14 Museum exhibit')
     expect(writer).toContain('The backup is S1 Levels')
-    expect(preview.prompts[1]!.text).toContain('separate reviewer')
+    // THE STANDARD (post writer brief v1.1), in the writer and the reviewer.
+    expect(writer).toContain('It says the pain plainly')
+    expect(writer).toContain('is it me fam?')
+    expect(writer).toContain('About 15 words or fewer')
+    expect(writer).toContain('shape slides 2 to 6 and the payoff')
+    const reviewer = preview.prompts[1]!.text
+    expect(reviewer).toContain('separate reviewer')
+    expect(reviewer.indexOf('run the stop test first')).toBeGreaterThan(0)
+    expect(reviewer.indexOf('run the stop test first')).toBeLessThan(reviewer.indexOf('ladder'))
+    expect(reviewer).toContain('a 2 in the group-chat voice, pain 8 or more')
     const s = await spec(post.id)
     expect(s.hookReview).toBe('done')
     expect(s.hookIdeas).toHaveLength(10)
-    expect(s.hookIdeas.every(x => x.source === 'claude' && x.code && x.effectOpen && x.moment && x.alt && x.reviewed)).toBe(true)
-    // The mock reviewer gives 3 of 10 a 3 or 4: those are hidden.
-    expect(s.hookIdeas.filter(x => (x.score ?? 9) <= 2)).toHaveLength(7)
+    expect(s.hookIdeas.every(x => x.source === 'claude' && x.code && x.effectOpen && x.moment && x.alt && x.reviewed && x.pain)).toBe(true)
+    // Every mock hook reads to the standard: no language notes.
+    expect(s.hookIdeas.flatMap(x => lintCopy(x.text, { kind: 'hook' }))).toEqual([])
+    // The mock reviewer gives 3 of 10 a 3 or 4, and hook 7 a 2 with pain 6:
+    // the stop test makes that one a 3. All four are hidden.
+    expect(s.hookIdeas.filter(x => (x.score ?? 9) <= 2)).toHaveLength(6)
+    expect(s.hookIdeas[6]).toMatchObject({ score: 3, pain: 6, stops: false })
+    expect(s.hookIdeas.filter(x => x.stops === false)).toHaveLength(4)
     expect(s.hookIdeas.filter(x => x.code === 'L14').length).toBeGreaterThanOrEqual(2)
   })
 

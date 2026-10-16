@@ -129,10 +129,10 @@ export const hooksJsonSchema = (n: number) => ({
     hooks: {
       type: 'array', minItems: n, maxItems: n,
       items: {
-        type: 'object', additionalProperties: false, required: ['effect_open', 'effect_payoff', 'moment', 'code', 'hook', 'alt_hook', 'rank'],
+        type: 'object', additionalProperties: false, required: ['effect_open', 'effect_payoff', 'moment', 'code', 'pain', 'hook', 'alt_hook', 'rank'],
         properties: {
           effect_open: { type: 'string', enum: [...EFFECT_CODES] }, effect_payoff: { type: 'string', enum: [...EFFECT_CODES] },
-          moment: { type: 'string' }, code: { type: 'string', enum: [...STRUCTURE_CODES] },
+          moment: { type: 'string' }, code: { type: 'string', enum: [...STRUCTURE_CODES] }, pain: { type: 'integer', minimum: 1, maximum: 10 },
           hook: { type: 'string' }, alt_hook: { type: 'string' }, rank: { type: 'integer', minimum: 1, maximum: 5 },
         },
       },
@@ -141,32 +141,54 @@ export const hooksJsonSchema = (n: number) => ({
 })
 export const reviewJsonSchema = (n: number) => ({
   type: 'object', additionalProperties: false, required: ['reviews'],
-  properties: { reviews: { type: 'array', minItems: n, maxItems: n, items: { type: 'object', additionalProperties: false, required: ['n', 'score', 'note'], properties: { n: { type: 'integer', minimum: 1, maximum: n }, score: { type: 'integer', minimum: 1, maximum: 5 }, note: { type: 'string' } } } } },
+  properties: { reviews: { type: 'array', minItems: n, maxItems: n, items: { type: 'object', additionalProperties: false, required: ['n', 'stops', 'clear', 'pain', 'score', 'note'], properties: { n: { type: 'integer', minimum: 1, maximum: n }, stops: { type: 'boolean' }, clear: { type: 'boolean' }, pain: { type: 'integer', minimum: 1, maximum: 10 }, score: { type: 'integer', minimum: 1, maximum: 5 }, note: { type: 'string' } } } } },
 })
 
-interface HookOut { effect_open?: unknown; effect_payoff?: unknown; moment?: unknown; code?: unknown; hook?: unknown; alt_hook?: unknown; rank?: unknown }
+interface HookOut { effect_open?: unknown; effect_payoff?: unknown; moment?: unknown; code?: unknown; pain?: unknown; hook?: unknown; alt_hook?: unknown; rank?: unknown }
 
-// A free stand-in for demo mode and tests: the vault's hooks with codes
-// (the account's primary and backup first, never its last), effects, a
-// moment and an alt hook each.
-export function mockHooks(n: number, vault: string[], topic: string, st: { primary: string | null; backup: string | null; last: string | null }): { hooks: Array<Required<{ [K in keyof HookOut]: string | number }>> } {
+// A free stand-in for demo mode and tests: hooks written to THE STANDARD
+// (the pain plainly, in the group-chat voice, 15 words or fewer) with
+// codes (the account's primary and backup first, never its last), effects,
+// a moment, a pain score and an alt hook each.
+const MOCK_HOOKS: Array<[string, string]> = [
+  ['man, 300 apps since grad and not one human email back. is it me fam?', 'ok so 300 applications and the only reply was a newsletter'],
+  ['uggh the portal wants my whole resume typed out again. on page 4 of 6', 'why does every portal make me retype the resume i just uploaded'],
+  ['ok so they said talk friday. it has been six fridays', 'they said talk friday. i have stopped counting fridays'],
+  ['applied before midnight and got rejected before i woke up. who is up doing this', 'rejected while i was asleep. somebody was up at 2am for this'],
+  ['entry level role wants 5 years. i graduated in may. be so for real', 'entry level but make it 5 years. i am 23'],
+  ['round 5 interview for a job that pays less than my last one. why', 'five rounds for less money than my old job. fam what'],
+  ['rent is due in 9 days. recruiter said end of week three weeks ago', 'rent in 9 days. recruiter in three weeks. same energy'],
+  ['rewrote my resume 40 times and still no callback. is it the font??', 'resume version 40 and still nothing. losing my mind fr'],
+  ['they ghosted me after the final round then reposted the job. cool cool cool', 'final round, then silence, then the same job reposted'],
+  ['a free 6 hour take-home for one interview. is this normal or am i cooked', 'six unpaid hours on a take-home. is this a job or a hobby'],
+]
+export function mockHooks(n: number, _vault: string[], topic: string, st: { primary: string | null; backup: string | null; last: string | null }): { hooks: Array<Required<{ [K in keyof HookOut]: string | number }>> } {
   const pool = [st.primary, st.primary, st.primary, st.backup, st.backup, ...STRUCTURE_CODES].filter((c): c is StructureCode => !!c && c !== st.last)
   const codes: StructureCode[] = []
   for (const c of pool) if (codes.length < n && (codes.filter(x => x === c).length < (c === st.primary ? 3 : c === st.backup ? 2 : 1))) codes.push(c)
-  const fallback = [`Recruiter said "talk Friday." This is Friday number 6`, `Page 4 of 6 wants the resume from page 1`, `Applied 11:52pm. Rejected 2:14am. Same night`, `The posting says entry level. Requirement 4 says mentoring`, `Round 5 was a take-home. It took my Saturday`]
   return {
     hooks: Array.from({ length: n }, (_, i) => {
-      const hook = trimWords(vault[i] ?? fallback[i % fallback.length]!, 14)
+      const [hook, alt] = MOCK_HOOKS[i % MOCK_HOOKS.length]!
       return {
         effect_open: EFFECT_CODES[i % 3]!, effect_payoff: (['E4', 'E6', 'E7'] as const)[i % 3]!,
         moment: `${['Sunday 9:40pm', 'Tuesday 2:14am', 'Friday 4pm'][i % 3]}, ${topic || 'the job search'}: the tell is on the screen`,
-        code: codes[i % Math.max(1, codes.length)] ?? 'S7', hook, alt_hook: `${hook.replace(/[.!?]*$/, '')}, take two`, rank: i % 3 === 2 ? 2 : 1,
+        code: codes[i % Math.max(1, codes.length)] ?? 'S7', pain: 7 + (i % 3), hook, alt_hook: alt, rank: i % 3 === 2 ? 2 : 1,
       }
     }),
   }
 }
-// The reviewer's stand-in: most are a 1 or 2, some are hidden.
-export const mockReview = (n: number) => ({ reviews: Array.from({ length: n }, (_, i) => ({ n: i + 1, score: [1, 2, 2, 3, 1, 4, 2, 3, 1, 2][i % 10]!, note: ['A tell and a lens, and the payoff lands.', 'A real tell; the lens could be sharper.', 'A moment, no frame yet.', 'Reads like a headline.'][[1, 2, 2, 3, 1, 4, 2, 3, 1, 2][i % 10]! - 1]! })) })
+// The reviewer's stand-in: the stop test, then the ladder. Most are a 1
+// or 2; the rest score 3 to 5 or fail the stop test (hook 7 is a 2 on the
+// ladder with pain 6, so the stop test hides it) and are hidden.
+const MOCK_SCORES = [1, 2, 2, 3, 1, 4, 2, 3, 1, 2]
+const MOCK_NOTES = ['A stranger stops on the first words; the turn waits for slide 2.', 'The pain is plain and clear on one read; the loop could pull harder.', 'Clear, but it closes its own loop.', 'Needs the photo to land.']
+export const mockReview = (n: number) => ({
+  reviews: Array.from({ length: n }, (_, i) => {
+    const score = MOCK_SCORES[i % 10]!
+    const pain = i % 10 === 6 ? 6 : score <= 2 ? 8 : 6
+    return { n: i + 1, stops: score <= 3, clear: score !== 4, pain, score, note: i % 10 === 6 ? 'A real tell, but the pain is a 6: a stranger scrolls past.' : MOCK_NOTES[score - 1]! }
+  }),
+})
 
 async function hookWriterVars(deps: Deps, ctx: Ctx, row: ContentRow, spec: SlideshowSpec) {
   const ch = toData(await getCharacter(deps, ctx, row.characterId!))
@@ -180,9 +202,17 @@ async function hookWriterVars(deps: Deps, ctx: Ctx, row: ContentRow, spec: Slide
       ...pronounVars(ch.pronouns), name: w.name || 'the account', who: w.who, count: String(cfgOf(deps).hooks), topic, account: row.accountTag || 'not given', voice: w.voice,
       structures: structuresLine(st), tension: spec.plan.tension ? `Tension (a tag, never the subject): ${spec.plan.tension}` : '',
       vault: kit.vault.length ? kit.vault.slice(0, 30).map(h => `- ${h.text}${h.kind ? ` (${h.kind})` : ''}`).join('\n') : 'None yet.',
-      language: kit.language || 'No buyer language collected yet.', claims: kit.claims || '', menu: deps.config.pipeline.templates.playbook_menu,
+      language: kit.language || 'No buyer language collected yet.', claims: kit.claims || '', ...standardVars(deps),
     },
   }
+}
+
+// THE STANDARD for slide 1, the ladder and the playbook's menu (with the
+// ladder in it), for every hook writer and the reviewer.
+export function standardVars(deps: Deps) {
+  const t = deps.config.pipeline.templates
+  const ladder = t.playbook_ladder.trim()
+  return { standard: t.hook_standard.trim(), ladder, menu: fill(t.playbook_menu, { ladder }) }
 }
 
 // "Write 10 with Claude" (section 28): the writer, then a separate reviewer
@@ -197,6 +227,7 @@ export async function buildSlideshowHooks(deps: Deps, ctx: Ctx, contentId: strin
   const { kit, st, topic, vars } = await hookWriterVars(deps, ctx, row, spec)
   const system = fill(t.system, vars), prompt = fill(t.prompt, vars)
   const reviewPrompt = fill(rt.prompt, { claims: kit.claims || '', hooks: `(the ${n} hooks the writer returns, numbered 1 to ${n})` })
+  const reviewSystem = fill(rt.system, standardVars(deps))
   const purpose = `slideshow_hooks:${row.id}`
   const mock = mockHooks(n, kit.vault.map(h => h.text), topic, st)
   return {
@@ -205,13 +236,13 @@ export async function buildSlideshowHooks(deps: Deps, ctx: Ctx, contentId: strin
       title: `Write ${n} hooks, then a reviewer scores them`,
       prompts: [
         { label: 'Hook writer', text: `${system}\n${prompt}`, wrapped: hardWrap(`${system}\n${prompt}`) },
-        { label: 'Reviewer', text: `${rt.system}\n${reviewPrompt}`, wrapped: hardWrap(`${rt.system}\n${reviewPrompt}`) },
+        { label: 'Reviewer', text: `${reviewSystem}\n${reviewPrompt}`, wrapped: hardWrap(`${reviewSystem}\n${reviewPrompt}`) },
       ],
       warnings: [], invalidates: [],
     },
     specs: [
       { type: 'llm', stage: 'content', purpose, label: `${n} slideshow hooks`, request: { model: route.model, system, prompt, schema: hooksJsonSchema(n), schemaName: 'slideshow_hooks', maxTokens: 400 + 170 * n, effort: route.effort ?? 'low', meta: { itemId: row.id, mockHooks: mock } } },
-      { type: 'llm', stage: 'content', purpose: `${purpose}:review`, label: `Review of ${n} hooks`, parentIndex: 0, request: { model: route.model, system: rt.system, prompt: reviewPrompt, schema: reviewJsonSchema(n), schemaName: 'slideshow_hooks_review', maxTokens: 200 + 60 * n, effort: route.effort ?? 'low', meta: { itemId: row.id, mockReview: mockReview(n) } } },
+      { type: 'llm', stage: 'content', purpose: `${purpose}:review`, label: `Review of ${n} hooks`, parentIndex: 0, request: { model: route.model, system: reviewSystem, prompt: reviewPrompt, schema: reviewJsonSchema(n), schemaName: 'slideshow_hooks_review', maxTokens: 300 + 90 * n, effort: route.effort ?? 'low', meta: { itemId: row.id, mockReview: mockReview(n) } } },
     ],
   }
 }
@@ -219,6 +250,7 @@ export async function buildSlideshowHooks(deps: Deps, ctx: Ctx, contentId: strin
 const code = (v: unknown) => (STRUCTURE_CODES as readonly string[]).includes(String(v)) ? String(v) as StructureCode : readCode(String(v ?? ''))
 const effect = (v: unknown) => (EFFECT_CODES as readonly string[]).includes(String(v)) ? String(v) as EffectCode : readEffect(String(v ?? ''))
 const rank = (v: unknown) => { const x = Math.round(Number(v)); return x >= 1 && x <= 5 ? x : null }
+const pain = (v: unknown) => { const x = Math.round(Number(v)); return x >= 1 && x <= 10 ? x : null }
 
 async function onSlideshowHooks(deps: Deps, ctx: Ctx, job: JobRow, out: JobOutcome): Promise<void> {
   const [, postId, part] = job.purpose.split(':') as [string, string, string | undefined]
@@ -226,11 +258,13 @@ async function onSlideshowHooks(deps: Deps, ctx: Ctx, job: JobRow, out: JobOutco
   if (out.status !== 'completed') { await cancelChildren(deps, job.id, 'The hooks were not written, so there was nothing to review. Nothing was charged for the review.'); return }
   const d = (out.data ?? {}) as { hooks?: HookOut[] }
   const ideas: HookIdea[] = (Array.isArray(d.hooks) ? d.hooks : []).map(h => {
-    const text = trimWords(clean(h.hook, 200), 16)
+    // Never cut mid-line: a hook over 15 words keeps its words and gets
+    // the lint's note (a hard cap only against a runaway answer).
+    const text = trimWords(clean(h.hook, 200), 30)
     return {
       text, pattern: guessPattern(text), source: 'claude' as const,
       code: code(h.code), effectOpen: effect(h.effect_open), effectPayoff: effect(h.effect_payoff),
-      moment: clean(h.moment, 400), alt: trimWords(clean(h.alt_hook, 200), 16), selfScore: rank(h.rank), score: null, note: '', reviewed: false,
+      moment: clean(h.moment, 400), alt: trimWords(clean(h.alt_hook, 200), 30), selfScore: rank(h.rank), score: null, note: '', reviewed: false, pain: pain(h.pain), stops: null,
     }
   }).filter(h => h.text.length >= 3)
   if (!ideas.length) { await cancelChildren(deps, job.id, 'No hooks came back, so there was nothing to review. Nothing was charged for the review.'); return }
@@ -252,12 +286,19 @@ async function onHooksReviewed(deps: Deps, ctx: Ctx, postId: string, out: JobOut
   if (!post) return
   const spec = parse(post)
   if (out.status !== 'completed') { await updateContent(deps, ctx, postId, { spec: { hookReview: 'failed' } }); return }
-  const d = (out.data ?? {}) as { reviews?: Array<{ n?: unknown; score?: unknown; note?: unknown }> }
+  const d = (out.data ?? {}) as { reviews?: Array<{ n?: unknown; stops?: unknown; clear?: unknown; pain?: unknown; score?: unknown; note?: unknown }> }
   const byN = new Map((Array.isArray(d.reviews) ? d.reviews : []).map(r => [Math.round(Number(r.n)), r]))
   const ideas = spec.hookIdeas.map((h, i) => {
     if (h.source !== 'claude') return h
     const r = byN.get(i + 1)
-    return r ? { ...h, score: rank(r.score), note: clean(r.note, 300), reviewed: true } : h
+    if (!r) return h
+    // The stop test first (THE STANDARD): a hook that would not stop a
+    // stranger, is not clear on one read, or hurts under 7 is a 3 at best,
+    // so it is hidden whatever its other marks.
+    const p = pain(r.pain) ?? h.pain ?? null
+    const stops = r.stops !== false && r.clear !== false && (p == null || p >= 7)
+    const s = rank(r.score)
+    return { ...h, score: s == null ? null : stops ? s : Math.max(3, s), note: clean(r.note, 300), reviewed: true, pain: p, stops }
   })
   await updateContent(deps, ctx, postId, { spec: { hookIdeas: ideas, hookReview: 'done' } })
 }
@@ -739,6 +780,7 @@ export async function buildSlideshowVariations(deps: Deps, ctx: Ctx, input: { co
   const vars = {
     ...pronounVars(ch.pronouns), name: ch.name, count: String(count), rest: String(n - 1), tags_max: String(cfgOf(deps).hashtags[1]), voice: voiceOf(ch), slides: list.map(s => `${s.index + 1}. ${s.text || '(no words)'}`).join('\n'), caption: spec.caption.trim() || 'none',
     alt: alt ? `Start from the alt hook: variation 1's hook is "${alt}" word for word; the other variations reword it.` : '',
+    standard: standardVars(deps).standard,
   }
   const system = fill(t.system, vars), prompt = fill(t.prompt, vars)
   const purpose = `slide_vars:${row.id}`

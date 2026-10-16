@@ -1,4 +1,4 @@
-# Post Writer Brief v1.0
+# Post Writer Brief v1.1
 
 The procedure for writing any batch of social posts (TikTok and Instagram) for one account in the SideStep network: mother characters and feeder slideshows. Oct 16, 2026. It produced the launch plan v2 (`claude/launch-plan-v2-posts.csv`) and is the spec for the Studio's Plan page and overnight runner when they draft posts.
 
@@ -15,10 +15,12 @@ Each slot arrives with: account, day, slot, tension, pillar, audience, product (
 - Characters: character clip, character slideshow, character photo.
 
 ## The procedure, for every slot
+**Slide 1 follows THE STANDARD at the top of the playbook (v1.1):** the pain said plainly in the viewer's words, 7+ out of 10 on pain, clear on one read with no image, a loop only swiping closes, about 15 words or fewer, no stacked quotes, labels or timestamps. Moments, structures and lenses shape slides 2 to 6 and the payoff, not the hook. Most posts are not ads: they name a shared pain so people share it. Voice: a friend in the group chat, fr fr (playbook, "The voice"): open with a feeling (man, uggh, ok so), fragments, ask the group ("is it me fam?"), one or two real slang words, never copy that could run on LinkedIn.
+
 1. **Effect.** Pick effect_open (E1 to E8) for slide 1 and effect_payoff for the end.
 2. **Moment first.** Write the moment card (playbook section 3): when, where, what's on screen, the tell. One scene of the problem happening. The tension is a tag, never the hook's subject.
 3. **Structure or lens.** Pick a code (S1 to S12, L13 to L25). Each account has a primary (about 35% of posts) and a backup (about 20%) in playbook section 4, plus at least 5 other codes per two weeks. Never the same code twice in a row.
-4. **Write 3, keep 1.** Draft at least 3 hooks with different lenses or tells. Rank each on the playbook ladder (section 8). Keep the best as the hook and the runner-up as alt_hook. Only a 1 or 2 ships. Kill test: what does the viewer get at the end, where's the surprise, could it be a news headline (then it's a 5).
+4. **Write 3, keep 1.** Draft at least 3 hooks in different proven shapes (playbook THE STANDARD). Rank each on the playbook ladder (section 8). Keep the best as the hook and the runner-up as alt_hook. Only a 1 or 2 ships. Kill test: the stop test first (would a stranger stop, clear on one read, pain 7+), then what the viewer gets at the end and where the turn is.
 5. **Jenga slides.** Each slide answers one small thing and opens the next. Setup and punchline never share a slide. The reveal waits. The last slide completes the scale.
 6. **Communication pass.** At least two of Feelings, Facts, Fun. No should, need to, must, ought, "just" before an instruction, or hustle words. No sentence starts with "You" (a "POV:" opener is fine). The CTA is a question, a warm offer or a shrug.
 7. **Benchmark.** The playbook's 10 points (section 9). Record the drivers hit.

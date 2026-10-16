@@ -39,6 +39,7 @@ export function SlideshowIdea({ ctx }: { ctx: PostCtx }) {
   const ships = (h: HookIdea) => h.source !== 'claude' || (h.reviewed ? SHIPS(h.score) : spec.hookReview === 'failed' && SHIPS(h.selfScore ?? null))
   const visible = reviewing ? ideas.filter(h => h.source !== 'claude') : ideas.filter(ships)
   const hidden = reviewing ? 0 : ideas.filter(h => h.source === 'claude' && !ships(h)).length
+  const stopFails = reviewing ? 0 : ideas.filter(h => h.source === 'claude' && h.reviewed && h.stops === false).length
   const byCode = visible.some(h => h.code)
   const tagOf = (h: HookIdea) => (byCode ? h.code ?? '' : h.pattern)
   const shown = filter ? visible.filter(h => tagOf(h) === filter) : visible
@@ -65,7 +66,7 @@ export function SlideshowIdea({ ctx }: { ctx: PostCtx }) {
   return (
     <div className="st-col" style={{ gap: 14 }} data-field="slideshow-hook">
       <Field id="post-hook" label="Hook (slide 1)" extra={<HowTo id="slideshow" label="Hook first, how it works" />}
-        hint={note ?? 'The words on the first slide: 4 to 14 words that stop the scroll. Type your own, or write 10 below and pick one.'}>
+        hint={note ?? 'The words on the first slide, to THE STANDARD: the pain said plainly, like a friend in the group chat, 15 words or fewer, with a loop only swiping closes. Type your own, or write 10 below and pick one.'}>
         <input className="st-input" maxLength={200} value={hook} onChange={e => draft.setSpec({ hook: e.target.value } as never)} placeholder="e.g. Recruiter said &quot;talk Friday.&quot; This is Friday number 6" />
       </Field>
       <LintNote hits={lint(hook, 'hook', { product })} field="hook-lint" />
@@ -86,7 +87,7 @@ export function SlideshowIdea({ ctx }: { ctx: PostCtx }) {
               watch={j => j.purpose.startsWith(`slideshow_hooks:${item.id}`)} onDone={() => void qc.invalidateQueries({ queryKey: keys.content })} />
           )}
         </div>
-        <span className="st-hint">From the vault: the kit's own hooks and the buyers' words, recast into patterns by code (press again for more). With Claude, the playbook way: a moment, a structure or lens, the effects, 3 written and the best kept with its runner-up as the alt hook; then a separate reviewer scores each 1 to 5 and only the 1s and 2s show.{spec.mode === 'topic' ? '' : ` ${name}'s voice card goes in.`}</span>
+        <span className="st-hint">From the vault: the kit's own hooks and the buyers' words, recast into patterns by code (press again for more). With Claude, to THE STANDARD: slide 1 says the pain plainly, in the voice of a friend in the group chat, 15 words or fewer, with a loop only swiping closes; each with its moment and structure or lens for slides 2 to 6, its effects, and the runner-up as the alt hook. Then a separate reviewer runs the stop test (would a stranger stop, clear on one read, pain 7 or more) and scores each 1 to 5; only the 1s and 2s show.{spec.mode === 'topic' ? '' : ` ${name}'s voice card goes in.`}</span>
         {(account?.primary || account?.backup || last) && (
           <span className="st-hint" data-field="account-structures">{item.accountTag || 'This account'}: {[account?.primary && `primary ${codeLabel(account.primary)}`, account?.backup && `backup ${codeLabel(account.backup)}`, last && `last post ${codeLabel(last)} (not again)`].filter(Boolean).join(', ')}. Change them on Posts, Accounts.</span>
         )}
@@ -120,6 +121,7 @@ export function SlideshowIdea({ ctx }: { ctx: PostCtx }) {
                       {h.code ? <span className="st-chip xs on" title="Structure or lens">{codeLabel(h.code)}</span> : <span className="tag">{patternLabel(h.pattern)} · vault</span>}
                       {h.effectOpen && <span className="st-chip xs" title="The effect: first second, then the payoff">{effectLabel(h.effectOpen)}{h.effectPayoff ? ` to ${effectLabel(h.effectPayoff)}` : ''}</span>}
                       {score != null && h.source === 'claude' && <span className={`st-score s${score}`} title={h.note || (h.reviewed ? 'The reviewer\'s score' : 'The writer\'s own rank (not reviewed)')}>{score}{h.reviewed ? '' : ' (writer)'}</span>}
+                      {h.pain != null && h.source === 'claude' && <span className={`st-chip xs ${h.pain >= 7 ? '' : 'warn'}`} title={h.reviewed ? 'The reviewer\'s pain score: how much it hurts for someone job hunting now (7 or more passes the stop test)' : 'The writer\'s own pain score'}>Pain {h.pain}/10</span>}
                       {h.note && <span className="st-hint" style={{ fontSize: 11.5 }}>{h.note}</span>}
                       {h.code && last && h.code === last && <span className="st-lint compact" title="Never the same structure twice in a row">Same code as the last post</span>}
                       <LintNote compact hits={lint(h.text, 'hook', { product })} />
@@ -134,7 +136,7 @@ export function SlideshowIdea({ ctx }: { ctx: PostCtx }) {
               )
             })}
           </div>
-          {hidden > 0 && <span className="st-hint" data-field="hooks-hidden">{hidden} scored 3 to 5 and are hidden (only a 1 or 2 ships).</span>}
+          {hidden > 0 && <span className="st-hint" data-field="hooks-hidden">{hidden} scored 3 to 5 and are hidden (only a 1 or 2 ships){stopFails ? `; ${stopFails} of them failed the stop test` : ''}.</span>}
         </div>
       )}
 

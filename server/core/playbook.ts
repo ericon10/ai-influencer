@@ -48,14 +48,15 @@ export const EFFECTS = [
 export type EffectCode = (typeof EFFECTS)[number]['code']
 export const EFFECT_CODES = EFFECTS.map(e => e.code) as unknown as readonly [EffectCode, ...EffectCode[]]
 
-// The ladder (playbook section 8): 1 is a moment, a tell and a lens with a
-// clear payoff; 5 is a topic or a restated pain. Only a 1 or 2 ships.
+// The ladder (1 is best; only a 1 or 2 ships), in short, for labels. The
+// writers and the reviewer read the full lines from config/templates.yaml
+// (playbook_ladder), which follow THE STANDARD (post writer brief v1.1).
 export const LADDER = [
-  { score: 1, line: 'A moment, a tell and a lens, with a clear payoff' },
-  { score: 2, line: 'A moment plus a tell' },
-  { score: 3, line: 'A real moment, no frame' },
-  { score: 4, line: 'A sourced stat with nothing around it' },
-  { score: 5, line: 'A topic or a restated pain' },
+  { score: 1, line: 'A 2 in the group-chat voice, pain 8 or more, a loop only swiping closes' },
+  { score: 2, line: 'The pain said plainly, clear on one read, pain 7 or more, a loop open' },
+  { score: 3, line: 'A real pain, but flat, in marketing words, or closing its own loop' },
+  { score: 4, line: 'A stat, a clever frame or a scene that needs the photo to land' },
+  { score: 5, line: 'A topic, a label or a stage direction' },
 ] as const
 export const SHIPS = (score: number | null | undefined) => score === 1 || score === 2
 

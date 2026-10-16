@@ -2549,11 +2549,32 @@ UX-PLAN.md section 28 has the audit and the plan.
   writer's own ranks show, marked "(writer)". The writer never gets the
   code of the account's last post in schedule order (`structure-repeat`,
   a default).
+- **THE STANDARD (brief v1.1, owner mid-build).** Slide 1 says the pain
+  plainly in the viewer's words (7 or more out of 10), clear on one read
+  with no image, opens a loop only swiping closes, about 15 words, in the
+  group-chat voice; moments, structures and lenses move to slides 2 to 6.
+  The text is one template (`hook_standard`) shared by every hook writer,
+  and the ladder another (`playbook_ladder`). The reviewer runs the stop
+  test first (stops, clear, pain) and code makes a fail a 3 at best, so
+  it is hidden whatever score the reviewer gave. The playbook file that
+  arrived was still v1.0 (no section 8 rewrite), so the ladder follows
+  the brief's statement of THE STANDARD until the v1.1 playbook replaces
+  `docs/content/viral-writing-playbook.md`; then only the template
+  changes. Writers no longer cut a hook at 16 words: the lint says when
+  it runs long.
 - **The language lint** (`server/core/copyLint.ts`) is one pure function
   for the browser and the server: free, warnings only, each check a
   default rule (area copy) switchable per account or character. It never
-  blocks a run or an export.
-- **The plan import is code, not Claude.** Every word is kept as written;
+  blocks a run or an export. THE STANDARD adds three hook checks: over 15
+  words, a label or stage direction to open (the list is data; a
+  timestamp or date is found by code), more than one quoted phrase. On
+  the launch plan's 140 hooks they flag 41 (28 labels or timestamps, 9
+  long, 6 stacked quotes); the rows still import as written.
+- **The plan import is code, not Claude, and column-driven.** Every value
+  is read by its header's name (case and spaces ignored, any order), so a
+  rewritten plan with the same columns replaces the test file without a
+  change; unknown columns and missing required ones are named in the
+  preview. Every word is kept as written;
   the scene is split by "Slide N:" into each slide's shot and the rest is
   the locked scene. Drafts are matched by account and row_id, so an import
   again updates instead of doubling and never touches a post with

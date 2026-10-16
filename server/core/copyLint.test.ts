@@ -49,9 +49,32 @@ describe('copy lint', () => {
     expect(hits.map(h => [h.rule, h.slide])).toEqual([['lint-values', 1]])
   })
 
-  it('the launch plan\'s own hooks read clean or close to it', () => {
-    expect(rules('Exhibit 1: a rejection received at 2:14am. Artist unknown.', 'hook')).toEqual([])
-    expect(rules("Entry level role. Requirement 4: 'experience mentoring junior staff.' I am the junior staff.", 'hook')).toEqual([])
+  it('THE STANDARD on a hook: 15 words or fewer, no label or timestamp to open, one quoted phrase at most', () => {
+    // The owner's example reads clean.
+    expect(rules('man, uggh, 300 apps already since grad.....is it me fam?', 'hook')).toEqual([])
+    // Labels and stage directions from the launch plan's own hooks.
+    expect(rules('Exhibit 1: a rejection received at 2:14am. Artist unknown.', 'hook')).toEqual(['lint-hook-label'])
+    expect(rules('Levels of ghosted after a final round. Level 5 asks for feedback.', 'hook')).toEqual(['lint-hook-label'])
+    expect(rules("Calendar invite, 4:55pm Thursday: 'Round 7: Final conversation (part 2).'", 'hook')).toContain('lint-hook-label')
+    expect(rules('Previously on my job hunt: two CEOs, one reorg, zero offers.', 'hook')).toContain('lint-hook-label')
+    // A timestamp or a date to open.
+    for (const t of ['2:14am. Rejected again, before I was even awake.', 'Sunday 9:40pm, page 4 of 6 wants my resume again.', '11:52 PM and the portal logged me out.', 'Oct 19: still in review.', '"6am" and the recruiter already said no.']) expect(rules(t, 'hook'), t).toContain('lint-hook-label')
+    // Not a timestamp: a number that is not a time.
+    expect(rules('300 apps and not one human email back.', 'hook')).not.toContain('lint-hook-label')
+    expect(rules('5 rounds for a job that pays less. Why.', 'hook')).not.toContain('lint-hook-label')
+    // Quotes: two quoted phrases warn; one, or apostrophes, do not.
+    expect(rules("Recruiter: 'talk Friday.' Me: 'which Friday?'", 'hook')).toContain('lint-hook-quotes')
+    expect(rules('They said "fast-paced" and meant "understaffed".', 'hook')).toContain('lint-hook-quotes')
+    expect(rules("Entry level role. 5 years required. Then I scrolled to 'About us.'", 'hook')).not.toContain('lint-hook-quotes')
+    expect(rules("It's 2am and I'm still applying. It's fine. I'm fine.", 'hook')).not.toContain('lint-hook-quotes')
+    // Over 15 words.
+    expect(rules('one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen', 'hook')).toContain('lint-hook-long')
+    expect(rules('one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen', 'hook')).not.toContain('lint-hook-long')
+    expect(lintCopy('one two three four five six seven eight nine ten', { kind: 'hook', lists: { hookMaxWords: 8 } }).map(h => h.match)).toEqual(['10 words'])
+    // Only on a hook: a slide may open with a label.
+    expect(rules('Exhibit 2: the follow-up that never came. 2:14am. "a" "b"', 'slide')).toEqual([])
+    // Each is a default: switched off, it says nothing.
+    expect(rules('Exhibit 1: a rejection.', 'hook', { off: ['lint-hook-label'] })).toEqual([])
   })
 })
 
