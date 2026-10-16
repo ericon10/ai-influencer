@@ -148,7 +148,7 @@ export function CoverCard({ ctx }: { ctx: PostCtx }) {
       </div>
       <div className="st-card-body st-row" style={{ gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' }}>
         <div className="st-col" style={{ gap: 8, flex: '1 1 260px', minWidth: 0 }}>
-          <video ref={video} className="st-content-result sm" src={`${assetUrl(o.videoAssetId)}#t=${at.toFixed(2)}`} muted playsInline preload="metadata" onLoadedMetadata={() => { if (video.current) video.current.currentTime = at }} />
+          <video ref={video} className="st-content-result" style={{ width: 200 }} src={`${assetUrl(o.videoAssetId)}#t=${at.toFixed(2)}`} muted playsInline preload="metadata" onLoadedMetadata={() => { if (video.current) video.current.currentTime = at }} />
           <input type="range" min={0} max={Math.max(0.1, total - 0.05)} step={0.05} value={at} onChange={e => seek(Number(e.target.value))} aria-label="Cover frame" />
           <span className="st-hint st-mono" data-field="cover-at">Frame at {at.toFixed(2)} s</span>
           <Field id="cover-text" label="Cover text (optional)">

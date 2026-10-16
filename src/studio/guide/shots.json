@@ -2336,5 +2336,89 @@
         "label": "The growth log, newest first"
       }
     ]
+  },
+  "editor-safezones": {
+    "w": 1030,
+    "h": 644,
+    "spots": [
+      {
+        "n": 1,
+        "x": 89.2,
+        "y": 0.8,
+        "w": 4.9,
+        "h": 2.7,
+        "label": "Safe zones: Off, TikTok or Reels"
+      },
+      {
+        "n": 2,
+        "x": 44.9,
+        "y": 14.6,
+        "w": 16.3,
+        "h": 3.7,
+        "label": "The app's top bar"
+      },
+      {
+        "n": 3,
+        "x": 58.9,
+        "y": 29.8,
+        "w": 2.3,
+        "h": 21.3,
+        "label": "The buttons on the right"
+      },
+      {
+        "n": 4,
+        "x": 44.9,
+        "y": 51.2,
+        "w": 16.3,
+        "h": 9.7,
+        "label": "The caption and sound name; keep your captions above it"
+      }
+    ]
+  },
+  "finish-extras": {
+    "w": 1030,
+    "h": 2100,
+    "spots": [
+      {
+        "n": 1,
+        "x": 1.4,
+        "y": 0.7,
+        "w": 97.1,
+        "h": 4.4,
+        "label": "Export for: TikTok, Reels or Shorts, with the numbers"
+      },
+      {
+        "n": 2,
+        "x": 3.3,
+        "y": 51.2,
+        "w": 75.8,
+        "h": 3.2,
+        "label": "Scrub to the cover frame"
+      },
+      {
+        "n": 3,
+        "x": 80.6,
+        "y": 36.2,
+        "w": 16.1,
+        "h": 16.7,
+        "label": "The cover with its text, to download"
+      },
+      {
+        "n": 4,
+        "x": 6.2,
+        "y": 67.8,
+        "w": 83.4,
+        "h": 1.9,
+        "label": "Up to 3 hooks, typed or picked"
+      },
+      {
+        "n": 5,
+        "x": 3.3,
+        "y": 79.4,
+        "w": 93.4,
+        "h": 19,
+        "label": "One version per hook, the same video after 2 s"
+      }
+    ]
   }
 }
