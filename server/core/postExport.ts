@@ -28,7 +28,8 @@ export interface PostExportInput {
   slides: Array<{
     index: number; text: string; shot: string
     picture: 'still' | 'special' | 'none'
-    stillId: string | null; special: { type: string; from: string; title: string; body: string; lines: string[]; time: string } | null
+    stillId: string | null
+    special: { type: string; from: string; title: string; body: string; lines: string[]; time: string; variant?: string; count?: number; blur?: boolean; assetId?: string | null; scale?: number; ratio?: number } | null
     position: { x: number; y: number } | null
     files: { tiktok: string; instagram: string }
   }>
@@ -54,6 +55,15 @@ export function planJson(p: PlanMeta | null | undefined): Record<string, unknown
     hook_score: p.hookScore, moment_id: p.momentId || null, moment: p.moment || null, alt_hook: p.altHook || null,
     scene: p.scene || null, clip_action: p.clipAction || null, cta: p.cta || null, stat_source: p.statSource || null, notes: p.notes || null,
   }
+}
+
+// A special slide in post.json: its words, and for a product screenshot
+// the uploaded asset and where it sits.
+function specialJson(sp: PostExportInput['slides'][number]['special']) {
+  if (!sp) return null
+  const { type, from, title, body, lines, time } = sp
+  if (type === 'product_shot') return { type, asset_id: sp.assetId ?? null, width: sp.scale ?? null, position: sp.variant === 'top' ? 'top' : 'middle' }
+  return { type, from, title, body, lines, time, ...(sp.variant ? { variant: sp.variant } : {}), ...(type === 'survey' ? { score: sp.count != null && sp.count >= 0 ? sp.count : null } : sp.count ? { count: sp.count } : {}), ...(sp.blur ? { blur: true } : {}) }
 }
 
 export function postExportJson(i: PostExportInput): Record<string, unknown> {
@@ -100,7 +110,7 @@ export function postExportJson(i: PostExportInput): Record<string, unknown> {
       shot: x.shot || null,
       picture: x.picture,
       still_id: x.stillId,
-      special: x.special,
+      special: specialJson(x.special),
       text_position: x.position,
       files: x.files,
     })),

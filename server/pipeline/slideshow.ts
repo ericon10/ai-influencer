@@ -779,10 +779,17 @@ const batchChildId = (jobId: string) => `cnt_${jobId.slice(4)}`
 
 const familyRoot = (row: ContentRow): string => row.variationOf ?? row.id
 
-// The other account tags in use (a variation goes to another account).
-async function otherTags(deps: Deps, ctx: Ctx, tag: string): Promise<string[]> {
-  const rows = await deps.db.select({ tag: contentItems.accountTag }).from(contentItems).where(and(eq(contentItems.accountId, ctx.accountId), isNull(contentItems.archivedAt)))
-  return [...new Set(rows.map(r => r.tag.trim()).filter(t => t && t !== tag.trim()))].sort()
+// The other account tags in use (a variation goes to another account) of
+// the same kind: a character post's variations go to that character's
+// other accounts, a topic post's to other faceless (topic) accounts, never
+// a face onto a faceless account or the other way round.
+async function otherTags(deps: Deps, ctx: Ctx, source: ContentRow): Promise<string[]> {
+  const tag = source.accountTag.trim()
+  const topic = parse(source).mode === 'topic'
+  const rows = await deps.db.select({ tag: contentItems.accountTag, kind: contentItems.kind, characterId: contentItems.characterId, spec: contentItems.spec }).from(contentItems).where(and(eq(contentItems.accountId, ctx.accountId), isNull(contentItems.archivedAt)))
+  const topicTags = new Set(rows.filter(r => r.kind === 'slideshow' && (r.spec as { mode?: string } | null)?.mode === 'topic').map(r => r.tag.trim()))
+  const fits = (r: (typeof rows)[number]) => topic ? topicTags.has(r.tag.trim()) : !topicTags.has(r.tag.trim()) && r.characterId === source.characterId
+  return [...new Set(rows.filter(fits).map(r => r.tag.trim()).filter(t => t && t !== tag))].sort()
 }
 
 async function onSlideshowVariations(deps: Deps, ctx: Ctx, job: JobRow, out: JobOutcome): Promise<void> {
@@ -796,7 +803,7 @@ async function onSlideshowVariations(deps: Deps, ctx: Ctx, job: JobRow, out: Job
   const d = (out.data ?? {}) as { variations?: Array<{ hook?: unknown; slides?: unknown; caption?: unknown; hashtags?: unknown }> }
   const vars = (Array.isArray(d.variations) ? d.variations : []).slice(0, cfgOf(deps).max_variations)
   const root = familyRoot(source)
-  const tagsInUse = await otherTags(deps, ctx, source.accountTag)
+  const tagsInUse = await otherTags(deps, ctx, source)
   const seenCaptions = new Set([spec.caption.trim().toLowerCase()])
   const made: string[] = []
   for (const [k, v] of vars.entries()) {
@@ -1024,6 +1031,9 @@ export function slideshowProblems(spec: SlideshowSpec): string[] {
   if (!list.length) return ['Pick stills']
   const missing = list.filter(s => !s.stillId && !s.special).map(s => s.index + 1)
   if (missing.length) return [`Slide${missing.length > 1 ? 's' : ''} ${missing.join(', ')} ${missing.length > 1 ? 'need' : 'needs'} a picture (Stills step)`]
+  // A product screenshot is only ever the owner's upload.
+  const shots = list.filter(s => s.special?.type === 'product_shot' && !s.special.assetId).map(s => s.index + 1)
+  if (shots.length) return [`Slide${shots.length > 1 ? 's' : ''} ${shots.join(', ')} ${shots.length > 1 ? 'need' : 'needs'} the product screenshot (Upload on the slide, Stills step)`]
   return []
 }
 

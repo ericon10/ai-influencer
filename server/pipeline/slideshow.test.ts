@@ -15,9 +15,10 @@ import { setSetting } from './settings.js'
 import { saveCredential } from '../providers/credentials.js'
 import { setRuleSwitch } from './rules.js'
 import { renderPlaceholderPortrait } from '../providers/mock.js'
-import { readAsset } from '../storage/assets.js'
+import { readAsset, saveAsset } from '../storage/assets.js'
 import { candidates, contentItems, jobs } from '../db/schema.js'
-import { slideList } from '../core/slides.js'
+import { emptySpecial, slideList } from '../core/slides.js'
+import { productShotBox } from '../core/slideSvg.js'
 import type { SlideshowSpec } from '../core/slideshowSpec.js'
 import type { GenRequest } from '../providers/types.js'
 
@@ -71,7 +72,7 @@ describe('hook first', () => {
   })
 
   it('Write 10 with Claude, the playbook way: one price for the writer and a separate reviewer; each hook has a moment, a code, effects, an alt hook and a score; only 1s and 2s show', async () => {
-    const post = await createContent(h.deps, h.ctx, { kind: 'slideshow', characterId, accountTag: 'F2', idea: 'job hunting' })
+    const post = await createContent(h.deps, h.ctx, { kind: 'slideshow', characterId, accountTag: 'F2', idea: 'job hunting', spec: { mode: 'topic' } })
     const { quote, preview, jobs: ran } = await run({ type: 'slideshow_hooks', contentId: post.id })
     expect(quote.models).toEqual(['Demo mock, free'])
     expect(ran).toHaveLength(2)
@@ -94,9 +95,9 @@ describe('hook first', () => {
   })
 
   it('never the same code twice in a row: the account\'s last post\'s code is out of the writer\'s list', async () => {
-    const before = await createContent(h.deps, h.ctx, { kind: 'slideshow', characterId, accountTag: 'F6', idea: 'rounds', spec: { plan: { structure: 'S6' } } })
+    const before = await createContent(h.deps, h.ctx, { kind: 'slideshow', characterId, accountTag: 'F6', idea: 'rounds', spec: { mode: 'topic', plan: { structure: 'S6' } } })
     expect(before.id).toBeTruthy()
-    const post = await createContent(h.deps, h.ctx, { kind: 'slideshow', characterId, accountTag: 'F6', idea: 'rounds' })
+    const post = await createContent(h.deps, h.ctx, { kind: 'slideshow', characterId, accountTag: 'F6', idea: 'rounds', spec: { mode: 'topic' } })
     const { preview } = await run({ type: 'slideshow_hooks', contentId: post.id })
     expect(preview.prompts[0]!.text).toContain('Never use S6 Teaser: the account\'s last post used it.')
     expect((await spec(post.id)).hookIdeas.some(x => x.code === 'S6')).toBe(false)
@@ -237,6 +238,37 @@ describe('export', () => {
     const id = await drafted()
     await expect(startRender(h.deps, h.ctx, id)).rejects.toThrow(/needs? a picture/)
   })
+
+  it('a Product screenshot slide: the owner\'s upload as it is, in both sizes; with no upload the export waits for it', async () => {
+    const id = await drafted()
+    await run({ type: 'slideshow_stills', contentId: id })
+    const s = await spec(id)
+    const specials = [...s.specials]
+    while (specials.length < 3) specials.push(null)
+    specials[2] = { ...emptySpecial('product_shot'), ratio: 0.46 }
+    await updateContent(h.deps, h.ctx, id, { spec: { specials } })
+    await expect(startRender(h.deps, h.ctx, id)).rejects.toThrow(/Slide 3 needs the product screenshot/)
+    // A plain green screenshot, 460 x 1000, as the owner would upload it.
+    const png = await sharp({ create: { width: 460, height: 1000, channels: 3, background: { r: 20, g: 210, b: 60 } } }).png().toBuffer()
+    const asset = await saveAsset(h.deps, h.ctx, { data: png, mime: 'image/png', origin: 'upload', label: 'screen' })
+    specials[2] = { ...emptySpecial('product_shot'), ratio: 0.46, assetId: asset.id }
+    await updateContent(h.deps, h.ctx, id, { spec: { specials } })
+    await startRender(h.deps, h.ctx, id)
+    await drain(h, 30)
+    const o = (await getContent(h.deps, h.ctx, id)).outputs as ContentOutputs
+    for (const [ids, frame] of [[o.imageAssetIds!, { width: 1080, height: 1920 }], [o.instagramAssetIds!, { width: 1080, height: 1440 }]] as const) {
+      const box = productShotBox({ scale: 0.72, variant: '', ratio: 0.46 }, frame)
+      const img = sharp((await readAsset(h.deps, h.ctx, ids[2]!)).data)
+      const { data } = await img.extract({ left: Math.round(box.x + box.w / 2) - 5, top: Math.round(box.y + box.h / 2) - 5, width: 10, height: 10 }).raw().toBuffer({ resolveWithObject: true })
+      const [r, g, b] = [data[0]!, data[1]!, data[2]!]
+      expect(g).toBeGreaterThan(170)
+      expect(r).toBeLessThan(70)
+      expect(b).toBeLessThan(100)
+    }
+    const zip = unzipSync(new Uint8Array((await readAsset(h.deps, h.ctx, o.zipAssetId!)).data))
+    const json = JSON.parse(Buffer.from(zip['post.json']!).toString())
+    expect(json.slides[2]).toMatchObject({ picture: 'special', special: { type: 'product_shot', asset_id: asset.id } })
+  })
 })
 
 describe('variations and batch', () => {
@@ -255,6 +287,7 @@ describe('variations and batch', () => {
       const row = await getContent(h.deps, h.ctx, k.id)
       const s = row.spec as SlideshowSpec
       expect(row.variationOf).toBe(id)
+      // Another account of the same kind: never a faceless feeder (F2, F6).
       expect(row.accountTag).toBe('careerwins.daily')
       expect(s.caption).not.toBe(source.caption)
       expect(s.hook).not.toBe(source.hook)

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { PATTERN_IDS, backdropFor, ctaText, editSlides, genericNames, guessPattern, postCaption, reorderMiddle, slideCountOf, slideList, vaultHooks, wordCount, emptySpecial } from './slides.js'
-import { DEFAULT_POS, SAFE, adSvg, classicSizeFrac, slideOverlaySvg, specialSvg, textLayout, wordsNote, type Draw } from './slideSvg.js'
+import { DRAWN_SPECIAL_IDS, PATTERN_IDS, SPECIAL_IDS, backdropFor, cleanSpecial, ctaText, editSlides, fullSpecial, genericNames, guessPattern, postCaption, reorderMiddle, slideCountOf, slideList, vaultHooks, wordCount, emptySpecial } from './slides.js'
+import { DEFAULT_POS, SAFE, adSvg, classicSizeFrac, productShotBox, slideOverlaySvg, specialSvg, textLayout, wordsNote, type Draw } from './slideSvg.js'
 import { postExportJson } from './postExport.js'
 
 // The slideshow power-up's pure parts (UX-PLAN.md section 27), shared by the
@@ -157,12 +157,77 @@ describe('text styles and the safe zones', () => {
     expect(wordsNote('one two three four five')).toBeNull()
   })
 
-  it('every special slide draws inside the frame', () => {
-    for (const t of ['notification', 'text_thread', 'rejection_email', 'job_posting'] as const) {
-      const svg = specialSvg(emptySpecial(t), TIKTOK, draw)
-      expect(svg.length).toBeGreaterThan(100)
-      for (const m of svg.matchAll(/ y="(-?[\d.]+)"/g)) expect(Number(m[1])).toBeLessThanOrEqual(1920)
+  it('every special slide draws inside the frame, in both sizes', () => {
+    for (const t of DRAWN_SPECIAL_IDS) {
+      for (const frame of [TIKTOK, { width: 1080, height: 1440 }]) {
+        const svg = specialSvg(emptySpecial(t), frame, draw)
+        expect(svg.length, t).toBeGreaterThan(100)
+        for (const m of svg.matchAll(/ y="(-?[\d.]+)"/g)) expect(Number(m[1]), t).toBeLessThanOrEqual(frame.height)
+        for (const m of svg.matchAll(/ x="(-?[\d.]+)"/g)) expect(Number(m[1]), t).toBeLessThanOrEqual(frame.width)
+      }
     }
+  })
+
+  it('the launch plan screens (section 28): the form empty or filled with its field count, blurred amounts, the picked score, the notification stack', () => {
+    // Application form: empty shows the labels only; filled shows the values and every field done.
+    const form = emptySpecial('application_form')
+    expect(specialSvg(form, TIKTOK, draw)).toContain('0 of 40 fields')
+    const filled = { ...form, variant: 'filled', lines: ['Job title: Intern', 'Company: Northwind'], count: 12 }
+    const fsvg = specialSvg(filled, TIKTOK, draw)
+    expect(fsvg).toContain('12 of 12 fields')
+    expect(fsvg).toContain('>Intern<')
+    expect(fsvg).toContain('>Job title<')
+    // Portal status: every step and its timestamp.
+    const portal = specialSvg(emptySpecial('portal_status'), TIKTOK, draw)
+    expect(portal).toContain('Still in review')
+    expect(portal).toContain('day 41')
+    // Bank app and receipt: blur hides the amounts, never the labels.
+    const bank = emptySpecial('bank_app')
+    expect(specialSvg(bank, TIKTOK, draw)).toContain('$1,204.18')
+    const hidden = specialSvg({ ...bank, blur: true }, TIKTOK, draw)
+    expect(hidden).not.toContain('$1,204.18')
+    expect(hidden).not.toContain('1,450.00')
+    expect(hidden).toContain('>Rent<')
+    expect(specialSvg({ ...emptySpecial('receipt'), blur: true }, TIKTOK, draw)).not.toContain('$640.00')
+    expect(specialSvg({ ...emptySpecial('receipt'), variant: 'receipt' }, TIKTOK, draw)).toContain('$640.00')
+    // Survey: 0 to 10, the picked score highlighted.
+    const none = specialSvg(emptySpecial('survey'), TIKTOK, draw)
+    const seven = specialSvg({ ...emptySpecial('survey'), count: 7 }, TIKTOK, draw)
+    for (const k of ['0', '5', '10']) expect(none).toContain(`>${k}<`)
+    expect(seven).not.toEqual(none)
+    // Lock screen: the clock and each notification in the stack.
+    const lock = specialSvg(emptySpecial('lock_screen'), TIKTOK, draw)
+    expect(lock).toContain('>2:14<')
+    expect(lock).toContain('did you hear back??')
+    expect(lock).toContain('Rent due in 9 days')
+    // Placard, invite and profile card show their own words.
+    expect(specialSvg(emptySpecial('museum_placard'), TIKTOK, draw)).toContain('Autoresponder')
+    expect(specialSvg(emptySpecial('calendar_invite'), TIKTOK, draw)).toContain('Quick chat')
+    expect(specialSvg(emptySpecial('profile_card'), TIKTOK, draw)).toContain('Jordan Lee')
+    // A real brand on any of them becomes a generic name.
+    const branded = cleanSpecial({ ...emptySpecial('calendar_invite'), from: 'Google Talent' }, ['Google'], ['Northwind'])
+    expect(branded.from).toBe('Northwind Talent')
+  })
+
+  it('a product screenshot is only ever the owner\'s upload: never drawn, never suggested, placed as uploaded and out of the bottom 20%', () => {
+    expect(SPECIAL_IDS).toContain('product_shot')
+    expect(DRAWN_SPECIAL_IDS).not.toContain('product_shot')
+    const shot = { ...emptySpecial('product_shot'), assetId: 'ast_1', ratio: 0.46 }
+    // Nothing drawn without the upload.
+    expect(slideOverlaySvg({ style: 'classic', text: '', pos: null, special: shot, ad: false }, TIKTOK, draw).svg).not.toContain('<image')
+    const { svg } = slideOverlaySvg({ style: 'classic', text: 'This is the app', pos: null, special: shot, ad: false, shotHref: 'data:image/png;base64,AAAA' }, TIKTOK, draw)
+    expect(svg).toContain('<image href="data:image/png;base64,AAAA"')
+    for (const variant of ['middle', 'top']) for (const scale of [0.3, 0.72, 1]) for (const ratio of [0.3, 0.46, 1, 2]) {
+      const b = productShotBox({ scale, variant, ratio }, TIKTOK)
+      expect(b.x).toBeGreaterThanOrEqual(0)
+      expect(b.x + b.w).toBeLessThanOrEqual(1080)
+      expect(b.y + b.h).toBeLessThanOrEqual(1920 * (1 - SAFE.bottom) + 0.01)
+      // Its own shape: never stretched.
+      expect(b.w / b.h).toBeCloseTo(ratio, 5)
+    }
+    expect(productShotBox({ scale: 0.72, variant: 'top', ratio: 0.46 }, TIKTOK).y).toBeLessThan(productShotBox({ scale: 0.72, variant: 'middle', ratio: 0.46 }, TIKTOK).y)
+    // An older special slide reads with the new fields.
+    expect(fullSpecial({ type: 'notification', from: 'Mail' } as never)).toMatchObject({ lines: [], blur: false, assetId: null, scale: 0.72 })
   })
 })
 
