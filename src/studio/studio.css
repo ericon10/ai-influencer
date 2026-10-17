@@ -1447,3 +1447,7 @@ button.st-chip:hover { color: var(--st-text); border-color: var(--st-text-3); }
   .st-planaccts tr.st-warnrow { background: var(--st-warn-soft); border-radius: 10px; }
   .st-planaccts tr.st-warnrow td { background: none; }
 }
+/* A switch keeps its words beside it on a phone (they wrapped under it). */
+@media (max-width: 860px) {
+  .st-row > .st-switch + .st-col, .st-row > .st-switch + .st-hint, .st-row > .st-switch + span { flex: 1 1 0; min-width: 0; }
+}
