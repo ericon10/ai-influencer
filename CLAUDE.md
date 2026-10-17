@@ -100,7 +100,7 @@ Every new feature's plan states which products, characters and accounts it
 applies to, and anything with no product works with neutral defaults
 (the general standard, no product words, neutral placeholders). Whether a
 post is an ad for its product is a separate switch (#ad, a plan row's
-product column). UX-PLAN.md section 29 has the details.
+ad column). UX-PLAN.md section 29 has the details.
 
 This file gives a new Claude Code session enough context to be useful
 immediately. Read this first before making changes.
