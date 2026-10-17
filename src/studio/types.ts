@@ -223,9 +223,9 @@ export type StudioAction =
   | { type: 'voice_convert'; soundIds: string[] }
   | { type: 'hook_variants'; hookId: string; characterIds: string[]; perCharacter?: number }
   | { type: 'slideshow_hooks'; contentId: string }
-  | { type: 'plan_generate'; postIds: string[]; stillModel?: string | null }
+  | { type: 'plan_generate'; postIds: string[]; path?: StillPathId; stillModel?: string | null }
   | { type: 'slideshow_draft'; contentId: string; hook: string; pattern?: string | null; code?: string | null; effectOpen?: string | null; effectPayoff?: string | null; moment?: string; alt?: string; score?: number | null }
-  | { type: 'slideshow_stills'; contentId: string; slides?: number[]; stillModel?: string }
+  | { type: 'slideshow_stills'; contentId: string; slides?: number[]; path?: StillPathId; stillModel?: string }
   | { type: 'slideshow_caption'; contentId: string }
   | { type: 'slideshow_variations'; contentId: string; count: number }
   | { type: 'slideshow_batch'; contentId: string }
@@ -354,6 +354,10 @@ export interface CutView {
 export type { SlideshowSpec, SceneLock, SpecialSlideSpec } from '../../server/core/slideshowSpec'
 export type { PlanMeta } from '../../server/core/planMeta'
 export type { PlanPreview, PlanPreviewRow, PlanPostView, PlanAccountView } from '../../server/pipeline/planImport'
+// Section 30: the stills paths and what each makes for a character.
+export type StillPathId = 'account' | 'api'
+export interface SlideStillModel { ref: string; label: string; from: 'file' | 'studio' | 'cheapest'; perStill: string }
+export interface SlideStillOptions { pick: StillPathId; name: string | null; paths: Array<{ path: StillPathId; label: string; problem: string | null; character: SlideStillModel | null; empty: SlideStillModel | null }> }
 export interface PlanImportResult { created: number; updated: number; kept: number; skipped: number; posts: Array<{ rowId: string; id: string; state: 'new' | 'update' }> }
 // The slideshow power-up (UX-PLAN.md section 27): the Scene library, a
 // post's family and batch, and the no-reuse check.

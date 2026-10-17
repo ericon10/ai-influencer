@@ -248,7 +248,7 @@ test('a mock screen drawn by code and the owner\'s Product screenshot, then the 
   await expect(cards.first()).toBeVisible({ timeout: 60_000 })
   const n = await cards.count()
   // The second slide: a lock screen with a notification stack (free).
-  await page.locator('[data-field="slide-card-1"] select').selectOption('lock_screen')
+  await page.locator('[data-field="slide-card-1"] select[aria-label$="picture"]').selectOption('lock_screen')
   // The last slide: the owner's own screenshot of the product.
   const last = page.locator(`[data-field="slide-card-${n - 1}"]`)
   await last.locator('select').selectOption('product_shot')

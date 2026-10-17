@@ -17,7 +17,7 @@ import { catalogWording } from '../core/wording.js'
 import { cleanVoiceCard, voiceCardText } from '../core/voiceCard.js'
 import { claimsText, languageText } from '../core/scriptKit.js'
 import {
-  CTA_IDS, DRAWN_SPECIAL_IDS, PATTERN_IDS, backdropFor, cleanSpecial, emptySpecial, fullSpecial, ctaText, guessPattern, isListPattern, isProductPost, postCaption, reorderMiddle, setAt, slideList, trimWords, vaultHooks,
+  CTA_IDS, DRAWN_SPECIAL_IDS, PATTERN_IDS, backdropFor, cleanSpecial, emptySpecial, fullSpecial, ctaText, guessPattern, isListPattern, isProductPost, postCaption, reorderMiddle, setAt, slideList, slidePerson, trimWords, vaultHooks,
   type HookIdea, type HookPattern, type SpecialSlide,
 } from '../core/slides.js'
 import { slideshowSpecSchema, type SceneLock, type SlideshowSpec } from '../core/slideshowSpec.js'
@@ -27,7 +27,9 @@ import type { PlanMeta } from '../core/planMeta.js'
 import { accountStructures } from './playbook.js'
 import { renderSlide, fontDraw } from '../media/slideRender.js'
 import type { GenRequest } from '../providers/types.js'
-import { estimateGen } from '../costs/pricebook.js'
+import { formatCredits } from '../costs/quotes.js'
+import { formatUsd } from '../costs/money.js'
+import { PATH_LABELS, characterStill, cheapestStill, stillPrice, type StillPath } from '../core/stillModels.js'
 import { listCredentials } from '../providers/credentials.js'
 import { ACCOUNT_PROVIDER } from '../providers/higgsfieldOAuth.js'
 import { readAsset, saveAsset } from '../storage/assets.js'
@@ -37,7 +39,7 @@ import { runModel, stillLevelFor, withModelLines } from './sceneActions.js'
 import { localStillChecks } from './sceneHooks.js'
 import { ruleSwitches } from './rules.js'
 import { getSetting, providerMode, resolveRoute, setSetting } from './settings.js'
-import { apiKeyReady, type StillChoice } from './clone.js'
+import { apiKeyReady } from './clone.js'
 import { claimsOf, languageOf } from './scaleKit.js'
 import { postWriting, templateFor, type WritingStandard } from './products.js'
 import { candidateAsset, getContent, postScene, updateContent, type ContentOutputs, type ContentRow } from './content.js'
@@ -568,7 +570,7 @@ export function draftPatch(deps: Deps, spec: SlideshowSpec, d: DraftOut, meta: H
     ...(meta.score ? { hookScore: meta.score } : {}),
   }
   return {
-    hook: texts[0]!, slides: texts.slice(1), shots, specials, textPos: [], lock,
+    hook: texts[0]!, slides: texts.slice(1), shots, specials, textPos: [], people: [], lock,
     pattern: meta.pattern, slideCount: Math.min(10, Math.max(3, n)),
     stillIds: spec.stillIds.slice(0, n),
     caption: clean(d.caption, 2200), hashtags: tags(d.hashtags, cfg.hashtags[1]), ctaLine: clean(d.cta, 300),
@@ -591,80 +593,124 @@ function endingPatch(spec: SlideshowSpec, v: unknown, endings: Array<{ pain: str
 
 // ── Stills: one locked scene, one still a slide (priced) ───────────────
 
-const STILL_MODEL_KEY = 'slideshow_still_model'
+const STILL_PATH_KEY = 'slideshow_still_path'
+// Before section 30 the pick was a model: Nano Banana 2.1 meant the plan.
+const LEGACY_MODEL_KEY = 'slideshow_still_model'
 
-// The stills model (like Recreate's): Nano Banana 2.1 on the Higgsfield
-// plan, GPT Image 2.5 Flare on the Higgsfield API; the last pick kept, the
-// plan when it is connected. One that cannot run says why.
-export async function slideStillChoices(deps: Deps, ctx: Ctx): Promise<{ choices: StillChoice[]; pick: string }> {
-  const cfg = cfgOf(deps)
+export interface StillPathChoice { path: StillPath; label: string; problem: string | null }
+
+// A model ref picked before section 30, read as its path (a model the API
+// does not offer ran on the plan).
+function legacyPath(deps: Deps, ref: string | null | undefined): StillPath | null {
+  if (!ref) return null
+  const m = deps.config.models.models.find(x => x.ref === ref)
+  return m ? (m.api === false ? 'account' : 'api') : null
+}
+
+// The two paths (section 30): Your Higgsfield plan (credits, when it is
+// connected) or the Higgsfield API (dollars, with a key); the last pick
+// kept, the plan when it is connected. In demo mode both run the free mock.
+export async function slideStillPaths(deps: Deps, ctx: Ctx): Promise<{ paths: StillPathChoice[]; pick: StillPath }> {
   const live = (await providerMode(deps.db, ctx.accountId)) === 'live'
   const plan = (await listCredentials(deps.db, ctx.accountId)).some(c => c.provider === ACCOUNT_PROVIDER)
   const api = !live || await apiKeyReady(deps, ctx)
-  const label = (ref: string) => deps.config.models.models.find(m => m.ref === ref)?.label ?? ref
-  const choices: StillChoice[] = [
-    { ref: cfg.still_model, label: label(cfg.still_model), path: 'account', pathLabel: 'Your Higgsfield plan', problem: !live || plan ? null : 'Runs only on your Higgsfield plan (the API does not offer it): connect it in Settings > Connected accounts.', note: null },
-    { ref: cfg.api_still_model, label: label(cfg.api_still_model), path: 'api', pathLabel: 'Higgsfield API', problem: api ? null : 'Needs your Higgsfield API key: Settings > Connected accounts.', note: null },
+  const paths: StillPathChoice[] = [
+    { path: 'account', label: PATH_LABELS.account, problem: !live || plan ? null : 'Connect your Higgsfield plan in Settings > Connected accounts.' },
+    { path: 'api', label: PATH_LABELS.api, problem: api ? null : 'Needs your Higgsfield API key: Settings > Connected accounts.' },
   ]
-  const saved = await getSetting<string | null>(deps.db, ctx.accountId, STILL_MODEL_KEY, null)
-  const pick = choices.find(c => c.ref === saved && !c.problem)?.ref ?? (plan || !live ? cfg.still_model : cfg.api_still_model)
-  return { choices, pick }
+  const saved = (await getSetting<StillPath | null>(deps.db, ctx.accountId, STILL_PATH_KEY, null)) ?? legacyPath(deps, await getSetting<string | null>(deps.db, ctx.accountId, LEGACY_MODEL_KEY, null))
+  const pick = paths.find(p => p.path === saved && !p.problem)?.path ?? (plan || !live ? 'account' : 'api')
+  return { paths, pick }
 }
 
-// One still's price with the picked model and path (the plan import's
-// preview): a character still attaches the sheet, a topic still does not.
-export async function slideStillPrice(deps: Deps, ctx: Ctx, want: string | null, mode: 'character' | 'topic'): Promise<{ micros: number; model: string; label: string; path: StillChoice['path']; problem: string | null }> {
-  const { choices, pick } = await slideStillChoices(deps, ctx)
-  const choice = choices.find(c => c.ref === want) ?? choices.find(c => c.ref === pick)!
-  const entry = deps.config.models.models.find(m => m.ref === choice.ref)
-  const kind: GenRequest['kind'] = mode === 'character' && (entry?.max_refs ?? 0) > 0 ? 'image_edit' : 'image'
-  const base = await runModel(deps, ctx, choice.ref, kind)
-  const run = choice.path === 'api' && base.model.startsWith('higgsfield/') ? { ...base, billing: 'api' as const } : base
-  const level = stillLevelFor(deps, choice.ref)
-  try {
-    const est = estimateGen(deps.config, { kind, model: run.model, modelRef: choice.ref, prompt: '', aspect: '9:16', quality: level.quality, resolution: level.resolution, ...(run.billing ? { billing: run.billing } : {}) })
-    return { micros: est.totalMicros, model: choice.ref, label: choice.label, path: choice.path, problem: choice.problem }
-  } catch {
-    return { micros: 0, model: choice.ref, label: choice.label, path: choice.path, problem: choice.problem ?? 'The price book has no price for it yet.' }
+// The path a run uses: the one asked for (or a model asked for before
+// section 30), else the post's last pick, else the account's.
+export async function stillPathFor(deps: Deps, ctx: Ctx, spec: SlideshowSpec | null, want: { path?: StillPath | null; stillModel?: string | null } = {}): Promise<StillPath> {
+  const { paths, pick } = await slideStillPaths(deps, ctx)
+  const asked = want.path ?? legacyPath(deps, want.stillModel) ?? spec?.stillPath ?? legacyPath(deps, spec?.stillModel)
+  const choice = paths.find(p => p.path === asked && !p.problem) ?? paths.find(p => p.path === pick)!
+  if (choice.problem) throw new AppError('bad_request', `${choice.label}: ${choice.problem}`)
+  return choice.path
+}
+
+export async function saveSlideStillPath(deps: Deps, ctx: Ctx, path: StillPath): Promise<void> {
+  if (path !== 'account' && path !== 'api') throw new AppError('invalid_request', `"${path}" is not a stills path.`)
+  await setSetting(deps, ctx, STILL_PATH_KEY, path)
+}
+
+// The model for a slide (section 30), by who is in it: the character's
+// file default, or the cheapest the path runs for a slide with no one.
+export function slideModel(deps: Deps, who: 'character' | 'none', ch: { preferredModels: Record<string, string> } | null, path: StillPath): { ref: string; label: string; from: 'file' | 'studio' | 'cheapest' } | null {
+  const { models } = deps.config.models
+  if (who === 'character') return characterStill(models, ch?.preferredModels ?? {}, deps.config.pipeline.scenes.settings, path)
+  const hit = cheapestStill(models, cfgOf(deps).empty_still_models, deps.config.pricebook, ref => stillLevelFor(deps, ref), path)
+  return hit ? { ref: hit.ref, label: hit.label, from: 'cheapest' } : null
+}
+
+// One still's price from the price book, as the Stills step and the plan
+// preview show it: plan credits on the plan, dollars on the API.
+export function slidePrice(deps: Deps, ref: string, path: StillPath): { credits: number | null; micros: number; display: string } {
+  const p = stillPrice(deps.config.pricebook, ref, stillLevelFor(deps, ref), path)
+  if (!p) return { credits: null, micros: 0, display: 'no price yet' }
+  return { credits: p.credits, micros: p.micros, display: p.credits != null ? formatCredits(p.credits) : formatUsd(p.micros) }
+}
+
+// What each path makes for a character (the Stills step's and the plan
+// card's path chips): the character's slides and the slides with no one.
+export async function slideStillOptions(deps: Deps, ctx: Ctx, characterId: string | null) {
+  const { paths, pick } = await slideStillPaths(deps, ctx)
+  const ch = characterId ? toData(await getCharacter(deps, ctx, characterId)) : null
+  const one = (who: 'character' | 'none', path: StillPath) => {
+    const m = slideModel(deps, who, ch, path)
+    return m ? { ref: m.ref, label: m.label, from: m.from, perStill: slidePrice(deps, m.ref, path).display } : null
+  }
+  return {
+    pick, name: ch?.name ?? null,
+    paths: paths.map(p => ({ ...p, character: ch ? one('character', p.path) : null, empty: one('none', p.path) })),
   }
 }
 
-export async function saveSlideStillModel(deps: Deps, ctx: Ctx, ref: string): Promise<void> {
-  const cfg = cfgOf(deps)
-  if (ref !== cfg.still_model && ref !== cfg.api_still_model) throw new AppError('invalid_request', `"${ref}" is not one of the slideshow stills models.`)
-  await setSetting(deps, ctx, STILL_MODEL_KEY, ref)
+// The model that runs on a path: the mock in demo mode; a Higgsfield model
+// billed to the picked path (the plan's credits through the account, or
+// the API's dollars), so the quote, the hold and the charge follow it.
+async function pathRun(deps: Deps, ctx: Ctx, model: string, kind: GenRequest['kind'], path: StillPath): Promise<{ model: string; billing?: StillPath }> {
+  const base = await runModel(deps, ctx, model, kind)
+  return base.model.startsWith('higgsfield/') ? { model: base.model, billing: path } : { model: base.model }
 }
 
 interface StillCtx {
   row: ContentRow; spec: SlideshowSpec
-  model: string; label: string; entry: { label: string; max_refs: number }
+  // Who this context's slides show (section 30) and the path they run on.
+  who: 'character' | 'none'; path: StillPath
+  model: string; label: string; entry: { label: string; max_refs: number; elements?: boolean }
   run: { model: string; billing?: 'account' | 'api' }
   level: { quality: string; resolution: string }
   aspect: '9:16' | '3:4'
   ch: Ch; characterRow: CharacterRow
-  // Character mode: the scene's fields with the lock, and the refs.
+  // A slide with the character: the scene's fields with the lock, and the refs.
   base?: SceneFields; refs?: Array<{ assetId: string }>; element?: string | null; mode?: ReferenceMode
   sw: Awaited<ReturnType<typeof ruleSwitches>>
 }
 
-async function stillContext(deps: Deps, ctx: Ctx, row: ContentRow, spec: SlideshowSpec, want?: string | null): Promise<StillCtx> {
-  const { choices, pick } = await slideStillChoices(deps, ctx)
-  const choice = choices.find(c => c.ref === want && !c.problem) ?? choices.find(c => c.ref === (spec.stillModel ?? pick) && !c.problem) ?? choices.find(c => c.ref === pick)!
-  if (choice.problem) throw new AppError('bad_request', `${choice.label}: ${choice.problem}`)
-  const model = choice.ref
-  const entry = deps.config.models.models.find(m => m.ref === model)
-  if (!entry) throw new AppError('bad_request', `Unknown model "${model}".`)
+// Everything a slide's still needs, for the slides that show the
+// character or the slides with no one in them. `forced` keeps the model a
+// run was quoted on (a batch's stills, started when their draft lands).
+async function stillContext(deps: Deps, ctx: Ctx, row: ContentRow, spec: SlideshowSpec, path: StillPath, who: 'character' | 'none', forced?: string | null): Promise<StillCtx> {
   const characterRow = await getCharacter(deps, ctx, row.characterId!)
   const ch = toData(characterRow)
+  const picked = forced ? { ref: forced } : slideModel(deps, who, ch, path)
+  if (!picked) throw new AppError('bad_request', `No stills model runs on ${PATH_LABELS[path]}. Pick the other path.`)
+  const model = picked.ref
+  const entry = deps.config.models.models.find(m => m.ref === model)
+  if (!entry) throw new AppError('bad_request', `Unknown model "${model}".`)
   const sw = await ruleSwitches(deps, ctx, characterRow.id)
   const aspect = spec.made === 'instagram' ? '3:4' : '9:16'
   const level = stillLevelFor(deps, model)
-  const onPlan = choice.path === 'account'
-  if (spec.mode === 'topic') {
+  const onPlan = path === 'account'
+  if (who === 'none') {
     const kind: GenRequest['kind'] = spec.lock.lookAssetId && entry.max_refs > 0 ? 'image_edit' : 'image'
-    const base = await runModel(deps, ctx, model, kind)
-    const run = !onPlan && base.model.startsWith('higgsfield/') ? { ...base, billing: 'api' as const } : base
-    return { row, spec, model, label: entry.label, entry, run, level, aspect, ch, characterRow, sw }
+    const run = await pathRun(deps, ctx, model, kind, path)
+    return { row, spec, who, path, model, label: entry.label, entry, run, level, aspect, ch, characterRow, sw }
   }
   // The character: the post's scene (made from the idea or the hook, free)
   // with the slideshow's locked lines over it.
@@ -695,11 +741,11 @@ async function stillContext(deps: Deps, ctx: Ctx, row: ContentRow, spec: Slidesh
   const identity = identityForModel(ch.identities, model)
   const mode: ReferenceMode = entry.max_refs > 0 ? 'refs' : identity ? 'trained' : 'text'
   const kind: GenRequest['kind'] = mode === 'refs' ? 'image_edit' : 'image'
-  const base = await runModel(deps, ctx, model, kind)
-  const run = !onPlan && base.model.startsWith('higgsfield/') ? { ...base, billing: 'api' as const } : base
-  // On the plan the character's Higgsfield element goes with the refs.
-  const element = onPlan ? ch.identities.find(i => i.kind === 'element' && i.status === 'ready' && i.provider === 'higgsfield')?.externalId ?? null : null
-  return { row: { ...row, sceneId: sceneId! }, spec, model, label: entry.label, entry, run, level, aspect, ch, characterRow, base: parsed.data, refs: mode === 'refs' ? refs.slice(0, Math.max(1, entry.max_refs)).map(r => ({ assetId: r.assetId })) : [], element, mode, sw }
+  const run = await pathRun(deps, ctx, model, kind, path)
+  // On the plan the character's Higgsfield element goes with the refs, on
+  // a model that takes elements (Flare does not: its refs carry the face).
+  const element = onPlan && entry.elements !== false ? ch.identities.find(i => i.kind === 'element' && i.status === 'ready' && i.provider === 'higgsfield')?.externalId ?? null : null
+  return { row: { ...row, sceneId: sceneId! }, spec, who, path, model, label: entry.label, entry, run, level, aspect, ch, characterRow, base: parsed.data, refs: mode === 'refs' ? refs.slice(0, Math.max(1, entry.max_refs)).map(r => ({ assetId: r.assetId })) : [], element, mode, sw }
 }
 
 const LIGHT_WORDS = (deps: Deps, id: string) => deps.config.pipeline.scenes.lights.find(l => l.id === id)?.text ?? ''
@@ -723,7 +769,7 @@ function slideRequest(deps: Deps, c: StillCtx, shot: string, seed: number, reali
   const { scenes: sc, views, rules } = deps.config.pipeline
   const s = c.spec
   const moment = shot.trim().length >= 3 ? shot.trim() : (s.hook.trim() || 'an ordinary moment of the day')
-  if (s.mode === 'topic') {
+  if (c.who === 'none') {
     const lock = s.lock
     const details = lock.details.map(d => d.trim()).filter(Boolean)
     const body = fill(t.slideshow_topic, {
@@ -771,38 +817,56 @@ export function emptySlides(spec: SlideshowSpec): number[] {
   return slideList(spec).filter(s => !s.stillId && !s.special).map(s => s.index)
 }
 
-export async function buildSlideshowStills(deps: Deps, ctx: Ctx, input: { contentId: string; slides?: number[]; stillModel?: string }): Promise<Built> {
+export async function buildSlideshowStills(deps: Deps, ctx: Ctx, input: { contentId: string; slides?: number[]; stillModel?: string; path?: StillPath }): Promise<Built> {
   const { row, spec } = await slideshowPost(deps, ctx, input.contentId)
   const list = slideList(spec)
   const wanted = input.slides?.length ? [...new Set(input.slides)].filter(i => i >= 0 && i < Math.max(list.length, 1)) : emptySlides(spec)
   if (!wanted.length) throw new AppError('bad_request', list.length ? 'Every slide has a picture. Press Reroll on a slide for a new one.' : 'Write or draft the slides first (the hook and the slides), or pick stills from the Library.')
-  const c = await stillContext(deps, ctx, row, spec, input.stillModel)
+  // Section 30: the path is the pick; each slide's model follows who is in it.
+  const path = await stillPathFor(deps, ctx, spec, { path: input.path, stillModel: input.stillModel })
+  const ctxs = await stillContexts(deps, ctx, row, spec, path)
   const realism: RealismWarning[] = []
   const warnings: RuleViolation[] = []
   const prompts: Built['preview']['prompts'] = []
   const specs: JobSpec[] = []
-  const stage = spec.mode === 'topic' ? 'slideshow' : 'scene'
   const total = wanted.filter(i => !list[i]?.special).length
   const [{ n: made } = { n: 0 }] = await deps.db.select({ n: sql<number>`count(*)::int` }).from(candidates).where(and(eq(candidates.accountId, ctx.accountId), sql`${candidates.meta}->>'slideshow' = ${row.id}`))
+  let empty = 0
   for (const i of wanted) {
     const slide = list[i]
     if (slide?.special) continue
+    const c = await ctxs.get(slidePerson(spec, i, ctxs.who))
+    if (c.who === 'none' && spec.mode !== 'topic') empty++
     const shot = slide?.shot || slide?.text || ''
     // A new seed each time a still of this post lands, so a reroll draws a
     // new picture (the same between the price and the run).
     const r = slideRequest(deps, c, shot, 1 + i + 37 * made, realism)
     warnings.push(...checked(r.warnings, `Slide ${i + 1}`))
-    if (prompts.length < 2) prompts.push({ label: `Slide ${i + 1} prompt`, text: r.prompt, wrapped: hardWrap(r.prompt) })
-    specs.push({ type: 'gen', stage, purpose: `slide_still:${row.id}`, label: `Slideshow still ${specs.length + 1} of ${total} (slide ${i + 1}), ${c.label}`, request: { ...r.request, slide: { slide: i, postId: row.id, sceneId: c.row.sceneId ?? null } } })
+    if (prompts.length < 2) prompts.push({ label: `Slide ${i + 1} prompt (${c.label})`, text: r.prompt, wrapped: hardWrap(r.prompt) })
+    specs.push({ type: 'gen', stage: c.who === 'none' ? 'slideshow' : 'scene', purpose: `slide_still:${row.id}`, label: `Slideshow still ${specs.length + 1} of ${total} (slide ${i + 1}), ${c.label}`, request: { ...r.request, slide: { slide: i, postId: row.id, sceneId: c.who === 'none' ? null : c.row.sceneId ?? null, path } } })
   }
   if (!specs.length) throw new AppError('bad_request', 'Those slides are special slides; they are drawn for free.')
   if (spec.mode === 'topic') warnings.push(warn('slideshow-topic', 'No one in these photos', 'A topic slideshow has no character: no face check runs. The REALISM line is in every prompt.'))
+  else if (empty) warnings.push(warn('slideshow-no-one', `No one in ${empty} slide${empty === 1 ? '' : 's'}`, `Their shots show a thing or a place, so they use the cheapest model on ${PATH_LABELS[path]} and no face check runs. Switch a slide to ${ctxs.who.name} on its card to put ${ctxs.who.pronouns.obj || 'them'} in it.`))
   const one = specs.length === 1
   return {
     purpose: `slide_still:${row.id}`, characterId: row.characterId,
     preview: { title: one ? `Reroll slide ${wanted[0]! + 1}` : `${specs.length} stills, one locked scene`, prompts, warnings: dedupeWarnings([...realism, ...warnings]), invalidates: [] },
     specs,
   }
+}
+
+// The two still contexts a post can need (the character's slides and the
+// slides with no one), each made once and only when a slide needs it.
+async function stillContexts(deps: Deps, ctx: Ctx, row: ContentRow, spec: SlideshowSpec, path: StillPath) {
+  const ch = toData(await getCharacter(deps, ctx, row.characterId!))
+  const made = new Map<'character' | 'none', Promise<StillCtx>>()
+  const get = (who: 'character' | 'none'): Promise<StillCtx> => {
+    let c = made.get(who)
+    if (!c) { c = stillContext(deps, ctx, row, spec, path, who); made.set(who, c) }
+    return c
+  }
+  return { get, who: { name: ch.name, pronouns: ch.pronouns } }
 }
 
 const dedupeWarnings = (list: RuleViolation[]): RuleViolation[] => {
@@ -921,18 +985,20 @@ export async function buildSlideshowVariations(deps: Deps, ctx: Ctx, input: { co
   const warnings: RuleViolation[] = []
   const realism: RealismWarning[] = []
   if (photos.length) {
-    const c = await stillContext(deps, ctx, row, spec)
-    const stage = spec.mode === 'topic' ? 'slideshow' : 'scene'
+    // The post's path; each slide's model by who is in it (section 30).
+    const path = await stillPathFor(deps, ctx, spec)
+    const ctxs = await stillContexts(deps, ctx, row, spec, path)
     for (let k = 0; k < count; k++) {
       const order = variationOrder(spec, n, k)
-      order.forEach((from, to) => {
+      for (const [to, from] of order.entries()) {
         const s = list[from]!
-        if (s.special) return
+        if (s.special) continue
+        const c = await ctxs.get(slidePerson(spec, from, ctxs.who))
         const r = slideRequest(deps, c, s.shot || s.text, 101 + k * 31 + to, realism)
         warnings.push(...checked(r.warnings, `Variation ${k + 1}, slide ${to + 1}`))
-        if (prompts.length < 2) prompts.push({ label: `Variation 1, slide ${to + 1} prompt`, text: r.prompt, wrapped: hardWrap(r.prompt) })
-        specs.push({ type: 'gen', stage, purpose: `slide_still:${row.id}:v`, label: `Variation still ${specs.length} of ${count * photos.length} (variation ${k + 1}, slide ${to + 1}), ${c.label}`, parentIndex: 0, request: { ...r.request, slide: { slide: to, variant: k, sceneId: c.row.sceneId ?? null } } })
-      })
+        if (prompts.length < 2) prompts.push({ label: `Variation 1, slide ${to + 1} prompt (${c.label})`, text: r.prompt, wrapped: hardWrap(r.prompt) })
+        specs.push({ type: 'gen', stage: c.who === 'none' ? 'slideshow' : 'scene', purpose: `slide_still:${row.id}:v`, label: `Variation still ${specs.length} of ${count * photos.length} (variation ${k + 1}, slide ${to + 1}), ${c.label}`, parentIndex: 0, request: { ...r.request, slide: { slide: to, variant: k, sceneId: c.who === 'none' ? null : c.row.sceneId ?? null, path } } })
+      }
     }
   }
   return {
@@ -990,6 +1056,7 @@ async function onSlideshowVariations(deps: Deps, ctx: Ctx, job: JobRow, out: Job
       ...spec,
       hook: texts[0]!, slides: texts.slice(1),
       shots: order.map(from => list[from]?.shot ?? ''),
+      people: order.map(from => spec.people[from] ?? ''),
       specials: order.map(from => list[from]?.special ?? null),
       stillIds: [], textPos: [], hookIdeas: [], hookReview: null, review: null, batchHooks: [],
       // The variation's own alt hook is the source's hook (one tap swaps back).
@@ -1027,8 +1094,11 @@ export async function buildSlideshowBatch(deps: Deps, ctx: Ctx, input: { content
   const prompts: Built['preview']['prompts'] = []
   const warnings: RuleViolation[] = []
   const realism: RealismWarning[] = []
-  const c = await stillContext(deps, ctx, row, spec)
-  const stage = spec.mode === 'topic' ? 'slideshow' : 'scene'
+  // The words come later, so each slide is priced as the post's mode: the
+  // character's model in a character batch, the cheapest in a topic one.
+  const path = await stillPathFor(deps, ctx, spec)
+  const c = await stillContext(deps, ctx, row, spec, path, spec.mode === 'topic' ? 'none' : 'character')
+  const stage = c.who === 'none' ? 'slideshow' : 'scene'
   for (const [b, hook] of hooks.entries()) {
     const r = await draftRequest(deps, ctx, row, spec, { hook, pattern: guessPattern(hook) }, n)
     if (!b) prompts.push({ label: 'Slideshow writer (the first hook)', text: `${r.system}\n${r.prompt}`, wrapped: hardWrap(`${r.system}\n${r.prompt}`) })
@@ -1041,7 +1111,7 @@ export async function buildSlideshowBatch(deps: Deps, ctx: Ctx, input: { content
       const p = slideRequest(deps, c, i === 0 ? hook : `${hook}, moment ${i + 1}`, 201 + b * 17 + i, realism)
       warnings.push(...checked(p.warnings, `Slideshow ${b + 1}, slide ${i + 1}`))
       if (prompts.length < 2) prompts.push({ label: 'A still prompt (its shot comes from the draft)', text: p.prompt, wrapped: hardWrap(p.prompt) })
-      specs.push({ type: 'gen', stage, purpose: `slide_still:${row.id}:b`, label: `Batch still ${b * n + i + 1} of ${hooks.length * n} (slideshow ${b + 1}, slide ${i + 1}), ${c.label}`, parentIndex: parent, request: { ...p.request, slide: { slide: i, row: b, sceneId: c.row.sceneId ?? null } } })
+      specs.push({ type: 'gen', stage, purpose: `slide_still:${row.id}:b`, label: `Batch still ${b * n + i + 1} of ${hooks.length * n} (slideshow ${b + 1}, slide ${i + 1}), ${c.label}`, parentIndex: parent, request: { ...p.request, slide: { slide: i, row: b, sceneId: c.who === 'none' ? null : c.row.sceneId ?? null, path } } })
     }
   }
   warnings.push(warn('slideshow-batch-specials', 'Special slides are not charged', 'A slide the draft makes a mock screen gets no still: its part of the price is released.'))
@@ -1071,7 +1141,7 @@ async function onSlideDraft(deps: Deps, ctx: Ctx, job: JobRow, out: JobOutcome):
   // A batch row: its own slideshow, the batch's scene and settings.
   const parentSpec = parse(anchor)
   const id = batchChildId(job.id)
-  const base: SlideshowSpec = { ...parentSpec, hook: '', slides: [], stillIds: [], shots: [], specials: [], textPos: [], hookIdeas: [], hookReview: null, batchHooks: [], caption: '', ctaLine: '', hashtags: [], review: 'pending' }
+  const base: SlideshowSpec = { ...parentSpec, hook: '', slides: [], stillIds: [], shots: [], specials: [], textPos: [], people: [], hookIdeas: [], hookReview: null, batchHooks: [], caption: '', ctaLine: '', hashtags: [], review: 'pending' }
   const spec = { ...base, ...draftPatch(deps, base, d, { hook, pattern: meta.pattern ?? null, n: meta.n ?? parentSpec.slideCount, endings: isProductPost(base) ? productEndings(deps, std) : [] }), review: 'pending' as const }
   await deps.db.insert(contentItems).values({
     id, accountId: ctx.accountId, characterId: anchor.characterId, kind: 'slideshow', title: '', idea: hook, productId: anchor.productId,
@@ -1081,7 +1151,12 @@ async function onSlideDraft(deps: Deps, ctx: Ctx, job: JobRow, out: JobOutcome):
   const row = await getContent(deps, ctx, id)
   const children = (await childJobs(deps, job.id)).filter(ch => ch.status === 'waiting')
   let c: StillCtx | null = null
-  try { c = await stillContext(deps, ctx, row, spec, (children[0]?.request as GenRequest | undefined)?.modelRef ?? null) } catch (e) {
+  const first = children[0]?.request as GenRequest | undefined
+  try {
+    // The model and path the run was quoted on.
+    const path = first?.slide?.path ?? (first?.billing as StillPath | undefined) ?? await stillPathFor(deps, ctx, spec)
+    c = await stillContext(deps, ctx, row, spec, path, children[0]?.stage === 'slideshow' ? 'none' : 'character', first?.modelRef ?? null)
+  } catch (e) {
     await cancelChildren(deps, job.id, `The stills could not start: ${(e as Error).message} Nothing was charged for them.`)
     return
   }

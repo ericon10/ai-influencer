@@ -8,7 +8,8 @@ import { PriceButton } from '../PriceButton'
 import { AsyncButton, Todo, errorMessage, useToast, type TodoItem } from '../ui'
 import { useProductList } from '../products'
 import { HowTo } from '../guide/Guide'
-import type { CharacterSummary, PlanImportResult, PlanPostView, PlanPreview } from '../types'
+import type { CharacterSummary, PlanImportResult, PlanPostView, PlanPreview, StillPathId } from '../types'
+import { StillPaths } from './post/slideshow/StillPaths'
 
 // Posts home > Launch plan (owner, 2026-10-16; UX-PLAN.md section 28): the
 // plan's CSV, previewed for free (rows by day and account, errors, what
@@ -23,6 +24,9 @@ const FORMAT_SHORT: Record<string, string> = {
 }
 const short = (f: string) => FORMAT_SHORT[f.trim().toLowerCase()] ?? f
 const usd = (n: number) => `$${n.toFixed(2)}`
+// Section 30: plan credits on the plan path, dollars on the API, or both.
+const credits = (n: number) => `${Math.round(n * 100) / 100} credit${n === 1 ? '' : 's'}`
+const priceOf = (c: number, d: number) => [c > 0 ? credits(c) : '', d > 0 || c <= 0 ? usd(d) : ''].filter(Boolean).join(' + ')
 const dayLabel = (d: string) => {
   if (!d) return 'No date'
   const t = new Date(`${d}T12:00:00Z`)
@@ -89,7 +93,7 @@ function ImportPlan({ characters, hasPosts, onImported }: { characters: Characte
   const [paste, setPaste] = useState(false)
   const [draw, setDraw] = useState(false)
   const [store, setStore] = useState<Record<string, string>>({})
-  const [model, setModel] = useState<string | null>(null)
+  const [path, setPath] = useState<StillPathId | null>(null)
   // The plan's product (section 29): '' not picked yet, 'none' No product.
   const [product, setProduct] = useState('')
   const [picked, setPicked] = useState<Set<string>>(new Set())
@@ -104,10 +108,10 @@ function ImportPlan({ characters, hasPosts, onImported }: { characters: Characte
     if (f.size > 400_000) { toast({ tone: 'bad', text: `${f.name} is over 400 KB. Split it.` }); return }
     setCsv(await f.text()); setName(f.name); setPaste(false); setPreview(null); setDone(null); setPicked(new Set())
   }
-  async function check(o: { draw?: boolean; store?: Record<string, string>; model?: string | null; product?: string } = {}) {
+  async function check(o: { draw?: boolean; store?: Record<string, string>; path?: StillPathId | null; product?: string } = {}) {
     try {
       const p = o.product ?? product
-      const next = await api.planPreview(csv, { drawSpecials: o.draw ?? draw, store: o.store ?? store, stillModel: o.model ?? model, productId: productArg(p) })
+      const next = await api.planPreview(csv, { drawSpecials: o.draw ?? draw, store: o.store ?? store, path: o.path ?? path, productId: productArg(p) })
       setPreview(next)
       // The product the plan's accounts agree on pre-fills the pick.
       if (!p && next.suggestedProductId) { setProduct(next.suggestedProductId); void check({ ...o, product: next.suggestedProductId }) }
@@ -122,6 +126,7 @@ function ImportPlan({ characters, hasPosts, onImported }: { characters: Characte
   const ticked = good.filter(r => picked.has(r.rowId))
   const stills = ticked.reduce((a, r) => a + r.photos, 0)
   const usdTicked = ticked.reduce((a, r) => a + r.priceUsd, 0)
+  const creditsTicked = ticked.reduce((a, r) => a + r.credits, 0)
   const toggle = (id: string) => setPicked(s => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n })
   // The plan's pick fills only the rows that name no product of their own.
   const needsPick = ticked.some(r => r.productFrom === 'plan')
@@ -235,14 +240,10 @@ function ImportPlan({ characters, hasPosts, onImported }: { characters: Characte
             <summary className="st-hint" style={{ cursor: 'pointer' }}>The plan by day and account</summary>
             <PlanGrid preview={preview} />
           </details>
-          <div className="st-row" style={{ gap: 6, flexWrap: 'wrap', alignItems: 'center' }} data-field="plan-still-model">
-            <span className="st-hint">Stills:</span>
-            {preview.still.choices.map(c => (
-              <button key={c.ref} type="button" className={`st-chip ${preview.still.model === c.ref ? 'on' : ''}`} disabled={!!c.problem} title={c.problem ?? c.pathLabel} onClick={() => { setModel(c.ref); void check({ model: c.ref }) }}>{c.label} · {c.pathLabel}</button>
-            ))}
-          </div>
+          <StillPaths field="plan-still-model" paths={preview.still.paths} value={preview.still.path} onPick={p => { setPath(p); void check({ path: p }) }}
+            models={preview.still.models.map(m => ({ who: m.who, model: m }))} />
           <span className="st-hint" role="status" data-field="plan-totals">
-            <b>{ticked.length} of {good.length} rows ticked</b>. Generating their pictures later: {stills} stills, about {usd(usdTicked)} ({preview.still.label}, {usd(preview.still.perStillUsd)} a still). Importing is free; each Generate shows its price first.
+            <b>{ticked.length} of {good.length} rows ticked</b>. Generating their pictures later: {stills} stills, about {priceOf(creditsTicked, usdTicked)} on {preview.still.pathLabel}. Importing is free; each Generate shows its price first.
           </span>
           <div className="st-col" style={{ gap: 6, alignItems: 'flex-start' }} data-field="plan-step-4">
             <span className="st-label">4 · Import</span>
@@ -279,7 +280,7 @@ function PlanGrid({ preview }: { preview: PlanPreview }) {
               {accounts.map(a => (
                 <td key={a}>
                   {preview.rows.filter(r => r.date === d && r.account === a).map(r => (
-                    <span key={r.line} className={`st-planchip ${r.state}`} title={[`${r.rowId} · ${r.slot} · ${r.format}`, r.hook, r.photos ? `${r.photos} photo${r.photos === 1 ? '' : 's'}${r.specials.length ? `, ${r.specials.length} drawn` : ''}, about ${usd(r.priceUsd)}` : '', ...r.errors, ...r.warnings].filter(Boolean).join('\n')}>
+                    <span key={r.line} className={`st-planchip ${r.state}`} title={[`${r.rowId} · ${r.slot} · ${r.format}`, r.hook, r.photos ? `${r.photos} photo${r.photos === 1 ? '' : 's'}${r.specials.length ? `, ${r.specials.length} drawn` : ''}, about ${r.price}` : '', ...r.errors, ...r.warnings].filter(Boolean).join('\n')}>
                       <b>{r.slot || '·'}</b> {short(r.format)}
                     </span>
                   ))}
@@ -300,14 +301,15 @@ function PlanPosts({ posts }: { posts: PlanPostView[] }) {
   const [day, setDay] = useState('')
   const [account, setAccount] = useState('')
   const [picked, setPicked] = useState<Set<string>>(new Set())
-  const models = useQuery({ queryKey: ['slide-still-models'], queryFn: () => api.slideStillModels(), staleTime: 60_000 })
-  const [model, setModel] = useState<string | null>(null)
+  const models = useQuery({ queryKey: ['slide-still-models', null], queryFn: () => api.slideStillModels(null), staleTime: 60_000 })
+  const [path, setPath] = useState<StillPathId | null>(null)
   const days = useMemo(() => [...new Set(posts.map(p => p.date))], [posts])
   const accounts = useMemo(() => [...new Set(posts.map(p => p.account))], [posts])
   const shown = posts.filter(p => (!day || p.date === day) && (!account || p.account === account))
   const needing = shown.filter(p => p.have < p.need)
   const ids = [...picked].filter(id => posts.some(p => p.id === id && p.have < p.need))
-  const pick = model ?? models.data?.pick ?? null
+  const pick = path ?? models.data?.pick ?? null
+  const on = models.data?.paths.find(p => p.path === pick)
   const toggle = (id: string) => setPicked(s => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n })
   return (
     <div className="st-col" style={{ gap: 10 }} data-field="plan-posts">
@@ -335,14 +337,14 @@ function PlanPosts({ posts }: { posts: PlanPostView[] }) {
           </tbody>
         </table>
       </div>
-      <div className="st-row" style={{ gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-        <span className="st-hint">Stills:</span>
-        {(models.data?.choices ?? []).map(c => <button key={c.ref} type="button" className={`st-chip ${pick === c.ref ? 'on' : ''}`} disabled={!!c.problem} title={c.problem ?? c.pathLabel} onClick={() => setModel(c.ref)}>{c.label} · {c.pathLabel}</button>)}
-      </div>
-      <PriceButton label={`Generate ${ids.length} post${ids.length === 1 ? '' : 's'}`} action={ids.length ? { type: 'plan_generate', postIds: ids.slice(0, 100), ...(pick ? { stillModel: pick } : {}) } : null}
+      {models.data && (
+        <StillPaths field="plan-generate-path" paths={models.data.paths} value={pick} onPick={p => { setPath(p); void api.saveSlideStillPath(p).catch(() => undefined) }}
+          models={on?.empty ? [{ who: 'Slides with no one', model: on.empty }] : []} />
+      )}
+      <PriceButton label={`Generate ${ids.length} post${ids.length === 1 ? '' : 's'}`} action={ids.length ? { type: 'plan_generate', postIds: ids.slice(0, 100), ...(pick ? { path: pick } : {}) } : null}
         todo={ids.length ? [] : [{ label: 'Tick the posts to generate' }]} onStarted={() => { setPicked(new Set()); void qc.invalidateQueries({ queryKey: ['plan'] }) }}
         onDone={() => void qc.invalidateQueries({ queryKey: ['plan'] })} />
-      <span className="st-hint">A slideshow gets a still for every photo slide (drawn slides are free), a clip its opening still; its take is made in the post with its own price after you pick the still. More than 10 posts run ten at a time.{ids.length > 100 ? ' At most 100 in one go.' : ''}</span>
+      <span className="st-hint">A slideshow gets a still for every photo slide (drawn slides are free), a clip its opening still; its take is made in the post with its own price after you pick the still. A slide with a character in it, and a clip's opening still, use the stills model in that character's file, on the path picked above. More than 10 posts run ten at a time.{ids.length > 100 ? ' At most 100 in one go.' : ''}</span>
     </div>
   )
 }

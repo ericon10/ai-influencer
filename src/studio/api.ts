@@ -1,4 +1,4 @@
-import type { ActionPreview, CharacterSummary, CharacterView, HiggsfieldAccount, JobView, Me, QuoteView, RulesView, SceneFields, ScenesData, SettingsView, StudioAction, Usage, VideoPrice, BrollClip, ContentData, ContentKind, LibraryData, PostStep, WorkerStatus, CloneOptions, CloneResult, CloneSource, CloneStill, CutView, SoundItem, EditorStyle, ImportPreview, VoiceLine, ProductSummary, ProductView, ProductClaims, KitGroup, SocialAccount, SentView, RecreateBatchView, GateCheckView, StorageInfo, TrashRef, TrashItem, ContentItem, AutoCleanItem, BrandLayer, TemplateReport, SlideFamily, ReuseReport, SlideBatch, StillChoice, SlideScene, PlanPreview, PlanPostView, PlanImportResult } from './types'
+import type { ActionPreview, CharacterSummary, CharacterView, HiggsfieldAccount, JobView, Me, QuoteView, RulesView, SceneFields, ScenesData, SettingsView, StudioAction, Usage, VideoPrice, BrollClip, ContentData, ContentKind, LibraryData, PostStep, WorkerStatus, CloneOptions, CloneResult, CloneSource, CloneStill, CutView, SoundItem, EditorStyle, ImportPreview, VoiceLine, ProductSummary, ProductView, ProductClaims, KitGroup, SocialAccount, SentView, RecreateBatchView, GateCheckView, StorageInfo, TrashRef, TrashItem, ContentItem, AutoCleanItem, BrandLayer, TemplateReport, SlideFamily, ReuseReport, SlideBatch, StillChoice, SlideScene, SlideStillOptions, StillPathId, PlanPreview, PlanPostView, PlanImportResult } from './types'
 import { sheetRefOf, typeOf, uploadFiles } from './files'
 
 // Thin client for /api/v1. Every write sends the CSRF header the server
@@ -166,12 +166,13 @@ export const api = {
   slideReuse: (id: string) => request<ReuseReport>('GET', `/content/${id}/slideshow/reuse`),
   slideBatch: (id: string) => request<SlideBatch>('GET', `/content/${id}/slideshow/batch`),
   reviewSlideBatch: (id: string, child: string, decision: 'approve' | 'reject' | 'pending') => request<SlideBatch>('POST', `/content/${id}/slideshow/batch/${child}`, { decision }),
-  slideStillModels: () => request<{ choices: StillChoice[]; pick: string }>('GET', '/slideshow/still-models'),
+  // Section 30: the two stills paths, and for a character what each makes.
+  slideStillModels: (characterId?: string | null) => request<SlideStillOptions>('GET', `/slideshow/still-models${characterId ? `?characterId=${encodeURIComponent(characterId)}` : ''}`),
   // The launch plan (section 28).
-  planPreview: (csv: string, o: { drawSpecials?: boolean; store?: Record<string, string>; stillModel?: string | null; productId?: string | null } = {}) => request<PlanPreview>('POST', '/plan/preview', { csv, ...o }),
+  planPreview: (csv: string, o: { drawSpecials?: boolean; store?: Record<string, string>; path?: StillPathId | null; productId?: string | null } = {}) => request<PlanPreview>('POST', '/plan/preview', { csv, ...o }),
   planImport: (csv: string, o: { drawSpecials?: boolean; store?: Record<string, string>; productId?: string | null; rows: string[] }) => request<PlanImportResult>('POST', '/plan/import', { csv, ...o }),
   plan: () => request<{ posts: PlanPostView[]; running: number }>('GET', '/plan'),
-  saveSlideStillModel: (model: string) => request<{ ok: true }>('PUT', '/slideshow/still-model', { model }),
+  saveSlideStillPath: (path: StillPathId) => request<{ ok: true }>('PUT', '/slideshow/still-model', { path }),
   slideScenes: () => request<{ scenes: SlideScene[] }>('GET', '/slide-scenes'),
   saveSlideScene: (body: { name: string; characterId?: string | null; topic?: string; place: string; light?: string; camera?: string; phone?: string; details?: string[]; lookAssetId?: string | null }) => request<SlideScene>('POST', '/slide-scenes', body),
   deleteSlideScene: (id: string) => request<{ ok: true }>('DELETE', `/slide-scenes/${id}`),

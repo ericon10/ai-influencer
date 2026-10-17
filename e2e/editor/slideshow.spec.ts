@@ -63,7 +63,7 @@ async function flow(page: Page, phone: boolean, info: TestInfo) {
   const after = (await api<{ item: { spec: { stillIds: string[] } } }>('GET', `/content/${id}`)).item.spec.stillIds
   expect(after.filter((_, i) => i !== 1)).toEqual(before.filter((_, i) => i !== 1))
   // Slide 4 becomes a text thread (free).
-  await page.locator('[data-field="slide-card-3"] select').selectOption('text_thread')
+  await page.locator('[data-field="slide-card-3"] select[aria-label$="picture"]').selectOption('text_thread')
 
   // Slides: Note style, drag slide 1's words, the CTA with a handle, #ad.
   await press(page.locator('.st-step', { hasText: 'Slides' }), phone)

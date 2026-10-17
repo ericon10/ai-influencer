@@ -51,7 +51,19 @@ describe('the launch plan', () => {
     expect(p.totals).toMatchObject({ rows: 140, ok: 140, problem: 0 })
     expect(p.totals.clips).toBe(10)
     expect(p.totals.photos).toBe(8)
-    expect(p.totals.usd).toBeGreaterThan(0)
+    // Section 30: priced on the picked path (the plan in demo mode, in
+    // credits): topic rows at the cheapest model, character slides at their
+    // file's default.
+    expect(p.still.path).toBe('account')
+    expect(p.totals.credits).toBeGreaterThan(0)
+    expect(p.totals.price).toMatch(/credits$/)
+    expect(p.still.models).toContainEqual({ who: 'Slides with no one', label: 'GPT Image 2.5 Flare', perStill: '1 credit', from: 'cheapest' })
+    expect(p.still.models).toContainEqual({ who: "Callie's slides", label: 'Nano Banana 2.1', perStill: '1.5 credits', from: 'file' })
+    const api = await previewPlan(h.deps, h.ctx, CSV, { path: 'api' })
+    expect(api.still.path).toBe('api')
+    expect(api.totals.credits).toBe(0)
+    expect(api.totals.usd).toBeGreaterThan(0)
+    expect(api.still.models).toContainEqual({ who: "Callie's slides", label: 'GPT Image 2.5 Flare', perStill: '$0.06', from: 'file' })
     expect(p.days[0]).toBe('2026-10-19')
     expect(p.rows[0]).toMatchObject({ date: '2026-10-19', slot: 'AM' })
     const accounts = Object.fromEntries(p.accounts.map(a => [a.tag, a]))
