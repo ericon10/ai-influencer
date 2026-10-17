@@ -1556,7 +1556,7 @@ export async function postFromClone(deps: Deps, ctx: Ctx, contentId: string, can
   const from = await getContent(deps, ctx, contentId)
   await keepClone(deps, ctx, candidateId, acknowledge)
   const cand = await getCandidate(deps, ctx, candidateId)
-  const row = await createContent(deps, ctx, { kind: 'meme', characterId: cand.characterId, idea: from.idea, accountTag: from.accountTag, spec: { clipId: cand.id }, step: 'text' })
+  const row = await createContent(deps, ctx, { kind: 'meme', characterId: cand.characterId, idea: from.idea, accountTag: from.accountTag, productId: from.productId, spec: { clipId: cand.id }, step: 'text' })
   return { id: row.id }
 }
 

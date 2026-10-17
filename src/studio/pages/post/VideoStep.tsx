@@ -108,7 +108,7 @@ function PostClip({ ctx }: { ctx: PostCtx }) {
       )}
       {twoShot && <ShotB ctx={ctx} style={twoShot} />}
       <Field id="post-broll" label={bgStyle ? `Background for the ${bgStyle.label.toLowerCase()}` : 'B-roll (optional)'} required={!!bgStyle} done={!!spec.brollId} group hint={bgStyle ? 'A screen recording, a post, or a screenshot (upload an image): it sits behind her, she is cut out over it.' : 'A screen recording or phone video, cut in hard before or after the clip.'}>
-        <BrollPicker data={data} ids={spec.brollId ? [spec.brollId] : []} multi={false} onChange={ids => draft.setSpec({ brollId: ids[0] ?? null })} timing={spec} setTiming={(p: Partial<BrollTiming>) => draft.setSpec(p)} />
+        <BrollPicker data={data} productId={item.productId} ids={spec.brollId ? [spec.brollId] : []} multi={false} onChange={ids => draft.setSpec({ brollId: ids[0] ?? null })} timing={spec} setTiming={(p: Partial<BrollTiming>) => draft.setSpec(p)} />
       </Field>
       {item.characterId && (
         <LibraryDrawer open={library} onClose={() => setLibrary(false)} kind="clips" characterId={item.characterId} characterName={name} picked={spec.clipId ? [spec.clipId] : []} onPick={use} />
@@ -150,7 +150,7 @@ function BatchClips({ ctx }: { ctx: PostCtx }) {
           : <button type="button" className="st-btn" style={{ alignSelf: 'flex-start' }} onClick={() => setRecreating(true)}><Clapperboard size={15} />Recreate a batch of clips</button>}
       </Field>
       <Field id="batch-broll" label="B-roll (optional)" group hint="Pick several to rotate them too.">
-        <BrollPicker data={data} ids={spec.brollIds ?? []} multi onChange={next => draft.setSpec({ brollIds: next })} timing={spec} setTiming={(p: Partial<BrollTiming>) => draft.setSpec(p)} />
+        <BrollPicker data={data} productId={item.productId} ids={spec.brollIds ?? []} multi onChange={next => draft.setSpec({ brollIds: next })} timing={spec} setTiming={(p: Partial<BrollTiming>) => draft.setSpec(p)} />
       </Field>
       {item.characterId && (
         <LibraryDrawer open={library} onClose={() => setLibrary(false)} kind="clips" characterId={item.characterId} characterName={name} picked={ids} multi onPick={toggle} />

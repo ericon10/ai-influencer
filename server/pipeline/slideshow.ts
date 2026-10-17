@@ -38,7 +38,8 @@ import { localStillChecks } from './sceneHooks.js'
 import { ruleSwitches } from './rules.js'
 import { getSetting, providerMode, resolveRoute, setSetting } from './settings.js'
 import { apiKeyReady, type StillChoice } from './clone.js'
-import { claimsOf, languageOf, listProducts } from './scaleKit.js'
+import { claimsOf, languageOf } from './scaleKit.js'
+import { postWriting, templateFor, type WritingStandard } from './products.js'
 import { candidateAsset, getContent, postScene, updateContent, type ContentOutputs, type ContentRow } from './content.js'
 
 // The slideshow power-up (owner, 2026-10-16; UX-PLAN.md section 27): hooks
@@ -72,15 +73,17 @@ async function slideshowPost(deps: Deps, ctx: Ctx, contentId: string): Promise<{
 
 // ── What the writers are told: the voice, the vault, the buyers' words ──
 
+// The post's own product only (section 29): never the first product. A
+// post with no product has no vault, buyer language or claims sheet; the
+// writers follow the general standard plus whatever its product adds.
 async function kitFor(deps: Deps, ctx: Ctx, productId: string | null) {
-  const list = await listProducts(deps, ctx)
-  const product = list.find(p => p.id === productId) ?? list[0] ?? null
-  if (!product) return { product: null, vault: [] as Array<{ text: string; kind: string }>, phrases: [] as string[], claims: '', language: '' }
+  const { product, std } = await postWriting(deps, ctx, productId)
+  if (!product) return { product: null, std: null as WritingStandard | null, vault: [] as Array<{ text: string; kind: string }>, phrases: [] as string[], claims: '', language: '' }
   const vault = await deps.db.select({ text: hookRows.text, kind: hookRows.kind }).from(hookRows)
     .where(and(eq(hookRows.accountId, ctx.accountId), eq(hookRows.productId, product.id), isNull(hookRows.archivedAt))).orderBy(asc(hookRows.number))
   const language = languageOf(product)
   return {
-    product, vault,
+    product, std, vault,
     phrases: language.groups.flatMap(g => g.items),
     claims: claimsText(product.name, claimsOf(product)),
     language: languageText(language) || '',
@@ -96,9 +99,9 @@ const topicOf = (row: ContentRow, s: SlideshowSpec) => row.idea.trim() || s.topi
 // the patterns, by code. Another press shows the next ones.
 export async function vaultHookIdeas(deps: Deps, ctx: Ctx, contentId: string, input: { offset?: number; patterns?: HookPattern[] } = {}): Promise<ContentRow> {
   const { row, spec } = await slideshowPost(deps, ctx, contentId)
-  const kit = await kitFor(deps, ctx, spec.productId)
-  const ideas = vaultHooks({ vault: kit.vault, phrases: kit.phrases, topic: topicOf(row, spec) || 'my job search', n: cfgOf(deps).hooks, offset: input.offset ?? 0, patterns: input.patterns })
-  return updateContent(deps, ctx, row.id, { spec: { hookIdeas: ideas, hookReview: null, ...(kit.product && !spec.productId ? { productId: kit.product.id } : {}) } })
+  const kit = await kitFor(deps, ctx, row.productId)
+  const ideas = vaultHooks({ vault: kit.vault, phrases: kit.phrases, topic: topicOf(row, spec) || 'everyday life', n: cfgOf(deps).hooks, offset: input.offset ?? 0, patterns: input.patterns })
+  return updateContent(deps, ctx, row.id, { spec: { hookIdeas: ideas, hookReview: null } })
 }
 
 // Who the words are for: the character, or a faceless topic account (a
@@ -123,6 +126,21 @@ export function structuresLine(st: { primary: string | null; backup: string | nu
   return parts.filter(Boolean).join(' ')
 }
 
+// The general standard's hooks (section 29): the moment, the pattern, the
+// hook and its runner-up, the writer's own rank; one call, no reviewer.
+export const generalHooksJsonSchema = (n: number) => ({
+  type: 'object', additionalProperties: false, required: ['hooks'],
+  properties: {
+    hooks: {
+      type: 'array', minItems: n, maxItems: n,
+      items: {
+        type: 'object', additionalProperties: false, required: ['moment', 'pattern', 'hook', 'alt_hook', 'rank'],
+        properties: { moment: { type: 'string' }, pattern: { type: 'string', enum: [...PATTERN_IDS] }, hook: { type: 'string' }, alt_hook: { type: 'string' }, rank: { type: 'integer', minimum: 1, maximum: 5 } },
+      },
+    },
+  },
+})
+// SideStep's (section 28): also the effects, the code and the pain.
 export const hooksJsonSchema = (n: number) => ({
   type: 'object', additionalProperties: false, required: ['hooks'],
   properties: {
@@ -144,7 +162,28 @@ export const reviewJsonSchema = (n: number) => ({
   properties: { reviews: { type: 'array', minItems: n, maxItems: n, items: { type: 'object', additionalProperties: false, required: ['n', 'stops', 'job', 'exact', 'pain', 'friend', 'score', 'note'], properties: { n: { type: 'integer', minimum: 1, maximum: n }, stops: { type: 'boolean' }, job: { type: 'boolean' }, exact: { type: 'boolean' }, pain: { type: 'integer', minimum: 1, maximum: 10 }, friend: { type: 'boolean' }, score: { type: 'integer', minimum: 1, maximum: 5 }, note: { type: 'string' } } } } },
 })
 
-interface HookOut { effect_open?: unknown; effect_payoff?: unknown; moment?: unknown; code?: unknown; pain?: unknown; hook?: unknown; alt_hook?: unknown; rank?: unknown }
+interface HookOut { effect_open?: unknown; effect_payoff?: unknown; moment?: unknown; code?: unknown; pain?: unknown; hook?: unknown; alt_hook?: unknown; rank?: unknown; pattern?: unknown }
+
+// The general standard's stand-in (demo mode and tests): plain hooks that
+// say what happened, on no product's subject.
+const MOCK_GENERAL: Array<[string, string, HookPattern]> = [
+  ['my landlord texted "quick question" at 11:48pm. it was not quick', 'a "quick question" from the landlord at midnight. not quick', 'storytime'],
+  ['i said yes to a 6am run club and now i live there', 'one yes to a 6am run club and i never left', 'pov'],
+  ['3 things nobody tells you about your first apartment', 'nobody warns you about these 3 first apartment things', 'nobody_tells'],
+  ['my sister said i would never finish a book in a week. day 6', 'day 6 of proving my sister wrong about one book', 'doubt'],
+  ['red flags i ignored at my last haircut appointment', 'the haircut red flags i saw and ignored anyway', 'red_flags'],
+  ['ranking every coffee order i tried this month', 'tier list: every coffee order this month', 'tier_list'],
+  ['myth: you need 8 hours. fact: i got 5 and ran 10k', 'everyone says 8 hours. i got 5 and ran a 10k', 'myth_fact'],
+  ['5 small things that made my mornings easy this week', 'this week 5 tiny things fixed my mornings', 'listicle'],
+]
+export function mockGeneralHooks(n: number, topic: string): { hooks: Array<{ moment: string; pattern: HookPattern; hook: string; alt_hook: string; rank: number }> } {
+  return {
+    hooks: Array.from({ length: n }, (_, i) => {
+      const [hook, alt, pattern] = MOCK_GENERAL[i % MOCK_GENERAL.length]!
+      return { moment: `${['Sunday 9:40pm', 'Tuesday 7:15am', 'Friday 4pm'][i % 3]}, ${topic || 'an ordinary day'}: the tell is in the first look`, pattern, hook, alt_hook: alt, rank: i % 3 === 2 ? 2 : 1 }
+    }),
+  }
+}
 
 // A free stand-in for demo mode and tests: hooks written to THE STANDARD
 // v1.2 (the job situation named, exactly what happened, pain 7 or more, the
@@ -163,7 +202,7 @@ const MOCK_HOOKS: Array<[string, string]> = [
   ['interviewer asked my 5 yr plan. bro my plan is getting ONE job offer', 'job interview asked my 5 yr plan. my plan is rent'],
   ['unpaid 6 hour take-home for a job interview. they never even opened it', 'did a 6 hour take-home for the job. they never opened the file'],
 ]
-export function mockHooks(n: number, _vault: string[], topic: string, st: { primary: string | null; backup: string | null; last: string | null }): { hooks: Array<Required<{ [K in keyof HookOut]: string | number }>> } {
+export function mockHooks(n: number, _vault: string[], topic: string, st: { primary: string | null; backup: string | null; last: string | null }): { hooks: Array<Required<{ [K in Exclude<keyof HookOut, 'pattern'>]: string | number }>> } {
   const pool = [st.primary, st.primary, st.primary, st.backup, st.backup, ...STRUCTURE_CODES].filter((c): c is StructureCode => !!c && c !== st.last)
   const codes: StructureCode[] = []
   for (const c of pool) if (codes.length < n && (codes.filter(x => x === c).length < (c === st.primary ? 3 : c === st.backup ? 2 : 1))) codes.push(c)
@@ -172,7 +211,7 @@ export function mockHooks(n: number, _vault: string[], topic: string, st: { prim
       const [hook, alt] = MOCK_HOOKS[i % MOCK_HOOKS.length]!
       return {
         effect_open: EFFECT_CODES[i % 3]!, effect_payoff: (['E4', 'E6', 'E7'] as const)[i % 3]!,
-        moment: `${['Sunday 9:40pm', 'Tuesday 2:14am', 'Friday 4pm'][i % 3]}, ${topic || 'the job search'}: the tell is on the screen`,
+        moment: `${['Sunday 9:40pm', 'Tuesday 2:14am', 'Friday 4pm'][i % 3]}, ${topic || 'the topic'}: the tell is on the screen`,
         code: codes[i % Math.max(1, codes.length)] ?? 'S7', pain: 7 + (i % 3), hook, alt_hook: alt, rank: i % 3 === 2 ? 2 : 1,
       }
     }),
@@ -193,40 +232,64 @@ export const mockReview = (n: number) => ({
 
 async function hookWriterVars(deps: Deps, ctx: Ctx, row: ContentRow, spec: SlideshowSpec) {
   const ch = toData(await getCharacter(deps, ctx, row.characterId!))
-  const kit = await kitFor(deps, ctx, spec.productId)
-  const st = await accountStructures(deps, ctx, row.accountTag, { postId: row.id, characterId: row.characterId })
+  const kit = await kitFor(deps, ctx, row.productId)
+  const std = kit.std
+  // The playbook's structures per account come with a product that adds
+  // them (SideStep); the general standard has none.
+  const st = std?.structures ? await accountStructures(deps, ctx, row.accountTag, { postId: row.id, characterId: row.characterId }) : { primary: null, backup: null, last: null }
   const w = writerFor(ch, row, spec)
-  const topic = topicOf(row, spec) || 'the job search'
+  const topic = topicOf(row, spec) || 'everyday life'
   return {
-    ch, kit, st, w, topic,
+    ch, kit, st, w, topic, std,
     vars: {
       ...pronounVars(ch.pronouns), name: w.name || 'the account', who: w.who, count: String(cfgOf(deps).hooks), topic, account: row.accountTag || 'not given', voice: w.voice,
-      structures: structuresLine(st), tension: spec.plan.tension ? `Tension (a tag, never the subject): ${spec.plan.tension}` : '',
-      product: isProductPost(spec)
-        ? `This is a product post: its last slide will be a friend's tip that fixes the hook's pain, so pick pains SideStep really fixes: ${productEndings(deps).map(e => e.pain).join('; ')}. Ghosting, fake jobs, layoffs, salary games, scams and interview rounds stay pure pain. The product is never in the hook.`
-        : '',
+      structures: std?.structures ? structuresLine(st) : '', tension: spec.plan.tension ? `Tension (a tag, never the subject): ${spec.plan.tension}` : '',
+      product: productLine(deps, kit.product?.name ?? '', std, isProductPost(spec)),
       vault: kit.vault.length ? kit.vault.slice(0, 30).map(h => `- ${h.text}${h.kind ? ` (${h.kind})` : ''}`).join('\n') : 'None yet.',
-      language: kit.language || 'No buyer language collected yet.', claims: kit.claims || '', ...standardVars(deps),
+      language: kit.language || 'No buyer language collected yet.', claims: kit.claims || '', ...standardVars(deps, std),
     },
   }
 }
 
-// The honest SideStep endings (THE STANDARD v1.2): the pain each one fixes
-// and its line, from config/templates.yaml (product_endings).
-export function productEndings(deps: Deps): Array<{ pain: string; line: string }> {
-  return deps.config.pipeline.templates.product_endings.split(/\n(?=\s*-\s)/).map(item => {
+// What the hook writer is told about the post's product (section 29): the
+// product is never in a hook; an ad (#ad on, a plan row with product =
+// yes) on a product whose rules have endings picks a pain one of them
+// fixes. A post that is not an ad never names it.
+function productLine(deps: Deps, product: string, std: WritingStandard | null, ad: boolean): string {
+  if (!product) return ''
+  if (ad && std?.endings) return `This is a product post: its last slide will be a friend's tip that fixes the hook's pain, so pick pains ${product} really fixes: ${productEndings(deps, std).map(e => e.pain).join('; ')}. Any other pain stays pure pain. ${product} is never in the hook.`
+  if (ad) return `This is a product post (an ad for ${product}): its last slide will be a friend's honest tip about ${product}. ${product} is never in the hook.`
+  return `This is not an ad: ${product} is never named.`
+}
+
+// A product's honest endings (SideStep's, THE STANDARD v1.2): the pain each
+// one fixes and its line, from config/templates.yaml (sidestep_product_
+// endings). None for a product whose rules have no endings.
+export function productEndings(deps: Deps, std: WritingStandard | null): Array<{ pain: string; line: string }> {
+  const text = std?.endings ? (deps.config.pipeline.templates as Record<string, unknown>)[`${std.key}_product_endings`] : null
+  if (typeof text !== 'string') return []
+  return text.split(/\n(?=\s*-\s)/).map(item => {
     const t = item.replace(/^\s*-\s*/, '').replace(/\s+/g, ' ').trim()
     const i = t.indexOf(':')
     return i > 0 ? { pain: t.slice(0, i).trim(), line: t.slice(i + 1).trim().replace(/^"|"$/g, '') } : null
   }).filter((e): e is { pain: string; line: string } => !!e && !!e.pain && !!e.line)
 }
 
-// THE STANDARD for slide 1, the ladder and the playbook's menu (with the
-// ladder in it), for every hook writer and the reviewer.
-export function standardVars(deps: Deps) {
-  const t = deps.config.pipeline.templates
-  const ladder = t.playbook_ladder.trim()
-  return { standard: t.hook_standard.trim(), ladder, menu: fill(t.playbook_menu, { ladder }) }
+// The standard for slide 1 (the general standard, or the post's product's
+// on top of it), and the product's ladder and playbook menu when it adds
+// them (SideStep's), for the hook writers and the reviewer.
+export function standardVars(deps: Deps, std: WritingStandard | null) {
+  const t = deps.config.pipeline.templates as Record<string, unknown>
+  const own = (name: string) => (std && typeof t[`${std.key}_${name}`] === 'string' ? String(t[`${std.key}_${name}`]).trim() : '')
+  const ladder = own('playbook_ladder')
+  const menu = own('playbook_menu')
+  return { standard: templateFor(deps, std, 'hook_standard').trim(), ladder, menu: menu ? fill(menu, { ladder }) : '' }
+}
+
+// The reviewer of a product whose rules add one (SideStep's stop test).
+function reviewTemplate(deps: Deps, std: WritingStandard | null): { system: string; prompt: string } {
+  const t = deps.config.pipeline.templates as Record<string, unknown>
+  return (std && t[`${std.key}_slideshow_hooks_review`] as { system: string; prompt: string } | undefined) ?? deps.config.pipeline.templates.sidestep_slideshow_hooks_review
 }
 
 // "Write 10 with Claude" (section 28): the writer, then a separate reviewer
@@ -235,14 +298,23 @@ export function standardVars(deps: Deps) {
 export async function buildSlideshowHooks(deps: Deps, ctx: Ctx, contentId: string): Promise<Built> {
   const { row, spec } = await slideshowPost(deps, ctx, contentId)
   const n = cfgOf(deps).hooks
-  const t = deps.config.pipeline.templates.slideshow_hooks
-  const rt = deps.config.pipeline.templates.slideshow_hooks_review
   const route = await resolveRoute(deps, ctx, 'content_writer')
-  const { kit, st, topic, vars } = await hookWriterVars(deps, ctx, row, spec)
+  const { kit, st, topic, vars, std } = await hookWriterVars(deps, ctx, row, spec)
+  const t = templateFor(deps, std, 'slideshow_hooks')
   const system = fill(t.system, vars), prompt = fill(t.prompt, vars)
-  const reviewPrompt = fill(rt.prompt, { claims: kit.claims || '', hooks: `(the ${n} hooks the writer returns, numbered 1 to ${n})` })
-  const reviewSystem = fill(rt.system, standardVars(deps))
   const purpose = `slideshow_hooks:${row.id}`
+  // The general standard (section 29): one call; the writer runs the stop
+  // test itself. A product whose rules add the reviewer gets the second call.
+  if (!std?.review) {
+    return {
+      purpose, characterId: row.characterId,
+      preview: { title: `Write ${n} hooks`, prompts: [{ label: 'Hook writer', text: `${system}\n${prompt}`, wrapped: hardWrap(`${system}\n${prompt}`) }], warnings: [], invalidates: [] },
+      specs: [{ type: 'llm', stage: 'content', purpose, label: `${n} slideshow hooks`, request: { model: route.model, system, prompt, schema: generalHooksJsonSchema(n), schemaName: 'slideshow_hooks', maxTokens: 400 + 140 * n, effort: route.effort ?? 'low', meta: { itemId: row.id, general: true, mockHooks: mockGeneralHooks(n, topic) } } }],
+    }
+  }
+  const rt = reviewTemplate(deps, std)
+  const reviewPrompt = fill(rt.prompt, { claims: kit.claims || '', hooks: `(the ${n} hooks the writer returns, numbered 1 to ${n})` })
+  const reviewSystem = fill(rt.system, standardVars(deps, std))
   const mock = mockHooks(n, kit.vault.map(h => h.text), topic, st)
   return {
     purpose, characterId: row.characterId,
@@ -271,6 +343,16 @@ async function onSlideshowHooks(deps: Deps, ctx: Ctx, job: JobRow, out: JobOutco
   if (part === 'review') return onHooksReviewed(deps, ctx, postId, out)
   if (out.status !== 'completed') { await cancelChildren(deps, job.id, 'The hooks were not written, so there was nothing to review. Nothing was charged for the review.'); return }
   const d = (out.data ?? {}) as { hooks?: HookOut[] }
+  // The general standard: the writer's own stop test and rank, no review.
+  if ((job.request as { meta?: { general?: boolean } }).meta?.general) {
+    const ideas: HookIdea[] = (Array.isArray(d.hooks) ? d.hooks : []).map(h => {
+      const text = trimWords(clean(h.hook, 200), 30)
+      const pattern = (PATTERN_IDS as readonly string[]).includes(String(h.pattern)) ? h.pattern as HookPattern : guessPattern(text)
+      return { text, pattern, source: 'claude' as const, code: null, effectOpen: null, effectPayoff: null, moment: clean(h.moment, 400), alt: trimWords(clean(h.alt_hook, 200), 30), selfScore: rank(h.rank), score: null, note: '', reviewed: false, pain: null, stops: null }
+    }).filter(h => h.text.length >= 3)
+    if (ideas.length) await updateContent(deps, ctx, postId, { spec: { hookIdeas: ideas, hookReview: null } })
+    return
+  }
   const ideas: HookIdea[] = (Array.isArray(d.hooks) ? d.hooks : []).map(h => {
     // Never cut mid-line: a hook over 22 words keeps its words and gets
     // the lint's note (a hard cap only against a runaway answer).
@@ -284,10 +366,10 @@ async function onSlideshowHooks(deps: Deps, ctx: Ctx, job: JobRow, out: JobOutco
   if (!ideas.length) { await cancelChildren(deps, job.id, 'No hooks came back, so there was nothing to review. Nothing was charged for the review.'); return }
   await updateContent(deps, ctx, postId, { spec: { hookIdeas: ideas, hookReview: 'pending' } })
   const post = await getContent(deps, ctx, postId).catch(() => null)
-  const kit = post ? await kitFor(deps, ctx, parse(post).productId) : null
+  const kit = post ? await kitFor(deps, ctx, post.productId) : null
   const listed = ideas.map((h, i) => `${i + 1}. Moment: ${h.moment || 'not given'}. Code: ${h.code ? codeLabel(h.code) : 'not given'}. Hook: ${h.text}`).join('\n')
   await activateChildren(deps, job.id, c => ({
-    prompt: fill(deps.config.pipeline.templates.slideshow_hooks_review.prompt, { claims: kit?.claims ?? '', hooks: listed }),
+    prompt: fill(reviewTemplate(deps, kit?.std ?? null).prompt, { claims: kit?.claims ?? '', hooks: listed }),
     schema: reviewJsonSchema(ideas.length),
     meta: { ...((c.request as { meta?: Record<string, unknown> }).meta ?? {}), mockReview: mockReview(ideas.length) },
   }))
@@ -356,23 +438,25 @@ interface DraftOut {
 // turn, payoff, relief) in the group-chat voice, one special slide, a
 // home-office scene; on a product post the last slide is the first honest
 // SideStep ending.
-export function mockDraft(hook: string, n: number, mode: 'character' | 'topic', ending: { pain: string; line: string } | null = null): Required<DraftOut> {
-  const base = ['ok so it started with one email at 2:14am', 'subject line said quick question. it was NOT quick', 'my roommate goes bro... page 4 wants page 1 again', 'so i typed the whole resume again. line by line', 'then the captcha asked if i was human 💀', 'honestly? some days, unclear']
+export function mockDraft(hook: string, n: number, mode: 'character' | 'topic', ending: { pain: string; line: string } | null = null, o: { product?: string; general?: boolean } = {}): Required<DraftOut> {
+  const base = o.general
+    ? ['ok so it started with one text at 11:48pm', 'it said quick question. it was not quick', 'my roommate read it over my shoulder and laughed', 'so i answered it line by line', 'then a second text came in 💀', 'honestly? some days, unclear']
+    : ['ok so it started with one email at 2:14am', 'subject line said quick question. it was NOT quick', 'my roommate goes bro... page 4 wants page 1 again', 'so i typed the whole resume again. line by line', 'then the captcha asked if i was human 💀', 'honestly? some days, unclear']
   const shots = mode === 'topic'
     ? ['the desk with the laptop open', 'a coffee mug beside the keyboard', 'the window view at lunch', 'a notepad with a to-do list', 'the monitor glowing at dusk', 'the empty chair at the end of the day', 'the hallway by the elevators', 'a phone face down on the desk', 'the door on the way out']
     : ['looking at the laptop with a coffee mug', 'leaning back in the chair, thinking', 'reading something on the phone', 'writing a list on a notepad', 'smiling at the screen', 'packing the laptop into a tote bag', 'standing by the window', 'checking the phone again', 'walking out the door']
-  const last = ending ? `my friend told me about SideStep fr fr. ${ending.line}` : 'which page broke u? asking for page 4'
+  const last = ending ? `my friend told me about ${o.product || 'it'} fr fr. ${ending.line}` : o.general ? 'what would u have said back?' : 'which page broke u? asking for page 4'
   const slides = Array.from({ length: n }, (_, i) => ({
     text: i === 0 ? hook : i === n - 1 ? last : base[(i - 1) % base.length]!,
     shot: shots[i % shots.length]!,
-    special: i === 2 && n >= 4 ? { type: 'notification', from: 'Mail', title: 'Hiring Team', body: 'We would love to set up a call this week.', lines: [], time: 'now' } : { type: 'none', from: '', title: '', body: '', lines: [], time: '' },
+    special: i === 2 && n >= 4 ? (o.general ? { type: 'notification', from: 'Messages', title: 'Sam', body: 'quick question', lines: [], time: 'now' } : { type: 'notification', from: 'Mail', title: 'Hiring Team', body: 'We would love to set up a call this week.', lines: [], time: 'now' }) : { type: 'none', from: '', title: '', body: '', lines: [], time: '' },
   }))
   return {
     slides,
     scene: { place: 'a small home office by a window', light: 'window', camera: mode === 'topic' ? 'phone held at chest height' : 'friend_phone', outfit: mode === 'topic' ? '' : 'a gray cotton crewneck sweater', details: ['a mug of coffee', 'a sticky note on the monitor'] },
     caption: `not me thinking this would take a week. ${hook.replace(/[.!?]*$/, '.')}`,
     cta: 'which page broke u?',
-    hashtags: ['jobsearch', 'careertok', 'storytime'],
+    hashtags: o.general ? ['storytime', 'relatable', 'dailylife'] : ['jobsearch', 'careertok', 'storytime'],
     product_ending: ending ? ending.pain : 'none',
   }
 }
@@ -382,9 +466,10 @@ export interface HookInfo { hook: string; pattern: HookPattern | null; code?: St
 
 async function draftRequest(deps: Deps, ctx: Ctx, row: ContentRow, spec: SlideshowSpec, h: HookInfo, n: number) {
   const ch = toData(await getCharacter(deps, ctx, row.characterId!))
-  const kit = await kitFor(deps, ctx, spec.productId)
+  const kit = await kitFor(deps, ctx, row.productId)
+  const std = kit.std
   const sc = deps.config.pipeline.scenes
-  const t = deps.config.pipeline.templates.slideshow_draft
+  const t = templateFor(deps, std, 'slideshow_draft')
   const route = await resolveRoute(deps, ctx, 'content_writer')
   const topicMode = spec.mode === 'topic'
   const lights = sc.lights.filter(l => l.id !== 'as_written').map(l => l.id)
@@ -394,9 +479,11 @@ async function draftRequest(deps: Deps, ctx: Ctx, row: ContentRow, spec: Slidesh
   const lock = spec.lock
   const given = [lock.place && `place: ${lock.place}`, lock.light && `light: ${lock.light}`, lock.camera && `camera: ${lock.camera}`, !topicMode && lock.outfit && `outfit: ${lock.outfit}`, lock.details.length && `details: ${lock.details.join('; ')}`].filter(Boolean)
   const product = kit.product?.name ?? ''
+  // Written for the product (its rules) and an ad for it (#ad, a plan row's
+  // product = yes) are separate (section 29): endings only on an ad.
   const isProduct = isProductPost(spec)
-  const endings = productEndings(deps)
-  const structure = h.code
+  const endings = isProduct ? productEndings(deps, std) : []
+  const structure = !std?.structures ? '' : h.code
     ? `Pour it into ${codeLabel(h.code)}.${h.effectOpen ? ` The viewer feels ${effectLabel(h.effectOpen)} on slide 1` : ''}${h.effectPayoff ? `${h.effectOpen ? ' and' : ' The viewer feels'} ${effectLabel(h.effectPayoff)} at the end` : ''}${h.effectOpen || h.effectPayoff ? '.' : ''}`
     : 'Pick the structure or lens that fits the hook (S1 to S12, L13 to L25).'
   const vars = {
@@ -406,17 +493,18 @@ async function draftRequest(deps: Deps, ctx: Ctx, row: ContentRow, spec: Slidesh
     outfit_rule: topicMode ? 'leave it empty' : `what ${pv.subj} wears in every photo`, tags_max: String(cfgOf(deps).hashtags[1]),
     caption_voice: w.captionVoice, voice: w.voice,
     scene: given.length ? `The scene is set: ${given.join('; ')}. Keep it.` : '',
-    product_rule: !product ? 'This is not a product post: product_ending is "none".' : isProduct
-      ? [
+    product_rule: !product ? 'There is no product: name no product or brand, and product_ending is "none".'
+      : isProduct && !endings.length ? `This is a product post (an ad for ${product}): the last slide is a friend's honest tip about ${product} that fits the hook's story, in the same voice, inside its claims sheet only. ${product} is never in the hook or the slides before the last two. product_ending is "none". The caption starts with "Ad:" naming ${product}.`
+      : isProduct ? [
         `This is a product post (an ad). The last slide is a friend's tip that fixes the exact pain from slide 1, in the same voice ("my friend told me about ${product} fr fr..."), using only one of these honest endings, and only when ${product} really fixes that pain:`,
         ...endings.map(e => `- ${e.pain}: "${e.line}"`),
         `product_ending is that ending's pain, word for word. Ghosting, fake jobs, layoffs, salary games, scams and interview rounds stay pure pain: if the hook's pain is one of those, or no ending above fixes it, never name ${product} anywhere, the last slide is relief or a question, and product_ending is "none". Never "stop getting ghosted", "stop getting passed over" or "it applies for you": ${product} cannot promise replies and never submits for anyone. ${product} is never in the hook or slides 1 to 5. Inside its claims sheet only. When it is named, the caption starts with "Ad:" naming it.`,
       ].join('\n')
-      : `This is not a product post: never name ${product}, and product_ending is "none".`,
+      : `This is not an ad: never name ${product}, and product_ending is "none".`,
     language: kit.language, claims: kit.claims,
   }
   const system = fill(t.system, vars), prompt = fill(t.prompt, vars)
-  return { system, prompt, route, schema: draftJsonSchema(n, cfgOf(deps).hashtags[1], lights, cameras, isProduct ? endings.map(e => e.pain) : []), mock: mockDraft(h.hook, n, spec.mode, isProduct ? endings[0] ?? null : null) }
+  return { system, prompt, route, endings, schema: draftJsonSchema(n, cfgOf(deps).hashtags[1], lights, cameras, endings.map(e => e.pain)), mock: mockDraft(h.hook, n, spec.mode, endings[0] ?? null, { product, general: !std }) }
 }
 
 export async function buildSlideshowDraft(deps: Deps, ctx: Ctx, input: { contentId: string; hook: string; pattern?: HookPattern | null; code?: StructureCode | null; effectOpen?: EffectCode | null; effectPayoff?: EffectCode | null; moment?: string; alt?: string; score?: number | null }): Promise<Built> {
@@ -440,7 +528,7 @@ export async function buildSlideshowDraft(deps: Deps, ctx: Ctx, input: { content
 // not set, the caption, the CTA line and at most 5 hashtags; and what the
 // hook brought (its code, effects, moment, alt hook and score). The
 // pictures already picked stay; dragged positions reset with the new words.
-export function draftPatch(deps: Deps, spec: SlideshowSpec, d: DraftOut, meta: HookInfo & { n: number }): Partial<SlideshowSpec> {
+export function draftPatch(deps: Deps, spec: SlideshowSpec, d: DraftOut, meta: HookInfo & { n: number; endings?: Array<{ pain: string; line: string }> }): Partial<SlideshowSpec> {
   const cfg = cfgOf(deps)
   const wording = deps.config.pipeline.wording
   const catalog = (s: string) => catalogWording(s, wording).text
@@ -486,17 +574,18 @@ export function draftPatch(deps: Deps, spec: SlideshowSpec, d: DraftOut, meta: H
     caption: clean(d.caption, 2200), hashtags: tags(d.hashtags, cfg.hashtags[1]), ctaLine: clean(d.cta, 300),
     cta: { ...spec.cta, kind: 'own' },
     plan,
-    ...endingPatch(deps, spec, d.product_ending),
+    ...endingPatch(spec, d.product_ending, meta.endings ?? []),
   }
 }
 
-// THE STANDARD v1.2 on a product post: the honest ending the draft used, or
-// "none" when the hook's pain is not one SideStep fixes: then there is no
-// product mention, so #ad goes off (the plan row keeps its product tag).
-function endingPatch(deps: Deps, spec: SlideshowSpec, v: unknown): Partial<SlideshowSpec> {
-  if (!isProductPost(spec)) return { productEnding: null }
+// An ad on a product whose rules have endings (SideStep's, THE STANDARD
+// v1.2): the honest ending the draft used, or "none" when the hook's pain is
+// not one the product fixes: then there is no product mention, so #ad goes
+// off (the plan row keeps its product tag). Any other post: no ending.
+function endingPatch(spec: SlideshowSpec, v: unknown, endings: Array<{ pain: string; line: string }>): Partial<SlideshowSpec> {
+  if (!isProductPost(spec) || !endings.length) return { productEnding: null }
   const pain = String(v ?? '').trim()
-  const known = productEndings(deps).find(e => e.pain.toLowerCase() === pain.toLowerCase())
+  const known = endings.find(e => e.pain.toLowerCase() === pain.toLowerCase())
   return known ? { productEnding: known.pain } : { productEnding: 'none', ad: false }
 }
 
@@ -819,7 +908,7 @@ export async function buildSlideshowVariations(deps: Deps, ctx: Ctx, input: { co
   const vars = {
     ...pronounVars(ch.pronouns), name: ch.name, count: String(count), rest: String(n - 1), tags_max: String(cfgOf(deps).hashtags[1]), voice: voiceOf(ch), slides: list.map(s => `${s.index + 1}. ${s.text || '(no words)'}`).join('\n'), caption: spec.caption.trim() || 'none',
     alt: alt ? `Start from the alt hook: variation 1's hook is "${alt}" word for word; the other variations reword it.` : '',
-    standard: standardVars(deps).standard,
+    standard: standardVars(deps, (await postWriting(deps, ctx, row.productId)).std).standard,
   }
   const system = fill(t.system, vars), prompt = fill(t.prompt, vars)
   const purpose = `slide_vars:${row.id}`
@@ -908,7 +997,7 @@ async function onSlideshowVariations(deps: Deps, ctx: Ctx, job: JobRow, out: Job
       caption, hashtags: tags(v.hashtags, cfgOf(deps).hashtags[1]),
     }
     await deps.db.insert(contentItems).values({
-      id, accountId: ctx.accountId, characterId: source.characterId, kind: 'slideshow', title: '', idea: source.idea,
+      id, accountId: ctx.accountId, characterId: source.characterId, kind: 'slideshow', title: '', idea: source.idea, productId: source.productId,
       accountTag: tagsInUse.length ? tagsInUse[k % tagsInUse.length]! : '', sceneId: source.sceneId, spec: vspec, step: 'text',
       variationOf: root, createdBy: job.userId,
     }).onConflictDoNothing()
@@ -973,18 +1062,19 @@ async function onSlideDraft(deps: Deps, ctx: Ctx, job: JobRow, out: JobOutcome):
   if (!anchor) { await cancelChildren(deps, job.id, 'The slideshow is gone.'); return }
   const d = (out.data ?? {}) as DraftOut
   const hook = meta.hook ?? ''
+  const { std } = await postWriting(deps, ctx, anchor.productId)
   if (tag !== 'batch') {
     const spec = parse(anchor)
-    await updateContent(deps, ctx, anchor.id, { spec: { ...draftPatch(deps, spec, d, { ...meta, hook, pattern: meta.pattern ?? null, n: meta.n ?? spec.slideCount }) } })
+    await updateContent(deps, ctx, anchor.id, { spec: { ...draftPatch(deps, spec, d, { ...meta, hook, pattern: meta.pattern ?? null, n: meta.n ?? spec.slideCount, endings: isProductPost(spec) ? productEndings(deps, std) : [] }) } })
     return
   }
   // A batch row: its own slideshow, the batch's scene and settings.
   const parentSpec = parse(anchor)
   const id = batchChildId(job.id)
   const base: SlideshowSpec = { ...parentSpec, hook: '', slides: [], stillIds: [], shots: [], specials: [], textPos: [], hookIdeas: [], hookReview: null, batchHooks: [], caption: '', ctaLine: '', hashtags: [], review: 'pending' }
-  const spec = { ...base, ...draftPatch(deps, base, d, { hook, pattern: meta.pattern ?? null, n: meta.n ?? parentSpec.slideCount }), review: 'pending' as const }
+  const spec = { ...base, ...draftPatch(deps, base, d, { hook, pattern: meta.pattern ?? null, n: meta.n ?? parentSpec.slideCount, endings: isProductPost(base) ? productEndings(deps, std) : [] }), review: 'pending' as const }
   await deps.db.insert(contentItems).values({
-    id, accountId: ctx.accountId, characterId: anchor.characterId, kind: 'slideshow', title: '', idea: hook,
+    id, accountId: ctx.accountId, characterId: anchor.characterId, kind: 'slideshow', title: '', idea: hook, productId: anchor.productId,
     accountTag: anchor.accountTag, sceneId: anchor.sceneId, spec, step: 'text', batchOf: anchor.id, createdBy: job.userId,
   }).onConflictDoNothing()
   // The stills, each with its slide's shot; a special slide's is released.

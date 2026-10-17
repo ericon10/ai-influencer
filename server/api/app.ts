@@ -124,7 +124,7 @@ async function fileBundle(deps: Deps, c: Context, ctx: Ctx): Promise<{ markdown:
 }
 
 // The plan routes' body as the import functions take it.
-const planArgs = (b: { csv: string; drawSpecials?: boolean; store?: Record<string, string>; stillModel?: string | null }) => [b.csv, { drawSpecials: b.drawSpecials, store: b.store, stillModel: b.stillModel }] as const
+const planArgs = (b: { csv: string; drawSpecials?: boolean; store?: Record<string, string>; stillModel?: string | null; productId?: string | null; rows?: string[] }) => [b.csv, { drawSpecials: b.drawSpecials, store: b.store, stillModel: b.stillModel, productId: b.productId, rows: b.rows }] as const
 
 export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
   const app = new Hono<Env>().basePath('/api/v1')
@@ -641,8 +641,8 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
   // One post, also one older than the newest 200 the list holds.
   // Older posts, a page at a time (Posts home), filtered by account or character.
   app.get('/content/page', async c => {
-    const q = parse(z.object({ before: z.string().regex(/^cnt_[a-z0-9]{8,40}$/).optional(), limit: z.coerce.number().int().min(1).max(200).optional(), tag: z.string().max(80).optional(), character: z.string().regex(/^chr_[a-z0-9]{8,40}$/).optional() }), c.req.query())
-    return c.json(await contentPage(deps, c.get('ctx'), { before: q.before, limit: q.limit, accountTag: q.tag, characterId: q.character }))
+    const q = parse(z.object({ before: z.string().regex(/^cnt_[a-z0-9]{8,40}$/).optional(), limit: z.coerce.number().int().min(1).max(200).optional(), tag: z.string().max(80).optional(), character: z.string().regex(/^chr_[a-z0-9]{8,40}$/).optional(), product: z.string().regex(/^(prd_[a-z0-9]{8,40}|none)$/).optional() }), c.req.query())
+    return c.json(await contentPage(deps, c.get('ctx'), { before: q.before, limit: q.limit, accountTag: q.tag, characterId: q.character, productId: q.product }))
   })
   app.get('/content/:id', async c => c.json(await contentItemView(deps, c.get('ctx'), c.req.param('id'))))
   // Delete and the Trash (owner, 2026-10-15; UX-PLAN.md section 22).
@@ -824,13 +824,13 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
   app.post('/broll', async c => {
     const ctx = c.get('ctx')
     requireRole(ctx, 'member')
-    const body = parse(z.object({ uploadId: z.string().max(40), name: z.string().max(300), title: z.string().max(120).optional(), product: z.string().max(60).optional() }), await json(c))
+    const body = parse(z.object({ uploadId: z.string().max(40), name: z.string().max(300), title: z.string().max(120).optional(), productId: z.string().max(60).nullable().optional() }), await json(c))
     return c.json(await addBroll(deps, ctx, body), 201)
   })
   app.patch('/broll/:id', async c => {
     const ctx = c.get('ctx')
     requireRole(ctx, 'member')
-    const body = parse(z.object({ title: z.string().max(120).optional(), product: z.string().max(60).optional() }), await json(c))
+    const body = parse(z.object({ title: z.string().max(120).optional(), productId: z.string().max(60).nullable().optional() }), await json(c))
     return c.json(await updateBroll(deps, ctx, c.req.param('id'), body))
   })
   app.delete('/broll/:id', async c => {
@@ -845,6 +845,7 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
     const body = parse(z.object({
       kind: z.enum(['meme', 'slideshow', 'batch']), characterId: z.string().max(60), title: z.string().max(120).optional(), spec: z.record(z.string(), z.unknown()).optional(),
       idea: z.string().max(2000).optional(), accountTag: z.string().max(60).optional(), sceneId: z.string().max(60).nullable().optional(), step: z.enum(POST_STEPS).optional(),
+      productId: z.string().max(60).nullable().optional(),
     }), await json(c))
     const row = await createContent(deps, ctx, body)
     return c.json({ id: row.id }, 201)
@@ -855,6 +856,7 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
     const body = parse(z.object({
       title: z.string().max(120).optional(), spec: z.record(z.string(), z.unknown()).optional(),
       idea: z.string().max(2000).optional(), accountTag: z.string().max(60).optional(), sceneId: z.string().max(60).nullable().optional(), step: z.enum(POST_STEPS).optional(), characterId: z.string().max(60).optional(),
+      productId: z.string().max(60).nullable().optional(),
     }), await json(c))
     const row = await updateContent(deps, ctx, c.req.param('id'), body)
     return c.json({ id: row.id })
@@ -1003,6 +1005,7 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
       name: z.string().max(80).optional(), notes: z.string().max(20_000).optional(),
       claims: z.object({ groups: groupBody.optional(), lines: groupBody.optional(), watch: z.array(z.string().max(60)).max(60).optional(), mentions: z.array(z.string().max(60)).max(60).optional() }).optional(),
       language: z.object({ groups: groupBody }).optional(),
+      writing: z.string().max(40).optional(),
     }), await json(c))
     await updateProduct(deps, ctx, c.req.param('id'), body)
     return c.json(await productView(deps, ctx, c.req.param('id')))
@@ -1083,7 +1086,7 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
   app.get('/slideshow/still-models', async c => c.json(await slideStillChoices(deps, c.get('ctx'))))
   // The launch plan (section 28): the free preview, the drafts (free), and
   // the plan's posts in schedule order.
-  const planBody = z.object({ csv: z.string().max(400_000), drawSpecials: z.boolean().optional(), store: z.record(z.string().max(60), z.string().max(60)).optional(), stillModel: z.string().max(80).nullable().optional() })
+  const planBody = z.object({ csv: z.string().max(400_000), drawSpecials: z.boolean().optional(), store: z.record(z.string().max(60), z.string().max(60)).optional(), stillModel: z.string().max(80).nullable().optional(), productId: z.string().max(60).nullable().optional(), rows: z.array(z.string().max(60)).max(2000).optional() })
   app.post('/plan/preview', async c => c.json(await previewPlan(deps, c.get('ctx'), ...planArgs(parse(planBody, await json(c))))))
   app.post('/plan/import', async c => {
     const ctx = c.get('ctx')

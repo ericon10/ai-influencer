@@ -22,7 +22,7 @@ import { useQueryClient } from '@tanstack/react-query'
 
 export function FinishStep({ ctx }: { ctx: PostCtx }) {
   const { item, draft, lib } = ctx
-  const lint = useLint(item.characterId)
+  const lint = useLint(item.characterId, item.productId)
   const memePlan = item.kind === 'meme' ? (draft.spec as unknown as MemeSpec).plan : undefined
   const duplicate = useDuplicate()
   const qc = useQueryClient()

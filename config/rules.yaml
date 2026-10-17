@@ -445,98 +445,98 @@ rules:
     spec: "28"
     title: 'No em or en dashes'
     check: { type: behavior }
-    message: 'Hooks, slides and captions with a long dash (em or en) get a free warning as they are typed, with a comma, a period or "to" as the fix.'
+    message: 'Hooks, slides and captions with a long dash (em or en) get a free warning as they are typed, with a comma, a period or "to" as the fix. On every post, any product (section 29).'
   - id: lint-values
     bucket: default
     area: copy
     spec: "28"
     title: 'No should, need to, must, ought'
     check: { type: behavior }
-    message: 'Values words in a hook, slide or caption get a free warning: turn them into a feeling, a fact or a joke (playbook section 7).'
+    message: 'Values words in a hook, slide or caption get a free warning: turn them into a feeling, a fact or a joke (playbook section 7). SideStep''s rules: on posts whose product uses them only (section 29).'
   - id: lint-just
     bucket: default
     area: copy
     spec: "28"
     title: 'No "just" before an instruction'
     check: { type: behavior }
-    message: '"Just apply", "you can just ask": a free warning that it reads as an order; drop "just" or ask a question.'
+    message: '"Just apply", "you can just ask": a free warning that it reads as an order; drop "just" or ask a question. SideStep''s rules: on posts whose product uses them only (section 29).'
   - id: lint-hype
     bucket: default
     area: copy
     spec: "28"
     title: 'No hustle words'
     check: { type: behavior }
-    message: 'dream job, unlock, level up, game-changer, supercharge: a free warning to say what actually happens instead.'
+    message: 'dream job, unlock, level up, game-changer, supercharge: a free warning to say what actually happens instead. SideStep''s rules: on posts whose product uses them only (section 29).'
   - id: lint-you-start
     bucket: default
     area: copy
     spec: "28"
     title: 'No sentence starts with "You"'
     check: { type: behavior }
-    message: 'A sentence that starts with "You" gets a free warning (move "you" to the middle or the end); a "POV:" opener is fine.'
+    message: 'A sentence that starts with "You" gets a free warning (move "you" to the middle or the end); a "POV:" opener is fine. SideStep''s rules: on posts whose product uses them only (section 29).'
   - id: lint-hashtags
     bucket: default
     area: copy
     spec: "28"
     title: 'At most 5 hashtags'
     check: { type: behavior }
-    message: 'A caption with more than 5 hashtags (in the text and the tags) gets a free warning.'
+    message: 'A caption with more than 5 hashtags (in the text and the tags) gets a free warning. SideStep''s rules: on posts whose product uses them only (section 29).'
   - id: lint-product-hook
     bucket: default
     area: copy
     spec: "28"
     title: 'The product is never in the hook'
     check: { type: behavior }
-    message: 'SideStep in a hook gets a free warning: a product post names it on slide 5 or 6, or late in the caption.'
+    message: 'The post''s own product in a hook gets a free warning: a product post names it on slide 5 or 6, or late in the caption. SideStep''s rules: on posts whose product uses them only (section 29).'
   - id: lint-ad-caption
     bucket: default
     area: copy
     spec: "28"
     title: 'A product post''s caption starts with "Ad:"'
     check: { type: behavior }
-    message: 'A product post (product = yes, or #ad on) whose caption does not start with "Ad:" gets a free warning.'
+    message: 'A product post (product = yes, or #ad on) whose caption does not start with "Ad:" gets a free warning. SideStep''s rules: on posts whose product uses them only (section 29).'
   - id: lint-hook-long
     bucket: default
     area: copy
     spec: "28"
     title: 'A hook reads in one go (22 words at most)'
     check: { type: behavior }
-    message: 'A hook over 22 words gets a free warning: slide 1 reads in one go. The writer aims for about 15 (THE STANDARD); the v1.2 passing examples run 14 to 22.'
+    message: 'A hook over 22 words gets a free warning: slide 1 reads in one go. The writer aims for about 15 (THE STANDARD); the v1.2 passing examples run 14 to 22. SideStep''s rules: on posts whose product uses them only (section 29).'
   - id: lint-hook-label
     bucket: default
     area: copy
     spec: "28"
     title: 'A hook never opens with a label or stage direction'
     check: { type: behavior }
-    message: 'A hook that opens with Exhibit, Levels of, Previously on, Calendar invite or a timestamp gets a free warning: say the pain plainly first, the frame can wait for slide 2.'
+    message: 'A hook that opens with Exhibit, Levels of, Previously on, Calendar invite or a timestamp gets a free warning: say the pain plainly first, the frame can wait for slide 2. SideStep''s rules: on posts whose product uses them only (section 29).'
   - id: lint-hook-quotes
     bucket: default
     area: copy
     spec: "28"
     title: 'One quoted phrase at most in a hook'
     check: { type: behavior }
-    message: 'A hook with more than one quoted phrase gets a free warning, so it is clear on one read.'
+    message: 'A hook with more than one quoted phrase gets a free warning, so it is clear on one read. SideStep''s rules: on posts whose product uses them only (section 29).'
   - id: lint-hook-nojob
     bucket: default
     area: copy
     spec: "28"
     title: 'A hook names the job situation'
     check: { type: behavior }
-    message: 'A hook with no job word (job, interview, recruiter, offer, salary, resume, hiring, application) gets a free warning: a stranger cannot tell it is about the job hunt (THE STANDARD v1.2).'
+    message: 'A hook with no job word (job, interview, recruiter, offer, salary, resume, hiring, application) gets a free warning: a stranger cannot tell it is about the job hunt (THE STANDARD v1.2). SideStep''s rules: on posts whose product uses them only (section 29).'
   - id: lint-product-ending
     bucket: default
     area: copy
     spec: "28"
     title: 'A product post''s last slide never promises replies or applying'
     check: { type: behavior }
-    message: 'On a product post, a last slide that says ghosted, passed over or applies for you gets a free warning: SideStep cannot promise replies and never submits for anyone. The honest endings are in THE STANDARD.'
+    message: 'On a product post, a last slide that says ghosted, passed over or applies for you gets a free warning: the product cannot promise replies and never submits for anyone. The honest endings are in THE STANDARD. SideStep''s rules: on posts whose product uses them only (section 29).'
   - id: structure-repeat
     bucket: default
     area: copy
     spec: "28"
     title: 'Never the same structure twice in a row'
     check: { type: behavior }
-    message: 'Per account, the hook writer never uses the structure or lens code of the account''s last post, and a hook card or a plan row with the same code as the post before it gets a warning.'
+    message: 'Per account, the hook writer never uses the structure or lens code of the account''s last post, and a hook card or a plan row with the same code as the post before it gets a warning. SideStep''s rules: on posts whose product uses them only (section 29).'
   - id: wording-risky
     bucket: default
     area: scene

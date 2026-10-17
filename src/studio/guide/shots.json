@@ -87,7 +87,7 @@
         "y": 34.1,
         "w": 94,
         "h": 8.2,
-        "label": "Accounts: tracked links, promo codes, signups, primary and backup structures"
+        "label": "Accounts: each account's product, tracked link or promo code, signups"
       },
       {
         "n": 3,
@@ -99,18 +99,18 @@
       },
       {
         "n": 4,
-        "x": 9.9,
-        "y": 54.5,
-        "w": 3.3,
+        "x": 3,
+        "y": 62.5,
+        "w": 94,
         "h": 3.1,
-        "label": "Filter by account (the tag you set on a post) or character"
+        "label": "Filter by account, character or product"
       },
       {
         "n": 5,
         "x": 3,
-        "y": 63.7,
+        "y": 67.7,
         "w": 22.5,
-        "h": 36.3,
+        "h": 32.3,
         "label": "A post: open it to keep going where you left off"
       }
     ]
@@ -2691,55 +2691,39 @@
   },
   "launch-plan-preview": {
     "w": 1124,
-    "h": 1588,
+    "h": 1100,
     "spots": [
       {
         "n": 1,
         "x": 1.9,
-        "y": 8.8,
+        "y": 12.8,
         "w": 96.3,
-        "h": 5.8,
-        "label": "Paste the plan, or Upload the CSV"
+        "h": 5.2,
+        "label": "1 · The CSV: its name and how many rows"
       },
       {
         "n": 2,
-        "x": 28.2,
-        "y": 15.3,
-        "w": 3.9,
-        "h": 1.6,
-        "label": "Draw mock screens by code (off: every slide a photo, as written)"
+        "x": 1.9,
+        "y": 19.1,
+        "w": 96.3,
+        "h": 8.8,
+        "label": "2 · Preview (free), and Draw mock screens by code"
       },
       {
         "n": 3,
         "x": 1.9,
-        "y": 17.7,
+        "y": 29,
         "w": 96.3,
-        "h": 21.8,
-        "label": "Each account: a character, or a topic account (no one in the photos)"
+        "h": 10.3,
+        "label": "3 · This plan is for: the product of the rows that name none"
       },
       {
         "n": 4,
         "x": 1.9,
-        "y": 41.9,
+        "y": 75.7,
         "w": 96.3,
-        "h": 46,
-        "label": "The rows by day and account; hover a chip for its hook and price"
-      },
-      {
-        "n": 5,
-        "x": 1.9,
-        "y": 90.9,
-        "w": 96.3,
-        "h": 1.8,
-        "label": "The stills model the price is for"
-      },
-      {
-        "n": 6,
-        "x": 1.9,
-        "y": 93.3,
-        "w": 96.3,
-        "h": 2.3,
-        "label": "What it is and what generating every picture would cost"
+        "h": 24.3,
+        "label": "Tick the rows to import: each with its product and Ad"
       }
     ]
   },
@@ -2868,6 +2852,132 @@
         "w": 22.5,
         "h": 72.5,
         "label": "The newest 200 posts show first, the most recently changed on top"
+      }
+    ]
+  },
+  "post-product": {
+    "w": 1196,
+    "h": 520,
+    "spots": [
+      {
+        "n": 1,
+        "x": 4.6,
+        "y": 66.7,
+        "w": 90.8,
+        "h": 5.4,
+        "label": "Product: No product, or one of yours. Saved with the post, free"
+      },
+      {
+        "n": 2,
+        "x": 4.6,
+        "y": 73.3,
+        "w": 90.8,
+        "h": 3.5,
+        "label": "What this post is written to: the general standard, plus its product's own rules"
+      },
+      {
+        "n": 3,
+        "x": 27.2,
+        "y": 66.7,
+        "w": 11.4,
+        "h": 5.4,
+        "label": "About products"
+      }
+    ]
+  },
+  "posts-product-filter": {
+    "w": 1196,
+    "h": 760,
+    "spots": [
+      {
+        "n": 1,
+        "x": 3,
+        "y": 21,
+        "w": 94,
+        "h": 3.7,
+        "label": "Filter by product: each product, or No product (older posts too)"
+      },
+      {
+        "n": 2,
+        "x": 4.4,
+        "y": 80.1,
+        "w": 19.6,
+        "h": 2.5,
+        "label": "Each card names its product"
+      }
+    ]
+  },
+  "accounts-product": {
+    "w": 1124,
+    "h": 520,
+    "spots": [
+      {
+        "n": 1,
+        "x": 25.9,
+        "y": 28.5,
+        "w": 8.5,
+        "h": 21.6,
+        "label": "The account's product: the product of every new post on it (none until you pick one)"
+      },
+      {
+        "n": 2,
+        "x": 1.9,
+        "y": 17.9,
+        "w": 96.3,
+        "h": 10.6,
+        "label": "Ranked by signups, never by views"
+      }
+    ]
+  },
+  "product-writing": {
+    "w": 1196,
+    "h": 640,
+    "spots": [
+      {
+        "n": 1,
+        "x": 12.8,
+        "y": 25.1,
+        "w": 43,
+        "h": 6.7,
+        "label": "Writing rules: the general standard alone, or a product's own rules on top"
+      },
+      {
+        "n": 2,
+        "x": 4.8,
+        "y": 33.1,
+        "w": 90.5,
+        "h": 8.4,
+        "label": "Only posts whose product is this one follow it"
+      },
+      {
+        "n": 3,
+        "x": 3,
+        "y": 47.6,
+        "w": 94,
+        "h": 52.4,
+        "label": "The product's hook vault"
+      }
+    ]
+  },
+  "launch-plan-import": {
+    "w": 1124,
+    "h": 520,
+    "spots": [
+      {
+        "n": 1,
+        "x": 1.9,
+        "y": 52,
+        "w": 96.3,
+        "h": 3.5,
+        "label": "The ticked rows and their stills' price, for later"
+      },
+      {
+        "n": 2,
+        "x": 1.9,
+        "y": 57.7,
+        "w": 96.3,
+        "h": 12.1,
+        "label": "4 · Import N rows (free): only the ticked rows"
       }
     ]
   }

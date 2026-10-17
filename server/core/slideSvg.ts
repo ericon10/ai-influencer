@@ -298,12 +298,12 @@ export function specialSvg(sp: SpecialSlide, frame: Frame, draw: Draw): string {
     const headY = SAFE.top * h
     out.push(draw.text('Inbox', 0.06 * w, headY + 50 * u, { size: 34 * u, weight: 500, fill: '#0a84ff' }))
     let y = 0.36 * h
-    const subject = wrapText(sp.title || 'Update on your application', 50 * u, 700, 0.88 * w, draw, 3)
+    const subject = wrapText(sp.title || 'An update', 50 * u, 700, 0.88 * w, draw, 3)
     subject.forEach(l => { out.push(draw.text(l, 0.06 * w, y, { size: 50 * u, weight: 700, fill: '#1c1c1e' })); y += 62 * u })
     y += 26 * u
     out.push(circle(0.06 * w + 38 * u, y + 30 * u, 38 * u, hueFor(sp.from || 'R')))
     out.push(draw.text(initial(sp.from || 'R'), 0.06 * w + 38 * u, y + 46 * u, { size: 40 * u, weight: 600, fill: '#ffffff', anchor: 'middle' }))
-    out.push(draw.text(sp.from || 'Recruiting Team', 0.06 * w + 96 * u, y + 22 * u, { size: 34 * u, weight: 600, fill: '#1c1c1e' }))
+    out.push(draw.text(sp.from || 'Mail', 0.06 * w + 96 * u, y + 22 * u, { size: 34 * u, weight: 600, fill: '#1c1c1e' }))
     out.push(draw.text(sp.time || '8:02 AM', 0.94 * w, y + 22 * u, { size: 28 * u, weight: 400, fill: '#8e8e93', anchor: 'end' }))
     out.push(draw.text('to me', 0.06 * w + 96 * u, y + 62 * u, { size: 28 * u, weight: 400, fill: '#8e8e93' }))
     y += 130 * u
@@ -320,7 +320,7 @@ export function specialSvg(sp: SpecialSlide, frame: Frame, draw: Draw): string {
     out.push(rect(0, 0, w, h, 0, '#000000', ' fill-opacity="0.22"'))
     const cw = 0.88 * w, cx = (w - cw) / 2, pad = 40 * u
     const bullets = sp.lines.slice(0, 5).flatMap(b => wrapText(b, 34 * u, 400, cw - 2 * pad - 30 * u, draw, 2).map((l, i) => ({ l, first: i === 0 })))
-    const title = wrapText(sp.title || 'Open role', 48 * u, 700, cw - 2 * pad, draw, 2)
+    const title = wrapText(sp.title || 'Open position', 48 * u, 700, cw - 2 * pad, draw, 2)
     const ch = pad * 2 + 90 * u + title.length * 58 * u + 110 * u + bullets.length * 46 * u + 120 * u
     const cy = Math.max(0.34 * h, Math.min((1 - SAFE.bottom) * h - ch, 0.56 * h - ch / 2))
     out.push(rect(cx, cy, cw, ch, 36 * u, '#ffffff'))
@@ -381,9 +381,9 @@ function drawnScreen(sp: SpecialSlide, frame: Frame, draw: Draw): string {
     const y0 = place(ch)
     out.push(rect(cx, y0, cw, ch, 32 * u, '#ffffff'))
     let y = y0 + pad + 26 * u
-    out.push(t(sp.from || 'Careers portal', cx + pad, y, 28, 500, '#8e8e93'))
+    out.push(t(sp.from || 'Form', cx + pad, y, 28, 500, '#8e8e93'))
     y += 58 * u
-    out.push(t(wrap(sp.title || 'Application', 44, 700, cw - 2 * pad, 1)[0] ?? '', cx + pad, y, 44, 700, '#1c1c1e'))
+    out.push(t(wrap(sp.title || 'Your details', 44, 700, cw - 2 * pad, 1)[0] ?? '', cx + pad, y, 44, 700, '#1c1c1e'))
     y += 40 * u
     if (total) {
       const done = sp.variant === 'filled' ? total : 0
@@ -410,9 +410,9 @@ function drawnScreen(sp: SpecialSlide, frame: Frame, draw: Draw): string {
     const y0 = place(ch)
     out.push(rect(cx, y0, cw, ch, 32 * u, '#ffffff'))
     let y = y0 + pad + 26 * u
-    out.push(t(sp.from || 'Candidate portal', cx + pad, y, 28, 500, '#8e8e93'))
+    out.push(t(sp.from || 'Status', cx + pad, y, 28, 500, '#8e8e93'))
     y += 56 * u
-    out.push(t(wrap(sp.title || 'Your application', 42, 700, cw - 2 * pad - 260 * u, 1)[0] ?? '', cx + pad, y, 42, 700, '#1c1c1e'))
+    out.push(t(wrap(sp.title || 'Your request', 42, 700, cw - 2 * pad - 260 * u, 1)[0] ?? '', cx + pad, y, 42, 700, '#1c1c1e'))
     if (sp.body) {
       const pw = Math.min(300 * u, draw.measure(sp.body, 26 * u, 600) + 40 * u)
       out.push(rect(cx + cw - pad - pw, y - 38 * u, pw, 50 * u, 25 * u, '#fff4d6'))
@@ -526,7 +526,7 @@ function drawnScreen(sp: SpecialSlide, frame: Frame, draw: Draw): string {
     const y0 = place(ch)
     out.push(rect(cx, y0, cw, ch, 32 * u, '#ffffff'))
     let y = y0 + pad + 26 * u
-    out.push(t(sp.from || 'Candidate experience survey', cx + pad, y, 26, 500, '#8e8e93'))
+    out.push(t(sp.from || 'Survey', cx + pad, y, 26, 500, '#8e8e93'))
     y += 64 * u
     q.forEach(l => { out.push(t(l, cx + pad, y, 40, 700, '#1c1c1e')); y += 52 * u })
     y += 20 * u

@@ -16,6 +16,7 @@ import type { CloneSource, SceneView, ScenesData } from '../../types'
 import { SourceBox } from './ClonePanel'
 import { HowTo } from '../../guide/Guide'
 import { SlideshowIdea } from './slideshow/SlideshowIdea'
+import { ProductPicker } from '../../products'
 
 // Step 1 (UX-PLAN.md section 15): one box by default. "Describe the shot or
 // paste a prompt"; what the words already say (camera, framing, outfit,
@@ -25,7 +26,7 @@ import { SlideshowIdea } from './slideshow/SlideshowIdea'
 
 const IDEA: Record<string, { label: string; placeholder: string }> = {
   meme: { label: 'Describe the shot or paste a prompt', placeholder: 'e.g. Front-camera selfie in a black tank at a packed rave, phone a little above her' },
-  slideshow: { label: 'What is it about? (optional)', placeholder: 'e.g. my first year after college, job hunting' },
+  slideshow: { label: 'What is it about? (optional)', placeholder: 'e.g. my first apartment, one month in' },
   batch: { label: 'What are the captions about?', placeholder: 'e.g. studying with AI the night before an exam' },
 }
 
@@ -131,6 +132,7 @@ export function IdeaStep({ ctx }: { ctx: PostCtx }) {
       ) : (
         <Field id="post-character" label="Character" required done={false} group>{characterChips}</Field>
       )}
+      <ProductPicker item={item} />
       {target && (
         <Callout tone="warn" icon={<AlertTriangle size={16} />}>
           Switching to {target.name} drops the stills and clips picked for {current?.name ?? 'this character'} in this post. The idea, the text and the B-roll stay.

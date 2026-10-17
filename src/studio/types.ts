@@ -299,7 +299,7 @@ export interface VideoPrice { model: string; label: string; display: string | nu
 
 // The content builder (text overlays): B-roll, meme videos, slideshows, batches.
 export type ContentKind = 'meme' | 'slideshow' | 'batch'
-export interface BrollClip { id: string; title: string; product: string; status: 'processing' | 'ready' | 'failed'; error: string | null; assetId: string | null; durationSec: number | null; createdAt: string }
+export interface BrollClip { id: string; title: string; productId: string | null; product: string; status: 'processing' | 'ready' | 'failed'; error: string | null; assetId: string | null; durationSec: number | null; createdAt: string }
 export interface BrollTiming { order: 'clip_first' | 'broll_first'; brollStart: number; brollSeconds: number }
 export interface MemeSpec extends BrollTiming {
   clipId: string | null; stillId: string | null; brollId: string | null; caption: string; clone: CloneSource | null
@@ -480,12 +480,14 @@ export interface ContentOutputs {
 export interface ContentItem {
   id: string; kind: ContentKind; characterId: string | null; title: string; spec: Record<string, unknown>
   idea: string; sceneId: string | null; accountTag: string; step: PostStep
+  // The post's product (section 29), or none.
+  productId?: string | null
   status: 'draft' | 'rendering' | 'ready' | 'failed'; outputs: ContentOutputs; error: string | null; createdAt: string; updatedAt: string
   // A slideshow's family and batch (section 27).
   variationOf?: string | null; batchOf?: string | null
 }
 export interface ContentData {
-  broll: BrollClip[]; products: string[]; items: ContentItem[]; accountTags: string[]
+  broll: BrollClip[]; products: ProductBrief[]; items: ContentItem[]; accountTags: string[]
   // Where "Show older posts" starts (the list holds the newest 200), and
   // the characters with posts.
   next?: string | null; characterIds?: string[]
@@ -539,9 +541,14 @@ export interface KitGroup { label: string; items: string[] }
 export interface ProductClaims { groups: KitGroup[]; lines: KitGroup[]; watch: string[]; mentions: string[] }
 export interface HookVariant { id: string; characterId: string; text: string; flags: string[]; createdAt: string }
 export interface KitHook { id: string; number: number; kind: string; text: string; variants: HookVariant[] }
-export interface ProductSummary { id: string; name: string; hooks: number }
+// A product and the rules it adds on top of the general standard (section
+// 29): lint and review say whether its posts get the language notes and
+// the stop-test reviewer.
+export interface ProductBrief { id: string; name: string; writing: string; writingLabel: string; lint: boolean; review: boolean }
+export interface ProductSummary { id: string; name: string; hooks: number; writing?: string; writingLabel?: string }
 export interface ProductView {
   id: string; name: string; claims: ProductClaims; language: { groups: KitGroup[] }
+  writing?: string; writingLabel?: string; writings?: Array<{ key: string; label: string }>
   voices: Array<{ name: string; status: 'live' | 'proposed'; card: VoiceCard }>; notes: string; hooks: KitHook[]
 }
 export interface SocialAccount {

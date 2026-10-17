@@ -14,7 +14,7 @@ import type { PostCtx } from './ctx'
 // can export at once (free). New stills and takes are generated in each
 // post, with their own price, as always.
 
-const TEMPLATE = 'character,account,clip,video,caption,style\nCallie,callie.jobs,dance-take.mp4,,entry level but they want 5 years experience,Crash zoom cut\nCallie,callie.jobs,"still: at her desk at night, laptop open",she sighs and looks up at the camera,ghosted after the final round,\n'
+const TEMPLATE = 'character,account,clip,video,caption,style\nCallie,callie.tiktok,dance-take.mp4,,me when the playlist finally hits,Crash zoom cut\nCallie,callie.tiktok,"still: at her desk at night, laptop open",she sighs and looks up at the camera,one more episode they said,\n'
 
 const usd = (n: number) => `$${n.toFixed(2)}`
 
