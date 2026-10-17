@@ -44,7 +44,7 @@ function Caption({ ctx }: { ctx: PostCtx }) {
   const spec = draft.spec as unknown as MemeSpec
   const clip = lib?.clips.find(c => c.id === spec.clipId && c.status === 'approved')
   const [hooks, setHooks] = useState(false)
-  const lint = useLint(item.characterId)
+  const lint = useLint(item.characterId, item.productId)
   const plan = spec.plan
   const product = !!plan?.product
   const setPlan = (patch: Record<string, unknown>) => draft.setSpec({ plan: { ...(plan ?? {}), ...patch } } as never)
@@ -76,7 +76,7 @@ function Caption({ ctx }: { ctx: PostCtx }) {
           </div>
         )}
         <PostCaptionFields plan={plan} product={product} lint={lint} onChange={setPlan} max={data.options.slideshow.hashtagsMax ?? 5} />
-        <HookPicker open={hooks} onClose={() => setHooks(false)} characterId={ctx.item.characterId} onPick={t => { draft.setSpec({ caption: t.slice(0, data.options.caption.maxChars) }); setHooks(false) }} />
+        <HookPicker open={hooks} onClose={() => setHooks(false)} characterId={ctx.item.characterId} productId={item.productId ?? null} onPick={t => { draft.setSpec({ caption: t.slice(0, data.options.caption.maxChars) }); setHooks(false) }} />
       </div>
       <div className="st-content-side"><CaptionPreview text={spec.captionOff ? '' : spec.caption ?? ''} data={data} video={clip?.assetId} look={spec.captionStyle} /><span className="st-hint">{spec.captionOff ? 'Preview: no caption.' : 'Preview. The export uses the same font, style and safe zones.'}</span></div>
     </div>
@@ -128,20 +128,22 @@ function Captions({ ctx }: { ctx: PostCtx }) {
 }
 
 // Library drawer > Hooks (UX-PLAN.md section 14): a hook, or a variant
-// written in this character's voice, becomes the caption.
-export function HookPicker({ open, onClose, characterId, onPick }: { open: boolean; onClose: () => void; characterId: string | null; onPick: (text: string) => void }) {
+// written in this character's voice, becomes the caption. The post's own
+// product's vault (section 29); with no product, pick one to browse.
+export function HookPicker({ open, onClose, characterId, onPick, productId: own = null }: { open: boolean; onClose: () => void; characterId: string | null; onPick: (text: string) => void; productId?: string | null }) {
   const products = useProducts()
   const list = products.data?.products ?? []
   const [productId, setProductId] = useState<string | null>(null)
-  const current = productId ?? list[0]?.id ?? null
+  const current = productId ?? own ?? null
   const product = useProduct(open ? current : null)
   const hooks = product.data?.hooks ?? []
   return (
     <Drawer open={open} onClose={onClose} title="Pick a hook" wide>
       <div className="st-col" style={{ gap: 12 }}>
         <div className="st-row"><HowTo id="hooks" label="How hooks work" /></div>
-        {list.length > 1 && <div className="st-row" style={{ gap: 6, flexWrap: 'wrap' }}>{list.map(p => <button key={p.id} className={`st-chip ${p.id === current ? 'on' : ''}`} onClick={() => setProductId(p.id)}>{p.name}</button>)}</div>}
-        {!products.data ? <div className="st-skel" style={{ height: 120 }} /> : !list.length ? <span className="st-hint">No hooks yet. Load a script kit in Library, Hooks.</span> : !product.data ? <div className="st-skel" style={{ height: 200 }} /> : (
+        {!own && list.length > 0 && <span className="st-hint" data-field="hookpicker-no-product">This post has no product (Idea step). Pick one to browse its vault; the post stays as it is.</span>}
+        {list.length > 1 || (!own && list.length > 0) ? <div className="st-row" style={{ gap: 6, flexWrap: 'wrap' }}>{list.map(p => <button key={p.id} className={`st-chip ${p.id === current ? 'on' : ''}`} onClick={() => setProductId(p.id)}>{p.name}{p.id === own ? ' (this post)' : ''}</button>)}</div> : null}
+        {!products.data ? <div className="st-skel" style={{ height: 120 }} /> : !list.length ? <span className="st-hint">No hooks yet. Load a script kit in Library, Hooks.</span> : !current ? null : !product.data ? <div className="st-skel" style={{ height: 200 }} /> : (
           <div className="st-col" style={{ gap: 6 }}>
             <span className="st-hint">Variants in this character's voice come first under each hook. Write more in Library, Hooks.</span>
             {hooks.map(h => {
@@ -172,7 +174,7 @@ export function PostCaptionFields({ plan, product, lint, onChange, max }: { plan
   return (
     <div className="st-col" style={{ gap: 8 }} data-field="post-caption-to-post">
       <Field label="Caption to post (not on the video)" hint="What goes under the video on TikTok or Instagram: 1 to 3 short sentences that add a layer. Optional.">
-        <textarea className="st-textarea" rows={2} maxLength={2200} value={caption} onChange={e => onChange({ caption: e.target.value })} placeholder="e.g. the junior staff would like to be mentored first. by anyone." />
+        <textarea className="st-textarea" rows={2} maxLength={2200} value={caption} onChange={e => onChange({ caption: e.target.value })} placeholder="e.g. we said one episode. it is 2am." />
       </Field>
       <LintNote hits={lint(caption, 'caption', { product, hashtags: tags })} field="post-caption-lint" />
       <div className="st-row" style={{ gap: 8, flexWrap: 'wrap' }}>

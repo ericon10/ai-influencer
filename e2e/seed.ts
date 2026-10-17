@@ -10,6 +10,7 @@ import sharp from 'sharp'
 //
 //   Callie        her character file (fixtures/callie) and 12 approved REF images
 //   Solei         Callie's file with the name replaced (the plan's SOLEI rows)
+//   SideStep      the product the plan and the hook writers use (the starter kit)
 //   stills, clip  two uploaded stills and one uploaded clip in Callie's Library
 //   base post     a video post with one picked take, made like a user would:
 //                 a scene, a still (Use this still), a 5 s take (Use this take)
@@ -36,6 +37,7 @@ export interface Seed {
   createdAt: string
   callie: string
   solei: string
+  sideStep: string
   stills: string[]
   libraryClip: string
   basePost: string
@@ -156,6 +158,17 @@ async function character(s: Studio, name: string, markdown: string, hue: number)
   return r.characterId
 }
 
+// SideStep, the owner's starter kit (Products, UX-PLAN section 29): the
+// owner's account gets it with its first product list; loaded here if not.
+async function product(s: Studio): Promise<string> {
+  const find = async () => (await s.call<{ products: { id: string; name: string }[] }>('GET', '/products')).products.find(p => p.name === 'SideStep')
+  let p = await find()
+  if (!p) { await s.call('POST', '/products/import', { starter: true }); p = await find() }
+  if (!p) throw new Error('SideStep is not in the product list.')
+  s.log(`SideStep: the product (${p.id})`)
+  return p.id
+}
+
 async function libraryItems(s: Studio, callie: string): Promise<{ stills: string[]; clip: string }> {
   const ups = []
   for (const [i, hue] of [[1, 20], [2, 200]] as const) {
@@ -252,12 +265,13 @@ export async function seed(api: string, log: Log = line => console.log(`[seed] $
   // Callie first: the oldest character files the plan's topic accounts.
   const callie = await character(s, 'Callie', md, 24)
   const solei = await character(s, 'Solei', md.replace(/Callie/g, 'Solei'), 300)
+  const sideStep = await product(s)
   const lib = await libraryItems(s, callie)
   const [base, voice, bed] = [await basePost(s, callie), await voiceLine(s, callie), await music(s)]
   const rec = await recreatePost(s, callie, 'E2E Recreate')
   const takeRec = await recreatePost(s, callie, 'E2E Recreate (take spec)')
   const out: Seed = {
-    api: s.api, createdAt: new Date().toISOString(), callie, solei, stills: lib.stills, libraryClip: lib.clip,
+    api: s.api, createdAt: new Date().toISOString(), callie, solei, sideStep, stills: lib.stills, libraryClip: lib.clip,
     basePost: base, voiceLine: voice, music: bed, recreatePost: rec.post, recreateTake: rec.take, takeRecreatePost: takeRec.post,
   }
   mkdirSync(dirname(SEED_FILE), { recursive: true })

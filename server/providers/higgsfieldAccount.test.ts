@@ -543,4 +543,16 @@ describe('when Higgsfield cannot be reached', () => {
     await expect(startAccountConnect(h.deps, account, { origin: 'http://localhost:5173' }, { fetchImpl: down as typeof fetch, retryDelayMs: 1 }))
       .rejects.toMatchObject({ code: 'provider_error', message: expect.stringMatching(/Could not reach Higgsfield/) })
   })
+
+  it('a sign-in that hangs gives up inside the deadline, with the plain message (never the 60 s function timeout)', async () => {
+    const account = await h.newAccount('Hanging')
+    let calls = 0
+    // Answers only when aborted, like a server that never replies.
+    const hang = (_url: string, init?: RequestInit) => { calls++; return new Promise<Response>((_, reject) => init?.signal?.addEventListener('abort', () => reject(new Error('aborted')))) }
+    const started = Date.now()
+    await expect(startAccountConnect(h.deps, account, { origin: 'http://localhost:5173' }, { fetchImpl: hang as typeof fetch, retryDelayMs: 1, deadlineMs: 300 }))
+      .rejects.toMatchObject({ code: 'provider_error', message: expect.stringMatching(/Could not reach Higgsfield/) })
+    expect(Date.now() - started).toBeLessThan(2_000)
+    expect(calls).toBe(1)
+  })
 })

@@ -4,7 +4,7 @@ import { and, desc, eq, inArray, isNull, sql } from 'drizzle-orm'
 import { zipSync } from 'fflate'
 import sharp from 'sharp'
 import { z } from 'zod'
-import { brollClips, candidates, contentItems, scenes } from '../db/schema.js'
+import { brollClips, candidates, contentItems, products, scenes } from '../db/schema.js'
 import { isVideoOp } from '../core/clips.js'
 import type { Ctx, Deps } from '../context.js'
 import { AppError, notFound } from '../lib/errors.js'
@@ -14,6 +14,7 @@ import { enqueueLocalJob, type JobSpec } from '../jobs/runner.js'
 import { captionPng, captionWords, type CaptionLook } from '../core/overlay.js'
 import { slideshowSpecSchema } from '../core/slideshowSpec.js'
 import { renderSlideshow, slideshowProblems } from './slideshow.js'
+import { checkProduct, defaultProductFor, GENERAL_LABEL, standardOf } from './products.js'
 import { fill, hardWrap } from '../core/text.js'
 import { pronounVars } from '../core/prompts.js'
 import { transcodeBroll } from '../media/meme.js'
@@ -78,23 +79,25 @@ const cleanTag = (s: string) => s.trim().replace(/\s+/g, ' ').slice(0, 60)
 
 // A direct upload becomes a B-roll clip: the worker converts it (lean H.264,
 // no sound) and keeps the copy; the upload itself is then removed.
-export async function addBroll(deps: Deps, ctx: Ctx, input: { uploadId: string; name: string; title?: string; product?: string }): Promise<BrollRow> {
+// Its product is picked from the account's products (section 29), or none.
+export async function addBroll(deps: Deps, ctx: Ctx, input: { uploadId: string; name: string; title?: string; productId?: string | null }): Promise<BrollRow> {
   if (!/^upl_[a-z0-9]{20}$/.test(input.uploadId)) throw new AppError('bad_request', 'That upload id is not valid.')
   if (!(await deps.store.exists(uploadKey(ctx.accountId, input.uploadId)))) throw new AppError('bad_request', `${input.name} did not finish uploading. Try again.`)
+  const productId = await checkProduct(deps, ctx, input.productId)
   const id = newId('brl')
   const [row] = await deps.db.insert(brollClips).values({
     id, accountId: ctx.accountId, title: (input.title?.trim() || input.name.replace(/\.[a-z0-9]+$/i, '')).slice(0, 120),
-    product: cleanTag(input.product ?? ''), status: 'processing', createdBy: ctx.userId,
+    productId, status: 'processing', createdBy: ctx.userId,
   }).returning()
   await enqueueLocalJob(deps, ctx, { stage: 'content', purpose: `broll_ingest:${id}`, label: `Prepare B-roll: ${row!.title}`, characterId: null, request: { uploadId: input.uploadId } })
   return row!
 }
 
-export async function updateBroll(deps: Deps, ctx: Ctx, id: string, patch: { title?: string; product?: string }): Promise<BrollRow> {
+export async function updateBroll(deps: Deps, ctx: Ctx, id: string, patch: { title?: string; productId?: string | null }): Promise<BrollRow> {
   const row = await getBroll(deps, ctx, id)
   const [out] = await deps.db.update(brollClips).set({
     title: patch.title !== undefined ? patch.title.trim().slice(0, 120) : row.title,
-    product: patch.product !== undefined ? cleanTag(patch.product) : row.product,
+    productId: patch.productId !== undefined ? await checkProduct(deps, ctx, patch.productId) : row.productId,
     updatedAt: deps.clock.now(),
   }).where(eq(brollClips.id, row.id)).returning()
   return out!
@@ -410,11 +413,13 @@ export async function listContent(deps: Deps, ctx: Ctx, characterId?: string | n
 // first by the time they were last changed, then by id; `before` is the id
 // of the last post shown, so a page starts right after it. The account and
 // character filters apply here, so a filter finds older posts too.
-export async function contentPage(deps: Deps, ctx: Ctx, q: { before?: string | null; limit?: number; accountTag?: string | null; characterId?: string | null }): Promise<{ items: ReturnType<typeof itemView>[]; next: string | null }> {
+// The product filter takes a product id, or "none" for posts with none.
+export async function contentPage(deps: Deps, ctx: Ctx, q: { before?: string | null; limit?: number; accountTag?: string | null; characterId?: string | null; productId?: string | null }): Promise<{ items: ReturnType<typeof itemView>[]; next: string | null }> {
   const limit = Math.max(1, Math.min(LIST_SIZE, Math.round(q.limit ?? 60)))
   const conds = [eq(contentItems.accountId, ctx.accountId), isNull(contentItems.archivedAt)]
   if (q.characterId) conds.push(eq(contentItems.characterId, q.characterId))
   if (q.accountTag) conds.push(eq(contentItems.accountTag, cleanTag(q.accountTag)))
+  if (q.productId) conds.push(q.productId === 'none' ? isNull(contentItems.productId) : eq(contentItems.productId, q.productId))
   if (q.before) conds.push(sql`(${contentItems.updatedAt}, ${contentItems.id}) < (select c.updated_at, c.id from content_items c where c.account_id = ${ctx.accountId} and c.id = ${q.before})`)
   const rows = await deps.db.select().from(contentItems).where(and(...conds)).orderBy(desc(contentItems.updatedAt), desc(contentItems.id)).limit(limit + 1)
   return { items: rows.slice(0, limit).map(itemView), next: rows.length > limit ? rows[limit - 1]!.id : null }
@@ -435,6 +440,9 @@ export interface PostInput {
   accountTag?: string
   sceneId?: string | null
   step?: PostStep
+  // The post's product (section 29): left out, its account's product (Posts
+  // home > Accounts) or none; null, none.
+  productId?: string | null
 }
 
 // A scene can belong to a post only when it is the post's character's.
@@ -450,16 +458,18 @@ export async function createContent(deps: Deps, ctx: Ctx, input: PostInput): Pro
   const defaults = deps.config.pipeline.content
   const base = input.kind === 'batch' ? { count: defaults.batch.default_count } : input.kind === 'meme' ? { brollSeconds: defaults.meme.broll_seconds, order: defaults.meme.order } : {}
   const spec = parseSpec(input.kind, { ...base, ...((input.spec as object) ?? {}) })
+  const accountTag = cleanTag(input.accountTag ?? '')
+  const productId = input.productId !== undefined ? await checkProduct(deps, ctx, input.productId) : await defaultProductFor(deps, ctx, accountTag)
   const [row] = await deps.db.insert(contentItems).values({
     id: newId('cnt'), accountId: ctx.accountId, characterId: input.characterId, kind: input.kind,
-    title: (input.title ?? '').slice(0, 120), spec, createdBy: ctx.userId,
-    idea: (input.idea ?? '').slice(0, 2000), accountTag: cleanTag(input.accountTag ?? ''),
+    title: (input.title ?? '').slice(0, 120), spec, createdBy: ctx.userId, productId,
+    idea: (input.idea ?? '').slice(0, 2000), accountTag,
     sceneId: await checkScene(deps, ctx, input.sceneId, input.characterId), step: input.step ?? 'idea',
   }).returning()
   return row!
 }
 
-export interface PostPatch { title?: string; spec?: unknown; idea?: string; accountTag?: string; sceneId?: string | null; step?: PostStep; characterId?: string }
+export interface PostPatch { title?: string; spec?: unknown; idea?: string; accountTag?: string; sceneId?: string | null; step?: PostStep; characterId?: string; productId?: string | null }
 
 // The picks that belong to a character (its clips and stills); B-roll is the
 // account's and stays when the character changes.
@@ -489,10 +499,15 @@ export async function updateContent(deps: Deps, ctx: Ctx, itemId: string, patch:
     const scene = await getScene(deps, ctx, sceneId)
     if (scene.brief.trim() === row.idea.trim()) await updateScene(deps, ctx, sceneId, { brief: patch.idea.trim() })
   }
+  // The product (section 29): picked, else a post with none takes its new
+  // account's product when the account changes.
+  const accountTag = patch.accountTag !== undefined ? cleanTag(patch.accountTag) : row.accountTag
+  const productId = patch.productId !== undefined ? await checkProduct(deps, ctx, patch.productId)
+    : !row.productId && accountTag !== row.accountTag ? await defaultProductFor(deps, ctx, accountTag) : row.productId
   const [out] = await deps.db.update(contentItems).set({
     title: patch.title !== undefined ? patch.title.slice(0, 120) : row.title, spec,
     idea: patch.idea !== undefined ? patch.idea.slice(0, 2000) : row.idea,
-    accountTag: patch.accountTag !== undefined ? cleanTag(patch.accountTag) : row.accountTag,
+    accountTag, productId,
     step: patch.step ?? row.step, characterId, sceneId, updatedAt: deps.clock.now(),
   }).where(eq(contentItems.id, row.id)).returning()
   return out!
@@ -523,7 +538,7 @@ export async function duplicateContent(deps: Deps, ctx: Ctx, itemId: string): Pr
   const copied = spec?.editor ? { ...spec, editor: { projectAssetId: null, savedAt: null, stack: spec.editor.stack ?? null } } : row.spec
   const [out] = await deps.db.insert(contentItems).values({
     id: newId('cnt'), accountId: ctx.accountId, characterId: row.characterId, kind: row.kind,
-    title: row.title, idea: row.idea, accountTag: row.accountTag, sceneId: row.sceneId, spec: copied,
+    title: row.title, idea: row.idea, accountTag: row.accountTag, sceneId: row.sceneId, spec: copied, productId: row.productId,
     step: 'text', createdBy: ctx.userId,
   }).returning()
   return out!
@@ -1342,7 +1357,7 @@ async function onContentCaptions(deps: Deps, ctx: Ctx, job: JobRow, out: JobOutc
 // ── The view the Content page reads ──────────────────────────────────
 
 const itemView = (i: ContentRow) => ({
-  id: i.id, kind: i.kind as ContentKind, characterId: i.characterId, title: i.title, idea: i.idea, sceneId: i.sceneId, accountTag: i.accountTag, step: i.step,
+  id: i.id, kind: i.kind as ContentKind, characterId: i.characterId, title: i.title, idea: i.idea, sceneId: i.sceneId, accountTag: i.accountTag, productId: i.productId, step: i.step,
   variationOf: i.variationOf, batchOf: i.batchOf,
   spec: i.kind === 'batch' ? batchSpec.parse(i.spec) : i.spec, status: i.status, outputs: i.outputs as ContentOutputs, error: i.error, createdAt: i.createdAt.toISOString(), updatedAt: i.updatedAt.toISOString(),
 })
@@ -1354,19 +1369,23 @@ export async function contentItemView(deps: Deps, ctx: Ctx, itemId: string) {
 }
 
 export async function contentView(deps: Deps, ctx: Ctx) {
-  const [broll, items, lint, tagRows, charRows] = await Promise.all([
+  const [broll, items, lint, tagRows, charRows, productRows] = await Promise.all([
     listBroll(deps, ctx), listContent(deps, ctx), lintSettings(deps, ctx),
     // Every account tag and character in use, not only the newest 200 posts'.
     deps.db.select({ tag: contentItems.accountTag, at: sql<string>`max(${contentItems.updatedAt})` }).from(contentItems).where(and(eq(contentItems.accountId, ctx.accountId), isNull(contentItems.archivedAt))).groupBy(contentItems.accountTag).orderBy(desc(sql`max(${contentItems.updatedAt})`)),
     deps.db.selectDistinct({ id: contentItems.characterId }).from(contentItems).where(and(eq(contentItems.accountId, ctx.accountId), isNull(contentItems.archivedAt))),
+    deps.db.select({ id: products.id, name: products.name, writing: products.writing }).from(products).where(and(eq(products.accountId, ctx.accountId), isNull(products.archivedAt))).orderBy(products.createdAt),
   ])
   const assetIds = broll.map(b => b.assetId).filter((x): x is string => !!x)
   const durations = new Map<string, number | null>()
   for (const a of assetIds) durations.set(a, (await getAsset(deps, ctx, a).catch(() => null))?.durationMs ?? null)
   const cfg = deps.config.pipeline.content
   return {
-    broll: broll.map(b => ({ id: b.id, title: b.title, product: b.product, status: b.status, error: b.error, assetId: b.assetId, durationSec: b.assetId && durations.get(b.assetId) ? Math.round(durations.get(b.assetId)! / 100) / 10 : null, createdAt: b.createdAt.toISOString() })),
-    products: [...new Set([...cfg.broll.products, ...broll.map(b => b.product).filter(Boolean)])].sort((a, b) => a.localeCompare(b)),
+    // A clip made before products were picked keeps its old label.
+    broll: broll.map(b => ({ id: b.id, title: b.title, productId: b.productId, product: productRows.find(p => p.id === b.productId)?.name ?? b.product, status: b.status, error: b.error, assetId: b.assetId, durationSec: b.assetId && durations.get(b.assetId) ? Math.round(durations.get(b.assetId)! / 100) / 10 : null, createdAt: b.createdAt.toISOString() })),
+    // The account's products (section 29) and their writing rules: what the
+    // post's product brings (the language notes only with lint on).
+    products: productRows.map(p => { const std = standardOf(deps, p.writing); return { id: p.id, name: p.name, writing: std?.key ?? '', writingLabel: std?.label ?? GENERAL_LABEL, lint: !!std?.lint, review: !!std?.review } }),
     items: items.map(itemView),
     // Where Posts home's "Show older posts" starts (null: none older).
     next: items.length === LIST_SIZE ? items[LIST_SIZE - 1]!.id : null,

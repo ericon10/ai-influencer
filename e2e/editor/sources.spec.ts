@@ -10,6 +10,9 @@ test('Pick a hook in the Caption step becomes the caption in the editor', async 
   const step = page.locator('[data-field="step-text"]')
   await step.getByRole('button', { name: 'Pick a hook' }).click()
   const drawer = page.getByRole('dialog').filter({ hasText: 'Pick a hook' })
+  // A post with no product (section 29): pick one to browse its vault; the post stays as it is.
+  await expect(drawer.locator('[data-field="hookpicker-no-product"]')).toBeVisible({ timeout: 20_000 })
+  await drawer.getByRole('button', { name: 'SideStep' }).click()
   const first = drawer.locator('.st-hookpick').first()
   await expect(first).toBeVisible({ timeout: 20_000 })
   // The hook's words, without its number badge and kind.

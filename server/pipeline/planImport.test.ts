@@ -13,7 +13,8 @@ import { importKit, starterKit } from './scaleKit.js'
 import { getScene } from './scenes.js'
 import { renderPlaceholderPortrait } from '../providers/mock.js'
 import { readAsset } from '../storage/assets.js'
-import { jobs } from '../db/schema.js'
+import { contentItems, jobs } from '../db/schema.js'
+import { readPlan } from '../core/planImport.js'
 import { slideList } from '../core/slides.js'
 import type { SlideshowSpec } from '../core/slideshowSpec.js'
 
@@ -25,6 +26,9 @@ import type { SlideshowSpec } from '../core/slideshowSpec.js'
 let h: Harness
 let callie: string
 let solei: string
+// The plan's product (section 29) and every row ticked.
+let sideStep: string
+let allRows: string[]
 const CSV = readFileSync(join(process.cwd(), 'docs', 'content', 'launch-plan-v2-posts.csv'), 'utf8')
 const byRow = (posts: Awaited<ReturnType<typeof planView>>['posts'], id: string) => posts.find(p => p.rowId === id)!
 
@@ -36,7 +40,8 @@ beforeAll(async () => {
   for (let i = 0; i <= 11; i++) images[`REF-${String(i).padStart(2, '0')}`] = { data: await renderPlaceholderPortrait(`REF-${i}`) }
   callie = (await importCharacter(h.deps, h.ctx, md, { images })).characterId
   solei = (await importCharacter(h.deps, h.ctx, md.replace(/Callie/g, 'Solei'), { images })).characterId
-  await importKit(h.deps, h.ctx, starterKit(), 'SideStep')
+  sideStep = (await importKit(h.deps, h.ctx, starterKit(), 'SideStep')).product.id
+  allRows = readPlan(CSV).rows.map(r => r.cells.row_id)
 }, 180_000)
 
 describe('the launch plan', () => {
@@ -68,12 +73,24 @@ describe('the launch plan', () => {
     expect(p.rows.flatMap(r => r.errors).join(' ')).toMatch(/is not YYYY-MM-DD/)
   })
 
-  it('Make 140 drafts (free): every word as written, the plan fields kept; an import again updates instead of doubling', async () => {
-    const r = await importPlan(h.deps, h.ctx, CSV)
+  it('Import every row for SideStep (free): every word as written, the plan fields kept, the plan\'s product on each; an import again updates instead of doubling', async () => {
+    const r = await importPlan(h.deps, h.ctx, CSV, { productId: sideStep, rows: allRows })
     expect(r).toMatchObject({ created: 140, updated: 0, skipped: 0 })
     const { posts } = await planView(h.deps, h.ctx)
     expect(posts).toHaveLength(140)
     expect(posts[0]!.date).toBe('2026-10-19')
+    // Written for SideStep, every row; an ad only where the row's own
+    // product column says yes (section 29): pure-pain rows stay plain posts.
+    const made = await h.deps.db.select().from(contentItems).where(sql`coalesce(${contentItems.spec}->'plan'->>'rowId', '') <> ''`)
+    expect(made.every(m => m.productId === sideStep)).toBe(true)
+    const yes = new Set(readPlan(CSV).rows.filter(x => /^(yes|y|true|1)$/i.test(x.cells.product.trim())).map(x => x.cells.row_id))
+    expect(yes.size).toBeGreaterThan(0)
+    expect(yes.size).toBeLessThan(140)
+    for (const m of made) {
+      const sp = m.spec as { ad?: boolean; plan: { rowId: string; product: boolean } }
+      expect(sp.plan.product, sp.plan.rowId).toBe(yes.has(sp.plan.rowId))
+      if (m.kind === 'slideshow') expect(sp.ad, sp.plan.rowId).toBe(yes.has(sp.plan.rowId))
+    }
 
     // A feeder's mock UI slideshow: topic, as written.
     const p1 = await getContent(h.deps, h.ctx, byRow(posts, 'P001').id)
@@ -113,7 +130,7 @@ describe('the launch plan', () => {
     expect((scene.prompts as { video?: { text: string } }).video?.text).toContain('bar penlight')
     expect((scene.fields as { outfit?: string }).outfit).toContain('linen button-up')
 
-    const again = await importPlan(h.deps, h.ctx, CSV)
+    const again = await importPlan(h.deps, h.ctx, CSV, { productId: sideStep, rows: allRows })
     expect(again).toMatchObject({ created: 0, updated: 140 })
     expect((await planView(h.deps, h.ctx)).posts).toHaveLength(140)
   })

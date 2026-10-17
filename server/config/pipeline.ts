@@ -164,14 +164,20 @@ const templatesSchema = z.object({
   hook_variants: z.object({ system: z.string(), prompt: z.string() }),
   slideshow_hooks: z.object({ system: z.string(), prompt: z.string() }),
   slideshow_draft: z.object({ system: z.string(), prompt: z.string() }),
-  // Section 28: the hook reviewer, the playbook's menu and the mock screens a
-  // writer may use.
-  slideshow_hooks_review: z.object({ system: z.string(), prompt: z.string() }),
-  playbook_menu: z.string(),
-  // THE STANDARD for slide 1 and the 1 to 5 ladder (post writer brief v1.1).
+  // The general standard for slide 1 (section 29), for every post whose
+  // product is on it or that has no product.
   hook_standard: z.string(),
-  playbook_ladder: z.string(),
-  product_endings: z.string(),
+  // The SideStep standard's writers (sections 28 and 29): THE STANDARD for
+  // slide 1, the ladder, the playbook's menu, the honest endings, the
+  // stop-test reviewer, and its own hook writer and draft. Only posts whose
+  // product is on the SideStep standard use them.
+  sidestep_slideshow_hooks: z.object({ system: z.string(), prompt: z.string() }),
+  sidestep_slideshow_hooks_review: z.object({ system: z.string(), prompt: z.string() }),
+  sidestep_slideshow_draft: z.object({ system: z.string(), prompt: z.string() }),
+  sidestep_playbook_menu: z.string(),
+  sidestep_hook_standard: z.string(),
+  sidestep_playbook_ladder: z.string(),
+  sidestep_product_endings: z.string(),
   slideshow_special_menu: z.string(),
   slideshow_caption: z.object({ system: z.string(), prompt: z.string() }),
   slideshow_variations: z.object({ system: z.string(), prompt: z.string() }),
@@ -290,7 +296,7 @@ const contentSchema = z.object({
     karaoke: z.object({ fill: z.string(), text: z.string(), color: z.string() }).default({ fill: '#ffd60a', text: '#000000', color: '#ffd60a' }),
   }),
   meme: z.object({ max_clip_seconds: z.number().positive(), broll_seconds: z.number().positive(), max_broll_seconds: z.number().positive(), order: z.enum(['clip_first', 'broll_first']) }),
-  broll: z.object({ max_upload_mb: z.number().positive(), max_seconds: z.number().positive(), products: z.array(z.string()).default([]) }),
+  broll: z.object({ max_upload_mb: z.number().positive(), max_seconds: z.number().positive() }),
   slideshow: z.object({
     slides: z.tuple([z.number().int().positive(), z.number().int().positive()]), hashtags: z.tuple([z.number().int().min(0), z.number().int().positive()]), max_stills: z.number().int().positive(), image: z.object({ quality: z.number().int().min(50).max(100) }),
     // Section 27 (the power-up): slides a draft makes, the Instagram size,
@@ -310,9 +316,19 @@ const contentSchema = z.object({
   // The playbook's fit table (section 28): a primary and a backup code per
   // account tag or character name.
   playbook: z.object({ fit: z.record(z.string(), z.tuple([z.string(), z.string()])).default({}) }).default({ fit: {} }),
-  // The language lint's word lists (section 28; the checks are rules).
+  // The rules a product adds on top of the general standard (section 29):
+  // a product picks one of these, or none; its posts follow it. `names` start a product of that
+  // name on it; `review` runs the stop-test reviewer after Write 10; `lint`
+  // shows the language notes; `endings` the honest product endings;
+  // `structures` the playbook's structures per account.
+  writing_standards: z.record(z.string(), z.object({
+    label: z.string(), names: z.array(z.string()).default([]),
+    review: z.boolean().default(false), lint: z.boolean().default(false), endings: z.boolean().default(false), structures: z.boolean().default(false),
+  })).default({}),
+  // The language lint's word lists (section 28; the checks are rules), for
+  // the writing standards with lint on.
   copy_lint: z.object({ values: z.array(z.string()), hype: z.array(z.string()), products: z.array(z.string()), max_hashtags: z.number().int().min(0).max(30), hook_max_words: z.number().int().min(4).max(40).default(22), hook_labels: z.array(z.string()).default([]), job_words: z.array(z.string()).default([]), ending_never: z.array(z.string()).default([]) })
-    .default({ values: ['should', 'need to', 'needs to', 'must', 'ought'], hype: ['dream job', 'unlock', 'level up', 'game-changer', 'game changer', 'supercharge'], products: ['SideStep'], max_hashtags: 5, hook_max_words: 22, hook_labels: ['Exhibit', 'Levels of', 'Previously on', 'Calendar invite'], job_words: [], ending_never: [] }),
+    .default({ values: ['should', 'need to', 'needs to', 'must', 'ought'], hype: ['dream job', 'unlock', 'level up', 'game-changer', 'game changer', 'supercharge'], products: [], max_hashtags: 5, hook_max_words: 22, hook_labels: ['Exhibit', 'Levels of', 'Previously on', 'Calendar invite'], job_words: [], ending_never: [] }),
   batch: z.object({ max: z.number().int().positive(), default_count: z.number().int().positive(), zip_part_mb: z.number().positive().default(150) }),
   clone: z.object({
     mode: z.enum(['replace', 'motion']).default('replace'),

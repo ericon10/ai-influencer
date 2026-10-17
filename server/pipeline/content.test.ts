@@ -19,6 +19,8 @@ import { makeClip } from '../media/testClips.js'
 import { probeFile } from '../media/ffmpeg.js'
 import { readAsset } from '../storage/assets.js'
 import { uploadKey } from '../storage/uploads.js'
+import { products } from '../db/schema.js'
+import { newId } from '../lib/ids.js'
 
 // The text-overlay content builder in demo mode: B-roll uploads, a meme
 // video, a slideshow written by (mock) Claude, and a batch. Rendering is
@@ -80,14 +82,18 @@ describe('content builder (demo mode)', () => {
     await makeClip(src, { width: 1280, height: 720, fps: 60, durationSec: 3, audio: true, source: 'smptebars' })
     const uploadId = 'upl_' + 'a'.repeat(20)
     await h.deps.store.put(uploadKey(h.ctx.accountId, uploadId), await readFile(src), 'video/mp4')
-    const row = await addBroll(h.deps, h.ctx, { uploadId, name: 'Screen Recording 2026-10-13.mov', product: '  Notion  ' })
-    expect(row).toMatchObject({ status: 'processing', title: 'Screen Recording 2026-10-13', product: 'Notion' })
+    // The clip's product is one of the account's products (section 29).
+    const notion = newId('prd')
+    await h.deps.db.insert(products).values({ id: notion, accountId: h.ctx.accountId, name: 'Notion' })
+    const row = await addBroll(h.deps, h.ctx, { uploadId, name: 'Screen Recording 2026-10-13.mov', productId: notion })
+    expect(row).toMatchObject({ status: 'processing', title: 'Screen Recording 2026-10-13', productId: notion })
     await drain(h, 20)
     const view = await contentView(h.deps, h.ctx)
     const clip = view.broll.find(b => b.id === row.id)!
     expect(clip.status).toBe('ready')
     expect(clip.durationSec).toBeCloseTo(3, 0)
-    expect(view.products).toContain('Notion')
+    expect(clip).toMatchObject({ productId: notion, product: 'Notion' })
+    expect(view.products.map(p => p.name)).toContain('Notion')
     const p = await probeAsset(clip.assetId!)
     expect(p).toMatchObject({ hasAudio: false, width: 1280, height: 720, fps: 30 })
     // The upload itself is removed once the copy is kept.

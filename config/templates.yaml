@@ -462,6 +462,8 @@ content_captions:
 # Hook variants (scale kit, overnight item 5): one hook from a product's
 # vault rewritten in each character's voice, so accounts never post the
 # same line. Anything about the product stays inside its claims sheet.
+# {standard} is the hook's product's writing standard (section 29): the
+# general standard, or SideStep's.
 hook_variants:
   system: |
     You rewrite one TikTok hook for several creator accounts. Each account
@@ -496,7 +498,6 @@ hook_variants:
     {voices}
 
     Write {count} variants: {per} for each of {names}.
-
 # "Punch it up": the owner's rough idea becomes three specific moments to
 # pick from. The pick fills the scene box and stays editable.
 scene_ideas:
@@ -688,9 +689,55 @@ qa_perception:
     Look closely for: {hints}
 
 # ── The slideshow power-up (owner, 2026-10-16; UX-PLAN.md section 27) ──
-# "Write 10 hooks" with Claude: the hook vault, the buyers' words and the
-# account's voice card go in; 10 hooks come back, each tagged by pattern.
+# "Write 10 with Claude" on the general standard (owner, 2026-10-17;
+# UX-PLAN.md section 29): a post whose product is on the general standard,
+# or that has no product. One Claude call, no reviewer: the writer runs the
+# stop test itself and keeps only hooks that pass. A product on another
+# standard uses its own writer (sidestep_slideshow_hooks).
 slideshow_hooks:
+  system: |
+    You write hooks for TikTok and Instagram photo slideshows for {who}.
+    A hook is the words on slide 1, and every hook follows this standard:
+    {standard}
+    Write exactly {count} candidates for this account's next post. For each
+    one, in this order:
+    1. moment: one specific scene of what happened, in one line: when,
+       where, what is on screen, and the tell (one detail only someone who
+       lived it would know). It feeds slides 2 to 6.
+    2. pattern: the hook's shape, one of doubt (someone doubts or reacts),
+       pov, nobody_tells, red_flags, listicle, storytime, myth_fact,
+       tier_list. Spread the candidates over at least 4 shapes.
+    3. Write 3 hooks for the moment and run the stop test on all three;
+       keep the best as hook and the runner-up as alt_hook. rank is your
+       own score of the kept hook: 1 passes the stop test and is sharp
+       enough to share, 2 passes it. Only keep hooks that pass.
+    {product}
+    Language: no quotation marks around the hook; an emoji only where a
+    person would text it. No em or en dashes. Roast the situation, never
+    the viewer. No real people, celebrities, named shows, songs, creators,
+    logos or real companies by name. Adults only. Original words only:
+    learn from the vault's hooks, never copy one. A product named stays
+    inside its claims sheet. Nothing sexual, no medical or money promises.
+    Never say the photos are real or that anyone in them is a real person.
+  prompt: |
+    Account: {account}
+    Who posts it: {who}
+    {voice}
+    Topic: {topic}
+    {tension}
+
+    Hooks from the vault (learn from them, never copy one):
+    {vault}
+
+    {language}
+
+    {claims}
+
+    Write {count} candidates.
+# The SideStep standard's "Write 10 with Claude" (sections 28 and 29):
+# the hook vault, the buyers' words and the account's voice card go in;
+# 10 hooks come back written to THE STANDARD, then the reviewer scores them.
+sidestep_slideshow_hooks:
   system: |
     You write hooks for TikTok and Instagram photo slideshows for {who}.
     A hook is the words on slide 1, and every hook follows this standard:
@@ -747,7 +794,7 @@ slideshow_hooks:
 # The second Claude call of "Write 10 with Claude" (section 28): a reviewer
 # that did not write the hooks scores each one on the playbook's ladder.
 # Only a 1 or a 2 is shown.
-slideshow_hooks_review:
+sidestep_slideshow_hooks_review:
   system: |
     You are a separate reviewer: you did not write these hooks. Every hook
     is measured against this standard:
@@ -781,11 +828,40 @@ slideshow_hooks_review:
     {hooks}
 
     Score every hook.
-# THE STANDARD (viral writing playbook v1.2, the top section; post writer
-# brief v1.2), shared by every hook writer: Write 10 with Claude and its
-# reviewer, Make variations and the kit's hook variants. Its pass and fail
-# examples are the writers' few-shot set.
+# The general standard (owner, 2026-10-17; UX-PLAN.md section 29): THE
+# STANDARD without SideStep's parts (the job word, pain 7 or more, the
+# honest endings, the job examples). Every post whose product is on the
+# general standard, or that has no product, is written to it. The voice is
+# the account's: its character's voice card, or the account's own words.
 hook_standard: |
+  Why we post: people share a post that names something they feel so
+  exactly that they send it to someone who feels it too. The reaction on
+  slide 1: "wait, that's me." Shares and follows come from that, not from
+  clever.
+  The hook (slide 1):
+  - Says exactly what happened: the number, the thing, the moment. Never a
+    pointer like "how bad it is" or "it did not go how i thought".
+  - Clear on one read, with no image: about 15 words or fewer. A stranger
+    knows what it is about without the photo. No labels or stage
+    directions ("Exhibit 3:", "Levels of...", a timestamp first), no
+    stacked quotes.
+  - Opens a loop the slides close. The punchline never sits on slide 1.
+  The voice: the account's own, from its voice card when one is given;
+  otherwise plain words, the way a real person texts a friend. Never
+  marketing copy: if it could run in a print ad, rewrite it.
+  The stop test (every hook, before anything else; any "no" means rewrite):
+  1. Would a stranger scrolling past stop on this line alone?
+  2. Is it clear on one read, with no image?
+  3. Does it say exactly what happened?
+  4. Does it sound like a person, not a brand?
+  Moments and the story shape slides 2 to 6 and the payoff; they never
+  replace a plain, clear slide 1.
+# THE STANDARD (viral writing playbook v1.2, the top section; post writer
+# brief v1.2): SideStep's, for the SideStep standard's writers only (Write
+# 10 with Claude and its reviewer, Make variations and the kit's hook
+# variants on posts whose product is on the SideStep standard; section 29).
+# Its pass and fail examples are those writers' few-shot set.
+sidestep_hook_standard: |
   Why we post: most posts are not ads. They show people that someone else
   feels their pain, and name it so exactly that people share it with
   others who feel it too. The reaction on slide 1: "HOLY SHIT, THEY KNOW
@@ -843,7 +919,7 @@ hook_standard: |
   replace a plain, painful slide 1.
 # The 1 to 5 ladder (playbook v1.2 section 8: stopping power and pain
 # first, cleverness last). 1 is best; only a 1 or 2 ships.
-playbook_ladder: |
+sidestep_playbook_ladder: |
   5: a topic, a label or a news-style headline. "Ghosting is bad." "Levels
      of ghosted."
   4: a punchline or joke that needs the slides or an image to make sense.
@@ -856,16 +932,16 @@ playbook_ladder: |
      "They ghosted me after 5 interviews. Then they reposted the same job."
 # SideStep endings on product posts (THE STANDARD, v1.2): the last slide is
 # a friend's tip that fixes the exact slide 1 pain, from these only.
-product_endings: |
+sidestep_product_endings: |
   - retyping the resume into boxes: "one click fills the whole app. i just
     check it and hit submit"
   - hours on jobs you don't fit: "it shows how u match before u apply"
   - rewriting the resume for every job: "it shows exactly what to add from
     stuff i actually did"
   - paying monthly for job tools: "$99 once. no subscription"
-# The playbook's menu, given to every writer (docs/content/viral-writing-
-# playbook.md sections 2, 4, 5 and 8).
-playbook_menu: |
+# The playbook's menu, given to the SideStep standard's writers
+# (docs/content/viral-writing-playbook.md sections 2, 4, 5 and 8).
+sidestep_playbook_menu: |
   Effects (what the viewer feels):
   E1 "That's literally me": a detail only a job seeker would know.
   E2 "Wait, what?": a hidden layer under something familiar.
@@ -895,11 +971,78 @@ playbook_menu: |
   on" recap. L23 Subtitles. L24 Forecast and horoscope. L25 Group chat.
   The ladder (1 is best; only a 1 or 2 ships):
   {ladder}
-# "Use this hook": every slide drafted from the hook, the Jenga way (the
-# post writer brief): each slide opens the next, setup and punchline never
+# "Use this hook" on the general standard (section 29): every slide drafted
+# from the hook, one story thread: each slide opens the next, setup and
+# punchline never on one slide, the payoff last; the clarity test on every
+# slide; each slide's image line inside one locked scene; special slides
+# where they fit.
+slideshow_draft:
+  system: |
+    You draft a TikTok photo slideshow for {who}.
+    {photos}
+    Write exactly {n} slides. Slide 1 is the hook given below, word for
+    word. The other slides tell its story: one thread, every slide on the
+    hook's story (no side jokes), in the same voice as the hook. With 6
+    slides: slide 2 is the setup that raises the stakes; slide 3 or 4 the
+    turn, often a person reacting; slide 5 the payoff (the truth, the
+    twist, the absurd detail: the clever jokes and moments go here); slide
+    6 relief or recognition, or a question the comments answer. With more
+    or fewer slides keep that shape: the setup first, the turn in the
+    middle, the payoff second to last, relief or a question last. The
+    clarity test: every slide makes sense to a stranger with no backstory.
+    Each slide opens the next; a setup and its punchline are never on the
+    same slide.
+    The voice of every slide: the account's own, from its voice card when
+    one is given; otherwise plain words, the way a real person texts a
+    friend. If a line could run in a print ad, rewrite it.
+    For every slide write:
+    - text: 4 to 14 words, one beat a slide; an emoji only where a person
+      would text it;
+    - shot: the image line, what that slide's photo shows: that beat, one
+      short sentence. Every photo is in the same place, light and phone,
+      like one camera roll from one day: only the moment changes;
+    - special: "none", or a mock screen drawn by code where it tells the
+      story better than a photo. Never on slide 1, at most 2 in a
+      slideshow. Invent generic names: never a real company, app or brand.
+      Leave the fields you do not use empty. The screens:
+      {specials}
+    Also write:
+    - scene: the one place of the whole set: place (where, specific),
+      light (one of: {lights}), camera ({cameras}), outfit ({outfit_rule}),
+      and details: 2 small things in the place that show up again;
+    - caption: one line in the same voice that adds a layer, never a
+      repeat of the slides; a source for any market stat goes here;
+      {caption_voice};
+    - cta: one line, a question, a warm offer or a shrug, never an order;
+    - hashtags: 3 to {tags_max}: one broad, one niche, one community, lower
+      case, without #;
+    - product_ending: "none".
+    {product_rule}
+    Language: no em or en dashes, no quotation marks around a slide.
+    Outfits in catalog terms (the garment, its color and fabric), never fit
+    or body words. Story details can be invented; a number that reads like
+    a market stat comes from the claims sheet, with a short source in the
+    caption. No real people, celebrities, named shows, songs, creators,
+    logos or real companies by name. Nothing sexual, no medical or money
+    promises. Never say the photos are real or that anyone in them is a
+    real person.
+  prompt: |
+    Hook (slide 1): {hook}
+    {moment}
+    Topic: {topic}
+    {voice}
+    {scene}
+
+    {language}
+
+    {claims}
+
+    Write {n} slides, the scene, the caption, the CTA and the hashtags.
+# The SideStep standard's "Use this hook" (sections 28 and 29): every slide
+# drafted from the hook, the Jenga way (the post writer brief): each slide opens the next, setup and punchline never
 # on one slide, the payoff last; each slide's photo inside one locked
 # scene; special slides where they fit.
-slideshow_draft:
+sidestep_slideshow_draft:
   system: |
     You draft a TikTok photo slideshow for {who}.
     {photos}
@@ -1007,6 +1150,7 @@ slideshow_caption:
     different one): {caption}
 # "Make variations": the same slideshow for other accounts, in new words.
 # A variation never shares a hook, a slide line or a caption word for word.
+# {standard} is the post's product's writing standard (section 29).
 slideshow_variations:
   system: |
     You rewrite a photo slideshow posted by {name}, an original, fictional

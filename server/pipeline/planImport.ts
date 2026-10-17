@@ -1,5 +1,5 @@
-import { and, eq, gt, inArray, isNull, like, or, sql } from 'drizzle-orm'
-import { candidates, contentItems, jobs } from '../db/schema.js'
+import { and, asc, eq, gt, inArray, isNull, like, or, sql } from 'drizzle-orm'
+import { candidates, contentItems, jobs, products } from '../db/schema.js'
 import type { Ctx, Deps } from '../context.js'
 import { AppError } from '../lib/errors.js'
 import type { JobSpec } from '../jobs/runner.js'
@@ -13,6 +13,7 @@ import { slideshowSpecSchema, type SlideshowSpec } from '../core/slideshowSpec.j
 import { listCharacters, type CharacterRow } from './characters.js'
 import { createContent, getContent, updateContent, type ContentRow } from './content.js'
 import { lintFor } from './copyLint.js'
+import { checkProduct, defaultProductFor, postWriting, type WritingStandard } from './products.js'
 import { createScene, updateScene } from './scenes.js'
 import { buildSceneRun } from './sceneActions.js'
 import { getCharacter } from './characters.js'
@@ -20,20 +21,30 @@ import { buildSlideshowStills, slideStillChoices, slideStillPrice } from './slid
 
 // The launch plan import (owner, 2026-10-16; UX-PLAN.md section 28): a CSV
 // of the plan's columns becomes drafts in the flows that exist, with every
-// word as written. The preview is free; making the drafts is free; nothing
-// paid runs here. "Generate N posts" is one priced action whose stills run
-// ten posts at a time (the job runner's queue).
+// word as written. The preview is free; importing the ticked rows is free;
+// nothing paid runs here. "Generate N posts" is one priced action whose
+// stills run ten posts at a time (the job runner's queue).
+// Products (section 29): a row names its own product (the product column,
+// by name; one not in Products is an error in the preview), and the plan's
+// pick fills the rows that name none. Each draft is written for its
+// product (its rules, its language notes). Whether a row is an ad is the
+// row's own ad column (#ad and the honest endings), never the product. An
+// older file's product column of yes or no is the ad column.
 
 const MAX_BYTES = 400_000
 const MAX_ROWS = 300
 const QUEUE = 10
 
-interface Opts { drawSpecials?: boolean; store?: Record<string, string>; stillModel?: string | null }
+// productId: the plan's product (null: none; left out: not picked yet).
+// rows: the row_ids to import (the preview always reads every row).
+interface Opts { drawSpecials?: boolean; store?: Record<string, string>; stillModel?: string | null; productId?: string | null; rows?: string[] }
 
 export interface PlanAccountView { tag: string; kind: 'character' | 'topic'; characterId: string | null; characterName: string; rows: number; problem: string | null }
 export interface PlanPreviewRow {
   line: number; rowId: string; date: string; slot: string; account: string; format: string; kind: PlanKind | null
   hook: string; photos: number; specials: Array<{ slide: number; type: string }>; priceUsd: number
+  // The row's product: its own (row) or the plan's pick (plan), by name ('' : none); and the ad switch.
+  product: string; productFrom: 'row' | 'plan'; ad: boolean
   errors: string[]; warnings: string[]; lint: string[]
   postId: string | null; state: 'new' | 'update' | 'kept' | 'problem'
 }
@@ -42,6 +53,12 @@ export interface PlanPreview {
   totals: { rows: number; ok: number; problem: number; kept: number; slideshows: number; photos: number; clips: number; stills: number; usd: number }
   still: { model: string; label: string; path: 'account' | 'api'; perStillUsd: number; problem: string | null; choices: Array<{ ref: string; label: string; pathLabel: string; problem: string | null }> }
   planId: string
+  // The plan's product as previewed (null: none or not picked), and the one
+  // its accounts agree on (Posts home > Accounts), to pre-fill the pick.
+  product: { id: string; name: string; writingLabel: string; notes: boolean } | null
+  suggestedProductId: string | null
+  // How many good rows name no product of their own (the plan's pick fills them).
+  blankProductRows: number
 }
 
 const norm = (s: string) => s.trim().toLowerCase()
@@ -75,7 +92,7 @@ function accountsFor(rows: CheckedRow[], chars: CharacterRow[], store: Record<st
   })
 }
 
-async function plan(deps: Deps, ctx: Ctx, csv: string, opts: Opts) {
+async function plan(deps: Deps, ctx: Ctx, csv: string, opts: Opts, std: WritingStandard | null = null) {
   if (csv.length > MAX_BYTES) throw new AppError('bad_request', 'That file is too big for one import (400 KB). Split it.')
   const read = readPlan(csv)
   const problems: string[] = []
@@ -89,7 +106,8 @@ async function plan(deps: Deps, ctx: Ctx, csv: string, opts: Opts) {
   for (const r of checked) ids.set(r.rowId, (ids.get(r.rowId) ?? 0) + 1)
   for (const r of checked) {
     if (r.rowId && (ids.get(r.rowId) ?? 0) > 1) r.errors.push(`row_id ${r.rowId} is used more than once`)
-    if (repeats.has(r.line)) r.warnings.push('The same structure as this account\'s post before it (never twice in a row)')
+    // The playbook's structures belong to a product that adds them (SideStep).
+    if (std?.structures && repeats.has(r.line)) r.warnings.push('The same structure as this account\'s post before it (never twice in a row)')
   }
   const chars = await listCharacters(deps, ctx)
   const accounts = accountsFor(checked, chars, opts.store ?? {})
@@ -97,7 +115,16 @@ async function plan(deps: Deps, ctx: Ctx, csv: string, opts: Opts) {
     const a = accounts.find(x => x.tag === r.account)
     if (a?.problem) r.errors.push(a.problem)
   }
-  return { raw, checked, accounts, problems, chars }
+  // A row's own product, by name (section 29).
+  const list = await deps.db.select({ id: products.id, name: products.name }).from(products).where(and(eq(products.accountId, ctx.accountId), isNull(products.archivedAt))).orderBy(asc(products.createdAt))
+  const rowProduct = new Map<number, { id: string; name: string }>()
+  for (const r of checked) {
+    if (!r.productName) continue
+    const hit = list.find(x => norm(x.name) === norm(r.productName))
+    if (hit) rowProduct.set(r.line, hit)
+    else r.errors.push(`Product "${r.productName}" is not in Products (Library > Hooks): add it there, or fix the row`)
+  }
+  return { raw, checked, accounts, problems, chars, rowProduct }
 }
 
 // What a slideshow row's slides become: a photo (made in topic or
@@ -119,7 +146,8 @@ function metaOf(raw: PlanRow, r: CheckedRow, planId: string): PlanMeta {
   return {
     rowId: r.rowId, planId, date: r.date, slot: r.slot, format: r.format.slice(0, 40),
     tension: c.tension.slice(0, 12), pillar: c.pillar.slice(0, 12), audience: c.audience.slice(0, 12),
-    product: r.product, mentionMother: planYes(c.mention_mother),
+    // (The plan row's product field is its ad switch, as before.)
+    product: r.ad, mentionMother: planYes(c.mention_mother),
     structure: r.code, effectOpen: r.effectOpen, effectPayoff: r.effectPayoff, hookScore: r.score,
     momentId: c.moment_id.slice(0, 30), moment: c.moment.slice(0, 800), altHook: c.alt_hook.slice(0, 200),
     scene: c.scene.slice(0, 4000), clipAction: c.clip_action.slice(0, 2000), cta: c.cta.slice(0, 300), statSource: c.stat_source.slice(0, 200), notes: c.notes.slice(0, 1500),
@@ -128,36 +156,50 @@ function metaOf(raw: PlanRow, r: CheckedRow, planId: string): PlanMeta {
 }
 
 export async function previewPlan(deps: Deps, ctx: Ctx, csv: string, opts: Opts = {}): Promise<PlanPreview> {
-  const { raw, checked, accounts, problems } = await plan(deps, ctx, csv, opts)
+  const { product, std } = await postWriting(deps, ctx, opts.productId)
+  const { raw, checked, accounts, problems, rowProduct } = await plan(deps, ctx, csv, opts, std)
   const made = await existing(deps, ctx)
   const { choices, pick } = await slideStillChoices(deps, ctx)
   const model = opts.stillModel && choices.some(c => c.ref === opts.stillModel) ? opts.stillModel : pick
   const [topicPrice, charPrice] = await Promise.all([slideStillPrice(deps, ctx, model, 'topic'), slideStillPrice(deps, ctx, model, 'character')])
   const lint = await lintFor(deps, ctx)
+  // The language notes follow each row's product: SideStep's all of them,
+  // any other product (or none) the dash check only.
+  const stds = new Map<string, boolean>()
+  for (const p of rowProduct.values()) if (!stds.has(p.id)) stds.set(p.id, !!(await postWriting(deps, ctx, p.id)).std?.lint)
   const rows: PlanPreviewRow[] = checked.map((r, i) => {
     const rawRow = raw[i]!
+    const own = rowProduct.get(r.line) ?? null
+    const name = own?.name ?? product?.name ?? ''
+    const standard = own ? !!stds.get(own.id) : !!std?.lint
+    const lists = { ...lint.lists, products: name ? [name] : [] }
     let photos = 0
     const specials: PlanPreviewRow['specials'] = []
     let lintHits: string[] = []
     if (r.kind && r.kind !== 'clip') {
       const s = slidesOf(deps, rawRow, r.kind, !!opts.drawSpecials)
       s.specials.forEach((sp, k) => { if (sp) specials.push({ slide: k + 1, type: sp.type }); else photos++ })
-      lintHits = lintPost({ texts: s.texts, caption: rawRow.cells.caption, hashtags: hashtagsOf(rawRow.cells.hashtags), product: r.product }, { lists: lint.lists, off: lint.off }).map(h => `${h.slide == null ? 'Caption' : h.slide === 0 ? 'Hook' : `Slide ${h.slide + 1}`}: ${h.message}`)
+      lintHits = lintPost({ texts: s.texts, caption: rawRow.cells.caption, hashtags: hashtagsOf(rawRow.cells.hashtags), product: r.ad, standard }, { lists, off: lint.off }).map(h => `${h.slide == null ? 'Caption' : h.slide === 0 ? 'Hook' : `Slide ${h.slide + 1}`}: ${h.message}`)
     } else if (r.kind === 'clip') {
       photos = 1
-      lintHits = lintPost({ texts: [rawRow.cells.hook], caption: rawRow.cells.caption, hashtags: hashtagsOf(rawRow.cells.hashtags), product: r.product }, { lists: lint.lists, off: lint.off }).map(h => `${h.slide == null ? 'Caption' : 'On-screen text'}: ${h.message}`)
+      lintHits = lintPost({ texts: [rawRow.cells.hook], caption: rawRow.cells.caption, hashtags: hashtagsOf(rawRow.cells.hashtags), product: r.ad, standard }, { lists, off: lint.off }).map(h => `${h.slide == null ? 'Caption' : 'On-screen text'}: ${h.message}`)
     }
     const post = made.get(`${norm(r.account)}|${r.rowId}`) ?? null
     const price = r.kind === 'topic_slideshow' ? topicPrice.micros : charPrice.micros
     const state: PlanPreviewRow['state'] = r.errors.length ? 'problem' : post ? (generated(post) ? 'kept' : 'update') : 'new'
     return {
       line: r.line, rowId: r.rowId, date: r.date, slot: r.slot, account: r.account, format: r.format, kind: r.kind,
+      product: name, productFrom: own ? 'row' as const : 'plan' as const, ad: r.ad,
       hook: r.hook, photos, specials, priceUsd: state === 'problem' || state === 'kept' ? 0 : Math.round(photos * price) / 1e6,
       errors: r.errors, warnings: r.warnings, lint: lintHits, postId: post?.id ?? null, state,
     }
   })
   const ok = rows.filter(r => r.state === 'new' || r.state === 'update')
   const usd = ok.reduce((a, r) => a + r.priceUsd, 0)
+  // The product the plan's accounts agree on (each account's product on the
+  // Accounts card), to pre-fill "This plan is for".
+  const linked = new Set<string>()
+  for (const a of accounts) { const id = await defaultProductFor(deps, ctx, a.tag); if (id) linked.add(id) }
   return {
     rows: scheduleOrder(rows), accounts, problems,
     days: [...new Set(scheduleOrder(rows).map(r => r.date))],
@@ -168,6 +210,9 @@ export async function previewPlan(deps: Deps, ctx: Ctx, csv: string, opts: Opts 
     },
     still: { model, label: topicPrice.label, path: topicPrice.path, perStillUsd: Math.round(topicPrice.micros / 1e4) / 100, problem: topicPrice.problem, choices: choices.map(c => ({ ref: c.ref, label: c.label, pathLabel: c.pathLabel, problem: c.problem })) },
     planId: planIdOf(checked),
+    product: product ? { id: product.id, name: product.name, writingLabel: std?.label ?? 'General standard', notes: !!std?.lint } : null,
+    suggestedProductId: linked.size === 1 ? [...linked][0]! : null,
+    blankProductRows: rows.filter(r => r.productFrom === 'plan' && (r.state === 'new' || r.state === 'update')).length,
   }
 }
 
@@ -176,18 +221,27 @@ const planIdOf = (rows: CheckedRow[]) => {
   return dates.length ? `plan-${dates[0]}` : 'plan'
 }
 
-// "Make N drafts" (free): every good row becomes a draft in its flow, with
-// its words as written. Rows already made without pictures are updated;
-// rows that already have pictures are kept as they are.
+// "Import N rows" (free): each ticked good row becomes a draft in its flow,
+// with its words as written and the plan's product. Rows already made
+// without pictures are updated; rows that already have pictures are kept
+// as they are. Rows not ticked are left out (no draft).
 export async function importPlan(deps: Deps, ctx: Ctx, csv: string, opts: Opts = {}): Promise<{ created: number; updated: number; kept: number; skipped: number; posts: Array<{ rowId: string; id: string; state: 'new' | 'update' }> }> {
-  const { raw, checked, accounts } = await plan(deps, ctx, csv, opts)
+  const picked = new Set((opts.rows ?? []).map(x => x.trim()).filter(Boolean))
+  if (!picked.size) throw new AppError('invalid_request', 'Tick the rows to import first.')
+  const planProduct = opts.productId === undefined ? undefined : await checkProduct(deps, ctx, opts.productId)
+  const { std } = await postWriting(deps, ctx, planProduct)
+  const { raw, checked, accounts, rowProduct } = await plan(deps, ctx, csv, opts, std)
+  // The plan's pick is needed only for ticked rows that name no product.
+  if (planProduct === undefined && checked.some(r => picked.has(r.rowId) && !r.errors.length && !rowProduct.has(r.line))) throw new AppError('invalid_request', 'Pick the plan\'s product first (or No product): some ticked rows name no product of their own.')
   const made = await existing(deps, ctx)
   const planId = planIdOf(checked)
   const out = { created: 0, updated: 0, kept: 0, skipped: 0, posts: [] as Array<{ rowId: string; id: string; state: 'new' | 'update' }> }
   const order = scheduleOrder(checked.map((r, i) => ({ ...r, i })))
   for (const r of order) {
     const rawRow = raw[r.i]!
+    if (!picked.has(r.rowId)) continue
     if (r.errors.length || !r.kind) { out.skipped++; continue }
+    const productId = rowProduct.get(r.line)?.id ?? planProduct ?? null
     const account = accounts.find(a => a.tag === r.account)!
     const post = made.get(`${norm(r.account)}|${r.rowId}`) ?? null
     if (post && generated(post)) { out.kept++; continue }
@@ -201,13 +255,13 @@ export async function importPlan(deps: Deps, ctx: Ctx, csv: string, opts: Opts =
       const spec = { caption: r.hook.slice(0, 400), plan: meta }
       if (post) {
         if (post.sceneId) await updateScene(deps, ctx, post.sceneId, { brief: c.scene, fields, ...(c.clip_action ? { prompts: { video: c.clip_action } } : {}) })
-        await updateContent(deps, ctx, post.id, { title, idea: c.moment, spec })
+        await updateContent(deps, ctx, post.id, { title, idea: c.moment, spec, productId })
         out.updated++; out.posts.push({ rowId: r.rowId, id: post.id, state: 'update' })
         continue
       }
       const scene = await createScene(deps, ctx, account.characterId!, { brief: c.scene, title: r.rowId, fields })
       if (c.clip_action) await updateScene(deps, ctx, scene.id, { prompts: { video: c.clip_action } })
-      const row = await createContent(deps, ctx, { kind: 'meme', characterId: account.characterId!, title, idea: c.moment, accountTag: r.account, sceneId: scene.id, step: 'stills', spec })
+      const row = await createContent(deps, ctx, { kind: 'meme', characterId: account.characterId!, title, idea: c.moment, accountTag: r.account, sceneId: scene.id, step: 'stills', spec, productId })
       out.created++; out.posts.push({ rowId: r.rowId, id: row.id, state: 'new' })
       continue
     }
@@ -218,15 +272,15 @@ export async function importPlan(deps: Deps, ctx: Ctx, csv: string, opts: Opts =
       mode: r.kind === 'topic_slideshow' ? 'topic' : 'character',
       shots: s.shots, specials: s.specials, stillIds: [], textPos: [],
       lock: slideshowSpecSchema.shape.lock.parse({ place: s.parts.common.slice(0, 1000), outfit: r.kind === 'topic_slideshow' ? '' : s.parts.outfit.slice(0, 300), hair: r.kind === 'topic_slideshow' ? '' : s.parts.hair.slice(0, 200), ownerSet: ['place', 'outfit', 'hair', 'light', 'camera', 'details'] }),
-      caption: c.caption.slice(0, 2200), hashtags: hashtagsOf(c.hashtags).slice(0, 15), ctaLine: c.cta.slice(0, 300), ad: r.product,
+      caption: c.caption.slice(0, 2200), hashtags: hashtagsOf(c.hashtags).slice(0, 15), ctaLine: c.cta.slice(0, 300), ad: r.ad,
       cta: { kind: 'own', handle: '', word: '' }, pattern: null, hookIdeas: [], hookReview: null, plan: meta,
     }
     if (post) {
-      await updateContent(deps, ctx, post.id, { title, idea: c.moment, spec })
+      await updateContent(deps, ctx, post.id, { title, idea: c.moment, spec, productId })
       out.updated++; out.posts.push({ rowId: r.rowId, id: post.id, state: 'update' })
       continue
     }
-    const row = await createContent(deps, ctx, { kind: 'slideshow', characterId: account.characterId!, title, idea: c.moment, accountTag: r.account, step: 'stills', spec })
+    const row = await createContent(deps, ctx, { kind: 'slideshow', characterId: account.characterId!, title, idea: c.moment, accountTag: r.account, step: 'stills', spec, productId })
     out.created++; out.posts.push({ rowId: r.rowId, id: row.id, state: 'new' })
   }
   return out

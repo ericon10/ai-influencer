@@ -84,7 +84,7 @@ async function stop(procs: ChildProcess[]) {
 async function reuse(api: string): Promise<Seed | null> {
   if (process.env.E2E_RESEED || !existsSync(SEED_FILE)) return null
   const s = JSON.parse(readFileSync(SEED_FILE, 'utf8')) as Seed
-  if (s.api !== api.replace(/\/$/, '')) return null
+  if (s.api !== api.replace(/\/$/, '') || !s.sideStep) return null
   const ok = async (path: string) => (await fetch(`${api}${path}`, { headers: { 'x-studio-request': '1' } })).ok
   const posts = await Promise.all([s.basePost, s.recreatePost, s.takeRecreatePost].map(id => ok(`/content/${id}`)))
   const { characters } = await (await fetch(`${api}/characters`, { headers: { 'x-studio-request': '1' } })).json() as { characters: { id: string }[] }

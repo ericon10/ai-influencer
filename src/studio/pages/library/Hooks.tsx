@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { AlertTriangle, Archive, Copy, FileUp, Plus, Sparkles } from 'lucide-react'
 import { api } from '../../api'
-import { useActiveJobs, useProduct, useProducts } from '../../hooks'
+import { keys, useActiveJobs, useProduct, useProducts } from '../../hooks'
+import { HowTo } from '../../guide/Guide'
 import { PriceButton } from '../../PriceButton'
 import { RunStatus } from '../../runs'
 import { Callout, errorMessage, useToast } from '../../ui'
@@ -81,8 +82,27 @@ function ProductPanel({ p, characters }: { p: ProductView; characters: Character
     try { await api.addHook(p.id, { text: adding, kind: kind ?? '' }); setAdding(''); await refresh(); await qc.invalidateQueries({ queryKey: ['products'] }) } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) }
   }
 
+  // The rules this product adds on top of the general standard (section 29):
+  // its posts follow them, no other product's do.
+  async function setWriting(writing: string) {
+    try {
+      await api.updateProduct(p.id, { writing }); await refresh()
+      await qc.invalidateQueries({ queryKey: ['products'] }); await qc.invalidateQueries({ queryKey: keys.content })
+    } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) }
+  }
+
   return (
     <div className="st-col" style={{ gap: 18 }}>
+      <section className="st-card" data-field="product-writing"><div className="st-card-body st-col" style={{ gap: 8 }}>
+        <div className="st-row" style={{ gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+          <span className="st-h3">Writing rules</span>
+          <select className="st-select" style={{ width: 'auto' }} value={p.writing ?? ''} onChange={e => void setWriting(e.target.value)} aria-label={`Writing rules for ${p.name}`}>
+            {(p.writings ?? [{ key: '', label: 'General standard' }]).map(w => <option key={w.key} value={w.key}>{w.key ? `General standard + ${w.label}` : w.label}</option>)}
+          </select>
+          <HowTo id="products" label="About products" />
+        </div>
+        <span className="st-hint">Every post is written to the general standard: the stop test (a stranger would stop, clear on one read, says exactly what happened, sounds like a person), one story thread, an image line a slide, the voice from the character's voice card or the account. {p.writing ? `${p.name}'s posts also get ${p.writingLabel}: its own hook writer and reviewer, its honest endings on ads and its language notes.` : `${p.name} adds no rules of its own.`} Only posts whose product is {p.name} follow this.</span>
+      </div></section>
       <section className="st-card" data-field="hook-vault"><div className="st-card-body st-col" style={{ gap: 12 }}>
         <div className="st-row" style={{ gap: 10, flexWrap: 'wrap' }}>
           <div className="grow"><div className="st-h3">Hook vault <span className="st-muted">({p.hooks.length})</span></div><span className="st-hint">Every hook opens on a conflict, a surprise or a question. Keep about 80% pure value and relatable posts, 20% soft product mentions.</span></div>
@@ -117,7 +137,7 @@ function ProductPanel({ p, characters }: { p: ProductView; characters: Character
             const rules = extra[0]!.items.map(x => { const m = x.match(/^([^:]{1,60}):\s*(.*)$/); return m ? { label: m[1]!.trim(), items: [m[2]!.trim()] } : { label: 'Note', items: [x] } })
             await api.updateProduct(p.id, { claims: { groups, lines: rules, watch: extra[1]!.items } }); await refresh()
           }} field="claims" />
-        <GroupsCard title="Buyer language" hint="How job seekers really talk. Use these words, not marketing words. Add phrases from comments and reviews as you collect them." groups={p.language.groups}
+        <GroupsCard title="Buyer language" hint={`How ${p.name}'s buyers really talk. Use these words, not marketing words. Add phrases from comments and reviews as you collect them.`} groups={p.language.groups}
           onSave={async groups => { await api.updateProduct(p.id, { language: { groups } }); await refresh() }} field="language" />
       </div>
 
@@ -161,7 +181,7 @@ function HookRow({ h, product, open, onOpen, picked, characters, onChange }: { h
               <span className="st-variant-text">{v.text}</span>
               <span className="st-spacer" />
               <button className="st-btn sm icon ghost" aria-label="Copy" title="Copy" onClick={() => void copy(v.text)}><Copy size={13} /></button>
-              <button className="st-btn sm ghost" disabled={!!newPost.busy} onClick={() => void newPost.create('meme', { characterId: v.characterId, idea: v.text, spec: { caption: v.text } })}><Plus size={13} />Use in a new post</button>
+              <button className="st-btn sm ghost" disabled={!!newPost.busy} onClick={() => void newPost.create('meme', { characterId: v.characterId, idea: v.text, spec: { caption: v.text }, productId: product.id })}><Plus size={13} />Use in a new post</button>
               <button className="st-btn sm icon ghost" aria-label="Archive this variant" title="Archive" onClick={async () => { try { await api.archiveVariant(v.id); onChange() } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) } }}><Archive size={13} /></button>
               {v.flags.map(f => <span key={f} className="st-hint st-warntext" style={{ flexBasis: '100%' }}><AlertTriangle size={12} style={{ verticalAlign: -2 }} /> {f}</span>)}
             </div>

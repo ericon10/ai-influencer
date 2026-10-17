@@ -29,7 +29,7 @@ export async function openDb(opts: { url?: string; migrateUrl?: string; pgliteDi
     // API and the worker can boot at the same moment on a fresh database.
     // Neon's pooled address cannot hold a session lock, so the lock uses the
     // direct address of the same database.
-    const mc = new pg.Client({ connectionString: opts.migrateUrl || directUrl(opts.url), connectionTimeoutMillis: 15_000 })
+    const mc = new pg.Client({ connectionString: sslUrl(opts.migrateUrl || directUrl(opts.url)), connectionTimeoutMillis: 15_000 })
     await mc.connect()
     try {
       await mc.query('select pg_advisory_lock($1)', [MIGRATION_LOCK])
@@ -40,7 +40,7 @@ export async function openDb(opts: { url?: string; migrateUrl?: string; pgliteDi
     }
     // Small pool, short idle life: serverless functions open few connections,
     // and closing idle ones lets Neon suspend the database between bursts.
-    const pool = new pg.Pool({ connectionString: opts.url, max: 4, idleTimeoutMillis: 10_000, connectionTimeoutMillis: 15_000 })
+    const pool = new pg.Pool({ connectionString: sslUrl(opts.url), max: 4, idleTimeoutMillis: 10_000, connectionTimeoutMillis: 15_000 })
     const db = drizzle(pool, { schema })
     return { db: db as unknown as Db, driver: 'postgres', close: () => pool.end() }
   }
@@ -80,6 +80,21 @@ export function directUrl(url: string): string {
   try {
     const u = new URL(url)
     u.hostname = u.hostname.replace(/-pooler\./, '.')
+    return u.toString()
+  } catch {
+    return url
+  }
+}
+
+// pg treats sslmode prefer, require and verify-ca as verify-full today and
+// warns about it on every connection (906 warnings in a week of production
+// logs). Saying verify-full keeps exactly today's behavior without the
+// warning; the environment's address is left as it is.
+export function sslUrl(url: string): string {
+  try {
+    const u = new URL(url)
+    const mode = u.searchParams.get('sslmode')
+    if (mode === 'prefer' || mode === 'require' || mode === 'verify-ca') u.searchParams.set('sslmode', 'verify-full')
     return u.toString()
   } catch {
     return url

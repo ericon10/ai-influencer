@@ -34,6 +34,12 @@ async function flow(page: Page, phone: boolean, info: TestInfo) {
   await page.goto(`/studio/posts/${id}`)
   await expect(page.locator('[data-field="slideshow-hook"]')).toBeVisible({ timeout: 30_000 })
 
+  // The post's product (section 29): a new post has none, so no vault. Pick SideStep.
+  const product = page.locator('[data-field="post-product"]')
+  await expect(product.getByRole('radio', { name: 'No product' })).toHaveAttribute('aria-checked', 'true')
+  await press(product.getByRole('radio', { name: 'SideStep' }), phone)
+  await expect(product.getByRole('radio', { name: /SideStep/ })).toHaveAttribute('aria-checked', 'true', { timeout: 15_000 })
+
   // Idea: 10 from the vault (free), each tagged by pattern.
   await press(page.getByRole('button', { name: /10 from the vault/ }), phone)
   const rows = page.locator('[data-field="hook-ideas"] .st-hookrow')

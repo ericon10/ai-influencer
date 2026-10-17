@@ -12,6 +12,13 @@ Wireframes: `docs/studio/ux/` (rough, grayscale; numbers match section 4).
 
 ## 0. Owner decisions (2026-10-13)
 
+- **Multi-product, multi-character, multi-account (standing rule, owner,
+  2026-10-17).** The Studio makes posts for many products, characters and
+  accounts. Nothing product-specific is ever global: a product's rules,
+  wording, examples, word lists and defaults apply only to that product's
+  posts (section 29). Every new feature's plan states which products,
+  characters and accounts it applies to, and anything with no product
+  works with neutral defaults.
 - **Home is Posts.** `/studio` opens the Posts list.
 - **No separate Create pages.** Making stills and clips happens inside a
   post, in its steps.
@@ -213,6 +220,15 @@ top; Activity, the month's spend and Demo/Live sit at the bottom.
     - The sidebar becomes a bottom bar: New, Posts, Characters, Library,
       Settings, Guide.
     - Steps stack, and drawers become bottom sheets.
+    - Every tap target is at least 40 px tall (owner's phone pass,
+      2026-10-17): small buttons, chips, segmented choices and step pills
+      grow on a phone; the round Guide buttons and switches keep their size
+      with a 44 px touch area around them; tick boxes are 22 px.
+    - A wide table becomes one small card per row (the launch plan's
+      posts, its accounts and its rows to import), so a column never sits
+      off the screen. A grid meant to scroll (the plan by day and account,
+      a strip of slides) scrolls inside its card, never the page.
+    - A switch keeps its words beside it.
 12. **How this works** (owner, 2026-10-13). Every page and every post step
     has a small "How this works" button in its header. It opens that
     section of the Guide in a drawer: what it is, what to do, tips, what
@@ -978,7 +994,7 @@ free export on the worker, Make another like this, captions optional.
 | Piece | Where | How it works | Clicks |
 |---|---|---|---|
 | Hook box | Idea step, at the top (slideshows) | One line, the hook (slide 1). Typing your own works; nothing is required | 0 |
-| Write 10 hooks | Under the hook box | Two buttons. **10 from the vault** (free, code only): hooks from the product's hook vault and buyer language, recast into the patterns below. **Write 10 with Claude** (priced on the button, the model named): the vault, the buyer language and the character's voice card go in; 10 come back. Each hook carries its pattern tag: someone doubts or reacts, POV, things nobody tells you, red flags, listicle, storytime, myth vs fact, tier list. Pattern chips filter the list. The product is the account's first kit unless another is picked | 1 |
+| Write 10 hooks | Under the hook box | Two buttons. **10 from the vault** (free, code only): hooks from the product's hook vault and buyer language, recast into the patterns below. **Write 10 with Claude** (priced on the button, the model named): the vault, the buyer language and the character's voice card go in; 10 come back. Each hook carries its pattern tag: someone doubts or reacts, POV, things nobody tells you, red flags, listicle, storytime, myth vs fact, tier list. Pattern chips filter the list. The product is the post's product (section 29), never the first kit by default | 1 |
 | Draft every slide | Each hook in the list: **Use this hook** (priced, Claude) | The hook becomes slide 1 and every slide is drafted (6 by default, 4 to 10 in Slides): hook, setup, the reveal on slide 3 or 4, the payoff, a soft CTA last. 4 to 12 words a slide. Each slide also gets the shot its photo shows (inside the locked scene) and, where it helps, a special slide (below). The caption and hashtags come with it. All editable | 1 |
 | Who is in the photos | Idea step, under the hook | **The character** (refs or the Element, the REALISM block, the outfit locked across the slides) or **No one, a topic** (feeder accounts: offices, skylines, commutes, desk setups, interview lobbies). Topic photos have no person and no face check; the REALISM block is still in every prompt | 1 |
 | One camera roll (the locked scene) | Stills step, top card | One scene for the whole slideshow so the set reads like one camera roll: place, light, phone camera, outfit (character only) and 2 details. Every slide's prompt carries the same lines; only the shot changes. Filled from the draft, editable | 0 |
@@ -1040,13 +1056,13 @@ batch's own spreadsheet import, every price button.
 
 | Piece | Where | How it works | Clicks |
 |---|---|---|---|
-| Write 10 with Claude, to THE STANDARD (v1.2) | Idea step (slideshows), under the hook box | Follows THE STANDARD at the top of `viral-writing-playbook.md` v1.2 and `post-writer-brief.md` v1.2: every hook names the job situation (a job application, interview, offer, recruiter, salary, resume), says exactly what happened (the number, the thing, the moment), hurts 7 or more out of 10, reads in one second with no image (about 15 words), opens a loop the slides close, in the TikTok group-chat voice (lowercase, CAPS for the shock word, texting spellings, one or two slang words, never LinkedIn). The playbook's pass and fail examples are the writer's few-shot set. For each of 10 slots Claude also gives the effects, a moment and a structure or lens (they shape slides 2 to 6, not the hook), writes 3 and keeps 1 plus the runner-up as the alt hook. Then a second Claude call, a separate reviewer, runs the five-check stop test first (stops a stranger, clearly a job, exactly what happened, pain 7 or more, sounds like a friend; any no is a 3 at best) and scores every hook on the v1.2 ladder; only the 1s and 2s are shown ("4 scored 3 to 5 and are hidden; 4 of them failed the stop test"). One price covers both calls, models named. THE STANDARD, the ladder and the honest endings are data (`hook_standard`, `playbook_ladder`, `product_endings` in `config/templates.yaml`), shared with Make variations and the kit's hook variants | 1 |
+| Write 10 with Claude, to THE STANDARD (v1.2) | Idea step (slideshows), under the hook box, on SideStep posts (section 29) | Follows THE STANDARD at the top of `viral-writing-playbook.md` v1.2 and `post-writer-brief.md` v1.2: every hook names the job situation (a job application, interview, offer, recruiter, salary, resume), says exactly what happened (the number, the thing, the moment), hurts 7 or more out of 10, reads in one second with no image (about 15 words), opens a loop the slides close, in the TikTok group-chat voice (lowercase, CAPS for the shock word, texting spellings, one or two slang words, never LinkedIn). The playbook's pass and fail examples are the writer's few-shot set. For each of 10 slots Claude also gives the effects, a moment and a structure or lens (they shape slides 2 to 6, not the hook), writes 3 and keeps 1 plus the runner-up as the alt hook. Then a second Claude call, a separate reviewer, runs the five-check stop test first (stops a stranger, clearly a job, exactly what happened, pain 7 or more, sounds like a friend; any no is a 3 at best) and scores every hook on the v1.2 ladder; only the 1s and 2s are shown ("4 scored 3 to 5 and are hidden; 4 of them failed the stop test"). One price covers both calls, models named. THE STANDARD, the ladder and the honest endings are data (`hook_standard`, `playbook_ladder`, `product_endings` in `config/templates.yaml`), shared with Make variations and the kit's hook variants | 1 |
 | A hook card | The hook list | The hook; one line for the moment; the code as the tag (S1 to S12, L13 to L25, with its name); the target effect (E1 to E8); the alt hook; the reviewer's score (1 or 2), its pain out of 10 and its note. Chips filter by code. 10 from the vault stays free and keeps its pattern tags | 0 |
 | Per account | Posts home > Accounts, each row | A **primary** and a **backup** structure (filled from the playbook's fit table: F1 S3 and S11, F2 L14 and S1, F3 S11 and L20, F4 S11 and S3, F5 S3 and L18, F6 S6 and S1, F7 S12 and S4, F8 S9 and L24, F9 S2 and L21, Callie S5 and S10, Solei S2 and S6; editable, a default). The writer leans on them and never repeats the account's last code; a hook with the last post's code carries a warning | 1 per edit |
 | The story draft | Use this hook | The draft follows the brief v1.2: 6 slides, 4 to 14 words, in the hook's voice, one thread: slide 2 the setup that raises the stakes, slide 3 or 4 the turn (often a person reacting), slide 5 the payoff, slide 6 relief, recognition or a question the comments answer; every slide makes sense to a stranger and has its image line; the caption is one line that adds a layer. The moment, code and effects of the hook go in; the alt hook is kept on the post | 1 |
 | Product endings | A product post's last slide (Use this hook, variations, batch) | Slide 6 is a friend's tip that fixes the exact slide 1 pain ("my friend told me about SideStep fr fr..."), from the four honest endings only: one click fills the whole app (retyping the resume into boxes), it shows how u match before u apply (hours on jobs you don't fit), it shows exactly what to add from stuff i actually did (rewriting the resume for every job), $99 once, no subscription (paying monthly for job tools). Ghosting, fake jobs, layoffs, salary games, scams and interview rounds stay pure pain: the draft says "none", SideStep is not named, #ad goes off and the Slides step says why. Never "stop getting ghosted", "passed over" or "it applies for you". The caption starts with "Ad:" when SideStep is named | 0 |
-| Language lint | Every hook card, the hook box, every slide's words, the caption (slideshows), the on-screen text (video posts), the plan import's preview and the Finish step | Free, as you type, warnings only: em or en dashes; should, need to, must, ought; "just" before an instruction; dream job, unlock, level up, game-changer, supercharge; a sentence that starts with "You" ("POV:" is fine); more than 5 hashtags; SideStep in a hook; a product post whose caption does not start with "Ad:"; and on a hook, THE STANDARD's four: no job word (job, interview, recruiter, offer, salary, resume, hiring, application), over 22 words (the writer aims for about 15; the v1.2 passing examples run to 22), opening with a label or stage direction (Exhibit, Levels of, Previously on, Calendar invite, a timestamp or date), more than one quoted phrase; on a product post's last slide: ghosted, passed over or applies for you. The caption is checked as posted ("Ad:" is put first by the export). Each is a default in Settings > Rules (on or off, per account or character); the word lists are data (`config/content.yaml`) | 0 |
-| Import a plan | Posts home, the **Launch plan** card (under Accounts, collapsed when empty) | Upload or paste a CSV with the plan's columns, read by name in any order (a rewritten plan with the same columns replaces the test file later; unknown columns and missing required ones are named in the preview). **Preview (free)**: the rows in a grid by day and account (format, the hook's first words), each row's errors and lint warnings, what each slide becomes (photo or special slide), the character each account's posts are filed under, and the total price to generate everything with the picked stills model. **Make 140 drafts** (free): every row becomes a draft in its flow. Importing the same file again updates the drafts that have not been generated yet (matched by row_id) instead of doubling them | 2 |
+| Language lint | On SideStep posts only (section 29): every hook card, the hook box, every slide's words, the caption (slideshows), the on-screen text (video posts), the plan import's preview and the Finish step | Free, as you type, warnings only: em or en dashes; should, need to, must, ought; "just" before an instruction; dream job, unlock, level up, game-changer, supercharge; a sentence that starts with "You" ("POV:" is fine); more than 5 hashtags; SideStep in a hook; a product post whose caption does not start with "Ad:"; and on a hook, THE STANDARD's four: no job word (job, interview, recruiter, offer, salary, resume, hiring, application), over 22 words (the writer aims for about 15; the v1.2 passing examples run to 22), opening with a label or stage direction (Exhibit, Levels of, Previously on, Calendar invite, a timestamp or date), more than one quoted phrase; on a product post's last slide: ghosted, passed over or applies for you. The caption is checked as posted ("Ad:" is put first by the export). Each is a default in Settings > Rules (on or off, per account or character); the word lists are data (`config/content.yaml`) | 0 |
+| Import a plan | Posts home, the **Launch plan** card (under Accounts, collapsed when empty) | Upload or paste a CSV with the plan's columns, read by name in any order (a rewritten plan with the same columns replaces the test file later; unknown columns and missing required ones are named in the preview). **Preview (free)**: the rows in a grid by day and account (format, the hook's first words), each row's errors and lint warnings, what each slide becomes (photo or special slide), the character each account's posts are filed under, and the total price to generate everything with the picked stills model. **Import N rows** (free; only the ticked rows, with the plan's product, section 29): each becomes a draft in its flow. Importing the same file again updates the drafts that have not been generated yet (matched by row_id) instead of doubling them | 2 |
 | Slideshow rows | Feeders (list, story, mock UI, stat) and character slideshows | A slideshow draft with the hook, slides 2 to 6, the scene, caption, hashtags and CTA as written (no redraft). The scene's "Slide N:" parts become each slide's shot; the rest is the locked scene. Every slide is a photo made as written by default (the plan's scenes put mock screens on laptops and phones in real places). **Draw mock screens by code** (a switch in the preview, off by default) turns a slide whose words describe a screen the Studio draws (calendar invite, email, lock screen, placard, invoice, bank app, portal timeline, form, survey, profile card, text thread, notification, posting) into that special slide with its quoted words filled in; any slide can also be switched by hand in its slide card. Feeders are topic slideshows (no one in the photos); Callie's and Solei's are character slideshows. product = yes turns on #ad | 0 |
 | Photo rows | Character photos | A one-slide character slideshow: the hook is the on-screen text, the scene is the locked scene, the export is one 1080 x 1920 JPEG (and the 3:4 crop) with caption.txt and post.json | 0 |
 | Clip rows | Character clips | A video post at its Stills step: the hook is the on-screen text, the scene as written is the post's idea (read for free into the scene fields), clip_action is "What happens in the video". Caption, hashtags and CTA wait in the Finish step to copy | 0 |
@@ -1093,3 +1109,64 @@ stills as they land and ends on its full count ("6 of 6"), and so does the
 card's "with their pictures" line, with no reload. Before, the card
 stopped reading the plan when the stills stopped running, so a finished
 post could stay at "0 of 6" until the page was reloaded.
+
+## 29. Products: every post belongs to one product, or none (owner, 2026-10-17)
+
+Goal: the Studio promotes many different things for many characters on
+many accounts (rule two, section 0). Every post is written to the general
+standard; everything that belongs to one product (its hook vault, buyer
+language and claims sheet, the rules it adds, their language notes, its
+B-roll, its plan rows) follows the post's product and nothing else. A post
+with no product gets the general standard and neutral defaults.
+
+Applies to: every post kind (video post, slideshow, batch), every
+character, every account. SideStep's rules reach SideStep posts only.
+
+**What the Studio did before this (the audit):**
+
+| Piece | Before |
+|---|---|
+| The post's product | Slideshows only, in their spec; when none was picked the writers took the account's first product (SideStep), so every slideshow wrote to SideStep's rules. Video posts and batches had none |
+| THE STANDARD (SideStep's writing standard v1.2) | In every hook writer, the reviewer, Use this hook, Make variations and the kit's hook variants, whatever the post was about |
+| Language notes | On every post: a Callie video post captioned "Do boys even know what it's like to be a girl?" got "No job word" |
+| "Pick a hook" (Caption step) | Its own product chips, not saved, the first product by default |
+| B-roll | A free-text "Product, e.g. Notion" label, not tied to the products |
+| Posts home | Filters by account and character only |
+| Launch plan import | Every row became a draft (all 140); the plan had no product; the CSV's product column was a yes or no |
+| Wording | Job-hunt examples in placeholders and in drawn screens' first words on every post |
+
+**What it does now:**
+
+| Piece | Where | How it works | Clicks |
+|---|---|---|---|
+| Product | The Idea step of every post (video post, slideshow, batch), one chip row: **No product** and each product, with what the post is written to under it | The post's product, saved with the post. A new post takes its account's product (Posts home > Accounts) or none; never "the first product". Make another like this, variations, batch posts, Recreate with another character and plan drafts keep their source's product. The post card shows it | 0 or 1 |
+| The general standard | Every writer, every post | The hook: a stranger would stop on it, clear on one read with no image, says exactly what happened, sounds like a person (the stop test, four checks), about 15 words, a loop the slides close. The slides: one story thread, the clarity test (every slide makes sense to a stranger), an image line a slide. The voice: the character's voice card, or the account's own words. Write 10 with Claude is one call with no reviewer: the writer runs the stop test and keeps only hooks that pass, each with its moment, pattern and alt hook. Data: the unprefixed templates in `config/templates.yaml` (`hook_standard`, `slideshow_hooks`, `slideshow_draft`, `slideshow_variations`, `hook_variants`) | 0 |
+| A product's own rules | Library > Hooks, each product's card: **Writing rules** | The general standard alone, or a set of rules on top (`writing_standards` in `config/content.yaml`). SideStep rules v1.2 add the job word, pain 7 or more, the group-chat voice, THE STANDARD's examples, the playbook's structures per account, the honest endings on ads, a separate stop-test reviewer (a second call) and the language notes; its templates are the `sidestep_` ones. A product made from the SideStep kit starts on them; any other on the general standard alone | 1 |
+| Written for a product vs an ad for it | The post's #ad switch; a plan row's ad column | Separate. #ad puts "Ad" on slide 1 and "Ad:" first in the caption and, on a product whose rules have them, the honest endings on the last slide; on any other product, an honest tip about it inside its claims sheet. A post written for a product with #ad off never names it. A plan import never turns a pure-pain row into an ad | 0 |
+| Language notes | Every hook, slide and caption | The long dash check on every post, any product. The rest (should and must, "just", hustle words, a sentence starting with "You", hashtags, the product in a hook, "Ad:", the four hook checks, the product ending) only on posts whose product's rules have lint on (SideStep's). The post's own product is the name never in a hook | 0 |
+| Accounts | Posts home > Accounts, a **Product** column | Each account's product: the default for new posts on that account. No account has one until the owner sets it (no hard-coded defaults) | 1 |
+| Posts home filter | Posts home, a **Product** chip row next to Account and Character | All, each product, No product; applied on the server, so Show older posts finds older posts of that product too | 1 |
+| Pick a hook | Caption step | The post's product's vault; with no product, a note and a product pick to browse | 0 |
+| B-roll | Library > B-roll and the post's B-roll row | The product is picked from your products (or none), no free text. A post's B-roll lists its product's clips first. A clip from before keeps its old label until a product is picked | 1 |
+| Launch plan import | Posts home > Launch plan | Four numbered steps: 1 **Upload the CSV** (shows "launch-plan-v2-posts.csv · 140 rows loaded"; the text itself behind **See or edit the rows** or **Paste the rows instead**), 2 **Preview (free)**, 3 **This plan is for** (the product of the rows that name none, or No product; filled when the plan's accounts agree on one) and **tick the rows to import** (nothing ticked at first; filter by day or account, Tick the shown, Tick all; each row shows its product and Ad), 4 **Import N rows (free)**. Only the ticked rows become drafts. The button names what is left when it cannot run | 3 to 4 |
+| Plan columns | The CSV | **product** holds a product name (blank: the plan's pick) and **ad** holds yes or no. A row naming a product not in Products is an error in the free preview and never imports. An older file whose product column is yes or no still imports: that is the ad column, and the plan's pick sets the product | 0 |
+| Draw mock screens by code | The import's step 2 | One plain line: phone screens, emails, placards and forms drawn by the Studio (free, the exact words) instead of photos; off, every slide is a photo made from its scene | 1 |
+
+Free throughout: the product pick, the filters, the writing rules, the
+import. Paid steps keep their price buttons; on the general standard
+Write 10 with Claude is one Claude call (SideStep's rules add the
+reviewer, a second call on the same button).
+
+Defaults in Settings > Rules (rule one): the language notes keep their
+switches; their messages say which are SideStep's. Fixed rules are
+unchanged.
+
+Wording: placeholders and examples outside SideStep are neutral (the
+caption box, the slideshow topic, hook and batch boxes, the voice card,
+the Accounts box, the batch CSV template, "How {product}'s buyers really
+talk"), and a drawn screen starts with neutral words. Slideshows stay
+TikTok only by default for every product (the owner's v1.2 item; the
+Instagram set is one switch in Finish). The 3 slideshows made before this
+on the TikTok account had no product picked (they wrote to SideStep only
+through the first-product default); they now show No product until the
+owner picks one.
