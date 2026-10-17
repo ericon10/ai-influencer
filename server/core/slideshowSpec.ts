@@ -109,8 +109,15 @@ export const slideshowSpecSchema = z.object({
   // handle typed, the comment word.
   cta: z.object({ kind: z.enum(CTA_IDS).default('own'), handle: str(40), word: str(30) }).prefault({}),
   ad: z.boolean().default(false),
-  // The stills model picked last for this post (null: the account's pick).
+  // The stills model picked last for this post (before section 30; read as
+  // its path: Nano Banana 2.1 the plan, GPT Image 2.5 Flare the API).
   stillModel: z.string().max(80).nullable().default(null),
+  // Section 30. The path picked last for this post's stills (null: the
+  // account's pick): Your Higgsfield plan (credits) or the Higgsfield API.
+  stillPath: z.enum(['account', 'api']).nullable().default(null),
+  // Who each slide's photo shows, picked on the slide card ('' reads it
+  // from the shot: a thing or a place is no one).
+  people: z.array(z.enum(['', 'character', 'none'])).max(12).default([]),
   // A batch (the parent post): the pasted hooks, one slideshow each.
   batchHooks: z.array(z.string().max(200)).max(10).default([]),
   // A batch's slideshow: what the review decided.

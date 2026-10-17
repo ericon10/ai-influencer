@@ -129,7 +129,7 @@ function ClaudeCard({ d }: { d: SettingsView }) {
             </div>
           </div>
         ))}
-        {d.mode !== 'live' && <p className="st-hint" style={{ marginTop: 10 }}>Demo mode runs a free mock in place of Claude, so prices show "Demo mock, free" until you go live.</p>}
+        {d.mode !== 'live' && <p className="st-hint" style={{ marginTop: 10 }}>Demo mode runs a free mock in place of Claude and the image and video models, so prices show "Demo mock, free" (a still names the model it stands in for) until you go live.</p>}
       </div>
     </div>
   )

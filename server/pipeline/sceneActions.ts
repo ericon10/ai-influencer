@@ -348,7 +348,7 @@ export async function writtenStillPrompt(deps: Deps, ctx: Ctx, row: CharacterRow
   return withModelLines(deps, sceneModel, assembleStillPrompt(templates, sc, views, f, ch, mode, text, { identityBlock: identity?.promptBlock, warnings: [], addendum, rules: sceneRules, flawDose: sw.on('realism-flaw-dose') }))
 }
 
-export async function buildSceneRun(deps: Deps, ctx: Ctx, row: CharacterRow, input: { sceneId: string; models: string[]; variations: number; reason?: string; withQa: boolean; allowRepeat?: boolean; write?: boolean; level?: string }): Promise<SceneBuilt> {
+export async function buildSceneRun(deps: Deps, ctx: Ctx, row: CharacterRow, input: { sceneId: string; models: string[]; variations: number; reason?: string; withQa: boolean; allowRepeat?: boolean; write?: boolean; level?: string; billing?: 'account' | 'api' }): Promise<SceneBuilt> {
   const scene = await getScene(deps, ctx, input.sceneId)
   if (scene.characterId !== row.id) throw new AppError('bad_request', 'That scene belongs to another character.')
   const ch = toData(row)
@@ -409,7 +409,10 @@ export async function buildSceneRun(deps: Deps, ctx: Ctx, row: CharacterRow, inp
     // model can set its own value for a level.
     const level = stillLevelFor(deps, model, input.level)
     const kind: GenRequest['kind'] = mode === 'refs' ? 'image_edit' : 'image'
-    const run = await runModel(deps, ctx, model, kind)
+    // A path picked by the caller (the launch plan's clip rows, section 30)
+    // bills the Higgsfield model there; otherwise the account's default.
+    const base = await runModel(deps, ctx, model, kind)
+    const run: { model: string; billing?: 'account' | 'api' } = input.billing && base.model.startsWith('higgsfield/') ? { ...base, billing: input.billing } : base
     const attached = mode === 'refs' ? refs.slice(0, Math.max(1, entry.max_refs)) : []
     prompts.push({ label: `${entry.label} prompt`, text: prompt, wrapped: hardWrap(prompt) })
     for (let v = 0; v < input.variations; v++) {

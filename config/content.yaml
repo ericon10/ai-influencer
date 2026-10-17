@@ -55,11 +55,17 @@ slideshow:
   draft_slides: 6
   hooks: 10
   instagram: { width: 1080, height: 1440 }
-  # The stills: Nano Banana 2.1 on the Higgsfield plan (the API does not
-  # offer it), GPT Image 2.5 Flare on the Higgsfield API. The last pick is
-  # kept; the plan when it is connected.
-  still_model: higgsfield/nano-banana-2.1
-  api_still_model: higgsfield/gpt-image-2.5-flare
+  # The stills (owner, 2026-10-17; UX-PLAN.md section 30). The path is the
+  # owner's pick on the Stills step and the Launch plan card: Your
+  # Higgsfield plan (credits) or the Higgsfield API (dollars); the last
+  # pick is kept, the plan when it is connected. The model follows who is
+  # in the slide. A slide that shows the character uses the character
+  # file's stills default (its Models section), else scenes.yaml
+  # default_still_model, at the Standard level. A slide with no one in it
+  # (a topic slideshow, or a shot with no person) uses the cheapest of
+  # these that the path can run, priced from the price book at the
+  # Standard level (GPT Image 2.5 Flare today: 1 credit, or $0.0625).
+  empty_still_models: [higgsfield/gpt-image-2.5-flare, higgsfield/nano-banana-2.1, higgsfield/soul-2]
   max_variations: 5
   batch_max: 10
   # Mock screens (special slides) never show a real brand: each name here

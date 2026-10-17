@@ -2692,3 +2692,64 @@ Decided (UX-PLAN.md section 29, approved with five changes):
 
 The three slideshows made before this on the TikTok account had no product
 picked, so they now show No product until the owner picks one.
+
+### G58. Slide image model: by who is in the slide (owner, 2026-10-17)
+
+The owner: "A slide showing a character uses that character file's stills
+default (Callie: GPT Image 2.5 Flare plus 'bare natural lips, no gloss').
+A slide with no character uses the cheapest model (Flare Standard today).
+Fix plan-path billing so Flare bills correctly there. Clip opening stills
+follow the path picked on the card. Model and price on every generate
+button. Don't change the edit, face pass or recreate defaults in this
+build." UX-PLAN.md section 30.
+
+- **The path is the pick, the model follows the slide.** A slideshow's
+  and the launch plan's stills pick a path (Your Higgsfield plan, credits;
+  or the Higgsfield API, dollars), kept per post (`spec.stillPath`) and as
+  the account's last pick (`slideshow_still_path`; the old
+  `slideshow_still_model` setting and `stillModel` action field are read as
+  their path). `server/core/stillModels.ts` is pure: a slide with the
+  character takes the file's `scene_still`, else `scene_still_alt`, else
+  `default_still_model`, each only when the path can run it (`runsOn`: the
+  plan needs an MCP entry, the API needs `api` not false); a slide with no
+  one takes the cheapest of `empty_still_models` the path runs, priced at
+  the Standard level from the price book (credits on the plan, dollars on
+  the API).
+- **Who is in a slide** is read from the shot for free
+  (`shotShowsCharacter` in `server/core/slides.ts`): the name, the
+  character's pronouns, a shot that starts with an -ing verb, a selfie or
+  a look at the lens show the character; anything else (a thing, a place,
+  "no face") shows no one. It is a default: the slide card switches it,
+  stored as `spec.people` (a parallel list that moves with the slide). A
+  plan photo row is always the character. A no-one slide in a character
+  slideshow uses the topic prompt and is kept as a `slide_topic`
+  candidate, so no face check runs on it.
+- **The billing fix.** Before, a still was sent to the account only when
+  its model was one the API does not offer (`runModel` gave Nano Banana
+  2.1 `billing: 'account'`; Flare got none). A Flare still on the plan
+  therefore carried no billing path and `withBilling` gave it the
+  account's Higgsfield default (production's is the API): the quote, the
+  hold and the charge were the API's dollars, on the API key. The
+  slideshow and plan code now stamps the picked path on every Higgsfield
+  request (`pathRun`), so the plan path goes through the account adapter:
+  Higgsfield's live credit price (the price book's 1 credit at Standard
+  when it is slow), a hold in credits, a charge of the quoted credits.
+  `buildSceneRun` takes an optional `billing` for the plan's clip rows;
+  without it nothing changes. Proven in `server/pipeline/slideModels.test.ts`
+  against the in-memory Higgsfield (its Flare price is now the real 1 credit
+  at medium, 2.75 at high).
+- **Elements.** On the plan the character's element went with the refs
+  because the plan's model was Nano Banana 2.1. Flare does not take
+  Elements (character template), so `models.yaml` marks it `elements:
+  false` and its stills carry the sheet refs only.
+- **Mixed runs.** The quote already names every model that runs; a set
+  with the character's and the no-one slides on different models shows
+  both on the button, and Details lists each still. A warning names the
+  no-one slides.
+- **Left as they were:** the post Stills step's model chips, edits, the
+  face pass, crops, upscales and Recreate's stills. A batch from hooks is
+  priced before its shots exist, so its slides use the post's mode.
+- **The local Callie fixture** still says "Stills with refs and all edits:
+  Nano Banana 2.1" (an older file); on the plan her slides run Nano Banana
+  2.1 there and Flare on the API (her second choice). A file on template
+  v1.6 ("Scene stills: GPT Image 2.5 Flare by default") runs Flare on both.

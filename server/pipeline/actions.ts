@@ -32,7 +32,7 @@ import { readBilling } from '../providers/billing.js'
 import { effectiveModel, readModelOverrides } from '../providers/modelOverrides.js'
 import { buildVoiceConvert, markConverting } from './voiceLines.js'
 import { buildHookVariants } from './scaleKit.js'
-import { buildSlideshowBatch, buildSlideshowCaption, buildSlideshowDraft, buildSlideshowHooks, buildSlideshowStills, buildSlideshowVariations, saveSlideStillModel } from './slideshow.js'
+import { buildSlideshowBatch, buildSlideshowCaption, buildSlideshowDraft, buildSlideshowHooks, buildSlideshowStills, buildSlideshowVariations, saveSlideStillPath, stillPathFor } from './slideshow.js'
 import { PATTERN_IDS } from '../core/slides.js'
 import { EFFECT_CODES, STRUCTURE_CODES } from '../core/playbook.js'
 import { buildPlanGenerate } from './planImport.js'
@@ -151,8 +151,11 @@ export const actionSchema = z.discriminatedUnion('type', [
     moment: z.string().max(400).optional(), alt: z.string().max(200).optional(), score: z.number().int().min(1).max(5).nullable().optional(),
   }),
   // The launch plan (section 28): stills for the ticked posts, ten at a time.
-  z.object({ type: z.literal('plan_generate'), postIds: z.array(z.string().max(60)).min(1).max(100), stillModel: z.string().max(80).nullable().optional() }),
-  z.object({ type: z.literal('slideshow_stills'), contentId: z.string().max(60), slides: z.array(z.number().int().min(0).max(11)).max(12).optional(), stillModel: z.string().max(80).optional() }),
+  // Section 30: `path` is the stills path (the plan or the API); each
+  // slide's model follows who is in it. `stillModel` (a model ref) is read
+  // as its path, for a page from before.
+  z.object({ type: z.literal('plan_generate'), postIds: z.array(z.string().max(60)).min(1).max(100), path: z.enum(['account', 'api']).optional(), stillModel: z.string().max(80).nullable().optional() }),
+  z.object({ type: z.literal('slideshow_stills'), contentId: z.string().max(60), slides: z.array(z.number().int().min(0).max(11)).max(12).optional(), path: z.enum(['account', 'api']).optional(), stillModel: z.string().max(80).optional() }),
   z.object({ type: z.literal('slideshow_caption'), contentId: z.string().max(60) }),
   z.object({ type: z.literal('slideshow_variations'), contentId: z.string().max(60), count: z.number().int().min(1).max(10) }),
   z.object({ type: z.literal('slideshow_batch'), contentId: z.string().max(60) }),
@@ -542,10 +545,11 @@ async function afterStart(deps: Deps, ctx: Ctx, action: StudioAction, built: Bui
   // The video model picked last is the next take's default.
   if (action.type === 'scene_video' && !action.test && action.model) await saveVideoModel(deps, ctx, action.model)
   if (action.type === 'clone' && action.model) await saveCloneModel(deps, ctx, action.model)
-  // The slideshow stills model picked last is the next run's default.
-  if (action.type === 'slideshow_stills' && action.stillModel) await saveSlideStillModel(deps, ctx, action.stillModel).catch(() => undefined)
+  // The slideshow stills path picked last is the next run's default.
+  if ((action.type === 'slideshow_stills' || action.type === 'plan_generate') && (action.path || action.stillModel)) {
+    await saveSlideStillPath(deps, ctx, await stillPathFor(deps, ctx, null, { path: action.path, stillModel: action.stillModel })).catch(() => undefined)
+  }
   if (action.type === 'plan_generate') {
-    if (action.stillModel) await saveSlideStillModel(deps, ctx, action.stillModel).catch(() => undefined)
     for (const j of jobs) if (/^scene:/.test(j.purpose)) await markSceneBusy(deps, ctx, j.purpose.split(':')[1]!).catch(() => undefined)
   }
   // "Make the video" on a still keeps that still; "Fix this face" picks the

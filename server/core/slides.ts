@@ -259,7 +259,11 @@ export interface SlideshowSlides {
   shots?: string[]
   specials?: Array<SpecialSlide | null>
   textPos?: Array<SlidePos | null>
+  // Who a slide's photo shows, picked by the owner on the slide card
+  // (section 30): the character, no one, or '' (read from the shot).
+  people?: SlidePerson[]
 }
+export type SlidePerson = '' | 'character' | 'none'
 export interface Slide { index: number; text: string; stillId: string | null; special: SpecialSlide | null; shot: string; pos: SlidePos | null }
 
 // How many slides a post has: the hook and its slides when there are words,
@@ -350,16 +354,54 @@ export function postCaption(caption: string, hashtags: string[], o: { ad: boolea
 // move, go or arrive as one. A repeated picture of an older post becomes
 // its own slot first.
 export type SlideEdit = { move: [number, number] } | { remove: number } | { add: number }
-export function editSlides(s: SlideshowSlides, op: SlideEdit): { hook: string; slides: string[]; stillIds: string[]; shots: string[]; specials: Array<SpecialSlide | null>; textPos: Array<SlidePos | null> } {
+export function editSlides(s: SlideshowSlides, op: SlideEdit): { hook: string; slides: string[]; stillIds: string[]; shots: string[]; specials: Array<SpecialSlide | null>; textPos: Array<SlidePos | null>; people: SlidePerson[] } {
   const list = slideList(s)
-  let rows = list.map(x => ({ text: [s.hook, ...s.slides][x.index] ?? '', still: x.stillId ?? '', shot: s.shots?.[x.index] ?? '', special: s.specials?.[x.index] ?? null, pos: s.textPos?.[x.index] ?? null }))
+  let rows = list.map(x => ({ text: [s.hook, ...s.slides][x.index] ?? '', still: x.stillId ?? '', shot: s.shots?.[x.index] ?? '', special: s.specials?.[x.index] ?? null, pos: s.textPos?.[x.index] ?? null, who: s.people?.[x.index] ?? '' }))
   if ('move' in op) {
     const [from, to] = op.move
     if (from >= 0 && from < rows.length && to >= 0 && to < rows.length && from !== to) { const [r] = rows.splice(from, 1); rows.splice(to, 0, r!) }
   } else if ('remove' in op) rows = rows.filter((_, i) => i !== op.remove)
-  else rows.splice(Math.min(Math.max(0, op.add), rows.length), 0, { text: '', still: '', shot: '', special: null, pos: null })
+  else rows.splice(Math.min(Math.max(0, op.add), rows.length), 0, { text: '', still: '', shot: '', special: null, pos: null, who: '' })
   return {
     hook: rows[0]?.text ?? '', slides: rows.slice(1).map(r => r.text),
-    stillIds: rows.map(r => r.still), shots: rows.map(r => r.shot), specials: rows.map(r => r.special), textPos: rows.map(r => r.pos),
+    stillIds: rows.map(r => r.still), shots: rows.map(r => r.shot), specials: rows.map(r => r.special), textPos: rows.map(r => r.pos), people: rows.map(r => r.who),
   }
+}
+
+// ── Who is in a slide's photo (section 30) ────────────────────────────
+
+// Words that start a shot but are things, not what someone is doing.
+const ING_NOUNS = new Set(['building', 'ceiling', 'morning', 'evening', 'clothing', 'thing', 'something', 'nothing', 'anything', 'everything', 'string', 'ring', 'king', 'wedding', 'sibling', 'parking', 'wing', 'spring', 'awning', 'railing', 'savings', 'earnings', 'bedding', 'housing', 'pudding', 'frosting', 'dumpling', 'icing', 'stuffing', 'sling', 'swing'])
+const NO_ONE = /\b(?:no one|nobody|no person|no people|no faces?|empty room|no-one)\b/i
+const LOOKS = /\b(?:selfie|at the lens|to the lens|into the lens|at the camera|into the camera|to the camera)\b/i
+const escape = (t: string) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+// Does a slide's shot show the character? Yes when it names them, says
+// their pronoun ("her hands"), starts with what they do ("typing fast on
+// the laptop"), or is a selfie or a look at the lens; no when it is a
+// thing or a place ("a laptop balanced on a keg", "close-up of the lock
+// screen") or says no one is in it. An empty shot shows the character (the
+// slide's words are the moment). A default: the slide card switches it.
+export function shotShowsCharacter(shot: string, who: { name: string; pronouns?: { subj?: string; obj?: string; poss?: string } }): boolean {
+  const t = shot.trim().toLowerCase()
+  if (!t) return true
+  const name = who.name.trim().toLowerCase()
+  if (name && new RegExp(`\\b${escape(name)}\\b`).test(t)) return true
+  if (NO_ONE.test(t)) return false
+  const own = [who.pronouns?.subj, who.pronouns?.obj, who.pronouns?.poss].map(p => (p ?? '').trim().toLowerCase()).filter(p => p.length > 1)
+  if (own.some(p => new RegExp(`\\b${escape(p)}\\b`).test(t))) return true
+  const first = t.match(/^[a-z]+/)?.[0] ?? ''
+  if (first.length > 4 && first.endsWith('ing') && !ING_NOUNS.has(first)) return true
+  return LOOKS.test(t)
+}
+
+// Each slide's person: a topic slideshow shows no one; a character
+// slideshow shows the character unless the owner said no one on the slide
+// card, or the shot reads as a thing or a place.
+export function slidePerson(s: SlideshowSlides & { mode?: 'character' | 'topic' }, i: number, who: { name: string; pronouns?: { subj?: string; obj?: string; poss?: string } }): 'character' | 'none' {
+  if (s.mode === 'topic') return 'none'
+  const picked = s.people?.[i] ?? ''
+  if (picked) return picked
+  const shot = (s.shots?.[i] ?? '').trim()
+  return shotShowsCharacter(shot, who) ? 'character' : 'none'
 }

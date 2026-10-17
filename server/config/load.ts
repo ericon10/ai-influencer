@@ -36,6 +36,9 @@ const modelsSchema = z.object({
     // Lines every prompt for this model carries (Flare: bare natural lips,
     // owner 2026-10-14), added before the REALISM block.
     prompt_lines: z.array(z.string()).default([]),
+    // False when a Higgsfield element (<<<id>>> in the prompt) does not work
+    // with the model (Flare: its refs carry the face, character template).
+    elements: z.boolean().optional(),
     // The model id in the Higgsfield web app and MCP connector. Models with
     // one can also run through the owner's Higgsfield account (plan credits).
     mcp_id: z.string().optional(),

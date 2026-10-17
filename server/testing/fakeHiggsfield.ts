@@ -42,7 +42,8 @@ const DISPLAY: Record<string, string> = { nano_banana_2_1: 'Nano Banana 2.1', gp
 
 const COST: Record<string, (p: Json) => number> = {
   nano_banana_2_1: () => 1.5,
-  gpt_image_2_5: () => 3,
+  // Flare's real plan charges (2026-10-14): 1 credit at medium, 2.75 at high.
+  gpt_image_2_5: p => (p.variant === 'flare' ? (p.quality === 'high' ? 2.75 : 1) : 3),
   seedance_2_5: p => 7 * (p.duration ?? 5),
   kling3_0: p => (p.mode === 'pro' ? 1.5 : 1) * (p.duration ?? 5),
   hf_mult_motion_control: p => 7 * (p.duration ?? 10),

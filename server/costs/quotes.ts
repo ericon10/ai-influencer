@@ -91,13 +91,20 @@ export async function createQuote(deps: Deps, ctx: Ctx, input: { purpose: string
     fingerprint: fingerprintItems(input.purpose, input.characterId, input.items),
     items, totalMicros: total, budget, status, expiresAt,
   })
+  // Demo mode runs the free mock in place of a real model; a generation
+  // names the model it stands in for, so the button reads as it will live
+  // (section 30: model and price on every generate button).
+  const labels = input.items.map(i => {
+    const stands = i.provider === 'mock' ? (i.request as { modelRef?: string } | null)?.modelRef : undefined
+    return stands && !stands.startsWith('mock/') ? `${modelLabel(deps, stands)} (demo mock, free)` : modelLabel(deps, `${i.provider}/${i.model}`)
+  })
   return {
     id, purpose: input.purpose, characterId: input.characterId, totalMicros: total, total: formatUsd(total),
     credits: items.reduce((s, i) => s + (i.credits ?? 0), 0),
     display: displayPrice(items),
     verified: input.items.every(i => i.estimate.verified),
-    items: items.map(i => ({ label: i.label, model: `${i.provider}/${i.model}`, modelLabel: modelLabel(deps, `${i.provider}/${i.model}`), amount: i.credits != null ? formatCredits(i.credits) : formatUsd(i.amountMicros), amountMicros: i.amountMicros, credits: i.credits, verified: i.verified })),
-    models: [...new Set(items.map(i => modelLabel(deps, `${i.provider}/${i.model}`)))],
+    items: items.map((i, k) => ({ label: i.label, model: `${i.provider}/${i.model}`, modelLabel: labels[k]!, amount: i.credits != null ? formatCredits(i.credits) : formatUsd(i.amountMicros), amountMicros: i.amountMicros, credits: i.credits, verified: i.verified })),
+    models: [...new Set(labels)],
     notes: [...new Set(input.items.map(i => i.estimate.note).filter((n): n is string => !!n))],
     budget, status, expiresAt: expiresAt.toISOString(), needsConfirm: budget.needsConfirm,
   }
