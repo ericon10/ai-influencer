@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { ChevronLeft, ChevronRight, Download, Expand, FolderOpen, X } from 'lucide-react'
 import { api, assetUrl, downloadUrl } from './api'
+import { HowTo } from './guide/Guide'
 
 // The viewer (owner, 2026-10-17; UX-PLAN.md section 34): any still or clip
 // full size over the page, one component for the whole Studio (Library
@@ -170,6 +171,8 @@ function ViewerDialog({ items, at, onOpen, onClose, actions }: { items: ViewerIt
           <div className="st-viewer-actions">
             <a className="st-btn" href={downloadUrl(item.assetId, fileSlug(item.name))} download data-field="viewer-download"><Download size={15} />Download</a>
             {actions?.(item, onClose)}
+            <span className="st-spacer" />
+            <HowTo id="library" label="About the viewer" />
           </div>
         </div>
       </div>

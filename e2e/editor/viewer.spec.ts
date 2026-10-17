@@ -311,6 +311,37 @@ test('collections: Select, Add to collection (a new name), the Collection filter
   expect(page.url()).not.toContain('stills.set=')
 })
 
+test('the review queue (Batch from hooks): a slide\'s photo opens full size, the slideshow\'s other photos either side, and Open the post', async ({ page }, info) => {
+  test.setTimeout(300_000)
+  const { id } = await api<{ id: string }>('POST', '/content', { kind: 'slideshow', characterId, title: `Viewer batch ${RUN}`, spec: { mode: 'topic', batchHooks: ['my first week at the new job went sideways'] } })
+  const action = { type: 'slideshow_batch', contentId: id }
+  const est = await api<{ quote: { id: string } }>('POST', '/actions/estimate', { action })
+  await api('POST', '/actions/run', { action, quoteId: est.quote.id, confirmed: true })
+  type Batch = { items: Array<{ id: string; spec: { stillIds?: string[] } }>; assets: Record<string, string> }
+  await expect.poll(async () => {
+    const b = await api<Batch>('GET', `/content/${id}/slideshow/batch`)
+    return b.items.length === 1 && (b.items[0]!.spec.stillIds ?? []).filter(x => x && b.assets[x]).length >= 2
+  }, { timeout: 240_000, intervals: [3000] }).toBe(true)
+  const child = (await api<Batch>('GET', `/content/${id}/slideshow/batch`)).items[0]!.id
+  await page.goto(`/studio/posts/${id}`)
+  const review = page.locator('[data-field="batch-review"]')
+  const photos = review.getByRole('button', { name: /^View slide \d+ full size$/ })
+  await expect(photos.first()).toBeVisible({ timeout: 60_000 })
+  const first = (await photos.first().getAttribute('aria-label'))!.match(/slide (\d+)/)![1]!
+  await photos.first().click()
+  const v = viewer(page)
+  await expect(v.getByRole('heading', { name: new RegExp(`^Slide ${first}`) })).toBeVisible()
+  await expect(v.locator('[data-field="viewer-cost"]')).toHaveText('Free (demo)')
+  await page.keyboard.press('ArrowRight')
+  await expect(v.getByRole('heading', { name: new RegExp(`^Slide ${first}`) })).toHaveCount(0)
+  await expect(v.getByRole('heading', { name: /^Slide \d+/ })).toBeVisible()
+  await snap(page, info, 'the viewer from the batch review')
+  await expect(v.getByRole('link', { name: 'Open the post' })).toHaveAttribute('href', `/studio/posts/${child}`)
+  await page.keyboard.press('Escape')
+  await expect(v).toHaveCount(0)
+  await expect(review).toBeVisible()
+})
+
 test.describe('phone', () => {
   test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true })
   test('phone: full screen, a swipe goes to the next item, the facts scroll under it, 44 px tap targets', async ({ page }, info) => {

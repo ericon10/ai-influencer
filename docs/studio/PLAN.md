@@ -605,6 +605,18 @@ Decisions: `DECISIONS.md` G37 and G38. UX: `UX-PLAN.md` section 15.
 - [x] Launch plan: numbered steps, the plan's pick, only the ticked rows, the CSV's product (a name) and ad columns, older yes or no files
 - [x] Tests: unit (products.test.ts, the lint, the plan reader), Playwright (products.spec.ts, the launch plan)
 
+### Library viewer, filters and collections (G62, UX-PLAN section 34, owner 2026-10-17)
+
+- [x] One viewer (`src/studio/viewer.tsx`): full size, a clip muted with its controls, arrows, swipe, Esc, X, a tap outside, focus kept and given back
+- [x] Under the asset: name, date, character, model, cost, the posts that use it, Download, the place's use button (`GET /library/items/:id`)
+- [x] Everywhere a still or clip is a thumbnail: Library tabs, the Library drawer in a post (view button, Use in this post), a post's stills and takes (Details opens the drawer), Recreate and Replace stills, slide cards, the batch review
+- [x] Small copies in the grids, the full file only in the viewer; an uploaded clip's first frame as its picture
+- [x] Filters on the server: character, type (the tab), model, date, used or unused, product, collection; chips with an x; per tab in the address
+- [x] Collections per account (one setting): Add to collection, the Collection filter, Remove, rename, delete (the items stay)
+- [x] Phone: full screen, swipe, the facts scroll under the asset, 44 px buttons
+- [x] Guide (Library section, glossary: Viewer, Collection), How this works on the filters, the viewer and Collections
+- [x] Tests: unit (`libraryFilter.test.ts`, `collections.test.ts`), pipeline (`library.test.ts`), Playwright (`viewer.spec.ts`)
+
 ## Roadmap after Phase 4 (owner, 2026-10-13; not started)
 
 SPEC 13.1, R1 to R7: Clone Video (first after Phase 3), Inspo board

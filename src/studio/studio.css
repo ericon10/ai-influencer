@@ -1490,6 +1490,8 @@ button.st-chip:hover { color: var(--st-text); border-color: var(--st-text-3); }
 .st-viewer-used { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .st-viewer-used .st-label { margin-right: 4px; }
 .st-viewer-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding-top: 4px; }
+/* The place's own buttons come from its tiles (small there): full size here. */
+.st-viewer-actions .st-btn.sm, .st-viewer-actions .st-btn.xs { height: 38px; padding: 0 15px; font-size: 13.5px; border-radius: 11px; }
 .st-tile-view {
   position: absolute; top: 14px; right: 14px; z-index: 2; width: 30px; height: 30px; display: grid; place-items: center; border-radius: 8px;
   border: 1px solid rgba(255, 255, 255, 0.5); background: rgba(12, 11, 10, 0.6); color: #fff; cursor: pointer;
