@@ -15,3 +15,5 @@ dist-editor/
 e2e/.out/
 # Agent worktrees (Claude Code); never commit.
 .claude/worktrees/
+# Vite writes these while it loads its config; a stopped server can leave one.
+vite.config.js.timestamp-*
