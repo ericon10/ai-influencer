@@ -141,7 +141,7 @@ export function HookVariants({ ctx }: { ctx: PostCtx }) {
           </div>
         )}
       </div>
-      <HookPicker open={picking !== null} onClose={() => setPicking(null)} characterId={item.characterId} onPick={t => { if (picking !== null) set(picking, t.slice(0, 200)); setPicking(null) }} />
+      <HookPicker open={picking !== null} onClose={() => setPicking(null)} characterId={item.characterId} productId={item.productId ?? null} onPick={t => { if (picking !== null) set(picking, t.slice(0, 200)); setPicking(null) }} />
     </section>
   )
 }

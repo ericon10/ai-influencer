@@ -11,6 +11,7 @@ import { importCharacter } from './files.js'
 import { createContent, getContent, startRender, updateContent, type ContentOutputs } from './content.js'
 import { batchView, draftPatch, familyView, listSlideScenes, mockDraft, productEndings, reuseReport, reviewBatchItem, saveSlideScene, archiveSlideScene, slideStillChoices, vaultHookIdeas } from './slideshow.js'
 import { importKit, starterKit } from './scaleKit.js'
+import { standardOf } from './products.js'
 import { setSetting } from './settings.js'
 import { saveCredential } from '../providers/credentials.js'
 import { setRuleSwitch } from './rules.js'
@@ -32,6 +33,8 @@ import type { GenRequest } from '../providers/types.js'
 
 let h: Harness
 let characterId: string
+// SideStep (its rules on top of the general standard, section 29).
+let sideStep: string
 
 const spec = async (id: string) => (await getContent(h.deps, h.ctx, id)).spec as SlideshowSpec
 
@@ -44,8 +47,8 @@ async function run(action: StudioAction) {
   return { quote, preview, jobs }
 }
 
-async function drafted(extra: Partial<SlideshowSpec> = {}, tag = 'callie.jobs') {
-  const post = await createContent(h.deps, h.ctx, { kind: 'slideshow', characterId, accountTag: tag, idea: 'job hunting after college', spec: extra })
+async function drafted(extra: Partial<SlideshowSpec> = {}, tag = 'callie.jobs', productId: string | null = null) {
+  const post = await createContent(h.deps, h.ctx, { kind: 'slideshow', characterId, accountTag: tag, idea: 'job hunting after college', spec: extra, productId })
   await run({ type: 'slideshow_draft', contentId: post.id, hook: 'My manager said I would never get promoted', pattern: 'doubt' })
   return post.id
 }
@@ -57,23 +60,23 @@ beforeAll(async () => {
   const images: Record<string, { data: Buffer }> = {}
   for (let i = 0; i <= 11; i++) images[`REF-${String(i).padStart(2, '0')}`] = { data: await renderPlaceholderPortrait(`Callie REF-${i}`) }
   characterId = (await importCharacter(h.deps, h.ctx, md, { images })).characterId
-  await importKit(h.deps, h.ctx, starterKit(), 'SideStep')
+  sideStep = (await importKit(h.deps, h.ctx, starterKit(), 'SideStep')).product.id
 }, 120_000)
 
 describe('hook first', () => {
   it('10 from the vault: free, tagged by pattern, from the kit\'s own hooks', async () => {
-    const post = await createContent(h.deps, h.ctx, { kind: 'slideshow', characterId, idea: 'job hunting' })
+    const post = await createContent(h.deps, h.ctx, { kind: 'slideshow', characterId, idea: 'job hunting', productId: sideStep })
     const row = await vaultHookIdeas(h.deps, h.ctx, post.id)
     const s = row.spec as SlideshowSpec
     expect(s.hookIdeas).toHaveLength(10)
     expect(s.hookIdeas.every(x => x.source === 'vault' && x.pattern)).toBe(true)
-    expect(s.productId).toMatch(/^prd_/)
+    expect(row.productId).toBe(sideStep)
     const again = (await vaultHookIdeas(h.deps, h.ctx, post.id, { offset: 5 })).spec as SlideshowSpec
     expect(again.hookIdeas[0]!.text).not.toBe(s.hookIdeas[0]!.text)
   })
 
-  it('Write 10 with Claude to THE STANDARD: one price for the writer and a separate reviewer that runs the stop test first; each hook has a moment, a code, effects, pain, an alt hook and a score; only 1s and 2s that pass the stop test show', async () => {
-    const post = await createContent(h.deps, h.ctx, { kind: 'slideshow', characterId, accountTag: 'F2', idea: 'job hunting', spec: { mode: 'topic' } })
+  it('Write 10 with Claude on a SideStep post, to THE STANDARD: one price for the writer and a separate reviewer that runs the stop test first; each hook has a moment, a code, effects, pain, an alt hook and a score; only 1s and 2s that pass the stop test show', async () => {
+    const post = await createContent(h.deps, h.ctx, { kind: 'slideshow', characterId, accountTag: 'F2', idea: 'job hunting', spec: { mode: 'topic' }, productId: sideStep })
     const { quote, preview, jobs: ran } = await run({ type: 'slideshow_hooks', contentId: post.id })
     expect(quote.models).toEqual(['Demo mock, free'])
     expect(ran).toHaveLength(2)
@@ -104,7 +107,7 @@ describe('hook first', () => {
     expect(s.hookIdeas).toHaveLength(10)
     expect(s.hookIdeas.every(x => x.source === 'claude' && x.code && x.effectOpen && x.moment && x.alt && x.reviewed && x.pain)).toBe(true)
     // Every mock hook reads to the standard: no language notes.
-    expect(s.hookIdeas.flatMap(x => lintCopy(x.text, { kind: 'hook' }))).toEqual([])
+    expect(s.hookIdeas.flatMap(x => lintCopy(x.text, { kind: 'hook', standard: true, lists: { jobWords: ['job', 'interview', 'recruiter', 'offer', 'salary', 'resume', 'hiring', 'application'] } }))).toEqual([])
     // The mock reviewer gives 3 of 10 a 3 or 4, and hook 7 a 2 with pain 6:
     // the stop test makes that one a 3. All four are hidden.
     expect(s.hookIdeas.filter(x => (x.score ?? 9) <= 2)).toHaveLength(6)
@@ -115,9 +118,9 @@ describe('hook first', () => {
   })
 
   it('never the same code twice in a row: the account\'s last post\'s code is out of the writer\'s list', async () => {
-    const before = await createContent(h.deps, h.ctx, { kind: 'slideshow', characterId, accountTag: 'F6', idea: 'rounds', spec: { mode: 'topic', plan: { structure: 'S6' } } })
+    const before = await createContent(h.deps, h.ctx, { kind: 'slideshow', characterId, accountTag: 'F6', idea: 'rounds', spec: { mode: 'topic', plan: { structure: 'S6' } }, productId: sideStep })
     expect(before.id).toBeTruthy()
-    const post = await createContent(h.deps, h.ctx, { kind: 'slideshow', characterId, accountTag: 'F6', idea: 'rounds', spec: { mode: 'topic' } })
+    const post = await createContent(h.deps, h.ctx, { kind: 'slideshow', characterId, accountTag: 'F6', idea: 'rounds', spec: { mode: 'topic' }, productId: sideStep })
     const { preview } = await run({ type: 'slideshow_hooks', contentId: post.id })
     expect(preview.prompts[0]!.text).toContain('Never use S6 Teaser: the account\'s last post used it.')
     expect((await spec(post.id)).hookIdeas.some(x => x.code === 'S6')).toBe(false)
@@ -139,8 +142,8 @@ describe('hook first', () => {
     expect(s.pattern).toBe('doubt')
   })
 
-  it('a product post (THE STANDARD v1.2): the last slide is a friend\'s tip from the honest endings only; when the pain is not one SideStep fixes, no mention and no Ad', async () => {
-    const id = await drafted({ ad: true, mode: 'topic' }, 'F3')
+  it('a SideStep ad (THE STANDARD v1.2): the last slide is a friend\'s tip from the honest endings only; when the pain is not one SideStep fixes, no mention and no Ad', async () => {
+    const id = await drafted({ ad: true, mode: 'topic' }, 'F3', sideStep)
     const s = await spec(id)
     const last = s.slides[s.slides.length - 1]!
     expect(last).toMatch(/^my friend told me about SideStep fr fr\. one click fills the whole app/)
@@ -150,13 +153,15 @@ describe('hook first', () => {
     // The writer's prompt lists the four honest endings and the never list.
     const { preview } = await estimateAction(h.deps, h.ctx, { type: 'slideshow_draft', contentId: id, hook: s.hook, pattern: 'doubt' })
     const text = preview.prompts[0]!.text
-    for (const e of productEndings(h.deps)) expect(text).toContain(e.line)
-    expect(productEndings(h.deps).map(e => e.pain)).toEqual(['retyping the resume into boxes', "hours on jobs you don't fit", 'rewriting the resume for every job', 'paying monthly for job tools'])
+    const std = standardOf(h.deps, 'sidestep')
+    for (const e of productEndings(h.deps, std)) expect(text).toContain(e.line)
+    expect(productEndings(h.deps, null)).toEqual([])
+    expect(productEndings(h.deps, std).map(e => e.pain)).toEqual(['retyping the resume into boxes', "hours on jobs you don't fit", 'rewriting the resume for every job', 'paying monthly for job tools'])
     expect(text).toContain('Never "stop getting ghosted", "stop getting passed over" or "it applies for you"')
     // The slides read clean, the ending included.
-    expect(lintPost({ texts: [s.hook, ...s.slides], caption: s.caption, hashtags: s.hashtags, product: true }).filter(x => x.rule === 'lint-product-ending')).toEqual([])
+    expect(lintPost({ texts: [s.hook, ...s.slides], caption: s.caption, hashtags: s.hashtags, product: true, standard: true }, { lists: { endingNever: ['ghosted', 'passed over', 'applies for you'] } }).filter(x => x.rule === 'lint-product-ending')).toEqual([])
     // A pain SideStep does not fix: the draft says "none", so no product mention and #ad goes off.
-    const patch = draftPatch(h.deps, s, { ...mockDraft('4 rounds of job interviews and they ghosted me', 6, 'topic'), product_ending: 'none' }, { hook: '4 rounds of job interviews and they ghosted me', pattern: null, n: 6 })
+    const patch = draftPatch(h.deps, s, { ...mockDraft('4 rounds of job interviews and they ghosted me', 6, 'topic'), product_ending: 'none' }, { hook: '4 rounds of job interviews and they ghosted me', pattern: null, n: 6, endings: productEndings(h.deps, std) })
     expect(patch).toMatchObject({ productEnding: 'none', ad: false })
     expect(isProductPost({ ...s, ...patch, plan: { ...s.plan, product: true } })).toBe(false)
     // Not a product post: no ending at all.

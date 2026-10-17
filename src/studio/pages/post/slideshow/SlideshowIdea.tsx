@@ -3,14 +3,14 @@ import { Link } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeftRight, Check, ChevronDown, ChevronRight, ExternalLink, Layers, RefreshCw, ThumbsDown, ThumbsUp } from 'lucide-react'
 import { api } from '../../../api'
-import { keys, useProducts, useSocialAccounts } from '../../../hooks'
+import { keys, useSocialAccounts } from '../../../hooks'
 import { PriceButton } from '../../../PriceButton'
 import { RunStatus } from '../../../runs'
 import { AsyncButton, Field, errorMessage, useToast } from '../../../ui'
 import { HowTo } from '../../../guide/Guide'
 import { HOOK_PATTERNS, backdropFor, isProductPost, patternLabel, slideList, wordCount, type HookIdea, type HookPattern } from '../../../../../server/core/slides'
 import { SHIPS, codeLabel, effectLabel } from '../../../../../server/core/playbook'
-import { LintNote, useLint } from '../../../lint'
+import { LintNote, useLint, useProductRules } from '../../../lint'
 import { wordsNote } from '../../../../../server/core/slideSvg'
 import type { SlideBatch, SlideshowSpec } from '../../../types'
 import type { PostCtx } from '../ctx'
@@ -26,17 +26,22 @@ export function SlideshowIdea({ ctx }: { ctx: PostCtx }) {
   const { item, draft } = ctx
   const qc = useQueryClient()
   const toast = useToast()
-  const lint = useLint(item.characterId)
+  const lint = useLint(item.characterId, item.productId)
   const spec = draft.spec as unknown as SlideshowSpec
   const [filter, setFilter] = useState<string | null>(null)
   const [offset, setOffset] = useState(0)
-  const products = useProducts().data?.products ?? []
+  // What the post's product adds on top of the general standard (section
+  // 29): SideStep's stop-test reviewer, pain and structures; none for a post
+  // with no product or a product that adds no rules.
+  const rules = useProductRules(item.productId)
   const account = useSocialAccounts().data?.accounts.find(a => a.tag === item.accountTag)
   const ideas = (spec.hookIdeas ?? []) as HookIdea[]
-  // Claude's hooks show once the reviewer has scored them, and only the 1s
-  // and 2s (the writer's own rank when the review did not come back).
+  // Claude's hooks show once the reviewer has scored them (a product whose
+  // rules add the reviewer), and only the 1s and 2s; otherwise the writer's
+  // own rank (the general standard, one call, or a review that did not come
+  // back).
   const reviewing = spec.hookReview === 'pending'
-  const ships = (h: HookIdea) => h.source !== 'claude' || (h.reviewed ? SHIPS(h.score) : spec.hookReview === 'failed' && SHIPS(h.selfScore ?? null))
+  const ships = (h: HookIdea) => h.source !== 'claude' || (h.reviewed ? SHIPS(h.score) : SHIPS(h.selfScore ?? 1))
   const visible = reviewing ? ideas.filter(h => h.source !== 'claude') : ideas.filter(ships)
   const hidden = reviewing ? 0 : ideas.filter(h => h.source === 'claude' && !ships(h)).length
   const stopFails = reviewing ? 0 : ideas.filter(h => h.source === 'claude' && h.reviewed && h.stops === false).length
@@ -49,7 +54,7 @@ export function SlideshowIdea({ ctx }: { ctx: PostCtx }) {
   const note = wordsNote(hook)
   const name = ctx.v?.data.name ?? 'the character'
   const product = isProductPost(spec)
-  const last = account?.lastCode ?? null
+  const last = rules.review ? account?.lastCode ?? null : null
 
   async function fromVault() {
     try {
@@ -61,13 +66,15 @@ export function SlideshowIdea({ ctx }: { ctx: PostCtx }) {
   }
   // The alt hook swap (free): the hook and the alt hook trade places.
   const swap = () => draft.setSpec({ hook: alt, plan: { ...spec.plan, altHook: hook } } as never)
-  const use = (h: HookIdea) => ({ type: 'slideshow_draft' as const, contentId: item.id, hook: h.text, pattern: h.pattern, ...(h.code ? { code: h.code, effectOpen: h.effectOpen ?? null, effectPayoff: h.effectPayoff ?? null, moment: h.moment ?? '', alt: h.alt ?? '', score: h.score ?? h.selfScore ?? null } : {}) })
+  const use = (h: HookIdea) => ({ type: 'slideshow_draft' as const, contentId: item.id, hook: h.text, pattern: h.pattern, ...(h.code ? { code: h.code, effectOpen: h.effectOpen ?? null, effectPayoff: h.effectPayoff ?? null } : {}), ...(h.moment || h.alt || h.code ? { moment: h.moment ?? '', alt: h.alt ?? '', score: h.score ?? h.selfScore ?? null } : {}) })
 
   return (
     <div className="st-col" style={{ gap: 14 }} data-field="slideshow-hook">
       <Field id="post-hook" label="Hook (slide 1)" extra={<HowTo id="slideshow" label="Hook first, how it works" />}
-        hint={note ?? 'The words on the first slide, to THE STANDARD: name the job situation, say exactly what happened, pain 7 or more, like a text from a friend in the group chat, about 15 words, with a loop the slides close. Type your own, or write 10 below and pick one.'}>
-        <input className="st-input" maxLength={200} value={hook} onChange={e => draft.setSpec({ hook: e.target.value } as never)} placeholder="e.g. Recruiter said &quot;talk Friday.&quot; This is Friday number 6" />
+        hint={note ?? (rules.review
+          ? `The words on the first slide, to the general standard plus ${rules.name}'s rules (THE STANDARD): name the job situation, say exactly what happened, pain 7 or more, like a text from a friend in the group chat, about 15 words, with a loop the slides close. Type your own, or write 10 below and pick one.`
+          : 'The words on the first slide, to the general standard: a stranger would stop on it, it is clear on one read with no image, it says exactly what happened, it sounds like a person, about 15 words, with a loop the slides close. Type your own, or write 10 below and pick one.')}>
+        <input className="st-input" maxLength={200} value={hook} onChange={e => draft.setSpec({ hook: e.target.value } as never)} placeholder="e.g. My landlord texted &quot;quick question&quot; at 11:48pm. It was not quick" />
       </Field>
       <LintNote hits={lint(hook, 'hook', { product })} field="hook-lint" />
       {(alt.trim() || hook.trim()) && (
@@ -87,15 +94,11 @@ export function SlideshowIdea({ ctx }: { ctx: PostCtx }) {
               watch={j => j.purpose.startsWith(`slideshow_hooks:${item.id}`)} onDone={() => void qc.invalidateQueries({ queryKey: keys.content })} />
           )}
         </div>
-        <span className="st-hint">From the vault: the kit's own hooks and the buyers' words, recast into patterns by code (press again for more). With Claude, to THE STANDARD (playbook v1.2, its pass and fail examples as the guide): each hook names the job situation and says exactly what happened, pain 7 or more, in the group-chat voice; each with its moment and structure or lens for slides 2 to 6, its effects, and the runner-up as the alt hook. Then a separate reviewer runs the five-check stop test (stops a stranger, clearly a job, exactly what happened, pain 7 or more, sounds like a friend) and scores each 1 to 5; only the 1s and 2s show.{spec.mode === 'topic' ? '' : ` ${name}'s voice card goes in.`}</span>
-        {(account?.primary || account?.backup || last) && (
+        {rules.review
+          ? <span className="st-hint">From the vault: {rules.name}'s own hooks and the buyers' words, recast into patterns by code (press again for more). With Claude, to the general standard plus {rules.name}'s rules (THE STANDARD, playbook v1.2, its pass and fail examples as the guide): each hook names the job situation and says exactly what happened, pain 7 or more, in the group-chat voice; each with its moment and structure or lens for slides 2 to 6, its effects, and the runner-up as the alt hook. Then a separate reviewer runs the five-check stop test (stops a stranger, clearly a job, exactly what happened, pain 7 or more, sounds like a friend) and scores each 1 to 5; only the 1s and 2s show.{spec.mode === 'topic' ? '' : ` ${name}'s voice card goes in.`}</span>
+          : <span className="st-hint">{item.productId ? 'From the vault: the product\'s own hooks and the buyers\' words, recast into patterns by code (press again for more). ' : 'This post has no product, so the vault has nothing to recast (pick a product in the row above to use its vault). '}With Claude, to the general standard, one call: each hook runs the stop test (a stranger would stop, clear on one read, says exactly what happened, sounds like a person), with its moment, its pattern and the runner-up as the alt hook.{spec.mode === 'topic' ? ' The account\'s own words set the voice.' : ` ${name}'s voice card sets the voice.`}</span>}
+        {rules.review && (account?.primary || account?.backup || last) && (
           <span className="st-hint" data-field="account-structures">{item.accountTag || 'This account'}: {[account?.primary && `primary ${codeLabel(account.primary)}`, account?.backup && `backup ${codeLabel(account.backup)}`, last && `last post ${codeLabel(last)} (not again)`].filter(Boolean).join(', ')}. Change them on Posts, Accounts.</span>
-        )}
-        {products.length > 1 && (
-          <div className="st-row" style={{ gap: 6, flexWrap: 'wrap' }}>
-            <span className="st-hint">Kit:</span>
-            {products.map(p => <button key={p.id} type="button" className={`st-chip ${(spec.productId ?? products[0]?.id) === p.id ? 'on' : ''}`} onClick={() => draft.setSpec({ productId: p.id } as never)}>{p.name}</button>)}
-          </div>
         )}
       </div>
       {reviewing && <span className="st-hint" role="status">The reviewer is scoring the hooks; only the 1s and 2s will show.</span>}
@@ -118,10 +121,10 @@ export function SlideshowIdea({ ctx }: { ctx: PostCtx }) {
                     {h.moment && <span className="st-hint moment">Moment: {h.moment}</span>}
                     {h.alt && <span className="st-hint">Alt: {h.alt}</span>}
                     <span className="st-row" style={{ gap: 6, flexWrap: 'wrap' }}>
-                      {h.code ? <span className="st-chip xs on" title="Structure or lens">{codeLabel(h.code)}</span> : <span className="tag">{patternLabel(h.pattern)} · vault</span>}
+                      {h.code ? <span className="st-chip xs on" title="Structure or lens">{codeLabel(h.code)}</span> : <span className="tag">{patternLabel(h.pattern)}{h.source === 'claude' ? '' : ' · vault'}</span>}
                       {h.effectOpen && <span className="st-chip xs" title="The effect: first second, then the payoff">{effectLabel(h.effectOpen)}{h.effectPayoff ? ` to ${effectLabel(h.effectPayoff)}` : ''}</span>}
                       {score != null && h.source === 'claude' && <span className={`st-score s${score}`} title={h.note || (h.reviewed ? 'The reviewer\'s score' : 'The writer\'s own rank (not reviewed)')}>{score}{h.reviewed ? '' : ' (writer)'}</span>}
-                      {h.pain != null && h.source === 'claude' && <span className={`st-chip xs ${h.pain >= 7 ? '' : 'warn'}`} title={h.reviewed ? 'The reviewer\'s pain score: how much it hurts for someone job hunting now (7 or more passes the stop test)' : 'The writer\'s own pain score'}>Pain {h.pain}/10</span>}
+                      {h.pain != null && h.source === 'claude' && <span className={`st-chip xs ${h.pain >= 7 ? '' : 'warn'}`} title={h.reviewed ? 'The reviewer\'s pain score (7 or more passes the stop test)' : 'The writer\'s own pain score'}>Pain {h.pain}/10</span>}
                       {h.note && <span className="st-hint" style={{ fontSize: 11.5 }}>{h.note}</span>}
                       {h.code && last && h.code === last && <span className="st-lint compact" title="Never the same structure twice in a row">Same code as the last post</span>}
                       <LintNote compact hits={lint(h.text, 'hook', { product })} />
@@ -144,7 +147,7 @@ export function SlideshowIdea({ ctx }: { ctx: PostCtx }) {
         <PriceButton label={`Draft ${n} slides from this hook`} variant="secondary" action={draft.saving ? null : { type: 'slideshow_draft', contentId: item.id, hook: hook.trim(), pattern: null, ...(alt.trim() ? { alt: alt.trim() } : {}) }} waiting={draft.saving ? 'Saving...' : undefined} />
       )}
       <RunStatus match={j => j.purpose === `slide_draft:${item.id}:self`} />
-      <span className="st-hint">Use this hook drafts its story in the same voice: the setup, the turn (often a person reacting), the payoff, then relief or a question; 4 to 14 words a slide, each with the image line its photo shows and, where it helps, a mock screen. On a product post the last slide is a friend's SideStep tip from the honest endings only. Plus the caption, a CTA line and 3 to 5 hashtags. Edit anything after.</span>
+      <span className="st-hint">Use this hook drafts its story in the same voice, one thread: the setup, the turn (often a person reacting), the payoff, then relief or a question; every slide clear to a stranger, 4 to 14 words, each with the image line its photo shows and, where it helps, a mock screen. {rules.review ? `On an ad (#ad on) the last slide is a friend's ${rules.name} tip from its honest endings only. ` : item.productId ? 'On an ad (#ad on) the last slide is an honest tip about the product. ' : ''}Plus the caption, a CTA line and 3 to 5 hashtags. Edit anything after.</span>
 
       <div className="st-row" style={{ gap: 16, flexWrap: 'wrap', alignItems: 'flex-end' }}>
         <Field id="slideshow-who" label="Who is in the photos" group>
@@ -159,7 +162,7 @@ export function SlideshowIdea({ ctx }: { ctx: PostCtx }) {
           </select>
         </Field>
       </div>
-      {spec.mode === 'topic' && <span className="st-hint">A topic account: offices, skylines, commutes, desk setups, interview lobbies. No one in focus and no faces; the REALISM line still goes in every prompt.</span>}
+      {spec.mode === 'topic' && <span className="st-hint">A topic account: places and things, for example rooms, streets, desks, shop counters, screens. No one in focus and no faces; the REALISM line still goes in every prompt.</span>}
 
       <BatchCard ctx={ctx} />
     </div>
@@ -193,7 +196,7 @@ function BatchCard({ ctx }: { ctx: PostCtx }) {
           <div className="st-row"><HowTo id="slideshow" label="How a batch works" /></div>
           <Field label={`Hooks, one a line (${Math.min(hooks.length, max)} of ${max})`} hint="Each line becomes its own slideshow, drafted from the hook with this post's settings (who is in the photos, slides, scene, text style).">
             <textarea className="st-textarea" rows={6} value={text} onChange={e => { setText(e.target.value); draft.setSpec({ batchHooks: e.target.value.split('\n').map(h => h.trim()).filter(Boolean).slice(0, max) } as never) }}
-              placeholder={'e.g. Things nobody tells you about your first job\nRed flags in a job posting I ignored\nPOV: the recruiter finally calls back'} />
+              placeholder={'e.g. Things nobody tells you about your first apartment\nRed flags I ignored at my last haircut\nPOV: the group chat finally answers'} />
           </Field>
           <PriceButton label={`Make ${Math.min(hooks.length, max) || ''} slideshow${hooks.length === 1 ? '' : 's'}`.replace('  ', ' ')} variant="primary"
             todo={hooks.length ? [] : [{ label: 'Paste the hooks', target: 'slideshow-batch' }]}

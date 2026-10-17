@@ -13,8 +13,9 @@ import { HowTo, QuickStartBanner } from '../guide/Guide'
 import { AccountsCard } from './AccountsCard'
 import { PlanCard } from './PlanCard'
 
-// Home (UX-PLAN.md): every post, newest work first, filtered by account
-// and character. One click opens a post where it was left.
+// Home (UX-PLAN.md): every post, newest work first, filtered by account,
+// character and product (section 29). One click opens a post where it was
+// left.
 
 const KIND_ICON = { meme: Film, slideshow: Images, batch: Layers }
 
@@ -25,13 +26,16 @@ export default function Posts() {
   const newPost = useNewPost()
   const [tag, setTag] = useState<string | null>(null)
   const [character, setCharacter] = useState<string | null>(null)
+  // The product filter (section 29): a product id, or "none".
+  const [product, setProduct] = useState<string | null>(null)
   const items = content.data?.items ?? []
   const characters = chars.data?.characters ?? []
+  const products = content.data?.products ?? []
   // The list holds the newest 200 posts; Show older posts pages past them,
   // with the filters applied on the server (so a filter finds older posts).
-  const older = useOlderPosts(content.data?.next ?? null, items.at(-1)?.id ?? null, tag, character)
+  const older = useOlderPosts(content.data?.next ?? null, items.at(-1)?.id ?? null, tag, character, product)
   const all = useMemo(() => { const seen = new Set(items.map(i => i.id)); return [...items, ...older.items.filter(i => !seen.has(i.id))] }, [items, older.items])
-  const shown = all.filter(i => (!tag || i.accountTag === tag) && (!character || i.characterId === character))
+  const shown = all.filter(i => (!tag || i.accountTag === tag) && (!character || i.characterId === character) && (!product || (product === 'none' ? !i.productId : i.productId === product)))
   const tags = content.data?.accountTags ?? []
   const used = useMemo(() => new Set([...(content.data?.characterIds ?? []), ...items.map(i => i.characterId)]), [items, content.data?.characterIds])
   const nav = useNavigate()
@@ -62,7 +66,7 @@ export default function Posts() {
       {characters.length > 0 && <AccountsCard characters={characters} />}
       {characters.length > 0 && <PlanCard characters={characters} />}
 
-      {(tags.length > 0 || used.size > 1) && (
+      {(tags.length > 0 || used.size > 1 || products.length > 0) && (
         <div className="st-col" style={{ gap: 8, marginBottom: 18 }}>
           {tags.length > 0 && (
             <div className="st-row" style={{ gap: 6, flexWrap: 'wrap' }}>
@@ -76,6 +80,14 @@ export default function Posts() {
               <span className="st-label" style={{ width: 76 }}>Character</span>
               <button className={`st-chip ${character === null ? 'on' : ''}`} onClick={() => setCharacter(null)}>All</button>
               {characters.filter(c => used.has(c.id)).map(c => <button key={c.id} className={`st-chip ${character === c.id ? 'on' : ''}`} onClick={() => setCharacter(c.id)}>{c.name}</button>)}
+            </div>
+          )}
+          {products.length > 0 && (
+            <div className="st-row" style={{ gap: 6, flexWrap: 'wrap' }} data-field="posts-product-filter">
+              <span className="st-label" style={{ width: 76 }}>Product</span>
+              <button className={`st-chip ${product === null ? 'on' : ''}`} onClick={() => setProduct(null)}>All</button>
+              {products.map(p => <button key={p.id} className={`st-chip ${product === p.id ? 'on' : ''}`} onClick={() => setProduct(p.id)}>{p.name}</button>)}
+              <button className={`st-chip ${product === 'none' ? 'on' : ''}`} onClick={() => setProduct('none')}>No product</button>
             </div>
           )}
         </div>
@@ -105,19 +117,19 @@ export default function Posts() {
           </div>
         </div>
       ) : !shown.length && !older.more ? (
-        <Callout tone="info">No posts match these filters. <button className="st-todo-link" onClick={() => { setTag(null); setCharacter(null) }}>Show all posts</button></Callout>
+        <Callout tone="info">No posts match these filters. <button className="st-todo-link" onClick={() => { setTag(null); setCharacter(null); setProduct(null) }}>Show all posts</button></Callout>
       ) : (
         <>
           {shown.length > 0 && (
             <div className="st-grid cards">
-              {shown.map(i => <PostCard key={i.id} item={i} lib={lib.data} characterName={characters.find(c => c.id === i.characterId)?.name ?? ''} />)}
+              {shown.map(i => <PostCard key={i.id} item={i} lib={lib.data} characterName={characters.find(c => c.id === i.characterId)?.name ?? ''} productName={products.find(p => p.id === i.productId)?.name ?? ''} />)}
             </div>
           )}
           {older.more && (
             <div className="st-row" style={{ gap: 10, justifyContent: 'center', marginTop: 18, flexWrap: 'wrap' }} data-field="posts-older">
               {!shown.length && <span className="st-hint">None of the newest {items.length} posts match these filters.</span>}
               <button type="button" className="st-btn" disabled={older.loading} onClick={() => void older.load()}>{older.loading ? <Loader2 size={15} className="st-spin" /> : null}Show older posts</button>
-              <span className="st-hint">{shown.length} shown{tag || character ? ' (filtered)' : ''}. Older ones load {PAGE} at a time.</span>
+              <span className="st-hint">{shown.length} shown{tag || character || product ? ' (filtered)' : ''}. Older ones load {PAGE} at a time.</span>
             </div>
           )}
         </>
@@ -129,11 +141,11 @@ export default function Posts() {
 // Older posts than the newest 200, a page at a time. A filter starts the
 // pages again from the end of the list, filtered on the server.
 const PAGE = 60
-function useOlderPosts(first: string | null, lastListed: string | null, tag: string | null, character: string | null) {
+function useOlderPosts(first: string | null, lastListed: string | null, tag: string | null, character: string | null, product: string | null) {
   const toast = useToast()
   const [state, setState] = useState<{ key: string; items: ContentItem[]; next: string | null }>({ key: '', items: [], next: null })
   const [loading, setLoading] = useState(false)
-  const key = `${first ?? ''}|${tag ?? ''}|${character ?? ''}`
+  const key = `${first ?? ''}|${tag ?? ''}|${character ?? ''}|${product ?? ''}`
   // A new list or a new filter starts over from the end of the list.
   useEffect(() => { setState({ key, items: [], next: first ? lastListed : null }) }, [key, first, lastListed])
   const cursor = state.key === key ? state.next : (first ? lastListed : null)
@@ -141,7 +153,7 @@ function useOlderPosts(first: string | null, lastListed: string | null, tag: str
     if (!cursor) return
     setLoading(true)
     try {
-      const page = await api.contentPage({ before: cursor, limit: PAGE, tag, character })
+      const page = await api.contentPage({ before: cursor, limit: PAGE, tag, character, product })
       setState(s => ({ key, items: [...(s.key === key ? s.items : []), ...page.items], next: page.next }))
     } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) } finally { setLoading(false) }
   }
@@ -166,7 +178,7 @@ const STATUS: Record<ContentItem['status'], { label: string; tone: string }> = {
   draft: { label: 'Draft', tone: '' }, rendering: { label: 'Rendering', tone: 'accent live' }, ready: { label: 'Exported', tone: 'ok' }, failed: { label: 'Export failed', tone: 'bad' },
 }
 
-function PostCard({ item, lib, characterName }: { item: ContentItem; lib: LibraryData | undefined; characterName: string }) {
+function PostCard({ item, lib, characterName, productName }: { item: ContentItem; lib: LibraryData | undefined; characterName: string; productName: string }) {
   const toast = useToast()
   const qc = useQueryClient()
   const duplicate = useDuplicate()
@@ -185,7 +197,7 @@ function PostCard({ item, lib, characterName }: { item: ContentItem; lib: Librar
       <div className="st-casting-body">
         <Link to={`/studio/posts/${item.id}`} className="st-postcard-name">{postName(item)}</Link>
         <div className="st-casting-meta">
-          <span>{[KIND_LABEL[item.kind], characterName, item.accountTag].filter(Boolean).join(' · ')}</span>
+          <span>{[KIND_LABEL[item.kind], characterName, item.accountTag, productName].filter(Boolean).join(' · ')}</span>
         </div>
         {item.kind === 'batch' && <BatchProgress item={item} />}
         <div className="st-row" style={{ gap: 4 }}>

@@ -4,9 +4,10 @@ import { expect, test, type Locator, type Page } from '@playwright/test'
 import { unzipSync } from 'fflate'
 import { API, api, snap } from './helpers'
 
-// Launch ready (UX-PLAN.md section 28), like a user, in demo mode: the plan
-// CSV uploaded, Preview (free) by day and account, Make the drafts (free),
-// Generate 2 posts (its price on the button, ten at a time), the Plan line
+// Launch ready (UX-PLAN.md sections 28 and 29), like a user, in demo mode:
+// the plan CSV uploaded (shown as its name and rows), Preview (free), the
+// plan's product (SideStep), F2's rows ticked and imported (free, only
+// those), Generate 2 posts (its price on the button, ten at a time), the Plan line
 // on a post; the playbook hook writer with its reviewer (only 1s and 2s
 // show), the language notes, the alt hook swap, a new mock screen and the
 // owner's Product screenshot, then the export with post.json and "Ad:".
@@ -17,6 +18,7 @@ const CSV = join(process.cwd(), 'docs', 'content', 'launch-plan-v2-posts.csv')
 
 interface PlanPost { id: string; rowId: string; account: string; need: number; have: number }
 const planPosts = async () => (await api<{ posts: PlanPost[] }>('GET', '/plan')).posts
+const sideStepId = async () => (await api<{ products: { id: string; name: string }[] }>('GET', '/products')).products.find(p => p.name === 'SideStep')!.id
 
 async function pay(page: Page, button: Locator, scope?: Locator) {
   await expect(button).toContainText(/\$\d|credits|Free/, { timeout: 30_000 })
@@ -34,33 +36,57 @@ async function openPlan(page: Page) {
   return card
 }
 
-test('the launch plan: upload the CSV, Preview (free), Make the drafts (free), Generate 2 posts (priced), the Plan line on a post', async ({ page }, info) => {
+test('the launch plan: upload the CSV, Preview (free), the plan\'s product, tick F2\'s rows and Import them (free), Generate 2 posts (priced), the Plan line on a post', async ({ page }, info) => {
   test.setTimeout(420_000)
+  const sideStep = await sideStepId()
   const card = await openPlan(page)
-  const again = card.getByRole('button', { name: /Import a plan CSV again/ })
+  const again = card.getByRole('button', { name: /Import plan rows again/ })
   if (await again.isVisible({ timeout: 2000 }).catch(() => false)) await again.click()
   await card.locator('[data-field="plan-import"] input[type="file"]').setInputFiles(CSV)
-  await expect(card.getByLabel('Plan rows')).not.toHaveValue('', { timeout: 10_000 })
+  // The file shows as its name and rows, not its raw text.
+  await expect(card.locator('[data-field="plan-file"]')).toHaveText('launch-plan-v2-posts.csv · 140 rows loaded', { timeout: 10_000 })
+  await expect(card.getByLabel('Plan rows')).toHaveCount(0)
   await card.getByRole('button', { name: /^Preview \(free\)/ }).click()
   const preview = card.locator('[data-field="plan-preview"]')
   await expect(preview).toBeVisible({ timeout: 60_000 })
-  // Every row reads: 140 posts, the 4 feeders as topic accounts, a price for all the stills.
-  // 140 in all: the ones to make, and any kept from an earlier import (they have pictures).
-  const totals = card.locator('[data-field="plan-totals"]')
-  await expect(totals).toContainText(/about \$\d+\.\d\d/)
-  const t = await totals.innerText()
-  expect(Number(t.match(/(\d+) posts/)![1]) + Number(t.match(/(\d+) already with pictures/)?.[1] ?? 0)).toBe(140)
   await expect(preview.locator('tbody tr', { hasText: 'Topic account' })).toHaveCount(4)
   await expect(preview.locator('tbody tr', { hasText: 'Character: Solei' })).toHaveCount(1)
-  await expect(card.locator('[data-field="plan-grid"] .st-planchip')).toHaveCount(140)
   await expect(card.locator('[data-field="plan-errors"]')).toHaveCount(0)
-  await card.locator('[data-field="plan-grid"]').scrollIntoViewIfNeeded()
-  await snap(page, info, 'the plan preview by day and account')
+  // Nothing imports before the product (this older file's product column
+  // is yes or no, so every row takes the plan's pick) and a ticked row.
+  const importBtn = card.locator('[data-field="plan-step-4"]').getByRole('button', { name: /^Import/ })
+  await card.getByLabel('This plan is for').selectOption(sideStep)
+  await expect(preview.locator('[data-field="plan-product"]')).toContainText(/SideStep rules/, { timeout: 30_000 })
+  await expect(importBtn).toBeDisabled()
+  await expect(card.locator('[data-field="plan-step-4"] .st-todo')).toContainText('Tick the rows to import')
+  // Tick F2's rows (28), each with its product and Ad on its ad rows.
+  const rows = card.locator('[data-field="plan-rows"]')
+  await rows.getByLabel('Account').selectOption('F2')
+  await rows.getByRole('button', { name: /^Tick the \d+ shown/ }).click()
+  const totals = card.locator('[data-field="plan-totals"]')
+  await expect(totals).toContainText(/^\d+ of \d+ rows ticked/)
+  const t = await totals.innerText()
+  const ticked = Number(t.match(/^(\d+) of/)![1])
+  expect(ticked).toBeGreaterThan(0)
+  expect(ticked).toBeLessThanOrEqual(28)
+  // (Rows made with pictures in an earlier run are kept and not listed.)
+  const listed = await rows.locator('tbody tr[data-field^="plan-row-"]').evaluateAll(els => els.map(e => e.getAttribute('data-field')!.replace('plan-row-', '')))
+  expect(listed.length).toBe(ticked)
+  await expect(rows.locator(`[data-field="plan-row-${listed[0]}"]`)).toContainText('SideStep (plan)')
+  const adRow = ['P037', 'P051', 'P087', 'P101', 'P137'].find(r => listed.includes(r))
+  if (adRow) await expect(rows.locator(`[data-field="plan-row-${adRow}"]`)).toContainText('Ad')
+  await rows.scrollIntoViewIfNeeded()
+  await snap(page, info, 'the plan\'s product and F2\'s rows ticked')
 
-  // Make 140 drafts (free): nothing paid runs.
-  await card.getByRole('button', { name: /^Make \d+ drafts \(free\)/ }).click()
+  // Import (free): only the ticked rows, each written for SideStep; nothing paid runs.
+  await expect(importBtn).toHaveText(`Import ${ticked} rows (free)`)
+  await importBtn.click()
   await expect(card.locator('[data-field="plan-done"]')).toContainText(/drafts made/, { timeout: 120_000 })
-  expect((await planPosts()).length).toBe(140)
+  const f2 = (await planPosts()).filter(p => p.account === 'F2')
+  expect(f2.length).toBeGreaterThanOrEqual(ticked)
+  const firstRow = await api<{ item: { productId: string | null; spec: { ad: boolean } } }>('GET', `/content/${f2.find(p => p.rowId === listed[0])!.id}`)
+  expect(firstRow.item.productId).toBe(sideStep)
+  if (adRow) expect((await api<{ item: { productId: string | null; spec: { ad: boolean } } }>('GET', `/content/${f2.find(p => p.rowId === adRow)!.id}`)).item).toMatchObject({ productId: sideStep, spec: { ad: true } })
 
   // Generate 2 posts: F2's first two that still need pictures, one price.
   const posts = card.locator('[data-field="plan-posts"]')
@@ -113,13 +139,13 @@ test('the Pictures column ends on the full count even when the run starts and en
   await snap(page, info, 'filled after a run the jobs list never showed running')
 })
 
-test('Write 10 with Claude to THE STANDARD: a moment, a code, effects, pain, an alt hook and a score each; the reviewer\'s stop test and ladder hide the rest; language notes; Swap with the alt hook', async ({ page }, info) => {
+test('Write 10 with Claude on a SideStep post, to THE STANDARD: a moment, a code, effects, pain, an alt hook and a score each; the reviewer\'s stop test and ladder hide the rest; language notes; Swap with the alt hook', async ({ page }, info) => {
   test.setTimeout(300_000)
   const p = (await planPosts()).find(x => x.account === 'F2')
   expect(p, 'import the plan first (the test above)').toBeTruthy()
   // A fresh F2 topic post, so the plan's own words stay as they are.
   const characters = (await api<{ characters: { id: string; name: string }[] }>('GET', '/characters')).characters
-  const { id } = await api<{ id: string }>('POST', '/content', { kind: 'slideshow', characterId: characters.find(c => c.name === 'Callie')!.id, accountTag: 'F2', idea: 'rejection emails', spec: { mode: 'topic' } })
+  const { id } = await api<{ id: string }>('POST', '/content', { kind: 'slideshow', characterId: characters.find(c => c.name === 'Callie')!.id, accountTag: 'F2', idea: 'rejection emails', spec: { mode: 'topic' }, productId: await sideStepId() })
   await page.goto(`/studio/posts/${id}`)
   await expect(page.locator('[data-field="slideshow-hook"]')).toBeVisible({ timeout: 30_000 })
   await expect(page.locator('[data-field="account-structures"]')).toContainText(/primary L14 Museum exhibit/)

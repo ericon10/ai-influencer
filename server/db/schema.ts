@@ -316,6 +316,9 @@ export const brollClips = pgTable('broll_clips', {
   accountId: text('account_id').notNull().references(() => accounts.id),
   assetId: text('asset_id'),
   title: text('title').notNull().default(''),
+  // The product it shows (UX-PLAN.md section 29), picked from the products.
+  // `product` is the old free-text label, kept for clips made before.
+  productId: text('product_id'),
   product: text('product').notNull().default(''),
   status: text('status').notNull().default('processing'), // processing | ready | failed
   error: text('error'),
@@ -364,6 +367,9 @@ export const contentItems = pgTable('content_items', {
   sceneId: text('scene_id'),
   // Where it gets posted, for example "Callie TikTok" (Posts filters by it).
   accountTag: text('account_tag').notNull().default(''),
+  // The product the post is for (UX-PLAN.md section 29), or none. Its vault,
+  // claims and writing rules follow it; nothing else does.
+  productId: text('product_id'),
   // The step it was left on: idea | stills | video | text | finish.
   step: text('step').notNull().default('idea'),
   spec: jsonb('spec').notNull().default({}),
@@ -535,6 +541,9 @@ export const products = pgTable('products', {
   language: jsonb('language').notNull().default({}),
   voices: jsonb('voices').notNull().default([]),
   notes: text('notes').notNull().default(''),
+  // The product's writing rules (UX-PLAN.md section 29): a key of
+  // writing_standards in config/content.yaml ("sidestep"), or "" for Plain.
+  writing: text('writing').notNull().default(''),
   createdBy: text('created_by'),
   createdAt: createdAt(),
   updatedAt: updatedAt(),

@@ -8,7 +8,7 @@ import { Callout, Img, errorMessage, useToast } from '../ui'
 import { ClipGrid, ClipUpload, StillGrid, StillUpload } from '../library'
 import { DeleteButton, SelectBar, SelectToggle, TileCheck, TrashTab, useDelete, useSelection, type Deletable } from '../trash'
 import { RunStatus } from '../runs'
-import type { BrollClip, ContentData, LibraryClip, ScenesData, SoundItem } from '../types'
+import type { BrollClip, ContentData, LibraryClip, ProductBrief, ScenesData, SoundItem } from '../types'
 import { KIND_LABEL, fileSlug, postName, useNewPost } from './post/parts'
 import { HowTo } from '../guide/Guide'
 import { VoiceLinesTab } from './library/VoiceLines'
@@ -271,6 +271,7 @@ const brollRef = (b: BrollClip): Deletable => ({ kind: 'broll', id: b.id, label:
 function BrollTab({ data, sel, del }: { data: ContentData; sel: Sel; del: Del }) {
   const toast = useToast()
   const qc = useQueryClient()
+  // A clip's product is picked from the products (section 29), or none.
   const [product, setProduct] = useState('')
   const [filter, setFilter] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
@@ -282,20 +283,23 @@ function BrollTab({ data, sel, del }: { data: ContentData; sel: Sel; del: Del })
     if (!videos.length) { toast({ tone: 'bad', text: 'Pick video files (MP4, MOV or WebM).' }); return }
     for (const [i, f] of videos.entries()) {
       setBusy(`Uploading ${f.name} (${i + 1} of ${videos.length})...`)
-      try { const b = await api.addBroll(f, product); setAdded(a => [...a, b.id]) } catch (e) { toast({ tone: 'bad', text: `${f.name}: ${errorMessage(e)}` }) }
+      try { const b = await api.addBroll(f, product || null); setAdded(a => [...a, b.id]) } catch (e) { toast({ tone: 'bad', text: `${f.name}: ${errorMessage(e)}` }) }
     }
     setBusy(null)
     await qc.invalidateQueries({ queryKey: keys.content })
   }
-  const shown = data.broll.filter(b => !filter || b.product === filter)
+  const shown = data.broll.filter(b => !filter || (filter === 'none' ? !b.productId : b.productId === filter))
+  const used = data.products.filter(p => data.broll.some(b => b.productId === p.id))
   return (
     <div className="st-col" style={{ gap: 18 }}>
       <section className="st-card"><div className="st-card-body st-col" style={{ gap: 12 }}>
         <div className="st-h3">Add B-roll</div>
         <span className="st-hint">Screen recordings and phone video of your laptop, up to {data.options.maxUploadMb} MB each. They are kept as a lean copy without sound. Landscape clips are fitted over a blurred copy in 9:16, so nothing on screen is cut off.</span>
         <div className="st-row" style={{ gap: 10, flexWrap: 'wrap' }}>
-          <input className="st-input" style={{ maxWidth: 260 }} list="broll-products" value={product} onChange={e => setProduct(e.target.value)} placeholder="Product, e.g. Notion" aria-label="Product" />
-          <datalist id="broll-products">{data.products.map(p => <option key={p} value={p} />)}</datalist>
+          <select className="st-select" style={{ width: 'auto', maxWidth: 260 }} value={product} onChange={e => setProduct(e.target.value)} aria-label="Product">
+            <option value="">No product</option>
+            {data.products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
           <input ref={input} type="file" accept="video/*" multiple hidden onChange={e => { const f = Array.from(e.target.files ?? []); e.target.value = ''; void upload(f) }} />
           <button className="st-btn primary" disabled={!!busy || !worker.ready} onClick={() => input.current?.click()}>{busy ? <Loader2 size={15} className="st-spin" /> : <Upload size={15} />}Upload videos</button>
           {busy && <span className="st-hint">{busy}</span>}
@@ -303,10 +307,11 @@ function BrollTab({ data, sel, del }: { data: ContentData; sel: Sel; del: Del })
         </div>
         <RunStatus match={j => added.some(id => j.purpose === `broll_ingest:${id}`)} />
       </div></section>
-      {data.products.length > 0 && (
+      {used.length > 0 && (
         <div className="st-row" style={{ gap: 6, flexWrap: 'wrap' }}>
           <button className={`st-chip ${filter === null ? 'on' : ''}`} onClick={() => setFilter(null)}>All products</button>
-          {data.products.map(p => <button key={p} className={`st-chip ${filter === p ? 'on' : ''}`} onClick={() => setFilter(p)}>{p}</button>)}
+          {used.map(p => <button key={p.id} className={`st-chip ${filter === p.id ? 'on' : ''}`} onClick={() => setFilter(p.id)}>{p.name}</button>)}
+          <button className={`st-chip ${filter === 'none' ? 'on' : ''}`} onClick={() => setFilter('none')}>No product</button>
         </div>
       )}
       {!shown.length ? <Callout tone="info">No B-roll yet. Upload a screen recording to start the library.</Callout> : (
@@ -317,13 +322,11 @@ function BrollTab({ data, sel, del }: { data: ContentData; sel: Sel; del: Del })
   )
 }
 
-function BrollCard({ b, products, sel, del }: { b: BrollClip; products: string[]; sel: Sel; del: Del }) {
+function BrollCard({ b, products, sel, del }: { b: BrollClip; products: ProductBrief[]; sel: Sel; del: Del }) {
   const toast = useToast()
   const qc = useQueryClient()
   const [title, setTitle] = useState(b.title)
-  const [product, setProduct] = useState(b.product)
-  const listId = useMemo(() => `p-${b.id}`, [b.id])
-  async function save(patch: { title?: string; product?: string }) {
+  async function save(patch: { title?: string; productId?: string | null }) {
     try { await api.updateBroll(b.id, patch); await qc.invalidateQueries({ queryKey: keys.content }) } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) }
   }
   const on = sel.has(b.id)
@@ -334,8 +337,10 @@ function BrollCard({ b, products, sel, del }: { b: BrollClip; products: string[]
         : b.status === 'processing' ? <div className="st-content-processing"><Loader2 size={18} className="st-spin" />Preparing...</div>
         : <div className="st-content-processing bad">{b.error ?? 'This upload failed.'}</div>}
       <input className="st-input" value={title} onChange={e => setTitle(e.target.value)} onBlur={() => title !== b.title && save({ title })} aria-label="Title" />
-      <input className="st-input" list={listId} value={product} onChange={e => setProduct(e.target.value)} onBlur={() => product !== b.product && save({ product })} placeholder="Product" aria-label="Product" />
-      <datalist id={listId}>{products.map(p => <option key={p} value={p} />)}</datalist>
+      <select className="st-select" value={b.productId ?? ''} onChange={e => void save({ productId: e.target.value || null })} aria-label="Product">
+        <option value="">{b.product && !b.productId ? `No product (was "${b.product}")` : 'No product'}</option>
+        {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+      </select>
       <div className="st-row"><span className="st-hint">{b.durationSec != null ? `${b.durationSec} s` : ''}</span><span className="st-spacer" />{!sel.on && b.status !== 'processing' && <DeleteButton onClick={() => void del.ask([brollRef(b)])} label={b.title || 'this B-roll'} />}</div>
     </div>
   )

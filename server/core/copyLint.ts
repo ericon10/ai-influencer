@@ -1,9 +1,11 @@
 // The language lint (owner, 2026-10-16; UX-PLAN.md section 28): free checks
-// on every hook, slide and caption, from the playbook's Communication
+// on hooks, slides and captions, from the playbook's Communication
 // Algorithm and the post writer brief. Warnings only, never a block (rule
 // one): each check is a default in Settings > Rules and the word lists are
-// data (config/content.yaml, copy_lint). Pure, so the browser runs the same
-// checks as you type.
+// data (config/content.yaml, copy_lint). The em and en dash check runs on
+// every post; the rest are SideStep's and run only on posts whose product's
+// rules have lint on (`standard`; UX-PLAN.md section 29). Pure, so the
+// browser runs the same checks as you type.
 
 export const LINT_RULES = [
   { id: 'lint-dashes', title: 'No em or en dashes' },
@@ -43,7 +45,7 @@ export interface LintLists {
 export const DEFAULT_LINT_LISTS: LintLists = {
   values: ['should', 'need to', 'needs to', 'must', 'ought'],
   hype: ['dream job', 'unlock', 'level up', 'game-changer', 'game changer', 'supercharge'],
-  products: ['SideStep'],
+  products: [],
   maxHashtags: 5,
   hookMaxWords: 22,
   hookLabels: ['Exhibit', 'Levels of', 'Previously on', 'Calendar invite'],
@@ -59,6 +61,9 @@ export interface LintOptions {
   kind: LintKind
   lists?: Partial<LintLists>
   off?: Iterable<string>
+  // The post's product's rules have lint on (SideStep's): every check runs.
+  // Off (any other post): the em and en dash check only.
+  standard?: boolean
   // A product post (product = yes, or #ad on).
   product?: boolean
   // The post's last slide (slide 6 of a product post: its SideStep ending).
@@ -98,7 +103,7 @@ export function hashtagCount(caption: string, hashtags: string[] = []): number {
 export function lintCopy(text: string, o: LintOptions): LintHit[] {
   const lists: LintLists = { ...DEFAULT_LINT_LISTS, ...(o.lists ?? {}) }
   const off = new Set(o.off ?? [])
-  const on = (id: LintRuleId) => !off.has(id)
+  const on = (id: LintRuleId) => !off.has(id) && (id === 'lint-dashes' || !!o.standard)
   const t = (text ?? '').trim()
   const out: LintHit[] = []
   const hit = (rule: LintRuleId, match: string, message: string) => { if (on(rule)) out.push({ rule, match, message }) }
@@ -138,7 +143,7 @@ export function lintCopy(text: string, o: LintOptions): LintHit[] {
   if (o.kind === 'slide' && o.product && o.last) {
     for (const w of lists.endingNever) {
       const m = w.trim() && t.match(phrase(w))
-      if (m) { hit('lint-product-ending', m[2]!, `"${m[2]!}" on the product ending. SideStep can't promise replies and never applies for anyone: use an honest ending (it fills the app, shows the match, shows what to add, $99 once).`); break }
+      if (m) { hit('lint-product-ending', m[2]!, `"${m[2]!}" on the product ending. ${lists.products[0] || 'The product'} can't promise replies and never applies for anyone: use one of its honest endings.`); break }
     }
   }
   if (o.kind === 'caption') {
@@ -152,10 +157,10 @@ export function lintCopy(text: string, o: LintOptions): LintHit[] {
 // Every slide and the caption of a slideshow at once (the Finish step and
 // the plan import): each hit with the slide it is on (0 is the hook, null
 // is the caption).
-export function lintPost(p: { texts: string[]; caption: string; hashtags: string[]; product: boolean }, o: { lists?: Partial<LintLists>; off?: Iterable<string> } = {}): Array<LintHit & { slide: number | null }> {
+export function lintPost(p: { texts: string[]; caption: string; hashtags: string[]; product: boolean; standard?: boolean }, o: { lists?: Partial<LintLists>; off?: Iterable<string> } = {}): Array<LintHit & { slide: number | null }> {
   const off = [...(o.off ?? [])]
   return [
-    ...p.texts.flatMap((t, i) => lintCopy(t, { kind: i === 0 ? 'hook' : 'slide', lists: o.lists, off, product: p.product, last: i > 0 && i === p.texts.length - 1 }).map(h => ({ ...h, slide: i }))),
-    ...lintCopy(p.caption, { kind: 'caption', lists: o.lists, off, product: p.product, hashtags: p.hashtags }).map(h => ({ ...h, slide: null })),
+    ...p.texts.flatMap((t, i) => lintCopy(t, { kind: i === 0 ? 'hook' : 'slide', lists: o.lists, off, product: p.product, standard: p.standard, last: i > 0 && i === p.texts.length - 1 }).map(h => ({ ...h, slide: i }))),
+    ...lintCopy(p.caption, { kind: 'caption', lists: o.lists, off, product: p.product, standard: p.standard, hashtags: p.hashtags }).map(h => ({ ...h, slide: null })),
   ]
 }

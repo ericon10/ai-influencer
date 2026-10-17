@@ -15,6 +15,7 @@ import { getCharacter, listCharacters, toData, updateCharacter } from './charact
 import { resolveRoute } from './settings.js'
 import { codeBefore, fitFor, placedPosts } from './playbook.js'
 import { STRUCTURE_CODES } from '../core/playbook.js'
+import { GENERAL_LABEL, standardOf, templateFor, writingForName, writingStandards } from './products.js'
 
 // The scale kit (overnight item 5, DECISIONS G35; UX-PLAN.md section 14):
 // per product, the hook vault, the claims sheet and the buyer-language
@@ -33,6 +34,8 @@ export const claimsOf = (r: ProductRow): Claims => {
   const c = (r.claims ?? {}) as Partial<Claims>
   return { groups: c.groups ?? [], lines: c.lines ?? [], watch: c.watch ?? [], mentions: c.mentions ?? [r.name.toLowerCase()] }
 }
+// A product's writing rules for the views (section 29).
+const writingView = (deps: Deps, r: ProductRow) => { const std = standardOf(deps, r.writing); return { writing: std?.key ?? '', writingLabel: std?.label ?? GENERAL_LABEL } }
 export const languageOf = (r: ProductRow): Language => ({ groups: ((r.language ?? {}) as Partial<Language>).groups ?? [] })
 const voicesOf = (r: ProductRow): KitVoice[] => (Array.isArray(r.voices) ? r.voices as KitVoice[] : [])
 
@@ -54,7 +57,7 @@ export async function productSummaries(deps: Deps, ctx: Ctx) {
   const rows = await listProducts(deps, ctx)
   const counts = rows.length ? await deps.db.select({ productId: hooks.productId, n: sql<number>`count(*)` }).from(hooks)
     .where(and(eq(hooks.accountId, ctx.accountId), inArray(hooks.productId, rows.map(r => r.id)), isNull(hooks.archivedAt))).groupBy(hooks.productId) : []
-  return rows.map(r => ({ id: r.id, name: r.name, hooks: Number(counts.find(c => c.productId === r.id)?.n ?? 0) }))
+  return rows.map(r => ({ id: r.id, name: r.name, hooks: Number(counts.find(c => c.productId === r.id)?.n ?? 0), ...writingView(deps, r) }))
 }
 
 export async function getProduct(deps: Deps, ctx: Ctx, id: string): Promise<ProductRow> {
@@ -73,6 +76,8 @@ export async function importKit(deps: Deps, ctx: Ctx, md: string, name?: string)
   const id = newId('prd')
   const [product] = await deps.db.insert(products).values({
     id, accountId: ctx.accountId, name: (name || kit.product).slice(0, 80), claims: kit.claims, language: kit.language, voices: kit.voices, notes: kit.notes.slice(0, 20_000), createdBy: ctx.userId,
+    // The rules it adds (section 29): the standard that names it, else none.
+    writing: writingForName(deps, name || kit.product),
   }).returning()
   if (kit.hooks.length) {
     await deps.db.insert(hooks).values(kit.hooks.slice(0, 500).map(h => ({ id: newId('hok'), accountId: ctx.accountId, productId: id, number: h.number, kind: h.kind.slice(0, 80), text: h.text.slice(0, 600) })))
@@ -99,8 +104,11 @@ const groupSchema = (g: unknown): Group[] => (Array.isArray(g) ? g : []).map(x =
 })).filter(x => x.label || x.items.length).slice(0, 30)
 const words = (v: unknown): string[] => (Array.isArray(v) ? v : []).map(x => String(x).trim().toLowerCase().slice(0, 60)).filter(Boolean).slice(0, 60)
 
-export async function updateProduct(deps: Deps, ctx: Ctx, id: string, patch: { name?: string; claims?: Partial<Claims>; language?: Partial<Language>; notes?: string }): Promise<ProductRow> {
+export async function updateProduct(deps: Deps, ctx: Ctx, id: string, patch: { name?: string; claims?: Partial<Claims>; language?: Partial<Language>; notes?: string; writing?: string }): Promise<ProductRow> {
   const row = await getProduct(deps, ctx, id)
+  // The rules it adds on top of the general standard (section 29): one in
+  // config, or "" for none.
+  if (patch.writing && !standardOf(deps, patch.writing)) throw new AppError('bad_request', 'Pick the general standard or one of the product rules.')
   const c = claimsOf(row)
   const claims: Claims = patch.claims ? {
     groups: patch.claims.groups ? groupSchema(patch.claims.groups) : c.groups,
@@ -113,6 +121,7 @@ export async function updateProduct(deps: Deps, ctx: Ctx, id: string, patch: { n
     claims,
     language: patch.language?.groups ? { groups: groupSchema(patch.language.groups) } : languageOf(row),
     notes: patch.notes !== undefined ? patch.notes.slice(0, 20_000) : row.notes,
+    writing: patch.writing !== undefined ? patch.writing : row.writing,
     updatedAt: deps.clock.now(),
   }).where(eq(products.id, row.id)).returning()
   return out!
@@ -166,7 +175,10 @@ export async function productView(deps: Deps, ctx: Ctx, id: string) {
   const ids = hookRows.map(h => h.id)
   const vars = ids.length ? await deps.db.select().from(hookVariants).where(and(eq(hookVariants.accountId, ctx.accountId), inArray(hookVariants.hookId, ids), isNull(hookVariants.archivedAt))).orderBy(desc(hookVariants.createdAt)) : []
   return {
-    id: row.id, name: row.name, claims: claimsOf(row), language: languageOf(row), voices: voicesOf(row), notes: row.notes,
+    id: row.id, name: row.name, claims: claimsOf(row), language: languageOf(row), voices: voicesOf(row), notes: row.notes, ...writingView(deps, row),
+    // What a product can pick: the general standard alone ("") or a set of
+    // rules on top, from config (section 29).
+    writings: [{ key: '', label: GENERAL_LABEL }, ...writingStandards(deps).map(w => ({ key: w.key, label: w.label }))],
     hooks: hookRows.map(h => ({
       id: h.id, number: h.number, kind: h.kind, text: h.text,
       variants: vars.filter(v => v.hookId === h.id).map(v => ({ id: v.id, characterId: v.characterId, text: v.text, flags: (v.flags as string[]) ?? [], createdAt: v.createdAt.toISOString() })),
@@ -219,7 +231,8 @@ export async function buildHookVariants(deps: Deps, ctx: Ctx, a: { hookId: strin
     hook: hook.text, kind: hook.kind || 'not given',
     claims: claimsText(product.name, claimsOf(product)),
     language: languageText(languageOf(product)) || 'None collected yet.',
-    standard: deps.config.pipeline.templates.hook_standard.trim(),
+    // The general standard, or the hook's product's own on top (section 29).
+    standard: templateFor(deps, standardOf(deps, product.writing), 'hook_standard').trim(),
     voices,
   }
   const system = fill(t.system, vars)
@@ -282,7 +295,7 @@ export async function scoreboard(deps: Deps, ctx: Ctx) {
     // the fit table's for its tag or its character; and its last code.
     const fit = fitFor(deps, [tag, characterId ? names.get(characterId) : null])
     return {
-      tag, characterId, productId: s?.productId ?? null, link: s?.link ?? '', code: s?.code ?? '', signups, views: s?.views ?? null, notes: s?.notes ?? '',
+      tag, characterId, productId: s?.productId || null, link: s?.link ?? '', code: s?.code ?? '', signups, views: s?.views ?? null, notes: s?.notes ?? '',
       primary: s?.primaryCode ?? fit.primary, backup: s?.backupCode ?? fit.backup, structuresSet: !!(s?.primaryCode || s?.backupCode), lastCode: lastCodes.get(tag) ?? null,
       posts: made, exported: ready, perPost: ready ? Math.round((signups / ready) * 100) / 100 : null, updatedAt: s?.updatedAt.toISOString() ?? null,
     }

@@ -2639,3 +2639,56 @@ UX-PLAN.md section 28 has the audit and the plan.
   account. Variation 1 uses the alt hook word for word.
 - **Paid test.** One capped real test under $1, price first, on the
   Higgsfield API path (GPT Image 2.5 Flare); see LATER.md for what ran.
+
+### G57. Products: every post belongs to one product, or none (owner, 2026-10-17)
+
+What went wrong: the SideStep writing standard (THE STANDARD v1.2, its job
+examples, the stop test's "job" check, pain 7+, the honest endings, the
+playbook menu and 13 language checks) was wired into the shared writer
+templates and a global lint, and `kitFor` gave any slideshow with no
+product the account's first product (SideStep). Every test and seed post
+was a job-hunt post, so nothing showed a non-SideStep post getting it; a
+Callie video post captioned "Do boys even know what it's like to be a
+girl?" got "No job word". The cause was reading "THE STANDARD is the spec
+for the writer, the reviewer and the lint" as every writer and every
+post, never asking which posts it was for. The owner's standing rule two
+(CLAUDE.md, UX-PLAN.md section 0) now says it for every feature: nothing
+product-specific is ever global, and every plan states which products,
+characters and accounts it applies to.
+
+Decided (UX-PLAN.md section 29, approved with five changes):
+- **The post's product is a column**, `content_items.product_id`
+  (migration 0017; the slideshow spec's `productId` moved there). A new
+  post takes its account's product (`social_accounts.product_id`, the
+  Accounts card) or none. No hard-coded account defaults: the owner sets
+  each account's product. Never "the first product".
+- **The general standard** for every post, any product or none: the stop
+  test's four checks (a stranger would stop, clear on one read, says
+  exactly what happened, sounds like a person), one story thread, the
+  clarity test, an image line a slide, the voice from the character's
+  voice card or the account. One Claude call for Write 10, no reviewer.
+  It is the unprefixed templates (`hook_standard`, `slideshow_hooks`,
+  `slideshow_draft`, `slideshow_variations`, `hook_variants`).
+- **A product adds its own rules on top** (`products.writing`, a key of
+  `writing_standards` in `config/content.yaml`): SideStep's add the job
+  word, pain 7+, its endings, the reviewer, the structures and the
+  language notes, through the `sidestep_` templates (`templateFor` picks
+  a standard's own version, else the general one). `names` starts a
+  product of that name on it (the kit import).
+- **Written for a product and an ad for it are separate.** The ad switch
+  is #ad (a plan row's ad column); the honest endings and "Ad:" follow
+  it. A plan import never turns a pure-pain row into an ad.
+- **The em and en dash check runs on every post**; the other 12 checks
+  only where the post's product's rules have lint on (`standard` in
+  `lintCopy`), with the post's own product as the name never in a hook.
+- **Plan CSV columns**: `product` is a product name (blank: the plan's
+  pick) and `ad` is yes or no. A name not in Products is an error in the
+  free preview. An older file's product column of yes or no is read as
+  the ad column, with the plan's pick as the product.
+- **Only the ticked rows import** (the preview reads them all), each with
+  its product. Posts home filters by product on the server; B-roll picks
+  its product from the products; Pick a hook opens the post's product's
+  vault; drawn screens start with neutral words.
+
+The three slideshows made before this on the TikTok account had no product
+picked, so they now show No product until the owner picks one.

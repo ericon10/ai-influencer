@@ -60,7 +60,7 @@ export function VoiceEditor({ v, open, onClose }: { v: CharacterView; open: bool
           <input className="st-input st-mono" value={form.elevenlabsId} placeholder="e.g. 21m00Tcm4TlvDq8ikWAM" onChange={set('elevenlabsId')} />
         </Field>
         <div className="st-grid two" style={{ gap: 12 }}>
-          <Field id="voice-who" label="Who"><input className="st-input" value={form.who} placeholder="e.g. 24, recently graduated, sunny and a little chaotic" onChange={set('who')} /></Field>
+          <Field id="voice-who" label="Who"><input className="st-input" value={form.who} placeholder="e.g. 24, just moved to a new city, sunny and a little chaotic" onChange={set('who')} /></Field>
           <Field id="voice-pov" label="Point of view"><input className="st-input" value={form.pov} placeholder="e.g. my friend / my roommate / me storytime" onChange={set('pov')} /></Field>
         </div>
         <Field id="voice-talks" label="Talks like"><textarea className="st-textarea" rows={2} value={form.talks} placeholder="e.g. casual, short sentences, a bit dramatic for laughs" onChange={set('talks')} /></Field>
@@ -73,7 +73,7 @@ export function VoiceEditor({ v, open, onClose }: { v: CharacterView; open: bool
           <Field id="voice-humor" label="Humor"><input className="st-input" value={form.humor} placeholder="e.g. self-roasting" onChange={set('humor')} /></Field>
         </div>
         <Field id="voice-pillars" label="Content pillars" hint="Separate with semicolons."><input className="st-input" value={form.pillars} placeholder="e.g. storytime; relatable pain; small wins; soft product" onChange={set('pillars')} /></Field>
-        <Field id="voice-example" label="An example line in this voice"><input className="st-input" value={form.example} placeholder="e.g. entry level but they want 5 years experience. I'm 24. Be so for real 😭" onChange={set('example')} /></Field>
+        <Field id="voice-example" label="An example line in this voice"><input className="st-input" value={form.example} placeholder="e.g. we said one episode. it is 2am. be so for real 😭" onChange={set('example')} /></Field>
         <div className="st-row" style={{ justifyContent: 'flex-end', gap: 8 }}>
           <button className="st-btn ghost" onClick={onClose}>Cancel</button>
           <button className="st-btn primary" disabled={busy} onClick={save}>{busy ? 'Saving...' : 'Save voice'}</button>

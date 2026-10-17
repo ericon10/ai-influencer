@@ -114,7 +114,7 @@ export function useNewPost() {
   const qc = useQueryClient()
   const [busy, setBusy] = useState<ContentKind | null>(null)
   // `open` adds to the post's link, e.g. "?clone=1" opens Clone Video.
-  async function create(kind: ContentKind, extra: { characterId?: string; sceneId?: string | null; idea?: string; step?: PostStep; spec?: Record<string, unknown> } = {}, open = '') {
+  async function create(kind: ContentKind, extra: { characterId?: string; sceneId?: string | null; idea?: string; step?: PostStep; spec?: Record<string, unknown>; productId?: string | null } = {}, open = '') {
     setBusy(kind)
     try {
       // Tapped before the characters loaded: wait for them, never read
@@ -205,14 +205,17 @@ export function CaptionStylePick({ value, onChange, data, off = false, onOff }: 
 
 // ── B-roll: pick one (a video post) or several (a batch), cut in hard ──
 
-export function BrollPicker({ data, ids, multi, onChange, timing, setTiming }: {
+// The post's product's clips come first (section 29); a clip's product is
+// picked from the products when it is uploaded.
+export function BrollPicker({ data, ids, multi, onChange, timing, setTiming, productId = null }: {
   data: ContentData; ids: string[]; multi: boolean; onChange: (ids: string[]) => void
-  timing: BrollTiming; setTiming: (p: Partial<BrollTiming>) => void
+  timing: BrollTiming; setTiming: (p: Partial<BrollTiming>) => void; productId?: string | null
 }) {
   const [product, setProduct] = useState<string | null>(null)
-  const ready = data.broll.filter(b => b.status === 'ready' && b.assetId)
+  const ready = data.broll.filter(b => b.status === 'ready' && b.assetId).sort((a, b) => Number(b.productId === productId && !!productId) - Number(a.productId === productId && !!productId))
   const preparing = data.broll.filter(b => b.status === 'processing').length
-  const shown = ready.filter(b => !product || b.product === product)
+  const shown = ready.filter(b => !product || b.productId === product)
+  const used = data.products.filter(p => ready.some(b => b.productId === p.id))
   const picked = ids.map(id => ready.find(b => b.id === id)).filter(b => !!b)
   const shortest = picked.reduce((m, b) => Math.min(m, b!.durationSec ?? m), Infinity)
   const max = data.options.meme.max_broll_seconds
@@ -222,10 +225,10 @@ export function BrollPicker({ data, ids, multi, onChange, timing, setTiming }: {
   }
   return (
     <div className="st-col" style={{ gap: 10 }}>
-      {data.products.length > 0 && (
+      {used.length > 0 && (
         <div className="st-row" style={{ gap: 6, flexWrap: 'wrap' }}>
           <button type="button" className={`st-chip ${product === null ? 'on' : ''}`} onClick={() => setProduct(null)}>All products</button>
-          {data.products.map(p => <button key={p} type="button" className={`st-chip ${product === p ? 'on' : ''}`} onClick={() => setProduct(p)}>{p}</button>)}
+          {used.map(p => <button key={p.id} type="button" className={`st-chip ${product === p.id ? 'on' : ''}`} onClick={() => setProduct(p.id)}>{p.name}</button>)}
         </div>
       )}
       <div className="st-refgrid">
@@ -240,7 +243,7 @@ export function BrollPicker({ data, ids, multi, onChange, timing, setTiming }: {
           )
         })}
       </div>
-      <BrollUpload data={data} />
+      <BrollUpload data={data} productId={productId} />
       {preparing > 0 && <span className="st-hint"><Loader2 size={12} className="st-spin" style={{ verticalAlign: -2 }} /> {preparing} B-roll {preparing === 1 ? 'clip is' : 'clips are'} being prepared.</span>}
       {picked.length > 0 && (
         <div className="st-row" style={{ gap: 14, flexWrap: 'wrap' }}>
@@ -258,13 +261,14 @@ export function BrollPicker({ data, ids, multi, onChange, timing, setTiming }: {
   )
 }
 
-// Add B-roll right here (it goes to Library > B-roll too).
-export function BrollUpload({ data }: { data: ContentData }) {
+// Add B-roll right here (it goes to Library > B-roll too), for the post's
+// product unless another is picked.
+export function BrollUpload({ data, productId = null }: { data: ContentData; productId?: string | null }) {
   const toast = useToast()
   const qc = useQueryClient()
   const worker = useWorkerGate()
   const input = useRef<HTMLInputElement | null>(null)
-  const [product, setProduct] = useState('')
+  const [product, setProduct] = useState<string>(productId ?? '')
   const [busy, setBusy] = useState<string | null>(null)
   const [added, setAdded] = useState<string[]>([])
   async function upload(files: File[]) {
@@ -273,15 +277,19 @@ export function BrollUpload({ data }: { data: ContentData }) {
     if (!videos.length) { toast({ tone: 'bad', text: 'Pick video files (MP4, MOV or WebM) or a screenshot (PNG or JPEG).' }); return }
     for (const [i, f] of videos.entries()) {
       setBusy(`Uploading ${f.name} (${i + 1} of ${videos.length})...`)
-      try { const b = await api.addBroll(f, product); setAdded(a => [...a, b.id]) } catch (e) { toast({ tone: 'bad', text: `${f.name}: ${errorMessage(e)}` }) }
+      try { const b = await api.addBroll(f, product || null); setAdded(a => [...a, b.id]) } catch (e) { toast({ tone: 'bad', text: `${f.name}: ${errorMessage(e)}` }) }
     }
     setBusy(null)
     await qc.invalidateQueries({ queryKey: keys.content })
   }
   return (
     <div className="st-row" style={{ gap: 8, flexWrap: 'wrap' }}>
-      <input className="st-input" style={{ maxWidth: 200 }} list="post-broll-products" value={product} onChange={e => setProduct(e.target.value)} placeholder="Product, e.g. Notion" aria-label="Product for new B-roll" />
-      <datalist id="post-broll-products">{data.products.map(p => <option key={p} value={p} />)}</datalist>
+      {data.products.length > 0 && (
+        <select className="st-select" style={{ width: 'auto', maxWidth: 220 }} value={product} onChange={e => setProduct(e.target.value)} aria-label="Product for new B-roll">
+          <option value="">No product</option>
+          {data.products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+        </select>
+      )}
       <input ref={input} type="file" accept="video/*,image/png,image/jpeg,image/webp" multiple hidden onChange={e => { const f = Array.from(e.target.files ?? []); e.target.value = ''; void upload(f) }} />
       <button type="button" className="st-btn sm" disabled={!!busy || !worker.ready} onClick={() => input.current?.click()} title="A screen recording, a phone video, or a screenshot">{busy ? <Loader2 size={14} className="st-spin" /> : <Upload size={14} />}Upload B-roll</button>
       {busy && <span className="st-hint">{busy}</span>}

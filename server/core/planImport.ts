@@ -8,8 +8,11 @@ import { emptySpecial, fullSpecial, genericNames, type SpecialSlide, type Specia
 // each slide's shot, and the checks the free preview shows. Prices, the
 // characters and the posts are the caller's (server/pipeline/planImport.ts).
 
+// product: the product's name (blank: the plan's pick); ad: yes or no
+// (UX-PLAN.md section 29). An older file's product column of yes or no is
+// read as the ad column, and the plan's pick sets the product.
 export const PLAN_COLUMNS = [
-  'row_id', 'date', 'slot', 'account', 'format', 'tension', 'pillar', 'audience', 'product', 'mention_mother',
+  'row_id', 'date', 'slot', 'account', 'format', 'tension', 'pillar', 'audience', 'product', 'ad', 'mention_mother',
   'structure', 'effect_open', 'effect_payoff', 'hook_score', 'moment_id', 'moment', 'hook', 'alt_hook',
   'slide_2', 'slide_3', 'slide_4', 'slide_5', 'slide_6', 'scene', 'clip_action', 'caption', 'hashtags', 'cta', 'stat_source', 'notes',
 ] as const
@@ -141,11 +144,15 @@ export function specialFor(desc: string, names: { brands: string[]; generic: str
 
 const yes = (s: string) => /^(?:y|yes|true|1)$/i.test(s.trim())
 export const planYes = yes
+const YES_NO = /^(?:y|yes|true|1|n|no|false|0)$/i
 const SLOTS = ['am', 'pm', 'daily']
 
 export interface CheckedRow {
   line: number; rowId: string; date: string; slot: string; account: string; format: string; kind: PlanKind | null
-  hook: string; slides: string[]; product: boolean
+  hook: string; slides: string[]
+  // An ad for its product (#ad, the honest endings), and the product the
+  // row names ('' : the plan's pick). Separate (section 29).
+  ad: boolean; productName: string
   code: ReturnType<typeof readCode>; effectOpen: ReturnType<typeof readEffect>; effectPayoff: ReturnType<typeof readEffect>; score: number | null
   errors: string[]; warnings: string[]
 }
@@ -176,7 +183,13 @@ export function checkRow(r: PlanRow): CheckedRow {
   const score = c.hook_score && Number.isInteger(n) && n >= 1 && n <= 5 ? n : null
   if (c.hook_score && score === null) warnings.push(`hook_score "${c.hook_score}" is not 1 to 5`)
   if (score && score > 2) warnings.push(`hook_score ${score}: only a 1 or 2 ships (playbook)`)
-  return { line: r.line, rowId: c.row_id, date: c.date, slot: c.slot, account: c.account.replace(/^@+/, ''), format: c.format, kind, hook: c.hook, slides, product: yes(c.product), code, effectOpen, effectPayoff, score, errors, warnings }
+  // The product and the ad switch (section 29). An older file's product
+  // column of yes or no is the ad switch, with the plan's pick as the product.
+  const older = YES_NO.test(c.product)
+  if (c.ad && !YES_NO.test(c.ad)) warnings.push(`ad "${c.ad}" is not yes or no: read as no`)
+  const ad = c.ad ? yes(c.ad) : older ? yes(c.product) : false
+  const productName = older ? '' : c.product.trim()
+  return { line: r.line, rowId: c.row_id, date: c.date, slot: c.slot, account: c.account.replace(/^@+/, ''), format: c.format, kind, hook: c.hook, slides, ad, productName, code, effectOpen, effectPayoff, score, errors, warnings }
 }
 
 // Schedule order (day, then AM, Daily, PM, then the file's order), and the

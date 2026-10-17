@@ -94,14 +94,14 @@ export const api = {
   worker: () => request<WorkerStatus>('GET', '/worker'),
   // The content builder.
   content: () => request<ContentData>('GET', '/content'),
-  addBroll: async (file: File, product: string, onProgress?: (done: number, total: number) => void) => {
+  addBroll: async (file: File, productId: string | null, onProgress?: (done: number, total: number) => void) => {
     const [up] = await uploadFiles([file], onProgress)
-    return request<BrollClip>('POST', '/broll', { uploadId: up!.uploadId, name: file.name, product })
+    return request<BrollClip>('POST', '/broll', { uploadId: up!.uploadId, name: file.name, productId })
   },
-  updateBroll: (id: string, patch: { title?: string; product?: string }) => request<BrollClip>('PATCH', `/broll/${id}`, patch),
+  updateBroll: (id: string, patch: { title?: string; productId?: string | null }) => request<BrollClip>('PATCH', `/broll/${id}`, patch),
   archiveBroll: (id: string) => request<{ ok: true }>('DELETE', `/broll/${id}`),
-  createContent: (body: { kind: ContentKind; characterId: string; title?: string; spec?: Record<string, unknown>; idea?: string; accountTag?: string; sceneId?: string | null; step?: PostStep }) => request<{ id: string }>('POST', '/content', body),
-  updateContent: (id: string, patch: { title?: string; spec?: Record<string, unknown>; idea?: string; accountTag?: string; sceneId?: string | null; step?: PostStep; characterId?: string }) => request<{ id: string }>('PATCH', `/content/${id}`, patch),
+  createContent: (body: { kind: ContentKind; characterId: string; title?: string; spec?: Record<string, unknown>; idea?: string; accountTag?: string; sceneId?: string | null; step?: PostStep; productId?: string | null }) => request<{ id: string }>('POST', '/content', body),
+  updateContent: (id: string, patch: { title?: string; spec?: Record<string, unknown>; idea?: string; accountTag?: string; sceneId?: string | null; step?: PostStep; characterId?: string; productId?: string | null }) => request<{ id: string }>('PATCH', `/content/${id}`, patch),
   editorStyles: () => request<{ styles: EditorStyle[] }>('GET', '/editor/styles'),
   duplicateContent: (id: string) => request<{ id: string }>('POST', `/content/${id}/duplicate`, {}),
   postScene: (id: string) => request<{ id: string; sceneId: string }>('POST', `/content/${id}/scene`, {}),
@@ -168,8 +168,8 @@ export const api = {
   reviewSlideBatch: (id: string, child: string, decision: 'approve' | 'reject' | 'pending') => request<SlideBatch>('POST', `/content/${id}/slideshow/batch/${child}`, { decision }),
   slideStillModels: () => request<{ choices: StillChoice[]; pick: string }>('GET', '/slideshow/still-models'),
   // The launch plan (section 28).
-  planPreview: (csv: string, o: { drawSpecials?: boolean; store?: Record<string, string>; stillModel?: string | null } = {}) => request<PlanPreview>('POST', '/plan/preview', { csv, ...o }),
-  planImport: (csv: string, o: { drawSpecials?: boolean; store?: Record<string, string> } = {}) => request<PlanImportResult>('POST', '/plan/import', { csv, ...o }),
+  planPreview: (csv: string, o: { drawSpecials?: boolean; store?: Record<string, string>; stillModel?: string | null; productId?: string | null } = {}) => request<PlanPreview>('POST', '/plan/preview', { csv, ...o }),
+  planImport: (csv: string, o: { drawSpecials?: boolean; store?: Record<string, string>; productId?: string | null; rows: string[] }) => request<PlanImportResult>('POST', '/plan/import', { csv, ...o }),
   plan: () => request<{ posts: PlanPostView[] }>('GET', '/plan'),
   saveSlideStillModel: (model: string) => request<{ ok: true }>('PUT', '/slideshow/still-model', { model }),
   slideScenes: () => request<{ scenes: SlideScene[] }>('GET', '/slide-scenes'),
@@ -205,7 +205,7 @@ export const api = {
   products: () => request<{ products: ProductSummary[] }>('GET', '/products'),
   product: (id: string) => request<ProductView>('GET', `/products/${id}`),
   importKit: (body: { markdown?: string; starter?: boolean; name?: string }) => request<{ product: ProductSummary; hooks: number; voicesApplied: string[] }>('POST', '/products/import', body),
-  updateProduct: (id: string, patch: { name?: string; claims?: Partial<ProductClaims>; language?: { groups: KitGroup[] }; notes?: string }) => request<ProductView>('PATCH', `/products/${id}`, patch),
+  updateProduct: (id: string, patch: { name?: string; claims?: Partial<ProductClaims>; language?: { groups: KitGroup[] }; notes?: string; writing?: string }) => request<ProductView>('PATCH', `/products/${id}`, patch),
   archiveProduct: (id: string) => request<{ ok: true }>('DELETE', `/products/${id}`),
   addHook: (productId: string, body: { text: string; kind?: string }) => request<{ id: string }>('POST', `/products/${productId}/hooks`, body),
   updateHook: (id: string, patch: { text?: string; kind?: string }) => request<{ id: string }>('PATCH', `/hooks/${id}`, patch),
@@ -253,8 +253,8 @@ export const api = {
   trashList: () => request<{ items: TrashItem[]; days: number }>('GET', '/trash'),
   restore: (ids: string[]) => request<{ restored: number }>('POST', '/trash/restore', { ids }),
   contentItem: (id: string) => request<{ item: ContentItem }>('GET', `/content/${id}`),
-  contentPage: (q: { before: string; limit?: number; tag?: string | null; character?: string | null }) => {
-    const p = new URLSearchParams({ before: q.before, ...(q.limit ? { limit: String(q.limit) } : {}), ...(q.tag ? { tag: q.tag } : {}), ...(q.character ? { character: q.character } : {}) })
+  contentPage: (q: { before: string; limit?: number; tag?: string | null; character?: string | null; product?: string | null }) => {
+    const p = new URLSearchParams({ before: q.before, ...(q.limit ? { limit: String(q.limit) } : {}), ...(q.tag ? { tag: q.tag } : {}), ...(q.character ? { character: q.character } : {}), ...(q.product ? { product: q.product } : {}) })
     return request<{ items: ContentItem[]; next: string | null }>('GET', `/content/page?${p}`)
   },
   checkStorage: () => request<{ ok: boolean; message: string }>('POST', '/settings/storage/check', {}),
