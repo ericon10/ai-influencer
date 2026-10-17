@@ -1379,6 +1379,79 @@ button.st-chip:hover { color: var(--st-text); border-color: var(--st-text-3); }
 .st-planchip.problem { background: var(--st-bad-soft); border-color: rgba(255, 93, 93, 0.4); }
 .st-clamp1 { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
+/* Phone pass (cleanup build, 2026-10-17; UX-PLAN section 3.11): on a phone
+   every tap target is at least 40 px tall, and the small round controls
+   (the Guide buttons, switches) get a 44 px touch area around them, so
+   nothing needs a precise tap. Sizes on a computer are unchanged. */
+@media (max-width: 860px) {
+  .st-btn.sm, .st-btn.xs, .st-seg button, .st-step { height: auto; min-height: 40px; }
+  .st-btn.sm.icon, .st-btn.xs.icon { width: 40px; }
+  .st-chip { height: auto; min-height: 40px; padding: 0 14px; }
+  .st-seg { flex-wrap: wrap; }
+  .gd-howto, .st-switch { position: relative; }
+  .gd-howto::after, .st-switch::after { content: ''; position: absolute; inset: -8px; }
+  .st-switch::after { inset: -9px -4px; }
+  .st-todo-link { min-height: 40px; display: inline-flex; align-items: center; }
+  .st-page input[type='checkbox'] { width: 22px; height: 22px; flex: none; }
+}
+/* The launch plan's posts on a phone: each row is a small card (tick, day
+   and its Pictures count on top, account, format and the post link, then
+   the hook), so the Pictures column is never off the screen. */
+@media (max-width: 860px) {
+  .st-planposts thead { display: none; }
+  .st-planposts, .st-planposts tbody { display: block; }
+  .st-planposts tr {
+    display: grid; grid-template-columns: 34px auto minmax(0, 1fr) auto; align-items: center; gap: 2px 10px;
+    grid-template-areas: 'pick day day pics' 'pick acct fmt link' 'pick hook hook hook';
+    padding: 10px 0; border-bottom: 1px solid var(--st-line);
+  }
+  .st-planposts tr:last-child { border-bottom: 0; }
+  .st-planposts td { display: block; padding: 0; border: 0; }
+  .st-planposts td:nth-child(1) { grid-area: pick; align-self: start; padding-top: 2px; }
+  .st-planposts td:nth-child(2) { grid-area: day; color: var(--st-text); font-weight: 600; }
+  .st-planposts td:nth-child(3) { grid-area: acct; }
+  .st-planposts td:nth-child(4) { grid-area: fmt; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .st-planposts td:nth-child(5) { grid-area: hook; max-width: none !important; }
+  .st-planposts td:nth-child(6) { grid-area: pics; color: var(--st-text); font-weight: 600; text-align: right; }
+  .st-planposts td:nth-child(7) { grid-area: link; }
+}
+/* The plan import's accounts and rows on a phone: cards too. Accounts:
+   the tag and its row count, then what it is and where its pictures are
+   filed. Rows: the tick, the row id, day and account on top, then the
+   format and product, then the hook and its notes. */
+@media (max-width: 860px) {
+  .st-planaccts thead, .st-planrows thead { display: none; }
+  .st-planaccts, .st-planaccts tbody, .st-planrows, .st-planrows tbody { display: block; }
+  .st-planaccts tr, .st-planrows tr { display: grid; align-items: center; gap: 4px 10px; padding: 10px 8px; border-bottom: 1px solid var(--st-line); }
+  .st-planaccts tr:last-child, .st-planrows tr:last-child { border-bottom: 0; }
+  .st-planaccts td, .st-planrows td { display: block; padding: 0; border: 0; max-width: none !important; }
+  .st-planaccts tr { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: 'tag rows' 'kind kind' 'file file'; }
+  .st-planaccts td:nth-child(1) { grid-area: tag; }
+  .st-planaccts td:nth-child(2) { grid-area: kind; }
+  .st-planaccts td:nth-child(3) { grid-area: file; }
+  .st-planaccts td:nth-child(3) select { width: 100%; }
+  .st-planaccts td:nth-child(4) { grid-area: rows; }
+  .st-planaccts td:nth-child(4)::after { content: ' rows'; }
+  .st-planrows tr { grid-template-columns: 34px auto minmax(0, 1fr) auto; grid-template-areas: 'tick id day acct' 'tick fmt fmt prod' 'tick hook hook hook' 'tick notes notes notes'; }
+  .st-planrows td:nth-child(1) { grid-area: tick; align-self: start; padding-top: 2px; }
+  .st-planrows td:nth-child(2) { grid-area: id; color: var(--st-text); font-weight: 600; }
+  .st-planrows td:nth-child(3) { grid-area: day; }
+  .st-planrows td:nth-child(4) { grid-area: acct; }
+  .st-planrows td:nth-child(5) { grid-area: fmt; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .st-planrows td:nth-child(6) { grid-area: prod; }
+  .st-planrows td:nth-child(7) { grid-area: hook; }
+  .st-planrows td:nth-child(8) { grid-area: notes; }
+  .st-planrows td:nth-child(8):empty { display: none; }
+}
+@media (max-width: 860px) {
+  .st-planaccts tr.st-warnrow { background: var(--st-warn-soft); border-radius: 10px; }
+  .st-planaccts tr.st-warnrow td { background: none; }
+}
+/* A switch keeps its words beside it on a phone (they wrapped under it). */
+@media (max-width: 860px) {
+  .st-row > .st-switch + .st-col, .st-row > .st-switch + .st-hint, .st-row > .st-switch + span { flex: 1 1 0; min-width: 0; }
+}
+
 /* The viewer (UX-PLAN.md section 34): any still or clip full size, one
    component for the whole Studio. Above drawers (same layer, later in the
    page), under toasts. */

@@ -220,6 +220,15 @@ top; Activity, the month's spend and Demo/Live sit at the bottom.
     - The sidebar becomes a bottom bar: New, Posts, Characters, Library,
       Settings, Guide.
     - Steps stack, and drawers become bottom sheets.
+    - Every tap target is at least 40 px tall (owner's phone pass,
+      2026-10-17): small buttons, chips, segmented choices and step pills
+      grow on a phone; the round Guide buttons and switches keep their size
+      with a 44 px touch area around them; tick boxes are 22 px.
+    - A wide table becomes one small card per row (the launch plan's
+      posts, its accounts and its rows to import), so a column never sits
+      off the screen. A grid meant to scroll (the plan by day and account,
+      a strip of slides) scrolls inside its card, never the page.
+    - A switch keeps its words beside it.
 12. **How this works** (owner, 2026-10-13). Every page and every post step
     has a small "How this works" button in its header. It opens that
     section of the Guide in a drawer: what it is, what to do, tips, what

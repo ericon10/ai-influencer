@@ -2,84 +2,104 @@
 
 Small ideas noticed while building, kept here instead of built (owner,
 2026-10-14: "put small ideas in LATER.md instead of building them").
-Newest at the bottom of each section. Each is a default-level idea, not a
-rule.
+Each is a default-level idea, not a rule.
 
-## Phase 3 (chaining, sound bed, rough cut)
+Sorted on 2026-10-17 (the cleanup build) into three lists:
 
-- Refresh the Guide's screenshots for the new Finish step (rough cut and
-  Sound row) and the Continue this shot panel; the text is already updated.
-- A cutaway helper for a failed seam (SPEC 4.3 step 4): a 1-second shot of
-  the scene (a glass, the string lights) generated to cover the seam. Paid,
-  so it needs a quote and a model test first.
-- Drag to trim and drag to reorder in the rough cut (today: numbers and
-  arrows). Phase 4's editor covers this for heavy edits.
-- A waveform on the Sound lane and on music chips, so the owner can see
-  where a track builds.
-- A "start the music at" offset per post (today a track starts at 0 s).
-- Ambience tags matched to the scene's place (a cafe scene picks a cafe
-  recording when one is tagged "cafe").
-- Show each chained clip's seam scores in the clip drawer (they are stored
-  in candidates.meta).
-- Let "Continue this shot" also continue a clip picked in a batch.
+- **Now**: launch week (posting starts Monday, October 19). Small, or it
+  unblocks the owner's real test.
+- **Next**: after the launch is running, in the order the results will
+  probably ask for them.
+- **Later**: parked. Still good ideas, nothing waits on them.
 
-## Phase 4 (Fine-tune, batch at scale)
+Ideas that were built since, or that the editor (G29) replaced, are at the
+bottom under "Done or replaced", so nothing is lost. New ideas go at the
+bottom of the list they belong to.
 
-- Snap to shot edges and to the playhead when dragging in Fine-tune.
-- A waveform under the Sound lane in Fine-tune, and the clip's own sound
-  as a lane when a clone keeps it.
-- Keyboard nudge (arrow keys move the playhead one frame) and J/K/L
-  playback in Fine-tune.
-- Preview Room tone in the browser (today it is mixed only in the export).
-- Batches: a progress line per batch on Posts home ("12 of 50 done"), and
-  a batch Fine-tune that edits the template every video shares.
+## Now (launch week)
 
-## Phase 5 (Amazing Edits)
+### Paid tests queued for the owner (each needs a quote shown first)
 
-- A live preview of the edit inside Fine-tune (CSS zooms and a slowed
-  playback rate in the browser), instead of the badge.
-- Per-edit fine numbers in Fine-tune (zoom amount, slow-motion speed,
-  freeze length) on top of Subtle, Normal and Strong.
-- More than one edit per post (a zoom-out reveal at the start and a freeze
-  at the payoff), each with its own marker on the Edit lane.
-- Sound accents that ride with an edit: a whoosh under the whip pan, a hit
-  under the flash, from the owner's uploaded sounds (no AI sound).
-- Pick the punch-in beats by hand (tap along while the music plays).
-- Thumbnails rendered from one of the owner's own kept clips, once there
-  are clips to choose from.
-- Trim shot B's handoff automatically for the whip pan (start it on its
-  blurriest frame).
-- Make the close-up for the whip pan and hand over the lens too (today it
-  is offered for the crash zoom).
+- **The capped real test (under $1, the owner's click in production):**
+  Posts > Launch plan, import the plan CSV (free), then Generate 1 post
+  for one feeder row and 1 post for a Callie slideshow row. The first
+  real API-path run.
+- **Write 10 with Claude on a real account:** the writer on F2 (SideStep's
+  rules, with its reviewer) and on CALLIE, to see the job words, the
+  group-chat voice and the pain scores land, and how many the stop test
+  hides. Two Claude calls each (a few cents). Then Use this hook on a
+  product row, to see the honest ending.
+- **Topic mode on Flare:** one feeder set of 6 stills (an office, a
+  skyline, a commute), to check no person creeps in and the place holds.
+  About 6 stills. (Can be the same run as the capped real test.)
 
-## Overnight run
+### Small ideas for launch volume
 
-- A cleaner room behind her for the dolly zoom: fill her area with a
-  normalized blur of the room only (no halo on high-contrast hair).
-- Text behind subject: drag the words up or down in Fine-tune, and pick
-  their color.
-- Split screen: a "reaction" layout (her small in a corner over shot A).
-- The green screen in batches (one background per video).
-- A person mask cache per clip, so a re-export skips making it again.
+- Batch review: approve all that have every picture in one click.
+- A "Generate the rest of this day" button on the plan list.
+- The plan grid could open a row's post on a click (today: the list below
+  the import).
 
-## Editor (OpenReel)
+## Next (after the launch)
 
-- Own moving thumbnails for the nine presets that share one (rendered by
-  the worker's preset renderer from the same keys).
-- Drag a preset card straight onto the timeline (today: click places it at
-  the playhead).
-- More suggested spots: a reaction peak (face motion) and the loudest beat.
-- Seamless loop as a preset (trim to the frame closest to the first).
-- The editor's caption box like the worker's: rounded corners, padding
-  and the bundled TikTok Sans, so captions match to the pixel.
-- More than one time, text or layout preset per video on the worker
-  (today the first one renders, the rest are listed).
-- Run scripts/editor-parity.mjs in CI with a Chromium that has H.264.
-- Tune the clone cleanup on real saved TikToks (the end card and the
-  handle positions); a per-clip "these spots" picker on the frame.
-- CSV import: a "Generate all new rows" button with one combined price.
+### Results and growth
 
-## Voice lines
+- Pull signups from the link tracker or the checkout (an API key or a
+  CSV upload) instead of typing them; keep a weekly history per account
+  so the scoreboard can show "this week".
+- A monthly reminder on Posts home for the growth review (template step
+  13), with the top 5 posts by follows from Results.
+- "Clone what sells": from the top account, one click makes the same
+  posts for a paused account's character.
+- Show which hooks each account already posted, so the vault suggests the
+  ones it has not.
+- Export straight into the posting engine once its format is fixed (the
+  mapping already lives in `server/core/postExport.ts`).
+- Read stat_source into a small source line on the last slide of a stat
+  post, when the owner wants one.
+
+### Paid tests (after the launch's first week)
+
+- **Make 3 variations:** to check the new wording and new pictures read as
+  new posts and the no-reuse warning stays quiet. About 18 stills. Due
+  when a post passes 50K views (the Results hint).
+- **Soft everyday makeup on a real still:** one public scene for Callie
+  on Flare (her own everyday line plus "the same lip shape, nose and jaw
+  as the references"). Check the lips and nose hold against REF-00 and no
+  gloss creeps in. About 1 still.
+- **Hair styling line:** two scenes with different rotated stylings (for
+  example "half-up claw clip" and "low loose ponytail") on Flare and Nano
+  Banana 2.1. Check the styling follows and the color and texture stay
+  REF-00's. About 4 stills.
+- **No makeup in a gym scene:** one gym scene, to check "No makeup, bare
+  skin" reads as bare and not as a sheet look. About 1 still.
+- **Winning stack in a real prompt:** one Write and generate for a
+  character with a winning stack, to see the writer carry it without
+  bending the shot. About 1 Claude call and 1 still.
+- **Brand check on real moments:** one Punch it up on a rough idea that is
+  off brand, to see the note come back. About 1 Claude call (under a
+  cent).
+
+### Writing at scale
+
+- Write variants for many hooks at once (pick 10 to 15 for the week, one
+  price), matching the kit's weekly rhythm.
+- A Hook column in the CSV import (the hook number fills the caption with
+  that character's variant, or the hook).
+- A claims check on the batch caption writer's output too (today on hook
+  variants only).
+- The Accounts card could show a topic account as "Topic" in its
+  character column (today it shows the character its pictures are filed
+  under).
+
+### Asked of the owner
+
+- Instagram reels for older job seekers in Facebook-comment voice (the
+  playbook v1.2 parks them).
+
+## Later (parked)
+
+### Voice lines
 
 - **Lip sync (plan only, owner 2026-10-14).** A converted voice line on a
   talking take: the take's mouth re-timed to the line. Plan:
@@ -105,23 +125,7 @@ rule.
 - Batch voiceovers: one converted line per caption, matched by hook
   number.
 
-## Scale kit
-
-- Pull signups from the link tracker or the checkout (an API key or a
-  CSV upload) instead of typing them; keep a weekly history per account
-  so the scoreboard can show "this week".
-- "Clone what sells": from the top account, one click makes the same
-  posts for a paused account's character.
-- Write variants for many hooks at once (pick 10 to 15 for the week, one
-  price), matching the kit's weekly rhythm.
-- A Hook column in the CSV import (the hook number fills the caption with
-  that character's variant, or the hook).
-- Show which hooks each account already posted, so the vault suggests the
-  ones it has not.
-- A claims check on the batch caption writer's output too (today on hook
-  variants only).
-
-## Storage and traffic (parked by the owner, 2026-10-15)
+### Storage and traffic (parked by the owner, 2026-10-15)
 
 - **Slim the posts list.** With the files off Vercel, JSON is what is left
   of a session's origin transfer, and most of it is the posts list
@@ -133,33 +137,16 @@ rule.
   `GET /content/:id`; ETag or a `since` cursor so a poll that changed
   nothing sends nothing; poll only the running jobs.
 
+### Slideshows
 
-## Long run (owner away, 2026-10-15)
+- A per-slide font size nudge on top of the style's own size.
+- Drag the words on the slide strip thumbnails too (today: the big
+  preview).
+- More special slides: a step counter.
+- A "Same scene as last post" chip in the Scene library.
+- Drag the product screenshot freely (today: Top or Middle and a size).
 
-### Paid tests queued for the owner
-
-No paid run was made in the long run; each of these needs a quote shown
-first.
-
-- **Soft everyday makeup on a real still:** one public scene for Callie
-  on Flare (her own everyday line plus "the same lip shape, nose and jaw
-  as the references"). Check the lips and nose hold against REF-00 and no
-  gloss creeps in. About 1 still.
-- **Hair styling line:** two scenes with different rotated stylings (for
-  example "half-up claw clip" and "low loose ponytail") on Flare and Nano
-  Banana 2.1. Check the styling follows and the color and texture stay
-  REF-00's. About 4 stills.
-- **No makeup in a gym scene:** one gym scene, to check "No makeup, bare
-  skin" reads as bare and not as a sheet look. About 1 still.
-
-- **Winning stack in a real prompt (part 3):** one Write and generate for a
-  character with a winning stack, to see the writer carry it without
-  bending the shot. About 1 Claude call and 1 still.
-- **Brand check on real moments (part 3):** one Punch it up on a rough idea
-  that is off brand, to see the note come back. About 1 Claude call (under
-  a cent).
-
-### Small ideas (not built)
+### Scenes and characters
 
 - Hair rotation could prefer stylings that fit the moment (damp and
   air-dried after a swim, sunglasses as a headband outdoors). Today it is
@@ -168,8 +155,50 @@ first.
   choice shows without opening More control.
 - The template check could offer "Add the missing sections" with the
   template's blank text, so the Brand card has every field to fill.
-- A monthly reminder on Posts home for the growth review (template step 13),
-  with the top 5 reels by follows once TikTok stats come in.
+
+### Video, sound and the editor
+
+- A cutaway helper for a failed seam (SPEC 4.3 step 4): a 1-second shot of
+  the scene (a glass, the string lights) generated to cover the seam. Paid,
+  so it needs a quote and a model test first.
+- A waveform on music chips and on the editor's audio tracks, so the owner
+  can see where a track builds.
+- A "start the music at" offset per post (today a track starts at 0 s).
+- Ambience tags matched to the scene's place (a cafe scene picks a cafe
+  recording when one is tagged "cafe").
+- Show each chained clip's seam scores in the clip drawer (they are stored
+  in candidates.meta).
+- Let "Continue this shot" also continue a clip picked in a batch.
+- Preview Room tone in the browser (today it is mixed only in the export).
+- Sound accents that ride with an edit: a whoosh under the whip pan, a hit
+  under the flash, from the owner's uploaded sounds (no AI sound).
+- Thumbnails rendered from one of the owner's own kept clips, once there
+  are clips to choose from.
+- Trim shot B's handoff automatically for the whip pan (start it on its
+  blurriest frame).
+- Make the close-up for the whip pan and hand over the lens too (today it
+  is offered for the crash zoom).
+- A cleaner room behind her for the dolly zoom: fill her area with a
+  normalized blur of the room only (no halo on high-contrast hair).
+- Text behind subject: drag the words up or down, and pick their color.
+- Split screen: a "reaction" layout (her small in a corner over shot A).
+- The green screen in batches (one background per video).
+- A person mask cache per clip, so a re-export skips making it again.
+- Own moving thumbnails for the nine presets that share one (rendered by
+  the worker's preset renderer from the same keys).
+- Drag a preset card straight onto the timeline (today: click places it at
+  the playhead).
+- More suggested spots: a reaction peak (face motion) and the loudest beat.
+- Seamless loop as a preset (trim to the frame closest to the first).
+- The editor's caption box like the worker's: rounded corners, padding
+  and the bundled TikTok Sans, so captions match to the pixel.
+- More than one time, text or layout preset per video on the worker
+  (today the first one renders, the rest are listed).
+- Run scripts/editor-parity.mjs in CI with a Chromium that has H.264.
+- Tune the clone cleanup on real saved TikToks (the end card and the
+  handle positions); a per-clip "these spots" picker on the frame.
+- The batch spreadsheet import (a batch's Idea step): a "Generate all new
+  rows" button with one combined price.
 - Hook variants could swap the opening time, text or layout edit too
   (today the first edit is a camera preset only, since the worker draws
   one of those per whole video).
@@ -177,67 +206,25 @@ first.
   zones on.
 - Safe zones for YouTube Shorts.
 
-## Slideshow power-up (2026-10-16)
+## Done or replaced
 
-### Real test made
+Taken off the lists on 2026-10-17; kept here so the history stays.
 
-- **One camera roll, Nano Banana 2.1 on the plan:** 4 stills of Callie at
-  1k 9:16 with her element and the exact Studio prompts. Quoted 1.5
-  credits a still first, charged 6.0 credits in all (31.2 to 25.2), about
-  $0.38 at the API rate. Same office, the same gray crewneck, blue mug and
-  sticky notes on every slide.
-
-### Paid tests queued for the owner
-
-- **Topic mode on Flare (API path):** one feeder set of 6 stills (an
-  office, a skyline, a commute) on GPT Image 2.5 Flare with an API key, to
-  check no person creeps in and the place holds. About 6 stills.
-- **Claude hooks and drafts:** Write 10 with Claude and Use this hook on a
-  real account voice card, to see the patterns land and the reveal sit on
-  slide 3 or 4. About 2 Claude calls (a few cents).
-- **Make 3 variations:** to check the new wording and new pictures read as
-  new posts and the no-reuse warning stays quiet. About 18 stills.
-
-### Small ideas (not built)
-
-- A per-slide font size nudge on top of the style's own size.
-- Drag the words on the slide strip thumbnails too (today: the big
-  preview).
-- More special slides: a calendar invite, a bank alert, a step counter.
-- A "Same scene as last post" chip in the Scene library.
-- Batch review: approve all that have every picture in one click.
-- Export straight into the posting engine once its format is fixed (the
-  mapping already lives in server/core/postExport.ts).
-
-## Slideshow power-up 2: launch ready (2026-10-16)
-
-### Paid tests queued for the owner
-
-- **The capped real test (under $1, the owner's click in production):**
-  Posts > Launch plan, import the plan CSV (free), then Generate 1 post
-  for one feeder row on GPT Image 2.5 Flare on the Higgsfield API (6
-  stills, about $0.36) and 1 post for a Callie slideshow row (6 stills).
-  The first real API-path run.
-- **Write 10 with Claude to THE STANDARD v1.2, on a real account:** the
-  writer and the reviewer on F2 and on CALLIE, to see the job words, the
-  group-chat voice and the pain scores land, and how many the five-check
-  stop test hides. Two Claude calls each (a few cents). Then Use this
-  hook on a product row, to see the honest ending.
-
-### Asked of the owner
-
-- Instagram reels for older job seekers in Facebook-comment voice (the
-  playbook v1.2 parks them).
-
-### Small ideas (not built)
-
-- The Accounts card could show a topic account as "Topic" in its
-  character column (today it shows the character its pictures are filed
-  under).
-- The plan grid could open a row's post on a click (today: the list below
-  the import).
-- Drag the product screenshot freely (today: Top or Middle and a size).
-- A "Generate the rest of this day" button on the plan list.
-- Read stat_source into a small source line on the last slide of a stat
-  post, when the owner wants one.
-
+- Refresh the Guide's screenshots for the rough cut and the Sound row:
+  the rough cut panel was replaced by the editor (G29).
+- Drag to trim and drag to reorder in the rough cut; snap to shot edges;
+  keyboard nudge and J/K/L; a batch Fine-tune; a live preview of the edit
+  inside Fine-tune; per-edit fine numbers; more than one edit per post:
+  Fine-tune was replaced by the OpenReel editor (G29), which places
+  presets on a timeline with handles and keyframes.
+- Pick the punch-in beats by hand: built as the editor's Beat card (Tap,
+  UX-PLAN section 12).
+- A progress line per batch on Posts home: built (UX-PLAN section 11,
+  Batch progress).
+- More special slides, a calendar invite and a bank alert: built (UX-PLAN
+  section 28, with seven more).
+- The real test of one camera roll on Nano Banana 2.1 (2026-10-16): made.
+  4 stills of Callie at 1k 9:16 with her element, quoted 1.5 credits a
+  still, charged 6.0 credits in all (31.2 to 25.2), about $0.38 at the
+  API rate; the same office, gray crewneck, blue mug and sticky notes on
+  every slide.

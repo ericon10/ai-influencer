@@ -61,6 +61,10 @@ interface Pending {
 export interface OAuthOptions {
   fetchImpl?: typeof fetch
   retryDelayMs?: number
+  // All tries together end within this (the Vercel function stops at 60 s;
+  // three 20 s tries plus the waits could pass it, as one sign-in did on
+  // 2026-10-13). Then the owner gets the plain message instead of a timeout.
+  deadlineMs?: number
 }
 
 const pendingAad = (accountId: string, provider: string) => `${accountId}|${provider}_oauth`
@@ -71,18 +75,23 @@ const RETRY = new Set([429, 500, 502, 503, 504])
 async function oauthFetch(o: OAuthOptions, url: string, init: RequestInit, attempts = 3): Promise<Response> {
   const doFetch = o.fetchImpl ?? fetch
   const base = o.retryDelayMs ?? 500
+  const end = Date.now() + (o.deadlineMs ?? 45_000)
+  const left = () => end - Date.now()
   let last: Response | null = null
   for (let i = 0; i < attempts; i++) {
     const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), 20_000)
+    const timer = setTimeout(() => controller.abort(), Math.max(1, Math.min(20_000, left())))
     try {
       const res = await doFetch(url, { ...init, signal: controller.signal })
       if (!RETRY.has(res.status) || i === attempts - 1) return res
       last = res
       const ra = Number(res.headers.get('retry-after'))
-      await new Promise(r => setTimeout(r, Number.isFinite(ra) && ra > 0 ? Math.min(ra * 1000, 8000) : base * 2 ** i))
+      const wait = Number.isFinite(ra) && ra > 0 ? Math.min(ra * 1000, 8000) : base * 2 ** i
+      // No time left for a useful try: answer with what came back.
+      if (left() - wait < 2_000) return res
+      await new Promise(r => setTimeout(r, wait))
     } catch (e) {
-      if (i === attempts - 1) throw e
+      if (i === attempts - 1 || left() - base * 2 ** i < 2_000) throw e
       await new Promise(r => setTimeout(r, base * 2 ** i))
     } finally {
       clearTimeout(timer)

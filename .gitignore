@@ -13,3 +13,5 @@ coverage/
 dist-worker/
 dist-editor/
 e2e/.out/
+# Agent worktrees (Claude Code); never commit.
+.claude/worktrees/
