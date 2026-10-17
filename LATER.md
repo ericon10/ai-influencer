@@ -23,9 +23,7 @@ bottom of the list they belong to.
 - **The capped real test (under $1, the owner's click in production):**
   Posts > Launch plan, import the plan CSV (free), then Generate 1 post
   for one feeder row and 1 post for a Callie slideshow row. The first
-  real API-path run. With the slide image model (UX-PLAN section 30) the
-  feeder row's stills go to the cheapest model and Callie's to her
-  file's stills default; the button names both.
+  real API-path run.
 - **Write 10 with Claude on a real account:** the writer on F2 (SideStep's
   rules, with its reviewer) and on CALLIE, to see the job words, the
   group-chat voice and the pain scores land, and how many the stop test
@@ -230,5 +228,3 @@ Taken off the lists on 2026-10-17; kept here so the history stays.
   still, charged 6.0 credits in all (31.2 to 25.2), about $0.38 at the
   API rate; the same office, gray crewneck, blue mug and sticky notes on
   every slide.
-- A results log (the playbook's section 15): built as Results on Posts
-  home (UX-PLAN section 32).
