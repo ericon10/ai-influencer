@@ -39,6 +39,10 @@ bottom of the list they belong to.
 - A "Generate the rest of this day" button on the plan list.
 - The plan grid could open a row's post on a click (today: the list below
   the import).
+- Guide screenshots to refresh after the cleanup build: Posts home (the
+  new Results, Download day and Approve for posting chips on the cards)
+  and Library (the filter row; the new viewer, filter and collection
+  shots are in).
 
 ## Next (after the launch)
 
@@ -91,6 +95,26 @@ bottom of the list they belong to.
 - The Accounts card could show a topic account as "Topic" in its
   character column (today it shows the character its pictures are filed
   under).
+
+### From the cleanup build (2026-10-17)
+
+- Gaps found by the Appendix A refresh (A.8.2): post.json does not carry
+  the post's product; a topic post's post.json names the character its
+  pictures are filed under (and that character's AI label); the plan id
+  can come from an error row's bad date ("plan-11/03/2026"); the plan
+  preview and a video post's Text step check the caption as written, so an
+  ad caption without "Ad:" warns although the export adds it; the "just"
+  note fires before a noun ("no notes. just rice"); a topic Flare still has
+  a stray space before the REALISM line; the preview's same-structure
+  warning follows the plan's product, not each row's.
+- Callie's fixture file still says "Stills with refs and all edits: Nano
+  Banana 2.1", so locally her slides run Nano Banana on the plan; a file on
+  template v1.6 runs Flare on both paths (her production file decides).
+- A cap-waiting group of Generate N posts starts on a new day (UTC) only
+  while the Studio is open (the worker sleeps when idle).
+- The Library viewer: Library > Trash and Posts thumbnails do not open in
+  it yet; clips uploaded before today have no first-frame picture (the
+  old video tile).
 
 ### Asked of the owner
 
@@ -147,6 +171,9 @@ bottom of the list they belong to.
 - Drag the product screenshot freely (today: Top or Middle and a size).
 
 ### Scenes and characters
+
+- A slideshow's locked place could feed makeup by setting (today the
+  scene's own setting does).
 
 - Hair rotation could prefer stylings that fit the moment (damp and
   air-dried after a swim, sunglasses as a headband outdoors). Today it is
@@ -228,3 +255,5 @@ Taken off the lists on 2026-10-17; kept here so the history stays.
   still, charged 6.0 credits in all (31.2 to 25.2), about $0.38 at the
   API rate; the same office, gray crewneck, blue mug and sticky notes on
   every slide.
+- A results log (the playbook's section 15): built as Results on Posts
+  home (UX-PLAN section 32).
