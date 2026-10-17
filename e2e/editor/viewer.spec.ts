@@ -379,6 +379,8 @@ test.describe('phone', () => {
       expect(r.width, await b.textContent() ?? '').toBeGreaterThanOrEqual(44)
     }
     expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(1)
+    // Let the info panel's scroll settle, then the X (it stays at the top).
+    await page.waitForTimeout(400)
     await v.getByRole('button', { name: 'Close' }).tap()
     await expect(v).toHaveCount(0)
   })
