@@ -170,7 +170,7 @@ function ImportPlan({ characters, hasPosts, onImported }: { characters: Characte
           </div>
 
           <div className="st-tablewrap">
-            <table className="st-table">
+            <table className="st-table st-planaccts">
               <thead><tr><th>Account</th><th>What it is</th><th>Pictures filed under</th><th>Rows</th></tr></thead>
               <tbody>
                 {preview.accounts.map(a => (
@@ -201,7 +201,7 @@ function ImportPlan({ characters, hasPosts, onImported }: { characters: Characte
               <span className="st-hint">{ticked.length} ticked</span>
             </div>
             <div className="st-tablewrap" style={{ maxHeight: 420, overflow: 'auto' }}>
-              <table className="st-table">
+              <table className="st-table st-planrows">
                 <thead><tr><th aria-label="Tick" /><th>Row</th><th>Day</th><th>Account</th><th>Format</th><th>Product</th><th>Hook</th><th>Notes</th></tr></thead>
                 <tbody>
                   {shown.map(r => (
@@ -315,7 +315,7 @@ function PlanPosts({ posts }: { posts: PlanPostView[] }) {
         {picked.size > 0 && <button type="button" className="st-btn sm ghost" onClick={() => setPicked(new Set())}>Clear</button>}
       </div>
       <div className="st-tablewrap">
-        <table className="st-table">
+        <table className="st-table st-planposts">
           <thead><tr><th aria-label="Pick" /><th>Day</th><th>Account</th><th>Format</th><th>Hook</th><th>Pictures</th><th /></tr></thead>
           <tbody>
             {shown.slice(0, 200).map(p => (
