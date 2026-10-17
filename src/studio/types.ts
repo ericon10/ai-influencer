@@ -359,6 +359,9 @@ export type StillPathId = 'account' | 'api'
 export interface SlideStillModel { ref: string; label: string; from: 'file' | 'studio' | 'cheapest'; perStill: string }
 export interface SlideStillOptions { pick: StillPathId; name: string | null; paths: Array<{ path: StillPathId; label: string; problem: string | null; character: SlideStillModel | null; empty: SlideStillModel | null }> }
 export interface PlanImportResult { created: number; updated: number; kept: number; skipped: number; posts: Array<{ rowId: string; id: string; state: 'new' | 'update' }> }
+// Results (UX-PLAN.md section 32): a post's results and the Results view.
+export type { PostResults, Decision, ResultHint, ResultRow } from '../../server/core/results'
+export type { ResultsView, ResultsCsvPreview, ResultsCsvPreviewRow } from '../../server/pipeline/results'
 // The slideshow power-up (UX-PLAN.md section 27): the Scene library, a
 // post's family and batch, and the no-reuse check.
 export interface SlideScene { id: string; characterId: string | null; topic: string; name: string; place: string; light: string; camera: string; phone: string; details: string[]; lookAssetId: string | null; createdAt: string }

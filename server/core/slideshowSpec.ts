@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { CTA_IDS, PATTERN_IDS, SPECIAL_IDS, TEXT_STYLE_IDS } from './slides.js'
 import { EFFECT_CODES, STRUCTURE_CODES } from './playbook.js'
 import { planMetaSchema } from './planMeta.js'
+import { resultsSchema } from './results.js'
 
 // A slideshow post's spec (UX-PLAN.md sections 5 and 27). The slides run in
 // parallel lists by slide number: slide 1 is the hook, then `slides`; each
@@ -134,6 +135,9 @@ export const slideshowSpecSchema = z.object({
   // Slideshows are TikTok only: the export makes 1080 x 1920; the
   // 1080 x 1440 set is an option, off by default.
   instagramSet: z.boolean().default(false),
+  // Section 32: what the post did once posted (typed on its card or pasted
+  // from a CSV). Never copied to a variation or Make another like this.
+  results: resultsSchema.nullable().default(null),
 })
 export type SlideshowSpec = z.infer<typeof slideshowSpecSchema>
 export type SpecialSlideSpec = z.infer<typeof specialSchema>

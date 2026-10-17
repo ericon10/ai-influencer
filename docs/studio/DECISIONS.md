@@ -2753,3 +2753,43 @@ build." UX-PLAN.md section 30.
   Nano Banana 2.1" (an older file); on the plan her slides run Nano Banana
   2.1 there and Flare on the API (her second choice). A file on template
   v1.6 ("Scene stills: GPT Image 2.5 Flare by default") runs Flare on both.
+
+### G60. Results: typed or pasted per post, and read by follows per post (owner, 2026-10-17)
+
+The owner, before launch: "On every post: post_url, posted_at, views_72h,
+follows_72h, saves_72h, shares_72h, decision (make 3 variations / keep /
+one more try / drop), notes. Typed on the post card, or bulk-pasted from a
+CSV by row_id. A Results view on Posts home: totals and follows per post by
+account, product, character and hook structure, with the decision rules
+shown as hints. Free, no platform APIs yet."
+
+Decided (UX-PLAN.md section 32):
+- **Results live on the post** (`content_items.spec.results`, every post
+  kind, in each kind's spec schema), no migration. They are written on
+  their own (`PUT /content/:id/results`, a `jsonb_set`), never through the
+  workspace's spec patch, so an edit in the workspace never undoes them,
+  and `updated_at` stays: typing results never moves a post up Posts home.
+  Make another like this, variations and a batch's slideshows start with
+  none.
+- **One reader for typed and pasted values** (`server/core/results.ts`,
+  shared by the browser): counts take K, M and thousands commas; posted_at
+  takes ISO and the common forms and is kept as written
+  ("YYYY-MM-DDTHH:MM", a time zone dropped); the decision takes the four
+  labels and their plain variants.
+- **The CSV matches by row_id**, or `post_id` for a post with no plan row,
+  with an optional `account` column for a row_id two accounts share. On one
+  account the first made post is the plan's (Make another like this keeps
+  the row_id). A blank cell changes nothing; a cell that cannot be read
+  leaves its whole row out; unknown columns are named and ignored. The
+  preview is free and writes nothing.
+- **Follows per post is the headline** of the Results card and the sort of
+  every breakdown (account, product, character, hook structure), the
+  playbook's rule. Topic posts are "No one" under Character.
+- **Hints, never automatic, thresholds as data** (`config/content.yaml`
+  `results`): 50K+ views, make 3 variations (Make variations one click
+  away on a slideshow); a hook family with two posts under 1K views, drop
+  it, shown on every post of the family. **A hook family** is a post and its
+  variations (`variation_of`) joined with every post sharing its plan
+  moment (`moment_id`), because Make another like this and variations keep
+  the moment and each plan row has its own.
+- **post.json** gets a `results` key (still version 2: a new key only).

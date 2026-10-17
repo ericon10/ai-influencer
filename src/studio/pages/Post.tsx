@@ -105,9 +105,12 @@ function Workspace({ item, data }: { item: ContentItem; data: ContentData }) {
     if (steps.findIndex(([k]) => k === 'finish') > ci) void draft.go('finish')
     let y = NaN
     try { y = Number(sessionStorage.getItem(scrollKey(item.id)) ?? NaN); sessionStorage.removeItem(scrollKey(item.id)) } catch { /* private window */ }
-    window.setTimeout(() => { if (Number.isFinite(y)) window.scrollTo({ top: y }); else scrollToField('step-finish') }, 150)
+    // A link to a part of the Finish step (Make variations from a results hint).
+    const field = params.get('field')
+    window.setTimeout(() => { if (field) scrollToField(field); else if (Number.isFinite(y)) window.scrollTo({ top: y }); else scrollToField('step-finish') }, field ? 600 : 150)
     void qc.invalidateQueries({ queryKey: keys.content })
     params.delete('step')
+    params.delete('field')
     setParams(params, { replace: true })
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 

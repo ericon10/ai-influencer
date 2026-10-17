@@ -1217,3 +1217,46 @@ Data, not code: the character's model comes from the file, the empty-slide
 candidates from `config/content.yaml`, the levels from
 `config/scenes.yaml`, the prices and credits from `config/pricebook.yaml`,
 and which models take elements from `config/models.yaml`.
+
+## 32. Results: what each post did, and what to make next (owner, 2026-10-17)
+
+Goal: from launch day on, every post keeps what it did once posted, and
+Posts home shows which accounts, products, characters and hook structures
+win, by follows per post (the playbook's section 11: decide by follows per
+post first, then saves and shares, never by views alone). Free; no
+platform APIs yet: the owner types or pastes the numbers. No new page, no
+new step.
+
+Applies to: every post kind (video post, slideshow, batch), with or
+without a plan row, every product (or none), every character and every
+account. Nothing in it is product-specific; the thresholds are data.
+
+**What the Studio did before this (the audit):**
+
+| Piece | Before |
+|---|---|
+| A post's results | Nowhere. Posts home > Accounts kept signups per account (typed), never per post |
+| Reading results | Only in the playbook (section 11): the tiers (50K+ views: make 3 variations; under 1K twice: drop the hook family) were words, not on any screen |
+| post.json | The post, its words, the plan's fields; nothing about how it did |
+
+**What it does now:**
+
+| Piece | Where | How it works | Clicks |
+|---|---|---|---|
+| The results of a post | Each post's card on Posts home: a **Results** row under its name (folded to one line: follows, views, saves, and the decision chip); the same fields in the post's **Finish** step, under Results | post_url, posted_at, views_72h, follows_72h, saves_72h, shares_72h, decision (Make 3 variations, Keep, One more try, Drop, or None) and notes. Saved as typed ("Saving..." then "Saved"). The number fields open the number pad on a phone and take "12.4K", "1.2M" and "1,203"; posted_at is the phone's date and time picker. Kept on the post (`spec.results`); results never move a post up Posts home (its last changed time stays) and never travel with Make another like this, a variation or a batch's slideshow | 1 to open, then typing |
+| The decision chip | The post's card, next to the Results line | A small colored chip: Make 3 variations (green), Keep (blue), One more try (amber), Drop (red). None shows no chip | 0 |
+| Paste results | Posts home > **Results** card: **Paste results from a CSV** (paste, or Upload the CSV) | Columns read by name in any order: `row_id, post_url, posted_at, views_72h, follows_72h, saves_72h, shares_72h, decision, notes` (common names like views or follows work too). A post with no plan row is matched by `post_id` (the Studio's id, in the post's link); an `account` column picks between two posts that share a row_id (the same plan imported for two accounts); on one account the plan's own post is the first made (Make another like this keeps the row_id). **Preview (free)**: each matched post and exactly which fields change (from what to what), the row_ids not found, the rows that match more than one post, a cell it cannot read (that row is left out), and the columns not used (named, then ignored). A blank cell leaves that field as it is; "none" clears the decision. **Apply N changes** writes only the rows that change something | 2 to 3 |
+| posted_at | The CSV and the card | ISO ("2026-10-19 21:14", "2026-10-19T21:14", a day alone) and common forms ("10/19/2026 9:14 PM": month first, day first when the first number is over 12; "19.10.2026 21:14"; "Oct 19, 2026 9:14 PM"; "19 Oct 2026 21:14"). Kept as written ("YYYY-MM-DDTHH:MM"); a time zone in the cell is dropped and the time stays as written | 0 |
+| The Results view | Posts home, the **Results** card (under Launch plan, folded like it) | **Follows per post** first and biggest, then posts with results, follows, views, saves and shares. **By** Account, Product, Character or Hook structure (the plan's structure code with its name, or the hook's from Use this hook; "No structure" when none): each row with posts, follows per post, follows, views, saves and shares, sorted by follows per post. Topic posts count as "No one (topic posts)" under Character. **Posted** from and to (days, on posted_at): only the posts that went up then; posts with numbers but no posted_at are counted apart. The Account, Character and Product filters above the cards apply to it too | 1 |
+| Decision hints | The post's card (under its Results line), its Finish step, and the Results card's **Hints** list | Hints, never automatic. A post at 50K views or more: **"50K+ views: make 3 variations"**, with **Make variations** one click away on a slideshow (it opens the post at its Make variations card). A hook family with two posts under 1K views: **"Under 1K twice: drop the hook family"**, on every post of that family (drafts included, so the next one is not posted). The numbers are data (`config/content.yaml`, `results`: variations_views, variations_count, drop_views, drop_posts) | 0 |
+| A hook family | The hints | A post and its variations (`variation_of`, the Studio's family), joined with every post that shares its plan moment (`moment_id`: the plan's row, its variations and Make another like this keep it). The plan gives each row its own moment, so two different rows are never one family | 0 |
+| post.json | Every export | A `results` key (post_url, posted_at, views_72h, follows_72h, saves_72h, shares_72h, decision, notes, updated_at; null until any is typed), named as the CSV names them, for the posting engine later. Still version 2 (a new key) | 0 |
+
+Free throughout: typing, the preview, Apply, the view and the hints.
+
+Built details: the Results card's numbers and the hints read every live
+post on the server (not only the newest 200 on the page); a hook family
+crosses accounts, so the hints are worked out over every post and the
+filters only choose which hinted posts are listed. Archived posts are out.
+Results are written into the post on their own (`PUT /content/:id/results`),
+so an edit in the post's workspace never undoes them.

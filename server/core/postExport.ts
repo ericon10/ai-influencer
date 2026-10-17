@@ -1,6 +1,7 @@
 import { patternLabel, type HookPattern } from './slides.js'
 import { effectName, structureName } from './playbook.js'
 import type { PlanMeta } from './planMeta.js'
+import { hasResults, type PostResults } from './results.js'
 
 // post.json (UX-PLAN.md section 27): every field of an exported slideshow,
 // one file per post in its zip. The posting engine's format is coming
@@ -8,7 +9,9 @@ import type { PlanMeta } from './planMeta.js'
 // the file's, so changing the format means changing this file only.
 
 // Version 2 (section 28): the plan's fields, the CTA line, and a post.json
-// for video posts too.
+// for video posts too. Section 32 adds `results` (null until typed) and
+// section 33 adds `posting` (only in a Download day pack); both are new
+// keys, so version 2 readers keep working.
 export const POST_EXPORT_VERSION = 2
 
 export interface PostExportInput {
@@ -40,6 +43,8 @@ export interface PostExportInput {
   // What the post keeps from its plan row or its hook (section 28).
   plan?: PlanMeta | null
   ctaLine?: string
+  // What the post did once posted (section 32).
+  results?: PostResults | null
 }
 
 // The plan's fields as the plan's CSV names them (section 28).
@@ -54,6 +59,17 @@ export function planJson(p: PlanMeta | null | undefined): Record<string, unknown
     effect_payoff: p.effectPayoff ? { code: p.effectPayoff, name: effectName(p.effectPayoff) } : null,
     hook_score: p.hookScore, moment_id: p.momentId || null, moment: p.moment || null, alt_hook: p.altHook || null,
     scene: p.scene || null, clip_action: p.clipAction || null, cta: p.cta || null, stat_source: p.statSource || null, notes: p.notes || null,
+  }
+}
+
+// The results as the results CSV names them (section 32): null until any
+// field is typed. The numbers are the first 72 hours.
+export function resultsJson(r: PostResults | null | undefined): Record<string, unknown> | null {
+  if (!r || !(hasResults(r) || r.postUrl || r.postedAt || r.decision || r.notes)) return null
+  return {
+    post_url: r.postUrl || null, posted_at: r.postedAt || null,
+    views_72h: r.views72h, follows_72h: r.follows72h, saves_72h: r.saves72h, shares_72h: r.shares72h,
+    decision: r.decision, notes: r.notes || null, updated_at: r.updatedAt,
   }
 }
 
@@ -104,6 +120,7 @@ export function postExportJson(i: PostExportInput): Record<string, unknown> {
       file: i.files.caption,
     },
     plan: planJson(i.plan),
+    results: resultsJson(i.results),
     slides: i.slides.map(x => ({
       number: x.index + 1,
       text: x.text,
@@ -129,6 +146,7 @@ export interface VideoExportInput {
   plan: PlanMeta | null
   aiLabel: string
   exportedAt: string
+  results?: PostResults | null
 }
 export function videoPostExportJson(i: VideoExportInput): Record<string, unknown> {
   return {
@@ -143,6 +161,7 @@ export function videoPostExportJson(i: VideoExportInput): Record<string, unknown
     video: { file: i.video.file, asset_id: i.video.assetId, duration_sec: i.video.durationSec, on_screen_text: i.video.captionOff ? null : i.video.onScreenText || null },
     caption: { text: i.caption.text, hashtags: i.caption.hashtags, ad: i.caption.ad, cta_line: i.caption.ctaLine || null, as_posted: i.caption.asPosted },
     plan: planJson(i.plan),
+    results: resultsJson(i.results),
     ai_label: i.aiLabel,
   }
 }

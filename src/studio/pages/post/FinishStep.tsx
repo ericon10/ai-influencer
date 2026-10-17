@@ -15,6 +15,8 @@ import { PostCaptionFields } from './TextStep'
 import { useLint } from '../../lint'
 import { keys, useSounds } from '../../hooks'
 import { useQueryClient } from '@tanstack/react-query'
+import { HintLines, ResultsFields, useResultsView } from '../../results'
+import { HowTo } from '../../guide/Guide'
 
 // The Finish step: the timeline (Open the editor, UX-PLAN.md section 12),
 // sound, export (free, on the worker), download, and make another like
@@ -118,9 +120,28 @@ export function FinishStep({ ctx }: { ctx: PostCtx }) {
       {item.kind === 'meme' && <CoverCard ctx={ctx} />}
       {item.kind === 'meme' && <HookVariants ctx={ctx} />}
       {item.kind === 'slideshow' && <VariationsCard ctx={ctx} />}
+      <PostResultsCard ctx={ctx} />
       <div className="st-row" style={{ gap: 8, flexWrap: 'wrap' }}>
         <button type="button" className="st-btn" onClick={() => void duplicate(item.id)}><CopyPlus size={15} />Make another like this</button>
       </div>
     </div>
+  )
+}
+
+// Results (UX-PLAN.md section 32): the same fields as the post's card on
+// Posts home, once the post is up. Saved as typed, free.
+function PostResultsCard({ ctx }: { ctx: PostCtx }) {
+  const hints = useResultsView().data?.hints?.[ctx.item.id]
+  return (
+    <section className="st-card" data-field="post-results-finish">
+      <div className="st-card-head">
+        <div className="grow"><div className="st-h3">Results</div><div className="st-hint">After it is posted: the link, when, and the first 72 hours. Follows per post decide what comes next.</div></div>
+        <HowTo id="results" />
+      </div>
+      <div className="st-card-body st-col" style={{ gap: 10 }}>
+        <HintLines hints={hints} item={ctx.item} link={false} />
+        <ResultsFields item={ctx.item} />
+      </div>
+    </section>
   )
 }
