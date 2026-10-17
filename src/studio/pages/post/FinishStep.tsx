@@ -16,6 +16,7 @@ import { useLint } from '../../lint'
 import { keys, useSounds } from '../../hooks'
 import { useQueryClient } from '@tanstack/react-query'
 import { HintLines, ResultsFields, useResultsView } from '../../results'
+import { PostingCard, packable } from '../../posting'
 import { HowTo } from '../../guide/Guide'
 
 // The Finish step: the timeline (Open the editor, UX-PLAN.md section 12),
@@ -120,6 +121,15 @@ export function FinishStep({ ctx }: { ctx: PostCtx }) {
       {item.kind === 'meme' && <CoverCard ctx={ctx} />}
       {item.kind === 'meme' && <HookVariants ctx={ctx} />}
       {item.kind === 'slideshow' && <VariationsCard ctx={ctx} />}
+      {packable(item) && (
+        <section className="st-card" data-field="post-posting-card">
+          <div className="st-card-head">
+            <div className="grow"><div className="st-h3">Posting</div><div className="st-hint">Approve it for its day's Download day zip (the slides or video, caption.txt, post.json and the checklist). Free.</div></div>
+            <HowTo id="download-day" />
+          </div>
+          <div className="st-card-body"><PostingCard item={item} /></div>
+        </section>
+      )}
       <PostResultsCard ctx={ctx} />
       <div className="st-row" style={{ gap: 8, flexWrap: 'wrap' }}>
         <button type="button" className="st-btn" onClick={() => void duplicate(item.id)}><CopyPlus size={15} />Make another like this</button>

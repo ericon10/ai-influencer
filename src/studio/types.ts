@@ -370,6 +370,8 @@ export interface PlanImportResult { created: number; updated: number; kept: numb
 // Results (UX-PLAN.md section 32): a post's results and the Results view.
 export type { PostResults, Decision, ResultHint, ResultRow } from '../../server/core/results'
 export type { ResultsView, ResultsCsvPreview, ResultsCsvPreviewRow } from '../../server/pipeline/results'
+// Download day (section 33).
+export type { DayView as PostingDayView, DayRow as PostingDayRow } from '../../server/pipeline/postingDay'
 // The slideshow power-up (UX-PLAN.md section 27): the Scene library, a
 // post's family and batch, and the no-reuse check.
 export interface SlideScene { id: string; characterId: string | null; topic: string; name: string; place: string; light: string; camera: string; phone: string; details: string[]; lookAssetId: string | null; createdAt: string }

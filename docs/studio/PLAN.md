@@ -635,6 +635,18 @@ Decisions: `DECISIONS.md` G37 and G38. UX: `UX-PLAN.md` section 15.
 - [x] Guide (Results section, glossary, Posts home), How this works on the card and the Finish step
 - [x] Tests: unit (the CSV reader, numbers, dates, decisions, totals, families, hints, post.json), pipeline (results.test.ts), Playwright (results.spec.ts)
 
+### Download day (G61, UX-PLAN section 33, owner 2026-10-17)
+
+- [x] Approve for posting on every video post and slideshow (`spec.posting`): the card's chip, the Finish step's Posting card; the batch review's Approve sets it
+- [x] A post's day and slot: its own (Post on, in Finish), else the plan's, else the day it was posted
+- [x] Slot times as data (`config/content.yaml` posting.slot_times), edited per account on the card
+- [x] Download day on Posts home: the day (today by default), the free preview in posting order with each reason, Include packed posts
+- [x] The zip on the worker (free): `<date>/<account>/<n>-<SLOT>-<HHMM>/` with 01.jpg... or video.mp4, caption.txt and post.json; checklist.txt and left-out.txt; approved posts with no export exported first
+- [x] Packed: marked on each post (the chip downloads that zip again), left out of the next zip of that day; Zips made on the card
+- [x] Phone: the list as cards, the button full width, 40 px targets
+- [x] Guide (Download day section, glossary, Posts home), How this works on the card and the Finish step
+- [x] Tests: unit (server/core/postingDay.test.ts), pipeline (server/pipeline/postingDay.test.ts), Playwright (e2e/editor/downloadday.spec.ts)
+
 ## Roadmap after Phase 4 (owner, 2026-10-13; not started)
 
 SPEC 13.1, R1 to R7: Clone Video (first after Phase 3), Inspo board

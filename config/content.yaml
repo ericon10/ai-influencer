@@ -149,6 +149,12 @@ results:
   drop_views: 1000
   drop_posts: 2
 
+# Download day (owner, 2026-10-17; UX-PLAN.md section 33): the plan's slots
+# as clock times, for the posting order and the folder names (1-AM-0900).
+# Starting points: change them on the Download day card (kept per account).
+posting:
+  slot_times: { AM: "09:00", Daily: "12:00", PM: "18:00" }
+
 batch:
   # Up to 50 videos (Phase 4: batch at scale); each is its own short job on
   # the worker. The download is a zip in parts of at most zip_part_mb.

@@ -2980,5 +2980,151 @@
         "label": "4 · Import N rows (free): only the ticked rows"
       }
     ]
+  },
+  "results-card": {
+    "w": 1044,
+    "h": 965,
+    "spots": [
+      {
+        "n": 1,
+        "x": 2,
+        "y": 9.6,
+        "w": 96,
+        "h": 3.7,
+        "label": "Posted from and to: only the posts that went up then"
+      },
+      {
+        "n": 2,
+        "x": 2,
+        "y": 15,
+        "w": 12.9,
+        "h": 8,
+        "label": "Follows per post, the headline"
+      },
+      {
+        "n": 3,
+        "x": 2,
+        "y": 24.6,
+        "w": 96,
+        "h": 22,
+        "label": "Hints, never automatic: 50K+ views, under 1K twice"
+      },
+      {
+        "n": 4,
+        "x": 2,
+        "y": 48.2,
+        "w": 96,
+        "h": 2.9,
+        "label": "By account, product, character or hook structure"
+      },
+      {
+        "n": 5,
+        "x": 2,
+        "y": 51.9,
+        "w": 96,
+        "h": 12.7,
+        "label": "Sorted by follows per post"
+      },
+      {
+        "n": 6,
+        "x": 2,
+        "y": 68.9,
+        "w": 96,
+        "h": 1.9,
+        "label": "Paste a CSV by row_id: a free preview, then Apply"
+      }
+    ]
+  },
+  "download-day": {
+    "w": 1044,
+    "h": 874,
+    "spots": [
+      {
+        "n": 1,
+        "x": 2,
+        "y": 12.7,
+        "w": 14.7,
+        "h": 5.2,
+        "label": "The day: today by default"
+      },
+      {
+        "n": 2,
+        "x": 24.3,
+        "y": 13.8,
+        "w": 4.2,
+        "h": 3,
+        "label": "Include packed posts: pack them again"
+      },
+      {
+        "n": 3,
+        "x": 2,
+        "y": 19.5,
+        "w": 96,
+        "h": 2.7,
+        "label": "Slot times: the posting order and the folder names"
+      },
+      {
+        "n": 4,
+        "x": 2,
+        "y": 26.6,
+        "w": 96,
+        "h": 31.4,
+        "label": "The day in posting order: goes in, or left out and why"
+      },
+      {
+        "n": 5,
+        "x": 2,
+        "y": 65.6,
+        "w": 24.2,
+        "h": 4.3,
+        "label": "Make the zip: free, on the worker"
+      },
+      {
+        "n": 6,
+        "x": 2,
+        "y": 83.4,
+        "w": 34.6,
+        "h": 4.3,
+        "label": "Download the zip"
+      }
+    ]
+  },
+  "post-card-posting": {
+    "w": 249,
+    "h": 1097,
+    "spots": [
+      {
+        "n": 1,
+        "x": 6.8,
+        "y": 36.7,
+        "w": 33.1,
+        "h": 1.8,
+        "label": "Approve for posting: only approved posts go into Download day"
+      },
+      {
+        "n": 2,
+        "x": 6.8,
+        "y": 39.1,
+        "w": 51.9,
+        "h": 1.8,
+        "label": "Packed: in a Download day zip (tap to download it again)"
+      },
+      {
+        "n": 3,
+        "x": 6.8,
+        "y": 43.6,
+        "w": 86.3,
+        "h": 2.4,
+        "label": "Results: what it did, typed as you go"
+      },
+      {
+        "n": 4,
+        "x": 11.2,
+        "y": 74.4,
+        "w": 77.5,
+        "h": 8.2,
+        "label": "The decision, a colored chip on the card"
+      }
+    ]
   }
 }

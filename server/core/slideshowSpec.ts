@@ -3,6 +3,7 @@ import { CTA_IDS, PATTERN_IDS, SPECIAL_IDS, TEXT_STYLE_IDS } from './slides.js'
 import { EFFECT_CODES, STRUCTURE_CODES } from './playbook.js'
 import { planMetaSchema } from './planMeta.js'
 import { resultsSchema } from './results.js'
+import { postingSchema } from './postingDay.js'
 
 // A slideshow post's spec (UX-PLAN.md sections 5 and 27). The slides run in
 // parallel lists by slide number: slide 1 is the hook, then `slides`; each
@@ -138,6 +139,9 @@ export const slideshowSpecSchema = z.object({
   // Section 32: what the post did once posted (typed on its card or pasted
   // from a CSV). Never copied to a variation or Make another like this.
   results: resultsSchema.nullable().default(null),
+  // Section 33: Approve for posting, its own day and slot, the Download day
+  // zip it went into. Never copied.
+  posting: postingSchema.nullable().default(null),
 })
 export type SlideshowSpec = z.infer<typeof slideshowSpecSchema>
 export type SpecialSlideSpec = z.infer<typeof specialSchema>

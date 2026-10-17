@@ -1,4 +1,4 @@
-import type { ActionPreview, CharacterSummary, CharacterView, HiggsfieldAccount, JobView, Me, QuoteView, RulesView, SceneFields, ScenesData, SettingsView, StudioAction, Usage, VideoPrice, BrollClip, ContentData, ContentKind, LibraryData, PostStep, WorkerStatus, CloneOptions, CloneResult, CloneSource, CloneStill, CutView, SoundItem, EditorStyle, ImportPreview, VoiceLine, ProductSummary, ProductView, ProductClaims, KitGroup, SocialAccount, SentView, RecreateBatchView, GateCheckView, StorageInfo, TrashRef, TrashItem, ContentItem, AutoCleanItem, BrandLayer, TemplateReport, SlideFamily, ReuseReport, SlideBatch, StillChoice, SlideScene, SlideStillOptions, StillPathId, PlanPreview, PlanPostView, PlanImportResult, PostResults, ResultsCsvPreview, ResultsView } from './types'
+import type { ActionPreview, CharacterSummary, CharacterView, HiggsfieldAccount, JobView, Me, QuoteView, RulesView, SceneFields, ScenesData, SettingsView, StudioAction, Usage, VideoPrice, BrollClip, ContentData, ContentKind, LibraryData, PostStep, WorkerStatus, CloneOptions, CloneResult, CloneSource, CloneStill, CutView, SoundItem, EditorStyle, ImportPreview, VoiceLine, ProductSummary, ProductView, ProductClaims, KitGroup, SocialAccount, SentView, RecreateBatchView, GateCheckView, StorageInfo, TrashRef, TrashItem, ContentItem, AutoCleanItem, BrandLayer, TemplateReport, SlideFamily, ReuseReport, SlideBatch, StillChoice, SlideScene, SlideStillOptions, StillPathId, PlanPreview, PlanPostView, PlanImportResult, PostResults, ResultsCsvPreview, ResultsView, PostingDayView } from './types'
 import { sheetRefOf, typeOf, uploadFiles } from './files'
 
 // Thin client for /api/v1. Every write sends the CSRF header the server
@@ -181,6 +181,12 @@ export const api = {
     return request<ResultsView>('GET', `/results${qs ? `?${qs}` : ''}`)
   },
   resultsCsvPreview: (csv: string) => request<ResultsCsvPreview>('POST', '/results/csv/preview', { csv }),
+  // Download day (section 33).
+  setPosting: (id: string, patch: { approved?: boolean; date?: string; slot?: string }) => request<{ posting: unknown }>('PUT', `/content/${id}/posting`, patch),
+  postingSlots: () => request<{ slots: Array<{ slot: string; time: string }> }>('GET', '/posting/slots'),
+  savePostingSlots: (times: Record<string, string>) => request<{ slots: Array<{ slot: string; time: string }> }>('PUT', '/posting/slots', { times }),
+  postingDay: (q: { date: string; includePacked?: boolean; tz?: string | null }) => request<PostingDayView>('GET', `/posting/day?${new URLSearchParams({ date: q.date, packed: q.includePacked ? '1' : '0', ...(q.tz ? { tz: q.tz } : {}) })}`),
+  postingPack: (body: { date: string; includePacked?: boolean; tz?: string | null }) => request<{ jobId: string; posts: number }>('POST', '/posting/day/pack', body),
   resultsCsvApply: (csv: string) => request<{ updated: number; same: number; skipped: number; posts: string[] }>('POST', '/results/csv/apply', { csv }),
   slideScenes: () => request<{ scenes: SlideScene[] }>('GET', '/slide-scenes'),
   saveSlideScene: (body: { name: string; characterId?: string | null; topic?: string; place: string; light?: string; camera?: string; phone?: string; details?: string[]; lookAssetId?: string | null }) => request<SlideScene>('POST', '/slide-scenes', body),

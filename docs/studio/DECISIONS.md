@@ -2836,3 +2836,48 @@ Decided (UX-PLAN.md section 32):
   moment (`moment_id`), because Make another like this and variations keep
   the moment and each plan row has its own.
 - **post.json** gets a `results` key (still version 2: a new key only).
+
+### G61. Download day: a day's approved posts in one zip, in posting order (owner, 2026-10-17)
+
+The owner, before launch: "Until the posting engine is ready, posts go out
+by hand. On Posts home: 'Download day' for a date. One zip with a folder
+per account, a subfolder per slot (numbered slides, caption.txt,
+post.json), and a checklist.txt listing every post in posting order:
+account, slot time, hook, Ad yes/no, and 'AI-generated label: on' on every
+line. Only approved posts go in; the report lists anything left out and
+why. Mark posts as 'packed' so they don't pack twice."
+
+Decided (UX-PLAN.md section 33):
+- **Approved is one switch on every post**, Approve for posting
+  (`spec.posting.approved`), on the post's card and in its Finish step.
+  Neither existing signal fits every post kind: the batch review's Approve
+  covers a batch's slideshows only (it now sets the switch too; a review
+  approved before this counts until the switch changes), and Exported only
+  says the files exist (an approved post with no export goes in, exported
+  first). Video posts and slideshows only; a batch keeps its own zip.
+- **A post's day**: its own (Post on, in Finish), else its plan row's date,
+  else the day it was posted (its results). The slot: its own, else the
+  plan's. Posting order: the slot's clock time, then the account, then the
+  plan's row.
+- **Slot times are data**: `config/content.yaml` `posting.slot_times`
+  (AM 09:00, Daily 12:00, PM 18:00), overridden per account on the card
+  (account setting `posting_slot_times`). Never hard-coded per account.
+- **The zip**: `<date>/<account>/<n>-<SLOT>-<HHMM>/` (numbered in posting
+  order within the account, so the folders sort that way) with `01.jpg`...
+  (the 1080 x 1920 set) or `video.mp4`, `caption.txt` (the export's caption
+  as posted) and `post.json` (the export's, plus `results` and a `posting`
+  block), and `checklist.txt` and `left-out.txt` at the top. Built by a
+  free local job on the worker with fflate (stored), saved like any export
+  (Vercel only moves JSON); the job row is the pack's record, so no table
+  or migration. Each post that went in is marked packed
+  (`spec.posting.packed`: when, the job, the day, the zip), and a later zip
+  of that day leaves it out unless Include packed posts is on.
+- **Left out, and why**, the first that applies: no account, not approved,
+  already packed, exporting right now, missing pictures (or a video post's
+  clip), not exported and could not be exported. An export that fails
+  inside the pack lands in left-out.txt with its reason.
+- **The zip uses each post's last export**; it does not export again a
+  post changed after its export (the preview shows when it was exported).
+- The posting state is written on its own (`PUT /content/:id/posting`,
+  `jsonb_set`), never through the workspace's spec patch, and never copied
+  by Make another like this, a variation or a batch's slideshow.

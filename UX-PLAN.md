@@ -1292,4 +1292,66 @@ post on the server (not only the newest 200 on the page); a hook family
 crosses accounts, so the hints are worked out over every post and the
 filters only choose which hinted posts are listed. Archived posts are out.
 Results are written into the post on their own (`PUT /content/:id/results`),
-so an edit in the post's workspace never undoes them.
+so an edit in the post's workspace never undoes them. On a phone (section
+3.11): the fields, chips and toggles are 40 px tall, a card with its Results
+open takes the whole row, and the breakdown and the CSV preview become one
+small card per row.
+
+## 33. Download day: one zip a day of the approved posts, in posting order (owner, 2026-10-17)
+
+Goal: until the posting engine is ready, posts go out by hand. Download
+day turns a day's posts into one download: a folder per account, a
+subfolder per slot with the slides (or the video), caption.txt and
+post.json, and checklist.txt in posting order. Only approved posts go in;
+each one is marked packed so it never packs twice by accident. Free. No new
+page, no new step: a card on Posts home, a chip on each post's card and a
+card in the Finish step.
+
+Applies to: video posts and slideshows, with or without a plan row, every
+product (or none), every character and every account. Nothing in it is
+product-specific; slot times are data. A batch (many videos in one post) is
+not a day's post: its own zip in its Finish step stays its download.
+
+**What "approved" means (chosen from the code).** The batch review's
+Approve covers a batch's slideshows only, and Exported (status ready) only
+says the files exist, not that the owner wants the post out (and an
+approved post with no export must still go in, exported first). So every
+post gets one switch, **Approve for posting** (`spec.posting.approved`):
+on its card on Posts home and in its Finish step. A batch review's Approve
+turns it on too (Reject or back to pending turns it off), and a batch
+slideshow approved in review before this counts as approved until the
+switch is changed. Nothing else approves a post.
+
+**What the Studio did before this (the audit):**
+
+| Piece | Before |
+|---|---|
+| Approve | Only in a slideshow batch's review (Approve exports it); nothing on other posts |
+| A post's day and slot | The plan row's date and slot (kept on the post, shown in its Plan line); nothing for a post with no plan row |
+| Downloads | One post at a time: a slideshow's zip (slides, caption.txt, post.json), a video post's MP4 and post.json, a batch's zip |
+| Posting order, a checklist | None |
+
+**What it does now:**
+
+| Piece | Where | How it works | Clicks |
+|---|---|---|---|
+| Approve for posting | Each video post's and slideshow's card on Posts home (a chip: Approve for posting, then Approved in green), and the Finish step's **Posting** card (a switch) | One tap on, one tap off. Saved on its own: it never moves the post up Posts home. Only approved posts go into Download day | 1 |
+| The post's day and slot | The Finish step's Posting card: **Post on** (a day) and the slot (AM, Daily, PM or Any time) | The plan's date and slot by default ("From the plan"); set here for a post with no plan row or to move one; **Back to the plan's** undoes it. A post's day is its own, else the plan's, else the day it was posted (its results). The card shows the day and slot next to the chips | 0 to 2 |
+| Download day | Posts home, the **Download day** card (under Launch plan, folded like it) | Pick the day: today by default (this phone's or computer's own day), or any other. **Include packed posts** (off): pack posts again. The **slot times** show as chips (AM 09:00, Daily 12:00, PM 18:00 to start; **Change** edits them, kept per account; the defaults are data in `config/content.yaml`, `posting.slot_times`) | 1 |
+| The preview (free) | The card's list | Every post of that day, in posting order (the slot's clock time, then the account, then the plan's row): the slot and time, the account, the hook, Ad, and either **Goes in** with its folder (and "exported first, free" when it has no export yet) or **Left out** and why: not approved for posting; already packed (when, and which day's zip); missing pictures (the slides that need one, or a video post's clip); not exported yet and could not be exported (the reason); exporting right now; no account. Each row opens its post. On a phone each row is a small card | 0 |
+| Make the zip | Under the list: **Make the zip · N posts · Free** (full width on a phone) | A free job on the Studio's worker, with the live status line. An approved post never exported is exported first (free). Then **Download the zip**. When nothing can go in, the button says what is left (approve a post, or Include packed posts) | 1 |
+| The zip | The download (`download-day-<date>.zip`) | `<date>/checklist.txt`, `<date>/left-out.txt`, and `<date>/<account>/<n>-<SLOT>-<HHMM>/` per post (for example `F2/1-AM-0900`, numbered in posting order within the account so the folders sort the same way; a post with no slot time is `n-ANY`): the 1080 x 1920 slides `01.jpg`, `02.jpg`... (a video post: `video.mp4`), `caption.txt` (the caption as posted, "Ad:" first on an ad) and `post.json` (the post's own, with its `results` and a `posting` block: day, slot, time, folder, pack id, "AI-generated label: on") | 0 |
+| checklist.txt | Top of the zip | One line per post in posting order: `[ ] 1. F2 \| 09:00 (AM) \| Hook: "..." \| Ad: no \| AI-generated label: on \| F2/1-AM-0900/`, under a line that says to post each one from its folder and turn the label on | 0 |
+| left-out.txt | Top of the zip | Each post of the day left out, with its account, slot time, hook and the reason; or "nothing was left out" | 0 |
+| Packed | Each post that went in: a **Packed** chip on its card (the day; it downloads that zip again) and on its Finish step's Posting card | The next Download day of that date leaves it out ("Already packed") unless Include packed posts is on. **Zips made** on the card lists the last ten zips, to download again (each is kept in storage like any export) | 0 |
+
+Free throughout: approving, the preview, the zip and any export it needs.
+The zip takes each post's last export: after a change, export the post
+again in its Finish step, then make the zip.
+
+Built details: the zip is made by a local job on the worker
+(`posting_pack:<date>`, fflate, stored, not compressed, in storage like any
+export and served as a redirect, so Vercel only moves JSON); the job is the
+pack's record (the zip's asset, the posts and the left-out list). A zip for
+a day cannot start while another for the same day is being made. A video
+exported from the editor gets a post.json made at packing time.

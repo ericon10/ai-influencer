@@ -47,6 +47,7 @@ import type { SceneBuilt } from './sceneActions.js'
 import { lintSettings } from './copyLint.js'
 import { planMetaSchema } from '../core/planMeta.js'
 import { resultsSchema } from '../core/results.js'
+import { postingSchema } from '../core/postingDay.js'
 import { videoPostExportJson } from '../core/postExport.js'
 import { postCaption } from '../core/slides.js'
 
@@ -297,6 +298,9 @@ const memeSpec = z.object({
   plan: planMetaSchema,
   // Section 32: what the post did once posted. Never copied.
   results: resultsSchema.nullable().default(null),
+  // Section 33: Approve for posting, its own day and slot, the Download day
+  // zip it went into. Never copied.
+  posting: postingSchema.nullable().default(null),
 })
 // A slideshow (server/core/slideshowSpec.ts; UX-PLAN.md section 27).
 const slideshowSpec = slideshowSpecSchema
@@ -541,8 +545,9 @@ export async function duplicateContent(deps: Deps, ctx: Ctx, itemId: string): Pr
   // timeline itself, which names this post's media.
   const spec = row.spec as { editor?: { stack?: unknown } | null } | null
   const withStack = spec?.editor ? { ...spec, editor: { projectAssetId: null, savedAt: null, stack: spec.editor.stack ?? null } } : row.spec
-  // What the post did once posted is its own (section 32).
-  const copied = { ...((withStack ?? {}) as object), results: null }
+  // What the post did once posted and its posting state are its own
+  // (sections 32 and 33).
+  const copied = { ...((withStack ?? {}) as object), results: null, posting: null }
   const [out] = await deps.db.insert(contentItems).values({
     id: newId('cnt'), accountId: ctx.accountId, characterId: row.characterId, kind: row.kind,
     title: row.title, idea: row.idea, accountTag: row.accountTag, sceneId: row.sceneId, spec: copied, productId: row.productId,
@@ -581,7 +586,7 @@ export async function candidateAsset(deps: Deps, ctx: Ctx, candidateId: string, 
 
 // What a render needs, checked before it is queued, so a mistake shows at
 // once instead of on the worker.
-function renderProblems(deps: Deps, row: ContentRow): string[] {
+export function renderProblems(deps: Deps, row: ContentRow): string[] {
   const out: string[] = []
   if (row.kind === 'meme') {
     const s = memeSpec.parse(row.spec)
@@ -997,9 +1002,20 @@ async function layBed(deps: Deps, ctx: Ctx, picture: string, out: string, dir: s
 }
 
 async function runContentRender(deps: Deps, ctx: Ctx, job: JobRow): Promise<unknown> {
-  const itemId = job.purpose.split(':')[1]!
-  const row = await getContent(deps, ctx, itemId)
+  const row = await getContent(deps, ctx, job.purpose.split(':')[1]!)
+  if (row.kind === 'batch') return renderBatchVideo(deps, ctx, job, row, slug(row.title || row.kind))
+  const outputs = await exportPostNow(deps, ctx, job, row)
+  return row.kind === 'meme' ? outputs : { images: outputs.imageAssetIds?.length ?? 0 }
+}
+
+// One video post or slideshow exported now, inside a worker job: the
+// Export button's own job, or a Download day zip exporting an approved post
+// that had no export yet (UX-PLAN.md section 33). Free.
+export async function exportPostNow(deps: Deps, ctx: Ctx, job: JobRow, row: ContentRow): Promise<ContentOutputs> {
+  const itemId = row.id
   const name = slug(row.title || row.kind)
+  if (row.kind !== 'meme' && row.kind !== 'slideshow') throw new AppError('bad_request', 'Only a video post or a slideshow exports on its own.')
+  if (row.status !== 'rendering') await deps.db.update(contentItems).set({ status: 'rendering', error: null }).where(eq(contentItems.id, itemId))
   try {
     if (row.kind === 'meme') {
       const parsed = memeSpec.parse(row.spec)
@@ -1016,33 +1032,39 @@ async function runContentRender(deps: Deps, ctx: Ctx, job: JobRow): Promise<unkn
         const v = await renderCut(deps, ctx, job, tl.cut, { characterId: row.characterId!, caption: s.caption, sound: tl.sound, edit: s.edit, captionStyle: s.captionStyle, label: `Video post: ${s.caption.slice(0, 60)}`, plan: tl.plan, preset })
         return { v, notes: tl.notes, timeline: !!tl.plan }
       })
-      // post.json (section 28): the caption to post, its hashtags and CTA
-      // line, and the plan's fields, next to the MP4.
-      const ch = row.characterId ? toData(await getCharacter(deps, ctx, row.characterId)) : null
-      const plan = s.plan
-      const json = videoPostExportJson({
-        post: { id: row.id, kind: row.kind, title: row.title, idea: row.idea, accountTag: row.accountTag, characterId: row.characterId, characterName: ch?.name ?? null, variationOf: row.variationOf, batchOf: row.batchOf, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString() },
-        video: { file: `${name}.mp4`, assetId: v.assetId, durationSec: v.durationSec ?? null, onScreenText: s.caption, captionOff: s.captionOff },
-        caption: { text: plan.caption, hashtags: plan.hashtags.slice(0, deps.config.pipeline.content.slideshow.hashtags[1]), ctaLine: plan.cta, ad: plan.product, asPosted: postCaption(plan.caption, plan.hashtags, { ad: plan.product, max: deps.config.pipeline.content.slideshow.hashtags[1], cta: plan.cta }) },
-        plan, aiLabel: ch?.disclosure ?? 'Label all posts as AI-generated', exportedAt: deps.clock.now().toISOString(), results: s.results,
-      })
+      const json = await videoPostJson(deps, ctx, row, { file: `${name}.mp4`, assetId: v.assetId, durationSec: v.durationSec ?? null })
       const jsonAsset = await saveAsset(deps, ctx, { data: Buffer.from(`${JSON.stringify(json, null, 2)}\n`), mime: 'application/json', origin: 'derived', label: `Video post ${name} (post.json)`, sourceJobId: job.id })
       const outputs: ContentOutputs = { videoAssetId: v.assetId, jsonAssetId: jsonAsset.id, dropped: v.dropped, durationSec: v.durationSec, sound: v.sound, editNote: v.editNote, renderedAt: deps.clock.now().toISOString(), preset: preset.id, ...(v.capped ? { capped: true } : {}), ...(timeline ? { fromTimeline: true } : {}), ...(notes.length ? { editorOnly: notes } : {}) }
       await setOutputs(deps, itemId, outputs, 'ready')
       return outputs
     }
-    if (row.kind === 'batch') return await renderBatchVideo(deps, ctx, job, row, name)
     // Slideshow (UX-PLAN.md section 27): each slide's picture or special
     // slide, its words in the post's text style, both sizes, caption.txt
     // and post.json in one zip.
     const outputs = await renderSlideshow(deps, ctx, job, row, name)
     await setOutputs(deps, itemId, outputs, 'ready')
-    return { images: outputs.imageAssetIds?.length ?? 0 }
+    return outputs
   } catch (e) {
-    if (row.kind === 'batch') throw e
     await deps.db.update(contentItems).set({ status: 'failed', error: (e as Error).message.slice(0, 400), updatedAt: deps.clock.now() }).where(eq(contentItems.id, itemId))
     throw e
   }
+}
+
+// A video post's post.json (section 28): the caption to post, its hashtags
+// and CTA line, the plan's fields and the results, next to the MP4. Also
+// made by Download day for a video exported from the editor (which writes
+// none).
+export async function videoPostJson(deps: Deps, ctx: Ctx, row: ContentRow, video: { file: string; assetId: string; durationSec: number | null }): Promise<Record<string, unknown>> {
+  const s = memeSpec.parse(row.spec)
+  const ch = row.characterId ? toData(await getCharacter(deps, ctx, row.characterId)) : null
+  const plan = s.plan
+  const max = deps.config.pipeline.content.slideshow.hashtags[1]
+  return videoPostExportJson({
+    post: { id: row.id, kind: row.kind, title: row.title, idea: row.idea, accountTag: row.accountTag, characterId: row.characterId, characterName: ch?.name ?? null, variationOf: row.variationOf, batchOf: row.batchOf, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString() },
+    video: { file: video.file, assetId: video.assetId, durationSec: video.durationSec, onScreenText: s.caption, captionOff: s.captionOff },
+    caption: { text: plan.caption, hashtags: plan.hashtags.slice(0, max), ctaLine: plan.cta, ad: plan.product, asPosted: postCaption(plan.caption, plan.hashtags, { ad: plan.product, max, cta: plan.cta }) },
+    plan, aiLabel: ch?.disclosure ?? 'Label all posts as AI-generated', exportedAt: deps.clock.now().toISOString(), results: s.results,
+  })
 }
 
 // Hook variants (long run part 4): the post's timeline rendered once per

@@ -13,6 +13,8 @@ import { HowTo, QuickStartBanner } from '../guide/Guide'
 import { AccountsCard } from './AccountsCard'
 import { PlanCard } from './PlanCard'
 import { ResultsCard } from './ResultsCard'
+import { DownloadDayCard } from './DownloadDayCard'
+import { PostingChips } from '../posting'
 import { ResultsRow, useResultsView } from '../results'
 import type { ResultHint } from '../types'
 
@@ -70,6 +72,7 @@ export default function Posts() {
       <QuickStartBanner />
       {characters.length > 0 && <AccountsCard characters={characters} />}
       {characters.length > 0 && <PlanCard characters={characters} />}
+      {characters.length > 0 && items.length > 0 && <DownloadDayCard />}
       {characters.length > 0 && items.length > 0 && <ResultsCard tag={tag} character={character} product={product} filtered={!!(tag || character || product)} />}
 
       {(tags.length > 0 || used.size > 1 || products.length > 0) && (
@@ -206,6 +209,7 @@ function PostCard({ item, lib, characterName, productName, hints }: { item: Cont
           <span>{[KIND_LABEL[item.kind], characterName, item.accountTag, productName].filter(Boolean).join(' · ')}</span>
         </div>
         {item.kind === 'batch' && <BatchProgress item={item} />}
+        <PostingChips item={item} />
         <ResultsRow item={item} hints={hints} />
         <div className="st-row" style={{ gap: 4 }}>
           <span className="st-hint">{new Date(item.updatedAt).toLocaleDateString([], { month: 'short', day: 'numeric' })}</span>

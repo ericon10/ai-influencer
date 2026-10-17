@@ -1452,6 +1452,7 @@ button.st-chip:hover { color: var(--st-text); border-color: var(--st-text-3); }
 /* A switch keeps its words beside it on a phone (they wrapped under it). */
 @media (max-width: 860px) {
   .st-row > .st-switch + .st-col, .st-row > .st-switch + .st-hint, .st-row > .st-switch + span { flex: 1 1 0; min-width: 0; }
+}
 /* Results (section 32): the card's Results row, the fields, the hints and
    the Results view's numbers. */
 .st-results-toggle { display: inline-flex; align-items: center; gap: 6px; min-width: 0; flex: 1; padding: 4px 0; border: 0; background: none; color: var(--st-text-2); font: inherit; font-size: 12.5px; cursor: pointer; text-align: left; }
@@ -1503,4 +1504,33 @@ button.st-chip:hover { color: var(--st-text); border-color: var(--st-text-3); }
   .st-postcard:has([data-field="results-fields"]) { grid-column: 1 / -1; }
   .st-postcard:has([data-field="results-fields"]) .st-postcard-cover { aspect-ratio: auto; height: 160px; }
   .st-input.sm { min-height: 40px; }
+}
+/* Download day (section 33): Approve for posting and Packed on a card, the
+   day's list in posting order, the zip button and the zips made. */
+.st-chip.st-approve { cursor: pointer; }
+.st-chip.st-approve.on { background: var(--st-ok-soft); border-color: rgba(63, 209, 143, 0.55); color: var(--st-ok); }
+.st-chip.st-packed { background: var(--st-info-soft); color: var(--st-text); text-decoration: none; gap: 4px; }
+a.st-chip.st-packed:hover { border-color: var(--st-text-3); }
+.st-daylist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.st-dayrow { display: flex; flex-direction: column; gap: 3px; padding: 9px 12px; border-radius: 12px; border: 1px solid var(--st-line); background: var(--st-surface-2); min-width: 0; }
+.st-dayrow.out { opacity: 0.85; background: transparent; border-style: dashed; }
+.st-dayrow-top { display: flex; align-items: center; gap: 8px; min-width: 0; flex-wrap: wrap; }
+.st-dayrow-n { min-width: 18px; color: var(--st-text); font-variant-numeric: tabular-nums; }
+.st-dayrow-when { font-weight: 600; color: var(--st-text); font-variant-numeric: tabular-nums; }
+.st-dayrow-acc { color: var(--st-text-2); }
+.st-dayrow-hook { font-size: 13px; color: var(--st-text-2); }
+.st-daybtn { align-self: flex-start; }
+.st-daypacks { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; font-size: 12.5px; color: var(--st-text-2); }
+.st-daypacks li { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: space-between; }
+@media (max-width: 860px) {
+  .st-chip.xs.st-approve, .st-chip.xs.st-packed { min-height: 40px; height: auto; padding: 0 14px; font-size: 12.5px; }
+  .st-daybtn { align-self: stretch; justify-content: center; min-height: 48px; height: auto; white-space: normal; }
+  .st-dayrow-top .st-btn.xs.icon, .st-dayrow-top .st-btn.xs { min-width: 40px; }
+  .st-daypacks li .st-btn { min-height: 40px; }
+  [data-field="download-day"] input[type='date'], [data-field="post-posting-finish"] input[type='date'] { font-size: 16px; min-height: 40px; }
+}
+/* On a phone a post's card with its Results open takes the whole row, so
+   the fields are wide enough to type in. */
+@media (max-width: 860px) {
+  .st-grid.cards > .st-postcard:has(.st-resultsform) { grid-column: 1 / -1; }
 }

@@ -9,7 +9,7 @@ export type GuideColor = 'orange' | 'pink' | 'violet' | 'blue' | 'teal' | 'green
 export type GuideId =
   | 'big-picture' | 'posts' | 'characters' | 'setup-start' | 'setup-face' | 'setup-sheet' | 'setup-file'
   | 'post-idea' | 'post-stills' | 'post-video' | 'post-clone' | 'post-text' | 'post-finish'
-  | 'library' | 'settings' | 'feedback' | 'realism' | 'voice' | 'hooks' | 'slideshow' | 'launch-plan' | 'products' | 'results'
+  | 'library' | 'settings' | 'feedback' | 'realism' | 'voice' | 'hooks' | 'slideshow' | 'launch-plan' | 'products' | 'results' | 'download-day'
 
 export interface GuideSection {
   id: GuideId
@@ -88,6 +88,7 @@ export const GUIDE: GuideSection[] = [
       'The newest 200 posts show first, the most recently changed on top. Show older posts, under the cards, loads 60 more at a time; a filter applies to them too, so an older post of one account is still found.',
       'Another on a card makes a filled-in copy that opens at the caption: the fastest way to make a series.',
       'Accounts (the card at the top, folded until you open it): each account\'s product, tracked link or promo code and its signups, ranked by signups. An account\'s product is the product of every new post on it. See Hooks and the scoreboard, and Products.',
+      'Download day (the card under the Launch plan): one zip per day of the approved posts, in posting order, with a checklist. Approve for posting is on each card. See Download day.',
       'Results on each card: once a post is up, open its Results row and type the link, when it went up and its first 72 hours (views, follows, saves, shares), a decision and notes. The decision shows as a colored chip on the card. The Results card at the top adds them up. See Results.',
     ],
     tips: ['Video post from a TikTok (in the New post menu) opens a post with Clone already open.'],
@@ -549,7 +550,37 @@ export const GUIDE: GuideSection[] = [
       'They go into the post\'s post.json under "results" the next time it is exported, for the posting engine later.',
     ],
     cost: 'Free.',
-    shots: [],
+    shots: [
+      { id: 'results-card', caption: 'Posts home > Results: follows per post first, the hints, by hook structure, Paste results from a CSV' },
+      { id: 'post-card-posting', caption: 'A post\'s card: Approve for posting, Packed, and its Results row opened' },
+    ],
+  },
+  {
+    id: 'download-day', group: 'Grow your accounts', title: 'Download day', color: 'blue',
+    tagline: 'A day\'s approved posts in one zip, in posting order, with a checklist. Free.',
+    where: 'Posts home: the Download day card; each post\'s card (Approve for posting) and its Finish step (Posting)',
+    intro: 'Until posts go out on their own, you post them by hand. Download day makes that one download per day: pick the day, see every post planned for it in posting order (each one going in, or left out and why), and make the zip. Inside: a folder per account, a folder per slot (1-AM-0900, 2-PM-1800) with the numbered slides (01.jpg, 02.jpg...) or video.mp4, caption.txt (the caption as posted, "Ad:" first on an ad) and post.json, and at the top checklist.txt (every post in order: account, slot time, hook, Ad yes or no, AI-generated label: on) and left-out.txt. Only posts you approved go in; each one is marked Packed so the next zip of that day leaves it out.',
+    steps: [
+      'Approve the posts that are ready: Approve for posting on the post\'s card on Posts home, or the switch in its Finish step (Posting). A batch review\'s Approve counts too. Tap again to take it back.',
+      'A post\'s day and slot come from its plan row (date and slot). A post with no plan row, or one to move: set Post on and the slot in its Finish step (Back to the plan\'s undoes it).',
+      'Open Download day on Posts home. It shows today (your own day, from this phone or computer); pick another day if you like.',
+      'The list is the day in posting order: the slot time, the account, the hook, Ad, and Goes in (with its folder) or Left out and why: not approved, already packed, missing pictures, not exported yet and could not be exported, exporting right now, or no account. Open any post from its row to fix it.',
+      'An approved post that was never exported goes in all the same: it is exported first, as part of the zip (free).',
+      'Press Make the zip (it says how many posts, and Free). It is made on the Studio\'s worker; the live line shows it running. Then Download the zip.',
+      'Each post that went in is marked Packed on its card (tap the chip to download that zip again). A second zip of the same day leaves them out ("Already packed"); switch on Include packed posts to pack them again.',
+      'Slot times: AM 09:00, Daily 12:00 and PM 18:00 to start. Change them on the card (they order the posts and name the folders). Zips made lists the last ten zips, to download again.',
+      'Post from the folders in checklist order: the slides in number order (or video.mp4), the words from caption.txt, the AI-generated label on, and tick the line.',
+    ],
+    tips: [
+      'The zip takes each post\'s last export: after you change a post, export it again in its Finish step, then make the zip.',
+      'A batch (many videos in one post) is not in Download day: its own zip in its Finish step is its download.',
+      'Works on a phone: the list stacks and the buttons are full width.',
+    ],
+    cost: 'Free (the zip and any export it needs run on the Studio\'s worker).',
+    shots: [
+      { id: 'download-day', caption: 'Posts home > Download day: the day, the slot times, the day in posting order, Make the zip, Download the zip' },
+      { id: 'post-card-posting', caption: 'A post\'s card: Approve for posting and Packed' },
+    ],
   },
   {
     id: 'library', group: 'Everything else', title: 'Library', color: 'teal',
@@ -646,6 +677,10 @@ export const GLOSSARY: Array<[string, string]> = [
   ['Follows per post', 'The follows of the posts with results, divided by how many there are. The headline of the Results card: decide by it first, then saves and shares.'],
   ['Decision', 'Yours, on each post: Make 3 variations, Keep, One more try or Drop. A colored chip on the card.'],
   ['Decision hints', 'Suggestions on a post and on the Results card, never automatic: 50K+ views, make 3 variations; a hook family under 1K twice, drop it. The numbers are data (config/content.yaml).'],
+  ['Download day', 'One zip for a day: a folder per account and slot with the slides or video, caption.txt and post.json, plus checklist.txt in posting order and left-out.txt. Only approved posts; free.'],
+  ['Approve for posting', 'On a post\'s card and in its Finish step: what lets a post into Download day. A batch review\'s Approve counts too.'],
+  ['Packed', 'A post that went into a Download day zip. The next zip of that day leaves it out unless Include packed posts is on; the chip downloads that zip again.'],
+  ['Slot times', 'The plan\'s slots as clock times (AM 09:00, Daily 12:00, PM 18:00 to start), changed on the Download day card: the posting order and the folder names.'],
   ['Hook family', 'A post and its variations, plus every post that shares its plan moment (moment_id).'],
   ['Chips (Idea step)', 'What your words already say about the shot (camera, phone camera, framing, outfit, makeup, place, light), read for free. Click one to change it; what you set wins.'],
   ['Send my prompt as written', 'A pasted prompt goes unchanged, with only the reference line, the 21+ line and the REALISM block added. No writer, no camera, light or outfit lines.'],

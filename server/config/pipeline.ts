@@ -332,6 +332,8 @@ const contentSchema = z.object({
   // Results (section 32): the decision hints' thresholds, data not code.
   results: z.object({ variations_views: z.number().int().positive(), variations_count: z.number().int().min(1).max(10), drop_views: z.number().int().positive(), drop_posts: z.number().int().min(1).max(10) })
     .default({ variations_views: 50000, variations_count: 3, drop_views: 1000, drop_posts: 2 }),
+  // Download day (section 33): each plan slot's clock time (HH:MM).
+  posting: z.object({ slot_times: z.record(z.string(), z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/)) }).default({ slot_times: { AM: '09:00', Daily: '12:00', PM: '18:00' } }),
   batch: z.object({ max: z.number().int().positive(), default_count: z.number().int().positive(), zip_part_mb: z.number().positive().default(150) }),
   clone: z.object({
     mode: z.enum(['replace', 'motion']).default('replace'),
