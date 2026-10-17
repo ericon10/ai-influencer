@@ -2980,5 +2980,135 @@
         "label": "4 · Import N rows (free): only the ticked rows"
       }
     ]
+  },
+  "library-filters": {
+    "w": 1360,
+    "h": 900,
+    "spots": [
+      {
+        "n": 1,
+        "x": 20.2,
+        "y": 26.1,
+        "w": 12.3,
+        "h": 4.1,
+        "label": "Model: the model that made it, Uploaded, or Made on the Studio"
+      },
+      {
+        "n": 2,
+        "x": 32.2,
+        "y": 26.1,
+        "w": 9.7,
+        "h": 4.1,
+        "label": "Date: Today, Last 7 days, Last 30 days, or From and To"
+      },
+      {
+        "n": 3,
+        "x": 41.7,
+        "y": 26.1,
+        "w": 10.1,
+        "h": 4.1,
+        "label": "Used in a post, or Not used"
+      },
+      {
+        "n": 4,
+        "x": 60.5,
+        "y": 26.1,
+        "w": 11,
+        "h": 4.1,
+        "label": "Collection: only its items"
+      },
+      {
+        "n": 5,
+        "x": 71.3,
+        "y": 26.1,
+        "w": 9.2,
+        "h": 4.1,
+        "label": "Collections: rename or delete one (its items stay)"
+      },
+      {
+        "n": 6,
+        "x": 20.2,
+        "y": 30.8,
+        "w": 77.6,
+        "h": 4.1,
+        "label": "Each filter as a chip: its x clears it"
+      }
+    ]
+  },
+  "library-collections": {
+    "w": 1360,
+    "h": 900,
+    "spots": [
+      {
+        "n": 1,
+        "x": 52.4,
+        "y": 54.2,
+        "w": 13.2,
+        "h": 35.5,
+        "label": "Tap the items for the collection"
+      },
+      {
+        "n": 2,
+        "x": 62,
+        "y": 93.5,
+        "w": 11.6,
+        "h": 4.1,
+        "label": "Add to collection: pick one, or type a new name"
+      }
+    ]
+  },
+  "library-viewer": {
+    "w": 1360,
+    "h": 900,
+    "spots": [
+      {
+        "n": 1,
+        "x": 37.4,
+        "y": 7.1,
+        "w": 25.2,
+        "h": 67.8,
+        "label": "Full size; tap outside the picture to close"
+      },
+      {
+        "n": 2,
+        "x": 94.3,
+        "y": 37.9,
+        "w": 4.3,
+        "h": 6.1,
+        "label": "Next and previous (or the arrow keys, or a swipe on a phone)"
+      },
+      {
+        "n": 3,
+        "x": 94.9,
+        "y": 0.9,
+        "w": 4,
+        "h": 5.7,
+        "label": "Close (or Esc)"
+      },
+      {
+        "n": 4,
+        "x": 19.4,
+        "y": 82.1,
+        "w": 61.2,
+        "h": 5,
+        "label": "Date, character, the model that made it and what it cost"
+      },
+      {
+        "n": 5,
+        "x": 19.4,
+        "y": 87.5,
+        "w": 61.2,
+        "h": 2.9,
+        "label": "The posts that use it: tap one to open it"
+      },
+      {
+        "n": 6,
+        "x": 19.4,
+        "y": 94.9,
+        "w": 61.2,
+        "h": 5.5,
+        "label": "Download the original file, or use it in a new post"
+      }
+    ]
   }
 }

@@ -34,7 +34,9 @@ export function LibraryFilters({ tab, filter, set, models, products, collections
     product: id => products.find(p => p.id === id)?.name ?? 'a product',
     set: id => collections.find(c => c.id === id)?.name ?? 'a deleted collection',
   })
-  const today = new Date().toISOString().slice(0, 10)
+  // Today in the browser's own day, as the date boxes read it.
+  const now = new Date()
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
   return (
     <>
       <div className="st-libfilters" data-field="library-filters" role="group" aria-label="Filters">

@@ -552,6 +552,9 @@ export const GUIDE: GuideSection[] = [
     ],
     shots: [
       { id: 'library', caption: 'The Library' },
+      { id: 'library-viewer', caption: 'The viewer: full size, its facts, the posts that use it, Download' },
+      { id: 'library-filters', caption: 'Filters as chips, kept per tab' },
+      { id: 'library-collections', caption: 'Select, then Add to collection' },
       { id: 'library-upload', caption: 'Stills: Upload images for a character, kept as uploaded' },
       { id: 'library-clips', caption: 'Clips: Use this clip' },
       { id: 'library-select', caption: 'Select: pick many, then Delete' },
