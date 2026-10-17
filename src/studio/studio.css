@@ -1495,3 +1495,10 @@ button.st-chip:hover { color: var(--st-text); border-color: var(--st-text-3); }
   .st-resultstable td[data-label]::before { content: attr(data-label) ': '; color: var(--st-text-3); font-size: 11.5px; }
   .st-resultstable td.lead { color: var(--st-text); }
 }
+/* A post card with its Results open takes the whole row on a phone (the
+   fields were squeezed into half the width), with a shorter cover. */
+@media (max-width: 860px) {
+  .st-postcard:has([data-field="results-fields"]) { grid-column: 1 / -1; }
+  .st-postcard:has([data-field="results-fields"]) .st-postcard-cover { aspect-ratio: auto; height: 160px; }
+  .st-input.sm { min-height: 40px; }
+}
