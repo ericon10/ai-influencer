@@ -1,4 +1,4 @@
-import type { ActionPreview, CharacterSummary, CharacterView, HiggsfieldAccount, JobView, Me, QuoteView, RulesView, SceneFields, ScenesData, SettingsView, StudioAction, Usage, VideoPrice, BrollClip, ContentData, ContentKind, LibraryData, PostStep, WorkerStatus, CloneOptions, CloneResult, CloneSource, CloneStill, CutView, SoundItem, EditorStyle, ImportPreview, VoiceLine, ProductSummary, ProductView, ProductClaims, KitGroup, SocialAccount, SentView, RecreateBatchView, GateCheckView, StorageInfo, TrashRef, TrashItem, ContentItem, AutoCleanItem, BrandLayer, TemplateReport, SlideFamily, ReuseReport, SlideBatch, StillChoice, SlideScene, SlideStillOptions, StillPathId, PlanPreview, PlanPostView, PlanImportResult, PostResults, ResultsCsvPreview, ResultsView, PostingDayView } from './types'
+import type { ActionPreview, CharacterSummary, CharacterView, HiggsfieldAccount, JobView, Me, QuoteView, RulesView, SceneFields, ScenesData, SettingsView, StudioAction, Usage, VideoPrice, BrollClip, ContentData, ContentKind, LibraryData, PostStep, WorkerStatus, CloneOptions, CloneResult, CloneSource, CloneStill, CutView, SoundItem, EditorStyle, ImportPreview, VoiceLine, ProductSummary, ProductView, ProductClaims, KitGroup, SocialAccount, SentView, RecreateBatchView, GateCheckView, StorageInfo, TrashRef, TrashItem, ContentItem, AutoCleanItem, BrandLayer, TemplateReport, SlideFamily, ReuseReport, SlideBatch, StillChoice, SlideScene, SlideStillOptions, StillPathId, PlanPreview, PlanPostView, PlanImportResult, PostResults, ResultsCsvPreview, ResultsView, PostingDayView, LibraryItemInfo, LibraryCollection } from './types'
 import { sheetRefOf, typeOf, uploadFiles } from './files'
 
 // Thin client for /api/v1. Every write sends the CSRF header the server
@@ -106,6 +106,15 @@ export const api = {
   duplicateContent: (id: string) => request<{ id: string }>('POST', `/content/${id}/duplicate`, {}),
   postScene: (id: string) => request<{ id: string; sceneId: string }>('POST', `/content/${id}/scene`, {}),
   library: (characterId?: string | null) => request<LibraryData>('GET', `/library${characterId ? `?characterId=${encodeURIComponent(characterId)}` : ''}`),
+  // The Library page with its filters (section 34): the query from
+  // libraryQueryString (server/core/libraryFilter.ts).
+  libraryFiltered: (query: string) => request<LibraryData>('GET', `/library?${query}`),
+  libraryItem: (id: string) => request<LibraryItemInfo>('GET', `/library/items/${encodeURIComponent(id)}`),
+  collections: () => request<{ collections: LibraryCollection[] }>('GET', '/library/collections'),
+  addToCollection: (body: { id?: string; name?: string; items: string[] }) => request<{ id: string; name: string; added: number; created: boolean }>('POST', '/library/collections', body),
+  removeFromCollection: (id: string, items: string[]) => request<{ removed: number }>('POST', `/library/collections/${id}/remove`, { items }),
+  renameCollection: (id: string, name: string) => request<{ ok: true }>('PATCH', `/library/collections/${id}`, { name }),
+  deleteCollection: (id: string) => request<{ ok: true }>('DELETE', `/library/collections/${id}`),
   // Any video file becomes a kept clip of the character (and is picked in
   // the post it was uploaded from).
   addClip: async (characterId: string, file: File, contentId?: string, onProgress?: (done: number, total: number) => void, slot?: 'a' | 'b') => {

@@ -1534,3 +1534,76 @@ a.st-chip.st-packed:hover { border-color: var(--st-text-3); }
 @media (max-width: 860px) {
   .st-grid.cards > .st-postcard:has(.st-resultsform) { grid-column: 1 / -1; }
 }
+/* The viewer (UX-PLAN.md section 34): any still or clip full size, one
+   component for the whole Studio. Above drawers (same layer, later in the
+   page), under toasts. */
+.st-viewer {
+  position: fixed; inset: 0; z-index: 90; display: flex; flex-direction: column; align-items: center;
+  overflow-y: auto; overscroll-behavior: contain; padding: 0 20px 24px;
+  background: rgba(6, 5, 4, 0.93); backdrop-filter: blur(8px); color: var(--st-text); animation: st-fade 0.15s ease;
+}
+.st-viewer-top { position: sticky; top: 0; z-index: 3; width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 12px 0 8px; }
+.st-viewer-count { font-size: 13px; color: #d8d1c7; font-variant-numeric: tabular-nums; }
+.st-btn.icon.st-viewer-x { width: 44px; height: 44px; border-radius: 999px; background: rgba(255, 255, 255, 0.1); color: #fff; border-color: transparent; }
+.st-btn.icon.st-viewer-x:hover { background: rgba(255, 255, 255, 0.2); }
+.st-viewer-stage { position: relative; flex: none; width: 100%; height: max(320px, min(68vh, calc(100vh - 290px))); display: flex; align-items: center; justify-content: center; touch-action: pan-y; }
+.st-viewer-media { position: relative; height: 100%; max-width: 100%; display: flex; align-items: center; justify-content: center; }
+.st-viewer-media img, .st-viewer-media video { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 10px; display: block; user-select: none; -webkit-user-drag: none; }
+.st-viewer-media video { background: #000; }
+.st-viewer-thumb { filter: blur(2px); height: 100%; }
+.st-viewer-thumb.gone { position: absolute; visibility: hidden; }
+.st-viewer-full:not(.on) { position: absolute; opacity: 0; }
+.st-viewer-nav {
+  position: absolute; top: 50%; transform: translateY(-50%); width: 48px; height: 48px; border-radius: 999px; display: grid; place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.18); background: rgba(12, 11, 10, 0.6); color: #fff; cursor: pointer; z-index: 2;
+}
+.st-viewer-nav:hover { background: rgba(40, 36, 32, 0.85); }
+.st-viewer-nav:focus-visible, .st-viewer-x:focus-visible { outline: none; box-shadow: var(--st-ring); }
+.st-viewer-nav.prev { left: 4px; }
+.st-viewer-nav.next { right: 4px; }
+.st-viewer-info {
+  width: min(860px, 100%); margin-top: 16px; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px;
+  border-radius: var(--st-r-l); border: 1px solid var(--st-line-2); background: var(--st-surface);
+}
+.st-viewer-name { margin: 0; overflow-wrap: anywhere; }
+.st-viewer-facts { display: flex; flex-wrap: wrap; gap: 8px 26px; margin: 0; font-size: 13.5px; }
+.st-viewer-facts dt { color: var(--st-text-3); font-size: 12px; }
+.st-viewer-facts dd { margin: 0; overflow-wrap: anywhere; }
+.st-viewer-used { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.st-viewer-used .st-label { margin-right: 4px; }
+.st-viewer-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding-top: 4px; }
+/* The place's own buttons come from its tiles (small there): full size here. */
+.st-viewer-actions .st-btn.sm, .st-viewer-actions .st-btn.xs { height: 38px; padding: 0 15px; font-size: 13.5px; border-radius: 11px; }
+.st-tile-view {
+  position: absolute; top: 14px; right: 14px; z-index: 2; width: 30px; height: 30px; display: grid; place-items: center; border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.5); background: rgba(12, 11, 10, 0.6); color: #fff; cursor: pointer;
+}
+.st-tile-view:hover { background: rgba(40, 36, 32, 0.85); }
+.st-slideframe-open { display: block; padding: 0; border: 0; background: none; cursor: zoom-in; border-radius: 8px; flex: none; color: inherit; }
+.st-slideframe-open:focus-visible { outline: none; box-shadow: var(--st-ring); }
+.st-clip-thumb { position: relative; }
+.st-clip-thumb video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; border-radius: 12px; }
+@media (max-width: 860px) {
+  .st-viewer { padding: 0 0 20px; }
+  .st-viewer-top { padding: 8px 10px; background: linear-gradient(180deg, rgba(6, 5, 4, 0.9), transparent); }
+  .st-viewer-stage { height: 64vh; }
+  .st-viewer-media img, .st-viewer-media video { border-radius: 0; }
+  .st-viewer-info { width: 100%; margin-top: 10px; border-radius: 0; border-left: 0; border-right: 0; padding: 14px 16px; }
+  .st-viewer-actions .st-btn, .st-viewer-used .st-chip { min-height: 44px; }
+  .st-tile-view { width: 44px; height: 44px; top: 10px; right: 10px; }
+}
+
+/* Library filters and collections (section 34). */
+.st-libfilters { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: -6px 0 12px; }
+.st-libfilters .st-select { width: auto; max-width: 220px; }
+.st-libchips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0 0 16px; }
+.st-libchips .st-chip { gap: 4px; }
+.st-chip-x { display: inline-grid; place-items: center; margin: 0 -4px 0 2px; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 999px; background: none; color: inherit; cursor: pointer; }
+.st-chip-x:hover { background: var(--st-surface-3); }
+.st-collist { display: flex; flex-direction: column; gap: 8px; }
+.st-colrow { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: var(--st-r); border: 1px solid var(--st-line); background: var(--st-surface-2); }
+@media (max-width: 860px) {
+  .st-libfilters .st-select, .st-libfilters .st-btn, .st-libfilters .st-input, .st-libchips .st-chip, .st-libchips .st-btn { min-height: 44px; }
+  .st-libfilters .st-select { max-width: none; flex: 1 1 140px; }
+  .st-chip-x { width: 32px; height: 32px; }
+}

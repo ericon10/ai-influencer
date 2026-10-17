@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from './api'
 
 // Server state. Job lists poll while anything is running, so progress is the
@@ -133,7 +133,9 @@ export function useContent() {
 
 // The Library (stills and clips across characters); polls while an upload is
 // being prepared, and looks again when a job that makes clips or stills ends.
-export function useLibrary(characterId: string | null = null) {
+// With `query` (the Library page's filters, section 34) the lists come
+// filtered by the server; the last lists stay on screen while the next load.
+export function useLibrary(characterId: string | null = null, query: string | null = null) {
   const qc = useQueryClient()
   const active = useActiveJobs()
   const busy = (active.data?.jobs ?? []).some(j => /^(clip_ingest|scene|scene_edit|scene_upscale|scene_video|scene_video_upscale|drift_lock|clone|chain_join):/.test(j.purpose))
@@ -143,8 +145,9 @@ export function useLibrary(characterId: string | null = null) {
     wasBusy.current = busy
   }, [busy, qc])
   return useQuery({
-    queryKey: keys.library(characterId),
-    queryFn: () => api.library(characterId),
+    queryKey: query ? ['library', 'filtered', query] : keys.library(characterId),
+    queryFn: () => (query ? api.libraryFiltered(query) : api.library(characterId)),
+    placeholderData: query ? keepPreviousData : undefined,
     refetchInterval: q => (busy || q.state.data?.clips.some(c => c.status === 'generating') ? 2000 : false),
   })
 }

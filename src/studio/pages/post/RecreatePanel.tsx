@@ -9,6 +9,7 @@ import { PriceButton } from '../../PriceButton'
 import { FailureLine, RunStatus, SaferRetry, Triggers } from '../../runs'
 import { failureLine, FRESH_MS } from '../../failures'
 import { AsyncButton, Callout, Field, errorMessage, isFresh, useToast, type TodoItem } from '../../ui'
+import { Viewer, useViewer } from '../../viewer'
 import type { CloneModel, CloneOptions, CloneResult, CloneSource, CloneStill, TakeGate } from '../../types'
 import type { PostCtx } from './ctx'
 import { HowTo } from '../../guide/Guide'
@@ -232,12 +233,19 @@ function StillsStep({ ctx, list: all, kept, takes, picked, opts }: { ctx: PostCt
   // Face passes sit next to the still they fix.
   const order = [...shown.filter(x => x.pass === 'still')].flatMap(s => [s, ...shown.filter(f => f.parentId === s.id)])
   const rest = shown.filter(x => !order.includes(x))
+  // A tap opens the still full size (the viewer, section 34).
+  const view = useViewer()
+  const viewable = [...order, ...rest, ...(showEarlier ? earlier : [])].filter(x => x.assetId)
   const tile = (x: CloneStill) => (
             <div key={x.id} className={`st-tile st-scene-tile ${kept === x.id ? 'picked' : ''} ${isFresh(x.createdAt) ? 'st-new' : ''} ${x.pass === 'face' ? 'st-facepass' : ''}`}>
-              <div className="st-tile-open">
-                {x.assetId ? <img className="st-clip" style={{ aspectRatio: '9 / 16', objectFit: 'cover' }} src={assetUrl(x.assetId, 480)} alt={`${x.pass === 'face' ? 'Face pass' : 'Still'} of ${x.characterName}`} /> : <div className="st-clip st-clip-empty" style={{ aspectRatio: '9 / 16' }}><AlertTriangle size={18} /></div>}
-                {kept === x.id && <span className="st-badge ok"><Check size={12} /></span>}
-              </div>
+              {x.assetId ? (
+                <button type="button" className="st-tile-open" onClick={() => view.open(x.id)} aria-label={`View ${x.pass === 'face' ? 'face pass' : 'still'} full size`}>
+                  <img className="st-clip" style={{ aspectRatio: '9 / 16', objectFit: 'cover' }} src={assetUrl(x.assetId, 480)} alt={`${x.pass === 'face' ? 'Face pass' : 'Still'} of ${x.characterName}`} />
+                  {kept === x.id && <span className="st-badge ok"><Check size={12} /></span>}
+                </button>
+              ) : (
+                <div className="st-tile-open"><div className="st-clip st-clip-empty" style={{ aspectRatio: '9 / 16' }}><AlertTriangle size={18} /></div></div>
+              )}
               <div className="st-row" style={{ gap: 6, padding: '0 4px', flexWrap: 'wrap' }}>
                 <span className="st-tile-label">{x.pass === 'face' ? 'Face pass' : 'Still'}</span>
                 {x.faceScore != null && <span className="st-badge plain" title="Face match to REF-00 (higher is better)">Face {pct(x.faceScore)}</span>}
@@ -277,6 +285,9 @@ function StillsStep({ ctx, list: all, kept, takes, picked, opts }: { ctx: PostCt
         />
       )}
       {showEarlier && earlier.length > 0 && <div className="st-grid scenes st-earlier" data-field="earlier-failures">{earlier.map(tile)}</div>}
+      <Viewer items={viewable.map(x => ({ id: x.id, assetId: x.assetId!, media: 'image' as const, name: x.pass === 'face' ? 'Face pass' : 'Still', thumbId: x.assetId, createdAt: x.createdAt, characterName: x.characterName }))}
+        openId={view.openId} onOpen={view.open} onClose={view.close}
+        actions={x => (kept === x.id ? <span className="st-badge ok"><CheckCircle2 size={12} /> Picked</span> : list.find(y => y.id === x.id && !y.error) ? <AsyncButton className="st-btn" onClick={() => use(x.id)} icon={<CheckCircle2 size={15} />}>Pick this one</AsyncButton> : null)} />
       {choices.length > 1 && (
         <div className="st-videomodels" role="radiogroup" aria-label="Stills model" data-field="recreate-stillmodel">
           {choices.map(c => {

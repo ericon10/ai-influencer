@@ -7,6 +7,7 @@ import { keys, useClones, useCloneStills, useMe, useWorkerGate } from '../../hoo
 import { PriceButton } from '../../PriceButton'
 import { RunStatus } from '../../runs'
 import { AsyncButton, Callout, Field, errorMessage, isFresh, useToast, type TodoItem } from '../../ui'
+import { Viewer, useViewer } from '../../viewer'
 import type { CloneMode, CloneModel, CloneResult, CloneSource, CloneStill, MemeSpec } from '../../types'
 import { pickPerson } from '../../../../server/core/cloneTarget'
 import type { PostCtx } from './ctx'
@@ -285,8 +286,14 @@ function RecreateSteps({ ctx, source, characterIds, outfit, look, list, kept, ta
     try { await api.setCloneNotLike(ctx.item.id, notLike.trim()); await qc.invalidateQueries({ queryKey: keys.content }) } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) }
   }
   const frame = source.rawFrameId ?? source.firstFrameId ?? null
+  // A tap opens a still full size (the viewer, section 34).
+  const view = useViewer()
+  const viewable = characterIds.flatMap(cid => list.filter(x => x.characterId === cid && x.assetId))
   return (
     <div className="st-col" style={{ gap: 16 }}>
+      <Viewer items={viewable.map(x => ({ id: x.id, assetId: x.assetId!, media: 'image' as const, name: x.pass === 'face' ? 'Face pass' : 'Still', thumbId: x.assetId, createdAt: x.createdAt, characterName: x.characterName }))}
+        openId={view.openId} onOpen={view.open} onClose={view.close}
+        actions={x => { const c = list.find(y => y.id === x.id); return !c || c.error ? null : kept[c.characterId] === c.id ? <span className="st-badge ok"><CheckCircle2 size={12} /> Used for the run</span> : <AsyncButton className="st-btn" onClick={() => use(c.id)} icon={<CheckCircle2 size={15} />}>Use this still</AsyncButton> }} />
       <div className="st-row" style={{ gap: 14, alignItems: 'flex-start', flexWrap: 'wrap' }}>
         {frame && <img className="st-clonepreview-still" src={assetUrl(frame, 720)} alt="The clip's frame the stills are made from" />}
         <div className="st-col grow" style={{ gap: 6, minWidth: 240 }}>
@@ -307,10 +314,12 @@ function RecreateSteps({ ctx, source, characterIds, outfit, look, list, kept, ta
               <div className="st-grid scenes">
                 {mine.map(x => (
                   <div key={x.id} className={`st-tile st-scene-tile ${kept[cid] === x.id ? 'picked' : ''} ${isFresh(x.createdAt) ? 'st-new' : ''}`}>
-                    <div className="st-tile-open">
-                      {x.assetId ? <img className="st-clip" style={{ aspectRatio: '9 / 16', objectFit: 'cover' }} src={assetUrl(x.assetId, 480)} alt={`Still of ${x.characterName}`} /> : <div className="st-clip st-clip-empty" style={{ aspectRatio: '9 / 16' }}><AlertTriangle size={18} /></div>}
-                      {kept[cid] === x.id && <span className="st-badge ok"><Check size={12} /></span>}
-                    </div>
+                    {x.assetId ? (
+                      <button type="button" className="st-tile-open" onClick={() => view.open(x.id)} aria-label={`View still of ${x.characterName} full size`}>
+                        <img className="st-clip" style={{ aspectRatio: '9 / 16', objectFit: 'cover' }} src={assetUrl(x.assetId, 480)} alt={`Still of ${x.characterName}`} />
+                        {kept[cid] === x.id && <span className="st-badge ok"><Check size={12} /></span>}
+                      </button>
+                    ) : <div className="st-tile-open"><div className="st-clip st-clip-empty" style={{ aspectRatio: '9 / 16' }}><AlertTriangle size={18} /></div></div>}
                     <div className="st-row" style={{ gap: 6, padding: '0 4px', flexWrap: 'wrap' }}>
                       <span className="st-tile-label">{x.pass === 'face' ? 'Face pass' : 'Still'}</span>
                       {x.faceScore != null && <span className="st-badge plain" title="Face match to REF-00">Face {Math.round(x.faceScore * 100)}</span>}

@@ -1,42 +1,55 @@
 import { useRef, useState, type ReactNode } from 'react'
-import { AlertTriangle, Check, Loader2, Upload } from 'lucide-react'
+import { AlertTriangle, Check, CheckCircle2, Loader2, Minus, Upload } from 'lucide-react'
 import { api, assetUrl } from './api'
 import { useLibrary, useRefresh, useWorkerGate } from './hooks'
 import { Callout, Drawer, Img, errorMessage, isFresh, useToast } from './ui'
 import { RunStatus } from './runs'
 import { HowTo } from './guide/Guide'
 import { DeleteButton, TileCheck } from './trash'
+import { THUMB_W, ViewButton, Viewer, useViewer, type ViewerItem } from './viewer'
 import type { LibraryClip, LibraryStill } from './types'
 
 // The Library's grids (UX-PLAN.md): stills and clips across characters. The
 // Library page browses them; inside a post they open as a drawer to pick
-// from, and the pick drops into the step.
+// from, and the pick drops into the step. A tap opens the viewer (section
+// 34); in a drawer a tap picks, and the view button on the tile opens it.
 
 const firstFrame = (id: string) => `${assetUrl(id)}#t=0.1`
 // Select mode (Library, owner 2026-10-15): the tile toggles its checkbox.
 export interface GridSelect<T> { has: (id: string) => boolean; toggle: (x: T) => void }
+// The viewer's own buttons for an item; `close` closes it first.
+export type ViewActions<T> = (x: T, close: () => void) => ReactNode
 
-export function StillGrid({ stills, picked = [], onPick, action, showCharacter = false, select, onDelete }: { stills: LibraryStill[]; picked?: string[]; onPick?: (s: LibraryStill) => void; action?: (s: LibraryStill) => ReactNode; showCharacter?: boolean; select?: GridSelect<LibraryStill> | null; onDelete?: (s: LibraryStill) => void }) {
+const usedLine = (n: number | undefined) => (n == null ? '' : n ? `Used in ${n === 1 ? '1 post' : `${n} posts`}` : '')
+export const stillItem = (s: LibraryStill): ViewerItem => ({ id: s.id, assetId: s.assetId, media: 'image', name: s.sceneTitle || 'Still', thumbId: s.assetId, createdAt: s.createdAt, characterName: s.characterName })
+export const clipItem = (c: LibraryClip): ViewerItem => ({ id: c.id, assetId: c.assetId, media: 'video', name: c.title || 'Clip', thumbId: c.posterId, createdAt: c.createdAt, characterName: c.characterName })
+
+export function StillGrid({ stills, picked = [], onPick, action, viewActions, showCharacter = false, select, onDelete }: { stills: LibraryStill[]; picked?: string[]; onPick?: (s: LibraryStill) => void; action?: (s: LibraryStill) => ReactNode; viewActions?: ViewActions<LibraryStill>; showCharacter?: boolean; select?: GridSelect<LibraryStill> | null; onDelete?: (s: LibraryStill) => void }) {
+  const v = useViewer()
+  const byId = new Map(stills.map(s => [s.id, s]))
   return (
+    <>
     <div className="st-grid scenes">
       {stills.map(s => {
         const n = picked.indexOf(s.id)
         const on = !!select?.has(s.id)
         const body = (
           <>
-            <Img assetId={s.assetId} width={480} style={{ aspectRatio: '9 / 16' }} />
+            <Img assetId={s.assetId} width={THUMB_W} style={{ aspectRatio: '9 / 16' }} />
             {select ? <TileCheck on={on} /> : n >= 0 && <span className="st-badge ok">{picked.length > 1 ? `${n + 1}` : <Check size={12} />}</span>}
           </>
         )
         const name = s.sceneTitle || 'Still'
         return (
-          <div key={s.id} className={`st-tile st-scene-tile ${n >= 0 || on ? 'picked' : ''} ${isFresh(s.createdAt) ? 'st-new' : ''}`}>
+          <div key={s.id} className={`st-tile st-scene-tile ${n >= 0 || on ? 'picked' : ''} ${isFresh(s.createdAt) ? 'st-new' : ''}`} data-id={s.id}>
             {select ? <button type="button" className="st-tile-open" onClick={() => select.toggle(s)} aria-pressed={on} aria-label={`Select ${name}`}>{body}</button>
-              : onPick ? <button type="button" className="st-tile-open" onClick={() => onPick(s)} aria-pressed={n >= 0}>{body}</button> : <div className="st-tile-open">{body}</div>}
+              : onPick ? <button type="button" className="st-tile-open" onClick={() => onPick(s)} aria-pressed={n >= 0} aria-label={`Pick ${name}`}>{body}</button>
+              : <button type="button" className="st-tile-open" onClick={() => v.open(s.id)} aria-label={`View ${name}`}>{body}</button>}
+            {onPick && !select && <ViewButton onClick={() => v.open(s.id)} label={name} />}
             <div className="st-tile-meta">
               <div className="st-col" style={{ gap: 2, minWidth: 0, flex: 1 }}>
                 <span className="st-tile-label">{name}</span>
-                <span className="st-hint">{[showCharacter ? s.characterName : '', s.op === 'upload_image' ? 'Uploaded' : '', s.status === 'approved' ? 'Picked' : ''].filter(Boolean).join(' · ')}</span>
+                <span className="st-hint">{[showCharacter ? s.characterName : '', s.op === 'upload_image' ? 'Uploaded' : '', s.status === 'approved' ? 'Picked' : '', usedLine(s.used)].filter(Boolean).join(' · ')}</span>
               </div>
               {onDelete && !select && <DeleteButton onClick={() => onDelete(s)} label={name} />}
             </div>
@@ -45,42 +58,70 @@ export function StillGrid({ stills, picked = [], onPick, action, showCharacter =
         )
       })}
     </div>
+    <Viewer items={stills.map(stillItem)} openId={v.openId} onOpen={v.open} onClose={v.close}
+      actions={(x, close) => { const s = byId.get(x.id); return s ? (viewActions ? viewActions(s, close) : action?.(s)) : null }} />
+    </>
   )
 }
 
-export function ClipGrid({ clips, picked = [], onPick, action, showCharacter = false, select, onDelete }: { clips: LibraryClip[]; picked?: string[]; onPick?: (c: LibraryClip) => void; action?: (c: LibraryClip) => ReactNode; showCharacter?: boolean; select?: GridSelect<LibraryClip> | null; onDelete?: (c: LibraryClip) => void }) {
+// A clip tile loads its small picture (the still it started from, or an
+// upload's first frame); the clip itself plays on hover (on a computer)
+// and in the viewer.
+function ClipThumb({ c }: { c: LibraryClip }) {
+  const [hover, setHover] = useState(false)
+  if (!c.posterId) return <video className="st-clip" src={firstFrame(c.assetId)} muted loop playsInline preload="metadata" style={{ aspectRatio: '9 / 16' }} onMouseEnter={e => void e.currentTarget.play().catch(() => {})} onMouseLeave={e => e.currentTarget.pause()} />
   return (
+    <div className="st-clip-thumb" onMouseEnter={() => { if (window.matchMedia('(hover: hover)').matches) setHover(true) }} onMouseLeave={() => setHover(false)}>
+      <Img assetId={c.posterId} width={THUMB_W} style={{ aspectRatio: '9 / 16' }} />
+      {hover && <video src={assetUrl(c.assetId)} muted loop playsInline autoPlay aria-hidden />}
+    </div>
+  )
+}
+
+export function ClipGrid({ clips, picked = [], onPick, action, viewActions, showCharacter = false, select, onDelete }: { clips: LibraryClip[]; picked?: string[]; onPick?: (c: LibraryClip) => void; action?: (c: LibraryClip) => ReactNode; viewActions?: ViewActions<LibraryClip>; showCharacter?: boolean; select?: GridSelect<LibraryClip> | null; onDelete?: (c: LibraryClip) => void }) {
+  const v = useViewer()
+  const ready = (c: LibraryClip) => c.status === 'approved' && !!c.assetId
+  const viewable = clips.filter(ready)
+  const byId = new Map(viewable.map(c => [c.id, c]))
+  return (
+    <>
     <div className="st-grid scenes">
       {clips.map(c => {
         const n = picked.indexOf(c.id)
         const on = !!select?.has(c.id)
-        const ready = c.status === 'approved' && !!c.assetId
+        const ok = ready(c)
         const body = (
           <>
-            {ready
-              ? <video className="st-clip" src={firstFrame(c.assetId)} poster={c.posterId ? assetUrl(c.posterId, 420) : undefined} muted loop playsInline preload="metadata" style={{ aspectRatio: '9 / 16' }} onMouseEnter={e => void e.currentTarget.play().catch(() => {})} onMouseLeave={e => e.currentTarget.pause()} />
+            {ok
+              ? <ClipThumb c={c} />
               : <div className="st-clip st-clip-empty" style={{ aspectRatio: '9 / 16' }}>{c.status === 'failed' ? <AlertTriangle size={18} /> : <Loader2 size={18} className="st-spin" />}</div>}
             {select ? <TileCheck on={on} /> : n >= 0 && <span className="st-badge ok">{picked.length > 1 ? `${n + 1}` : <Check size={12} />}</span>}
-            {!ready && <span className={`st-badge ${c.status === 'failed' ? 'bad' : 'accent live'}`}>{c.status === 'failed' ? 'Failed' : 'Preparing'}</span>}
+            {!ok && <span className={`st-badge ${c.status === 'failed' ? 'bad' : 'accent live'}`}>{c.status === 'failed' ? 'Failed' : 'Preparing'}</span>}
           </>
         )
         return (
-          <div key={c.id} className={`st-tile st-scene-tile ${n >= 0 || on ? 'picked' : ''} ${isFresh(c.createdAt) ? 'st-new' : ''}`}>
+          <div key={c.id} className={`st-tile st-scene-tile ${n >= 0 || on ? 'picked' : ''} ${isFresh(c.createdAt) ? 'st-new' : ''}`} data-id={c.id}>
             {select ? <button type="button" className="st-tile-open" onClick={() => select.toggle(c)} aria-pressed={on} aria-label={`Select ${c.title}`}>{body}</button>
-              : onPick && ready ? <button type="button" className="st-tile-open" onClick={() => onPick(c)} aria-pressed={n >= 0}>{body}</button> : <div className="st-tile-open">{body}</div>}
+              : onPick && ok ? <button type="button" className="st-tile-open" onClick={() => onPick(c)} aria-pressed={n >= 0} aria-label={`Pick ${c.title}`}>{body}</button>
+              : ok ? <button type="button" className="st-tile-open" onClick={() => v.open(c.id)} aria-label={`View ${c.title}`}>{body}</button>
+              : <div className="st-tile-open">{body}</div>}
+            {onPick && ok && !select && <ViewButton onClick={() => v.open(c.id)} label={c.title} />}
             <div className="st-tile-meta">
               <div className="st-col" style={{ gap: 2, minWidth: 0, flex: 1 }}>
                 <span className="st-tile-label">{c.title}</span>
-                <span className="st-hint">{[showCharacter ? c.characterName : '', c.op === 'upload' ? 'Uploaded' : c.op === 'video_upscale' ? 'Upscaled take' : c.op === 'clone' ? 'Clone' : 'Take', c.durationSec ? `${c.durationSec} s` : ''].filter(Boolean).join(' · ')}</span>
+                <span className="st-hint">{[showCharacter ? c.characterName : '', c.op === 'upload' ? 'Uploaded' : c.op === 'video_upscale' ? 'Upscaled take' : c.op === 'clone' ? 'Clone' : 'Take', c.durationSec ? `${c.durationSec} s` : '', usedLine(c.used)].filter(Boolean).join(' · ')}</span>
                 {c.error && <span className="st-hint" style={{ color: 'var(--st-bad)' }}>{c.error}</span>}
               </div>
               {onDelete && !select && c.status !== 'generating' && <DeleteButton onClick={() => onDelete(c)} label={c.title} />}
             </div>
-            {action && ready && !select && <div className="st-tile-action">{action(c)}</div>}
+            {action && ok && !select && <div className="st-tile-action">{action(c)}</div>}
           </div>
         )
       })}
     </div>
+    <Viewer items={viewable.map(clipItem)} openId={v.openId} onOpen={v.open} onClose={v.close}
+      actions={(x, close) => { const c = byId.get(x.id); return c ? (viewActions ? viewActions(c, close) : action?.(c)) : null }} />
+    </>
   )
 }
 
@@ -189,10 +230,16 @@ export function LibraryDrawer({ open, onClose, kind, characterId, characterName,
         {!d ? <div className="st-skel" style={{ height: 240, borderRadius: 18 }} />
           : !list.length ? <Callout tone="info">{kind === 'stills' ? `No stills of ${characterName} yet. Make some in the Stills step.` : `No clips of ${characterName} yet. Upload a video, or make a take from a still.`}</Callout>
           : kind === 'stills'
-            ? <StillGrid stills={list as LibraryStill[]} picked={picked} onPick={s => { onPick(s.id); if (!multi) onClose() }} />
-            : <ClipGrid clips={list as LibraryClip[]} picked={picked} onPick={c => { onPick(c.id); if (!multi) onClose() }} />}
+            ? <StillGrid stills={list as LibraryStill[]} picked={picked} onPick={s => { onPick(s.id); if (!multi) onClose() }} viewActions={(s, close) => <UseInPost on={picked.includes(s.id)} multi={multi} use={() => { onPick(s.id); if (!multi) { close(); onClose() } }} />} />
+            : <ClipGrid clips={list as LibraryClip[]} picked={picked} onPick={c => { onPick(c.id); if (!multi) onClose() }} viewActions={(c, close) => <UseInPost on={picked.includes(c.id)} multi={multi} use={() => { onPick(c.id); if (!multi) { close(); onClose() } }} />} />}
         {multi && <div className="st-row"><span className="st-spacer" /><button className="st-btn primary" onClick={onClose}>Done</button></div>}
       </div>
     </Drawer>
   )
+}
+
+// In the viewer over a post's Library drawer: the same as picking the tile.
+function UseInPost({ on, multi, use }: { on: boolean; multi: boolean; use: () => void }) {
+  if (multi) return on ? <button type="button" className="st-btn" onClick={use}><Minus size={15} />Take it out of the post</button> : <button type="button" className="st-btn primary" onClick={use}><CheckCircle2 size={15} />Use in this post</button>
+  return on ? <span className="st-badge ok"><Check size={12} /> In this post</span> : <button type="button" className="st-btn primary" onClick={use}><CheckCircle2 size={15} />Use in this post</button>
 }

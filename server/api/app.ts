@@ -20,7 +20,9 @@ import { approveSceneCandidate, archiveScene, copyScene, createScene, cropCandid
 import { whatWasSent, whatWasSentForJob } from '../pipeline/sent.js'
 import { videoPrices } from '../pipeline/sceneActions.js'
 import { expectedVersion, readWorkerStatus } from '../jobs/workerStatus.js'
-import { addClip, addStills, libraryView } from '../pipeline/clips.js'
+import { addClip, addStills, libraryItem, libraryView } from '../pipeline/clips.js'
+import { addToCollection, deleteLibraryCollection, listCollections, removeFromCollection, renameLibraryCollection } from '../pipeline/collections.js'
+import { hasFilter, parseLibraryQuery, type LibraryQuery } from '../core/libraryFilter.js'
 import { autoCleanPreview, cleanIfDue, setAutoCleanDays, startAutoClean, storageView } from '../pipeline/storage.js'
 import { listTrash, parseRefs, restore, trash, trashWarnings, TRASH_DAYS } from '../pipeline/trash.js'
 import { cancelContinue, continueShot, keepTwoShots, useChainTake } from '../pipeline/chain.js'
@@ -679,7 +681,44 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
     const body = parse(z.object({ ids: z.array(z.string().max(60)).min(1).max(200) }), await json(c))
     return c.json(await restore(deps, ctx, body.ids))
   })
-  app.get('/library', async c => c.json(await libraryView(deps, c.get('ctx'), { characterId: c.req.query('characterId') || null })))
+  // The Library page's lists with its filters (UX-PLAN.md section 34); a
+  // plain call (a post's pickers) gets the lists as before.
+  app.get('/library', async c => {
+    let query: LibraryQuery
+    try { query = parseLibraryQuery(c.req.query()) } catch (e) { throw new AppError('bad_request', (e as Error).message) }
+    return c.json(await libraryView(deps, c.get('ctx'), hasFilter(query) ? { query } : { characterId: query.characterId }))
+  })
+  // One item for the viewer: name, date, character, model, cost, the posts
+  // that use it, its collections.
+  app.get('/library/items/:id', async c => c.json(await libraryItem(deps, c.get('ctx'), c.req.param('id'))))
+  // Collections: named sets of Library items, per account. Deleting one
+  // never deletes its items.
+  const collectionId = z.string().regex(/^col_[0-9a-z]{8,40}$/)
+  const itemIds = z.array(z.string().regex(/^cand_[0-9a-z]{8,40}$/)).min(1).max(500)
+  app.get('/library/collections', async c => c.json({ collections: await listCollections(deps, c.get('ctx')) }))
+  app.post('/library/collections', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    const body = parse(z.object({ id: collectionId.optional(), name: z.string().max(200).optional(), items: itemIds }).refine(b => b.id || b.name?.trim(), 'Pick a collection or type a name.'), await json(c))
+    return c.json(await addToCollection(deps, ctx, body))
+  })
+  app.post('/library/collections/:id/remove', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    const body = parse(z.object({ items: itemIds }), await json(c))
+    return c.json(await removeFromCollection(deps, ctx, parse(collectionId, c.req.param('id')), body.items))
+  })
+  app.patch('/library/collections/:id', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    const body = parse(z.object({ name: z.string().max(200) }), await json(c))
+    return c.json(await renameLibraryCollection(deps, ctx, parse(collectionId, c.req.param('id')), body.name))
+  })
+  app.delete('/library/collections/:id', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    return c.json(await deleteLibraryCollection(deps, ctx, parse(collectionId, c.req.param('id'))))
+  })
   // An uploaded video becomes a kept clip of the character (picked in the
   // post it was uploaded from).
   app.post('/characters/:id/clips', async c => {

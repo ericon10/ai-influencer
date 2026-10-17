@@ -2881,3 +2881,67 @@ Decided (UX-PLAN.md section 33):
 - The posting state is written on its own (`PUT /content/:id/posting`,
   `jsonb_set`), never through the workspace's spec patch, and never copied
   by Make another like this, a variation or a batch's slideshow.
+
+### G62. Library viewer, filters and collections (owner, 2026-10-17)
+
+Goal: see anything full size in one tap, find it again fast, keep named
+sets of it (UX-PLAN.md section 34).
+
+- **One viewer for the Studio** (`src/studio/viewer.tsx`): there was no
+  lightbox in `src/studio/` to grow, so this is the only one. A modal
+  dialog (labelled, focus kept inside, focus back on the tile when it
+  closes, the page under it does not scroll). A still fits the screen; a
+  clip is `<video controls muted playsInline>`, muted on first mount only
+  so the owner's unmute sticks. Arrow keys, the arrow buttons or a swipe
+  (more than 50 px, mostly sideways) move through the list it was opened
+  from; Esc, the X or a tap outside the picture closes it. Keys only act
+  while it is the top dialog, so Esc over the Library drawer closes the
+  viewer and leaves the drawer. It sits on the drawers' layer and opens
+  after them, so it shows above a drawer and below a toast.
+- **Where it opens**: Library Stills and Clips (a tap); the Library drawer
+  in a post (a tap still picks, as before; a view button in the tile's
+  corner opens the viewer, whose Use in this post picks); a post's stills
+  and takes (a tap opens the viewer with Use this still, Use this take or
+  Add to the slideshow, and Details, which opens the drawer the tap opened
+  before: check, fix, crop, keep, reject; a failed tile with no file opens
+  the drawer straight away); the Recreate and Replace stills grids (Pick
+  this one, Use this still); a slideshow's slide cards and its batch
+  review (Open the post). Drawn slides are not in the viewer.
+- **Facts under the asset** come from `GET /library/items/:id`: the model
+  asked for and the cost read the way What was sent reads a run
+  (`runFacts` in `server/pipeline/sent.ts`): the real cost when known,
+  else the quote, credits on the plan, dollars on the API, "Free (demo)"
+  for a mock run; "Free (uploaded)" and "Free (made on the Studio)" for
+  uploads and local renders. "Used in" is the Delete warning's own check
+  (`livePostNames`, `postsUsing` in `server/pipeline/trash.ts`): every
+  live post that names the item or its file in its fields, its render or
+  its saved editor timeline. A saved timeline never changes (each save is
+  a new file), so the names in it are kept per file in a cache setting
+  (`library.timeline_names`) and each file is read once; the Trash and
+  Auto-clean keep reading the files themselves.
+- **Small first**: grids ask for the 480 wide copy; the viewer shows that
+  copy at once and loads the full file over it; the items either side
+  load their small copies only. An uploaded clip now gets its first frame
+  as a picture when the worker prepares it (`meta.poster`, moved to the
+  Trash and purged with the clip), so Library > Clips loads pictures and
+  plays the clip on hover (a computer) or in the viewer. Older uploads
+  without one keep the first-frame video tile. A take's tile in a post
+  shows the still it started from and loads nothing more until hovered.
+- **Filters run on the server** (`GET /library` with `type`, `characterId`,
+  `model`, `from`, `to`, `used`, `product`, `set`; read by
+  `server/core/libraryFilter.ts`, shared with the page), before the newest
+  400 are taken, so older matches are found; a plain call (a post's
+  pickers) is unchanged. The type is the tab. Model is the model the run
+  asked for (`modelRef`), or Uploaded, or Made on the Studio (no run, or a
+  local job). Product (rule two, G57) is made in a post of that product
+  (its scene, or a slideshow's own still) or used by one. Dates are the
+  browser's own day (Today starts at local midnight). The page address
+  keeps each tab's filters as `stills.model=...`, `clips.used=...`; the
+  character stays the page-wide `c` as before.
+- **Collections are one account setting** (`library.collections`, no
+  migration): `{ list: [{ id: col_..., name, items: [candidate ids] }] }`.
+  Names are unique whatever their case, at most 60 characters; up to 200
+  collections of up to 2,000 items. Only the account's own stills and
+  clips go in. A trashed item stays in its collections and shows again
+  when restored. Removing an item or deleting a collection never touches
+  the item. The pure operations are `server/core/collections.ts`.

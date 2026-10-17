@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { AlertTriangle, Check, CheckCircle2, Download, Film, Loader2, RotateCcw, Wand2, XCircle } from 'lucide-react'
+import { AlertTriangle, Check, CheckCircle2, Download, Film, Info, Loader2, RotateCcw, Wand2, XCircle } from 'lucide-react'
 import { api, ApiError, assetUrl } from '../../api'
 import { useRefresh } from '../../hooks'
 import { PriceButton } from '../../PriceButton'
@@ -9,6 +9,7 @@ import type { CharacterView, SceneStill, SceneView, ScenesData } from '../../typ
 import { OP_LABEL, STILL_STATUS, claudeChecked, wrap } from './StillDrawer'
 import { PromptBox } from './PromptBox'
 import { StarButton } from '../../trash'
+import { THUMB_W, Viewer, useViewer } from '../../viewer'
 
 // Stage 9 (owner ruling 2026-10-13): a video from a picked still. Straight
 // to the picked model (Kling 3.0 Pro unless another was picked last, each
@@ -65,6 +66,9 @@ export function VideoSection({ v, data, scene, startId, setStartId, onUseTake, u
   // What the writer starts from: the box's saved text, else the idea.
   const seed = (scene.fields.moment || scene.brief || '').trim()
   const [open, setOpen] = useState<string | null>(null)
+  // A tap plays the take full size (the viewer, section 34); Details there
+  // opens its drawer.
+  const view = useViewer()
   useEffect(() => { if (endId && (endId === start?.id || !stills.some(s => s.id === endId))) setEndId(null) }, [endId, start?.id, stills])
   const ends = stills.filter(c => c.id !== start?.id).sort((a, b) => Number(b.op === 'end_frame') - Number(a.op === 'end_frame'))
   const writeTodo: TodoItem[] = !start ? [{ label: 'Pick a start frame', target: 'video-start' }] : []
@@ -73,6 +77,12 @@ export function VideoSection({ v, data, scene, startId, setStartId, onUseTake, u
     ...(motion.trim().length < 3 ? [{ label: pw.on ? 'What happens in the video (write it, or type your own)' : 'What happens in the video', target: 'video-motion' }] : []),
   ]
   const clip = clips.find(c => c.id === open) ?? null
+  // A take's small picture: the still it started from (an upscale's, its take's).
+  const posterOf = (c: SceneStill): string | null => {
+    let p = c.parentId ? scene.candidates.find(x => x.id === c.parentId) : undefined
+    if (p?.media === 'video') p = p.parentId ? scene.candidates.find(x => x.id === p!.parentId) : undefined
+    return p && p.media !== 'video' ? p.assetId ?? null : null
+  }
   // Keep (if not kept yet), then pick it for the post. A face that does not
   // match REF-00 asks first (a strong warning; the owner decides).
   async function useTake(id: string, acknowledge = false) {
@@ -222,8 +232,16 @@ export function VideoSection({ v, data, scene, startId, setStartId, onUseTake, u
         <>
           <div className="st-section-head" style={{ margin: '6px 0 0' }}><div className="st-h3">Takes</div><span className="st-muted">{clips.filter(c => c.assetId).length}</span></div>
           <div className="st-grid scenes">
-            {clips.map(c => <ClipTile key={c.id} c={c} aspect={scene.aspect} onOpen={() => setOpen(c.id)} used={c.id === usedId} onUse={onUseTake ? () => useTake(c.id) : undefined} />)}
+            {clips.map(c => <ClipTile key={c.id} c={c} aspect={scene.aspect} poster={posterOf(c)} onOpen={() => (c.assetId ? view.open(c.id) : setOpen(c.id))} used={c.id === usedId} onUse={onUseTake ? () => useTake(c.id) : undefined} />)}
           </div>
+          <Viewer items={clips.filter(c => c.assetId).map(c => ({ id: c.id, assetId: c.assetId!, media: 'video' as const, name: `${OP_LABEL[c.op]}: ${scene.title || 'Scene'}`, thumbId: posterOf(c), createdAt: c.createdAt, characterName: v.data.name, note: c.id === usedId ? 'Used for this post' : STILL_STATUS[c.status]?.label }))}
+            openId={view.openId} onOpen={view.open} onClose={view.close}
+            actions={(x, close) => {
+              const c = clips.find(t => t.id === x.id)
+              if (!c) return null
+              const usable = ['in_review', 'approved', 'rejected', 'superseded'].includes(c.status)
+              return <>{onUseTake && usable && c.id !== usedId && <AsyncButton className="st-btn ok" onClick={async () => { await useTake(c.id); close() }} icon={<CheckCircle2 size={15} />}>Use this take</AsyncButton>}<button type="button" className="st-btn ghost" onClick={() => { close(); setOpen(c.id) }}><Info size={15} />Details</button></>
+            }} />
         </>
       )}
       <ClipDrawer v={v} scene={scene} clip={clip} onClose={() => setOpen(null)} onOpen={setOpen} onUse={onUseTake ? (ack: boolean) => useTake(clip!.id, ack) : undefined} used={clip?.id === usedId} />
@@ -256,7 +274,7 @@ function EndFrameHelper({ v, data, start }: { v: CharacterView; data: ScenesData
   )
 }
 
-function ClipTile({ c, aspect, onOpen, onUse, used }: { c: SceneStill; aspect: string; onOpen: () => void; onUse?: () => Promise<void>; used: boolean }) {
+function ClipTile({ c, aspect, poster, onOpen, onUse, used }: { c: SceneStill; aspect: string; poster: string | null; onOpen: () => void; onUse?: () => Promise<void>; used: boolean }) {
   const s = STILL_STATUS[c.status] ?? { label: c.status, tone: '' }
   const test = JSON.stringify(c.qaReport ?? '').includes('faces not representative')
   const usable = !!c.assetId && ['in_review', 'approved', 'rejected', 'superseded'].includes(c.status)
@@ -264,7 +282,7 @@ function ClipTile({ c, aspect, onOpen, onUse, used }: { c: SceneStill; aspect: s
     <div className={`st-tile st-scene-tile ${used ? 'picked' : ''} ${isFresh(c.createdAt) ? 'st-new' : ''}`}>
       <button type="button" className="st-tile-open" onClick={onOpen} aria-label={`Open ${test ? 'motion test' : OP_LABEL[c.op]}`}>
         {c.assetId
-          ? <video className="st-clip" src={assetUrl(c.assetId)} muted loop playsInline preload="metadata" style={{ aspectRatio: aspect.replace(':', ' / ') }} onMouseEnter={e => void e.currentTarget.play().catch(() => {})} onMouseLeave={e => e.currentTarget.pause()} />
+          ? <video className="st-clip" src={assetUrl(c.assetId)} poster={poster ? assetUrl(poster, THUMB_W) : undefined} muted loop playsInline preload={poster ? 'none' : 'metadata'} style={{ aspectRatio: aspect.replace(':', ' / ') }} onMouseEnter={e => void e.currentTarget.play().catch(() => {})} onMouseLeave={e => e.currentTarget.pause()} />
           : <div className="st-clip st-clip-empty" style={{ aspectRatio: aspect.replace(':', ' / ') }}><AlertTriangle size={18} /></div>}
         <span className={`st-badge ${used ? 'ok' : s.tone}`}>{used ? 'Used' : s.label}</span>
       </button>

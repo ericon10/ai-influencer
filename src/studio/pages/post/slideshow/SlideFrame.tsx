@@ -3,6 +3,7 @@ import { assetUrl } from '../../../api'
 import { slideOverlaySvg, specialOwnBackground, SAFE } from '../../../../../server/core/slideSvg'
 import { cleanSpecial, type Slide, type SlidePos, type TextStyleId } from '../../../../../server/core/slides'
 import { browserDraw } from './draw'
+import type { ViewerItem } from '../../../viewer'
 
 // One slide as it will be exported (UX-PLAN.md section 27): the picture,
 // a special slide over it, the words in the post's text style at their
@@ -82,3 +83,12 @@ export function SlideFrame({ slide, assetId, style, ad, width, frame = 'tiktok',
 }
 
 const clamp = (v: number) => Math.min(1, Math.max(0, v))
+
+// The slides with a photo, for the viewer (UX-PLAN.md section 34): each
+// opens its photo full size; drawn slides are left out.
+export function slideViewerItems(list: Slide[], assetOf: (stillId: string) => string | null | undefined): ViewerItem[] {
+  return list.flatMap(s => {
+    const assetId = !s.special && s.stillId ? assetOf(s.stillId) : null
+    return assetId ? [{ id: `slide-${s.index}`, infoId: s.stillId, assetId, media: 'image' as const, name: `Slide ${s.index + 1}${s.text ? `: ${s.text.length > 60 ? `${s.text.slice(0, 60)}...` : s.text}` : ''}`, thumbId: assetId }] : []
+  })
+}

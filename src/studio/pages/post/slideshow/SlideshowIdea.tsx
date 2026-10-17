@@ -14,7 +14,8 @@ import { LintNote, useLint, useProductRules } from '../../../lint'
 import { wordsNote } from '../../../../../server/core/slideSvg'
 import type { SlideBatch, SlideshowSpec } from '../../../types'
 import type { PostCtx } from '../ctx'
-import { SlideFrame } from './SlideFrame'
+import { SlideFrame, slideViewerItems } from './SlideFrame'
+import { Viewer, useViewer } from '../../../viewer'
 import { useSlideFonts } from './draw'
 
 // The slideshow's Idea step, hook first (UX-PLAN.md section 27): the hook
@@ -236,11 +237,7 @@ function BatchReview({ ctx, items, assets, refetch }: { ctx: PostCtx; items: Sli
               <span className="st-hint">{state === 'approved' ? (x.status === 'ready' ? 'Approved, exported' : x.status === 'rendering' ? 'Approved, exporting...' : 'Approved') : state === 'rejected' ? 'Rejected' : missing ? `${missing} still${missing === 1 ? '' : 's'} coming` : 'Ready to review'}</span>
               <Link className="st-btn ghost sm" to={`/studio/posts/${x.id}`}><ExternalLink size={13} />Open</Link>
             </div>
-            {fonts && (
-              <div className="st-slidestrip">
-                {list.map(s => <SlideFrame key={s.index} slide={s} assetId={(s.special ? backdropFor(list, s.index) : s.stillId) ? stills.get((s.special ? backdropFor(list, s.index) : s.stillId)!) : null} style={x.spec.textStyle} ad={x.spec.ad && s.index === 0} width={84} brands={brands} />)}
-              </div>
-            )}
+            {fonts && <ReviewStrip postId={x.id} list={list} stills={stills} textStyle={x.spec.textStyle} ad={x.spec.ad} brands={brands} />}
             {state !== 'rejected' ? (
               <div className="st-row" style={{ gap: 8, flexWrap: 'wrap', alignItems: 'flex-start' }}>
                 <AsyncButton className={`st-btn sm ${state === 'approved' ? 'ok' : 'primary'}`} disabled={missing > 0 || state === 'approved'} onClick={() => decide(x.id, 'approve')} icon={state === 'approved' ? <Check size={13} /> : <ThumbsUp size={13} />}>{state === 'approved' ? 'Approved' : 'Approve'}<span className="st-price">Free</span></AsyncButton>
@@ -254,6 +251,25 @@ function BatchReview({ ctx, items, assets, refetch }: { ctx: PostCtx; items: Sli
           </div>
         )
       })}
+    </div>
+  )
+}
+
+// One slideshow's slides in the review: a tap on a photo opens it full size
+// (the viewer, section 34), with the slideshow's other photos either side.
+function ReviewStrip({ postId, list, stills, textStyle, ad, brands }: { postId: string; list: ReturnType<typeof slideList>; stills: Map<string, string>; textStyle: SlideshowSpec['textStyle']; ad: boolean; brands: { names: string[]; generic: string[] } }) {
+  const view = useViewer()
+  return (
+    <div className="st-slidestrip">
+      {list.map(s => {
+        const back = s.special ? backdropFor(list, s.index) : s.stillId
+        const frame = <SlideFrame key={s.index} slide={s} assetId={back ? stills.get(back) : null} style={textStyle} ad={ad && s.index === 0} width={84} brands={brands} />
+        return !s.special && s.stillId && stills.get(s.stillId)
+          ? <button key={s.index} type="button" className="st-slideframe-open" onClick={() => view.open(`slide-${s.index}`)} aria-label={`View slide ${s.index + 1} full size`}>{frame}</button>
+          : frame
+      })}
+      <Viewer items={slideViewerItems(list, id => stills.get(id))} openId={view.openId} onOpen={view.open} onClose={view.close}
+        actions={(_x, close) => <Link className="st-btn" to={`/studio/posts/${postId}`} onClick={close}><ExternalLink size={15} />Open the post</Link>} />
     </div>
   )
 }
