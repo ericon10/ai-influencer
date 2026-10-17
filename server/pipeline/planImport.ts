@@ -1,5 +1,5 @@
-import { and, eq, inArray, isNull, sql } from 'drizzle-orm'
-import { candidates, contentItems } from '../db/schema.js'
+import { and, eq, gt, inArray, isNull, like, or, sql } from 'drizzle-orm'
+import { candidates, contentItems, jobs } from '../db/schema.js'
 import type { Ctx, Deps } from '../context.js'
 import { AppError } from '../lib/errors.js'
 import type { JobSpec } from '../jobs/runner.js'
@@ -233,9 +233,24 @@ export async function importPlan(deps: Deps, ctx: Ctx, csv: string, opts: Opts =
 }
 
 // The plan's posts after import, in schedule order, with what each still
-// needs (the Launch plan card's list).
+// needs (the Launch plan card's list), and how many of their stills are
+// still on their way. The card reads the plan again while any are (G63):
+// it never depends on the jobs list, which shows at most 100 jobs, so a
+// big run or a busy account could hide the stills still running and the
+// card stopped at "0 of 6".
 export interface PlanPostView { id: string; rowId: string; planId: string; date: string; slot: string; account: string; format: string; kind: string; hook: string; status: string; need: number; have: number; exported: boolean; mode: 'character' | 'topic' | null }
-export async function planView(deps: Deps, ctx: Ctx): Promise<{ posts: PlanPostView[] }> {
+const ACTIVE_JOBS = ['waiting', 'queued', 'submitting', 'running', 'ingesting']
+export async function planView(deps: Deps, ctx: Ctx): Promise<{ posts: PlanPostView[]; running: number }> {
+  // The stills on their way are read first, then the posts: when none are
+  // running, every still is already in its slide. A finished still counts
+  // until its hook has put it in place (phase "checking"); one stuck there
+  // for 10 minutes no longer does.
+  const since = new Date(deps.clock.now().getTime() - 10 * 60_000)
+  const active = await deps.db.select({ purpose: jobs.purpose }).from(jobs).where(and(
+    eq(jobs.accountId, ctx.accountId),
+    or(like(jobs.purpose, 'slide_still:%'), like(jobs.purpose, 'scene:%')),
+    or(inArray(jobs.status, ACTIVE_JOBS), and(eq(jobs.status, 'completed'), eq(jobs.phase, 'checking'), gt(jobs.completedAt, since))),
+  ))
   const rows = await deps.db.select().from(contentItems)
     .where(and(eq(contentItems.accountId, ctx.accountId), isNull(contentItems.archivedAt), sql`coalesce(${contentItems.spec}->'plan'->>'rowId', '') <> ''`))
   const sceneIds = rows.filter(r => r.kind === 'meme' && r.sceneId).map(r => r.sceneId!)
@@ -254,7 +269,8 @@ export async function planView(deps: Deps, ctx: Ctx): Promise<{ posts: PlanPostV
     } else { need = 1; have = Math.min(1, byScene.get(r.sceneId ?? '') ?? 0); mode = 'character' }
     return { id: r.id, rowId: p.rowId, planId: p.planId, date: p.date, slot: p.slot, account: r.accountTag, format: p.format, kind: r.kind, hook: r.kind === 'slideshow' ? String((r.spec as { hook?: string }).hook ?? '') : String((r.spec as { caption?: string }).caption ?? ''), status: r.status, need, have, exported: !!(out?.imageAssetIds?.length || out?.videoAssetId), mode, line: 0 }
   })
-  return { posts: scheduleOrder(posts.map((p, i) => ({ ...p, line: i }))).map(({ line: _line, ...p }) => p) }
+  const mine = new Set(rows.map(r => (r.kind === 'slideshow' ? `slide_still:${r.id}` : `scene:${r.sceneId ?? ''}`)))
+  return { posts: scheduleOrder(posts.map((p, i) => ({ ...p, line: i }))).map(({ line: _line, ...p }) => p), running: active.filter(j => mine.has(j.purpose)).length }
 }
 
 // ── Generate N posts (priced): ten at a time ──────────────────────────

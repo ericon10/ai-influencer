@@ -170,7 +170,7 @@ export const api = {
   // The launch plan (section 28).
   planPreview: (csv: string, o: { drawSpecials?: boolean; store?: Record<string, string>; stillModel?: string | null } = {}) => request<PlanPreview>('POST', '/plan/preview', { csv, ...o }),
   planImport: (csv: string, o: { drawSpecials?: boolean; store?: Record<string, string> } = {}) => request<PlanImportResult>('POST', '/plan/import', { csv, ...o }),
-  plan: () => request<{ posts: PlanPostView[] }>('GET', '/plan'),
+  plan: () => request<{ posts: PlanPostView[]; running: number }>('GET', '/plan'),
   saveSlideStillModel: (model: string) => request<{ ok: true }>('PUT', '/slideshow/still-model', { model }),
   slideScenes: () => request<{ scenes: SlideScene[] }>('GET', '/slide-scenes'),
   saveSlideScene: (body: { name: string; characterId?: string | null; topic?: string; place: string; light?: string; camera?: string; phone?: string; details?: string[]; lookAssetId?: string | null }) => request<SlideScene>('POST', '/slide-scenes', body),

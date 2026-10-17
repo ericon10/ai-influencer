@@ -8,9 +8,11 @@ import { setBudget } from '../costs/budgets.js'
 import { getAsset, readAsset } from '../storage/assets.js'
 import { probeMedia } from '../media/ffmpeg.js'
 import { saveAsset } from '../storage/assets.js'
-import { renderPlaceholderPortrait } from '../providers/mock.js'
+import { createMockAdapter, renderPlaceholderPortrait } from '../providers/mock.js'
 import type { GenRequest, ProviderAdapter } from '../providers/types.js'
 import { finalizeImagePrompt } from '../core/realism.js'
+import { loadConfig } from '../config/load.js'
+import { registerJobHook } from './hooks.js'
 
 // Image prompts go through the realism step like every built prompt.
 const img = (prompt: string, extra: Partial<GenRequest> = {}): JobSpec => ({
@@ -237,6 +239,34 @@ describe('job runner', () => {
     expect((job.resultMeta as { data: { concepts: unknown[] } }).data.concepts).toHaveLength(3)
     expect(job.actualMicros).toBeGreaterThan(0)
     expect(job.actualMicros!).toBeLessThan(job.estimateMicros)
+  })
+})
+
+// The plan's "0 of 6" (G63): a finished still was marked completed before
+// its hook put it in its slide, and on the plan path the Higgsfield charge
+// was read in between (a second or more), so a page polling the jobs list
+// saw "done" and read the post before the still was there. Now the job is
+// completed and "checking" in one step, and "done" only after its hook.
+describe('a finished job counts as running until its hook has run', () => {
+  let h: Harness | null = null
+  afterEach(async () => { await h?.close(); h = null })
+
+  it('is completed and checking in one step, while the plan charge is read and while its hook runs', async () => {
+    const seen: Array<{ at: string; status: string; phase: string | null }> = []
+    const look = async (at: string) => {
+      const [j] = await h!.deps.db.select().from(jobs).where(eq(jobs.purpose, 'test_checking:plan'))
+      seen.push({ at, status: j!.status, phase: j!.phase })
+    }
+    const mock = createMockAdapter({ config: loadConfig(), loadAsset: async () => { throw new Error('no refs here') } })
+    // The plan path: the runner reads the account's charges after settling.
+    const plan: ProviderAdapter = { ...mock, async charges() { await look('charge'); return [] } }
+    h = await createHarness({ overrides: { gen: { mock: plan } } })
+    registerJobHook('test_checking', async () => { await look('hook') })
+    const spec: JobSpec = { ...img('a still on the plan path'), purpose: 'test_checking:plan', request: { ...img('a still on the plan path').request, billing: 'account' } as GenRequest }
+    const { rows } = await quoteAndRun(h, [spec])
+    await drain(h)
+    expect(seen).toEqual([{ at: 'charge', status: 'completed', phase: 'checking' }, { at: 'hook', status: 'completed', phase: 'checking' }])
+    expect((await getJob(h.deps, h.ctx, rows[0]!.id)).phase).toBe('done')
   })
 })
 
