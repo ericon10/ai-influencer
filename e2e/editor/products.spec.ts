@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { api, snap } from './helpers'
+import { api, seedData, snap } from './helpers'
 
 // Products (owner, 2026-10-17; UX-PLAN.md section 29), like a user, in demo
 // mode: a Callie video post with No product gets no SideStep notes (the
@@ -8,7 +8,8 @@ import { api, snap } from './helpers'
 // posts; a product's writing rules on its card.
 
 const products = async () => (await api<{ products: { id: string; name: string }[] }>('GET', '/products')).products
-const callieId = async () => (await api<{ characters: { id: string; name: string }[] }>('GET', '/characters')).characters.find(c => c.name === 'Callie')!.id
+// The seeded Callie; SideStep is the owner's starter kit (the seed checks it is there).
+const callieId = async () => seedData().callie
 
 test('a video post with No product gets the dash check only; picked as SideStep, its notes come back', async ({ page }, info) => {
   test.setTimeout(120_000)
@@ -42,7 +43,7 @@ test('a video post with No product gets the dash check only; picked as SideStep,
 
 test('Posts home filters by product; an account\'s product is the default of its new posts; a product\'s writing rules', async ({ page }, info) => {
   test.setTimeout(120_000)
-  const sideStep = (await products()).find(p => p.name === 'SideStep')!.id
+  const sideStep = seedData().sideStep
   const tag = 'e2e.products'
   // The Accounts card: this account's product is SideStep.
   await api('PUT', `/social-accounts/${tag}`, { productId: null })

@@ -1,6 +1,6 @@
 import { expect, test, type Locator, type Page, type TestInfo } from '@playwright/test'
 import { unzipSync } from 'fflate'
-import { API, api, snap } from './helpers'
+import { API, api, seedData, snap } from './helpers'
 
 // The slideshow power-up (UX-PLAN.md section 27), like a user, in demo
 // mode: hooks from the vault, Use this hook (its price on the button), the
@@ -10,10 +10,8 @@ import { API, api, snap } from './helpers'
 
 const press = (l: Locator, phone: boolean) => (phone ? l.tap() : l.click())
 
-async function characterId(): Promise<string> {
-  const { characters } = await api<{ characters: { id: string; progress: { approved: number } }[] }>('GET', '/characters')
-  return (characters.find(c => c.progress.approved > 0) ?? characters[0]!).id
-}
+// The seeded Callie (her sheet is approved).
+const characterId = async (): Promise<string> => seedData().callie
 
 // A price button: its price shows before it can be pressed; above the
 // confirm threshold it asks once more.

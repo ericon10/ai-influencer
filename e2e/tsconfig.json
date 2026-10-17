@@ -9,5 +9,5 @@
     "skipLibCheck": true,
     "noEmit": true
   },
-  "include": ["editor/**/*.ts", "playwright.config.ts"]
+  "include": ["editor/**/*.ts", "playwright.config.ts", "global-setup.ts", "seed.ts"]
 }

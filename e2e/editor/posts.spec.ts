@@ -1,15 +1,19 @@
 import { expect, test } from '@playwright/test'
-import { allPosts, api, snap } from './helpers'
+import { allPosts, api, seedData, snap } from './helpers'
 
 // Posts home past the newest 200 posts (owner, 2026-10-17): Show older
 // posts loads more, and a filter applies to the older pages too, so every
-// post stays reachable. Needs more than 200 posts (the launch plan import
-// makes 140).
+// post stays reachable. Makes posts (free drafts) until there are more than
+// 200, so the older pages always have something on them.
 
 test('Posts home: Show older posts pages past the newest 200, and a filter finds an older post', async ({ page }, info) => {
   test.setTimeout(180_000)
+  const have = (await allPosts()).length
+  for (let i = have; i < 230; i += 10) {
+    await Promise.all(Array.from({ length: Math.min(10, 230 - i) }, (_, k) => api('POST', '/content', { kind: 'meme', characterId: seedData().callie, accountTag: 'e2e.older', title: `An older post ${i + k + 1}`, idea: 'an older post' })))
+  }
   const first = await api<{ items: { id: string }[]; next: string | null }>('GET', '/content')
-  test.skip(!first.next, 'Fewer than 200 posts: nothing older to show.')
+  expect(first.next, 'more than 200 posts').toBeTruthy()
   await page.goto('/studio')
   const cards = page.locator('.st-postcard-name')
   await expect(cards).toHaveCount(200, { timeout: 30_000 })

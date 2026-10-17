@@ -35,13 +35,16 @@ const dayLabel = (d: string) => {
 
 export function PlanCard({ characters }: { characters: CharacterSummary[] }) {
   const qc = useQueryClient()
-  const plan = useQuery({ queryKey: ['plan'], queryFn: () => api.plan(), staleTime: 5_000 })
+  // While the plan's stills are on their way the plan is read every 3 s, and
+  // the plan itself says so (G63): it counts its own running stills, so the
+  // card never depends on the jobs list (at most 100 jobs; a big run could
+  // hide the stills still running, and the card stopped at "0 of 6").
+  const plan = useQuery({ queryKey: ['plan'], queryFn: () => api.plan(), staleTime: 5_000, refetchInterval: q => (q.state.data?.running ? 3000 : false) })
   const posts = plan.data?.posts ?? []
   const [open, setOpen] = useState(() => { try { return localStorage.getItem(KEY) === '1' } catch { return false } })
   useEffect(() => { try { localStorage.setItem(KEY, open ? '1' : '0') } catch { /* private window */ } }, [open])
-  // While stills run, the list follows them; when the last one finishes it
-  // is read once more, so every post shows its final count (the last poll
-  // could come before the last still landed, and it stayed "0 of 6").
+  // Stills started somewhere else (a post's Generate the set) show in the
+  // jobs list first: the plan is read then, and once more when they stop.
   const jobs = useActiveJobs()
   const running = (jobs.data?.jobs ?? []).some(j => /^(slide_still|scene):/.test(j.purpose))
   useEffect(() => {
@@ -339,7 +342,7 @@ function PlanPosts({ posts }: { posts: PlanPostView[] }) {
           models={on?.empty ? [{ who: 'Slides with no one', model: on.empty }] : []} />
       )}
       <PriceButton label={`Generate ${ids.length} post${ids.length === 1 ? '' : 's'}`} action={ids.length ? { type: 'plan_generate', postIds: ids.slice(0, 100), ...(pick ? { path: pick } : {}) } : null}
-        todo={ids.length ? [] : [{ label: 'Tick the posts to generate' }]} onStarted={() => setPicked(new Set())}
+        todo={ids.length ? [] : [{ label: 'Tick the posts to generate' }]} onStarted={() => { setPicked(new Set()); void qc.invalidateQueries({ queryKey: ['plan'] }) }}
         onDone={() => void qc.invalidateQueries({ queryKey: ['plan'] })} />
       <span className="st-hint">A slideshow gets a still for every photo slide (drawn slides are free), a clip its opening still; its take is made in the post with its own price after you pick the still. A slide with a character in it, and a clip's opening still, use the stills model in that character's file, on the path picked above. More than 10 posts run ten at a time.{ids.length > 100 ? ' At most 100 in one go.' : ''}</span>
     </div>

@@ -3,7 +3,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { expect, test, type Browser, type Page } from '@playwright/test'
 import sharp from 'sharp'
-import { api, seedPost, snap, uploadFile } from './helpers'
+import { api, seedData, seedPost, snap, uploadFile } from './helpers'
 import { emptyTransfer, LIVE, startLive, type Live } from './r2'
 
 // Storage, traffic and auto-clean (owner, 2026-10-15), driven like a user
@@ -223,8 +223,7 @@ async function session(browser: Browser, mode: 'through' | 'redirect', character
   const { items } = await api<{ items: { id: string; kind: string; step: string }[] }>('GET', '/content')
   const post = items.find(i => i.kind === 'slideshow') ?? items[0]!
   await go(`/studio/posts/${post.id}`)
-  const recreate = join(OUT, 'cache', 'recreate-post.txt')
-  if (existsSync(recreate)) await go(`/studio/posts/${readFileSync(recreate, 'utf8').trim()}`)
+  await go(`/studio/posts/${seedData().recreatePost}`)
   await go('/studio/settings')
   const t = { ...live.transfer, byPath: Object.fromEntries(Object.entries(live.transfer.byPath).sort((a, b) => b[1] - a[1]).slice(0, 8)) }
   await ctx.close()

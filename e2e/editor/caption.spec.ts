@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Locator, type Page } from '@playwright/test'
 import sharp from 'sharp'
 import { API, api, captionBlocks, clipBlocks, seedPost, snap, CAPTION } from './helpers'
 import { editorReady, LIVE, startLive, type Live } from './r2'
@@ -29,8 +29,15 @@ async function finish(page: Page) {
   await step(page, 'Finish').click()
   await page.locator('[data-field="post-timeline"]').waitFor({ timeout: 20_000 })
 }
+// The button in the middle of the screen, never under the post's sticky
+// step bar: Playwright scrolls a button only just into view, where the bar
+// can take the click (it opened the Caption step instead of the editor).
+async function clickClear(button: Locator) {
+  await button.evaluate(el => el.scrollIntoView({ block: 'center' }))
+  await button.click()
+}
 async function openEditor(page: Page) {
-  await page.locator('[data-field="post-timeline"]').getByRole('button', { name: /Open the editor/ }).click()
+  await clickClear(page.locator('[data-field="post-timeline"]').getByRole('button', { name: /Open the editor/ }))
   await page.waitForURL(/\/editor\/\?studio=/, { timeout: 30_000 })
   await editorReady(page)
 }

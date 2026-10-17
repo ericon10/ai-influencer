@@ -465,18 +465,21 @@ async function ingestGen(deps: Deps, job: JobRow): Promise<void> {
     return needsAttention(deps, job, `Could not copy the output into storage: ${(e as Error).message}`)
   }
 
+  // Settled and "checking" in one step: the free checks (face match, skin
+  // texture) run in the hook, which also puts the result in place (a slide's
+  // still, a post's take). Until then the job still counts as running, so a
+  // page never reads "done" before the result is there (the plan's
+  // "0 of 6", G63; reading the plan charge below takes a second or more).
   if (req.billing === 'account') {
     // Plan credits are charged as quoted (the request fixes the duration);
     // the credits Higgsfield actually took are logged next to the quote.
     const credits = req.quotedCredits ?? 0
-    await settle(deps, job, 'completed', job.estimateMicros, `${credits} plan credits`, { quantity: credits, unit: 'credit' })
+    await settle(deps, job, 'completed', job.estimateMicros, `${credits} plan credits`, { quantity: credits, unit: 'credit' }, 'checking')
     await recordPlanCost(deps, job, adapter, req)
   } else {
     const actual = actualGen(deps.config, req, measured)
-    await settle(deps, job, 'completed', actual.totalMicros, `${actual.lines.map(l => l.label).join(', ')}`)
+    await settle(deps, job, 'completed', actual.totalMicros, `${actual.lines.map(l => l.label).join(', ')}`, {}, 'checking')
   }
-  // The free checks (face match, skin texture) run in the hook.
-  await update(deps, job, { phase: 'checking', phaseAt: deps.clock.now() })
   await runHook(deps, ctx, job, { status: 'completed', assets })
   await update(deps, job, { phase: 'done', phaseAt: deps.clock.now() })
 }
@@ -544,13 +547,13 @@ async function finishLocal(deps: Deps, ctx: Ctx, job: JobRow, status: 'completed
 
 // Final ledger entries for a finished job: release the hold, record the
 // actual charge (computed from the price book until reconciled).
-async function settle(deps: Deps, job: JobRow, status: 'completed', actualMicros: number, note: string, amount: { quantity?: number; unit?: string } = {}): Promise<void> {
+async function settle(deps: Deps, job: JobRow, status: 'completed', actualMicros: number, note: string, amount: { quantity?: number; unit?: string } = {}, phase?: 'checking'): Promise<void> {
   await deps.db.transaction(async tx => {
     await appendLedger(tx as unknown as Db, [
       { accountId: job.accountId, userId: job.userId, characterId: job.characterId, jobId: job.id, quoteId: job.quoteId, stage: job.stage, provider: job.provider, model: job.model, entryType: 'release', amountMicros: -job.estimateMicros, source: 'estimate', note: 'hold released' },
       { accountId: job.accountId, userId: job.userId, characterId: job.characterId, jobId: job.id, quoteId: job.quoteId, stage: job.stage, provider: job.provider, model: job.model, entryType: 'charge', amountMicros: actualMicros, source: 'computed', note, ...amount },
     ])
-    await tx.update(jobs).set({ status, actualMicros, actualSource: 'computed', completedAt: deps.clock.now(), lockedUntil: null, nextPollAt: null, error: null, updatedAt: deps.clock.now() }).where(eq(jobs.id, job.id))
+    await tx.update(jobs).set({ status, actualMicros, actualSource: 'computed', completedAt: deps.clock.now(), lockedUntil: null, nextPollAt: null, error: null, updatedAt: deps.clock.now(), ...(phase ? { phase, phaseAt: deps.clock.now() } : {}) }).where(eq(jobs.id, job.id))
   })
   await event(deps.db, job, status, { actualMicros })
 }

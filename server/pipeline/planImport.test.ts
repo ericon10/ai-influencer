@@ -161,11 +161,24 @@ describe('the launch plan', () => {
     expect(new Set(rows.map(groupOf))).toEqual(new Set([0, 1]))
     expect(rows.filter(r => groupOf(r) === 1).every(r => r.status === 'waiting')).toBe(true)
     expect(rows.filter(r => groupOf(r) === 0).every(r => r.status === 'queued')).toBe(true)
+    // The plan says how many of its stills are on their way (the card reads
+    // it again while any are, G63): all of them, the waiting ten too.
+    expect((await planView(h.deps, h.ctx)).running).toBe(ran.jobs.length)
     await drain(h, 200)
     const done = await h.deps.db.select({ status: jobs.status }).from(jobs).where(inArray(jobs.id, ran.jobs.map(j => j.id)))
     expect(done.every(r => r.status === 'completed')).toBe(true)
-    const after = (await planView(h.deps, h.ctx)).posts.filter(p => picked.some(x => x.id === p.id))
+    const view = await planView(h.deps, h.ctx)
+    expect(view.running).toBe(0)
+    const after = view.posts.filter(p => picked.some(x => x.id === p.id))
     expect(after.every(p => p.have === p.need)).toBe(true)
+
+    // A finished still counts until its hook has put it in its slide
+    // (phase "checking"), and a still of another post never counts.
+    const one = ran.jobs[0]!.id
+    await h.deps.db.update(jobs).set({ phase: 'checking' }).where(eq(jobs.id, one))
+    expect((await planView(h.deps, h.ctx)).running).toBe(1)
+    await h.deps.db.update(jobs).set({ phase: 'done' }).where(eq(jobs.id, one))
+    expect((await planView(h.deps, h.ctx)).running).toBe(0)
 
     // The export: post.json has the plan's fields.
     const first = after[0]!

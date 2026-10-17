@@ -26,8 +26,9 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 const CACHE = join(HERE, '..', '.out', 'cache')
 mkdirSync(CACHE, { recursive: true })
 const VITE = new URL(process.env.E2E_BASE ?? 'http://localhost:5173')
-export const LIVE = 'http://localhost:5198'
-export const R2 = 'http://localhost:5199'
+// Free ports picked by global-setup.ts (so runs side by side never clash).
+export const LIVE = `http://localhost:${process.env.E2E_LIVE_PORT || 5198}`
+export const R2 = `http://localhost:${process.env.E2E_R2_PORT || 5199}`
 
 export interface Live {
   // Storage refuses everything (the Studio then sends files in parts).

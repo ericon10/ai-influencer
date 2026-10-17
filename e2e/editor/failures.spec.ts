@@ -1,18 +1,13 @@
 import { expect, test, type Locator, type Page, type TestInfo } from '@playwright/test'
-import { allPosts, api, snap } from './helpers'
+import { api, seedData, snap } from './helpers'
 
 // Earlier failures in one gray line (owner, 2026-10-15): in the Recreate
 // stills grid and in the run rows, only the run just started shows its
 // failures red; the earlier ones are counted in one gray line with Show and
 // Clear. The lists are served by the test (nothing runs).
 
-async function recreatePost(): Promise<{ id: string; characterId: string }> {
-  const items = await allPosts<{ id: string; characterId: string | null; spec?: { clone?: { assetId?: string | null } | null } }>()
-  // The oldest one: the editor tests copy posts, and a copy is not set up the same way.
-  const p = [...items].reverse().find(i => i.spec?.clone?.assetId && i.characterId)
-  if (!p) throw new Error('No post with a Recreate source. Start one from a real clip in demo mode first.')
-  return { id: p.id, characterId: p.characterId! }
-}
+// The seeded Recreate post (its source clip, stills and a kept take).
+const recreatePost = () => ({ id: seedData().recreatePost, characterId: seedData().callie })
 
 const gate = { ok: true, face: 0.6, likeness: 0.2, margin: 0.4, reasons: [], note: null }
 function still(id: string, o: Partial<Record<string, unknown>>) {
@@ -47,7 +42,7 @@ async function openStills(page: Page, post: string) {
 const press = (l: Locator, phone: boolean) => (phone ? l.tap() : l.click())
 
 async function stillsGrid(page: Page, info: TestInfo, phone: boolean) {
-  const { id, characterId } = await recreatePost()
+  const { id, characterId } = recreatePost()
   await api('PATCH', `/content/${id}`, { spec: { failuresClearedAt: null } })
   const hourAgo = new Date(Date.now() - 3600_000).toISOString()
   const blocked = 'The provider content filter blocked this result.'
@@ -117,9 +112,9 @@ async function runRows(page: Page, info: TestInfo, phone: boolean) {
 
 // The face strip under a Recreate take (owner, 2026-10-15): drift is marked
 // under the video rule's face number, 0.45, so the strip and the rule agree.
-// The local face models are not installed, so the test serves known scores
-// over the real take; the line itself comes from the API (the video rule in
-// the gate check). The take's own review may be running again when the page
+// A mock take has no face to score, so the test serves known scores over
+// the real take; the line itself comes from the API (the video rule in the
+// gate check). The take's own review may be running again when the page
 // opens (it asks for missing text frames), so the test never waits on it.
 async function faceStrip(page: Page, info: TestInfo, phone: boolean) {
   test.setTimeout(180_000)
@@ -128,15 +123,10 @@ async function faceStrip(page: Page, info: TestInfo, phone: boolean) {
   expect(faceMin).toBe(0.45)
   type Review = { faceMin: number; step: number; duration: number; samples: Array<{ t: number; face: number | null; likeness: number | null }>; drift: Array<{ start: number; end: number }>; text: unknown[]; cuts: number[]; notes: string[] }
   type Clones = { clones: Array<{ id: string; assetId: string | null; needsFrames?: boolean; review: Review | null }> }
-  // The oldest Recreate post with a take (copies are not set up the same way).
-  const items = await allPosts<{ id: string; characterId: string | null; spec?: { clone?: { assetId?: string | null } | null } }>()
-  let id = ''
-  let take: Clones['clones'][number] | undefined
-  for (const p of [...items].reverse().filter(i => i.spec?.clone?.assetId && i.characterId)) {
-    take = (await api<Clones>('GET', `/content/${p.id}/clones`)).clones.find(c => c.assetId)
-    if (take) { id = p.id; break }
-  }
-  if (!take) throw new Error('No Recreate post with a take. Run one in demo mode first.')
+  // The seeded Recreate post and its kept take.
+  const { id } = recreatePost()
+  const take = (await api<Clones>('GET', `/content/${id}/clones`)).clones.find(c => c.id === seedData().recreateTake)
+  expect(take?.assetId, 'the seeded Recreate take').toBeTruthy()
   const faces = [0.62, 0.58, 0.47, 0.45, 0.44, 0.31, 0.5, 0.6, null, 0.55, 0.52, 0.49]
   const step = 0.5
   const samples = faces.map((face, i) => ({ t: i * step, face, likeness: null }))

@@ -3,10 +3,11 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { expect, type Locator, type Page, type TestInfo } from '@playwright/test'
+import { SEED_FILE, type Seed } from '../seed'
 
-// Helpers for the editor e2e suite. Everything a test does to the editor
-// goes through the mouse and keyboard; the API is used only to make a fresh
-// post to open (mock providers, nothing paid).
+// Helpers for the browser suite. Everything a test does to the Studio and
+// the editor goes through the mouse and keyboard; the API is used to read
+// the seed and to make fresh records to open (mock providers, nothing paid).
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const CACHE = join(HERE, '..', '.out', 'cache')
@@ -36,21 +37,15 @@ export async function allPosts<T extends { id: string }>(): Promise<T[]> {
   return out
 }
 
-// A post to copy: E2E_POST, or the oldest with one shot (see below).
-let basePost: string | null = process.env.E2E_POST ?? null
-async function findBasePost(): Promise<string> {
-  if (basePost) return basePost
-  const items = await allPosts<{ id: string; characterId: string | null; spec?: { clipId?: string | null; editor?: { stack?: unknown } | null } }>()
-  // A live character only: the character file test archives any Wren left
-  // from an earlier run, and her posts with her.
-  const live = new Set((await api<{ characters: { id: string }[] }>('GET', '/characters')).characters.map(c => c.id))
-  // The oldest post with one shot and no saved editor presets, so copies
-  // of posts this suite saved never leak their presets into the next test.
-  for (const p of items.filter(i => i.spec?.clipId && !i.spec?.editor?.stack && i.characterId && live.has(i.characterId)).reverse()) {
-    const m = await api<{ media: { kind: string }[] }>('GET', `/content/${p.id}/editor`).catch(() => null)
-    if (m?.media.filter(x => x.kind === 'video').length === 1) return (basePost = p.id)
-  }
-  throw new Error('No post with a picked clip. Make one in the Studio (demo mode) or set E2E_POST.')
+// The run's seed (seed.ts, made in global-setup.ts): the ids of the records
+// every spec starts from. Specs copy them or read them; a spec that changes
+// one puts it back.
+let seeded: Seed | null = null
+export function seedData(): Seed {
+  if (seeded) return seeded
+  const file = process.env.E2E_SEED_FILE ?? SEED_FILE
+  if (!existsSync(file)) throw new Error(`No seed at ${file}. Run the suite with npm run e2e:editor (it seeds), or npm run e2e:seed against your Studio.`)
+  return (seeded = JSON.parse(readFileSync(file, 'utf8')) as Seed)
 }
 
 export async function uploadFile(path: string, name: string, type: string): Promise<string> {
@@ -63,38 +58,17 @@ export async function uploadFile(path: string, name: string, type: string): Prom
   return slot.uploadId
 }
 
-// A music bed as the Studio stores uploads (AAC in an M4A): 12 s, a click
-// every half second (120 BPM) over a low tone.
-async function musicSound(): Promise<string> {
-  const file = join(CACHE, 'beat-120.m4a')
-  if (!existsSync(file)) {
-    execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-f', 'lavfi', '-i', 'sine=frequency=110:duration=12', '-f', 'lavfi', '-i', "aevalsrc='if(lt(mod(t,0.5),0.04),sin(2*PI*1500*t),0)':d=12", '-filter_complex', 'amix=inputs=2:weights=1 3', '-c:a', 'aac', file])
-  }
-  const uploadId = await uploadFile(file, 'e2e-beat-120.m4a', 'audio/mp4')
-  const sound = await api<{ id: string }>('POST', '/sounds', { uploadId, name: 'e2e-beat-120.m4a', kind: 'music', title: 'E2E beat 120' })
-  for (let i = 0; i < 60; i++) {
-    const { sounds } = await api<{ sounds: { id: string; status: string }[] }>('GET', '/sounds')
-    if (sounds.find(s => s.id === sound.id)?.status === 'ready') break
-    await new Promise(r => setTimeout(r, 1000))
-  }
-  return sound.id
-}
-
 export const CAPTION = 'me when the code finally works'
 
-// A fresh copy of the base post: its clip, a caption, and optionally a
-// music bed and the first ready voice line (whose words become captions).
+// A fresh copy of the seeded base post: its take, a caption, and optionally
+// the seeded music bed (E2E beat 120: 12 s, a click every half second over
+// a low tone) and Callie's voice line (its words become captions; the base
+// post is hers, and another character's line is refused).
 export async function seedPost(opts: { caption?: string; music?: boolean; voice?: boolean } = {}): Promise<string> {
-  const { id } = await api<{ id: string }>('POST', `/content/${await findBasePost()}/duplicate`)
-  const music = opts.music ? await musicSound() : null
-  let voice: { id: string; at: number; captions: boolean } | null = null
-  if (opts.voice) {
-    // A voice line of this post's own character (another's is refused).
-    const characterId = (await api<{ item: { characterId: string | null } }>('GET', `/content/${id}`)).item.characterId
-    const { lines } = await api<{ lines: { id: string; status: string; characterId: string | null }[] }>('GET', '/voice-lines')
-    const ready = lines.find(l => l.status === 'ready' && l.characterId === characterId)
-    if (ready) voice = { id: ready.id, at: 0.5, captions: true }
-  }
+  const seed = seedData()
+  const { id } = await api<{ id: string }>('POST', `/content/${seed.basePost}/duplicate`)
+  const music = opts.music ? seed.music : null
+  const voice = opts.voice ? { id: seed.voiceLine, at: 0.5, captions: true } : null
   await api('PATCH', `/content/${id}`, {
     title: 'Editor e2e',
     spec: { caption: opts.caption ?? CAPTION, sound: { music, musicLevel: 'normal', duck: true, clipSound: true, voice }, editor: null },

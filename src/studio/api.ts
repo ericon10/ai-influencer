@@ -180,7 +180,7 @@ export const api = {
   // The launch plan (section 28).
   planPreview: (csv: string, o: { drawSpecials?: boolean; store?: Record<string, string>; path?: StillPathId | null; productId?: string | null } = {}) => request<PlanPreview>('POST', '/plan/preview', { csv, ...o }),
   planImport: (csv: string, o: { drawSpecials?: boolean; store?: Record<string, string>; productId?: string | null; rows: string[] }) => request<PlanImportResult>('POST', '/plan/import', { csv, ...o }),
-  plan: () => request<{ posts: PlanPostView[] }>('GET', '/plan'),
+  plan: () => request<{ posts: PlanPostView[]; running: number }>('GET', '/plan'),
   saveSlideStillPath: (path: StillPathId) => request<{ ok: true }>('PUT', '/slideshow/still-model', { path }),
   // Results (section 32): typed on a post, pasted from a CSV, the view.
   setResults: (id: string, patch: Partial<Omit<PostResults, 'updatedAt'>>) => request<{ results: PostResults }>('PUT', `/content/${id}/results`, patch),

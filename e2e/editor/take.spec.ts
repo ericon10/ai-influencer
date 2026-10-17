@@ -1,8 +1,5 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
-import { expect, test, type Page, type TestInfo } from '@playwright/test'
-import { allPosts, api, captionBlocks, clipBlocks, seedPost, seek, snap } from './helpers'
+import { expect, test, type Locator, type Page, type TestInfo } from '@playwright/test'
+import { api, captionBlocks, clipBlocks, seedData, seedPost, seek, snap } from './helpers'
 import { editorReady, LIVE, startLive, type Live } from './r2'
 
 // The editor opens with the take (owner, 2026-10-15): "Open editor brings
@@ -12,16 +9,10 @@ import { editorReady, LIVE, startLive, type Live } from './r2'
 // Recreate review (Use this take), a finished post, Library > Clips, and
 // Make another like this.
 
-const CACHE = join(dirname(fileURLToPath(import.meta.url)), '..', '.out', 'cache')
-mkdirSync(CACHE, { recursive: true })
-const RECREATE = join(CACHE, 'recreate-post.txt')
 let live: Live
 test.beforeAll(async () => { live = await startLive() })
 test.afterAll(async () => { await live.close() })
 test.beforeEach(() => { live.refuse = false; live.keptRedirect = false; live.hits = []; live.proxied = 0 })
-
-type Item = { id: string; kind: string; status: string; characterId: string | null; spec?: Record<string, any> }
-const posts = async () => allPosts<Item>()
 
 // What the post should put on the timeline: its shots and their lengths.
 async function expected(post: string) {
@@ -81,8 +72,15 @@ const toFinish = async (page: Page, post: string) => {
   await page.goto(`${LIVE}/studio/posts/${post}?step=finish`)
   await page.locator('[data-field="post-timeline"]').waitFor({ timeout: 30_000 })
 }
+// The button in the middle of the screen, never under the post's sticky
+// step bar: Playwright scrolls a button only just into view, where the bar
+// can take the click (it opened the Caption step instead of the editor).
+async function clickClear(button: Locator) {
+  await button.evaluate(el => el.scrollIntoView({ block: 'center' }))
+  await button.click()
+}
 const openFromFinish = async (page: Page) => {
-  await page.locator('[data-field="post-timeline"]').getByRole('button', { name: /Open the editor/ }).click()
+  await clickClear(page.locator('[data-field="post-timeline"]').getByRole('button', { name: /Open the editor/ }))
   await page.waitForURL(/\/editor\/\?studio=/, { timeout: 30_000 })
 }
 
@@ -112,19 +110,11 @@ test('storage refuses the browser: the Studio sends the file in parts', async ({
 
 test('every path opens the editor with the take: Recreate review, a finished post, Library, Make another like this', async ({ page }, info) => {
   test.setTimeout(600_000)
-  const all = await posts()
 
   // 1. A Recreate review: Keep and Use this take, then Open the editor.
-  // The post is remembered: the list holds only the newest 200 posts.
-  const remembered = existsSync(RECREATE) ? readFileSync(RECREATE, 'utf8').trim() : ''
-  const candidates = [process.env.E2E_RECREATE ?? '', remembered, ...all.filter(p => p.kind === 'meme' && p.spec?.clone?.assetId && p.characterId).map(p => p.id)].filter(Boolean)
-  let rec: { id: string } | undefined
-  for (const id of [...new Set(candidates)]) {
-    const media = await api<{ groups: { id: string; items: { kind: string; name: string }[] }[] }>('GET', `/content/${id}/editor/media`).catch(() => null)
-    if (media?.groups.find(g => g.id === 'post')?.items.some(x => x.kind === 'video')) { rec = { id }; break }
-  }
-  if (!rec) throw new Error('No Recreate post with a take. Make one in demo mode first, or set E2E_RECREATE.')
-  writeFileSync(RECREATE, rec.id)
+  // This spec's own seeded Recreate post (Use this take picks its clip),
+  // opened as the seed left it: the take kept, no clip picked yet.
+  const rec = { id: seedData().takeRecreatePost }
   await api('PATCH', `/content/${rec.id}`, { spec: { clipId: null, captionOff: false } })
   await page.goto(`${LIVE}/studio/posts/${rec.id}`)
   const vstep = page.locator('[data-field="step-video"]')

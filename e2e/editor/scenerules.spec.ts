@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page, type TestInfo } from '@playwright/test'
-import { api, snap } from './helpers'
+import { api, seedData, snap } from './helpers'
 
 // Character template v1.6 scene rules (long run part 2, owner 2026-10-15):
 // makeup by setting (no makeup at home or the gym, soft everyday makeup out
@@ -11,12 +11,8 @@ const BANK = ['behind both shoulders', 'tucked behind one ear', 'blowing back of
 
 const press = async (l: Locator, phone: boolean) => (phone ? l.tap() : l.click())
 
-async function callie(): Promise<string> {
-  const { characters } = await api<{ characters: { id: string; name: string }[] }>('GET', '/characters')
-  const c = characters.find(x => x.name === 'Callie')
-  if (!c) throw new Error('Callie is not in the local Studio.')
-  return c.id
-}
+// The seeded Callie.
+const callie = async (): Promise<string> => seedData().callie
 
 // A new video post for Callie with the idea typed in, and More control open.
 async function newPost(page: Page, characterId: string, idea: string, phone: boolean): Promise<string> {

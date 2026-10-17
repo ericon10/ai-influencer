@@ -196,7 +196,8 @@ the Studio; they are not creative limits on a character.
 | `server/pipeline/clips.ts` | Uploaded clips (kept clips of a character), uploaded images (kept byte for byte, `upload_image`, G48) and the Library view |
 | `src/studio/viewer.tsx`, `server/core/libraryFilter.ts`, `server/core/collections.ts`, `server/pipeline/collections.ts`, `src/studio/pages/library/Filters.tsx` | The viewer (G62, UX-PLAN section 34): any still or clip full size from every thumbnail (Library, its drawer in a post, a post's stills and takes, Recreate stills, slide cards, the batch review), arrows and swipe, its facts (`GET /library/items/:id`: model and cost from `runFacts`, the posts that use it), Download, the place's use button; Library filters on the server (type, character, model, date, used, product, collection) as chips kept per tab in the address; collections in one account setting (`library.collections`) |
 | `server/pipeline/editorMedia.ts`, fork `apps/web/src/studio/media/` | The editor's Add media, Studio first (G48): this post's takes and stills, the character's clips and stills, the Library; tap or drag onto the timeline |
-| `e2e/editor/r2.ts` | The live site's media path for the browser tests: a proxy and a fake R2 with the browser cache on (never Playwright routing for media) |
+| `e2e/editor/r2.ts` | The live site's media path for the browser tests: a proxy and a fake R2 with the browser cache on (never Playwright routing for media); free ports from the global setup |
+| `e2e/global-setup.ts`, `e2e/seed.ts` | The hermetic browser suite (G63): each run starts its own Studio on a throwaway database in `e2e/.out/run-<time>/`, seeds it through the API in demo mode (Callie, Solei, SideStep, a base post with a take, a voice line, music, two Recreate posts; ids in `seed.json`, read by `helpers.ts` `seedData()`), and stops it at the end |
 | `server/pipeline/clone.ts`, `src/studio/pages/post/ClonePanel.tsx` | Clone Video (SPEC 13.1 R1, DECISIONS G18, G28, G38): the source clip with its sound, Replace the person or Recreate from a real clip (4 stills from the frame, You pick, face pass, the motion from the clip as uploaded, Trim), free checks (face, skin, not the performer), original sound put back, results kept in Library > Clips |
 | `server/pipeline/chain.ts`, `src/studio/pages/post/ContinueShot.tsx` | Chaining (DECISIONS G22): Continue this shot, the last frame as the next start frame on the same model, takes joined into one clip (seams scored, never crossfaded), two shots when a seam fails |
 | `server/core/cut.ts`, `server/media/timeline.ts`, `server/pipeline/cutView.ts`, `src/studio/pages/post/SoundRow.tsx` | The automatic cut (G22): what the Studio lays out on the timeline from the steps (shots, timed captions); the Sound row. Export renders it on the worker |
@@ -305,3 +306,36 @@ npm run preview      # preview the production build locally
 
 To diagnose Higgsfield issues, flip `HF_DEBUG = true` at the top of
 `src/utils/higgsfieldGenerate.js` for verbose request/response logs.
+
+### Browser tests (Character Studio, G63)
+
+```bash
+npm run build:editor                     # once: the OpenReel editor into dist-editor/
+npm run models                           # once: the face models into .data/models
+npm run e2e:editor                       # the whole suite on its own fresh Studio
+npm run e2e:editor -- launchplan.spec    # one spec; every spec runs alone or in any order
+```
+
+- **Hermetic.** Each run starts its own Studio (`e2e/global-setup.ts`):
+  `server/dev.ts` on a fresh PGlite database and blob folder in
+  `e2e/.out/run-<time>/` (demo mode, mock providers, no deployment
+  settings), Vite on its own port, then the seed (`e2e/seed.ts`). It stops
+  them at the end; the run's logs (`api.log`, `web.log`) and data stay in
+  the run folder (the newest two are kept). Nothing depends on what a
+  container or an earlier run left.
+- **Ports.** `E2E_WEB_PORT` and `E2E_API_PORT` (default 5190 and 8790, never
+  the dev 5173 and 8787); the live-site proxy and fake storage of `r2.ts`
+  take free ports (`E2E_LIVE_PORT`, `E2E_R2_PORT` to pin them).
+- **An already running Studio.** `E2E_BASE=http://localhost:5173` (and
+  `E2E_API`, default `E2E_BASE/api/v1`) runs the suite against it in demo
+  mode; the seed is made there once and reused while its records exist
+  (`E2E_RESEED=1` makes a new one). `npm run e2e:seed` (with `E2E_API`)
+  seeds a running Studio on its own. The seed refuses a Studio in live mode.
+- **Writing a spec.** Never assume what a database holds: read the seed
+  (`seedData()` in `e2e/editor/helpers.ts`: `callie`, `solei`, `sideStep`,
+  `basePost`, `voiceLine`, `music`, `recreatePost`, `recreateTake`,
+  `takeRecreatePost`, `stills`, `libraryClip`) or make the records through
+  the API. `seedPost()` copies the base post; a spec that renames,
+  archives or deletes works on its own copy, and one that edits a seeded
+  record puts it back. No `test.skip` for missing data, `retries` stays 0,
+  no fixed sleeps where a real state can be waited on.
