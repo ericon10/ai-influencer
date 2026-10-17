@@ -99,7 +99,10 @@ test('the launch plan: upload the CSV, Preview (free), the plan\'s product, tick
   await snap(page, info, 'two posts ticked, the price on the button')
   await pay(page, go, posts)
   await expect.poll(async () => (await planPosts()).filter(p => need.some(n => n.id === p.id)).every(p => p.have >= p.need), { timeout: 240_000, intervals: [3000] }).toBe(true)
+  // The card reads the plan again when the stills are done: no reload.
   await expect(posts.locator(`[data-field="plan-post-${need[0]!.rowId}"]`)).toContainText(/(\d+) of \1/, { timeout: 30_000 })
+  await expect(posts.locator(`[data-field="plan-post-${need[1]!.rowId}"]`)).toContainText(/(\d+) of \1/, { timeout: 30_000 })
+  await snap(page, info, 'both posts filled after Generate, no reload')
 
   // The post: the Plan line, the hook as written, every slide filled.
   await posts.locator(`[data-field="plan-post-${need[0]!.rowId}"]`).getByRole('link').click()
@@ -108,6 +111,32 @@ test('the launch plan: upload the CSV, Preview (free), the plan\'s product, tick
   await line.getByRole('button').click()
   await expect(line).toContainText('Alt hook:')
   await snap(page, info, 'an imported post with its Plan line')
+})
+
+test('the Pictures column ends on the full count even when the run starts and ends between two reads of the jobs list', async ({ page }, info) => {
+  test.setTimeout(300_000)
+  const p = (await planPosts()).find(x => x.account === 'F2' && x.have < x.need)
+  expect(p, 'import the plan first (the test above)').toBeTruthy()
+  // The jobs list never shows a still running, as when the run is over
+  // before the list is read again. The card still reads the plan when the
+  // run is done (it stayed "0 of 6" until a reload, owner, 2026-10-17).
+  await page.route(/\/api\/v1\/jobs\?.*live=1/, async r => {
+    const res = await r.fetch().catch(() => null)
+    if (!res) return r.abort().catch(() => undefined)
+    const body = await res.json() as { jobs: { status: string; phase?: string }[] }
+    const active = ['waiting', 'queued', 'submitting', 'running', 'ingesting', 'needs_attention']
+    await r.fulfill({ response: res, json: { ...body, jobs: body.jobs.filter(j => !active.includes(j.status) && j.phase !== 'checking') } })
+  })
+  const card = await openPlan(page)
+  const posts = card.locator('[data-field="plan-posts"]')
+  await posts.getByLabel('Account').selectOption('F2')
+  const row = posts.locator(`[data-field="plan-post-${p!.rowId}"]`)
+  await expect(row).toContainText(`${p!.have} of ${p!.need}`)
+  await posts.getByLabel(`Pick ${p!.rowId}`).check()
+  await pay(page, posts.getByRole('button', { name: /^Generate 1 post/ }), posts)
+  await expect.poll(async () => (await planPosts()).some(x => x.id === p!.id && x.have >= x.need), { timeout: 120_000, intervals: [2000] }).toBe(true)
+  await expect(row).toContainText(`${p!.need} of ${p!.need}`, { timeout: 30_000 })
+  await snap(page, info, 'filled after a run the jobs list never showed running')
 })
 
 test('Write 10 with Claude on a SideStep post, to THE STANDARD: a moment, a code, effects, pain, an alt hook and a score each; the reviewer\'s stop test and ladder hide the rest; language notes; Swap with the alt hook', async ({ page }, info) => {

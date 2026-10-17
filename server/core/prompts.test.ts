@@ -92,6 +92,11 @@ describe('rules engine', () => {
     expect(lint('measurements 34-24-36', {})).toContain('neutral-body-measurements')
     expect(blocks('a C cup, measurements 34-24-36', {})).toEqual([])
     expect(lint('holding a cup of coffee', {})).toEqual([])
+    // "A" is an article, and a cup "of" something is a cup.
+    expect(lint('A cup of coffee on the sill.', {})).not.toContain('neutral-body-cups')
+    expect(lint('A cup sits on the sill.', {})).not.toContain('neutral-body-cups')
+    expect(lint('a DD cup bralette', {})).toContain('neutral-body-cups')
+    expect(validateCharacter({ age: 30, card: 'Holds a cup of tea in every photo.', marks: [], body: 'Average build' }).map(i => i.field)).not.toContain('body')
   })
   it('flags a model switch mid-sheet as a warning (5.1.7)', () => {
     expect(lint('x', { stage: 'sheet', sheetLock: { model: 'higgsfield/gpt-image-2.5' }, request: { model: 'higgsfield/nano-banana-2' } })).toContain('sheet-one-model')

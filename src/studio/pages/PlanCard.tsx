@@ -35,7 +35,9 @@ export function PlanCard({ characters }: { characters: CharacterSummary[] }) {
   const posts = plan.data?.posts ?? []
   const [open, setOpen] = useState(() => { try { return localStorage.getItem(KEY) === '1' } catch { return false } })
   useEffect(() => { try { localStorage.setItem(KEY, open ? '1' : '0') } catch { /* private window */ } }, [open])
-  // While stills run, the list follows them.
+  // While stills run, the list follows them; when the last one finishes it
+  // is read once more, so every post shows its final count (the last poll
+  // could come before the last still landed, and it stayed "0 of 6").
   const jobs = useActiveJobs()
   const running = (jobs.data?.jobs ?? []).some(j => /^(slide_still|scene):/.test(j.purpose))
   useEffect(() => {
@@ -43,6 +45,11 @@ export function PlanCard({ characters }: { characters: CharacterSummary[] }) {
     const t = setInterval(() => void qc.invalidateQueries({ queryKey: ['plan'] }), 5000)
     return () => clearInterval(t)
   }, [running, open, qc])
+  const wasRunning = useRef(false)
+  useEffect(() => {
+    if (wasRunning.current && !running) void qc.invalidateQueries({ queryKey: ['plan'] })
+    wasRunning.current = running
+  }, [running, qc])
   const have = posts.filter(p => p.need > 0 && p.have >= p.need).length
   const exported = posts.filter(p => p.exported).length
 
@@ -286,6 +293,7 @@ function PlanGrid({ preview }: { preview: PlanPreview }) {
 // The plan's posts after import: tick, generate (one price, ten at a time),
 // open any post.
 function PlanPosts({ posts }: { posts: PlanPostView[] }) {
+  const qc = useQueryClient()
   const [day, setDay] = useState('')
   const [account, setAccount] = useState('')
   const [picked, setPicked] = useState<Set<string>>(new Set())
@@ -329,7 +337,8 @@ function PlanPosts({ posts }: { posts: PlanPostView[] }) {
         {(models.data?.choices ?? []).map(c => <button key={c.ref} type="button" className={`st-chip ${pick === c.ref ? 'on' : ''}`} disabled={!!c.problem} title={c.problem ?? c.pathLabel} onClick={() => setModel(c.ref)}>{c.label} · {c.pathLabel}</button>)}
       </div>
       <PriceButton label={`Generate ${ids.length} post${ids.length === 1 ? '' : 's'}`} action={ids.length ? { type: 'plan_generate', postIds: ids.slice(0, 100), ...(pick ? { stillModel: pick } : {}) } : null}
-        todo={ids.length ? [] : [{ label: 'Tick the posts to generate' }]} onStarted={() => setPicked(new Set())} />
+        todo={ids.length ? [] : [{ label: 'Tick the posts to generate' }]} onStarted={() => setPicked(new Set())}
+        onDone={() => void qc.invalidateQueries({ queryKey: ['plan'] })} />
       <span className="st-hint">A slideshow gets a still for every photo slide (drawn slides are free), a clip its opening still; its take is made in the post with its own price after you pick the still. More than 10 posts run ten at a time.{ids.length > 100 ? ' At most 100 in one go.' : ''}</span>
     </div>
   )

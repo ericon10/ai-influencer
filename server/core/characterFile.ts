@@ -391,7 +391,9 @@ export function importFreeform(md: string, opts: ImportOptions = {}): ImportResu
   const followUps: Bullet[] = []
   const preferredModels: Record<string, string> = {}
   const avoidModels: string[] = []
-  for (const b of bullets(find(sections, /^models?$/, /^model notes$/)?.body ?? '')) {
+  // "Models", "Model notes" and template v1.6's "Models (UNIVERSAL
+  // defaults, update as tests change)" are all read.
+  for (const b of bullets(find(sections, /^models?\b/)?.body ?? '')) {
     const k = (b.key ?? '').toLowerCase()
     const line = b.key ? `${b.key}: ${b.value}` : b.value
     const id = line.match(UUID)?.[0]
@@ -412,12 +414,24 @@ export function importFreeform(md: string, opts: ImportOptions = {}): ImportResu
     // "Stills, also strong: ..." is a second choice run alongside the first.
     const set = (role: string) => { preferredModels[/\balso\b|alternat|second/.test(k) ? `${role}_alt` : role] = ref }
     if (/avoid/.test(k)) { if (!avoidModels.includes(ref)) avoidModels.push(ref) }
-    else if (/video/.test(k) && /final/.test(k)) set('video_final')
-    else if (/video/.test(k) && /test|cheap|motion/.test(k)) set('video_test')
-    else if (/still|scene|image|edit/.test(k)) {
+    else if (/video/.test(k)) {
+      if (/final/.test(k)) set('video_final')
+      else if (/test|cheap|motion/.test(k)) set('video_test')
+      else {
+        // Template v1.6 names both in one line: "Video from stills:
+        // Seedance 2.5 for finals, Kling 3.0 Pro as the cheaper default."
+        // A video line is never read as a still model.
+        for (const clause of splitList(b.value, ',')) {
+          const r = modelIn(clause, models)
+          if (r && /\bfinals?\b/i.test(clause)) preferredModels.video_final = r
+          else if (r && /\b(?:cheap\w*|tests?)\b/i.test(clause)) preferredModels.video_test = r
+        }
+      }
+    } else if (/still|scene|image|edit/.test(k)) {
       if (/still|scene|image/.test(k)) set('scene_still')
       if (/edit/.test(k)) set('edit')
-    } else if (!b.key && /sheet/i.test(b.value)) preferredModels.sheet = ref
+    // Template v1.6: "Hero and sheet: GPT Image 2.5 Flare, High, 2K."
+    } else if (/sheet/.test(k) || (!b.key && /sheet/i.test(b.value))) preferredModels.sheet = ref
   }
   // Template v1.6 keeps the saved identity in its own section:
   // "Higgsfield Element "Wren": 4b2a...". Kept as written too.

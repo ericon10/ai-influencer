@@ -1094,6 +1094,13 @@ that character's other accounts, a topic post's to another topic account,
 never a face onto a faceless account. post.json lists each special
 slide's own fields, and a product screenshot's asset, width and place.
 
+**The Pictures column follows Generate (owner, 2026-10-17).** After
+Generate N posts, each post's row on the Launch plan card counts its
+stills as they land and ends on its full count ("6 of 6"), and so does the
+card's "with their pictures" line, with no reload. Before, the card
+stopped reading the plan when the stills stopped running, so a finished
+post could stay at "0 of 6" until the page was reloaded.
+
 ## 29. Products: every post belongs to one product, or none (owner, 2026-10-17)
 
 Goal: the Studio promotes many different things for many characters on

@@ -73,7 +73,10 @@ const runBody = z.object({ csv: z.string().max(MAX_BYTES), exportFree: z.boolean
 // Creates one video post per good row; rows with a problem are skipped (the
 // preview named them). The free rows export at once when asked.
 export async function runImport(deps: Deps, ctx: Ctx, batchId: string, raw: unknown): Promise<{ created: Array<{ line: number; id: string; status: 'reuse' | 'generate' }>; exporting: number; skipped: number; notExported: Array<{ line: number; id: string; reason: string }> }> {
-  const body = runBody.parse(raw)
+  // A bad body is the caller's mistake (400), as on the preview route.
+  const parsed = runBody.safeParse(raw)
+  if (!parsed.success) throw new AppError('bad_request', parsed.error.issues.map(i => `${i.path.join('.') || 'body'}: ${i.message}`).join('; '))
+  const body = parsed.data
   const { batch, rows } = await plan(deps, ctx, batchId, body.csv)
   const good = rows.filter(r => r.status !== 'problem')
   if (!good.length) throw new AppError('bad_request', 'No row is ready to import. Fix the rows the preview names, then import again.')

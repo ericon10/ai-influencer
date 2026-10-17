@@ -673,7 +673,11 @@ export async function buildSceneEndFrame(deps: Deps, ctx: Ctx, row: CharacterRow
   // runs here too, a still with no visible face is caught now.
   if ((await deps.faces.status()).available) await assertFace(deps, ctx, cand.assetId)
   const realism: RealismWarning[] = []
-  const prompt = buildEditPrompt(t, fill(t.video.end_frame, { ...pronounVars(ch.pronouns), change }), ch, true, { warnings: realism, flawDose: sw.on('realism-flaw-dose') })
+  // The character's own skin marks by name ("the mole"); jewelry is a
+  // default, not a mark to keep.
+  const markNames = [...new Set(ch.marks.filter(m => m.kind !== 'jewelry').map(m => `the ${m.name}`))]
+  const marks = markNames.length ? `, ${markNames.join(', ')}` : ''
+  const prompt = buildEditPrompt(t, fill(t.video.end_frame, { ...pronounVars(ch.pronouns), change, marks }), ch, true, { warnings: realism, flawDose: sw.on('realism-flaw-dose') })
   const request: GenRequest = {
     kind: 'image_edit', model: run.model, prompt, aspect: aspectFor(sc, f), quality: sc.settings.quality, resolution: sc.settings.resolution,
     refs: [{ assetId: cand.assetId }, { assetId: ref00 }], maskFor: { assetId: cand.assetId, region: 'head' },
