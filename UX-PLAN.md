@@ -1171,6 +1171,53 @@ on the TikTok account had no product picked (they wrote to SideStep only
 through the first-product default); they now show No product until the
 owner picks one.
 
+## 30. Slide image model: by who is in the slide (owner, 2026-10-17)
+
+Goal: a slide showing a character uses that character file's stills
+default (Callie: GPT Image 2.5 Flare plus "bare natural lips, no gloss");
+a slide with no character uses the cheapest model. Plan-path billing is
+right for Flare. Clip opening stills follow the path picked on the card.
+Model and price on every generate button. The edit, face pass and
+Recreate stills defaults do not change.
+
+**What the Studio did before this (the audit):**
+
+| Piece | Before |
+|---|---|
+| The stills pick | One model per path, the same for every slide: Nano Banana 2.1 on the Higgsfield plan, GPT Image 2.5 Flare on the Higgsfield API (`still_model`, `api_still_model`), the last pick kept |
+| Character files | The Models section's stills default ("Scene stills: GPT Image 2.5 Flare by default") was read, but only the post Stills step's model chips used it |
+| Topic slides | The same model as the path (Nano Banana 2.1 on the plan at 1.5 credits a still, when Flare is 1) |
+| A character slideshow's slide of a thing | Made with the character's sheet refs and her name in the prompt, like every other slide |
+| Flare on the plan path | Not offered. A run that put Flare on the plan sent no billing path (only a model the API does not offer went to the account), so the runner used the account's Higgsfield default, which is the API in production: the quote, the hold and the charge were the API's dollars, on the API key |
+| Clip opening stills (Generate N posts) | The picked model, with no billing path: the account's Higgsfield default, whatever the card said |
+| The plan preview's price | Dollars for every path, from one model's price |
+
+**What it does now:**
+
+| Piece | Where | How it works | Clicks |
+|---|---|---|---|
+| Stills on | The slideshow's Stills step, above Generate the set; the Launch plan card, in the import's preview and above Generate N posts | Two chips: **Your Higgsfield plan · credits** and **Higgsfield API · dollars**. The owner's pick, kept per post and as the account's last pick; the plan when it is connected. A path that cannot run says why (connect the plan, add the key) | 1 |
+| The models line | Under the chips | What the picked path makes, with a still's price: "Callie's slides: GPT Image 2.5 Flare (Callie's file), 1 credit a still. Slides with no one: GPT Image 2.5 Flare (the cheapest on this path), 1 credit a still" | 0 |
+| A slide that shows the character | Every still of a character slideshow, a photo row, a clip's opening still | The stills model in the character file's Models section ("Scene stills: ..."), at the Standard level. When the path cannot run it (Nano Banana 2.1 on the API), the file's second choice; a file that names none uses the Studio default (`default_still_model`, GPT Image 2.5 Flare at Standard: medium, 2k). Every Flare prompt carries "Bare natural lips, no gloss." The sheet refs carry the face; the Higgsfield element goes with them on the plan only on a model that takes elements (Flare does not) | 0 |
+| A slide with no one in it | A topic slideshow's slides; a character slideshow's slide whose shot has no person | The cheapest still model the path can run, from the price book at the Standard level (`empty_still_models` in `config/content.yaml`; GPT Image 2.5 Flare today: 1 plan credit, about $0.06 on the API). The topic prompt (no one in focus, no faces), no refs, no face check | 0 |
+| Who is in the photo | Each slide card of a character slideshow: **Callie in it · GPT Image 2.5 Flare** or **No one in it · GPT Image 2.5 Flare** | Read from the shot for free: the character's name, her pronoun, a shot that starts with what she does ("typing fast on the laptop"), a selfie or a look at the lens shows her; a thing or a place ("a laptop balanced on a keg", "close-up of the lock screen") shows no one. A default: the owner switches it on the card and the pick moves with the slide. A plan photo row is always the character | 0 or 1 |
+| Plan-path billing | Every still on Your Higgsfield plan | Billed to the Higgsfield account (MCP): the quote is Higgsfield's live credit price (the price book's credits when it is slow; Flare at Standard 1 credit a still), the hold and the charge are in credits. On the API, the API's dollars. The path is in each request, so it never falls back to the account's Higgsfield default | 0 |
+| Clip opening stills | The Launch plan card, Generate N posts | A clip row's opening still is its character's file default, on the path picked on the card | 0 |
+| Model and price on the button | Generate the set, Reroll and Make it on a slide card, Generate N posts, Make variations, Make 10 | "Generate the set (6 stills) · 6 credits · GPT Image 2.5 Flare". When one run mixes models (the character's and the no-one slides on different models) the button names both ("Nano Banana 2.1 + GPT Image 2.5 Flare") and Details lists each still with its model and price | 0 |
+| The plan preview's price | Launch plan card, the import's preview | Each photo priced on its own model on the picked path: credits on the plan, dollars on the API ("about 180 credits on Your Higgsfield plan") | 0 |
+
+Unchanged: the post Stills step's own model chips (its default stays
+GPT Image 2.5 Flare), one-change edits, the face pass, crops and upscales,
+Recreate's stills (Nano Banana 2.1 on the plan, GPT Image 2.5 on the API),
+a batch from hooks (its slides are priced before their shots exist, so
+each uses the post's mode: the character's model, or the cheapest for a
+topic batch). Variations use each slide's own model.
+
+Data, not code: the character's model comes from the file, the empty-slide
+candidates from `config/content.yaml`, the levels from
+`config/scenes.yaml`, the prices and credits from `config/pricebook.yaml`,
+and which models take elements from `config/models.yaml`.
+
 ## 34. Library viewer, filters and collections (owner, 2026-10-17)
 
 Goal: see anything full size in one tap, find it again fast, and keep

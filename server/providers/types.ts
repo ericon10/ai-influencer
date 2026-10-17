@@ -72,7 +72,7 @@ export interface GenRequest {
   // A slideshow still (UX-PLAN.md section 27): the post and the slide it
   // lands in, the scene it belongs to, and which variation or batch row
   // made it. Never sent to a provider.
-  slide?: { slide: number; postId?: string; sceneId?: string | null; variant?: number; row?: number }
+  slide?: { slide: number; postId?: string; sceneId?: string | null; variant?: number; row?: number; path?: 'account' | 'api' }
 }
 
 export interface ModelInfo {

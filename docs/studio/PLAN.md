@@ -605,6 +605,16 @@ Decisions: `DECISIONS.md` G37 and G38. UX: `UX-PLAN.md` section 15.
 - [x] Launch plan: numbered steps, the plan's pick, only the ticked rows, the CSV's product (a name) and ad columns, older yes or no files
 - [x] Tests: unit (products.test.ts, the lint, the plan reader), Playwright (products.spec.ts, the launch plan)
 
+### Slide image model (G58, UX-PLAN section 30, owner 2026-10-17)
+
+- [x] The stills path is the pick (Your Higgsfield plan or the Higgsfield API) on the Stills step and the Launch plan card; the model follows who is in each slide
+- [x] A slide with the character: the character file's stills default (else its second choice, else `default_still_model`), Flare's "Bare natural lips, no gloss." kept
+- [x] A slide with no one: the cheapest model the path runs, from the price book (`empty_still_models`); who is in a slide read from the shot, switched on the slide card
+- [x] Plan-path billing: every Higgsfield still carries its path, so Flare on the plan is quoted, held and charged in credits through the account
+- [x] Clip opening stills follow the card's path; the plan preview prices each photo on its own model, in credits or dollars
+- [x] Model and price on every stills button (two models named when a run mixes them)
+- [x] Guide (slideshow and launch plan sections, two glossary terms); tests: unit (`stillModels.test.ts`, `slideModels.test.ts`), Playwright (`slidemodel.spec.ts`)
+
 ### Library viewer, filters and collections (G62, UX-PLAN section 34, owner 2026-10-17)
 
 - [x] One viewer (`src/studio/viewer.tsx`): full size, a clip muted with its controls, arrows, swipe, Esc, X, a tap outside, focus kept and given back

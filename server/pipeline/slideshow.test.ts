@@ -9,7 +9,7 @@ import { registerPipelineHooks } from './hooks.js'
 import { buildAction, estimateAction, runAction, type StudioAction } from './actions.js'
 import { importCharacter } from './files.js'
 import { createContent, getContent, startRender, updateContent, type ContentOutputs } from './content.js'
-import { batchView, draftPatch, familyView, listSlideScenes, mockDraft, productEndings, reuseReport, reviewBatchItem, saveSlideScene, archiveSlideScene, slideStillChoices, vaultHookIdeas } from './slideshow.js'
+import { batchView, draftPatch, familyView, listSlideScenes, mockDraft, productEndings, reuseReport, reviewBatchItem, saveSlideScene, archiveSlideScene, slideStillPaths, vaultHookIdeas } from './slideshow.js'
 import { importKit, starterKit } from './scaleKit.js'
 import { standardOf } from './products.js'
 import { setSetting } from './settings.js'
@@ -248,12 +248,14 @@ describe('stills in one locked scene', () => {
   it('works on the Higgsfield API, not only the plan: with only an API key the stills run on GPT Image 2.5 Flare, billed to the API', async () => {
     await setSetting(h.deps, h.ctx, 'provider_mode', 'live')
     try {
-      const none = await slideStillChoices(h.deps, h.ctx)
-      expect(none.choices.find(c => c.path === 'account')!.problem).toMatch(/Higgsfield plan/)
+      const none = await slideStillPaths(h.deps, h.ctx)
+      expect(none.paths.find(c => c.path === 'account')!.problem).toMatch(/Higgsfield plan/)
       await saveCredential(h.deps, h.ctx, 'higgsfield', 'kid_test:secret_test')
-      const { choices, pick } = await slideStillChoices(h.deps, h.ctx)
-      expect(pick).toBe('higgsfield/gpt-image-2.5-flare')
-      expect(choices.find(c => c.ref === pick)!.problem).toBeNull()
+      const { paths, pick } = await slideStillPaths(h.deps, h.ctx)
+      expect(pick).toBe('api')
+      expect(paths.find(c => c.path === pick)!.problem).toBeNull()
+      // Callie's file names Nano Banana 2.1 first (plan only), then Flare:
+      // her slides run on Flare on the API.
       const id = await (async () => { await setSetting(h.deps, h.ctx, 'provider_mode', 'demo'); const x = await drafted(); await setSetting(h.deps, h.ctx, 'provider_mode', 'live'); return x })()
       const built = await buildAction(h.deps, h.ctx, { type: 'slideshow_stills', contentId: id })
       expect(built.specs.every(x => (x.request as GenRequest).model === 'higgsfield/gpt-image-2.5-flare' && (x.request as GenRequest).billing === 'api')).toBe(true)

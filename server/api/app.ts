@@ -39,7 +39,7 @@ import { editorLibrary } from '../pipeline/editorMedia.js'
 import { addRecreateRow, recreateBatch, recreateFor, reviewTakeAgain, setRecreateRows, startRecreate, useCloneTake } from '../pipeline/recreate.js'
 import { jobViews } from '../jobs/jobView.js'
 import { importPlan, planView, previewPlan } from '../pipeline/planImport.js'
-import { archiveSlideScene, batchView, familyView, listSlideScenes, reuseReport, reviewBatchItem, saveSlideScene, saveSlideStillModel, slideStillChoices, vaultHookIdeas } from '../pipeline/slideshow.js'
+import { archiveSlideScene, batchView, familyView, listSlideScenes, reuseReport, reviewBatchItem, saveSlideScene, saveSlideStillPath, slideStillOptions, stillPathFor, vaultHookIdeas } from '../pipeline/slideshow.js'
 import { PATTERN_IDS } from '../core/slides.js'
 import { POST_STEPS, addBroll, archiveBroll, archiveContent, contentItemView, contentPage, contentView, createContent, duplicateContent, postScene, retryFailedBatch, startCover, startRender, startVariants, updateBroll, updateContent } from '../pipeline/content.js'
 import { rulesView, setRuleSwitch } from '../pipeline/rules.js'
@@ -126,7 +126,7 @@ async function fileBundle(deps: Deps, c: Context, ctx: Ctx): Promise<{ markdown:
 }
 
 // The plan routes' body as the import functions take it.
-const planArgs = (b: { csv: string; drawSpecials?: boolean; store?: Record<string, string>; stillModel?: string | null; productId?: string | null; rows?: string[] }) => [b.csv, { drawSpecials: b.drawSpecials, store: b.store, stillModel: b.stillModel, productId: b.productId, rows: b.rows }] as const
+const planArgs = (b: { csv: string; drawSpecials?: boolean; store?: Record<string, string>; stillModel?: string | null; path?: 'account' | 'api' | null; productId?: string | null; rows?: string[] }) => [b.csv, { drawSpecials: b.drawSpecials, store: b.store, stillModel: b.stillModel, path: b.path, productId: b.productId, rows: b.rows }] as const
 
 export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
   const app = new Hono<Env>().basePath('/api/v1')
@@ -1122,10 +1122,12 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
     const body = parse(z.object({ decision: z.enum(['approve', 'reject', 'pending']) }), await json(c))
     return c.json(await reviewBatchItem(deps, ctx, c.req.param('id'), c.req.param('child'), body.decision, id => startRender(deps, ctx, id)))
   })
-  app.get('/slideshow/still-models', async c => c.json(await slideStillChoices(deps, c.get('ctx'))))
+  // Section 30: the two stills paths, and for a character what each makes
+  // (the character's slides and the slides with no one, with a still's price).
+  app.get('/slideshow/still-models', async c => c.json(await slideStillOptions(deps, c.get('ctx'), c.req.query('characterId') || null)))
   // The launch plan (section 28): the free preview, the drafts (free), and
   // the plan's posts in schedule order.
-  const planBody = z.object({ csv: z.string().max(400_000), drawSpecials: z.boolean().optional(), store: z.record(z.string().max(60), z.string().max(60)).optional(), stillModel: z.string().max(80).nullable().optional(), productId: z.string().max(60).nullable().optional(), rows: z.array(z.string().max(60)).max(2000).optional() })
+  const planBody = z.object({ csv: z.string().max(400_000), drawSpecials: z.boolean().optional(), store: z.record(z.string().max(60), z.string().max(60)).optional(), stillModel: z.string().max(80).nullable().optional(), path: z.enum(['account', 'api']).nullable().optional(), productId: z.string().max(60).nullable().optional(), rows: z.array(z.string().max(60)).max(2000).optional() })
   app.post('/plan/preview', async c => c.json(await previewPlan(deps, c.get('ctx'), ...planArgs(parse(planBody, await json(c))))))
   app.post('/plan/import', async c => {
     const ctx = c.get('ctx')
@@ -1133,11 +1135,13 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
     return c.json(await importPlan(deps, ctx, ...planArgs(parse(planBody, await json(c)))))
   })
   app.get('/plan', async c => c.json(await planView(deps, c.get('ctx'))))
+  // The stills path picked last (a model ref from a page from before is
+  // read as its path).
   app.put('/slideshow/still-model', async c => {
     const ctx = c.get('ctx')
     requireRole(ctx, 'member')
-    const body = parse(z.object({ model: z.string().max(80) }), await json(c))
-    await saveSlideStillModel(deps, ctx, body.model)
+    const body = parse(z.object({ path: z.enum(['account', 'api']).optional(), model: z.string().max(80).optional() }), await json(c))
+    await saveSlideStillPath(deps, ctx, await stillPathFor(deps, ctx, null, { path: body.path, stillModel: body.model }))
     return c.json({ ok: true })
   })
   app.get('/slide-scenes', async c => c.json({ scenes: await listSlideScenes(deps, c.get('ctx')) }))
