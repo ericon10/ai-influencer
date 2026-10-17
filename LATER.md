@@ -226,9 +226,6 @@ first.
 
 ### Asked of the owner
 
-- **The 15-word note.** Four of THE STANDARD v1.2's five passing examples
-  run 18 to 22 words, so they get the "over 15 words" note. If they are
-  the bar, `hook_max_words` in `config/content.yaml` could be 22.
 - Instagram reels for older job seekers in Facebook-comment voice (the
   playbook v1.2 parks them).
 

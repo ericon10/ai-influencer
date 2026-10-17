@@ -119,8 +119,8 @@ test('Write 10 with Claude to THE STANDARD: a moment, a code, effects, pain, an 
   await expect(notes).toContainText(/unlock|dream job/)
   await expect(notes).toContainText(/You/)
   await snap(page, info, 'language notes under the hook')
-  // THE STANDARD's three: a label to open, stacked quotes, over 15 words.
-  await hook.fill("Exhibit 1: recruiter said 'talk Friday' and then 'end of week' and then nothing at all for weeks")
+  // THE STANDARD's three: a label to open, stacked quotes, over 22 words.
+  await hook.fill("Exhibit 1: recruiter said 'talk Friday' and then 'end of week' and then nothing at all for weeks and weeks while rent came due twice")
   await expect(notes).toContainText(/Opens with "Exhibit"/)
   await expect(notes).toContainText(/2 quoted phrases/)
   await expect(notes).toContainText(/\d+ words\. Slide 1 reads in one go/)

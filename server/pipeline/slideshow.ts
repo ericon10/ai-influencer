@@ -272,7 +272,7 @@ async function onSlideshowHooks(deps: Deps, ctx: Ctx, job: JobRow, out: JobOutco
   if (out.status !== 'completed') { await cancelChildren(deps, job.id, 'The hooks were not written, so there was nothing to review. Nothing was charged for the review.'); return }
   const d = (out.data ?? {}) as { hooks?: HookOut[] }
   const ideas: HookIdea[] = (Array.isArray(d.hooks) ? d.hooks : []).map(h => {
-    // Never cut mid-line: a hook over 15 words keeps its words and gets
+    // Never cut mid-line: a hook over 22 words keeps its words and gets
     // the lint's note (a hard cap only against a runaway answer).
     const text = trimWords(clean(h.hook, 200), 30)
     return {

@@ -15,7 +15,7 @@ export const LINT_RULES = [
   { id: 'lint-product-hook', title: 'The product is never in the hook' },
   { id: 'lint-ad-caption', title: 'A product post\'s caption starts with "Ad:"' },
   // THE STANDARD (post writer brief v1.1): slide 1 reads in one go.
-  { id: 'lint-hook-long', title: 'A hook is 15 words or fewer' },
+  { id: 'lint-hook-long', title: 'A hook reads in one go (22 words at most)' },
   { id: 'lint-hook-label', title: 'A hook never opens with a label or stage direction' },
   { id: 'lint-hook-quotes', title: 'One quoted phrase at most in a hook' },
   // THE STANDARD v1.2: the hook names the job situation; a product post's
@@ -45,7 +45,7 @@ export const DEFAULT_LINT_LISTS: LintLists = {
   hype: ['dream job', 'unlock', 'level up', 'game-changer', 'game changer', 'supercharge'],
   products: ['SideStep'],
   maxHashtags: 5,
-  hookMaxWords: 15,
+  hookMaxWords: 22,
   hookLabels: ['Exhibit', 'Levels of', 'Previously on', 'Calendar invite'],
   jobWords: ['job', 'interview', 'recruiter', 'offer', 'salary', 'salaries', 'resume', 'résumé', 'hiring', 'application'],
   endingNever: ['ghosted', 'ghosting', 'passed over', 'applies for you', 'apply for you', 'applies for me', 'applying for you', 'auto-apply', 'auto apply'],

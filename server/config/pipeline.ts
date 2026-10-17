@@ -310,8 +310,8 @@ const contentSchema = z.object({
   // account tag or character name.
   playbook: z.object({ fit: z.record(z.string(), z.tuple([z.string(), z.string()])).default({}) }).default({ fit: {} }),
   // The language lint's word lists (section 28; the checks are rules).
-  copy_lint: z.object({ values: z.array(z.string()), hype: z.array(z.string()), products: z.array(z.string()), max_hashtags: z.number().int().min(0).max(30), hook_max_words: z.number().int().min(4).max(40).default(15), hook_labels: z.array(z.string()).default([]), job_words: z.array(z.string()).default([]), ending_never: z.array(z.string()).default([]) })
-    .default({ values: ['should', 'need to', 'needs to', 'must', 'ought'], hype: ['dream job', 'unlock', 'level up', 'game-changer', 'game changer', 'supercharge'], products: ['SideStep'], max_hashtags: 5, hook_max_words: 15, hook_labels: ['Exhibit', 'Levels of', 'Previously on', 'Calendar invite'], job_words: [], ending_never: [] }),
+  copy_lint: z.object({ values: z.array(z.string()), hype: z.array(z.string()), products: z.array(z.string()), max_hashtags: z.number().int().min(0).max(30), hook_max_words: z.number().int().min(4).max(40).default(22), hook_labels: z.array(z.string()).default([]), job_words: z.array(z.string()).default([]), ending_never: z.array(z.string()).default([]) })
+    .default({ values: ['should', 'need to', 'needs to', 'must', 'ought'], hype: ['dream job', 'unlock', 'level up', 'game-changer', 'game changer', 'supercharge'], products: ['SideStep'], max_hashtags: 5, hook_max_words: 22, hook_labels: ['Exhibit', 'Levels of', 'Previously on', 'Calendar invite'], job_words: [], ending_never: [] }),
   batch: z.object({ max: z.number().int().positive(), default_count: z.number().int().positive(), zip_part_mb: z.number().positive().default(150) }),
   clone: z.object({
     mode: z.enum(['replace', 'motion']).default('replace'),

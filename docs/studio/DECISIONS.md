@@ -2576,18 +2576,28 @@ UX-PLAN.md section 28 has the audit and the plan.
   checks: a hook with no job word, and ghosted, passed over or applies for
   you on a product post's last slide. Slideshows are TikTok only: Export
   makes 1080 x 1920; the 1080 x 1440 set is a per-post option, off.
-  The 15-word note stays as asked in v1.1, though four of the five v1.2
-  passing examples run 18 to 22 words (one number in content.yaml,
-  `hook_max_words`). Hooks are no longer cut at 16 words anywhere (Use
+  The length note shows over 22 words (owner, 2026-10-16: the v1.2
+  passing examples, 14 to 22 words, are the bar; `hook_max_words` in
+  content.yaml); the writer still aims for THE STANDARD's "about 15". Hooks are no longer cut at 16 words anywhere (Use
   this hook and batch included): 30 is a cap against runaway answers.
+- **Follow-ups (owner, 2026-10-17).** The length note shows over 22 words.
+  Posts home pages past the newest 200 posts: `GET /content/page` with
+  keyset paging (when the post was last changed, then its id; `before` is
+  the last post shown, compared as a row value so ties never skip a
+  post), the account and character filters on the server, and the chips
+  from every post (`accountTags`, `characterIds`). The first list stays
+  the newest 200 with the options, so nothing else changes; an older post
+  already opened by its link (`/content/:id`).
 - **The language lint** (`server/core/copyLint.ts`) is one pure function
   for the browser and the server: free, warnings only, each check a
   default rule (area copy) switchable per account or character. It never
   blocks a run or an export. THE STANDARD adds three hook checks: over 15
   words, a label or stage direction to open (the list is data; a
   timestamp or date is found by code), more than one quoted phrase. On
-  the launch plan's 140 hooks they flag 41 (28 labels or timestamps, 9
-  long, 6 stacked quotes); the rows still import as written.
+  the launch plan's 140 hooks the hook checks flag 92 (v1.2, the length
+  note at 22: 83 with no job word, 28 labels or timestamps, 6 stacked
+  quotes, 1 long); the rows still import as written, and the rewritten
+  plan replaces the test file.
 - **The plan import is code, not Claude, and column-driven.** Every value
   is read by its header's name (case and spaces ignored, any order), so a
   rewritten plan with the same columns replaces the test file without a

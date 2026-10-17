@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page, type TestInfo } from '@playwright/test'
-import { api, snap } from './helpers'
+import { allPosts, api, snap } from './helpers'
 
 // Name the garment (owner, 2026-10-16; UX-PLAN section 26): an outfit the
 // clip reader wrote with no garment type warns on the Recreate stills
@@ -12,7 +12,7 @@ type CloneSpec = { assetId?: string | null; outfit: { choice: string; text: stri
 type Item = { id: string; characterId: string | null; spec?: { clone?: CloneSpec | null } }
 
 async function recreatePost(): Promise<Item> {
-  const { items } = await api<{ items: Item[] }>('GET', '/content')
+  const items = await allPosts<Item>()
   // The oldest one: the editor tests copy posts, and a copy is not set up the same way.
   const p = [...items].reverse().find(i => i.spec?.clone?.assetId && i.characterId)
   if (!p) throw new Error('No post with a Recreate source. Start one from a real clip in demo mode first.')

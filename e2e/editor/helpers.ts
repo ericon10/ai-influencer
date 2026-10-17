@@ -22,11 +22,25 @@ export async function api<T = any>(method: string, path: string, body?: unknown)
   return (text ? JSON.parse(text) : {}) as T
 }
 
+// Every post, newest first: the list holds the newest 200; the rest come a
+// page at a time (Posts home's Show older posts).
+export async function allPosts<T extends { id: string }>(): Promise<T[]> {
+  const first = await api<{ items: T[]; next?: string | null }>('GET', '/content')
+  const out = [...first.items]
+  let next = first.next ?? null
+  for (let i = 0; next && i < 50; i++) {
+    const page = await api<{ items: T[]; next: string | null }>('GET', `/content/page?before=${next}&limit=200`)
+    out.push(...page.items)
+    next = page.next
+  }
+  return out
+}
+
 // A post to copy: E2E_POST, or the oldest with one shot (see below).
 let basePost: string | null = process.env.E2E_POST ?? null
 async function findBasePost(): Promise<string> {
   if (basePost) return basePost
-  const { items } = await api<{ items: { id: string; characterId: string | null; spec?: { clipId?: string | null; editor?: { stack?: unknown } | null } }[] }>('GET', '/content')
+  const items = await allPosts<{ id: string; characterId: string | null; spec?: { clipId?: string | null; editor?: { stack?: unknown } | null } }>()
   // A live character only: the character file test archives any Wren left
   // from an earlier run, and her posts with her.
   const live = new Set((await api<{ characters: { id: string }[] }>('GET', '/characters')).characters.map(c => c.id))

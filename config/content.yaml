@@ -96,10 +96,11 @@ copy_lint:
   # Never in a hook (a product post names it on slide 5 or 6).
   products: [SideStep]
   max_hashtags: 5
-  # THE STANDARD (post writer brief v1.1): slide 1 is about 15 words or
-  # fewer and never opens with a label or a stage direction (a timestamp
-  # or date is found by code).
-  hook_max_words: 15
+  # THE STANDARD: slide 1 reads in one go. The writer aims for about 15
+  # words; the note shows over 22 (owner, 2026-10-16: the v1.2 passing
+  # examples, 14 to 22 words, are the bar). Slide 1 never opens with a
+  # label or a stage direction (a timestamp or date is found by code).
+  hook_max_words: 22
   hook_labels: [Exhibit, Levels of, Previously on, Calendar invite]
   # THE STANDARD v1.2: every hook names the job situation (one of these, or
   # a word starting with one); a product post's last slide never says these.

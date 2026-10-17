@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { Archive, CopyPlus, FileUp, Film, Images, Layers, Loader2, Plus } from 'lucide-react'
@@ -27,9 +27,13 @@ export default function Posts() {
   const [character, setCharacter] = useState<string | null>(null)
   const items = content.data?.items ?? []
   const characters = chars.data?.characters ?? []
-  const shown = items.filter(i => (!tag || i.accountTag === tag) && (!character || i.characterId === character))
+  // The list holds the newest 200 posts; Show older posts pages past them,
+  // with the filters applied on the server (so a filter finds older posts).
+  const older = useOlderPosts(content.data?.next ?? null, items.at(-1)?.id ?? null, tag, character)
+  const all = useMemo(() => { const seen = new Set(items.map(i => i.id)); return [...items, ...older.items.filter(i => !seen.has(i.id))] }, [items, older.items])
+  const shown = all.filter(i => (!tag || i.accountTag === tag) && (!character || i.characterId === character))
   const tags = content.data?.accountTags ?? []
-  const used = useMemo(() => new Set(items.map(i => i.characterId)), [items])
+  const used = useMemo(() => new Set([...(content.data?.characterIds ?? []), ...items.map(i => i.characterId)]), [items, content.data?.characterIds])
   const nav = useNavigate()
   const toast = useToast()
   const [setting, setSetting] = useState(false)
@@ -100,15 +104,48 @@ export default function Posts() {
             })}
           </div>
         </div>
-      ) : !shown.length ? (
+      ) : !shown.length && !older.more ? (
         <Callout tone="info">No posts match these filters. <button className="st-todo-link" onClick={() => { setTag(null); setCharacter(null) }}>Show all posts</button></Callout>
       ) : (
-        <div className="st-grid cards">
-          {shown.map(i => <PostCard key={i.id} item={i} lib={lib.data} characterName={characters.find(c => c.id === i.characterId)?.name ?? ''} />)}
-        </div>
+        <>
+          {shown.length > 0 && (
+            <div className="st-grid cards">
+              {shown.map(i => <PostCard key={i.id} item={i} lib={lib.data} characterName={characters.find(c => c.id === i.characterId)?.name ?? ''} />)}
+            </div>
+          )}
+          {older.more && (
+            <div className="st-row" style={{ gap: 10, justifyContent: 'center', marginTop: 18, flexWrap: 'wrap' }} data-field="posts-older">
+              {!shown.length && <span className="st-hint">None of the newest {items.length} posts match these filters.</span>}
+              <button type="button" className="st-btn" disabled={older.loading} onClick={() => void older.load()}>{older.loading ? <Loader2 size={15} className="st-spin" /> : null}Show older posts</button>
+              <span className="st-hint">{shown.length} shown{tag || character ? ' (filtered)' : ''}. Older ones load {PAGE} at a time.</span>
+            </div>
+          )}
+        </>
       )}
     </div>
   )
+}
+
+// Older posts than the newest 200, a page at a time. A filter starts the
+// pages again from the end of the list, filtered on the server.
+const PAGE = 60
+function useOlderPosts(first: string | null, lastListed: string | null, tag: string | null, character: string | null) {
+  const toast = useToast()
+  const [state, setState] = useState<{ key: string; items: ContentItem[]; next: string | null }>({ key: '', items: [], next: null })
+  const [loading, setLoading] = useState(false)
+  const key = `${first ?? ''}|${tag ?? ''}|${character ?? ''}`
+  // A new list or a new filter starts over from the end of the list.
+  useEffect(() => { setState({ key, items: [], next: first ? lastListed : null }) }, [key, first, lastListed])
+  const cursor = state.key === key ? state.next : (first ? lastListed : null)
+  async function load() {
+    if (!cursor) return
+    setLoading(true)
+    try {
+      const page = await api.contentPage({ before: cursor, limit: PAGE, tag, character })
+      setState(s => ({ key, items: [...(s.key === key ? s.items : []), ...page.items], next: page.next }))
+    } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) } finally { setLoading(false) }
+  }
+  return { items: state.key === key ? state.items : [], more: !!cursor, loading, load }
 }
 
 // The picture on a post's card: its export, else its clip, else its still.

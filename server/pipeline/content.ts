@@ -1,6 +1,6 @@
 import { writeFile, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { and, desc, eq, inArray, isNull } from 'drizzle-orm'
+import { and, desc, eq, inArray, isNull, sql } from 'drizzle-orm'
 import { zipSync } from 'fflate'
 import sharp from 'sharp'
 import { z } from 'zod'
@@ -397,10 +397,27 @@ function parseSpec(kind: string, raw: unknown) {
   return r.data
 }
 
+// The newest posts first (the list holds the newest 200; Posts home pages
+// past them with contentPage).
+export const LIST_SIZE = 200
 export async function listContent(deps: Deps, ctx: Ctx, characterId?: string | null): Promise<ContentRow[]> {
   return deps.db.select().from(contentItems)
     .where(and(eq(contentItems.accountId, ctx.accountId), isNull(contentItems.archivedAt), ...(characterId ? [eq(contentItems.characterId, characterId)] : [])))
-    .orderBy(desc(contentItems.updatedAt)).limit(200)
+    .orderBy(desc(contentItems.updatedAt), desc(contentItems.id)).limit(LIST_SIZE)
+}
+
+// Older posts, a page at a time (Posts home, "Show older posts"): newest
+// first by the time they were last changed, then by id; `before` is the id
+// of the last post shown, so a page starts right after it. The account and
+// character filters apply here, so a filter finds older posts too.
+export async function contentPage(deps: Deps, ctx: Ctx, q: { before?: string | null; limit?: number; accountTag?: string | null; characterId?: string | null }): Promise<{ items: ReturnType<typeof itemView>[]; next: string | null }> {
+  const limit = Math.max(1, Math.min(LIST_SIZE, Math.round(q.limit ?? 60)))
+  const conds = [eq(contentItems.accountId, ctx.accountId), isNull(contentItems.archivedAt)]
+  if (q.characterId) conds.push(eq(contentItems.characterId, q.characterId))
+  if (q.accountTag) conds.push(eq(contentItems.accountTag, cleanTag(q.accountTag)))
+  if (q.before) conds.push(sql`(${contentItems.updatedAt}, ${contentItems.id}) < (select c.updated_at, c.id from content_items c where c.account_id = ${ctx.accountId} and c.id = ${q.before})`)
+  const rows = await deps.db.select().from(contentItems).where(and(...conds)).orderBy(desc(contentItems.updatedAt), desc(contentItems.id)).limit(limit + 1)
+  return { items: rows.slice(0, limit).map(itemView), next: rows.length > limit ? rows[limit - 1]!.id : null }
 }
 
 export async function getContent(deps: Deps, ctx: Ctx, itemId: string): Promise<ContentRow> {
@@ -1337,7 +1354,12 @@ export async function contentItemView(deps: Deps, ctx: Ctx, itemId: string) {
 }
 
 export async function contentView(deps: Deps, ctx: Ctx) {
-  const [broll, items, lint] = await Promise.all([listBroll(deps, ctx), listContent(deps, ctx), lintSettings(deps, ctx)])
+  const [broll, items, lint, tagRows, charRows] = await Promise.all([
+    listBroll(deps, ctx), listContent(deps, ctx), lintSettings(deps, ctx),
+    // Every account tag and character in use, not only the newest 200 posts'.
+    deps.db.select({ tag: contentItems.accountTag, at: sql<string>`max(${contentItems.updatedAt})` }).from(contentItems).where(and(eq(contentItems.accountId, ctx.accountId), isNull(contentItems.archivedAt))).groupBy(contentItems.accountTag).orderBy(desc(sql`max(${contentItems.updatedAt})`)),
+    deps.db.selectDistinct({ id: contentItems.characterId }).from(contentItems).where(and(eq(contentItems.accountId, ctx.accountId), isNull(contentItems.archivedAt))),
+  ])
   const assetIds = broll.map(b => b.assetId).filter((x): x is string => !!x)
   const durations = new Map<string, number | null>()
   for (const a of assetIds) durations.set(a, (await getAsset(deps, ctx, a).catch(() => null))?.durationMs ?? null)
@@ -1346,8 +1368,12 @@ export async function contentView(deps: Deps, ctx: Ctx) {
     broll: broll.map(b => ({ id: b.id, title: b.title, product: b.product, status: b.status, error: b.error, assetId: b.assetId, durationSec: b.assetId && durations.get(b.assetId) ? Math.round(durations.get(b.assetId)! / 100) / 10 : null, createdAt: b.createdAt.toISOString() })),
     products: [...new Set([...cfg.broll.products, ...broll.map(b => b.product).filter(Boolean)])].sort((a, b) => a.localeCompare(b)),
     items: items.map(itemView),
-    // Account tags in use, most recent first (the Idea step suggests them).
-    accountTags: [...new Set(items.map(i => i.accountTag).filter(Boolean))],
+    // Where Posts home's "Show older posts" starts (null: none older).
+    next: items.length === LIST_SIZE ? items[LIST_SIZE - 1]!.id : null,
+    // Account tags in use, most recent first (the Idea step suggests them),
+    // and the characters with posts: from every post.
+    accountTags: tagRows.map(r => r.tag).filter(Boolean),
+    characterIds: charRows.map(r => r.id).filter((x): x is string => !!x),
     options: {
       caption: { size: cfg.caption.size, safe: cfg.caption.safe, position: cfg.caption.position, maxChars: cfg.caption.max_chars, box: cfg.caption.box, style: cfg.caption.style, outline: cfg.caption.outline, karaoke: cfg.caption.karaoke },
       canvas: cfg.canvas, meme: cfg.meme, batch: cfg.batch,

@@ -497,9 +497,9 @@ rules:
     bucket: default
     area: copy
     spec: "28"
-    title: 'A hook is 15 words or fewer'
+    title: 'A hook reads in one go (22 words at most)'
     check: { type: behavior }
-    message: 'A hook over 15 words gets a free warning: slide 1 reads in one go (THE STANDARD, post writer brief v1.1).'
+    message: 'A hook over 22 words gets a free warning: slide 1 reads in one go. The writer aims for about 15 (THE STANDARD); the v1.2 passing examples run 14 to 22.'
   - id: lint-hook-label
     bucket: default
     area: copy

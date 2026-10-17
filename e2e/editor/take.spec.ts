@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { expect, test, type Page, type TestInfo } from '@playwright/test'
-import { api, captionBlocks, clipBlocks, seedPost, seek, snap } from './helpers'
+import { allPosts, api, captionBlocks, clipBlocks, seedPost, seek, snap } from './helpers'
 import { editorReady, LIVE, startLive, type Live } from './r2'
 
 // The editor opens with the take (owner, 2026-10-15): "Open editor brings
@@ -21,7 +21,7 @@ test.afterAll(async () => { await live.close() })
 test.beforeEach(() => { live.refuse = false; live.keptRedirect = false; live.hits = []; live.proxied = 0 })
 
 type Item = { id: string; kind: string; status: string; characterId: string | null; spec?: Record<string, any> }
-const posts = async () => (await api<{ items: Item[] }>('GET', '/content')).items
+const posts = async () => allPosts<Item>()
 
 // What the post should put on the timeline: its shots and their lengths.
 async function expected(post: string) {

@@ -253,6 +253,10 @@ export const api = {
   trashList: () => request<{ items: TrashItem[]; days: number }>('GET', '/trash'),
   restore: (ids: string[]) => request<{ restored: number }>('POST', '/trash/restore', { ids }),
   contentItem: (id: string) => request<{ item: ContentItem }>('GET', `/content/${id}`),
+  contentPage: (q: { before: string; limit?: number; tag?: string | null; character?: string | null }) => {
+    const p = new URLSearchParams({ before: q.before, ...(q.limit ? { limit: String(q.limit) } : {}), ...(q.tag ? { tag: q.tag } : {}), ...(q.character ? { character: q.character } : {}) })
+    return request<{ items: ContentItem[]; next: string | null }>('GET', `/content/page?${p}`)
+  },
   checkStorage: () => request<{ ok: boolean; message: string }>('POST', '/settings/storage/check', {}),
   // The shared MCP connection flow (Higgsfield account, Dzine AI soon).
   connect: (provider: string) => request<{ url: string }>('POST', `/oauth/${provider}/start`, {}),

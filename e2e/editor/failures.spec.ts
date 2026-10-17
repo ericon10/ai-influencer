@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page, type TestInfo } from '@playwright/test'
-import { api, snap } from './helpers'
+import { allPosts, api, snap } from './helpers'
 
 // Earlier failures in one gray line (owner, 2026-10-15): in the Recreate
 // stills grid and in the run rows, only the run just started shows its
@@ -7,7 +7,7 @@ import { api, snap } from './helpers'
 // Clear. The lists are served by the test (nothing runs).
 
 async function recreatePost(): Promise<{ id: string; characterId: string }> {
-  const { items } = await api<{ items: { id: string; characterId: string | null; spec?: { clone?: { assetId?: string | null } | null } }[] }>('GET', '/content')
+  const items = await allPosts<{ id: string; characterId: string | null; spec?: { clone?: { assetId?: string | null } | null } }>()
   // The oldest one: the editor tests copy posts, and a copy is not set up the same way.
   const p = [...items].reverse().find(i => i.spec?.clone?.assetId && i.characterId)
   if (!p) throw new Error('No post with a Recreate source. Start one from a real clip in demo mode first.')
@@ -129,7 +129,7 @@ async function faceStrip(page: Page, info: TestInfo, phone: boolean) {
   type Review = { faceMin: number; step: number; duration: number; samples: Array<{ t: number; face: number | null; likeness: number | null }>; drift: Array<{ start: number; end: number }>; text: unknown[]; cuts: number[]; notes: string[] }
   type Clones = { clones: Array<{ id: string; assetId: string | null; needsFrames?: boolean; review: Review | null }> }
   // The oldest Recreate post with a take (copies are not set up the same way).
-  const { items } = await api<{ items: { id: string; characterId: string | null; spec?: { clone?: { assetId?: string | null } | null } }[] }>('GET', '/content')
+  const items = await allPosts<{ id: string; characterId: string | null; spec?: { clone?: { assetId?: string | null } | null } }>()
   let id = ''
   let take: Clones['clones'][number] | undefined
   for (const p of [...items].reverse().filter(i => i.spec?.clone?.assetId && i.characterId)) {

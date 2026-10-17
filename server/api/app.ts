@@ -39,7 +39,7 @@ import { jobViews } from '../jobs/jobView.js'
 import { importPlan, planView, previewPlan } from '../pipeline/planImport.js'
 import { archiveSlideScene, batchView, familyView, listSlideScenes, reuseReport, reviewBatchItem, saveSlideScene, saveSlideStillModel, slideStillChoices, vaultHookIdeas } from '../pipeline/slideshow.js'
 import { PATTERN_IDS } from '../core/slides.js'
-import { POST_STEPS, addBroll, archiveBroll, archiveContent, contentItemView, contentView, createContent, duplicateContent, postScene, retryFailedBatch, startCover, startRender, startVariants, updateBroll, updateContent } from '../pipeline/content.js'
+import { POST_STEPS, addBroll, archiveBroll, archiveContent, contentItemView, contentPage, contentView, createContent, duplicateContent, postScene, retryFailedBatch, startCover, startRender, startVariants, updateBroll, updateContent } from '../pipeline/content.js'
 import { rulesView, setRuleSwitch } from '../pipeline/rules.js'
 import { chooseConcept } from '../pipeline/concepts.js'
 import { approveCandidate, keepStale, pickHero, rejectCandidate, reopenCandidate, setFavorite, mirrorCandidate } from '../pipeline/review.js'
@@ -639,6 +639,11 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
     return c.json(await contentView(deps, ctx))
   })
   // One post, also one older than the newest 200 the list holds.
+  // Older posts, a page at a time (Posts home), filtered by account or character.
+  app.get('/content/page', async c => {
+    const q = parse(z.object({ before: z.string().regex(/^cnt_[a-z0-9]{8,40}$/).optional(), limit: z.coerce.number().int().min(1).max(200).optional(), tag: z.string().max(80).optional(), character: z.string().regex(/^chr_[a-z0-9]{8,40}$/).optional() }), c.req.query())
+    return c.json(await contentPage(deps, c.get('ctx'), { before: q.before, limit: q.limit, accountTag: q.tag, characterId: q.character }))
+  })
   app.get('/content/:id', async c => c.json(await contentItemView(deps, c.get('ctx'), c.req.param('id'))))
   // Delete and the Trash (owner, 2026-10-15; UX-PLAN.md section 22).
   app.post('/trash/check', async c => c.json({ warnings: await trashWarnings(deps, c.get('ctx'), parseRefs((await json(c) as { items?: unknown }).items)) }))

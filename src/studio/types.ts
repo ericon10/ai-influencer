@@ -486,6 +486,9 @@ export interface ContentItem {
 }
 export interface ContentData {
   broll: BrollClip[]; products: string[]; items: ContentItem[]; accountTags: string[]
+  // Where "Show older posts" starts (the list holds the newest 200), and
+  // the characters with posts.
+  next?: string | null; characterIds?: string[]
   options: {
     caption: { size: number; safe: { top: number; bottom: number; left: number; right: number }; position: 'top' | 'upper_third' | 'middle' | 'bottom'; maxChars: number; box: { fill: string; text: string; radius: number; pad_x: number; pad_y: number }; style?: CaptionStyle | 'plain'; outline?: { text: string; stroke: string; width: number }; karaoke?: { fill: string; text: string; color: string } }
     canvas: { width: number; height: number; fps: number }

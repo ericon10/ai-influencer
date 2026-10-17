@@ -49,15 +49,14 @@ describe('copy lint', () => {
     expect(hits.map(h => [h.rule, h.slide])).toEqual([['lint-values', 1]])
   })
 
-  it('THE STANDARD on a hook: 15 words or fewer, no label or timestamp to open, one quoted phrase at most', () => {
-    // The owner's examples that pass (THE STANDARD v1.2): no notes but the
-    // length one, which four of them get (18 to 22 words against "about 15
-    // words or fewer"; hook_max_words in config/content.yaml).
-    expect(rules("man 54 f'ing boxes to fill on that job app fam?????????? 54!!!!!! that wuz AFTER i gave the resume", 'hook')).toEqual(['lint-hook-long'])
-    expect(rules('a guy at my bar is on round 6 for a job that pays less than my tips', 'hook')).toEqual(['lint-hook-long'])
+  it('THE STANDARD on a hook: 22 words at most, no label or timestamp to open, one quoted phrase at most', () => {
+    // The owner's examples that pass (THE STANDARD v1.2, 14 to 22 words)
+    // read clean: they are the bar for the length note (owner, 2026-10-16).
+    expect(rules("man 54 f'ing boxes to fill on that job app fam?????????? 54!!!!!! that wuz AFTER i gave the resume", 'hook')).toEqual([])
+    expect(rules('a guy at my bar is on round 6 for a job that pays less than my tips', 'hook')).toEqual([])
     expect(rules('this job\'s been "actively hiring" since JANUARY. i applied 3 times. hiring WHO bro', 'hook')).toEqual([])
-    expect(rules('4 rounds of job interviews and they ghosted me. FOUR. not even a "no thx" ngl i\'m tight', 'hook')).toEqual(['lint-hook-long'])
-    expect(rules('took a job offer for 9k less than i wanted bc i had like 5 weeks of $ left. i hate it here', 'hook')).toEqual(['lint-hook-long'])
+    expect(rules('4 rounds of job interviews and they ghosted me. FOUR. not even a "no thx" ngl i\'m tight', 'hook')).toEqual([])
+    expect(rules('took a job offer for 9k less than i wanted bc i had like 5 weeks of $ left. i hate it here', 'hook')).toEqual([])
     // Labels and stage directions from the launch plan's own hooks.
     // (Both also name no job situation: THE STANDARD v1.2's note too.)
     expect(rules('Exhibit 1: a rejection received at 2:14am. Artist unknown.', 'hook')).toEqual(['lint-hook-label', 'lint-hook-nojob'])
@@ -74,9 +73,10 @@ describe('copy lint', () => {
     expect(rules('They said "fast-paced" and meant "understaffed".', 'hook')).toContain('lint-hook-quotes')
     expect(rules("Entry level role. 5 years required. Then I scrolled to 'About us.'", 'hook')).not.toContain('lint-hook-quotes')
     expect(rules("It's 2am and I'm still applying. It's fine. I'm fine.", 'hook')).not.toContain('lint-hook-quotes')
-    // Over 15 words.
-    expect(rules('one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen', 'hook')).toContain('lint-hook-long')
-    expect(rules('one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen', 'hook')).not.toContain('lint-hook-long')
+    // Over 22 words.
+    const words = (n: number) => Array.from({ length: n }, (_, i) => `w${i + 1}`).join(' ')
+    expect(rules(`${words(22)} job`, 'hook')).toContain('lint-hook-long')
+    expect(rules(`${words(21)} job`, 'hook')).not.toContain('lint-hook-long')
     expect(lintCopy('one two three four five six seven eight nine job', { kind: 'hook', lists: { hookMaxWords: 8 } }).map(h => h.match)).toEqual(['10 words'])
     // Only on a hook: a slide may open with a label.
     expect(rules('Exhibit 2: the follow-up that never came. 2:14am. "a" "b"', 'slide')).toEqual([])

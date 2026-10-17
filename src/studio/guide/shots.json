@@ -70,39 +70,47 @@
     ]
   },
   "posts-home": {
-    "w": 1140,
+    "w": 1196,
     "h": 900,
     "spots": [
       {
         "n": 1,
-        "x": 64.6,
+        "x": 67.3,
         "y": 11.3,
-        "w": 31.1,
+        "w": 29.7,
         "h": 4.2,
         "label": "Start a post right here too"
       },
       {
         "n": 2,
-        "x": 6.1,
-        "y": 36,
-        "w": 69.2,
-        "h": 4.3,
-        "label": "Accounts: tracked links, promo codes and signups"
+        "x": 3,
+        "y": 34.1,
+        "w": 94,
+        "h": 8.2,
+        "label": "Accounts: tracked links, promo codes, signups, primary and backup structures"
       },
       {
         "n": 3,
-        "x": 4.2,
-        "y": 44.8,
-        "w": 6.7,
-        "h": 2.1,
-        "label": "Filter by account (the tag you set on a post)"
+        "x": 3,
+        "y": 44.3,
+        "w": 94,
+        "h": 8.2,
+        "label": "Launch plan: import the plan's CSV, then generate its posts"
       },
       {
         "n": 4,
-        "x": 4.2,
-        "y": 49.4,
-        "w": 21.8,
-        "h": 50,
+        "x": 9.9,
+        "y": 54.5,
+        "w": 3.3,
+        "h": 3.1,
+        "label": "Filter by account (the tag you set on a post) or character"
+      },
+      {
+        "n": 5,
+        "x": 3,
+        "y": 63.7,
+        "w": 22.5,
+        "h": 36.3,
         "label": "A post: open it to keep going where you left off"
       }
     ]
@@ -2838,6 +2846,28 @@
         "w": 27.6,
         "h": 41.9,
         "label": "The big preview, exactly as it goes into the JPEG"
+      }
+    ]
+  },
+  "posts-older": {
+    "w": 1196,
+    "h": 555,
+    "spots": [
+      {
+        "n": 1,
+        "x": 34.1,
+        "y": 75.7,
+        "w": 12.1,
+        "h": 6.8,
+        "label": "Show older posts: 60 more at a time, the filters applied"
+      },
+      {
+        "n": 2,
+        "x": 74.5,
+        "y": 0,
+        "w": 22.5,
+        "h": 72.5,
+        "label": "The newest 200 posts show first, the most recently changed on top"
       }
     ]
   }
