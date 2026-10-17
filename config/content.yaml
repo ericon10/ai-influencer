@@ -42,7 +42,6 @@ broll:
   # lean H.264 copy without sound.
   max_upload_mb: 200
   max_seconds: 120
-  products: []
 
 slideshow:
   slides: [5, 7]
@@ -87,14 +86,39 @@ playbook:
     CALLIE: [S5, S10]
     SOLEI: [S2, S6]
 
+# Writing rules by product (owner, 2026-10-17; UX-PLAN.md section 29).
+# Every post is written to the general standard (the stop test, one story
+# thread, the clarity test, an image line a slide, the voice from the
+# character's voice card or the account; one Claude call for hooks, no
+# reviewer). A product can add its own rules on top: it picks one of these
+# on its card (Library > Hooks). A post follows its own product's; a post
+# with no product gets the general standard only. A standard's templates
+# are the ones named with its key first in config/templates.yaml
+# (sidestep_slideshow_hooks); a name it has no version of falls back to the
+# general one. `names`: a product of that name starts on it (kit import).
+writing_standards:
+  sidestep:
+    label: SideStep rules v1.2 (job word, pain 7+, honest endings)
+    names: [SideStep]
+    # The five-check stop test and the ladder after Write 10 (a second call).
+    review: true
+    # The language notes (copy_lint below) on its posts' words.
+    lint: true
+    # The honest endings on a product post's last slide.
+    endings: true
+    # The playbook's structures per account (playbook above).
+    structures: true
+
 # The language lint (owner, 2026-10-16; UX-PLAN.md section 28): free
-# warnings on every hook, slide and caption. Each check is a default in
-# Settings > Rules; these are its word lists.
+# warnings on the hooks, slides and captions of posts whose product's
+# writing standard has lint on (section 29: SideStep's); the em and en dash
+# check runs on every post. Each check is a default in Settings > Rules;
+# these are its word lists. The post's own product is the name never in a
+# hook.
 copy_lint:
   values: [should, need to, needs to, must, ought]
   hype: [dream job, unlock, level up, game-changer, game changer, supercharge]
-  # Never in a hook (a product post names it on slide 5 or 6).
-  products: [SideStep]
+  products: []
   max_hashtags: 5
   # THE STANDARD: slide 1 reads in one go. The writer aims for about 15
   # words; the note shows over 22 (owner, 2026-10-16: the v1.2 passing

@@ -66,7 +66,7 @@ export async function recreateFor(deps: Deps, ctx: Ctx, input: { contentId: stri
   const characterId = await characterFor(deps, ctx, input.characterId)
   if (characterId === from.characterId) throw new AppError('bad_request', 'Pick another character.')
   const clone: CloneSource = { ...src, stills: {}, target: src.target, outfit: { ...src.outfit, lookId: null }, spentCredits: 0 }
-  const post = await createContent(deps, ctx, { kind: 'meme', characterId, idea: from.idea, accountTag: from.accountTag, step: 'video', spec: { start: 'clip', clone } })
+  const post = await createContent(deps, ctx, { kind: 'meme', characterId, idea: from.idea, accountTag: from.accountTag, productId: from.productId, step: 'video', spec: { start: 'clip', clone } })
   return { id: post.id }
 }
 

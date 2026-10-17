@@ -197,21 +197,23 @@ export interface SpecialSlide {
 }
 
 const base = { from: '', title: '', body: '', lines: [] as string[], time: '', variant: '', count: 0, blur: false, assetId: null as string | null, scale: 0.72, ratio: 0.5 }
+// A new screen's starting words: neutral, on no product's subject (rule
+// two, UX-PLAN.md section 29); every field is the owner's to change.
 export function emptySpecial(type: SpecialType): SpecialSlide {
   switch (type) {
-    case 'notification': return { ...base, type, from: 'Messages', title: 'Jordan', body: 'did you see the email??', time: 'now' }
-    case 'text_thread': return { ...base, type, title: 'Mom', lines: ['how did the interview go', 'me: they said they will let me know', 'thats good right?'], time: '9:41' }
-    case 'rejection_email': return { ...base, type, from: 'Recruiting Team', title: 'Update on your application', body: 'Thank you for your interest. After careful consideration, we have decided to move forward with other candidates.', time: '8:02 AM' }
-    case 'job_posting': return { ...base, type, from: 'Northwind Studio', title: 'Junior Product Designer', body: 'Remote · $68k to $80k', lines: ['2+ years of experience', 'A portfolio of shipped work', 'Comfortable presenting ideas'], time: '2 days ago' }
-    case 'application_form': return { ...base, type, from: 'Careers portal', title: 'Work history, page 4 of 6', lines: ['Job title', 'Company', 'Start date (MM/YYYY)', 'End date (MM/YYYY)', 'Describe your responsibilities'], variant: 'empty', count: 40 }
-    case 'portal_status': return { ...base, type, from: 'Candidate portal', title: 'Junior Coordinator', body: 'In review', lines: ['Submitted · Oct 2, 11:52 PM', 'Received · Oct 2, 11:52 PM', 'In review · Oct 3, 9:00 AM', 'Still in review · day 41'] }
-    case 'calendar_invite': return { ...base, type, title: 'Quick chat', from: 'Talent Team', time: 'Tue, Oct 20 · 2:00 to 2:30 PM', body: 'Video call', lines: ['JR', 'MK', 'You'] }
-    case 'receipt': return { ...base, type, variant: 'invoice', title: 'INVOICE No. 047', from: 'Bill to: The Talent Team', lines: ['Round 4 deck · $640.00', 'Retyping my resume · $45.00', 'Emotional damages · TBD'], body: 'Total due · $685.00', time: 'Due on receipt' }
+    case 'notification': return { ...base, type, from: 'Messages', title: 'Jordan', body: 'did you see this??', time: 'now' }
+    case 'text_thread': return { ...base, type, title: 'Mom', lines: ['how did it go?', 'me: they said they will let me know', 'thats good right?'], time: '9:41' }
+    case 'rejection_email': return { ...base, type, from: 'Customer Team', title: 'An update on your request', body: 'Thank you for reaching out. After careful review, we are not able to move forward at this time.', time: '8:02 AM' }
+    case 'job_posting': return { ...base, type, from: 'Northwind Studio', title: 'Weekend Assistant', body: 'Downtown · $22 an hour', lines: ['Friendly and on time', 'Free on weekends', 'Starts next month'], time: '2 days ago' }
+    case 'application_form': return { ...base, type, from: 'Sign-up form', title: 'Your details, page 4 of 6', lines: ['Full name', 'Email', 'Date of birth (MM/DD/YYYY)', 'Address', 'Tell us about yourself'], variant: 'empty', count: 40 }
+    case 'portal_status': return { ...base, type, from: 'Order status', title: 'Order 4471', body: 'Processing', lines: ['Placed · Oct 2, 11:52 PM', 'Received · Oct 2, 11:52 PM', 'Processing · Oct 3, 9:00 AM', 'Still processing · day 41'] }
+    case 'calendar_invite': return { ...base, type, title: 'Quick chat', from: 'Sam', time: 'Tue, Oct 20 · 2:00 to 2:30 PM', body: 'Video call', lines: ['SK', 'MK', 'You'] }
+    case 'receipt': return { ...base, type, variant: 'invoice', title: 'INVOICE No. 047', from: 'Bill to: Me', lines: ['Late night snacks · $24.00', 'Ride home · $18.50', 'Regret · TBD'], body: 'Total due · $42.50', time: 'Due on receipt' }
     case 'bank_app': return { ...base, type, from: 'Everyday Bank', title: 'Savings', time: 'Available balance', body: '$1,204.18', lines: ['Rent · -$1,450.00', 'Groceries · -$62.40', 'Transfer in · +$200.00'] }
-    case 'museum_placard': return { ...base, type, title: "'Warm Regards.'", from: 'Autoresponder', time: 'Email, 2026', body: 'Received at 2:14 AM. The only warm thing in the building at 2am.' }
-    case 'survey': return { ...base, type, from: 'Candidate experience survey', title: 'How likely are you to recommend our hiring process to a friend?', count: -1 }
-    case 'lock_screen': return { ...base, type, time: '2:14', from: 'Wednesday, October 21', lines: ['Mail · Talent Team · Thank you for your interest in the...', 'Messages · Mom · did you hear back??', 'Calendar · Rent due in 9 days'] }
-    case 'profile_card': return { ...base, type, title: 'Jordan Lee', from: 'Open to work · Class of 2026', body: 'Recent grad. 147 applications and counting.', lines: ['Connections · 212', 'Profile views this week · 3'], variant: 'blue' }
+    case 'museum_placard': return { ...base, type, title: "'Read 9:14 PM.'", from: 'Group chat', time: 'Text, 2026', body: 'Seen by four people. Answered by none.' }
+    case 'survey': return { ...base, type, from: 'Customer survey', title: 'How likely are you to recommend us to a friend?', count: -1 }
+    case 'lock_screen': return { ...base, type, time: '2:14', from: 'Wednesday, October 21', lines: ['Messages · Sam · are you up??', 'Mail · Your order has shipped', 'Calendar · Rent due in 9 days'] }
+    case 'profile_card': return { ...base, type, title: 'Jordan Lee', from: 'Weekend runner · Coffee person', body: 'Trying every coffee shop in the city. 47 so far.', lines: ['Followers · 212', 'Profile views this week · 3'], variant: 'blue' }
     case 'product_shot': return { ...base, type }
   }
 }

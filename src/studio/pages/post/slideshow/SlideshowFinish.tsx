@@ -43,7 +43,7 @@ export function SlideshowOutputs({ ctx, name }: { ctx: PostCtx; name: string }) 
   )
 }
 
-// Slideshows are TikTok only (THE STANDARD v1.2): the export makes the
+// Slideshows are TikTok only (owner, 2026-10-16): the export makes the
 // 1080 x 1920 set; the 1080 x 1440 Instagram set is an option, off by
 // default, and Export makes it next time.
 export function InstagramSet({ ctx }: { ctx: PostCtx }) {
@@ -133,7 +133,7 @@ export function VariationsCard({ ctx }: { ctx: PostCtx }) {
 // a note with the slide it is on; export still works.
 export function LintSummary({ ctx }: { ctx: PostCtx }) {
   const { item, draft } = ctx
-  const lint = useLint(item.characterId)
+  const lint = useLint(item.characterId, item.productId)
   const spec = draft.spec as unknown as SlideshowSpec
   const product = isProductPost(spec)
   const texts = [spec.hook ?? '', ...(spec.slides ?? [])]

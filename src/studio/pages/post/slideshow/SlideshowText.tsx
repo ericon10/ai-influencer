@@ -10,7 +10,7 @@ import { wordsNote } from '../../../../../server/core/slideSvg'
 import type { SlideshowSpec } from '../../../types'
 import type { PostCtx } from '../ctx'
 import { SlideFrame, type FrameId } from './SlideFrame'
-import { LintNote, useLint } from '../../../lint'
+import { LintNote, useLint, useProductRules } from '../../../lint'
 import { useSlideFonts } from './draw'
 
 // The slideshow's Slides step (UX-PLAN.md section 27): the text style
@@ -38,7 +38,9 @@ export function SlideshowText({ ctx }: { ctx: PostCtx }) {
   const tags = (spec.hashtags ?? []).slice(0, max)
   const texts = [spec.hook, ...spec.slides]
   const hasWords = texts.some(t => t.trim())
-  const lint = useLint(item.characterId)
+  const lint = useLint(item.characterId, item.productId)
+  // The honest endings come with a product whose rules have them (SideStep's).
+  const rules = useProductRules(item.productId)
   const product = isProductPost(spec)
   const cta = spec.ctaLine ?? ''
 
@@ -162,8 +164,8 @@ export function SlideshowText({ ctx }: { ctx: PostCtx }) {
           <button type="button" role="switch" aria-checked={spec.ad} className={`st-switch ${spec.ad ? 'on' : ''}`} onClick={() => draft.setSpec({ ad: !spec.ad } as never)}><span /></button>
           <span className="st-col" style={{ gap: 2 }}><b>#ad</b><span className="st-hint">{spec.ad ? 'On: "Ad" on slide 1, and "Ad:" first in the caption.' : 'Off. Turn it on for a product post, a paid post or a brand deal.'}</span></span>
         </label>
-        {spec.productEnding && spec.productEnding !== 'none' && <span className="st-hint" data-field="product-ending">The last slide is the SideStep tip for: {spec.productEnding}. Only the honest endings: never "stop getting ghosted", "passed over" or "it applies for you".</span>}
-        {spec.productEnding === 'none' && spec.plan?.product && <span className="st-hint st-warntext" data-field="product-ending">No SideStep ending: this hook's pain is not one SideStep fixes (ghosting, fake jobs, layoffs, salary games, scams and interview rounds stay pure pain), so the draft left the product out and #ad is off. For a product post, use a hook about retyping the resume, jobs that don't fit, rewriting the resume for every job, or paying monthly for job tools.</span>}
+        {rules.review && spec.productEnding && spec.productEnding !== 'none' && <span className="st-hint" data-field="product-ending">The last slide is the {rules.name} tip for: {spec.productEnding}. Only the honest endings: never "stop getting ghosted", "passed over" or "it applies for you".</span>}
+        {rules.review && spec.productEnding === 'none' && spec.plan?.product && <span className="st-hint st-warntext" data-field="product-ending">No {rules.name} ending: this hook's pain is not one {rules.name} fixes (ghosting, fake jobs, layoffs, salary games, scams and interview rounds stay pure pain), so the draft left the product out and #ad is off. For a product post, use a hook about retyping the resume, jobs that don't fit, rewriting the resume for every job, or paying monthly for job tools.</span>}
         {(spec.caption.trim() || tags.length > 0 || cta.trim()) && (
           <div className="st-col" style={{ gap: 6 }}>
             <span className="st-label">As posted</span>

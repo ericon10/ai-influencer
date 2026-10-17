@@ -5,7 +5,8 @@ import { CalendarDays, ChevronDown, ChevronRight, ExternalLink, Upload } from 'l
 import { api } from '../api'
 import { keys, useActiveJobs } from '../hooks'
 import { PriceButton } from '../PriceButton'
-import { AsyncButton, errorMessage, useToast } from '../ui'
+import { AsyncButton, Todo, errorMessage, useToast, type TodoItem } from '../ui'
+import { useProductList } from '../products'
 import { HowTo } from '../guide/Guide'
 import type { CharacterSummary, PlanImportResult, PlanPostView, PlanPreview } from '../types'
 
@@ -53,7 +54,7 @@ export function PlanCard({ characters }: { characters: CharacterSummary[] }) {
           <CalendarDays size={16} />
           <div className="grow">
             <div className="st-h3">Launch plan</div>
-            <div className="st-hint">{posts.length ? `${posts.length} posts from the plan · ${have} with their pictures · ${exported} exported` : 'Import the plan\'s CSV: every row becomes a draft with its words as written. Free; nothing paid runs.'}</div>
+            <div className="st-hint">{posts.length ? `${posts.length} posts from the plan · ${have} with their pictures · ${exported} exported` : 'Import the plan\'s CSV: the rows you tick become drafts with their words as written. Free; nothing paid runs.'}</div>
           </div>
         </button>
         <HowTo id="launch-plan" label="How the plan import works" />
@@ -71,45 +72,96 @@ export function PlanCard({ characters }: { characters: CharacterSummary[] }) {
 function ImportPlan({ characters, hasPosts, onImported }: { characters: CharacterSummary[]; hasPosts: boolean; onImported: () => void }) {
   const toast = useToast()
   const qc = useQueryClient()
+  const products = useProductList()
   const [show, setShow] = useState(!hasPosts)
   const [csv, setCsv] = useState('')
   const [name, setName] = useState('')
+  const [paste, setPaste] = useState(false)
   const [draw, setDraw] = useState(false)
   const [store, setStore] = useState<Record<string, string>>({})
   const [model, setModel] = useState<string | null>(null)
+  // The plan's product (section 29): '' not picked yet, 'none' No product.
+  const [product, setProduct] = useState('')
+  const [picked, setPicked] = useState<Set<string>>(new Set())
+  const [day, setDay] = useState('')
+  const [account, setAccount] = useState('')
   const [preview, setPreview] = useState<PlanPreview | null>(null)
   const [done, setDone] = useState<PlanImportResult | null>(null)
   const file = useRef<HTMLInputElement>(null)
+  const productArg = (p: string) => (p === 'none' ? null : p || undefined)
   async function load(f: File | undefined) {
     if (!f) return
     if (f.size > 400_000) { toast({ tone: 'bad', text: `${f.name} is over 400 KB. Split it.` }); return }
-    setCsv(await f.text()); setName(f.name); setPreview(null); setDone(null)
+    setCsv(await f.text()); setName(f.name); setPaste(false); setPreview(null); setDone(null); setPicked(new Set())
   }
-  async function check(o: { draw?: boolean; store?: Record<string, string>; model?: string | null } = {}) {
+  async function check(o: { draw?: boolean; store?: Record<string, string>; model?: string | null; product?: string } = {}) {
     try {
-      setPreview(await api.planPreview(csv, { drawSpecials: o.draw ?? draw, store: o.store ?? store, stillModel: o.model ?? model }))
+      const p = o.product ?? product
+      const next = await api.planPreview(csv, { drawSpecials: o.draw ?? draw, store: o.store ?? store, stillModel: o.model ?? model, productId: productArg(p) })
+      setPreview(next)
+      // The product the plan's accounts agree on pre-fills the pick.
+      if (!p && next.suggestedProductId) { setProduct(next.suggestedProductId); void check({ ...o, product: next.suggestedProductId }) }
       setDone(null)
     } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) }
   }
-  if (!show) return <button type="button" className="st-btn sm ghost" style={{ alignSelf: 'flex-start' }} onClick={() => setShow(true)}><Upload size={13} />Import a plan CSV again</button>
-  const ok = preview?.totals.ok ?? 0
+  if (!show) return <button type="button" className="st-btn sm ghost" style={{ alignSelf: 'flex-start' }} onClick={() => setShow(true)}><Upload size={13} />Import plan rows again</button>
+  const lines = csv.split('\n').filter(l => l.trim()).length
+  const rows = preview?.rows ?? []
+  const good = rows.filter(r => r.state === 'new' || r.state === 'update')
+  const shown = good.filter(r => (!day || r.date === day) && (!account || r.account === account))
+  const ticked = good.filter(r => picked.has(r.rowId))
+  const stills = ticked.reduce((a, r) => a + r.photos, 0)
+  const usdTicked = ticked.reduce((a, r) => a + r.priceUsd, 0)
+  const toggle = (id: string) => setPicked(s => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n })
+  // The plan's pick fills only the rows that name no product of their own.
+  const needsPick = ticked.some(r => r.productFrom === 'plan')
+  const todo: TodoItem[] = [
+    ...(!product && needsPick ? [{ label: 'Pick the plan\'s product (or No product) for the rows that name none', target: 'plan-product' }] : []),
+    ...(!ticked.length ? [{ label: 'Tick the rows to import', target: 'plan-rows' }] : []),
+  ]
   return (
-    <div className="st-col" style={{ gap: 10 }} data-field="plan-import">
-      <span className="st-hint">The plan's columns (row_id, date, slot, account, format, hook, slides 2 to 6, scene, clip_action, caption, hashtags, cta and the playbook fields). Slideshow rows become slideshows, photo rows one-slide slideshows, clip rows video posts. Every word as written; no redraft.</span>
-      <textarea className="st-textarea" rows={3} value={csv} onChange={e => { setCsv(e.target.value); setName(''); setPreview(null); setDone(null) }} placeholder="Paste the plan (with its header line), or upload the CSV" aria-label="Plan rows" />
-      <input ref={file} type="file" accept=".csv,text/csv,text/plain" hidden onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; void load(f) }} />
-      <div className="st-row" style={{ gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-        <button type="button" className="st-btn sm secondary" onClick={() => file.current?.click()}><Upload size={13} />Upload the CSV</button>
-        {name && <span className="st-hint">{name}</span>}
-        <label className="st-row" style={{ gap: 8, cursor: 'pointer' }}>
-          <button type="button" role="switch" aria-checked={draw} className={`st-switch ${draw ? 'on' : ''}`} onClick={() => { setDraw(!draw); if (preview) void check({ draw: !draw }) }}><span /></button>
-          <span className="st-hint">Draw mock screens by code (off: every slide is a photo made as written)</span>
-        </label>
-        <AsyncButton className="st-btn sm" disabled={!csv.trim()} title={csv.trim() ? undefined : 'Paste the rows or upload the CSV first'} busyLabel="Reading the plan..." onClick={() => check()}>Preview (free)</AsyncButton>
+    <div className="st-col" style={{ gap: 12 }} data-field="plan-import">
+      <span className="st-hint">The plan's columns (row_id, date, slot, account, format, hook, slides 2 to 6, scene, clip_action, caption, hashtags, cta and the playbook fields). Slideshow rows become slideshows, photo rows one-slide slideshows, clip rows video posts. Every word as written; no redraft. Nothing is saved until step 4, and only the rows you tick.</span>
+
+      <div className="st-col" style={{ gap: 8 }} data-field="plan-step-1">
+        <span className="st-label">1 · The plan's CSV</span>
+        <input ref={file} type="file" accept=".csv,text/csv,text/plain" hidden onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; void load(f) }} />
+        <div className="st-row" style={{ gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+          <button type="button" className="st-btn sm secondary" onClick={() => file.current?.click()}><Upload size={13} />Upload the CSV</button>
+          {csv && !paste && <span className="st-hint" data-field="plan-file">{name ? `${name} · ` : ''}{lines - 1} row{lines - 1 === 1 ? '' : 's'} loaded</span>}
+          <button type="button" className="st-btn xs ghost" onClick={() => setPaste(p => !p)}>{paste ? 'Hide the rows' : csv ? 'See or edit the rows' : 'Paste the rows instead'}</button>
+        </div>
+        {paste && <textarea className="st-textarea" rows={4} value={csv} onChange={e => { setCsv(e.target.value); setName(''); setPreview(null); setDone(null) }} placeholder="Paste the plan (with its header line)" aria-label="Plan rows" />}
       </div>
+
+      <div className="st-col" style={{ gap: 8 }} data-field="plan-step-2">
+        <span className="st-label">2 · Preview (free)</span>
+        <div className="st-row" style={{ gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+          <AsyncButton className="st-btn sm" disabled={!csv.trim()} title={csv.trim() ? undefined : 'Upload or paste the plan first'} busyLabel="Reading the plan..." onClick={() => check()}>Preview (free)</AsyncButton>
+          <label className="st-row" style={{ gap: 8, cursor: 'pointer' }}>
+            <button type="button" role="switch" aria-checked={draw} className={`st-switch ${draw ? 'on' : ''}`} onClick={() => { setDraw(!draw); if (preview) void check({ draw: !draw }) }}><span /></button>
+            <span className="st-hint">Draw mock screens by code: a slide whose scene describes a phone screen, an email, a placard or a form is drawn by the Studio (free, the exact words). Off: every slide is a photo made from its scene.</span>
+          </label>
+        </div>
+      </div>
+
       {preview && (
-        <div className="st-col" style={{ gap: 10 }} data-field="plan-preview">
+        <div className="st-col" style={{ gap: 12 }} data-field="plan-preview">
           {preview.problems.map(p => <span key={p} className="st-hint st-warntext">{p}</span>)}
+
+          <div className="st-col" style={{ gap: 8 }} data-field="plan-product">
+            <span className="st-label">3 · This plan is for{preview.blankProductRows < good.length ? ' (the rows that name no product)' : ''}</span>
+            <div className="st-row" style={{ gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+              <select className="st-select" style={{ width: 'auto' }} value={product} onChange={e => { setProduct(e.target.value); void check({ product: e.target.value }) }} aria-label="This plan is for">
+                <option value="">Pick the product...</option>
+                <option value="none">No product</option>
+                {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+              <HowTo id="products" label="About products" />
+            </div>
+            <span className="st-hint">A row that names a product in the CSV's product column uses it; {preview.blankProductRows} row{preview.blankProductRows === 1 ? '' : 's'} name none and use this pick: {preview.product ? `the general standard plus ${preview.product.writingLabel === 'General standard' ? `${preview.product.name}'s vault and claims` : preview.product.writingLabel}` : 'the general standard, no product words'}. A row is an ad only when its own ad column says yes (#ad and, on a product with them, its honest endings); every other row stays a plain post. In an older file, a product column of yes or no is the ad column.</span>
+          </div>
+
           <div className="st-tablewrap">
             <table className="st-table">
               <thead><tr><th>Account</th><th>What it is</th><th>Pictures filed under</th><th>Rows</th></tr></thead>
@@ -129,20 +181,50 @@ function ImportPlan({ characters, hasPosts, onImported }: { characters: Characte
               </tbody>
             </table>
           </div>
-          <span className="st-hint">A topic account's pictures are filed under a character only for storage: nothing of hers (face, voice, name) goes into its posts.</span>
-          <PlanGrid preview={preview} />
+          <span className="st-hint">A topic account's pictures are filed under a character only for storage: nothing of that character (face, voice, name) goes into its posts.</span>
+
+          <div className="st-col" style={{ gap: 8 }} data-field="plan-rows">
+            <span className="st-label">Tick the rows to import</span>
+            <div className="st-row" style={{ gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+              <select className="st-select" style={{ width: 'auto' }} value={day} onChange={e => setDay(e.target.value)} aria-label="Day"><option value="">Every day</option>{preview.days.map(d => <option key={d} value={d}>{dayLabel(d)}</option>)}</select>
+              <select className="st-select" style={{ width: 'auto' }} value={account} onChange={e => setAccount(e.target.value)} aria-label="Account"><option value="">Every account</option>{preview.accounts.map(a => <option key={a.tag} value={a.tag}>{a.tag}</option>)}</select>
+              <button type="button" className="st-btn sm ghost" disabled={!shown.length} onClick={() => setPicked(s => new Set([...s, ...shown.map(r => r.rowId)]))}>Tick the {shown.length} shown</button>
+              <button type="button" className="st-btn sm ghost" disabled={!good.length} onClick={() => setPicked(new Set(good.map(r => r.rowId)))}>Tick all {good.length}</button>
+              {picked.size > 0 && <button type="button" className="st-btn sm ghost" onClick={() => setPicked(new Set())}>Clear</button>}
+              <span className="st-hint">{ticked.length} ticked</span>
+            </div>
+            <div className="st-tablewrap" style={{ maxHeight: 420, overflow: 'auto' }}>
+              <table className="st-table">
+                <thead><tr><th aria-label="Tick" /><th>Row</th><th>Day</th><th>Account</th><th>Format</th><th>Product</th><th>Hook</th><th>Notes</th></tr></thead>
+                <tbody>
+                  {shown.map(r => (
+                    <tr key={r.line} data-field={`plan-row-${r.rowId}`}>
+                      <td><input type="checkbox" checked={picked.has(r.rowId)} onChange={() => toggle(r.rowId)} aria-label={`Import ${r.rowId}`} /></td>
+                      <td>{r.rowId}</td>
+                      <td style={{ whiteSpace: 'nowrap' }}>{dayLabel(r.date)} {r.slot}</td>
+                      <td>{r.account}</td>
+                      <td>{short(r.format)}</td>
+                      <td style={{ whiteSpace: 'nowrap' }}>{r.productFrom === 'row' ? r.product : r.product ? <span className="st-muted">{r.product} (plan)</span> : <span className="st-muted">{product ? 'None' : 'The plan\'s pick'}</span>}{r.ad ? <span className="st-chip xs" style={{ marginLeft: 6 }}>Ad</span> : null}</td>
+                      <td style={{ maxWidth: 380 }}><span className="st-clamp1" title={r.hook}>{r.hook}</span></td>
+                      <td>{r.state === 'update' ? <span className="st-hint">Draft exists (updated)</span> : null}{[...r.warnings, ...r.lint].length ? <span className="st-lint compact" title={[...r.warnings, ...r.lint].join('\n')}>{[...r.warnings, ...r.lint].length} note{[...r.warnings, ...r.lint].length === 1 ? '' : 's'}</span> : null}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
           {preview.rows.some(r => r.errors.length) && (
             <div className="st-col" style={{ gap: 4 }} data-field="plan-errors">
-              <b className="st-warntext">Rows that will be skipped</b>
+              <b className="st-warntext">Rows that cannot import</b>
               {preview.rows.filter(r => r.errors.length).slice(0, 20).map(r => <span key={r.line} className="st-hint st-warntext">Line {r.line} ({r.rowId || 'no id'}): {r.errors.join('; ')}</span>)}
             </div>
           )}
-          {preview.rows.some(r => r.warnings.length || r.lint.length) && (
-            <details className="st-col" data-field="plan-warnings">
-              <summary className="st-hint" style={{ cursor: 'pointer' }}>{preview.rows.filter(r => r.warnings.length || r.lint.length).length} rows with notes (warnings and language notes; they still import)</summary>
-              {preview.rows.filter(r => r.warnings.length || r.lint.length).slice(0, 40).map(r => <span key={r.line} className="st-hint">{r.rowId}: {[...r.warnings, ...r.lint].join('; ')}</span>)}
-            </details>
-          )}
+          {preview.totals.kept > 0 && <span className="st-hint">{preview.totals.kept} row{preview.totals.kept === 1 ? ' is' : 's are'} already made with pictures and stay as they are.</span>}
+          <details>
+            <summary className="st-hint" style={{ cursor: 'pointer' }}>The plan by day and account</summary>
+            <PlanGrid preview={preview} />
+          </details>
           <div className="st-row" style={{ gap: 6, flexWrap: 'wrap', alignItems: 'center' }} data-field="plan-still-model">
             <span className="st-hint">Stills:</span>
             {preview.still.choices.map(c => (
@@ -150,20 +232,25 @@ function ImportPlan({ characters, hasPosts, onImported }: { characters: Characte
             ))}
           </div>
           <span className="st-hint" role="status" data-field="plan-totals">
-            <b>{ok} posts</b>: {preview.totals.slideshows} slideshows, {preview.totals.photos} photos, {preview.totals.clips} clips{preview.totals.kept ? `, ${preview.totals.kept} already with pictures (kept as they are)` : ''}{preview.totals.problem ? `, ${preview.totals.problem} skipped` : ''}. Generating all their pictures later: {preview.totals.stills} stills, about {usd(preview.totals.usd)} ({preview.still.label}, {usd(preview.still.perStillUsd)} a still). Making the drafts is free; each Generate shows its price first.
+            <b>{ticked.length} of {good.length} rows ticked</b>. Generating their pictures later: {stills} stills, about {usd(usdTicked)} ({preview.still.label}, {usd(preview.still.perStillUsd)} a still). Importing is free; each Generate shows its price first.
           </span>
-          <AsyncButton className="st-btn" disabled={!ok} title={ok ? undefined : 'Fix the rows above first'} busyLabel={`Making ${ok} drafts...`} onClick={async () => {
-            try {
-              const r = await api.planImport(csv, { drawSpecials: draw, store })
-              setDone(r)
-              onImported()
-              await qc.invalidateQueries({ queryKey: keys.content })
-              toast({ tone: 'ok', text: `${r.created} drafts made${r.updated ? `, ${r.updated} updated` : ''}.` })
-            } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) }
-          }}>Make {ok} drafts (free)</AsyncButton>
+          <div className="st-col" style={{ gap: 6, alignItems: 'flex-start' }} data-field="plan-step-4">
+            <span className="st-label">4 · Import</span>
+            <AsyncButton className="st-btn" disabled={todo.length > 0} title={todo.length ? todo.map(t => t.label).join('; ') : undefined} busyLabel={`Importing ${ticked.length} rows...`} onClick={async () => {
+              try {
+                const r = await api.planImport(csv, { drawSpecials: draw, store, productId: productArg(product), rows: ticked.map(x => x.rowId) })
+                setDone(r)
+                setPicked(new Set())
+                onImported()
+                await qc.invalidateQueries({ queryKey: keys.content })
+                toast({ tone: 'ok', text: `${r.created} drafts made${r.updated ? `, ${r.updated} updated` : ''}.` })
+              } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) }
+            }}>Import {ticked.length || ''} row{ticked.length === 1 ? '' : 's'} (free)</AsyncButton>
+            <Todo items={todo} />
+          </div>
         </div>
       )}
-      {done && <span className="st-hint" role="status" data-field="plan-done">{done.created} drafts made, {done.updated} updated{done.kept ? `, ${done.kept} kept (they have pictures)` : ''}{done.skipped ? `, ${done.skipped} skipped` : ''}. Tick them below and generate, or open any post.</span>}
+      {done && <span className="st-hint" role="status" data-field="plan-done">{done.created} drafts made, {done.updated} updated{done.kept ? `, ${done.kept} kept (they have pictures)` : ''}{done.skipped ? `, ${done.skipped} skipped` : ''}. They are in the list below and on Posts home: tick them there and generate, or open any post.</span>}
     </div>
   )
 }

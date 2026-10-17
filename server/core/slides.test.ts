@@ -179,7 +179,7 @@ describe('text styles and the safe zones', () => {
     expect(fsvg).toContain('>Job title<')
     // Portal status: every step and its timestamp.
     const portal = specialSvg(emptySpecial('portal_status'), TIKTOK, draw)
-    expect(portal).toContain('Still in review')
+    expect(portal).toContain('Still processing')
     expect(portal).toContain('day 41')
     // Bank app and receipt: blur hides the amounts, never the labels.
     const bank = emptySpecial('bank_app')
@@ -188,8 +188,8 @@ describe('text styles and the safe zones', () => {
     expect(hidden).not.toContain('$1,204.18')
     expect(hidden).not.toContain('1,450.00')
     expect(hidden).toContain('>Rent<')
-    expect(specialSvg({ ...emptySpecial('receipt'), blur: true }, TIKTOK, draw)).not.toContain('$640.00')
-    expect(specialSvg({ ...emptySpecial('receipt'), variant: 'receipt' }, TIKTOK, draw)).toContain('$640.00')
+    expect(specialSvg({ ...emptySpecial('receipt'), blur: true }, TIKTOK, draw)).not.toContain('$24.00')
+    expect(specialSvg({ ...emptySpecial('receipt'), variant: 'receipt' }, TIKTOK, draw)).toContain('$24.00')
     // Survey: 0 to 10, the picked score highlighted.
     const none = specialSvg(emptySpecial('survey'), TIKTOK, draw)
     const seven = specialSvg({ ...emptySpecial('survey'), count: 7 }, TIKTOK, draw)
@@ -198,10 +198,10 @@ describe('text styles and the safe zones', () => {
     // Lock screen: the clock and each notification in the stack.
     const lock = specialSvg(emptySpecial('lock_screen'), TIKTOK, draw)
     expect(lock).toContain('>2:14<')
-    expect(lock).toContain('did you hear back??')
+    expect(lock).toContain('are you up??')
     expect(lock).toContain('Rent due in 9 days')
     // Placard, invite and profile card show their own words.
-    expect(specialSvg(emptySpecial('museum_placard'), TIKTOK, draw)).toContain('Autoresponder')
+    expect(specialSvg(emptySpecial('museum_placard'), TIKTOK, draw)).toContain('Group chat')
     expect(specialSvg(emptySpecial('calendar_invite'), TIKTOK, draw)).toContain('Quick chat')
     expect(specialSvg(emptySpecial('profile_card'), TIKTOK, draw)).toContain('Jordan Lee')
     // A real brand on any of them becomes a generic name.

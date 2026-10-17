@@ -110,7 +110,7 @@ export function parseScriptKit(md: string, fallbackName = 'Product'): ScriptKit 
     groups: c.groups,
     lines: [...c.prose.length ? [{ label: 'Note', items: c.prose }] : [], ...c.lines],
     watch: watchWords(never),
-    mentions: [product.toLowerCase(), 'extension'],
+    mentions: [product.toLowerCase()],
   }
 
   // Buyer language.

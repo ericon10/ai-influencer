@@ -94,7 +94,8 @@ export const slideshowSpecSchema = z.object({
   pattern: z.enum(PATTERN_IDS).nullable().default(null),
   // How many slides a draft makes (6 by default).
   slideCount: z.number().int().min(3).max(10).default(6),
-  productId: id.nullable().default(null),
+  // (The post's product is the post's own, content_items.product_id, for
+  // every kind of post: UX-PLAN.md section 29.)
   // Who is in the photos: the character, or no one (a topic account).
   mode: z.enum(['character', 'topic']).default('character'),
   lock: sceneLockSchema,

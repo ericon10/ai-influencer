@@ -594,6 +594,16 @@ Decisions: `DECISIONS.md` G37 and G38. UX: `UX-PLAN.md` section 15.
 - [x] Posts home past 200 posts: Show older posts (60 at a time, filters on the server, chips from every post); the e2e finders page too
 - [ ] The capped real test on the API path (production, the owner's click)
 
+### Products (G57, UX-PLAN section 29, owner 2026-10-17)
+
+- [x] Rule two in CLAUDE.md and UX-PLAN section 0: nothing product-specific is ever global
+- [x] The post's product (`content_items.product_id`, migration 0017), the Idea step's Product row, an account's product as the default (no hard-coded defaults), never the first product; copies keep it
+- [x] The general standard for every post (one call, no reviewer); SideStep's rules on top for SideStep posts only (`writing_standards`, the `sidestep_` templates, the product card's Writing rules)
+- [x] Written for a product vs an ad for it; the dash check on every post, the other notes SideStep's
+- [x] Posts home product filter; Accounts product column; Pick a hook by the post's product; B-roll by product; neutral placeholders and drawn screens
+- [x] Launch plan: numbered steps, the plan's pick, only the ticked rows, the CSV's product (a name) and ad columns, older yes or no files
+- [x] Tests: unit (products.test.ts, the lint, the plan reader), Playwright (products.spec.ts, the launch plan)
+
 ## Roadmap after Phase 4 (owner, 2026-10-13; not started)
 
 SPEC 13.1, R1 to R7: Clone Video (first after Phase 3), Inspo board
