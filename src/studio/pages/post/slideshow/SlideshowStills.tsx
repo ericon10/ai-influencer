@@ -10,7 +10,8 @@ import { HowTo } from '../../../guide/Guide'
 import { SPECIAL_TYPES, backdropFor, editSlides, emptySpecial, setAt, slideList, type SlideEdit, type SpecialType } from '../../../../../server/core/slides'
 import type { SceneLock, SlideshowSpec } from '../../../types'
 import type { PostCtx } from '../ctx'
-import { SlideFrame } from './SlideFrame'
+import { SlideFrame, slideViewerItems } from './SlideFrame'
+import { Viewer, useViewer } from '../../../viewer'
 import { useSlideFonts } from './draw'
 
 // The slideshow's Stills step (UX-PLAN.md section 27): one locked scene so
@@ -32,6 +33,8 @@ export function SlideshowStills({ ctx }: { ctx: PostCtx }) {
   const list = slideList(spec)
   const stills = useMemo(() => new Map((lib?.stills ?? []).map(s => [s.id, s.assetId])), [lib])
   const [pickFor, setPickFor] = useState<number | null>(null)
+  // A tap on a slide's photo opens it full size (the viewer, section 34).
+  const view = useViewer()
   const [uploadFor, setUploadFor] = useState<number | null>(null)
   const [uploading, setUploading] = useState<number | null>(null)
   const file = useRef<HTMLInputElement | null>(null)
@@ -115,7 +118,10 @@ export function SlideshowStills({ ctx }: { ctx: PostCtx }) {
             const asset = back ? stills.get(back) : null
             return (
               <div key={s.index} className={`st-slidecard ${s.special ? 'special' : ''}`} data-field={`slide-card-${s.index}`}>
-                {fonts ? <SlideFrame slide={s} assetId={asset} style={spec.textStyle} ad={spec.ad && s.index === 0} width={156} frame={spec.made === 'instagram' ? 'instagram' : 'tiktok'} brands={brands} /> : <div className="st-skel" style={{ width: 156, height: 277 }} />}
+                {fonts ? (() => {
+                  const frame = <SlideFrame slide={s} assetId={asset} style={spec.textStyle} ad={spec.ad && s.index === 0} width={156} frame={spec.made === 'instagram' ? 'instagram' : 'tiktok'} brands={brands} />
+                  return asset && !s.special ? <button type="button" className="st-slideframe-open" onClick={() => view.open(`slide-${s.index}`)} aria-label={`View slide ${s.index + 1} full size`}>{frame}</button> : frame
+                })() : <div className="st-skel" style={{ width: 156, height: 277 }} />}
                 <select className="st-select sm" aria-label={`Slide ${s.index + 1} picture`} value={s.special?.type ?? 'photo'}
                   onChange={e => setSlide(s.index, { special: e.target.value === 'photo' ? null : { ...emptySpecial(e.target.value as SpecialType), ...(s.special ? { from: s.special.from, title: s.special.title, body: s.special.body, lines: s.special.lines } : {}), type: e.target.value as SpecialType } })}>
                   <option value="photo">Photo</option>
@@ -153,6 +159,7 @@ export function SlideshowStills({ ctx }: { ctx: PostCtx }) {
         {list.length < 10 && <button type="button" className="st-btn ghost sm" onClick={() => edit({ add: list.length })}><Plus size={14} />Add a slide</button>}
         {list.length > 0 && ctx.current === 'stills' && <button type="button" className="st-btn ghost sm" onClick={() => void ctx.advance('text')}>Continue to the slides<ArrowRight size={14} /></button>}
       </div>
+      <Viewer items={slideViewerItems(list, id => stills.get(id))} openId={view.openId} onOpen={view.open} onClose={view.close} />
       <input ref={file} type="file" accept="image/png,image/jpeg,image/webp" hidden aria-label="Upload a picture for this slide" onChange={e => { const f = Array.from(e.target.files ?? []); e.target.value = ''; if (uploadFor != null) void uploadInto(uploadFor, f) }} />
       {item.characterId && (
         <LibraryDrawer open={pickFor != null} onClose={() => setPickFor(null)} kind="stills" characterId={item.characterId} characterName={v?.data.name ?? 'this character'}

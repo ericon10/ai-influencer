@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { AudioLines, Clapperboard, Download, Film, History, Images, LayoutGrid, Loader2, Mic, Music, Plus, Sparkles, Trash2, Upload, Wind } from 'lucide-react'
 import { api, assetUrl, downloadUrl } from '../api'
 import { keys, useCharacters, useContent, useLibrary, useScenes, useSounds, useWorkerGate } from '../hooks'
@@ -12,6 +12,8 @@ import type { BrollClip, ContentData, LibraryClip, ProductBrief, ScenesData, Sou
 import { KIND_LABEL, fileSlug, postName, useNewPost } from './post/parts'
 import { HowTo } from '../guide/Guide'
 import { VoiceLinesTab } from './library/VoiceLines'
+import { CollectionButtons, LibraryFilters, NoMatch } from './library/Filters'
+import { EMPTY_FILTER, filterFromParams, filterParams, isFiltered, libraryQueryString, type LibraryTab } from '../../../server/core/libraryFilter'
 import { HooksTab } from './library/Hooks'
 
 // The Library (UX-PLAN.md): browse everything made, across characters.
@@ -40,7 +42,13 @@ export default function Library() {
   const characterId = params.get('c')
   const scene = params.get('scene')
   const chars = useCharacters()
-  const lib = useLibrary(characterId)
+  // Stills and Clips: the filters in the address, run on the server (section 34).
+  const ftab: LibraryTab | null = tab === 'stills' || tab === 'clips' ? tab : null
+  const filter = ftab ? filterFromParams(params, ftab) : EMPTY_FILTER
+  const filterKey = JSON.stringify(filter)
+  const query = useMemo(() => (ftab ? libraryQueryString(ftab, characterId, filter, new Date()) : null), [ftab, characterId, filterKey]) // eslint-disable-line react-hooks/exhaustive-deps
+  const lib = useLibrary(characterId, query)
+  const collections = useQuery({ queryKey: ['collections'], queryFn: api.collections, enabled: !!ftab })
   const content = useContent()
   const newPost = useNewPost()
   const characters = chars.data?.characters ?? []
@@ -55,7 +63,7 @@ export default function Library() {
   const del = useDelete()
   const sel = useSelection<Deletable>()
   // A new tab or character starts a new selection.
-  useEffect(() => { sel.stop() }, [tab, characterId]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { sel.stop() }, [tab, characterId, filterKey]) // eslint-disable-line react-hooks/exhaustive-deps
   const still = (s: { id: string; sceneTitle: string }): Deletable => ({ kind: 'candidate', id: s.id, label: s.sceneTitle || 'Still' })
   const clip = (c: { id: string; title: string }): Deletable => ({ kind: 'candidate', id: c.id, label: c.title || 'Clip' })
   const pick = <T,>(to: (x: T) => Deletable) => sel.on ? { has: sel.has, toggle: (x: T) => sel.toggle(to(x)) } : null
@@ -78,6 +86,10 @@ export default function Library() {
         )}
         {SELECTABLE.includes(tab) && <><span className="st-spacer" /><SelectToggle sel={sel} /></>}
       </div>
+      {ftab && (
+        <LibraryFilters tab={ftab} filter={filter} set={set} models={lib.data?.models ?? []} products={content.data?.products ?? []} collections={collections.data?.collections ?? []}
+          character={characterId ? characters.find(c => c.id === characterId)?.name ?? 'One character' : null} />
+      )}
       {del.dialog}
 
       {tab === 'stills' && (
@@ -85,7 +97,8 @@ export default function Library() {
           <div className="st-col" style={{ gap: 20 }}>
             {characters.length > 0 && <StillUpload characters={characters} characterId={characterId} />}
             {scene && <Callout tone="info">Showing one scene's stills. <button className="st-todo-link" onClick={() => set({ scene: null })}>Show all stills</button></Callout>}
-            {!stills.length ? <Callout tone="info">No stills yet. Make them in a post's Stills step, or upload images above. <button className="st-todo-link" onClick={() => void newPost.create('meme')}>Start a video post</button></Callout> : (
+            {lib.data.more && <span className="st-hint">Showing the newest 400. Narrow the filters to reach older ones.</span>}
+            {!stills.length ? (isFiltered(filter) ? <NoMatch onClear={() => set(filterParams('stills', EMPTY_FILTER))} /> : <Callout tone="info">No stills yet. Make them in a post's Stills step, or upload images above. <button className="st-todo-link" onClick={() => void newPost.create('meme')}>Start a video post</button></Callout>) : (
               <StillGrid stills={stills} showCharacter={!characterId} select={pick(still)} onDelete={s => void del.ask([still(s)])} action={s => (
                 <button type="button" className="st-btn sm" disabled={!!newPost.busy} onClick={() => void newPost.create('meme', { characterId: s.characterId, sceneId: s.sceneId, spec: { stillId: s.id }, step: 'video' })}><Plus size={13} />Use in a new post</button>
               )} />
@@ -102,7 +115,8 @@ export default function Library() {
               {uploadFor ? <ClipUpload characterId={uploadFor} label={`Upload a video${characters.length > 1 ? ` of ${characters.find(c => c.id === uploadFor)?.name}` : ''}`} /> : <span className="st-hint">Pick a character above to upload a video as one of their clips.</span>}
               <span className="st-hint">Kept takes, uploads and clones. Any video file becomes a clip.</span>
             </div>
-            {!clips.length ? <Callout tone="info">No clips yet. Keep a take in a post's Video step, or upload a video.</Callout> : (
+            {lib.data.more && <span className="st-hint">Showing the newest 400. Narrow the filters to reach older ones.</span>}
+            {!clips.length ? (isFiltered(filter) ? <NoMatch onClear={() => set(filterParams('clips', EMPTY_FILTER))} /> : <Callout tone="info">No clips yet. Keep a take in a post's Video step, or upload a video.</Callout>) : (
               <ClipGrid clips={clips} showCharacter={!characterId} select={pick(clip)} onDelete={c => void del.ask([clip(c)])} action={c => (
                 <div className="st-row" style={{ gap: 6, flexWrap: 'wrap' }}>
                   <button type="button" className="st-btn sm" disabled={!!newPost.busy} onClick={() => void newPost.create('meme', { characterId: c.characterId, spec: { clipId: c.id }, step: 'text' })}><Plus size={13} />Make a video post</button>
@@ -125,14 +139,19 @@ export default function Library() {
       )}
       {tab === 'trash' && <TrashTab characterId={characterId} />}
 
-      {(tab === 'stills' || tab === 'clips') && <DeleteBar sel={sel} del={del} all={everything} />}
+      {ftab && (
+        <DeleteBar sel={sel} del={del} all={everything}>
+          <CollectionButtons sel={sel} set={filter.set ? collections.data?.collections.find(c => c.id === filter.set) ?? null : null} />
+        </DeleteBar>
+      )}
     </div>
   )
 }
 
-function DeleteBar({ sel, del, all }: { sel: Sel; del: Del; all: Deletable[] }) {
+function DeleteBar({ sel, del, all, children }: { sel: Sel; del: Del; all: Deletable[]; children?: ReactNode }) {
   return (
     <SelectBar sel={sel} all={all}>
+      {children}
       <button type="button" className="st-btn sm bad" disabled={del.busy || !sel.items.length} onClick={() => void del.ask(sel.items, sel.stop)}>{del.busy ? <Loader2 size={13} className="st-spin" /> : <Trash2 size={13} />}Delete {sel.items.length || ''}</button>
     </SelectBar>
   )

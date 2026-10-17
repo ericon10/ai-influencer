@@ -10,6 +10,7 @@ import type { CharacterView, SceneFields, SceneStill, SceneView, ScenesData } fr
 import { StillDrawer, STILL_STATUS, OP_LABEL, claudeChecked, wrap } from './StillDrawer'
 import { PromptBox } from './PromptBox'
 import { SentButton } from './SentPanel'
+import { Viewer, useViewer } from '../../viewer'
 
 // The stills of a post (UX-PLAN.md, the Stills step): its scene's details
 // (planned by Claude or filled in, all optional, saved as you type), the
@@ -73,6 +74,9 @@ export function SceneStills({ v, data, scene, action, picked = [], onStarted, on
   const refresh = useRefresh()
   const toast = useToast()
   const [open, setOpen] = useState<string | null>(null)
+  // A tap opens the still full size (the viewer, section 34); Details there
+  // opens this drawer.
+  const view = useViewer()
   const checks = sceneChecks(data, scene.fields, scene.missing)
   const todo: TodoItem[] = checks.left.map(k => ({ label: FIELD_LABEL[k] ?? k, target: `scene-${k}`, onGo: () => onEditDetails?.() }))
   const still = scene.candidates.find(c => c.id === open && c.media !== 'video') ?? null
@@ -102,9 +106,18 @@ export function SceneStills({ v, data, scene, action, picked = [], onStarted, on
         )}
         {tiles.length === 0 && !scene.busy && <span className="st-hint">No stills yet. Generate to see them here.</span>}
         <div className="st-grid scenes">
-          {tiles.map(c => <StillTile key={c.id} c={c} aspect={scene.aspect} onOpen={() => setOpen(c.id)} action={action} picked={picked.indexOf(c.id)} />)}
+          {tiles.map(c => <StillTile key={c.id} c={c} aspect={scene.aspect} onOpen={() => (c.assetId ? view.open(c.id) : setOpen(c.id))} action={action} picked={picked.indexOf(c.id)} />)}
         </div>
       </section>
+
+      <Viewer items={tiles.filter(c => c.assetId).map(c => ({ id: c.id, assetId: c.assetId!, media: 'image' as const, name: `${OP_LABEL[c.op]}: ${scene.title || 'Scene'}`, thumbId: c.assetId, createdAt: c.createdAt, characterName: v.data.name, note: STILL_STATUS[c.status]?.label }))}
+        openId={view.openId} onOpen={view.open} onClose={view.close}
+        actions={(x, close) => {
+          const c = tiles.find(t => t.id === x.id)
+          if (!c) return null
+          const usable = !['failed', 'qa_pending', 'qa_failed', 'rejected'].includes(c.status)
+          return <>{action && usable && action(c)}<button type="button" className="st-btn ghost" onClick={() => { close(); setOpen(c.id) }}><Info size={15} />Details</button></>
+        }} />
 
       <StillDrawer v={v} data={data} scene={scene} still={still} onClose={() => setOpen(null)} onOpen={setOpen} action={action} />
     </div>

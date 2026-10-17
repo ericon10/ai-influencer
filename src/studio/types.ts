@@ -518,9 +518,21 @@ export interface WorkerStatus {
 
 
 // The Library: everything made, across characters (server/pipeline/clips.ts).
-export interface LibraryStill { id: string; assetId: string; characterId: string; characterName: string; sceneId: string | null; sceneTitle: string; status: string; op: string; createdAt: string }
+export interface LibraryStill { id: string; assetId: string; characterId: string; characterName: string; sceneId: string | null; sceneTitle: string; status: string; op: string; createdAt: string; used?: number }
 export interface LibraryClip extends LibraryStill { posterId: string | null; durationSec: number | null; title: string; error: string | null }
-export interface LibraryData { stills: LibraryStill[]; clips: LibraryClip[] }
+// With the Library page's filters (section 34): the Model filter's choices,
+// and whether more than the newest 400 match.
+export interface LibraryData { stills: LibraryStill[]; clips: LibraryClip[]; models?: Array<{ id: string; label: string }>; more?: boolean }
+// One item in the viewer (section 34).
+export interface LibraryItemInfo {
+  id: string; name: string; media: 'image' | 'video'; assetId: string | null; createdAt: string
+  characterId: string; characterName: string; op: string
+  model: string; cost: string; costNote: string | null
+  usedIn: Array<{ id: string; name: string }>
+  collections: Array<{ id: string; name: string }>
+  width: number | null; height: number | null; durationSec: number | null
+}
+export interface LibraryCollection { id: string; name: string; count: number; createdAt: string }
 
 // Saved styles from the editor (editor phase C, G31): presets with places
 // relative to the video.
