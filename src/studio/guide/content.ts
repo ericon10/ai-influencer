@@ -476,7 +476,7 @@ export const GUIDE: GuideSection[] = [
     steps: [
       'In the Idea step of any post (video post, slideshow, batch), pick the Product: No product, or one of yours. The line under it says what the post is written to. Saved at once, free.',
       'A new post takes its account\'s product (Posts home > Accounts, the Product column). No account has a product until you set it there, so Callie\'s or Solei\'s posts start with No product unless you pick one.',
-      'Written for a product is not the same as an ad for it. #ad (or a plan row\'s product column) makes a post an ad: "Ad" on slide 1, "Ad:" first in the caption and, on a product with them, its honest endings. A post written for a product with #ad off never names it.',
+      'Written for a product is not the same as an ad for it. #ad (or a plan row\'s ad column) makes a post an ad: "Ad" on slide 1, "Ad:" first in the caption and, on a product with them, its honest endings. A post written for a product with #ad off never names it.',
       'Library > Hooks, each product\'s card: Writing rules. The general standard alone, or a set of rules on top (SideStep rules v1.2). A product made from the SideStep kit starts on SideStep\'s rules; any other starts on the general standard.',
       'Posts home: the Product chips filter the posts (each product, or No product), on the server, so Show older posts finds older ones too. Each card names its product.',
       'Library > B-roll: a clip\'s product is picked from your products (or none). In a post, its product\'s clips come first.',
