@@ -251,7 +251,7 @@ test('a mock screen drawn by code and the owner\'s Product screenshot, then the 
   await page.locator('[data-field="slide-card-1"] select[aria-label$="picture"]').selectOption('lock_screen')
   // The last slide: the owner's own screenshot of the product.
   const last = page.locator(`[data-field="slide-card-${n - 1}"]`)
-  await last.locator('select').selectOption('product_shot')
+  await last.locator('select[aria-label$="picture"]').selectOption('product_shot')
   await expect(last.locator(`[data-field="product-shot-${n - 1}"]`)).toContainText('The Studio never draws a product screen')
   mkdirSync(info.outputDir, { recursive: true })
   const shot = join(info.outputDir, 'product-screenshot.png')
