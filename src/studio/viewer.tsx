@@ -107,12 +107,10 @@ function ViewerDialog({ items, at, onOpen, onClose, actions }: { items: ViewerIt
   }, [])
 
   // The ones next to it load their small copies, so the next one shows at once.
+  const near = [items[at - 1], items[at + 1]].map(n => (n ? (n.media === 'image' ? n.assetId : n.thumbId) : null) ?? '').join(' ')
   useEffect(() => {
-    for (const n of [items[at - 1], items[at + 1]]) {
-      const thumb = n ? (n.media === 'image' ? n.assetId : n.thumbId) : null
-      if (thumb) { const img = new Image(); img.src = assetUrl(thumb, THUMB_W) }
-    }
-  }, [items, at])
+    for (const thumb of near.split(' ').filter(Boolean)) { const img = new Image(); img.src = assetUrl(thumb, THUMB_W) }
+  }, [near])
 
   // A swipe left or right on a phone.
   const touch = useRef<{ x: number; y: number } | null>(null)
