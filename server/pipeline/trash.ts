@@ -6,6 +6,7 @@ import { newId } from '../lib/ids.js'
 import { isVideoOp } from '../core/clips.js'
 import { THUMB_WIDTHS, thumbKeyOf } from '../storage/assets.js'
 import type { ContentOutputs } from './content.js'
+import { getSetting, putCacheSetting } from './settings.js'
 
 // Delete and the Trash (owner, 2026-10-15; UX-PLAN.md section 22). An item
 // deleted in the Library moves to the Trash and waits 7 days, restorable;
@@ -73,6 +74,53 @@ function uses(spec: Spec, ref: TrashRef): boolean {
 
 const postName = (p: { title: string; idea: string }) => p.title || p.idea.slice(0, 40) || 'Untitled post'
 
+// Which live posts name what (the Library's Used filter and the viewer's
+// "Used in", UX-PLAN.md section 34): the same names the Delete warning reads
+// (a post's fields, its render, its saved editor timeline). A saved timeline
+// file never changes (a new save is a new file), so the names in it are kept
+// per file in a cache setting and each file is read once. A timeline that
+// cannot be read counts its post's fields and render only, here.
+export interface PostNames { id: string; name: string; productId: string | null; sceneId: string | null; names: Set<string> }
+const TIMELINE_CACHE = 'library.timeline_names'
+export async function livePostNames(deps: Deps, ctx: Ctx): Promise<PostNames[]> {
+  const posts = await deps.db.select({ id: contentItems.id, title: contentItems.title, idea: contentItems.idea, spec: contentItems.spec, outputs: contentItems.outputs, productId: contentItems.productId, sceneId: contentItems.sceneId })
+    .from(contentItems).where(and(eq(contentItems.accountId, ctx.accountId), LIVE_POST))
+  const cache = await getSetting<Record<string, string[]>>(deps.db, ctx.accountId, TIMELINE_CACHE, {})
+  const projectOf = (p: (typeof posts)[number]) => (p.spec as { editor?: { projectAssetId?: string | null } | null } | null)?.editor?.projectAssetId ?? null
+  const missing = [...new Set(posts.map(projectOf).filter((x): x is string => !!x && !cache[x]))]
+  let added = 0
+  for (let i = 0; i < missing.length; i += 8) {
+    await Promise.all(missing.slice(i, i + 8).map(async id => {
+      const [row] = await deps.db.select().from(assets).where(and(eq(assets.accountId, ctx.accountId), eq(assets.id, id)))
+      if (!row || row.archivedAt) return
+      try {
+        const names = new Set<string>()
+        tokensOf((await deps.store.get(row.storageKey)).toString('utf8'), names)
+        cache[id] = [...names]
+        added++
+      } catch { /* not readable now: tried again next time */ }
+    }))
+  }
+  if (added) {
+    // Only the files live posts still point at stay in the cache.
+    const live = new Set(posts.map(projectOf).filter((x): x is string => !!x))
+    for (const k of Object.keys(cache)) if (!live.has(k)) delete cache[k]
+    await putCacheSetting(deps.db, ctx.accountId, TIMELINE_CACHE, cache).catch(() => undefined)
+  }
+  return posts.map(p => {
+    const names = new Set<string>()
+    tokensOf(p.spec, names)
+    tokensOf(p.outputs, names)
+    for (const n of cache[projectOf(p) ?? ''] ?? []) names.add(n)
+    return { id: p.id, name: postName(p), productId: p.productId ?? null, sceneId: p.sceneId ?? null, names }
+  })
+}
+
+// The posts that use an item: its own id or its file named anywhere in them.
+export function postsUsing(index: PostNames[], item: { id: string; assetId: string | null }): Array<{ id: string; name: string }> {
+  return index.filter(p => p.names.has(item.id) || (!!item.assetId && p.names.has(item.assetId))).map(p => ({ id: p.id, name: p.name }))
+}
+
 // What deleting these touches, in plain words: the posts that use them and
 // a character's sheet refs. Shown before anything moves.
 export async function trashWarnings(deps: Deps, ctx: Ctx, refs: TrashRef[]): Promise<TrashWarning[]> {
@@ -107,7 +155,9 @@ async function snapshot(deps: Deps, ctx: Ctx, ref: TrashRef): Promise<{ label: s
   if (ref.kind === 'candidate') {
     const [c] = await deps.db.select().from(candidates).where(and(eq(candidates.accountId, acct), eq(candidates.id, ref.id)))
     if (!c || c.status === 'trashed' || c.status === 'purged') return null
-    const plain = Object.values(((c.meta ?? {}) as { plain?: Record<string, string> }).plain ?? {})
+    const meta = (c.meta ?? {}) as { plain?: Record<string, string>; poster?: string }
+    // Its plain copies, and an uploaded clip's first-frame picture.
+    const plain = [...Object.values(meta.plain ?? {}), ...(meta.poster ? [meta.poster] : [])]
     const label = c.label || (isVideoOp(c.op) ? (c.op === 'clone' ? 'Recreate take' : c.op === 'upload' ? 'Uploaded clip' : 'Take') : c.op === 'upload_image' ? 'Uploaded image' : 'Still')
     return { label, characterId: c.characterId, assetIds: [c.assetId, ...plain].filter((x): x is string => !!x), restore: { status: c.status } }
   }

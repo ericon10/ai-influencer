@@ -75,9 +75,7 @@ async function sentView(deps: Deps, ctx: Ctx, job: typeof jobs.$inferSelect, cha
     if (row) for (const i of toData(row).identities) if (i.externalId) named.set(i.externalId, i.name || row.name)
   }
   const elements = ids.map(id => ({ id, name: named.get(id) ?? 'Higgsfield element' }))
-  const demo = job.provider === 'mock'
-  const path: SentView['path'] = demo ? 'demo' : req.billing === 'account' ? 'plan' : 'api'
-  const asked = req.modelRef ?? req.model
+  const { demo, path, asked, quoted, actual, check, failed } = runFacts(deps, job)
   const settings = [
     req.aspect ? { label: 'Aspect', value: req.aspect } : null,
     req.resolution ? { label: 'Resolution', value: req.resolution } : null,
@@ -86,13 +84,6 @@ async function sentView(deps: Deps, ctx: Ctx, job: typeof jobs.$inferSelect, cha
     req.kind.startsWith('video') ? { label: 'Sound', value: req.audio === true ? 'on' : 'off' } : null,
     req.seed != null ? { label: 'Seed', value: String(req.seed) } : null,
   ].filter((x): x is { label: string; value: string } => !!x)
-  const check = job.costCheck as CostCheck | null
-  const failed = ['failed', 'canceled', 'needs_attention'].includes(job.status)
-  const quoted = demo ? 'Free (demo)' : req.quotedCredits != null ? formatCredits(req.quotedCredits) : formatUsd(job.estimateMicros)
-  const actual = demo ? null
-    : check?.actual.credits != null ? formatCredits(check.actual.credits)
-    : check?.actual.micros != null && check.actual.source !== 'quote' ? formatUsd(check.actual.micros)
-    : null
   const error = failed ? (job.error as { message?: string } | null)?.message ?? 'The run did not finish.' : null
   return {
     candidateId,
@@ -104,7 +95,7 @@ async function sentView(deps: Deps, ctx: Ctx, job: typeof jobs.$inferSelect, cha
     model: modelLabel(deps, asked),
     ranOn: demo ? 'Demo mock, free' : modelLabel(deps, req.model),
     path,
-    pathLabel: path === 'plan' ? 'Your Higgsfield plan' : path === 'api' ? 'Higgsfield API' : 'Demo mode (a free mock ran)',
+    pathLabel: PATH_LABEL[path],
     settings,
     quoted,
     actual,
@@ -116,4 +107,25 @@ async function sentView(deps: Deps, ctx: Ctx, job: typeof jobs.$inferSelect, cha
     providerJobId: job.providerJobId ?? null,
     at: job.submittedAt?.toISOString() ?? null,
   }
+}
+
+const PATH_LABEL: Record<SentView['path'], string> = { plan: 'Your Higgsfield plan', api: 'Higgsfield API', demo: 'Demo mode (a free mock ran)' }
+
+// A run's model, path and cost (also the Library viewer's, UX-PLAN.md
+// section 34): the model asked for, the plan or the API (or demo), the price
+// quoted (credits on the plan, dollars on the API) and the real cost when it
+// is known.
+export function runFacts(deps: Pick<Deps, 'config'>, job: typeof jobs.$inferSelect) {
+  const req = job.request as GenRequest
+  const demo = job.provider === 'mock'
+  const path: SentView['path'] = demo ? 'demo' : req.billing === 'account' ? 'plan' : 'api'
+  const asked = req.modelRef ?? req.model
+  const check = job.costCheck as CostCheck | null
+  const failed = ['failed', 'canceled', 'needs_attention'].includes(job.status)
+  const quoted = demo ? 'Free (demo)' : req.quotedCredits != null ? formatCredits(req.quotedCredits) : formatUsd(job.estimateMicros)
+  const actual = demo ? null
+    : check?.actual.credits != null ? formatCredits(check.actual.credits)
+    : check?.actual.micros != null && check.actual.source !== 'quote' ? formatUsd(check.actual.micros)
+    : null
+  return { demo, path, pathLabel: PATH_LABEL[path], asked, model: modelLabel(deps, asked), quoted, actual, check, failed }
 }
