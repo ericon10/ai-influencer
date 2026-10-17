@@ -226,7 +226,8 @@ the Studio; they are not creative limits on a character.
 | `server/pipeline/scenes.ts`, `sceneActions.ts`, `sceneHooks.ts` | Scene records, picks and crops; paid scene steps; what finished scene jobs do |
 | `server/qa/texture.ts` | Texture check after upscales and edits (skin smoothed) |
 | `server/providers/` | `ProviderAdapter` (SPEC 7.1), mock, Higgsfield API, Higgsfield account (MCP, plan credits), shared MCP connection flow (Dzine AI coming soon), Anthropic, contract tests |
-| `server/jobs/runner.ts` | Quotes required for every run, holds, submit, webhook/poll, ingest, ledger |
+| `server/jobs/runner.ts` | Quotes required for every run, holds, submit, webhook/poll, ingest, ledger; queue groups wait on the daily cap (G59) |
+| `server/costs/budgets.ts` | Budget caps per run, character, month and day (G59: $10 a day by default, today in UTC, plan credits at the price book's API rate, `daySpend`, the plain block messages, today's spend on every price) |
 | `server/media/` | ffmpeg tools including the seam-scored join (SPEC 4.3) |
 | `server/qa/faces.ts` | Face matcher for identity and distinctness QA (YuNet + SFace on onnxruntime-web) |
 | `server/pipeline/` | Stage services, review gates, job hooks, import/export, cost views |

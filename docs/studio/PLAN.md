@@ -615,6 +615,15 @@ Decisions: `DECISIONS.md` G37 and G38. UX: `UX-PLAN.md` section 15.
 - [x] Model and price on every stills button (two models named when a run mixes them)
 - [x] Guide (slideshow and launch plan sections, two glossary terms); tests: unit (`stillModels.test.ts`, `slideModels.test.ts`), Playwright (`slidemodel.spec.ts`)
 
+### Daily spend cap (G59, UX-PLAN section 31, owner 2026-10-17)
+
+- [x] Per day in Settings > Budgets and usage, $10 by default (`budgets.yaml` `day`), saved per account; today is the calendar day in UTC
+- [x] One cap for the plan and the API: plan credits at the price book's API rate (`api_credit_usd`)
+- [x] A run that would pass it waits and says why (today's spend, the run's price, the cap, what to do); re-checked at the click
+- [x] Generate N posts: each later group of ten checked when its turn comes; over the cap it waits with the same words, no charge, and starts when the cap is raised or on a new day
+- [x] Today's spend next to the price on every paid button ("today $3.20 of $10"), desktop and phone; today in Budgets and usage
+- [x] Guide (Settings, Prices, the glossary); tests: unit (`dayCap.test.ts`), Playwright (`dailycap.spec.ts`)
+
 ### Results (G60, UX-PLAN section 32, owner 2026-10-17)
 
 - [x] Per-post results on every post kind (`spec.results`): post_url, posted_at, views, follows, saves and shares in the first 72 hours, decision, notes; saved as typed, never moving the post up Posts home, never copied

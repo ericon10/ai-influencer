@@ -6,7 +6,7 @@ import type { CostEstimate } from '../providers/types.js'
 import { AppError } from '../lib/errors.js'
 import { newId } from '../lib/ids.js'
 import { sha256Hex } from '../lib/passwords.js'
-import { checkBudget, type BudgetCheck } from './budgets.js'
+import { checkBudget, dayValue, type BudgetCheck } from './budgets.js'
 import { formatUsd } from './money.js'
 import { stableStringify } from './stableJson.js'
 
@@ -73,11 +73,19 @@ export function fingerprintItems(purpose: string, characterId: string | null, it
   return sha256Hex(stableStringify({ purpose, characterId, items: items.map(i => ({ p: i.provider, m: i.model, k: i.kind, r: i.request })) }))
 }
 
-export async function createQuote(deps: Deps, ctx: Ctx, input: { purpose: string; characterId: string | null; items: QuoteItem[] }): Promise<QuoteView> {
+// What a run counts toward today's cap (section 31): its plan credits at
+// the price book's API rate, its dollars as they are; for a run queued in
+// groups (Generate N posts), only what starts now (each later group is
+// checked when its turn comes).
+export function runDayMicros(deps: Pick<Deps, 'config'>, items: Array<{ estimate: { totalMicros: number; credits?: number } }>, startNow?: boolean[]): number {
+  return dayValue(items.filter((_, i) => startNow?.[i] !== false).map(i => ({ amountMicros: i.estimate.totalMicros, credits: i.estimate.credits ?? null })), deps.config.pricebook.api_credit_usd)
+}
+
+export async function createQuote(deps: Deps, ctx: Ctx, input: { purpose: string; characterId: string | null; items: QuoteItem[]; startNow?: boolean[] }): Promise<QuoteView> {
   if (!input.items.length) throw new AppError('bad_request', 'Nothing to quote.')
   const total = input.items.reduce((s, i) => s + i.estimate.totalMicros, 0)
   const now = deps.clock.now()
-  const budget = await checkBudget(deps.db, ctx.accountId, deps.config.budgets, now, total, input.characterId)
+  const budget = await checkBudget(deps.db, ctx.accountId, deps.config.budgets, now, total, input.characterId, { dayMicros: runDayMicros(deps, input.items, input.startNow), creditUsd: deps.config.pricebook.api_credit_usd })
   const id = newId('qte')
   const expiresAt = new Date(now.getTime() + deps.config.runtime.jobs.quote_ttl_sec * 1000)
   const status = budget.ok ? 'open' : 'blocked'
@@ -112,7 +120,7 @@ export async function createQuote(deps: Deps, ctx: Ctx, input: { purpose: string
 
 // Validates and consumes a quote inside the run's transaction. Re-checks the
 // budget, because spend may have changed since the quote was shown.
-export async function consumeQuote(tx: Db, deps: Deps, ctx: Ctx, quoteId: string | undefined, purpose: string, characterId: string | null, items: QuoteItem[], confirmed: boolean): Promise<typeof quotes.$inferSelect> {
+export async function consumeQuote(tx: Db, deps: Deps, ctx: Ctx, quoteId: string | undefined, purpose: string, characterId: string | null, items: QuoteItem[], confirmed: boolean, startNow?: boolean[]): Promise<typeof quotes.$inferSelect> {
   if (!quoteId) throw new AppError('quote_required', 'Get a price estimate first. Every run needs an approved estimate.')
   // Serialize runs per account so concurrent runs cannot both pass a cap.
   await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${ctx.accountId}))`)
@@ -123,10 +131,10 @@ export async function consumeQuote(tx: Db, deps: Deps, ctx: Ctx, quoteId: string
   if (q.fingerprint !== fingerprintItems(purpose, characterId, items)) {
     throw new AppError('quote_expired', 'The run no longer matches its estimate. Get a new estimate.')
   }
-  const budget = await checkBudget(tx, ctx.accountId, deps.config.budgets, deps.clock.now(), q.totalMicros, characterId)
+  const budget = await checkBudget(tx, ctx.accountId, deps.config.budgets, deps.clock.now(), q.totalMicros, characterId, { dayMicros: runDayMicros(deps, items, startNow), creditUsd: deps.config.pricebook.api_credit_usd })
   if (!budget.ok) {
     await tx.update(quotes).set({ status: 'blocked', budget }).where(eq(quotes.id, q.id))
-    throw new AppError('budget_exceeded', 'This run would go over a budget cap.', budget.blocks)
+    throw new AppError('budget_exceeded', budget.messages[0] ?? 'This run would go over a budget cap.', budget.blocks)
   }
   if (budget.needsConfirm && !confirmed) {
     throw new AppError('bad_request', `This run costs ${displayPrice(q.items as Array<{ amountMicros: number; credits?: number | null }>)}. Confirm to continue.`, { needsConfirm: true })

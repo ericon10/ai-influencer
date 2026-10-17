@@ -108,12 +108,17 @@ const pricebookSchema = z.object({
     // own price); otherwise the credits are a placeholder.
     credits_verified: z.boolean().optional(),
   })),
+  // What one Higgsfield credit costs on the API, in USD (section 31): the
+  // daily cap counts plan credits at this rate, so one cap covers both paths.
+  api_credit_usd: z.number().nonnegative().default(0.0625),
 })
 
 const budgetsSchema = z.object({
   job: z.number().positive(),
   character: z.number().positive(),
   month: z.number().positive(),
+  // Section 31: per account, a calendar day (UTC), both Higgsfield paths.
+  day: z.number().positive().default(10),
   warn_pct: z.number().int().min(1).max(100),
   confirm_above: z.number().nonnegative(),
   variation_threshold: z.number().nonnegative(),

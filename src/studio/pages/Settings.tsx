@@ -431,12 +431,13 @@ function BudgetsCard({ d }: { d: SettingsView }) {
   }
   return (
     <div className="st-card">
-      <div className="st-card-head"><div className="grow"><div className="st-h2">Budget caps</div><div className="st-hint">Runs that would cross a cap are blocked before they reach a provider.</div></div></div>
+      <div className="st-card-head"><div className="grow"><div className="st-h2">Budget caps</div><div className="st-hint">Runs that would cross a cap are blocked before they reach a provider. Every price button shows today's spend against the daily cap.</div></div><HowTo id="settings" label="About budget caps" /></div>
       <div className="st-card-body st-col" style={{ gap: 16 }}>
         <div className="st-grid two">
           {field('job', 'Per run', 'One run, all its variations and QA.')}
           {field('character', 'Per character', 'Lifetime spend on one character.')}
           {field('month', 'Per month', 'Everything in a calendar month.')}
+          {field('day', 'Per day', 'Everything today, UTC, on your Higgsfield plan and the API: plan credits count at the Higgsfield API rate (1 credit = $0.0625). A run that would pass it waits and says so; nothing is charged while it waits.')}
           {field('confirmAbove', 'Ask me to confirm above', 'An extra tap for any run costing more.')}
           {field('warnPct', 'Warn at', 'Show a warning when a cap is this full.', true)}
         </div>

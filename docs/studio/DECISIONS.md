@@ -2754,6 +2754,49 @@ build." UX-PLAN.md section 30.
   2.1 there and Flare on the API (her second choice). A file on template
   v1.6 ("Scene stills: GPT Image 2.5 Flare by default") runs Flare on both.
 
+### G59. Daily spend cap (owner, 2026-10-17)
+
+The owner: "A setting in Settings, default $10 a day, editable. A run that
+would cross the cap waits and says so, with today's spend and the run's
+price. The cap applies on the plan path and the API path. Show today's
+spend next to the price on every paid button." UX-PLAN.md section 31.
+
+- **A fourth cap, scope `day`.** `config/budgets.yaml` `day: 10.00`, edited
+  in Settings > Budgets and usage (`PUT /settings/budgets` `day`), stored in
+  the `budgets` table like the others. No migration. A fixed rule: it
+  blocks.
+- **A day is the calendar day in UTC** (`dayWindow`): the Studio has no
+  time zone for the owner, so the UI says "today, UTC".
+- **One cap for both paths.** Plan runs are priced in credits and were $0
+  to the caps unless the owner set a credit value. The daily cap counts
+  credits at the price book's API rate (`api_credit_usd: 0.0625`, the 1.5
+  credits = $0.094 rate every Higgsfield dollar price in the book is read
+  at): ledger rows with `unit: credit` count `quantity x rate`, running
+  plan jobs count `quotedCredits x rate`. The other caps keep their rules.
+- **Today's spend** (`daySpend`) is the day's charges plus the holds of
+  runs under way, read from the jobs table (waiting children, queued,
+  running, needs attention), so two runs started together cannot pass the
+  cap. A queue's later groups are not counted: they hold nothing for today
+  until their turn.
+- **The block.** `checkBudget` adds the day block and a plain message per
+  block (`messages`); the quote shows it and the price button reads
+  "Waits" with the message and a link to Budgets and usage. The run
+  re-checks at the click (`consumeQuote`), and the refusal carries the
+  same words. Every quote carries `budget.day.label` ("today $3.20 of
+  $10"), which every price button shows after the model.
+- **Queued groups.** The quote counts only group 0 (`startNow`).
+  `advanceQueue` checks the next group's value (credits at the rate, else
+  its estimate) against today before it starts it; over the cap the group
+  stays waiting with `error: { message, capWait: true }` (a `cap_wait`
+  event once) and its holds, never a charge. The run list shows the
+  message as the waiting line. `resumeCapWaits` starts it again: when the
+  owner raises the cap, and at most once a minute while the Studio reads
+  its runs (the worker sleeps when idle, so a new day is noticed when the
+  Studio is open).
+- **Fixed in passing:** `advanceQueue` wrote its "activated" events
+  without the account id; the insert failed (caught and logged), so a
+  later group's jobs started but their events were lost.
+
 ### G60. Results: typed or pasted per post, and read by follows per post (owner, 2026-10-17)
 
 The owner, before launch: "On every post: post_url, posted_at, views_72h,

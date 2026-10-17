@@ -133,11 +133,13 @@ export async function jobViews(deps: Deps, accountId: string, rows: JobRow[], la
     const refused = (phase === 'failed' || phase === 'canceled') && j.kind !== 'llm' && typeof sent === 'string' && FILTER_REFUSAL.test((j.error as { message?: string } | null)?.message ?? '')
     const triggers = refused ? findRiskyWords(sent as string, deps.config.pipeline.wording) : []
     const retry = (phase === 'failed' || phase === 'canceled') && j.provider !== LOCAL && !parent
+    // A queued group waiting on the daily cap says so (section 31).
+    const capWait = phase === 'waiting' ? (j.error as { message?: string; capWait?: boolean } | null) : null
     return {
       id: j.id, label: labels.get(j.id) || j.purpose, purpose: j.purpose, stage: j.stage, status: j.status, kind: j.kind,
       model: ref, modelName: name, characterId: j.characterId,
       estimate: formatUsd(j.estimateMicros), actual: j.actualMicros != null ? formatUsd(j.actualMicros) : null,
-      phase, phaseLabel: LABELS[phase](name), since: since.toISOString(),
+      phase, phaseLabel: capWait?.capWait && capWait.message ? capWait.message : LABELS[phase](name), since: since.toISOString(),
       typicalSec: j.provider === LOCAL ? fallback.local ?? null : typical.get(j.model) ?? fallback[j.kind] ?? null,
       error: why?.plain ?? null, detail: why?.detail ?? null,
       // A failed run released its hold (the provider refunds it); a run that

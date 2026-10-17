@@ -10,7 +10,7 @@ import type { AuthProvider } from '../auth/provider.js'
 import { jobEvents, jobs } from '../db/schema.js'
 import { readAsset, saveAsset, getAsset, thumbnail } from '../storage/assets.js'
 import { verifyAssetSignature } from '../jobs/assetUrls.js'
-import { cancelJob, getJob, resolveJob, wakeFromWebhook } from '../jobs/runner.js'
+import { cancelJob, getJob, resolveJob, resumeCapWaits, wakeFromWebhook } from '../jobs/runner.js'
 import { wakeWorker } from '../jobs/wake.js'
 import { actionSchema, estimateAction, runAction } from '../pipeline/actions.js'
 import { createCharacter, getCandidate, getCharacter, linkInspiration, listCharacters, setCharacterFields, toData, updateCharacter } from '../pipeline/characters.js'
@@ -123,6 +123,16 @@ async function fileBundle(deps: Deps, c: Context, ctx: Ctx): Promise<{ markdown:
   const body = await c.req.parseBody({ all: true })
   const md = ([] as unknown[]).concat(body.file ?? [])[0]
   return { markdown: md instanceof File ? await md.text() : null, files: await multipartFiles(body.images) }
+}
+
+// When each account's queues waiting on the daily cap were last checked
+// (once a minute per process at most).
+const capChecked = new Map<string, number>()
+function capCheckDue(accountId: string, now: number): boolean {
+  if (now - (capChecked.get(accountId) ?? 0) < 60_000) return false
+  capChecked.set(accountId, now)
+  if (capChecked.size > 1000) capChecked.delete(capChecked.keys().next().value!)
+  return true
 }
 
 // The plan routes' body as the import functions take it.
@@ -559,6 +569,12 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
     // Studio polls this while jobs run, so an overdue job wakes the worker.
     const overdue = deps.clock.now().getTime() - 20_000
     if (rows.some(r => ['queued', 'submitting', 'running', 'ingesting'].includes(r.status) && r.nextPollAt && r.nextPollAt.getTime() < overdue)) await wakeWorker(deps)
+    // A queued group waiting on the daily cap starts once the cap allows it
+    // (a new day, UTC): checked at most once a minute while the Studio reads.
+    if (rows.some(r => r.status === 'waiting' && (r.error as { capWait?: boolean } | null)?.capWait) && capCheckDue(ctx.accountId, deps.clock.now().getTime())) {
+      const started = await resumeCapWaits(deps, ctx.accountId).catch(() => [] as string[])
+      if (started.length) for (const r of rows) if (started.includes(r.id)) { r.status = 'queued'; r.error = null }
+    }
     const ids = rows.map(r => r.id)
     const created = ids.length ? await deps.db.select().from(jobEvents).where(and(inArray(jobEvents.jobId, ids), eq(jobEvents.type, 'created'))) : []
     const labels = new Map(created.map(e => [e.jobId, (e.data as { label?: string }).label ?? '']))
@@ -1278,12 +1294,15 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
     requireRole(ctx, 'admin')
     const body = parse(z.object({
       job: z.number().positive().max(1000).optional(), character: z.number().positive().max(100000).optional(), month: z.number().positive().max(1000000).optional(),
+      day: z.number().positive().max(100000).optional(),
       confirmAbove: z.number().min(0).max(1000).optional(), warnPct: z.number().int().min(1).max(100).optional(),
     }), await json(c))
     if (body.job) await setBudget(deps, ctx, 'job', body.job)
     if (body.character) await setBudget(deps, ctx, 'character', body.character)
     if (body.month) await setBudget(deps, ctx, 'month', body.month, { warnPct: body.warnPct })
     if (body.confirmAbove != null) await setBudget(deps, ctx, 'confirm_above', body.confirmAbove)
+    // Section 31: a raised daily cap starts the queued groups it now allows.
+    if (body.day) { await setBudget(deps, ctx, 'day', body.day); await resumeCapWaits(deps, ctx.accountId) }
     return c.json(await settingsView(deps, ctx))
   })
 

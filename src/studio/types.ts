@@ -184,7 +184,13 @@ export interface QuoteView {
   // The models that will run, by name.
   models: string[]
   notes?: string[]
-  budget: { ok: boolean; blocks: Array<{ scope: string; capMicros: number; afterMicros: number }>; warnings: Array<{ scope: string; capMicros: number; afterMicros: number }> }
+  budget: {
+    ok: boolean; blocks: Array<{ scope: string; capMicros: number; afterMicros: number }>; warnings: Array<{ scope: string; capMicros: number; afterMicros: number }>
+    // Each block in plain words (section 31: "Waits: today's spend ...").
+    messages?: string[]
+    // Today's spend (UTC) against the daily cap, plan credits at the API rate.
+    day?: { capMicros: number; spentMicros: number; heldMicros: number; runMicros: number; label: string }
+  }
 }
 
 export interface ActionPreview { title: string; prompts: Array<{ label: string; text: string; wrapped: string }>; warnings: Array<{ title: string; message: string; spec: string; ruleId?: string; fix?: { label: string; action: StudioAction } }>; invalidates: string[]; followUp?: { label: string; display: string; verified: boolean; models: string[] } }
@@ -257,7 +263,7 @@ export interface SettingsView {
   }
   credentials: Array<{ id: string; provider: string; last4: string; verifyStatus: string; verifiedAt: string | null; createdAt: string }>
   providers: Array<{ id: string; label: string; hint: string; placeholder: string; usedFor: string; serverKey?: boolean }>
-  budgets: { job: number; character: number; month: number; confirmAbove: number; warnPct: number }
+  budgets: { job: number; character: number; month: number; day: number; confirmAbove: number; warnPct: number }
   routing: Array<{ task: string; configured: string; effective: string }>
   // Claude tasks and the model each runs on (Settings, Claude models).
   claude: {
@@ -287,6 +293,8 @@ export interface HiggsfieldAccount {
 export interface Usage {
   month: { since: string; spent: string; spentMicros: number; cap: string; capMicros: number; warnPct: number }
   held: string; heldMicros: number
+  // Section 31: today (UTC) against the daily cap.
+  day: { since: string; spentMicros: number; heldMicros: number; capMicros: number; spent: string; cap: string; label: string; creditUsd: number }
   byCharacter: Array<{ characterId: string | null; name: string; amount: string; micros: number }>
   byModel: Array<{ model: string; runs: number; amount: string; micros: number }>
   recent: Array<{ id: string; at: string; type: string; amount: string; micros: number; stage: string; model: string; note: string; source: string }>

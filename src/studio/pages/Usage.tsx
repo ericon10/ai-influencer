@@ -22,7 +22,12 @@ export function UsagePanel() {
               {d.heldMicros > 0 && <span className="st-badge accent">{d.held} reserved by running jobs</span>}
             </div>
             <Meter value={d.month.spentMicros + d.heldMicros} max={d.month.capMicros} />
-            <div className="st-row" style={{ marginTop: 10 }}><span className="st-hint">Caps block runs before they reach a provider. Edit them above.</span></div>
+            <div className="st-row" style={{ marginTop: 14, alignItems: 'baseline' }} data-field="usage-today">
+              <b>{d.day.spent}</b><span className="st-muted">spent today (UTC) of your {d.day.cap} daily cap</span>
+              {d.day.heldMicros > 0 && <span className="st-hint">(running jobs included)</span>}
+            </div>
+            <Meter value={d.day.spentMicros + d.day.heldMicros} max={d.day.capMicros} />
+            <div className="st-row" style={{ marginTop: 10 }}><span className="st-hint">Caps block runs before they reach a provider. Edit them above. The daily cap covers your Higgsfield plan and the API: plan credits count at the API rate (1 credit = ${d.day.creditUsd.toFixed(4).replace(/0+$/, '')}).</span></div>
           </div>
           <div className="st-grid two">
             <div className="st-card">

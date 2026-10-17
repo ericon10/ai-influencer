@@ -13,6 +13,7 @@ import { reportWorkerStart, touchWorker, workerVersion } from './workerStatus.js
 import { appendLedger } from '../costs/ledger.js'
 import { actualGen } from '../costs/pricebook.js'
 import { consumeQuote, createQuote, type QuoteItem, type QuoteView } from '../costs/quotes.js'
+import { creditMicros, dayCapMessage, daySpend, effectiveBudgets } from '../costs/budgets.js'
 import { getAsset, readAsset, saveAsset, type AssetRow } from '../storage/assets.js'
 import { probeFile } from '../media/ffmpeg.js'
 import { stripAudio } from '../media/edit.js'
@@ -118,9 +119,13 @@ export async function quoteItemsFor(deps: Deps, ctx: Ctx, specs: JobSpec[]): Pro
   return items
 }
 
+// The jobs that start with the run: all of them, except a queue's later
+// groups (they wait their turn, and the daily cap checks each then).
+const startsNow = (specs: JobSpec[]) => specs.map(s => (s.queue?.group ?? 0) === 0)
+
 export async function quoteJobs(deps: Deps, ctx: Ctx, input: { purpose: string; characterId: string | null; specs: JobSpec[] }): Promise<QuoteView> {
   const items = await quoteItemsFor(deps, ctx, input.specs)
-  return createQuote(deps, ctx, { purpose: input.purpose, characterId: input.characterId, items })
+  return createQuote(deps, ctx, { purpose: input.purpose, characterId: input.characterId, items, startNow: startsNow(input.specs) })
 }
 
 // Creates the jobs for an approved quote and reserves their cost.
@@ -146,7 +151,7 @@ export async function enqueueLocalJob(deps: Deps, ctx: Ctx, input: { stage: stri
 async function createJobs(deps: Deps, ctx: Ctx, input: { quoteId?: string; confirmed?: boolean; purpose: string; characterId: string | null; specs: JobSpec[] }): Promise<JobRow[]> {
   const items = await quoteItemsFor(deps, ctx, input.specs)
   return deps.db.transaction(async tx => {
-    const quote = await consumeQuote(tx as unknown as Db, deps, ctx, input.quoteId, input.purpose, input.characterId, items, !!input.confirmed)
+    const quote = await consumeQuote(tx as unknown as Db, deps, ctx, input.quoteId, input.purpose, input.characterId, items, !!input.confirmed, startsNow(input.specs))
     const quotedItems = quote.items as Array<{ amountMicros: number; priceVersion: string }>
     const rows: JobRow[] = []
     // A queue (the plan's Generate N posts, section 28): group 0 starts now,
@@ -603,12 +608,16 @@ async function runHook(deps: Deps, ctx: Ctx, job: JobRow, outcome: JobOutcome): 
 }
 
 // A queue's next group starts when nothing of the group before it is still
-// to run: no job queued or running, and none waiting on a parent.
+// to run: no job queued or running, and none waiting on a parent. The daily
+// cap (section 31) is checked then: a group that would pass today's cap
+// waits, says so on each of its runs, and is charged nothing; it starts
+// when the cap is raised or on a new day (resumeCapWaits).
 const RUNNING: JobStatusName[] = ['queued', 'submitting', 'running', 'ingesting']
 export async function advanceQueue(deps: Deps, job: JobRow): Promise<string[]> {
   const q = (job.request as { queue?: { id: string; group: number } }).queue
   if (!q) return []
-  const rows = await deps.db.select({ id: jobs.id, status: jobs.status, request: jobs.request }).from(jobs)
+  // (accountId too: the 'activated' event is written per job.)
+  const rows = await deps.db.select({ id: jobs.id, accountId: jobs.accountId, status: jobs.status, request: jobs.request }).from(jobs)
     .where(and(eq(jobs.accountId, job.accountId), sql`${jobs.request}->'queue'->>'id' = ${q.id}`))
   const info = rows.map(r => { const req = r.request as { queue: { group: number }; parentJobId?: string }; return { id: r.id, status: r.status as JobStatusName, group: req.queue.group, child: !!req.parentJobId } })
   const pending = (g: number) => info.some(r => r.group <= g && (RUNNING.includes(r.status) || (r.status === 'waiting' && r.child)))
@@ -617,10 +626,47 @@ export async function advanceQueue(deps: Deps, job: JobRow): Promise<string[]> {
   const next = Math.min(...held.map(r => r.group))
   if (pending(next - 1)) return []
   const ids = held.filter(r => r.group === next).map(r => r.id)
-  await deps.db.update(jobs).set({ status: 'queued', nextPollAt: deps.clock.now(), updatedAt: deps.clock.now() }).where(and(inArray(jobs.id, ids), eq(jobs.status, 'waiting')))
+  if (await capHolds(deps, job.accountId, ids)) return []
+  await deps.db.update(jobs).set({ status: 'queued', nextPollAt: deps.clock.now(), error: null, updatedAt: deps.clock.now() }).where(and(inArray(jobs.id, ids), eq(jobs.status, 'waiting')))
   for (const r of rows.filter(x => ids.includes(x.id))) await event(deps.db, r as unknown as JobRow, 'activated', { queue: q.id, group: next })
   await wakeWorker(deps)
   return ids
+}
+
+// Would this group pass today's cap? Then each of its runs says why it
+// waits (once), and it stays waiting with its hold: nothing is charged.
+async function capHolds(deps: Deps, accountId: string, ids: string[]): Promise<boolean> {
+  const rows = await deps.db.select().from(jobs).where(inArray(jobs.id, ids))
+  const rate = deps.config.pricebook.api_credit_usd
+  const value = rows.reduce((s, j) => {
+    const credits = (j.request as GenRequest).quotedCredits
+    return s + (credits != null ? creditMicros(credits, rate) : j.estimateMicros)
+  }, 0)
+  if (value <= 0) return false
+  const [b, today] = await Promise.all([effectiveBudgets(deps.db, accountId, deps.config.budgets), daySpend(deps.db, accountId, deps.clock.now(), rate)])
+  const used = today.spentMicros + today.heldMicros
+  if (used + value <= b.dayCapMicros) return false
+  const message = dayCapMessage(used, value, b.dayCapMicros, 'group')
+  for (const r of rows) {
+    const before = r.error as { message?: string; capWait?: boolean } | null
+    if (before?.message === message) continue
+    await update(deps, r, { error: { message, capWait: true } })
+    if (!before?.capWait) await event(deps.db, r, 'cap_wait', { message })
+  }
+  return true
+}
+
+// The queues waiting on the daily cap start again when it allows (the cap
+// raised, or a new day): checked when the cap changes and when the Studio
+// reads its runs.
+export async function resumeCapWaits(deps: Deps, accountId: string): Promise<string[]> {
+  const rows = await deps.db.select().from(jobs)
+    .where(and(eq(jobs.accountId, accountId), eq(jobs.status, 'waiting'), sql`${jobs.error} ->> 'capWait' = 'true'`))
+  const queues = new Map<string, JobRow>()
+  for (const r of rows) { const q = (r.request as { queue?: { id: string } }).queue?.id; if (q && !queues.has(q)) queues.set(q, r) }
+  const started: string[] = []
+  for (const r of queues.values()) started.push(...await advanceQueue(deps, r))
+  return started
 }
 
 // ── Dependent jobs ───────────────────────────────────────────────

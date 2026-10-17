@@ -200,11 +200,13 @@ function RunGroup({ jobs, onDismiss }: { jobs: JobView[]; onDismiss: () => void 
   const running = jobs.filter(j => ACTIVE.includes(j.status))
   const label = jobs[0]!.label.replace(/\s*\d+\s+of\s+\d+.*$|,\s*still\s+\d+$/i, '')
   const lead = running.find(j => j.phase === 'generating') ?? running[0]
+  // A queued group waiting on the daily cap says why, as written (section 31).
+  const capWait = running.find(j => j.phase === 'waiting' && /^Waits:/.test(j.phaseLabel))
   return (
     <div className="st-col" style={{ gap: 6 }}>
       <div className={`st-run ${running.length ? 'live' : failed.length ? 'bad' : 'ok'}`} data-live={running.length ? 'true' : undefined}>
         {running.length ? <Loader2 size={15} className="st-spin" /> : failed.length ? <XCircle size={15} /> : <CheckCircle2 size={15} />}
-        <span className="st-run-text"><b>{label}: </b>{done} of {jobs.length - released} done{released ? ` (${released} not needed)` : ''}{failed.length ? `, ${failed.length} failed` : ''}{lead ? `; ${lead.phaseLabel.toLowerCase()}` : ''}.</span>
+        <span className="st-run-text"><b>{label}: </b>{done} of {jobs.length - released} done{released ? ` (${released} not needed)` : ''}{failed.length ? `, ${failed.length} failed` : ''}{capWait ? '.' : lead ? `; ${lead.phaseLabel.toLowerCase()}.` : '.'}{capWait && <span data-field="cap-wait"> {capWait.phaseLabel}</span>}</span>
         {!running.length && <button type="button" className="st-btn icon ghost sm" aria-label="Hide" onClick={onDismiss}><X size={13} /></button>}
       </div>
       {failed.map(j => <RunRow key={j.id} j={j} />)}

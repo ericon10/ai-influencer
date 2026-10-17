@@ -5,6 +5,11 @@
 # entries (negotiated or deposit-discounted prices) in Settings.
 version: "2026-10-12"
 currency: USD
+# What one Higgsfield credit costs on the API: 1.5 credits = $0.094, the
+# API's published rate, the same rate every Higgsfield dollar price here is
+# read at. The daily spend cap (UX-PLAN.md section 31) counts plan credits
+# at it, so one cap covers the plan and the API.
+api_credit_usd: 0.0625
 entries:
   # Higgsfield. USD prices marked `verified: false` are placeholders, set
   # high on purpose, until the pay-per-use API price list is confirmed.

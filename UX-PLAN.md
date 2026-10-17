@@ -1218,6 +1218,39 @@ candidates from `config/content.yaml`, the levels from
 `config/scenes.yaml`, the prices and credits from `config/pricebook.yaml`,
 and which models take elements from `config/models.yaml`.
 
+## 31. Daily spend cap (owner, 2026-10-17)
+
+Goal: a setting in Settings, default $10 a day, editable. A run that would
+cross the cap waits and says so, with today's spend and the run's price.
+The cap applies on the plan path and the API path. Today's spend shows
+next to the price on every paid button. Budget caps are a fixed rule
+(rule one): this one blocks.
+
+**What the Studio did before this (the audit):**
+
+| Piece | Before |
+|---|---|
+| Caps | Per run ($3), per character ($50), per month ($200); holds of unfinished runs count as spent. No daily cap |
+| Plan-path runs | Priced in credits and counted at the owner's credit value for the caps, $0 unless set: on the plan, the caps never saw them |
+| A blocked run | "Over budget" on the price and "This run would go over a budget cap. Adjust caps in Settings." No numbers |
+| Generate N posts | One quote for every group of ten, held up front; a later group started when the one before finished, with no check |
+| Paid buttons | The price and the model; no running total |
+
+**What it does now:**
+
+| Piece | Where | How it works | Clicks |
+|---|---|---|---|
+| Per day | Settings > Budgets and usage, Budget caps | $10 by default (`config/budgets.yaml`, `day`), saved per account (the `budgets` table, scope `day`). "Today" is the calendar day in UTC (the Studio does not know your time zone) and the field says so | 1 to edit |
+| One cap, both paths | Every paid run | Plan credits count at the price book's API rate (`api_credit_usd` in `config/pricebook.yaml`: 1.5 credits = $0.094, so $0.0625 a credit); API and Claude runs at their dollars. Today's spend is what was charged today plus what runs under way hold (they count as spent, so two runs started together cannot pass it) | 0 |
+| Today next to the price | Every price button (Generate, Reroll, Make it, Use this hook, Write 10, Retry, Generate N posts, the rest) | A small "today $3.20 of $10" after the model, on desktop and phone; Details repeats it | 0 |
+| A run over the cap waits | The price button | The price reads **Waits**, the button is held, and one line says why: "Waits: today's spend $8.40 + this run $2.10 would pass your $10 daily cap. Raise the cap in Settings > Budgets and usage, or run it tomorrow (UTC). Nothing is charged while it waits." with a link to Budgets and usage. The server checks again at the click, so spend that landed in between still stops it | 0 |
+| Generate N posts and its groups of ten | The Launch plan card, and every run list | The quote counts the first group against today; each later group is checked when its turn comes. A group that would pass the cap stays waiting (its hold, no charge) and each of its runs says "Waits: today's spend ... + this group ... would pass your ... daily cap." It starts on its own when the cap is raised, or on a new day (UTC) while the Studio is open | 0 |
+| Batches, variations, Make 10 | Their price buttons | One run each: counted whole against today | 0 |
+| Today in Budgets and usage | Settings > Budgets and usage, the spend card | "$X spent today (UTC) of your $10 daily cap" with a bar, and how plan credits count | 0 |
+
+The other caps are unchanged (the per-run cap, the character cap, the
+month cap, the confirm step); a blocked run says which cap in plain words.
+
 ## 32. Results: what each post did, and what to make next (owner, 2026-10-17)
 
 Goal: from launch day on, every post keeps what it did once posted, and

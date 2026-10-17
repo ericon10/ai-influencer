@@ -160,6 +160,7 @@ export async function settingsView(deps: Deps, ctx: Ctx) {
     ],
     budgets: {
       job: microsToUsd(b.jobCapMicros), character: microsToUsd(b.characterCapMicros), month: microsToUsd(b.monthCapMicros),
+      day: microsToUsd(b.dayCapMicros),
       confirmAbove: microsToUsd(b.confirmAboveMicros), warnPct: b.warnPct,
     },
     routing: await Promise.all(tasks.map(async t => ({ task: t, configured: deps.config.routing.tasks[t]!.model, effective: (await resolveRoute(deps, ctx, t)).model }))),

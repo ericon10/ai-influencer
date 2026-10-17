@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { AlertTriangle, Info, Loader2, Receipt, RotateCcw, Sparkles } from 'lucide-react'
 import { api, ApiError } from './api'
@@ -111,6 +112,10 @@ export function PriceButton({ action, label, variant = 'primary', size = 'normal
   // the warning, with its one-tap fix priced on its own button.
   const garment = (est.data?.preview.warnings ?? []).filter(w => w.ruleId === 'outfit-garment')
   const blocked = quote?.status === 'blocked'
+  // The daily cap (section 31): a run that would pass it waits, and says so
+  // with today's spend and its price; every price shows today's spend.
+  const waits = blocked && !!quote?.budget.blocks.some(b => b.scope === 'day')
+  const today = quote?.budget.day?.label
   const estimateError = est.error ? errorMessage(est.error) : null
   const disabled = held || !action || est.isLoading || !!estimateError || blocked || running
 
@@ -157,7 +162,7 @@ export function PriceButton({ action, label, variant = 'primary', size = 'normal
   const cls = `st-btn ${variant === 'primary' ? 'primary' : ''} ${size === 'big' ? 'big' : size === 'sm' ? 'sm' : ''}`
   const price = held || !action ? null
     : est.isFetching && !quote ? <span className="st-price loading"><Loader2 size={13} className="st-spin" />Getting price...</span>
-    : blocked ? <span className="st-price">Over budget</span>
+    : blocked ? <span className="st-price">{waits ? 'Waits' : 'Over budget'}</span>
     : quote ? <span className="st-price">{quote.display}</span>
     : estimateError ? <span className="st-price">No price</span>
     : null
@@ -174,6 +179,7 @@ export function PriceButton({ action, label, variant = 'primary', size = 'normal
         </button>
         {confirming && <button className="st-btn ghost sm" onClick={() => setConfirming(false)}>Cancel</button>}
         {quote && !held && <span className="st-model-tag" title="The model this runs on (Claude models can be switched in Settings)">{quote.models.join(' + ')}</span>}
+        {quote && !held && today && <span className="st-today-tag" data-field="today-spend" title="Today's spend (UTC) against your daily cap: what ran today and what is running now. Plan credits count at the Higgsfield API rate.">{today}</span>}
         {quote && !confirming && !compact && (
           <button className="st-btn ghost sm" onClick={() => setDetails(true)} aria-label="Price details"><Receipt size={14} />Details</button>
         )}
@@ -189,7 +195,12 @@ export function PriceButton({ action, label, variant = 'primary', size = 'normal
       {est.data?.preview.followUp && !held && (
         <span className="st-hint"><Receipt size={12} style={{ verticalAlign: -2 }} /> Then: {est.data.preview.followUp.label}: <b>{est.data.preview.followUp.display}</b> on {est.data.preview.followUp.models.join(' + ')}{est.data.preview.followUp.verified ? '' : ' (not confirmed yet)'}</span>
       )}
-      {blocked && <span className="st-hint" style={{ color: 'var(--st-bad)' }}>This run would go over a budget cap. Adjust caps in Settings.</span>}
+      {blocked && (
+        <span className="st-hint" style={{ color: 'var(--st-bad)' }} role="alert" data-field="budget-block">
+          {(quote?.budget.messages?.length ? quote.budget.messages : ['This run would go over a budget cap.']).join(' ')}{' '}
+          <Link to="/studio/settings?tab=usage">Budgets and usage</Link>
+        </span>
+      )}
       {!noStatus && !compact && <RunStatus ids={started} match={watch} pending={running} hideEarlier={hideEarlier} />}
       {realism.map((w, i) => <span key={i} className="st-hint" style={{ color: 'var(--st-warn)' }}><AlertTriangle size={12} style={{ verticalAlign: -2 }} /> {w.message}</span>)}
       {risky.map((w, i) => <span key={`r${i}`} className="st-hint" data-field="wording-risky" style={{ color: 'var(--st-warn)' }}><AlertTriangle size={12} style={{ verticalAlign: -2 }} /> {w.title}: {w.message}</span>)}
@@ -214,7 +225,8 @@ export function PriceButton({ action, label, variant = 'primary', size = 'normal
             ))}
             <div className="st-quote-total"><span className="st-muted">Total, reserved until done</span><b>{quote.display}</b></div>
             {quote.credits > 0 && <p className="st-hint" style={{ marginTop: 8 }}>Plan credits come from your Higgsfield account{quote.totalMicros > 0 ? `; they count as ${quote.total} toward budgets` : ''}.</p>}
-            {quote.budget.warnings.map((w, i) => <div key={i} style={{ marginTop: 10 }}><Callout tone="warn">Close to the {w.scope} budget.</Callout></div>)}
+            {quote.budget.warnings.map((w, i) => <div key={i} style={{ marginTop: 10 }}><Callout tone="warn">Close to the {w.scope === 'day' ? 'daily' : w.scope} budget.</Callout></div>)}
+            {quote.budget.day && <p className="st-hint" style={{ marginTop: 8 }}>Daily cap: {quote.budget.day.label} (UTC). Plan credits count at the Higgsfield API rate.</p>}
             {est.data.preview.warnings.map((w, i) => <div key={i} style={{ marginTop: 10 }}><Callout tone="warn">{w.title}: {w.message}</Callout></div>)}
             {est.data.preview.prompts.length > 0 && (
               <div className="st-col" style={{ marginTop: 16 }}>

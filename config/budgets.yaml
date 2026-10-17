@@ -3,6 +3,7 @@
 job: 3.00                    # one run, all variations
 character: 50.00             # lifetime per character
 month: 200.00                # per account, calendar month (UTC)
+day: 10.00                   # per account, calendar day (UTC); plan credits count at the price book's API rate (UX-PLAN section 31)
 warn_pct: 80
 confirm_above: 0.50          # extra confirmation for any single run above this
 variation_threshold: 0.25    # outputs priced above this default to 2 variations

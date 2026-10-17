@@ -3,7 +3,7 @@ import { candidates, characters, jobs, ledgerEntries } from '../db/schema.js'
 import type { CostCheck } from '../core/costCheck.js'
 import { modelLabel } from '../costs/quotes.js'
 import type { Ctx, Deps } from '../context.js'
-import { effectiveBudgets } from '../costs/budgets.js'
+import { capText, dayWindow, daySpend, effectiveBudgets, todayText } from '../costs/budgets.js'
 import { heldMicros, monthWindow, spendByStage, spentMicros } from '../costs/ledger.js'
 import { formatUsd } from '../costs/money.js'
 
@@ -31,10 +31,12 @@ export async function characterCosts(deps: Deps, ctx: Ctx, characterId: string) 
 
 export async function accountUsage(deps: Deps, ctx: Ctx) {
   const { since, until } = monthWindow(deps.clock.now())
-  const [monthSpent, held, budgets] = await Promise.all([
+  const rate = deps.config.pricebook.api_credit_usd
+  const [monthSpent, held, budgets, today] = await Promise.all([
     spentMicros(deps.db, ctx.accountId, { since, until }),
     heldMicros(deps.db, ctx.accountId),
     effectiveBudgets(deps.db, ctx.accountId, deps.config.budgets),
+    daySpend(deps.db, ctx.accountId, deps.clock.now(), rate),
   ])
   const byCharacter = await deps.db.select({ characterId: ledgerEntries.characterId, name: characters.name, total: sql<string>`sum(${ledgerEntries.amountMicros})` })
     .from(ledgerEntries).leftJoin(characters, eq(characters.id, ledgerEntries.characterId))
@@ -51,8 +53,14 @@ export async function accountUsage(deps: Deps, ctx: Ctx) {
   return {
     month: { since: since.toISOString(), spentMicros: monthSpent, spent: formatUsd(monthSpent), capMicros: budgets.monthCapMicros, cap: formatUsd(budgets.monthCapMicros), warnPct: budgets.warnPct },
     heldMicros: held, held: formatUsd(held),
+    // Section 31: today (UTC), plan credits at the API rate, held runs included.
+    day: {
+      since: dayWindow(deps.clock.now()).since.toISOString(), spentMicros: today.spentMicros, heldMicros: today.heldMicros,
+      capMicros: budgets.dayCapMicros, spent: formatUsd(today.spentMicros + today.heldMicros), cap: capText(budgets.dayCapMicros),
+      label: todayText(today.spentMicros + today.heldMicros, budgets.dayCapMicros), creditUsd: rate,
+    },
     budgets: {
-      job: formatUsd(budgets.jobCapMicros), character: formatUsd(budgets.characterCapMicros), month: formatUsd(budgets.monthCapMicros),
+      job: formatUsd(budgets.jobCapMicros), character: formatUsd(budgets.characterCapMicros), month: formatUsd(budgets.monthCapMicros), day: formatUsd(budgets.dayCapMicros),
       confirmAbove: formatUsd(budgets.confirmAboveMicros), raw: budgets,
     },
     byCharacter: byCharacter.map(r => ({ characterId: r.characterId, name: r.name ?? 'Account', micros: Number(r.total), amount: formatUsd(Number(r.total)) })),
