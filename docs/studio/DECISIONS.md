@@ -2692,3 +2692,72 @@ Decided (UX-PLAN.md section 29, approved with five changes):
 
 The three slideshows made before this on the TikTok account had no product
 picked, so they now show No product until the owner picks one.
+
+### G63. A browser suite that seeds its own data; the plan's "0 of 6" (owner, 2026-10-17)
+
+The owner: "Make the browser suite seed its own data, so every run starts
+from the same known set and doesn't depend on what a container happens to
+have. Get a 100% green baseline on production code. Fix or explain the
+launch plan '0 of 6 pictures after Generate' failure; it's the path my
+real test uses."
+
+Decided:
+- **Each run starts its own Studio** (`e2e/global-setup.ts`):
+  `server/dev.ts` on a fresh PGlite database and blob folder in
+  `e2e/.out/run-<time>/`, demo mode, the mock providers, every deployment
+  setting blanked (a `.env` can never point a run at Neon, R2 or a real
+  key), then Vite on its own port (`E2E_WEB_PORT`, `E2E_API_PORT`; default
+  5190 and 8790, never the dev ports). It stops both at the end; the logs
+  and data of the newest two runs stay. `E2E_BASE` still runs the suite
+  against a Studio that is already running (demo mode only).
+- **The seed** (`e2e/seed.ts`, also `npm run e2e:seed`), all through the
+  public API in demo mode, nothing paid: Callie from `fixtures/callie/`
+  with 12 approved REF images; Solei (Callie's file, the name replaced,
+  for the plan's SOLEI rows); SideStep (the owner's starter kit); two
+  uploaded stills and one uploaded clip in Callie's Library; a base video
+  post made like a user would (a scene, a mock still, Use this still, a
+  5 s mock take, Use this take); a voice line converted to ready; the
+  E2E beat 120 music bed; two Recreate posts (the source clip, 4 stills
+  and the face pass, You pick, the motion run, the take kept), one read
+  by the failures and garment specs, one for the take spec, which picks
+  its take as the clip. Wren is not seeded: the character file spec makes
+  her. The ids go to `seed.json`; `seedData()` in the helpers replaces
+  "the oldest post with one shot", `E2E_POST` and `E2E_RECREATE`.
+- **Specs pass alone and in any order.** The launch plan tests after the
+  first make F2's drafts themselves when run alone; the Posts paging test
+  makes posts until there are more than 200 (it skipped before); the
+  Brand card tests make Wren when needed (they skipped before). No skips,
+  `retries` stays 0.
+- **The plan's "0 of 6", found.** d8b2dce was not enough. Two causes, both
+  the card deciding a run was over before its pictures were in place:
+  1. The card knew stills were running only from the jobs list, which
+     shows at most 100 jobs, newest first. Every job of one Generate has
+     the same creation time, so which 100 show is arbitrary. With 17 posts
+     or more (6 stills each), or a busy last 15 minutes (finished jobs are
+     in the list too), the stills still running could be missing from it:
+     the card read the plan a last time and stopped, and those posts stayed
+     at "0 of 6" until a reload. Generate's own "done" waits for every job
+     it started to show finished in that list, so with more than 100 it
+     never came either. On the real path this happens with any big run:
+     the stills take 30 to 90 seconds each and the run lasts minutes, so
+     the list fills with finished stills from the earlier ten.
+  2. A finished still was marked completed before its hook put it in its
+     slide, and on the plan path the runner read the Higgsfield
+     transactions (the real credits) in between, a second or more. A read
+     in that gap saw the run done and the still not yet in place, and
+     nothing read the plan again: the post stayed one short.
+  Fixed: `GET /plan` says how many of the plan's own stills are on their
+  way, straight from the jobs table (no 100 limit, no 15 minutes), read
+  before the counts; the card reads the plan every 3 s while any are, and
+  at once after Generate. The runner marks a job completed and "checking"
+  in one step and "done" only after its hook, so a still counts as running
+  until it is in its slide. Tests: the runner test fails on the old order
+  (the job read as completed and "provider_queued" while the charge is
+  read); a launch plan test hides the run from the jobs list entirely and
+  failed at "0 of 6" on the old card, and passes now; the plan test checks
+  the running count, a still in "checking" included. The launch plan spec
+  ran 5 times in a row green.
+- **Left as it is.** Generate's own "done" (PriceButton `onDone`) still
+  waits on the jobs list; the plan card no longer needs it. A still whose
+  hook fails is not placed (the run row says so); one stuck in "checking"
+  for 10 minutes stops counting.

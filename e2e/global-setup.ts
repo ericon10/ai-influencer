@@ -1,5 +1,5 @@
 import { spawn, type ChildProcess } from 'node:child_process'
-import { copyFileSync, existsSync, mkdirSync, openSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { appendFileSync, copyFileSync, existsSync, mkdirSync, openSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { createServer, connect } from 'node:net'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -65,15 +65,25 @@ function stopRecorded(dir: string) {
   }
 }
 
+let stopping = false
 function start(name: string, bin: string, args: string[], env: NodeJS.ProcessEnv, logFile: string): ChildProcess {
   const fd = openSync(logFile, 'a')
   // Its own process group, so the stop takes its children too.
   const p = spawn(join(ROOT, 'node_modules', '.bin', bin), args, { cwd: ROOT, env, stdio: ['ignore', fd, fd], detached: true })
   p.on('error', e => log(`${name}: ${e.message}`))
+  // Stopped before the run ended (a crash, or something else stopped it):
+  // said at once, in the console and its log, so the failures after it are clear.
+  p.on('exit', (code, signal) => {
+    if (stopping) return
+    const line = `${name} stopped during the run (${signal ? `signal ${signal}` : `exit ${code}`}); the tests after this fail. See ${logFile}`
+    log(line)
+    try { appendFileSync(logFile, `[e2e] ${line}\n`) } catch { /* gone */ }
+  })
   return p
 }
 
 async function stop(procs: ChildProcess[]) {
+  stopping = true
   for (const p of procs) if (p.pid && p.exitCode == null) { try { process.kill(-p.pid, 'SIGTERM') } catch { /* gone */ } }
   const end = Date.now() + 8000
   while (Date.now() < end && procs.some(p => p.exitCode == null && p.signalCode == null)) await sleep(200)
@@ -112,6 +122,8 @@ export default async function globalSetup() {
     if (await inUse(port) || await inUse(port, '::1')) throw new Error(`Port ${port} is in use. Stop what runs there, or pick another with ${name}=...`)
   }
   if (!existsSync(join(ROOT, 'dist-editor', 'index.html'))) throw new Error('The editor is not built: run npm run build:editor first (it makes dist-editor/).')
+  const models = resolve(ROOT, process.env.STUDIO_MODELS_DIR || '.data/models')
+  if (!existsSync(join(models, 'face_recognition_sface_2021dec.onnx'))) log(`no face models in ${models} (npm run models): the free face checks are off for this run`)
 
   cleanOldRuns()
   const runDir = join(OUT, `run-${new Date().toISOString().replace(/[-:]/g, '').replace(/\..*/, '')}`)
@@ -136,7 +148,9 @@ export default async function globalSetup() {
   const procs: ChildProcess[] = []
   const t0 = Date.now()
   try {
-    procs.push(start('API', 'tsx', ['server/dev.ts'], studioEnv, apiLog))
+    // By its full path: a stop aimed at someone's dev server ("tsx
+    // server/dev.ts") never takes the suite's own Studio with it.
+    procs.push(start('The Studio API', 'tsx', [join(ROOT, 'server', 'dev.ts')], studioEnv, apiLog))
     writeFileSync(join(runDir, 'pids.json'), JSON.stringify(procs.map(p => p.pid)))
     await waitFor(`http://127.0.0.1:${apiPort}/api/v1/health`, 'The Studio API', procs[0]!, apiLog)
     procs.push(start('Vite', 'vite', ['--port', String(webPort), '--strictPort'], studioEnv, webLog))

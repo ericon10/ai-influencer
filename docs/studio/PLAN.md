@@ -605,6 +605,14 @@ Decisions: `DECISIONS.md` G37 and G38. UX: `UX-PLAN.md` section 15.
 - [x] Launch plan: numbered steps, the plan's pick, only the ticked rows, the CSV's product (a name) and ad columns, older yes or no files
 - [x] Tests: unit (products.test.ts, the lint, the plan reader), Playwright (products.spec.ts, the launch plan)
 
+### Browser suite on its own data (G63, owner 2026-10-17)
+
+- [x] Each run on its own fresh Studio (`e2e/global-setup.ts`: PGlite and blobs in `e2e/.out/run-<time>/`, Vite on its own port), stopped at the end; `E2E_BASE` for a running Studio
+- [x] The seed through the API in demo mode (`e2e/seed.ts`, `npm run e2e:seed`): Callie, Solei, SideStep, Library items, a base post with a take, a voice line, music, two Recreate posts; ids in `seed.json`
+- [x] Every spec alone or in any order: no finders, no `E2E_POST` or `E2E_RECREATE`, no skips, `retries` 0
+- [x] The plan's "0 of 6" after Generate: `/plan` counts its own running stills (the jobs list shows at most 100), and a still counts until it is in its slide
+- [x] Two full runs from fresh state, both green
+
 ## Roadmap after Phase 4 (owner, 2026-10-13; not started)
 
 SPEC 13.1, R1 to R7: Clone Video (first after Phase 3), Inspo board
