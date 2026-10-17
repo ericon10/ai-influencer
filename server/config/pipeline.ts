@@ -300,12 +300,12 @@ const contentSchema = z.object({
   slideshow: z.object({
     slides: z.tuple([z.number().int().positive(), z.number().int().positive()]), hashtags: z.tuple([z.number().int().min(0), z.number().int().positive()]), max_stills: z.number().int().positive(), image: z.object({ quality: z.number().int().min(50).max(100) }),
     // Section 27 (the power-up): slides a draft makes, the Instagram size,
-    // the stills models (plan, API), variations, batch and the mock-screen
-    // names (a real brand on a mock screen becomes a generic name).
+    // variations, batch and the mock-screen names (a real brand on a mock
+    // screen becomes a generic name). Section 30: the models a slide with
+    // no one in it may use (the cheapest on the picked path runs).
     draft_slides: z.number().int().min(3).max(10).default(6),
     instagram: z.object({ width: z.number().int().positive(), height: z.number().int().positive() }).default({ width: 1080, height: 1440 }),
-    still_model: z.string().default('higgsfield/nano-banana-2.1'),
-    api_still_model: z.string().default('higgsfield/gpt-image-2.5-flare'),
+    empty_still_models: z.array(z.string()).min(1).default(['higgsfield/gpt-image-2.5-flare', 'higgsfield/nano-banana-2.1']),
     max_variations: z.number().int().min(1).max(10).default(5),
     // A batch post stores at most 10 hooks (slideshowSpec batchHooks).
     batch_max: z.number().int().min(1).max(10).default(10),

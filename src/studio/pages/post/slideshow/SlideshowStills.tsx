@@ -7,18 +7,21 @@ import { PriceButton } from '../../../PriceButton'
 import { LibraryDrawer } from '../../../library'
 import { Field, errorMessage, useToast, type TodoItem } from '../../../ui'
 import { HowTo } from '../../../guide/Guide'
-import { SPECIAL_TYPES, backdropFor, editSlides, emptySpecial, setAt, slideList, type SlideEdit, type SpecialType } from '../../../../../server/core/slides'
+import { SPECIAL_TYPES, backdropFor, editSlides, emptySpecial, setAt, slideList, slidePerson, type SlideEdit, type SlidePerson, type SpecialType } from '../../../../../server/core/slides'
 import type { SceneLock, SlideshowSpec } from '../../../types'
 import type { PostCtx } from '../ctx'
 import { SlideFrame } from './SlideFrame'
 import { useSlideFonts } from './draw'
+import { StillPaths, type PathModel } from './StillPaths'
 
 // The slideshow's Stills step (UX-PLAN.md section 27): one locked scene so
 // the set reads like one camera roll (place, light, phone, outfit, 2
 // details; saved and picked in the Scene library), the shape the stills
 // are made in, Generate the set (priced, every slide with no picture), and
 // a card per slide: its shot, Reroll (priced), a picture from the Library
-// or an upload, a special slide (drawn free), the order.
+// or an upload, a special slide (drawn free), the order. Section 30: the
+// stills path (the plan or the API) is the pick; each slide's model follows
+// who is in it (the slide card says, and switches it).
 
 const IMAGE = /^image\/(png|jpe?g|webp)$/
 
@@ -35,16 +38,27 @@ export function SlideshowStills({ ctx }: { ctx: PostCtx }) {
   const [uploadFor, setUploadFor] = useState<number | null>(null)
   const [uploading, setUploading] = useState<number | null>(null)
   const file = useRef<HTMLInputElement | null>(null)
-  const models = useQuery({ queryKey: ['slide-still-models'], queryFn: api.slideStillModels, staleTime: 60_000 })
-  const choice = spec.stillModel && models.data?.choices.some(c => c.ref === spec.stillModel && !c.problem) ? spec.stillModel : models.data?.pick
+  const models = useQuery({ queryKey: ['slide-still-models', item.characterId], queryFn: () => api.slideStillModels(item.characterId), staleTime: 60_000 })
+  const path = spec.stillPath && models.data?.paths.some(p => p.path === spec.stillPath && !p.problem) ? spec.stillPath : models.data?.pick
+  const on = models.data?.paths.find(p => p.path === path)
+  const name = v?.data.name ?? models.data?.name ?? 'The character'
+  const who = { name, pronouns: v?.data.pronouns }
   const ready = !!v?.sheet.shots[0]?.approved
   const topic = spec.mode === 'topic'
   const empty = list.filter(s => !s.stillId && !s.special).length
+  // What the picked path makes here: the character's slides and the ones
+  // with no one (a topic slideshow has only those).
+  const people = list.filter(s => !s.special).map(s => slidePerson(spec, s.index, who))
+  const pathModels: PathModel[] = [
+    ...(!topic && on?.character && people.includes('character') ? [{ who: `${name}'s slides`, model: on.character }] : []),
+    ...(on?.empty && (topic || people.includes('none')) ? [{ who: topic ? 'No one in these photos' : 'Slides with no one', model: on.empty }] : []),
+  ]
   const brands = { names: ctx.data.options.slideshow.brandNames ?? [], generic: ctx.data.options.slideshow.genericNames ?? [] }
 
   function edit(op: SlideEdit) { draft.setSpec(editSlides(spec, op) as never) }
-  function setSlide(i: number, patch: { still?: string; shot?: string; special?: SlideshowSpec['specials'][number] }) {
+  function setSlide(i: number, patch: { still?: string; shot?: string; special?: SlideshowSpec['specials'][number]; who?: SlidePerson }) {
     const out: Partial<SlideshowSpec> = {}
+    if (patch.who !== undefined) out.people = setAt(spec.people ?? [], i, patch.who, '')
     if (patch.still !== undefined) out.stillIds = setAt(list.map(s => s.stillId ?? ''), i, patch.still, '')
     if (patch.shot !== undefined) out.shots = setAt(spec.shots ?? [], i, patch.shot, '')
     if (patch.special !== undefined) out.specials = setAt(spec.specials ?? [], i, patch.special, null)
@@ -87,20 +101,13 @@ export function SlideshowStills({ ctx }: { ctx: PostCtx }) {
 
       <div className="st-col" style={{ gap: 8 }} data-field="slideshow-generate">
         {models.data && (
-          <div className="st-row" style={{ gap: 6, flexWrap: 'wrap' }} role="radiogroup" aria-label="Stills model">
-            {models.data.choices.map(c => (
-              <button key={c.ref} type="button" role="radio" aria-checked={choice === c.ref} disabled={!!c.problem} title={c.problem ?? c.pathLabel}
-                className={`st-chip ${choice === c.ref ? 'on' : ''}`} onClick={() => { draft.setSpec({ stillModel: c.ref } as never); void api.saveSlideStillModel(c.ref).catch(() => undefined) }}>
-                {c.label}<span className="st-muted"> · {c.pathLabel}</span>
-              </button>
-            ))}
-          </div>
+          <StillPaths paths={models.data.paths} value={path ?? null} models={pathModels} name={name}
+            onPick={p => { draft.setSpec({ stillPath: p } as never); void api.saveSlideStillPath(p).catch(() => undefined) }} />
         )}
-        {models.data?.choices.filter(c => c.problem).map(c => <span key={c.ref} className="st-hint">{c.label}: {c.problem}</span>)}
         <PriceButton
           label={empty ? `Generate the set (${empty} still${empty === 1 ? '' : 's'})` : list.length ? 'Every slide has a picture' : 'Generate the set'}
           todo={todo} waiting={draft.saving ? 'Saving...' : undefined}
-          action={todo.length || draft.saving || !empty || !item.characterId ? null : { type: 'slideshow_stills', contentId: item.id, ...(choice ? { stillModel: choice } : {}) }}
+          action={todo.length || draft.saving || !empty || !item.characterId ? null : { type: 'slideshow_stills', contentId: item.id, ...(path ? { path } : {}) }}
           watch={j => j.purpose === `slide_still:${item.id}`}
           onDone={() => { if (item.characterId) refresh(item.characterId); void qc.invalidateQueries({ queryKey: ['estimate'] }) }}
           onStarted={() => void ctx.advance('stills')}
@@ -123,9 +130,17 @@ export function SlideshowStills({ ctx }: { ctx: PostCtx }) {
                 </select>
                 {!s.special ? (
                   <>
+                    {!topic && (
+                      <select className="st-select sm" aria-label={`Slide ${s.index + 1}: who is in the photo`} data-field={`slide-who-${s.index}`} value={slidePerson(spec, s.index, who)}
+                        title={spec.people?.[s.index] ? 'Your pick' : 'Read from the shot: a thing or a place is no one'}
+                        onChange={e => setSlide(s.index, { who: e.target.value as SlidePerson })}>
+                        <option value="character">{name} in it{on?.character ? ` · ${on.character.label}` : ''}</option>
+                        <option value="none">No one in it{on?.empty ? ` · ${on.empty.label}` : ''}</option>
+                      </select>
+                    )}
                     <textarea className="st-textarea" aria-label={`Slide ${s.index + 1} shot`} maxLength={300} value={spec.shots?.[s.index] ?? ''} onChange={e => setSlide(s.index, { shot: e.target.value })} placeholder={s.text ? `e.g. ${topic ? 'the desk' : 'her'} ${s.index ? 'later that day' : 'at the start'}` : 'What the photo shows'} />
                     <div className="st-row" style={{ gap: 4, flexWrap: 'wrap' }}>
-                      {item.characterId && <PriceButton size="sm" variant="secondary" icon={false} compact label={asset ? 'Reroll' : 'Make it'} action={draft.saving ? null : { type: 'slideshow_stills', contentId: item.id, slides: [s.index], ...(choice ? { stillModel: choice } : {}) }} waiting={draft.saving ? 'Saving...' : undefined} todo={todo} />}
+                      {item.characterId && <PriceButton size="sm" variant="secondary" icon={false} compact label={asset ? 'Reroll' : 'Make it'} action={draft.saving ? null : { type: 'slideshow_stills', contentId: item.id, slides: [s.index], ...(path ? { path } : {}) }} waiting={draft.saving ? 'Saving...' : undefined} todo={todo} />}
                     </div>
                     <div className="st-row" style={{ gap: 4, flexWrap: 'wrap' }}>
                       <button type="button" className="st-btn ghost xs" onClick={() => setPickFor(s.index)}><Images size={12} />Library</button>

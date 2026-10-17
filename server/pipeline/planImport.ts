@@ -10,14 +10,18 @@ import type { PlanMeta } from '../core/planMeta.js'
 import { checkRow, hashtagsOf, isCharacterKind, planYes, readPlan, repeatedCodes, sceneParts, scheduleOrder, specialFor, type CheckedRow, type PlanKind, type PlanRow } from '../core/planImport.js'
 import { slideList, type SpecialSlide } from '../core/slides.js'
 import { slideshowSpecSchema, type SlideshowSpec } from '../core/slideshowSpec.js'
-import { listCharacters, type CharacterRow } from './characters.js'
+import { listCharacters, toData, type CharacterRow } from './characters.js'
 import { createContent, getContent, updateContent, type ContentRow } from './content.js'
 import { lintFor } from './copyLint.js'
 import { checkProduct, defaultProductFor, postWriting, type WritingStandard } from './products.js'
 import { createScene, updateScene } from './scenes.js'
 import { buildSceneRun } from './sceneActions.js'
 import { getCharacter } from './characters.js'
-import { buildSlideshowStills, slideStillChoices, slideStillPrice } from './slideshow.js'
+import { buildSlideshowStills, slideModel, slidePrice, slideStillPaths, stillPathFor } from './slideshow.js'
+import { shotShowsCharacter } from '../core/slides.js'
+import { PATH_LABELS, type StillPath } from '../core/stillModels.js'
+import { formatCredits } from '../costs/quotes.js'
+import { formatUsd } from '../costs/money.js'
 
 // The launch plan import (owner, 2026-10-16; UX-PLAN.md section 28): a CSV
 // of the plan's columns becomes drafts in the flows that exist, with every
@@ -37,12 +41,16 @@ const QUEUE = 10
 
 // productId: the plan's product (null: none; left out: not picked yet).
 // rows: the row_ids to import (the preview always reads every row).
-interface Opts { drawSpecials?: boolean; store?: Record<string, string>; stillModel?: string | null; productId?: string | null; rows?: string[] }
+// path: the stills path for the preview's prices (section 30; stillModel is
+// a model ref from a page from before, read as its path).
+interface Opts { drawSpecials?: boolean; store?: Record<string, string>; stillModel?: string | null; path?: StillPath | null; productId?: string | null; rows?: string[] }
 
 export interface PlanAccountView { tag: string; kind: 'character' | 'topic'; characterId: string | null; characterName: string; rows: number; problem: string | null }
 export interface PlanPreviewRow {
   line: number; rowId: string; date: string; slot: string; account: string; format: string; kind: PlanKind | null
-  hook: string; photos: number; specials: Array<{ slide: number; type: string }>; priceUsd: number
+  // The stills' price on the picked path (section 30): plan credits on the
+  // plan, dollars on the API (priceUsd is the dollar part), and as shown.
+  hook: string; photos: number; specials: Array<{ slide: number; type: string }>; priceUsd: number; credits: number; price: string
   // The row's product: its own (row) or the plan's pick (plan), by name ('' : none); and the ad switch.
   product: string; productFrom: 'row' | 'plan'; ad: boolean
   errors: string[]; warnings: string[]; lint: string[]
@@ -50,8 +58,10 @@ export interface PlanPreviewRow {
 }
 export interface PlanPreview {
   rows: PlanPreviewRow[]; accounts: PlanAccountView[]; days: string[]; problems: string[]
-  totals: { rows: number; ok: number; problem: number; kept: number; slideshows: number; photos: number; clips: number; stills: number; usd: number }
-  still: { model: string; label: string; path: 'account' | 'api'; perStillUsd: number; problem: string | null; choices: Array<{ ref: string; label: string; pathLabel: string; problem: string | null }> }
+  totals: { rows: number; ok: number; problem: number; kept: number; slideshows: number; photos: number; clips: number; stills: number; usd: number; credits: number; price: string }
+  // Section 30: the picked path, the two paths, and the model each kind of
+  // slide uses on it (each character's own default, the cheapest for no one).
+  still: { path: StillPath; pathLabel: string; problem: string | null; paths: Array<{ path: StillPath; label: string; problem: string | null }>; models: Array<{ who: string; label: string; perStill: string; from: 'file' | 'studio' | 'cheapest' }> }
   planId: string
   // The plan's product as previewed (null: none or not picked), and the one
   // its accounts agree on (Posts home > Accounts), to pre-fill the pick.
@@ -157,11 +167,23 @@ function metaOf(raw: PlanRow, r: CheckedRow, planId: string): PlanMeta {
 
 export async function previewPlan(deps: Deps, ctx: Ctx, csv: string, opts: Opts = {}): Promise<PlanPreview> {
   const { product, std } = await postWriting(deps, ctx, opts.productId)
-  const { raw, checked, accounts, problems, rowProduct } = await plan(deps, ctx, csv, opts, std)
+  const { raw, checked, accounts, problems, rowProduct, chars } = await plan(deps, ctx, csv, opts, std)
   const made = await existing(deps, ctx)
-  const { choices, pick } = await slideStillChoices(deps, ctx)
-  const model = opts.stillModel && choices.some(c => c.ref === opts.stillModel) ? opts.stillModel : pick
-  const [topicPrice, charPrice] = await Promise.all([slideStillPrice(deps, ctx, model, 'topic'), slideStillPrice(deps, ctx, model, 'character')])
+  // Section 30: each still priced by its own model on the picked path.
+  const { paths } = await slideStillPaths(deps, ctx)
+  const path = await stillPathFor(deps, ctx, null, { path: opts.path, stillModel: opts.stillModel }).catch(() => paths.find(p => !p.problem)?.path ?? 'account')
+  const perStill = new Map<string, { label: string; who: string; from: 'file' | 'studio' | 'cheapest'; credits: number | null; micros: number; display: string }>()
+  const stillFor = (characterId: string | null, who: 'character' | 'none') => {
+    const key = `${who === 'none' ? '' : characterId ?? ''}|${who}`
+    const hit = perStill.get(key)
+    if (hit) return hit
+    const row = who === 'character' ? chars.find(c => c.id === characterId) : null
+    const m = slideModel(deps, who, row ? toData(row) : null, path)
+    const price = m ? slidePrice(deps, m.ref, path) : { credits: null, micros: 0, display: 'no model' }
+    const out = { label: m?.label ?? 'No model on this path', who: who === 'none' ? 'Slides with no one' : `${row?.name ?? 'The character'}'s slides`, from: m?.from ?? 'studio' as const, ...price }
+    perStill.set(key, out)
+    return out
+  }
   const lint = await lintFor(deps, ctx)
   // The language notes follow each row's product: SideStep's all of them,
   // any other product (or none) the dash check only.
@@ -176,26 +198,39 @@ export async function previewPlan(deps: Deps, ctx: Ctx, csv: string, opts: Opts 
     let photos = 0
     const specials: PlanPreviewRow['specials'] = []
     let lintHits: string[] = []
+    // Each photo's price by who is in it (section 30): a topic row's are
+    // the cheapest model, a character's slides their file's default.
+    const acct = accounts.find(a => a.tag === r.account)
+    const chRow = chars.find(c => c.id === acct?.characterId)
+    const pronouns = chRow ? toData(chRow).pronouns : undefined
+    let credits = 0, micros = 0
+    const add = (who: 'character' | 'none') => { const p = stillFor(acct?.characterId ?? null, who); credits += p.credits ?? 0; micros += p.credits == null ? p.micros : 0 }
     if (r.kind && r.kind !== 'clip') {
       const s = slidesOf(deps, rawRow, r.kind, !!opts.drawSpecials)
-      s.specials.forEach((sp, k) => { if (sp) specials.push({ slide: k + 1, type: sp.type }); else photos++ })
+      s.specials.forEach((sp, k) => {
+        if (sp) { specials.push({ slide: k + 1, type: sp.type }); return }
+        photos++
+        add(r.kind === 'topic_slideshow' ? 'none' : r.kind === 'photo' || shotShowsCharacter(s.shots[k] ?? '', { name: chRow?.name ?? '', pronouns }) ? 'character' : 'none')
+      })
       lintHits = lintPost({ texts: s.texts, caption: rawRow.cells.caption, hashtags: hashtagsOf(rawRow.cells.hashtags), product: r.ad, standard }, { lists, off: lint.off }).map(h => `${h.slide == null ? 'Caption' : h.slide === 0 ? 'Hook' : `Slide ${h.slide + 1}`}: ${h.message}`)
     } else if (r.kind === 'clip') {
       photos = 1
+      add('character')
       lintHits = lintPost({ texts: [rawRow.cells.hook], caption: rawRow.cells.caption, hashtags: hashtagsOf(rawRow.cells.hashtags), product: r.ad, standard }, { lists, off: lint.off }).map(h => `${h.slide == null ? 'Caption' : 'On-screen text'}: ${h.message}`)
     }
     const post = made.get(`${norm(r.account)}|${r.rowId}`) ?? null
-    const price = r.kind === 'topic_slideshow' ? topicPrice.micros : charPrice.micros
     const state: PlanPreviewRow['state'] = r.errors.length ? 'problem' : post ? (generated(post) ? 'kept' : 'update') : 'new'
+    const free = state === 'problem' || state === 'kept'
     return {
       line: r.line, rowId: r.rowId, date: r.date, slot: r.slot, account: r.account, format: r.format, kind: r.kind,
       product: name, productFrom: own ? 'row' as const : 'plan' as const, ad: r.ad,
-      hook: r.hook, photos, specials, priceUsd: state === 'problem' || state === 'kept' ? 0 : Math.round(photos * price) / 1e6,
+      hook: r.hook, photos, specials, priceUsd: free ? 0 : micros / 1e6, credits: free ? 0 : credits, price: free ? 'Free' : priceText(credits, micros),
       errors: r.errors, warnings: r.warnings, lint: lintHits, postId: post?.id ?? null, state,
     }
   })
   const ok = rows.filter(r => r.state === 'new' || r.state === 'update')
   const usd = ok.reduce((a, r) => a + r.priceUsd, 0)
+  const credits = Math.round(ok.reduce((a, r) => a + r.credits, 0) * 100) / 100
   // The product the plan's accounts agree on (each account's product on the
   // Accounts card), to pre-fill "This plan is for".
   const linked = new Set<string>()
@@ -206,14 +241,23 @@ export async function previewPlan(deps: Deps, ctx: Ctx, csv: string, opts: Opts 
     totals: {
       rows: rows.length, ok: ok.length, problem: rows.filter(r => r.state === 'problem').length, kept: rows.filter(r => r.state === 'kept').length,
       slideshows: ok.filter(r => r.kind === 'topic_slideshow' || r.kind === 'character_slideshow').length, photos: ok.filter(r => r.kind === 'photo').length, clips: ok.filter(r => r.kind === 'clip').length,
-      stills: ok.reduce((a, r) => a + r.photos, 0), usd: Math.round(usd * 100) / 100,
+      stills: ok.reduce((a, r) => a + r.photos, 0), usd: Math.round(usd * 100) / 100, credits, price: priceText(credits, Math.round(usd * 1e6)),
     },
-    still: { model, label: topicPrice.label, path: topicPrice.path, perStillUsd: Math.round(topicPrice.micros / 1e4) / 100, problem: topicPrice.problem, choices: choices.map(c => ({ ref: c.ref, label: c.label, pathLabel: c.pathLabel, problem: c.problem })) },
+    still: {
+      path, pathLabel: PATH_LABELS[path], problem: paths.find(p => p.path === path)?.problem ?? null, paths,
+      models: [...perStill.values()].sort((a, b) => (a.who === 'Slides with no one' ? 1 : 0) - (b.who === 'Slides with no one' ? 1 : 0)).map(m => ({ who: m.who, label: m.label, perStill: m.display, from: m.from })),
+    },
     planId: planIdOf(checked),
     product: product ? { id: product.id, name: product.name, writingLabel: std?.label ?? 'General standard', notes: !!std?.lint } : null,
     suggestedProductId: linked.size === 1 ? [...linked][0]! : null,
     blankProductRows: rows.filter(r => r.productFrom === 'plan' && (r.state === 'new' || r.state === 'update')).length,
   }
+}
+
+// A price as shown: plan credits, dollars, or both.
+export function priceText(credits: number, micros: number): string {
+  const parts = [credits > 0 ? formatCredits(credits) : '', micros > 0 || credits <= 0 ? formatUsd(micros) : ''].filter(Boolean)
+  return parts.join(' + ')
 }
 
 const planIdOf = (rows: CheckedRow[]) => {
@@ -271,6 +315,8 @@ export async function importPlan(deps: Deps, ctx: Ctx, csv: string, opts: Opts =
       slideCount: Math.max(3, Math.min(10, s.texts.length)),
       mode: r.kind === 'topic_slideshow' ? 'topic' : 'character',
       shots: s.shots, specials: s.specials, stillIds: [], textPos: [],
+      // A photo row is the character's photo, whatever its moment says.
+      people: r.kind === 'photo' ? ['character'] : [],
       lock: slideshowSpecSchema.shape.lock.parse({ place: s.parts.common.slice(0, 1000), outfit: r.kind === 'topic_slideshow' ? '' : s.parts.outfit.slice(0, 300), hair: r.kind === 'topic_slideshow' ? '' : s.parts.hair.slice(0, 200), ownerSet: ['place', 'outfit', 'hair', 'light', 'camera', 'details'] }),
       caption: c.caption.slice(0, 2200), hashtags: hashtagsOf(c.hashtags).slice(0, 15), ctaLine: c.cta.slice(0, 300), ad: r.ad,
       cta: { kind: 'own', handle: '', word: '' }, pattern: null, hookIdeas: [], hookReview: null, plan: meta,
@@ -315,7 +361,7 @@ export async function planView(deps: Deps, ctx: Ctx): Promise<{ posts: PlanPostV
 
 type Built = { purpose: string; characterId: string | null; specs: JobSpec[]; preview: { title: string; prompts: Array<{ label: string; text: string; wrapped: string }>; warnings: RuleViolation[]; invalidates: string[] } }
 
-export async function buildPlanGenerate(deps: Deps, ctx: Ctx, input: { postIds: string[]; stillModel?: string | null }): Promise<Built> {
+export async function buildPlanGenerate(deps: Deps, ctx: Ctx, input: { postIds: string[]; path?: StillPath | null; stillModel?: string | null }): Promise<Built> {
   const ids = [...new Set(input.postIds)].slice(0, 100)
   if (!ids.length) throw new AppError('invalid_request', 'Tick the posts to generate first.')
   const posts: ContentRow[] = []
@@ -325,15 +371,20 @@ export async function buildPlanGenerate(deps: Deps, ctx: Ctx, input: { postIds: 
   const prompts: Built['preview']['prompts'] = []
   const warnings: Built['preview']['warnings'] = []
   const skipped: string[] = []
+  // Section 30: the path picked on the card; every still's model follows
+  // who is in it, a clip's opening still the character's default.
+  const path = await stillPathFor(deps, ctx, null, { path: input.path, stillModel: input.stillModel })
   let group = 0, inGroup = 0
   for (const post of ordered) {
     const rowId = String((post.spec as { plan?: PlanMeta }).plan?.rowId ?? post.id)
     let built: { specs: JobSpec[]; preview: Built['preview'] } | null = null
     try {
-      if (post.kind === 'slideshow') built = await buildSlideshowStills(deps, ctx, { contentId: post.id, ...(input.stillModel ? { stillModel: input.stillModel } : {}) })
+      if (post.kind === 'slideshow') built = await buildSlideshowStills(deps, ctx, { contentId: post.id, path })
       else if (post.kind === 'meme' && post.sceneId && post.characterId) {
-        const model = input.stillModel ?? (await slideStillChoices(deps, ctx)).pick
-        built = await buildSceneRun(deps, ctx, await getCharacter(deps, ctx, post.characterId), { sceneId: post.sceneId, models: [model], variations: 1, withQa: false })
+        const character = await getCharacter(deps, ctx, post.characterId)
+        const model = slideModel(deps, 'character', toData(character), path)
+        if (!model) throw new AppError('bad_request', `No stills model runs on ${PATH_LABELS[path]}.`)
+        built = await buildSceneRun(deps, ctx, character, { sceneId: post.sceneId, models: [model.ref], variations: 1, withQa: false, billing: path })
       }
     } catch (e) { skipped.push(`${rowId}: ${(e as Error).message}`); continue }
     if (!built || !built.specs.length) { skipped.push(`${rowId}: nothing to make`); continue }

@@ -52,6 +52,9 @@ models:
     # Flare adds lip gloss and a pout unless told otherwise (Callie's file,
     # Oct 13 test); every Flare prompt says it (owner, 2026-10-14).
     prompt_lines: ["Bare natural lips, no gloss."]
+    # Flare does not take Elements (character template): its refs carry the
+    # face, on the plan as on the API.
+    elements: false
     use_for: [scene_still]
     notes: Strong for stills; made Callie's best beach shot with real skin texture and the right ear cuff, though it once distorted her hair in a scene. Run it alongside Nano Banana 2.1 and pick the best.
   - ref: higgsfield/nano-banana-2.1
