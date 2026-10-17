@@ -36,6 +36,8 @@ const priced = async (button: Locator) => expect(button).toContainText(/\$\d|cre
 test('the Stills step: the path chips, the model each slide gets, who is in each slide, model and price on Generate the set', async ({ page }, info) => {
   test.setTimeout(240_000)
   const characterId = await juno()
+  // The account's last pick is the plan (a run of this test leaves the API picked).
+  await api('PUT', '/slideshow/still-model', { path: 'account' })
   const { id } = await api<{ id: string }>('POST', '/content', {
     kind: 'slideshow', characterId, accountTag: 'e2e.slidemodel', idea: 'a cafe morning', step: 'stills',
     spec: { mode: 'character', hook: 'It was 6am and the inbox had one new email', slides: ['so i opened it', 'reader, it was a no'], shots: ['typing at the cafe table', 'a latte beside the laptop, screen not legible', 'laughing at the lens'], lock: { place: 'a cafe corner table by the window' } },
@@ -44,7 +46,7 @@ test('the Stills step: the path chips, the model each slide gets, who is in each
   const generate = page.locator('[data-field="slideshow-generate"]')
   await expect(generate).toBeVisible({ timeout: 30_000 })
 
-  // The path is the pick; the plan is picked in demo mode.
+  // The path is the pick: the plan here.
   const paths = generate.locator('[data-field="still-paths"]')
   await expect(paths.getByRole('radio', { name: /Your Higgsfield plan/ })).toHaveAttribute('aria-checked', 'true', { timeout: 20_000 })
   const line = paths.locator('[data-field="still-models"]')
@@ -78,6 +80,7 @@ test('the Stills step: the path chips, the model each slide gets, who is in each
 test('the Launch plan card: path chips and Generate N posts with its model and price', async ({ page }, info) => {
   test.setTimeout(240_000)
   const characterId = await juno()
+  await api('PUT', '/slideshow/still-model', { path: 'account' })
   // One feeder row from the plan, under its own row id and account.
   const lines = readFileSync(join(ROOT, 'docs', 'content', 'launch-plan-v2-posts.csv'), 'utf8').split('\n')
   const row = lines.find(l => l.startsWith('P001,'))!.replace(/^P001,/, 'SM001,').replace(',F2,', ',SMF2,')
