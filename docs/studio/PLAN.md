@@ -621,7 +621,7 @@ Decisions: `DECISIONS.md` G37 and G38. UX: `UX-PLAN.md` section 15.
 - [x] The seed through the API in demo mode (`e2e/seed.ts`, `npm run e2e:seed`): Callie, Solei, SideStep, Library items, a base post with a take, a voice line, music, two Recreate posts; ids in `seed.json`
 - [x] Every spec alone or in any order: no finders, no `E2E_POST` or `E2E_RECREATE`, no skips, `retries` 0
 - [x] The plan's "0 of 6" after Generate: `/plan` counts its own running stills (the jobs list shows at most 100), and a still counts until it is in its slide
-- [x] Two full runs from fresh state, both green
+- [ ] Two full runs from fresh state, both green (one so far: 95 of 97; the No caption click under the sticky step bar is fixed, and the Export for Shorts test, where the page stopped updating after the export, passed on a rerun)
 
 ## Roadmap after Phase 4 (owner, 2026-10-13; not started)
 
