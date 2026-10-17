@@ -101,6 +101,9 @@ const claudePlugin = {
 export default defineConfig({
   plugins: [react(), searchPlugin, claudePlugin, editorPlugin],
   server: {
+    // Test output and agent worktrees are not app files: a trace Playwright
+    // writes there must never reload the page under a running test.
+    watch: { ignored: ['**/e2e/.out/**', '**/.claude/**', '**/.data/**'] },
     proxy: {
       // Character Studio API (npm run dev:api).
       '/api/v1': {
