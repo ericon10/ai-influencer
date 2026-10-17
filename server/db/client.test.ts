@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { sql } from 'drizzle-orm'
-import { directUrl, openDb } from './client.js'
+import { directUrl, openDb, sslUrl } from './client.js'
 
 describe('openDb', () => {
   it('applies migrations to an in-memory PGlite database', async () => {
@@ -15,5 +15,13 @@ describe('openDb', () => {
     expect(directUrl('postgresql://u:p@ep-cool-fog-a1b2c3-pooler.us-east-1.aws.neon.tech/neondb?sslmode=require'))
       .toBe('postgresql://u:p@ep-cool-fog-a1b2c3.us-east-1.aws.neon.tech/neondb?sslmode=require')
     expect(directUrl('postgresql://u:p@db.internal:5432/app')).toBe('postgresql://u:p@db.internal:5432/app')
+  })
+
+  it('says verify-full for the SSL modes pg already treats as verify-full, so it stops warning', () => {
+    expect(sslUrl('postgresql://u:p@ep-a-pooler.us-east-1.aws.neon.tech/studio?sslmode=require&channel_binding=require'))
+      .toBe('postgresql://u:p@ep-a-pooler.us-east-1.aws.neon.tech/studio?sslmode=verify-full&channel_binding=require')
+    expect(sslUrl('postgresql://u:p@h/db?sslmode=prefer')).toBe('postgresql://u:p@h/db?sslmode=verify-full')
+    expect(sslUrl('postgresql://u:p@h/db?sslmode=disable')).toBe('postgresql://u:p@h/db?sslmode=disable')
+    expect(sslUrl('postgresql://u:p@db.internal:5432/app')).toBe('postgresql://u:p@db.internal:5432/app')
   })
 })
