@@ -391,6 +391,7 @@ export const GUIDE: GuideSection[] = [
       'Each post keeps its plan row: structure, effects, hook score, moment, alt hook, tension, pillar, audience, mention of the mother account, the scene and clip action as written, and the notes. They show in the small Plan line under the post\'s name and go into post.json.',
       'Below the import: the plan\'s posts in schedule order. Filter by day or account, tick the ones to make (or Tick the shown that need pictures), pick the stills model, and press Generate N posts: one price first. A slideshow gets a still for every photo slide; a clip gets its opening still, and its take is made in the post with its own price after you pick the still.',
       'More than 10 posts run ten at a time: the next ten start when the ten before them are done. Up to 100 in one go.',
+      'The Pictures column counts each post\'s stills as they land and ends on the full count ("6 of 6"); the card\'s "with their pictures" line follows it. No reload needed.',
       'Open any post from its row to review it, reroll a slide, swap the alt hook, and export.',
     ],
     tips: [

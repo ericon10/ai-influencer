@@ -592,6 +592,7 @@ Decisions: `DECISIONS.md` G37 and G38. UX: `UX-PLAN.md` section 15.
 - [x] Tests: unit (lint, playbook codes, the plan reader, the screens, the screenshot box), pipeline (hook writer and reviewer, never twice, the plan import and Generate N posts on the real CSV, the screenshot in both export sizes), Playwright (the plan, the hook cards, the lint, the swap, a lock screen and a product screenshot to export)
 - [x] The length note over 22 words (owner: the v1.2 examples are the bar)
 - [x] Posts home past 200 posts: Show older posts (60 at a time, filters on the server, chips from every post); the e2e finders page too
+- [x] The plan's Pictures column shows each post's final count after Generate (it stayed "0 of 6" until a reload)
 - [ ] The capped real test on the API path (production, the owner's click)
 
 ## Roadmap after Phase 4 (owner, 2026-10-13; not started)

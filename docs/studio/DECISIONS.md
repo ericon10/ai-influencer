@@ -2588,6 +2588,14 @@ UX-PLAN.md section 28 has the audit and the plan.
   from every post (`accountTags`, `characterIds`). The first list stays
   the newest 200 with the options, so nothing else changes; an older post
   already opened by its link (`/content/:id`).
+- **The plan's Pictures column after Generate (owner, 2026-10-17).** The
+  Launch plan card read `/plan` every 5 s only while a still was running,
+  and never once more after the last one: the last read could come before
+  the last still landed, and a run on the mock could start and end
+  between two reads of the jobs list, so a filled post stayed "0 of 6"
+  until a reload. Now the card reads the plan again when its stills stop
+  running (as `useCharacter` and `useScenes` do), and Generate N posts
+  reads it when its own jobs are done.
 - **The language lint** (`server/core/copyLint.ts`) is one pure function
   for the browser and the server: free, warnings only, each check a
   default rule (area copy) switchable per account or character. It never
