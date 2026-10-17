@@ -22,6 +22,7 @@
     "lint:text": "tsx scripts/check-no-emdash.ts",
     "check": "npm run typecheck && npm run lint:text && npm run test",
     "e2e:editor": "playwright test -c e2e/playwright.config.ts",
+    "e2e:seed": "tsx e2e/seed.ts",
     "db:generate": "drizzle-kit generate",
     "build:app": "vite build",
     "build:editor": "node scripts/build-editor.mjs",

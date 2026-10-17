@@ -1,8 +1,8 @@
-import { mkdirSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { expect, test, type Locator, type Page } from '@playwright/test'
 import { unzipSync } from 'fflate'
-import { API, api, snap } from './helpers'
+import { API, api, seedData, snap } from './helpers'
 
 // Launch ready (UX-PLAN.md section 28), like a user, in demo mode: the plan
 // CSV uploaded, Preview (free) by day and account, Make the drafts (free),
@@ -10,13 +10,21 @@ import { API, api, snap } from './helpers'
 // on a post; the playbook hook writer with its reviewer (only 1s and 2s
 // show), the language notes, the alt hook swap, a new mock screen and the
 // owner's Product screenshot, then the export with post.json and "Ad:".
-// Needs a local Solei (Callie's file with the name replaced) so the
-// plan's SOLEI rows match, as they do in production.
+// The seed has Solei (Callie's file with the name replaced) so the plan's
+// SOLEI rows match, as they do in production.
 
 const CSV = join(process.cwd(), 'docs', 'content', 'launch-plan-v2-posts.csv')
 
 interface PlanPost { id: string; rowId: string; account: string; need: number; have: number }
 const planPosts = async () => (await api<{ posts: PlanPost[] }>('GET', '/plan')).posts
+// The plan's drafts as the first test makes them (free), when a test runs
+// on its own.
+async function plan(): Promise<PlanPost[]> {
+  const have = await planPosts()
+  if (have.length) return have
+  await api('POST', '/plan/import', { csv: readFileSync(CSV, 'utf8') })
+  return planPosts()
+}
 
 async function pay(page: Page, button: Locator, scope?: Locator) {
   await expect(button).toContainText(/\$\d|credits|Free/, { timeout: 30_000 })
@@ -89,8 +97,8 @@ test('the launch plan: upload the CSV, Preview (free), Make the drafts (free), G
 
 test('the Pictures column ends on the full count even when the run starts and ends between two reads of the jobs list', async ({ page }, info) => {
   test.setTimeout(300_000)
-  const p = (await planPosts()).find(x => x.account === 'F2' && x.have < x.need)
-  expect(p, 'import the plan first (the test above)').toBeTruthy()
+  const p = (await plan()).find(x => x.account === 'F2' && x.have < x.need)
+  expect(p, 'an F2 post that still needs its pictures').toBeTruthy()
   // The jobs list never shows a still running, as when the run is over
   // before the list is read again. The card still reads the plan when the
   // run is done (it stayed "0 of 6" until a reload, owner, 2026-10-17).
@@ -113,13 +121,39 @@ test('the Pictures column ends on the full count even when the run starts and en
   await snap(page, info, 'filled after a run the jobs list never showed running')
 })
 
+test('the Pictures column ends on the full count when the jobs list never shows the run (more than 100 jobs in play)', async ({ page }, info) => {
+  test.setTimeout(300_000)
+  const p = (await plan()).find(x => x.account === 'F2' && x.have < x.need)
+  expect(p, 'an F2 post that still needs its pictures').toBeTruthy()
+  // The jobs list holds at most 100 jobs, newest first, and a run's jobs
+  // are all made at the same moment: with Generate 20 posts (120 stills),
+  // or a busy last 15 minutes, the stills still running can be missing
+  // from it. Here the list never shows this run at all. The card used to
+  // stop at "0 of 6" (owner, 2026-10-17); it now asks the plan itself.
+  await page.route(/\/api\/v1\/jobs\?.*live=1/, async r => {
+    const res = await r.fetch().catch(() => null)
+    if (!res) return r.abort().catch(() => undefined)
+    const body = await res.json() as { jobs: { purpose: string }[] }
+    await r.fulfill({ response: res, json: { ...body, jobs: body.jobs.filter(j => !j.purpose.startsWith('slide_still:')) } })
+  })
+  const card = await openPlan(page)
+  const posts = card.locator('[data-field="plan-posts"]')
+  await posts.getByLabel('Account').selectOption('F2')
+  const row = posts.locator(`[data-field="plan-post-${p!.rowId}"]`)
+  await expect(row).toContainText(`${p!.have} of ${p!.need}`)
+  await posts.getByLabel(`Pick ${p!.rowId}`).check()
+  await pay(page, posts.getByRole('button', { name: /^Generate 1 post/ }), posts)
+  await expect.poll(async () => (await planPosts()).some(x => x.id === p!.id && x.have >= x.need), { timeout: 120_000, intervals: [2000] }).toBe(true)
+  await expect(row).toContainText(`${p!.need} of ${p!.need}`, { timeout: 30_000 })
+  await snap(page, info, 'filled after a run the jobs list never showed')
+})
+
 test('Write 10 with Claude to THE STANDARD: a moment, a code, effects, pain, an alt hook and a score each; the reviewer\'s stop test and ladder hide the rest; language notes; Swap with the alt hook', async ({ page }, info) => {
   test.setTimeout(300_000)
-  const p = (await planPosts()).find(x => x.account === 'F2')
-  expect(p, 'import the plan first (the test above)').toBeTruthy()
+  const p = (await plan()).find(x => x.account === 'F2')
+  expect(p, 'the plan\'s F2 posts').toBeTruthy()
   // A fresh F2 topic post, so the plan's own words stay as they are.
-  const characters = (await api<{ characters: { id: string; name: string }[] }>('GET', '/characters')).characters
-  const { id } = await api<{ id: string }>('POST', '/content', { kind: 'slideshow', characterId: characters.find(c => c.name === 'Callie')!.id, accountTag: 'F2', idea: 'rejection emails', spec: { mode: 'topic' } })
+  const { id } = await api<{ id: string }>('POST', '/content', { kind: 'slideshow', characterId: seedData().callie, accountTag: 'F2', idea: 'rejection emails', spec: { mode: 'topic' } })
   await page.goto(`/studio/posts/${id}`)
   await expect(page.locator('[data-field="slideshow-hook"]')).toBeVisible({ timeout: 30_000 })
   await expect(page.locator('[data-field="account-structures"]')).toContainText(/primary L14 Museum exhibit/)
@@ -170,7 +204,7 @@ test('Write 10 with Claude to THE STANDARD: a moment, a code, effects, pain, an 
 test('a mock screen drawn by code and the owner\'s Product screenshot, then the export: post.json with the plan and "Ad:" first', async ({ page }, info) => {
   test.setTimeout(420_000)
   // A product slideshow from the plan (an ad), its pictures made in the test above or here.
-  const all = await planPosts()
+  const all = await plan()
   const rows = await Promise.all(all.filter(p => p.account !== 'CALLIE' && p.account !== 'SOLEI').slice(0, 60).map(async p => ({ p, item: (await api<{ item: { kind: string; spec: { plan: { product: boolean }; mode: string } } }>('GET', `/content/${p.id}`)).item })))
   const pick = rows.find(r => r.item.kind === 'slideshow' && r.item.spec.plan.product)
   expect(pick, 'a product slideshow in the plan').toBeTruthy()

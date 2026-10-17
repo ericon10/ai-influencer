@@ -1,8 +1,8 @@
-import { mkdirSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import sharp from 'sharp'
 import { expect, test, type Locator, type Page, type TestInfo } from '@playwright/test'
-import { api, snap } from './helpers'
+import { API, api, snap } from './helpers'
 
 // Character files from the Claude project (long run part 3, owner
 // 2026-10-15): "Import a character file" first, the free check against
@@ -60,16 +60,11 @@ async function callieCheck(page: Page, info: TestInfo, phone: boolean) {
 
 async function wrenImport(page: Page, info: TestInfo, phone: boolean) {
   test.setTimeout(180_000)
-  // Start clean: a Wren left from an earlier run is archived. When she owns
-  // the post the editor tests copy (E2E_POST), she is renamed and kept
-  // instead, so the tests after this one still have their post.
+  // Start clean: a Wren made earlier (by the test before this one, or an
+  // earlier run on the same Studio) is archived. Wren is this spec's own:
+  // the seed never makes her, and no other spec uses her.
   const old = await byName('Wren')
-  if (old) {
-    const base = process.env.E2E_POST
-    const owner = base ? (await api<{ item: { characterId: string | null } }>('GET', `/content/${base}`).catch(() => null))?.item.characterId : null
-    if (owner === old.id) await api('PATCH', `/characters/${old.id}`, { patch: { name: 'Wren (base post)' }, reason: 'kept for the editor tests' })
-    else await api('DELETE', `/characters/${old.id}`)
-  }
+  if (old) await api('DELETE', `/characters/${old.id}`)
   const sheet = await wrenSheet()
 
   // A new character from a v1.6 file and its folder.
@@ -100,10 +95,18 @@ async function wrenImport(page: Page, info: TestInfo, phone: boolean) {
   await api('DELETE', `/content/${post}`)
 }
 
+// Wren as the import test leaves her: made from her file here when this
+// test runs on its own.
+async function wren(): Promise<{ id: string; name: string }> {
+  const have = await byName('Wren')
+  if (have) return have
+  await api('POST', '/characters/import', { markdown: readFileSync(WREN, 'utf8') })
+  return (await byName('Wren'))!
+}
+
 async function brandCard(page: Page, info: TestInfo, phone: boolean) {
-  const wren = await byName('Wren')
-  test.skip(!wren, 'The import test makes Wren first.')
-  await page.goto(`/studio/characters/${wren!.id}?tab=file`)
+  const w = await wren()
+  await page.goto(`/studio/characters/${w.id}?tab=file`)
   const card = page.locator('[data-field="brand-card"]')
   await expect(card).toBeVisible({ timeout: 20_000 })
   const statement = card.locator('[data-field="brand-statement"] input')
@@ -112,7 +115,7 @@ async function brandCard(page: Page, info: TestInfo, phone: boolean) {
   const line = `Wren, the slow trail runner on a budget (${phone ? 'phone' : 'desktop'})`
   await press(statement, phone)
   await statement.fill(line)
-  const saved = page.waitForResponse(r => r.url().includes(`/characters/${wren!.id}/brand`) && r.request().method() === 'PUT')
+  const saved = page.waitForResponse(r => r.url().includes(`/characters/${w.id}/brand`) && r.request().method() === 'PUT')
   await press(card.locator('[data-field="brand-arc"] input'), phone)
   await saved
   // A growth log entry, newest first.
@@ -128,14 +131,13 @@ async function brandCard(page: Page, info: TestInfo, phone: boolean) {
   await card.scrollIntoViewIfNeeded()
   await snap(page, info, phone ? 'phone: the Brand card' : 'the Brand card')
   // Written into the file itself.
-  const md = await (await fetch(`${process.env.E2E_API ?? 'http://localhost:8787/api/v1'}/characters/${wren!.id}/export`, { headers: { 'x-studio-request': '1' } })).text()
+  const md = await (await fetch(`${API}/characters/${w.id}/export`, { headers: { 'x-studio-request': '1' } })).text()
   expect(md).toContain(`- Brand statement: ${line}`)
 }
 
 async function offBrand(page: Page, info: TestInfo, phone: boolean) {
-  const wren = await byName('Wren')
-  test.skip(!wren, 'The import test makes Wren first.')
-  const post = (await api<{ id: string }>('POST', '/content', { kind: 'meme', characterId: wren!.id, idea: 'Wren at a trail race' })).id
+  const w = await wren()
+  const post = (await api<{ id: string }>('POST', '/content', { kind: 'meme', characterId: w.id, idea: 'Wren at a trail race' })).id
   // The mock writer says every moment fits; one is served as off brand.
   await page.route('**/api/v1/jobs/*', async r => {
     if (r.request().method() !== 'GET') return r.fallback()
