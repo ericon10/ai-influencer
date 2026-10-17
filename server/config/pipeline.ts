@@ -329,6 +329,9 @@ const contentSchema = z.object({
   // the writing standards with lint on.
   copy_lint: z.object({ values: z.array(z.string()), hype: z.array(z.string()), products: z.array(z.string()), max_hashtags: z.number().int().min(0).max(30), hook_max_words: z.number().int().min(4).max(40).default(22), hook_labels: z.array(z.string()).default([]), job_words: z.array(z.string()).default([]), ending_never: z.array(z.string()).default([]) })
     .default({ values: ['should', 'need to', 'needs to', 'must', 'ought'], hype: ['dream job', 'unlock', 'level up', 'game-changer', 'game changer', 'supercharge'], products: [], max_hashtags: 5, hook_max_words: 22, hook_labels: ['Exhibit', 'Levels of', 'Previously on', 'Calendar invite'], job_words: [], ending_never: [] }),
+  // Results (section 32): the decision hints' thresholds, data not code.
+  results: z.object({ variations_views: z.number().int().positive(), variations_count: z.number().int().min(1).max(10), drop_views: z.number().int().positive(), drop_posts: z.number().int().min(1).max(10) })
+    .default({ variations_views: 50000, variations_count: 3, drop_views: 1000, drop_posts: 2 }),
   batch: z.object({ max: z.number().int().positive(), default_count: z.number().int().positive(), zip_part_mb: z.number().positive().default(150) }),
   clone: z.object({
     mode: z.enum(['replace', 'motion']).default('replace'),

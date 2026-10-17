@@ -131,6 +131,18 @@ copy_lint:
   job_words: [job, interview, recruiter, offer, salary, salaries, resume, résumé, hiring, application]
   ending_never: [ghosted, ghosting, passed over, applies for you, apply for you, applies for me, applying for you, auto-apply, auto apply]
 
+# Results (owner, 2026-10-17; UX-PLAN.md section 32): the decision hints on
+# a post's card and in Posts home > Results, never automatic (the
+# playbook's tiers, section 11). A post at variations_views or more: "50K+
+# views: make 3 variations". A hook family (a post, its variations and the
+# posts that share its plan moment) with drop_posts posts under drop_views:
+# "Under 1K twice: drop the hook family".
+results:
+  variations_views: 50000
+  variations_count: 3
+  drop_views: 1000
+  drop_posts: 2
+
 batch:
   # Up to 50 videos (Phase 4: batch at scale); each is its own short job on
   # the worker. The download is a zip in parts of at most zip_part_mb.

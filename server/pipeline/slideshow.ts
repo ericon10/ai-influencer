@@ -991,7 +991,7 @@ async function onSlideshowVariations(deps: Deps, ctx: Ctx, job: JobRow, out: Job
       hook: texts[0]!, slides: texts.slice(1),
       shots: order.map(from => list[from]?.shot ?? ''),
       specials: order.map(from => list[from]?.special ?? null),
-      stillIds: [], textPos: [], hookIdeas: [], hookReview: null, review: null, batchHooks: [],
+      stillIds: [], textPos: [], hookIdeas: [], hookReview: null, review: null, batchHooks: [], results: null,
       // The variation's own alt hook is the source's hook (one tap swaps back).
       plan: { ...spec.plan, rowId: '', planId: '', altHook: spec.hook },
       caption, hashtags: tags(v.hashtags, cfgOf(deps).hashtags[1]),
@@ -1071,7 +1071,7 @@ async function onSlideDraft(deps: Deps, ctx: Ctx, job: JobRow, out: JobOutcome):
   // A batch row: its own slideshow, the batch's scene and settings.
   const parentSpec = parse(anchor)
   const id = batchChildId(job.id)
-  const base: SlideshowSpec = { ...parentSpec, hook: '', slides: [], stillIds: [], shots: [], specials: [], textPos: [], hookIdeas: [], hookReview: null, batchHooks: [], caption: '', ctaLine: '', hashtags: [], review: 'pending' }
+  const base: SlideshowSpec = { ...parentSpec, hook: '', slides: [], stillIds: [], shots: [], specials: [], textPos: [], hookIdeas: [], hookReview: null, batchHooks: [], caption: '', ctaLine: '', hashtags: [], review: 'pending', results: null }
   const spec = { ...base, ...draftPatch(deps, base, d, { hook, pattern: meta.pattern ?? null, n: meta.n ?? parentSpec.slideCount, endings: isProductPost(base) ? productEndings(deps, std) : [] }), review: 'pending' as const }
   await deps.db.insert(contentItems).values({
     id, accountId: ctx.accountId, characterId: anchor.characterId, kind: 'slideshow', title: '', idea: hook, productId: anchor.productId,
@@ -1258,7 +1258,7 @@ export async function renderSlideshow(deps: Deps, ctx: Ctx, job: JobRow, row: Co
     sizes: { tiktok, ...(insta ? { instagram: insta } : {}) },
     aiLabel: character?.disclosure ?? 'Label all posts as AI-generated',
     exportedAt: deps.clock.now().toISOString(),
-    plan: spec.plan, ctaLine: spec.ctaLine,
+    plan: spec.plan, ctaLine: spec.ctaLine, results: spec.results,
   })
   const jsonBuf = Buffer.from(`${JSON.stringify(json, null, 2)}\n`)
   files['post.json'] = jsonBuf

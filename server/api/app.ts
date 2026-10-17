@@ -37,6 +37,8 @@ import { editorLibrary } from '../pipeline/editorMedia.js'
 import { addRecreateRow, recreateBatch, recreateFor, reviewTakeAgain, setRecreateRows, startRecreate, useCloneTake } from '../pipeline/recreate.js'
 import { jobViews } from '../jobs/jobView.js'
 import { importPlan, planView, previewPlan } from '../pipeline/planImport.js'
+import { applyResultsCsv, previewResultsCsv, resultsView, setPostResults } from '../pipeline/results.js'
+import { DECISIONS } from '../core/results.js'
 import { archiveSlideScene, batchView, familyView, listSlideScenes, reuseReport, reviewBatchItem, saveSlideScene, saveSlideStillModel, slideStillChoices, vaultHookIdeas } from '../pipeline/slideshow.js'
 import { PATTERN_IDS } from '../core/slides.js'
 import { POST_STEPS, addBroll, archiveBroll, archiveContent, contentItemView, contentPage, contentView, createContent, duplicateContent, postScene, retryFailedBatch, startCover, startRender, startVariants, updateBroll, updateContent } from '../pipeline/content.js'
@@ -1094,6 +1096,30 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
     return c.json(await importPlan(deps, ctx, ...planArgs(parse(planBody, await json(c)))))
   })
   app.get('/plan', async c => c.json(await planView(deps, c.get('ctx'))))
+  // Results (section 32): typed on a post's card or Finish step, pasted
+  // from a CSV by row_id (a free preview, then Apply), and the Results view.
+  const count = z.number().int().min(0).max(100_000_000_000).nullable()
+  app.put('/content/:id/results', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    const body = parse(z.object({
+      postUrl: z.string().max(500).optional(), postedAt: z.string().max(40).optional(),
+      views72h: count.optional(), follows72h: count.optional(), saves72h: count.optional(), shares72h: count.optional(),
+      decision: z.enum(DECISIONS).nullable().optional(), notes: z.string().max(2000).optional(),
+    }), await json(c))
+    return c.json({ results: await setPostResults(deps, ctx, c.req.param('id'), body) })
+  })
+  app.get('/results', async c => {
+    const day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/)
+    const q = parse(z.object({ from: day.optional(), to: day.optional(), tag: z.string().max(80).optional(), character: z.string().regex(/^chr_[a-z0-9]{8,40}$/).optional(), product: z.string().regex(/^(prd_[a-z0-9]{8,40}|none)$/).optional() }), c.req.query())
+    return c.json(await resultsView(deps, c.get('ctx'), { from: q.from, to: q.to, accountTag: q.tag, characterId: q.character, productId: q.product }))
+  })
+  app.post('/results/csv/preview', async c => c.json(await previewResultsCsv(deps, c.get('ctx'), parse(z.object({ csv: z.string().max(400_000) }), await json(c)).csv)))
+  app.post('/results/csv/apply', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    return c.json(await applyResultsCsv(deps, ctx, parse(z.object({ csv: z.string().max(400_000) }), await json(c)).csv))
+  })
   app.put('/slideshow/still-model', async c => {
     const ctx = c.get('ctx')
     requireRole(ctx, 'member')

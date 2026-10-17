@@ -12,6 +12,9 @@ import { batchProgress } from './post/batchProgress'
 import { HowTo, QuickStartBanner } from '../guide/Guide'
 import { AccountsCard } from './AccountsCard'
 import { PlanCard } from './PlanCard'
+import { ResultsCard } from './ResultsCard'
+import { ResultsRow, useResultsView } from '../results'
+import type { ResultHint } from '../types'
 
 // Home (UX-PLAN.md): every post, newest work first, filtered by account,
 // character and product (section 29). One click opens a post where it was
@@ -38,6 +41,8 @@ export default function Posts() {
   const shown = all.filter(i => (!tag || i.accountTag === tag) && (!character || i.characterId === character) && (!product || (product === 'none' ? !i.productId : i.productId === product)))
   const tags = content.data?.accountTags ?? []
   const used = useMemo(() => new Set([...(content.data?.characterIds ?? []), ...items.map(i => i.characterId)]), [items, content.data?.characterIds])
+  // The decision hints on each card (section 32), read over every post.
+  const hints = useResultsView().data?.hints ?? {}
   const nav = useNavigate()
   const toast = useToast()
   const [setting, setSetting] = useState(false)
@@ -65,6 +70,7 @@ export default function Posts() {
       <QuickStartBanner />
       {characters.length > 0 && <AccountsCard characters={characters} />}
       {characters.length > 0 && <PlanCard characters={characters} />}
+      {characters.length > 0 && items.length > 0 && <ResultsCard tag={tag} character={character} product={product} filtered={!!(tag || character || product)} />}
 
       {(tags.length > 0 || used.size > 1 || products.length > 0) && (
         <div className="st-col" style={{ gap: 8, marginBottom: 18 }}>
@@ -122,7 +128,7 @@ export default function Posts() {
         <>
           {shown.length > 0 && (
             <div className="st-grid cards">
-              {shown.map(i => <PostCard key={i.id} item={i} lib={lib.data} characterName={characters.find(c => c.id === i.characterId)?.name ?? ''} productName={products.find(p => p.id === i.productId)?.name ?? ''} />)}
+              {shown.map(i => <PostCard key={i.id} item={i} lib={lib.data} characterName={characters.find(c => c.id === i.characterId)?.name ?? ''} productName={products.find(p => p.id === i.productId)?.name ?? ''} hints={hints[i.id]} />)}
             </div>
           )}
           {older.more && (
@@ -178,7 +184,7 @@ const STATUS: Record<ContentItem['status'], { label: string; tone: string }> = {
   draft: { label: 'Draft', tone: '' }, rendering: { label: 'Rendering', tone: 'accent live' }, ready: { label: 'Exported', tone: 'ok' }, failed: { label: 'Export failed', tone: 'bad' },
 }
 
-function PostCard({ item, lib, characterName, productName }: { item: ContentItem; lib: LibraryData | undefined; characterName: string; productName: string }) {
+function PostCard({ item, lib, characterName, productName, hints }: { item: ContentItem; lib: LibraryData | undefined; characterName: string; productName: string; hints?: ResultHint[] }) {
   const toast = useToast()
   const qc = useQueryClient()
   const duplicate = useDuplicate()
@@ -200,6 +206,7 @@ function PostCard({ item, lib, characterName, productName }: { item: ContentItem
           <span>{[KIND_LABEL[item.kind], characterName, item.accountTag, productName].filter(Boolean).join(' · ')}</span>
         </div>
         {item.kind === 'batch' && <BatchProgress item={item} />}
+        <ResultsRow item={item} hints={hints} />
         <div className="st-row" style={{ gap: 4 }}>
           <span className="st-hint">{new Date(item.updatedAt).toLocaleDateString([], { month: 'short', day: 'numeric' })}</span>
           <span className="st-spacer" />

@@ -605,6 +605,17 @@ Decisions: `DECISIONS.md` G37 and G38. UX: `UX-PLAN.md` section 15.
 - [x] Launch plan: numbered steps, the plan's pick, only the ticked rows, the CSV's product (a name) and ad columns, older yes or no files
 - [x] Tests: unit (products.test.ts, the lint, the plan reader), Playwright (products.spec.ts, the launch plan)
 
+### Results (G60, UX-PLAN section 32, owner 2026-10-17)
+
+- [x] Per-post results on every post kind (`spec.results`): post_url, posted_at, views, follows, saves and shares in the first 72 hours, decision, notes; saved as typed, never moving the post up Posts home, never copied
+- [x] Typed on the post card (a Results row, the decision chip) and in the Finish step; the number pad on a phone; 12.4K and 1,203
+- [x] Paste a CSV by row_id (or post_id, an account column for a shared row_id): a free preview (matched posts, the changes, row_ids not found, unknown columns), then Apply
+- [x] The Results card on Posts home: follows per post first, totals, by account, product, character and hook structure, a posted_at range, the Posts home filters
+- [x] Decision hints from data (`config/content.yaml` results): 50K+ views, make 3 variations; a hook family under 1K twice, drop it
+- [x] post.json `results`
+- [x] Guide (Results section, glossary, Posts home), How this works on the card and the Finish step
+- [x] Tests: unit (the CSV reader, numbers, dates, decisions, totals, families, hints, post.json), pipeline (results.test.ts), Playwright (results.spec.ts)
+
 ## Roadmap after Phase 4 (owner, 2026-10-13; not started)
 
 SPEC 13.1, R1 to R7: Clone Video (first after Phase 3), Inspo board

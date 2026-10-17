@@ -355,6 +355,9 @@ export type { SlideshowSpec, SceneLock, SpecialSlideSpec } from '../../server/co
 export type { PlanMeta } from '../../server/core/planMeta'
 export type { PlanPreview, PlanPreviewRow, PlanPostView, PlanAccountView } from '../../server/pipeline/planImport'
 export interface PlanImportResult { created: number; updated: number; kept: number; skipped: number; posts: Array<{ rowId: string; id: string; state: 'new' | 'update' }> }
+// Results (UX-PLAN.md section 32): a post's results and the Results view.
+export type { PostResults, Decision, ResultHint, ResultRow } from '../../server/core/results'
+export type { ResultsView, ResultsCsvPreview, ResultsCsvPreviewRow } from '../../server/pipeline/results'
 // The slideshow power-up (UX-PLAN.md section 27): the Scene library, a
 // post's family and batch, and the no-reuse check.
 export interface SlideScene { id: string; characterId: string | null; topic: string; name: string; place: string; light: string; camera: string; phone: string; details: string[]; lookAssetId: string | null; createdAt: string }

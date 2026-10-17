@@ -1,4 +1,4 @@
-import type { ActionPreview, CharacterSummary, CharacterView, HiggsfieldAccount, JobView, Me, QuoteView, RulesView, SceneFields, ScenesData, SettingsView, StudioAction, Usage, VideoPrice, BrollClip, ContentData, ContentKind, LibraryData, PostStep, WorkerStatus, CloneOptions, CloneResult, CloneSource, CloneStill, CutView, SoundItem, EditorStyle, ImportPreview, VoiceLine, ProductSummary, ProductView, ProductClaims, KitGroup, SocialAccount, SentView, RecreateBatchView, GateCheckView, StorageInfo, TrashRef, TrashItem, ContentItem, AutoCleanItem, BrandLayer, TemplateReport, SlideFamily, ReuseReport, SlideBatch, StillChoice, SlideScene, PlanPreview, PlanPostView, PlanImportResult } from './types'
+import type { ActionPreview, CharacterSummary, CharacterView, HiggsfieldAccount, JobView, Me, QuoteView, RulesView, SceneFields, ScenesData, SettingsView, StudioAction, Usage, VideoPrice, BrollClip, ContentData, ContentKind, LibraryData, PostStep, WorkerStatus, CloneOptions, CloneResult, CloneSource, CloneStill, CutView, SoundItem, EditorStyle, ImportPreview, VoiceLine, ProductSummary, ProductView, ProductClaims, KitGroup, SocialAccount, SentView, RecreateBatchView, GateCheckView, StorageInfo, TrashRef, TrashItem, ContentItem, AutoCleanItem, BrandLayer, TemplateReport, SlideFamily, ReuseReport, SlideBatch, StillChoice, SlideScene, PlanPreview, PlanPostView, PlanImportResult, PostResults, ResultsView, ResultsCsvPreview } from './types'
 import { sheetRefOf, typeOf, uploadFiles } from './files'
 
 // Thin client for /api/v1. Every write sends the CSRF header the server
@@ -171,6 +171,15 @@ export const api = {
   planPreview: (csv: string, o: { drawSpecials?: boolean; store?: Record<string, string>; stillModel?: string | null; productId?: string | null } = {}) => request<PlanPreview>('POST', '/plan/preview', { csv, ...o }),
   planImport: (csv: string, o: { drawSpecials?: boolean; store?: Record<string, string>; productId?: string | null; rows: string[] }) => request<PlanImportResult>('POST', '/plan/import', { csv, ...o }),
   plan: () => request<{ posts: PlanPostView[] }>('GET', '/plan'),
+  // Results (section 32): typed on a post, pasted from a CSV, the view.
+  setResults: (id: string, patch: Partial<Omit<PostResults, 'updatedAt'>>) => request<{ results: PostResults }>('PUT', `/content/${id}/results`, patch),
+  results: (q: { from?: string | null; to?: string | null; tag?: string | null; character?: string | null; product?: string | null } = {}) => {
+    const p = new URLSearchParams(Object.entries(q).filter((e): e is [string, string] => !!e[1]))
+    const qs = p.toString()
+    return request<ResultsView>('GET', `/results${qs ? `?${qs}` : ''}`)
+  },
+  resultsCsvPreview: (csv: string) => request<ResultsCsvPreview>('POST', '/results/csv/preview', { csv }),
+  resultsCsvApply: (csv: string) => request<{ updated: number; same: number; skipped: number; posts: string[] }>('POST', '/results/csv/apply', { csv }),
   saveSlideStillModel: (model: string) => request<{ ok: true }>('PUT', '/slideshow/still-model', { model }),
   slideScenes: () => request<{ scenes: SlideScene[] }>('GET', '/slide-scenes'),
   saveSlideScene: (body: { name: string; characterId?: string | null; topic?: string; place: string; light?: string; camera?: string; phone?: string; details?: string[]; lookAssetId?: string | null }) => request<SlideScene>('POST', '/slide-scenes', body),

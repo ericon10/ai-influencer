@@ -46,6 +46,7 @@ import { resolveRoute } from './settings.js'
 import type { SceneBuilt } from './sceneActions.js'
 import { lintSettings } from './copyLint.js'
 import { planMetaSchema } from '../core/planMeta.js'
+import { resultsSchema } from '../core/results.js'
 import { videoPostExportJson } from '../core/postExport.js'
 import { postCaption } from '../core/slides.js'
 
@@ -294,6 +295,8 @@ const memeSpec = z.object({
   // is the caption above; the post's own caption, hashtags and CTA line
   // are in plan), and its alt hook.
   plan: planMetaSchema,
+  // Section 32: what the post did once posted. Never copied.
+  results: resultsSchema.nullable().default(null),
 })
 // A slideshow (server/core/slideshowSpec.ts; UX-PLAN.md section 27).
 const slideshowSpec = slideshowSpecSchema
@@ -325,6 +328,8 @@ const batchObject = z.object({
   // A batch of recreates (owner, 2026-10-14): up to 20 rows, each a clip
   // and a character in its own video post, with its own motion model.
   recreate: z.object({ rows: z.array(z.object({ postId: id, model: z.string().max(80).nullable().default(null) })).max(50).default([]) }).nullable().default(null),
+  // Section 32: what the batch did once posted. Never copied.
+  results: resultsSchema.nullable().default(null),
 })
 const batchSpec = z.preprocess(raw => {
   if (!raw || typeof raw !== 'object') return raw
@@ -535,7 +540,9 @@ export async function duplicateContent(deps: Deps, ctx: Ctx, itemId: string): Pr
   // The editor's stack comes along (its places are relative), not the
   // timeline itself, which names this post's media.
   const spec = row.spec as { editor?: { stack?: unknown } | null } | null
-  const copied = spec?.editor ? { ...spec, editor: { projectAssetId: null, savedAt: null, stack: spec.editor.stack ?? null } } : row.spec
+  const withStack = spec?.editor ? { ...spec, editor: { projectAssetId: null, savedAt: null, stack: spec.editor.stack ?? null } } : row.spec
+  // What the post did once posted is its own (section 32).
+  const copied = { ...((withStack ?? {}) as object), results: null }
   const [out] = await deps.db.insert(contentItems).values({
     id: newId('cnt'), accountId: ctx.accountId, characterId: row.characterId, kind: row.kind,
     title: row.title, idea: row.idea, accountTag: row.accountTag, sceneId: row.sceneId, spec: copied, productId: row.productId,
@@ -1017,7 +1024,7 @@ async function runContentRender(deps: Deps, ctx: Ctx, job: JobRow): Promise<unkn
         post: { id: row.id, kind: row.kind, title: row.title, idea: row.idea, accountTag: row.accountTag, characterId: row.characterId, characterName: ch?.name ?? null, variationOf: row.variationOf, batchOf: row.batchOf, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString() },
         video: { file: `${name}.mp4`, assetId: v.assetId, durationSec: v.durationSec ?? null, onScreenText: s.caption, captionOff: s.captionOff },
         caption: { text: plan.caption, hashtags: plan.hashtags.slice(0, deps.config.pipeline.content.slideshow.hashtags[1]), ctaLine: plan.cta, ad: plan.product, asPosted: postCaption(plan.caption, plan.hashtags, { ad: plan.product, max: deps.config.pipeline.content.slideshow.hashtags[1], cta: plan.cta }) },
-        plan, aiLabel: ch?.disclosure ?? 'Label all posts as AI-generated', exportedAt: deps.clock.now().toISOString(),
+        plan, aiLabel: ch?.disclosure ?? 'Label all posts as AI-generated', exportedAt: deps.clock.now().toISOString(), results: s.results,
       })
       const jsonAsset = await saveAsset(deps, ctx, { data: Buffer.from(`${JSON.stringify(json, null, 2)}\n`), mime: 'application/json', origin: 'derived', label: `Video post ${name} (post.json)`, sourceJobId: job.id })
       const outputs: ContentOutputs = { videoAssetId: v.assetId, jsonAssetId: jsonAsset.id, dropped: v.dropped, durationSec: v.durationSec, sound: v.sound, editNote: v.editNote, renderedAt: deps.clock.now().toISOString(), preset: preset.id, ...(v.capped ? { capped: true } : {}), ...(timeline ? { fromTimeline: true } : {}), ...(notes.length ? { editorOnly: notes } : {}) }

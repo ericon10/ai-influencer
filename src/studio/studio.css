@@ -1450,4 +1450,48 @@ button.st-chip:hover { color: var(--st-text); border-color: var(--st-text-3); }
 /* A switch keeps its words beside it on a phone (they wrapped under it). */
 @media (max-width: 860px) {
   .st-row > .st-switch + .st-col, .st-row > .st-switch + .st-hint, .st-row > .st-switch + span { flex: 1 1 0; min-width: 0; }
+/* Results (section 32): the card's Results row, the fields, the hints and
+   the Results view's numbers. */
+.st-results-toggle { display: inline-flex; align-items: center; gap: 6px; min-width: 0; flex: 1; padding: 4px 0; border: 0; background: none; color: var(--st-text-2); font: inherit; font-size: 12.5px; cursor: pointer; text-align: left; }
+.st-results-toggle b { color: var(--st-text); font-weight: 650; }
+.st-results-toggle:hover b { text-decoration: underline; }
+.st-resultsform { display: flex; flex-direction: column; gap: 10px; }
+.st-resultsform.compact { padding: 10px; border-radius: 12px; border: 1px solid var(--st-line); background: var(--st-bg-2); }
+.st-resultsgrid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px 10px; }
+.st-resultsgrid .wide { grid-column: span 2; }
+.st-resultsform.compact .st-resultsgrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.st-resultsform.compact .st-resultsgrid .wide { grid-column: 1 / -1; }
+.st-resultsform .st-chip { height: 26px; font-size: 12px; }
+.st-input.bad { border-color: rgba(255, 93, 93, 0.6); }
+.st-hintline { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 12px; line-height: 1.35; padding: 4px 8px; border-radius: 9px; }
+.st-hintline svg { flex: none; }
+.st-hintline.variations { background: var(--st-ok-soft); color: var(--st-ok); }
+.st-hintline.drop { background: var(--st-warn-soft); color: var(--st-warn); }
+.st-hintline-go { color: inherit; font-weight: 650; text-decoration: underline; }
+.st-stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 10px; }
+.st-stat { display: flex; flex-direction: column; gap: 2px; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--st-line); background: var(--st-surface-2); }
+.st-stat b { font-size: 22px; line-height: 1.1; color: var(--st-text); font-variant-numeric: tabular-nums; }
+.st-stat.head { border-color: rgba(255, 106, 61, 0.55); background: var(--st-accent-soft); }
+.st-stat.head b { font-size: 28px; }
+.st-table td.num, .st-table th.num { text-align: right; }
+.st-table tr.lead td { color: var(--st-text); }
+@media (max-width: 720px) {
+  .st-resultsgrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .st-resultsgrid .wide { grid-column: 1 / -1; }
+}
+/* Results on a phone (section 32, the phone rules of section 3.11): the
+   fields, chips and toggles at 40 px (16 px text, so a phone never zooms),
+   and the breakdown and the CSV preview as one small card per row. */
+@media (max-width: 860px) {
+  .st-resultsform .st-chip, .st-resultsform .st-input.sm, .st-results-toggle, .st-hintline-go { min-height: 40px; height: auto; }
+  .st-resultsform .st-input, .st-resultsform .st-textarea { font-size: 16px; }
+  .st-hintline-go { display: inline-flex; align-items: center; }
+  .st-resultstable thead { display: none; }
+  .st-resultstable, .st-resultstable tbody { display: block; }
+  .st-resultstable tr { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; padding: 10px 4px; border-bottom: 1px solid var(--st-line); }
+  .st-resultstable tr:last-child { border-bottom: 0; }
+  .st-resultstable td { display: block; padding: 0; border: 0; text-align: left; max-width: none !important; }
+  .st-resultstable td:first-child, .st-resultstable td.wide { flex: 1 0 100%; color: var(--st-text); }
+  .st-resultstable td[data-label]::before { content: attr(data-label) ': '; color: var(--st-text-3); font-size: 11.5px; }
+  .st-resultstable td.lead { color: var(--st-text); }
 }

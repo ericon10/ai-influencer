@@ -9,7 +9,7 @@ export type GuideColor = 'orange' | 'pink' | 'violet' | 'blue' | 'teal' | 'green
 export type GuideId =
   | 'big-picture' | 'posts' | 'characters' | 'setup-start' | 'setup-face' | 'setup-sheet' | 'setup-file'
   | 'post-idea' | 'post-stills' | 'post-video' | 'post-clone' | 'post-text' | 'post-finish'
-  | 'library' | 'settings' | 'feedback' | 'realism' | 'voice' | 'hooks' | 'slideshow' | 'launch-plan' | 'products'
+  | 'library' | 'settings' | 'feedback' | 'realism' | 'voice' | 'hooks' | 'slideshow' | 'launch-plan' | 'products' | 'results'
 
 export interface GuideSection {
   id: GuideId
@@ -88,6 +88,7 @@ export const GUIDE: GuideSection[] = [
       'The newest 200 posts show first, the most recently changed on top. Show older posts, under the cards, loads 60 more at a time; a filter applies to them too, so an older post of one account is still found.',
       'Another on a card makes a filled-in copy that opens at the caption: the fastest way to make a series.',
       'Accounts (the card at the top, folded until you open it): each account\'s product, tracked link or promo code and its signups, ranked by signups. An account\'s product is the product of every new post on it. See Hooks and the scoreboard, and Products.',
+      'Results on each card: once a post is up, open its Results row and type the link, when it went up and its first 72 hours (views, follows, saves, shares), a decision and notes. The decision shows as a colored chip on the card. The Results card at the top adds them up. See Results.',
     ],
     tips: ['Video post from a TikTok (in the New post menu) opens a post with Clone already open.'],
     shots: [
@@ -523,6 +524,32 @@ export const GUIDE: GuideSection[] = [
     ],
   },
   {
+    id: 'results', group: 'Grow your accounts', title: 'Results', color: 'green',
+    tagline: 'What each post did, typed or pasted, and what to make next. Free.',
+    where: 'Posts home: each post\'s Results row and the Results card; a post\'s Finish step',
+    intro: 'Once a post is up, keep what it did with it: the post\'s link, when it went up, and its first 72 hours (views, follows, saves, shares), your decision (Make 3 variations, Keep, One more try or Drop) and notes. Type them on the post\'s card or in its Finish step, or paste a whole sheet at once from a CSV, matched by the plan\'s row_id. The Results card on Posts home adds them up by account, product, character and hook structure, with follows per post first: decide by follows per post, then saves and shares, never by views alone. Nothing here reads TikTok or Instagram; you type or paste the numbers.',
+    steps: [
+      'On Posts home, open a post\'s Results row (under its name) and type. It saves as you type ("Saving..." then "Saved"). On a phone the number fields open the number pad.',
+      'Numbers can be typed the way the apps show them: 12.4K, 1.2M, 1,203.',
+      'Pick a decision: Make 3 variations, Keep, One more try, Drop, or None. It shows as a small colored chip on the card.',
+      'The same fields are in the post\'s Finish step, under Results.',
+      'Paste a whole sheet: open the Results card, Upload the CSV or paste it, then Preview (free). The columns are read by name, in any order: row_id (the plan\'s), post_url, posted_at, views_72h, follows_72h, saves_72h, shares_72h, decision, notes. A post with no plan row is matched by post_id, the Studio\'s id (in the post\'s link). A column the Studio does not use is named and left out.',
+      'The preview lists each post the sheet matches and exactly which fields change (from what to what), the row_ids it did not find, and any row with a problem (a number or date it cannot read). Apply N changes writes only the rows that change something; a blank cell leaves that field as it is.',
+      'Two posts with the same row_id (the same plan imported for two accounts): add an account column to say which, or use post_id.',
+      'posted_at takes 2026-10-19 21:14, 2026-10-19T21:14, 10/19/2026 9:14 PM (month first; day first when the first number is over 12), 19.10.2026 21:14, Oct 19, 2026 9:14 PM. A time zone in the cell is dropped and the time stays as written.',
+      'The Results card: Follows per post (the headline), posts with results, follows, views, saves and shares, then a table By Account, Product, Character or Hook structure (the plan\'s structure code and name, or No structure), each row with its posts, follows per post, follows, views, saves and shares, best follows per post first. Topic posts (no one in the photos) count as No one under Character.',
+      'Posted: pick a from and to day to see only the posts that went up then. Posts with numbers but no posted at are counted apart. The Account, Character and Product filters above the cards apply to the Results card too.',
+    ],
+    tips: [
+      'Hints, never automatic: a post at 50K views or more says "50K+ views: make 3 variations" (on a slideshow, Make variations is one click away); a hook family with two posts under 1K views says "Under 1K twice: drop the hook family" on every post of that family. The numbers are in config/content.yaml (results).',
+      'A hook family is a post and its variations, plus every post that shares its plan moment (moment_id): a plan row, its variations and Make another like this keep it.',
+      'Results never move a post up Posts home, and Make another like this, variations and batches start with none.',
+      'They go into the post\'s post.json under "results" the next time it is exported, for the posting engine later.',
+    ],
+    cost: 'Free.',
+    shots: [],
+  },
+  {
     id: 'library', group: 'Everything else', title: 'Library', color: 'teal',
     tagline: 'Everything you made, ready to reuse. Delete anything; the Trash keeps it 7 days.',
     where: 'Sidebar > Library',
@@ -612,6 +639,11 @@ export const GUIDE: GuideSection[] = [
 ]
 
 export const GLOSSARY: Array<[string, string]> = [
+  ['Results', 'What a post did once posted: its link, when it went up, its first 72 hours (views, follows, saves, shares), your decision and notes. Typed on its card or in Finish, or pasted from a CSV by row_id. Free.'],
+  ['Follows per post', 'The follows of the posts with results, divided by how many there are. The headline of the Results card: decide by it first, then saves and shares.'],
+  ['Decision', 'Yours, on each post: Make 3 variations, Keep, One more try or Drop. A colored chip on the card.'],
+  ['Decision hints', 'Suggestions on a post and on the Results card, never automatic: 50K+ views, make 3 variations; a hook family under 1K twice, drop it. The numbers are data (config/content.yaml).'],
+  ['Hook family', 'A post and its variations, plus every post that shares its plan moment (moment_id).'],
   ['Chips (Idea step)', 'What your words already say about the shot (camera, phone camera, framing, outfit, makeup, place, light), read for free. Click one to change it; what you set wins.'],
   ['Send my prompt as written', 'A pasted prompt goes unchanged, with only the reference line, the 21+ line and the REALISM block added. No writer, no camera, light or outfit lines.'],
   ['More control', 'The collapsed part of the Idea step: character, account, format, places and every detail of the shot.'],
