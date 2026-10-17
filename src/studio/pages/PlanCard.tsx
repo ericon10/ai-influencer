@@ -138,7 +138,7 @@ function ImportPlan({ characters, hasPosts, onImported }: { characters: Characte
         <span className="st-label">2 · Preview (free)</span>
         <div className="st-row" style={{ gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
           <AsyncButton className="st-btn sm" disabled={!csv.trim()} title={csv.trim() ? undefined : 'Upload or paste the plan first'} busyLabel="Reading the plan..." onClick={() => check()}>Preview (free)</AsyncButton>
-          <label className="st-row" style={{ gap: 8, cursor: 'pointer' }}>
+          <label className="st-row" style={{ gap: 8, cursor: 'pointer', flex: '1 1 320px', minWidth: 0, alignItems: 'flex-start' }}>
             <button type="button" role="switch" aria-checked={draw} className={`st-switch ${draw ? 'on' : ''}`} onClick={() => { setDraw(!draw); if (preview) void check({ draw: !draw }) }}><span /></button>
             <span className="st-hint">Draw mock screens by code: a slide whose scene describes a phone screen, an email, a placard or a form is drawn by the Studio (free, the exact words). Off: every slide is a photo made from its scene.</span>
           </label>
@@ -206,7 +206,7 @@ function ImportPlan({ characters, hasPosts, onImported }: { characters: Characte
                       <td>{short(r.format)}</td>
                       <td style={{ whiteSpace: 'nowrap' }}>{r.productFrom === 'row' ? r.product : r.product ? <span className="st-muted">{r.product} (plan)</span> : <span className="st-muted">{product ? 'None' : 'The plan\'s pick'}</span>}{r.ad ? <span className="st-chip xs" style={{ marginLeft: 6 }}>Ad</span> : null}</td>
                       <td style={{ maxWidth: 380 }}><span className="st-clamp1" title={r.hook}>{r.hook}</span></td>
-                      <td>{r.state === 'update' ? <span className="st-hint">Draft exists (updated)</span> : null}{[...r.warnings, ...r.lint].length ? <span className="st-lint compact" title={[...r.warnings, ...r.lint].join('\n')}>{[...r.warnings, ...r.lint].length} note{[...r.warnings, ...r.lint].length === 1 ? '' : 's'}</span> : null}</td>
+                      <td>{r.state === 'update' ? <span className="st-hint">A draft exists (updated)</span> : null}{[...r.warnings, ...r.lint].length ? <span className="st-lint compact" title={[...r.warnings, ...r.lint].join('\n')}>{[...r.warnings, ...r.lint].length} note{[...r.warnings, ...r.lint].length === 1 ? '' : 's'}</span> : null}</td>
                     </tr>
                   ))}
                 </tbody>
