@@ -262,7 +262,8 @@ describe('a finished job counts as running until its hook has run', () => {
     const plan: ProviderAdapter = { ...mock, async charges() { await look('charge'); return [] } }
     h = await createHarness({ overrides: { gen: { mock: plan } } })
     registerJobHook('test_checking', async () => { await look('hook') })
-    const spec: JobSpec = { ...img('a still on the plan path'), purpose: 'test_checking:plan', request: { ...img('a still on the plan path').request, billing: 'account' } as GenRequest }
+    const base = img('a still on the plan path') as Extract<JobSpec, { type: 'gen' }>
+    const spec: JobSpec = { ...base, purpose: 'test_checking:plan', request: { ...base.request, billing: 'account' } }
     const { rows } = await quoteAndRun(h, [spec])
     await drain(h)
     expect(seen).toEqual([{ at: 'charge', status: 'completed', phase: 'checking' }, { at: 'hook', status: 'completed', phase: 'checking' }])
