@@ -1,4 +1,4 @@
-import { expect, test, type Page, type TestInfo } from '@playwright/test'
+import { expect, test, type Locator, type Page, type TestInfo } from '@playwright/test'
 import { api, captionBlocks, clipBlocks, seedData, seedPost, seek, snap } from './helpers'
 import { editorReady, LIVE, startLive, type Live } from './r2'
 
@@ -72,8 +72,15 @@ const toFinish = async (page: Page, post: string) => {
   await page.goto(`${LIVE}/studio/posts/${post}?step=finish`)
   await page.locator('[data-field="post-timeline"]').waitFor({ timeout: 30_000 })
 }
+// The button in the middle of the screen, never under the post's sticky
+// step bar: Playwright scrolls a button only just into view, where the bar
+// can take the click (it opened the Caption step instead of the editor).
+async function clickClear(button: Locator) {
+  await button.evaluate(el => el.scrollIntoView({ block: 'center' }))
+  await button.click()
+}
 const openFromFinish = async (page: Page) => {
-  await page.locator('[data-field="post-timeline"]').getByRole('button', { name: /Open the editor/ }).click()
+  await clickClear(page.locator('[data-field="post-timeline"]').getByRole('button', { name: /Open the editor/ }))
   await page.waitForURL(/\/editor\/\?studio=/, { timeout: 30_000 })
 }
 
