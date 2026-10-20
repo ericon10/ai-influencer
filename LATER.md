@@ -182,6 +182,11 @@ bottom of the list they belong to.
   choice shows without opening More control.
 - The template check could offer "Add the missing sections" with the
   template's blank text, so the Brand card has every field to fill.
+- A real "Delete character" button (today Delete only archives): the
+  character, its sheet, candidates and jobs, files through the Trash,
+  spend history kept. Dani was removed by hand on 2026-10-20.
+- Fix the character creator gaps that left Dani half-built (revision 2,
+  3 failed heroes); she will be added again through the creator.
 
 ### Video, sound and the editor
 
