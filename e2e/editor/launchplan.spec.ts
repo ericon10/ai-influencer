@@ -224,7 +224,8 @@ test('Write 10 with Claude on a SideStep post, to THE STANDARD: a moment, a code
   // Swap with the alt hook (free).
   await hook.fill('applied for the job at 11:52pm. rejected at 2:14am.')
   await page.getByLabel('Alt hook').fill('job rejection at 2:14am. who is up doing this')
-  await expect(notes).toHaveCount(0)
+  // Only the line lint of every post may remain (no clear emotion, 2026-10-22).
+  await expect(notes).not.toContainText(/job word|dash|quoted|Slide 1 reads|Opens with/)
   await page.getByRole('button', { name: /Swap with the alt hook/ }).click()
   await expect(hook).toHaveValue('job rejection at 2:14am. who is up doing this')
   await expect(page.getByLabel('Alt hook')).toHaveValue('applied for the job at 11:52pm. rejected at 2:14am.')

@@ -35,7 +35,7 @@ async function openImport(page: Page, phone: boolean) {
   // Import a character file is the first choice in the header.
   const first = page.locator('.st-pagehead .st-btn').first()
   await expect(first).toHaveText('Import a character file')
-  await expect(page.locator('.st-pagehead .st-btn').nth(1)).toHaveText('Start from a concept')
+  await expect(page.locator('.st-pagehead .st-btn').nth(1)).toHaveText('New character')
   await press(first, phone)
   await expect(page.getByText('Import a character file', { exact: true }).last()).toBeVisible()
 }
