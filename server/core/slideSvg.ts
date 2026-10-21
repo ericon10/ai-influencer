@@ -31,7 +31,10 @@ export const DEFAULT_POS: SlidePos = { x: 0.5, y: 0.28 }
 // Over a special slide the words sit above the mock screen.
 export const SPECIAL_POS: SlidePos = { x: 0.5, y: 0.24 }
 
-const ASCENT = 0.93
+// The baseline sits this far (in font sizes) below the top of a line's
+// em box so the ink (caps and ascenders down to descenders) is centered on
+// the line: measured on TikTok Sans, where 0.93 drew every style low.
+const ASCENT = 0.78
 const esc = (s: string) => s.replace(/[<>&"]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' })[c]!)
 const num = (n: number) => (Math.round(n * 10) / 10).toString()
 
@@ -154,8 +157,8 @@ export function textLayout(style: TextStyleId, text: string, frame: Frame, pos: 
   const textW = Math.max(...lines.map(l => draw.measure(l, size, def.weight)))
   let bw: number, bh: number
   if (style === 'box') { const px = 26 * w / 1080, py = 12 * w / 1080; bw = textW + 2 * px; bh = lines.length * lineH + 2 * py }
-  else if (style === 'note') { const pad = 0.05 * w; bw = 0.84 * w; bh = noteHeader(w) + lines.length * lineH + 2 * pad }
-  else { bw = textW; bh = lines.length * lineH }
+  else if (style === 'note') { const pad = 0.05 * w; bw = 0.84 * w; bh = noteHeader(w) + lines.length * lineH + 2 * pad + NOTE_SHADOW.y * w }
+  else { const p = 2 * inkPad(style, size); bw = textW + p; bh = lines.length * lineH + p }
   const want = pos ?? fallback
   const minY = SAFE.top * h + bh / 2, maxY = (1 - SAFE.bottom) * h - bh / 2
   const minX = SAFE.side * w + bw / 2, maxX = (1 - SAFE.side) * w - bw / 2
@@ -169,6 +172,14 @@ export function textLayout(style: TextStyleId, text: string, frame: Frame, pos: 
 }
 
 const noteHeader = (w: number) => Math.round(0.07 * w)
+// What a style draws past its glyphs (Classic's outline, Minimal's
+// shadow), kept inside the block so nothing is drawn outside the box.
+const strokeW = (size: number) => size * 0.15
+const shadowOff = (size: number) => Math.max(1.5, size * 0.05)
+const inkPad = (style: TextStyleId, size: number) => (style === 'classic' ? strokeW(size) / 2 : style === 'minimal' ? shadowOff(size) : 0)
+// The Note card's drop shadow, inside the block too (the card is that
+// much smaller).
+const NOTE_SHADOW = { x: 0.006, y: 0.01 } as const
 
 // The text block as SVG over the whole frame.
 export function textSvg(l: TextLayout, frame: Frame, draw: Draw): string {
@@ -176,10 +187,10 @@ export function textSvg(l: TextLayout, frame: Frame, draw: Draw): string {
   const parts: string[] = []
   const cx = l.block.x + l.block.w / 2
   if (l.style === 'classic') {
-    const top = l.block.y
+    const top = l.block.y + inkPad('classic', l.size)
     l.lines.forEach((line, i) => {
       const y = top + i * l.lineH + (l.lineH - l.size) / 2 + l.size * ASCENT
-      parts.push(draw.text(line, cx, y, { size: l.size, weight: l.weight, fill: '#ffffff', anchor: 'middle', stroke: { color: '#000000', width: l.size * 0.15 } }))
+      parts.push(draw.text(line, cx, y, { size: l.size, weight: l.weight, fill: '#ffffff', anchor: 'middle', stroke: { color: '#000000', width: strokeW(l.size) } }))
     })
   } else if (l.style === 'box') {
     const px = 26 * w / 1080, py = 12 * w / 1080, r = 18 * w / 1080
@@ -193,16 +204,19 @@ export function textSvg(l: TextLayout, frame: Frame, draw: Draw): string {
       parts.push(draw.text(line, cx, y, { size: l.size, weight: l.weight, fill: '#000000', anchor: 'middle' }))
     })
   } else if (l.style === 'minimal') {
-    const off = Math.max(1.5, l.size * 0.05)
+    // The words sit a shadow's width in from the top left, the shadow
+    // that much down and right, both inside the block.
+    const off = shadowOff(l.size)
     l.lines.forEach((line, i) => {
-      const y = l.block.y + i * l.lineH + (l.lineH - l.size) / 2 + l.size * ASCENT
+      const y = l.block.y + off + i * l.lineH + (l.lineH - l.size) / 2 + l.size * ASCENT
       parts.push(draw.text(line, cx + off * 0.6, y + off, { size: l.size, weight: l.weight, fill: '#000000', anchor: 'middle', opacity: 0.38 }))
-      parts.push(draw.text(line, cx, y, { size: l.size, weight: l.weight, fill: '#ffffff', anchor: 'middle' }))
+      parts.push(draw.text(line, cx - off * 0.3, y, { size: l.size, weight: l.weight, fill: '#ffffff', anchor: 'middle' }))
     })
   } else {
     const pad = 0.05 * w, r = 0.035 * w, head = noteHeader(w)
-    const { x, y, w: bw, h: bh } = l.block
-    parts.push(`<rect x="${num(x + 0.006 * w)}" y="${num(y + 0.01 * w)}" width="${num(bw)}" height="${num(bh)}" rx="${num(r)}" fill="#000000" fill-opacity="0.18"/>`)
+    const { x, y } = l.block, sx = NOTE_SHADOW.x * w, sy = NOTE_SHADOW.y * w
+    const bw = l.block.w - sx, bh = l.block.h - sy
+    parts.push(`<rect x="${num(x + sx)}" y="${num(y + sy)}" width="${num(bw)}" height="${num(bh)}" rx="${num(r)}" fill="#000000" fill-opacity="0.18"/>`)
     parts.push(`<rect x="${num(x)}" y="${num(y)}" width="${num(bw)}" height="${num(bh)}" rx="${num(r)}" fill="#fffdf6"/>`)
     parts.push(`<rect x="${num(x)}" y="${num(y + head)}" width="${num(bw)}" height="1.5" fill="#e8e1cc"/>`)
     const hs = Math.round(0.03 * w)

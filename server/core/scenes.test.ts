@@ -210,9 +210,10 @@ describe('reference picker by angle (SPEC 5.2 rule 14)', () => {
   })
 
   it('always has the chest-up face ref, then the closest angle, the body and the expression', () => {
-    // Waist-up gets face refs only: a full-body sheet shot drags the sheet
-    // outfit into a closer shot (the owner's first real run, 2026-10-14).
-    expect(pickSceneRefs(sheet.shots, views, allApproved, market, scenes).map(r => r.refId)).toEqual(['REF-00', 'REF-01', 'REF-10'])
+    // Waist-up gets no full-body sheet shot (it drags the sheet outfit into
+    // a closer shot, the owner's first real run, 2026-10-14), only the
+    // waist-up build ref closest to its angle (REF-13 for three-quarter).
+    expect(pickSceneRefs(sheet.shots, views, allApproved, market, scenes).map(r => r.refId)).toEqual(['REF-00', 'REF-01', 'REF-13', 'REF-10'])
     expect(pickSceneRefs(sheet.shots, views, allApproved, { ...market, framing: 'knees_up' }, scenes).map(r => r.refId)).toEqual(['REF-00', 'REF-01', 'REF-07', 'REF-10'])
     expect(pickSceneRefs(sheet.shots, views, allApproved, { view: 'front', framing: 'chest_up', expression: 'neutral' }, scenes).map(r => r.refId)).toEqual(['REF-00'])
     expect(pickSceneRefs(sheet.shots, views, allApproved, { view: 'back', framing: 'full_body', expression: 'neutral' }, scenes).map(r => r.refId)).toEqual(['REF-00', 'REF-05', 'REF-08'])

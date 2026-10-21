@@ -65,7 +65,10 @@ slideshow:
   # (a topic slideshow, or a shot with no person) uses the cheapest of
   # these that the path can run, priced from the price book at the
   # Standard level (GPT Image 2.5 Flare today: 1 credit, or $0.0625).
-  empty_still_models: [higgsfield/gpt-image-2.5-flare, higgsfield/nano-banana-2.1, higgsfield/soul-2]
+  # Soul 2.0 is left out (2026-10-22): it is cheaper on the plan (0.12
+  # credits) but takes no reference image, so it cannot hold a set's look
+  # picture (the same place in every photo).
+  empty_still_models: [higgsfield/gpt-image-2.5-flare, higgsfield/nano-banana-2.1]
   max_variations: 5
   batch_max: 10
   # Mock screens (special slides) never show a real brand: each name here

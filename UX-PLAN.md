@@ -1425,13 +1425,26 @@ and LATER.md, never into the build.
 | 4 | Faceless characters | Characters (Person or Faceless first), the post workspace | A faceless character's file (persona, place bank, look rules, voice and line formats, sound bank); its stills follow the faceless still rules (no person or body part, no text-carrying objects, a plain level upright phone snapshot, the fixed ending "Level, unedited. Sharp, real phone grain, muted color. No people.", Soul 2.0, 9:16); no hero, sheet, likeness gates, Element or face checks; posts use the same workspace (Still, Video, Sound, Text, Posted); products switch to an edit model; plan rows route to it; each account links to one character; voiceover clips (only if a source allows automated access); the "Finished damage" recipe |
 | 5 | Line lint | Every on-screen line and slide 1 | Flags a line that reads as setup instead of a hit in its first words, or carries no clear emotion (angry, infuriated, sad, frustrated). Shows the flag, never blocks, free |
 
-### Tier 2: importer and quality
+### Tier 2: importer and quality (planned 2026-10-22)
 
-Items 6 to 17 of the owner's list (the scene from new CSV columns, Stills
-on kept, captions off faces on stills and video, drawn screens from text
-lines, slide image columns, mixed framing, the slide's image line wins,
-Punch up, SideStep lines need a screenshot, the free pre-check, the Notes
-badge and the "need to" lint). Each is planned here before it is built.
+Applies to every product, character and account (rule two): the columns,
+checks and placement are neutral; nothing is SideStep-only except item 15,
+which reads the product's name from the line.
+
+| # | What | Where | Plan |
+|---|---|---|---|
+| 6 | Scene from CSV columns | Plan CSV import | New optional columns `place`, `light`, `outfit`, `detail_1`, `detail_2` fill the post's scene lock (place, light, outfit, details) over what the `scene` cell says. Feeder (topic) rows may leave them blank; a character row needs an outfit (item 16) |
+| 7 | Stills on kept | Plan page, Import | The preview's "Stills on" pick is sent with the import and saved on every imported post (`spec.stillPath`); Generate N right after the import uses it |
+| 8 | Captions off faces, stills (R1) | Slide cards, slideshow export | A free face pass on each slide still finds the face boxes; the words go in the largest clear band of the safe zone that misses every face box grown by 4%: above first, then below, then one size smaller, last a box under the chin. Runs when a still lands, on a style change and after import; "Auto-place all" on the slideshow; a slide the owner dragged keeps its place; topic slides with no face keep theirs. Character still prompts add "Leave clear space in the top third of the frame for a caption." |
+| 9 | Captions off faces, video (R1) | Video post caption, editor preview | Faces sampled about every 0.5 s across the clip, the union of their boxes; the caption goes in the clear band inside TikTok's safe zone, else under the chin above the buttons zone. The preview shows the face boxes |
+| 10 | Drawn screens from text lines | Plan import, slides | A slide line that is mostly on-screen text (a job posting, an email, a text thread, a bank app) becomes that drawn screen automatically, its fields filled from the line, with generic company names, on every slideshow (no longer topic-only) |
+| 11 | Slide image columns | Plan CSV import | `slide_1_image` to `slide_6_image` are each slide's own image line |
+| 12 | Mixed framing | Character slideshows | Character slides rotate framing: close-up, mid, wide, hands only, over the shoulder (a default the owner can change per slide) |
+| 13 | The slide's image line wins | Character slide prompts | A slide with its own image line sends it as written with only the REFERENCE line, the 21+ line, the outfit lock, the mark line and REALISM; no generic background, expression, camera or hair lines; no "same place in every photo" when the outfit lock says the place changes; `lock.place` carries only outfit and hair |
+| 14 | Punch up | Import preview and each slideshow | A priced Claude call rewrites thin image lines to the density rule (a named camera, 3 to 5 specific objects, one background person or motion, mixed real light, mid-action), shows before and after, applies on OK |
+| 15 | Product screenshot lines | Slides | An image line naming the product (SideStep) is marked "needs Eric's screenshot": never generated, never priced |
+| 16 | Free pre-check | Plan preview and Generate N | Blocks a character row with no outfit and a slide with no shot line, named with the fix; free |
+| 17 | Notes badge, "need to" lint | Plan rows | The notes badge opens its list on tap; the "need to" (values) lint flags only lines aimed at "you" |
 
 ### Built in this run (2026-10-22)
 
@@ -1466,3 +1479,31 @@ badge and the "need to" lint). Each is planned here before it is built.
   (a scene whose moment is Caught you) keeps them. Multi Shot is not
   offered yet: no model in `config/models.yaml` documents it.
 - **Tier 2**: not started in this run.
+
+### Follow-ups built (2026-10-22, second run)
+
+- **3e**: built. REF-12 (front waist-up) and REF-13 (three-quarter
+  waist-up) are optional sheet shots with a `waist_up` framing (3:4),
+  their own prompt lines and mark checks; a character turns them on with
+  "Build refs" on its sheet (`PUT /characters/:id/build-refs`). A
+  waist-up scene gets the build ref closest to its angle. Elements stay
+  made on Higgsfield: the character file names one or more Element IDs,
+  each with the REFs that built it (`refs`).
+- **4j for person characters**: built. "Finished damage" is a switch on
+  any person video post (one still, a 7 s just-existing take prefilled in
+  the Video step, the sad song noted, the line).
+- **Sound drawer** (replaces 4i): the sound's name and the voiceover's
+  search words with Copy, and PlayPhrase.me and GetYarn.io buttons that
+  open their search in a new tab with the words filled in. No scraping,
+  no downloads. post.json has `sound_to_add` and the Download day
+  checklist says "Add this sound in the app".
+- **Slideshow text styles**: checked with the bundled fonts. Classic and
+  Minimal drew their words low (descenders, the outline and the shadow
+  past the box) and the Note card's shadow fell outside it. Every style
+  now draws inside its box, words centered on their lines
+  (`server/media/slideBox.test.ts`).
+- **Text presets for 9:16**: every editor Text preset is sized for a
+  1080x1920 frame and scaled to the post's height when added (size,
+  outline, spacing, shadow); Caption is 56 px on a 9:16 post, was 24.
+- **Price book**: a Soul 2.0 still is 0.12 plan credits, confirmed from
+  the account's transactions of 2026-10-21.

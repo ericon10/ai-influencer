@@ -6,7 +6,8 @@ import { captionBlock, captionBlocks, centerOf, countColor, deselect, frame, inl
 // drew the words above their selection box and left the box empty below.
 // Now the words render inside their box, a two-line caption grows the box,
 // one click selects, a drag moves, a second click or typing edits in place,
-// and a double-click edits too. Every Text preset is checked on a 9:16 post.
+// and a double-click edits too. Every Text preset is checked on a 9:16 post,
+// and each is sized relative to the frame's height so it reads on a phone.
 
 const PRESETS: Array<{ name: string; text: string }> = [
   { name: 'Heading', text: 'Heading' },
@@ -60,6 +61,11 @@ test.describe('text presets', () => {
       // The words are drawn in the box, not above it.
       expect(ink.inside).toBeGreaterThan(15)
       expect(ink.above).toBeLessThan(ink.inside * 0.25)
+      // Sized for the 9:16 frame (owner, 2026-10-22): every preset is at
+      // least 2.5% of the frame's height, so it reads on a phone (Caption
+      // was 24 px, 1.5%, before).
+      const f = await frame(page)
+      expect(ink.box.height / f.height).toBeGreaterThanOrEqual(0.025)
     })
   }
 

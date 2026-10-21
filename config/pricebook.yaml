@@ -33,7 +33,7 @@ entries:
   - { provider: higgsfield, model: nano-banana-2.1, unit: image, price: 0.15, verified: false, credits: 2, credits_verified: true, when: { resolution: 2k }, source: "2 plan credits per image at 2k: the Studio's Nano Banana 2.1 runs at 2k in the account's transactions (2026-10-13)." }
   - { provider: higgsfield, model: nano-banana-2.1, unit: image, price: 0.15, verified: false, credits: 4, source: "Placeholder credits above 2k." }
   - { provider: higgsfield, model: nano-banana-2, unit: image, price: 0.12, verified: false, credits: 3, source: "Placeholder credits." }
-  - { provider: higgsfield, model: soul-2, unit: image, price: 0.10, verified: false, credits: 3, source: "Placeholder credits." }
+  - { provider: higgsfield, model: soul-2, unit: image, price: 0.10, verified: false, credits: 0.12, credits_verified: true, source: "0.12 plan credits a still: every Soul 2.0 spend in the account's transactions on 2026-10-21. Dollars on the API are a placeholder, not yet confirmed by an API run." }
   - { provider: higgsfield, model: bytedance-upscale, unit: image, price: 0.10, verified: false, credits: 2, credits_verified: true, source: "2 credits at 2k, verified live 2026-10-12" }
   # Video, per second. Official prices from open.higgsfield.ai/pricing (read
   # by the owner 2026-10-12). "From" prices are starting tiers: they stay

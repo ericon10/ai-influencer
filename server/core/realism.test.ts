@@ -45,7 +45,7 @@ describe('REALISM block', () => {
       ...buildHeroPrompts(templates, views, callie),
       ...sheet.shots.filter(s => s.source !== 'hero').map(s => buildSheetPrompt(templates, views, s, callie)),
     ]
-    expect(prompts).toHaveLength(3 + 11)
+    expect(prompts).toHaveLength(3 + 13)
     // Reference images keep their plain gray background, so the block's
     // background clause is left out of hero and sheet prompts only.
     const reference = 'REALISM: Candid phone photo, natural skin texture with visible pores, small imperfections, no retouching, not a professional shoot.'

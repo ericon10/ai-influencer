@@ -43,6 +43,6 @@ describe('reference sheet graph', () => {
     expect(nextUp(shots, states)).toBeNull()
     states = set(states, 'REF-04', 'approved')
     expect(nextUp(shots, states)).toMatchObject({ shot: { id: 'REF-05' }, action: 'recheck' })
-    expect(sheetProgress(shots, states)).toMatchObject({ approved: 10, stale: 2, complete: false })
+    expect(sheetProgress(shots, states)).toMatchObject({ approved: 12, stale: 2, complete: false })
   })
 })

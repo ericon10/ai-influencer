@@ -120,9 +120,10 @@ export function pickSceneRefs(shots: SheetShot[], views: ViewsConfig, approved: 
     : undefined
   add(sameView && approved.has(sameView.id) ? sameView : sameSide, 'angle')
   // The build refs (REF-12, REF-13; item 3e, 2026-10-22): a waist-up or
-  // knees-up scene gets the build ref closest to its angle, when one is
-  // approved, so the model's build carries without the sheet's jeans.
-  if (f.framing === 'waist_up' || f.framing === 'knees_up') {
+  // knees-up scene with no full-body ref gets the build ref closest to its
+  // angle, when one is approved, so the model's build carries without the
+  // sheet's jeans (a framing that gets a full-body ref keeps its slots).
+  if ((f.framing === 'waist_up' || f.framing === 'knees_up') && !sc.settings.body_ref_framings.includes(f.framing)) {
     const builds = shots.filter(s => s.framing === 'waist_up' && approved.has(s.id))
     add(builds.find(s => s.view === f.view) ?? (view && view.turn !== 'none' ? builds.find(s => views.views[s.view]?.turn !== 'none') : undefined) ?? builds[0], 'body')
   }
