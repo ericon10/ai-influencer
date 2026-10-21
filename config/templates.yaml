@@ -316,9 +316,9 @@ prompt_writer:
     You write the prompt for an image-to-video model that turns a still
     photo of {name}, an original, fictional adult character, into a
     believable phone video. The attached still is the first frame{end_frame}.
-    Direct a real recording: who records it, the ordinary task, the one
-    thing that interrupts it, the small reaction, and the return to the
-    task. Write exactly these labeled lines, each on its own line, in this
+    Direct a real recording: who records it and what happens, beat by
+    beat, with as many actions, camera moves and shots as the idea needs.
+    {recipe}Write exactly these labeled lines, each on its own line, in this
     order, and nothing before or after them:
     FORMAT: (the Studio fills this line in)
     SUBJECT: {name} exactly as in the start frame: the same face, hair and
@@ -331,8 +331,7 @@ prompt_writer:
     CAMERA: who records, the front or rear camera, the position and the
     distance; small human hand movement; one or two cause-and-effect
     imperfections (an event, the camera's response, the recovery).
-    ACTION: the ordinary task, then one trigger, a small reaction, and the
-    return to the task, in order, with rough timing.
+    ACTION: what happens, in order, with rough timing.
     CONTINUITY: hands and props: contact before anything moves, the same
     grip, where each thing ends up and stays.
     AUDIO: (the Studio fills this line in)
@@ -340,8 +339,9 @@ prompt_writer:
     {directors_pass}
     Rules:
     - {min} to {max} words in all. Present tense.
-    - Calm, natural motion keeps the face steady: small movements, no fast
-      turns, no talking, singing or shouting.
+    - Protect {name}'s face: same face and outfit as the start frame, the
+      face clear and in focus whenever it is in frame; no talking, singing
+      or shouting.
     - These directions are added after your text, so never contradict
       them: {directions}
     - Never describe {name}'s face, eyes, hair color or skin, and never
@@ -360,7 +360,13 @@ prompt_writer:
     Write the labeled lines.
   # The two lines the Studio always writes itself (defaults: 9:16, sound
   # off unless the owner turns it on).
-  video_format: "FORMAT: {duration} s, {aspect}, live-action personal phone video, one continuous take, no cuts."
+  video_format: "FORMAT: {duration} s, {aspect}, live-action personal phone video."
+  # Rule R3 (owner, 2026-10-22): the one-action, calm, one-camera-move rules
+  # live only in the "Caught you" recipe (a scene whose moment is Caught
+  # you). Every other clip keeps only: start from the approved still, the
+  # same face and outfit, protect the face.
+  video_recipe_caught_you: "This is the \"caught you\" recipe: one ordinary task, one thing that interrupts it, a small calm reaction (noticing the camera and looking into the lens), and the return to the task; calm, natural motion, small movements, no fast turns, one camera move only, one continuous take with no cuts. "
+  video_format_caught_you: "FORMAT: {duration} s, {aspect}, live-action personal phone video, one continuous take, no cuts."
   video_audio_off: "AUDIO: Sound off: silent, no dialogue, no music."
   video_audio_on: "AUDIO: Phone-microphone sound: natural location ambience and small sounds with their visible causes, no added music."
   # Chaining: the writer is told the take continues the last one.
@@ -386,7 +392,7 @@ prompt_writer:
     moment the viewer remembers; the hook in the first second (motion,
     angle, face); the payoff in the last 2 seconds (a look to the lens, a
     reveal, a laugh, a punchline); what the camera reveals and when, with
-    one move only (a push in, a pan or a pull back); depth (a foreground
+    as many moves or shots as it needs; depth (a foreground
     element, {name}, life in the background); motivated light that sets the
     mood; one contrast (still against moving, calm against busy). Return
     them as "notes": one short line such as "Moment: ... · Hook: ... ·

@@ -1,4 +1,4 @@
-import type { ActionPreview, CharacterSummary, CharacterView, HiggsfieldAccount, JobView, Me, QuoteView, RulesView, SceneFields, ScenesData, SettingsView, StudioAction, Usage, VideoPrice, BrollClip, ContentData, ContentKind, LibraryData, PostStep, WorkerStatus, CloneOptions, CloneResult, CloneSource, CloneStill, CutView, SoundItem, EditorStyle, ImportPreview, VoiceLine, ProductSummary, ProductView, ProductClaims, KitGroup, SocialAccount, SentView, RecreateBatchView, GateCheckView, StorageInfo, TrashRef, TrashItem, ContentItem, AutoCleanItem, BrandLayer, TemplateReport, SlideFamily, ReuseReport, SlideBatch, StillChoice, SlideScene, SlideStillOptions, StillPathId, PlanPreview, PlanPostView, PlanImportResult, PostResults, ResultsCsvPreview, ResultsView, PostingDayView, LibraryItemInfo, LibraryCollection } from './types'
+import type { ActionPreview, CharacterSummary, CharacterView, HiggsfieldAccount, JobView, Me, QuoteView, RulesView, SceneFields, ScenesData, SettingsView, StudioAction, Usage, VideoPrice, BrollClip, ContentData, ContentKind, LibraryData, PostStep, WorkerStatus, CloneOptions, CloneResult, CloneSource, CloneStill, CutView, SoundItem, EditorStyle, ImportPreview, VoiceLine, ProductSummary, ProductView, ProductClaims, KitGroup, SocialAccount, SentView, RecreateBatchView, GateCheckView, StorageInfo, TrashRef, TrashItem, ContentItem, AutoCleanItem, BrandLayer, TemplateReport, SlideFamily, ReuseReport, SlideBatch, StillChoice, SlideScene, SlideStillOptions, StillPathId, PlanPreview, PlanPostView, PlanImportResult, PostResults, ResultsCsvPreview, ResultsView, PostingDayView, LibraryItemInfo, LibraryCollection, FacelessFile, FacelessPreview, FacelessImportResult } from './types'
 import { sheetRefOf, typeOf, uploadFiles } from './files'
 
 // Thin client for /api/v1. Every write sends the CSRF header the server
@@ -37,10 +37,17 @@ export const api = {
   logout: () => request<{ ok: true }>('POST', '/auth/logout', {}),
 
   characters: () => request<{ characters: CharacterSummary[] }>('GET', '/characters'),
-  createCharacter: (name: string) => request<{ id: string }>('POST', '/characters', { name }),
+  createCharacter: (name: string, o: { kind?: 'person' | 'faceless'; template?: 'doug' | null } = {}) => request<{ id: string }>('POST', '/characters', { name, ...o }),
+  saveFaceless: (id: string, file: FacelessFile) => request<CharacterView>('PUT', `/characters/${id}/faceless`, { file }),
   character: (id: string) => request<CharacterView>('GET', `/characters/${id}`),
   updateCharacter: (id: string, patch: Record<string, unknown>, reason = 'edited') => request<CharacterView>('PATCH', `/characters/${id}`, { patch, reason }),
-  archiveCharacter: (id: string) => request<{ ok: true }>('DELETE', `/characters/${id}`),
+  archiveCharacter: (id: string) => request<{ ok: true; trashIds: string[] }>('DELETE', `/characters/${id}`),
+  // One reference image by hand (2026-10-22): add or replace (REF-00 is the hero), or remove.
+  setRefImage: async (id: string, refId: string, file: File) => {
+    const [up] = await uploadFiles([file])
+    return request<{ refId: string; unchanged: boolean; checkJobId: string | null; view: CharacterView }>('POST', `/characters/${id}/refs/${refId}`, { uploads: [up] })
+  },
+  clearRefImage: (id: string, refId: string) => request<{ view: CharacterView }>('DELETE', `/characters/${id}/refs/${refId}`),
   addInspiration: async (id: string, file: File) => {
     const [up] = await uploadFiles([file])
     return request<{ assetId: string }>('POST', `/characters/${id}/inspirations`, { uploads: [up] })
@@ -180,6 +187,8 @@ export const api = {
   // The launch plan (section 28).
   planPreview: (csv: string, o: { drawSpecials?: boolean; store?: Record<string, string>; path?: StillPathId | null; productId?: string | null } = {}) => request<PlanPreview>('POST', '/plan/preview', { csv, ...o }),
   planImport: (csv: string, o: { drawSpecials?: boolean; store?: Record<string, string>; productId?: string | null; rows: string[]; existing?: 'replace' | 'add' }) => request<PlanImportResult>('POST', '/plan/import', { csv, ...o }),
+  facelessPreview: (csv: string, o: { characterId?: string | null; accountTag?: string | null } = {}) => request<FacelessPreview>('POST', '/faceless/preview', { csv, ...o }),
+  facelessImport: (csv: string, o: { characterId?: string | null; accountTag?: string | null; rows: string[]; existing?: 'replace' | 'add' }) => request<FacelessImportResult>('POST', '/faceless/import', { csv, ...o }),
   planClear: (o: { scope: 'all' | 'empty' | 'ids'; planId?: string | null; ids?: string[]; dryRun?: boolean }) => request<{ posts: number; withPictures: number; trashed: number }>('POST', '/plan/clear', o),
   plan: () => request<{ posts: PlanPostView[]; running: number }>('GET', '/plan'),
   saveSlideStillPath: (path: StillPathId) => request<{ ok: true }>('PUT', '/slideshow/still-model', { path }),

@@ -267,8 +267,12 @@ video:
   aspect: "9:16"
   max_takes: 4
   takes: 1
-  # Directions added to every video prompt (editable per clip).
-  directions: "No talking, no winking, steady eye contact. One continuous take, no cuts."
+  # Directions added to every video prompt (editable per clip). Rule R3
+  # (owner, 2026-10-22): only the start still, the same face and outfit and
+  # a protected face; the calm, one-take lines belong to the "Caught you"
+  # recipe alone (directions_caught_you).
+  directions: "Same face and outfit as the start frame. Keep the face clear and in focus."
+  directions_caught_you: "No talking, no winking, steady eye contact. One continuous take, no cuts."
   # Optional, off by default: a cheap motion check for complex movement.
   test: { model: higgsfield/kling-3.0-turbo, duration: 5, resolution: 720p, label: "Quick motion test", note: "Faces not representative" }
   # "Upscale this take": the exact take, never re-rolled.

@@ -530,6 +530,24 @@ rules:
     title: 'A product post''s last slide never promises replies or applying'
     check: { type: behavior }
     message: 'On a product post, a last slide that says ghosted, passed over or applies for you gets a free warning: the product cannot promise replies and never submits for anyone. The honest endings are in THE STANDARD. SideStep''s rules: on posts whose product uses them only (section 29).'
+  - id: lint-hit-first
+    bucket: default
+    area: copy
+    spec: "35"
+    # Owner, 2026-10-22: "flag lines that read as setup instead of a hit in
+    # the first words". UX-PLAN section 35, item 5.
+    title: 'The line opens on the hit, not the setup'
+    check: { type: behavior }
+    message: 'Slide 1 or a video''s on-screen line that opens on a setup ("So I", "When", "Story time", "POV") with no feeling in its first words gets a free warning: put the hit first. Shown, never blocking; on every post, any product.'
+  - id: lint-emotion
+    bucket: default
+    area: copy
+    spec: "35"
+    # Owner, 2026-10-22: "or carry no clear emotion (angry, infuriated, sad,
+    # frustrated)". UX-PLAN section 35, item 5.
+    title: 'The line carries a clear emotion'
+    check: { type: behavior }
+    message: 'Slide 1 or a video''s on-screen line with no clear emotion word (angry, infuriated, sad, frustrated and the like, config/content.yaml copy_lint) gets a free warning. Shown, never blocking; on every post, any product.'
   - id: structure-repeat
     bucket: default
     area: copy

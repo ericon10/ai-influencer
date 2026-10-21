@@ -17,8 +17,9 @@ test('a video post with No product gets the dash check only; picked as SideStep,
   await page.goto(`/studio/posts/${id}`)
   const caption = page.getByLabel('Caption', { exact: true })
   await expect(caption).toHaveValue('Do boys even know what it\'s like to be a girl?', { timeout: 30_000 })
-  // No product: no "No job word", nothing of SideStep.
-  await expect(page.locator('[data-field="hook-lint"]')).toHaveCount(0)
+  // No product: no "No job word", nothing of SideStep (the line lint of
+  // every post may note the missing emotion, 2026-10-22).
+  await expect(page.locator('[data-field="hook-lint"]')).not.toContainText(/job|dash|should/)
   await snap(page, info, 'no product: no SideStep notes under the caption')
   // The long dash check runs on every post.
   await caption.fill(`Do boys even know ${String.fromCharCode(0x2014)} what it's like`)

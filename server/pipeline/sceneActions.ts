@@ -61,7 +61,7 @@ export function lintOrThrow(violations: RuleViolation[], label: string): RuleVio
   return violations.filter(v => v.severity === 'warning')
 }
 
-function modelEntry(deps: Deps, ref: string): ModelEntry {
+export function modelEntry(deps: Deps, ref: string): ModelEntry {
   const m = deps.config.models.models.find(x => x.ref === ref)
   if (!m) throw new AppError('bad_request', `Unknown model "${ref}".`)
   return m
@@ -308,13 +308,16 @@ export async function buildScenePromptWrite(deps: Deps, ctx: Ctx, row: Character
   if (motion.length < 3) throw new AppError('invalid_request', 'Say what happens in the clip first.')
   const start = input.startCandidateId ? await getCandidate(deps, ctx, input.startCandidateId) : null
   if (start && (start.sceneId !== scene.id || !start.assetId || isVideoCandidate(start))) throw new AppError('bad_request', 'The start frame must be a still from this scene.')
-  const directions = (input.directions ?? sc.video.directions).trim()
+  // Rule R3 (owner, 2026-10-22): the calm, one-take lines only for the
+  // "Caught you" recipe; every other clip is free in its shots.
+  const caughtYou = f.momentType === 'caught_you'
+  const directions = (input.directions ?? (caughtYou ? sc.video.directions_caught_you ?? sc.video.directions : sc.video.directions)).trim()
   // The guide's labeled lines (owner, 2026-10-13). The start frame shows the
   // place and the look, so the writer gets the idea and only the scene's
   // task, trigger, camera and light; the Studio writes FORMAT (9:16 by
   // default) and AUDIO (sound off unless turned on) itself.
   const range = sc.settings.prompt_words.video
-  const system = withStack(fill(t.prompt_writer.video_system, { ...pv, name: ch.name, min: String(range[0]), max: String(range[1]), directions, end_frame: input.endCandidateId ? t.prompt_writer.end_frame : '', directors_pass: pass }))
+  const system = withStack(fill(t.prompt_writer.video_system, { ...pv, name: ch.name, min: String(range[0]), max: String(range[1]), directions, end_frame: input.endCandidateId ? t.prompt_writer.end_frame : '', directors_pass: pass, recipe: caughtYou ? t.prompt_writer.video_recipe_caught_you : '' }))
   let facts = videoWriterFacts(t, sc, views, f, ch)
   // Chaining: a start frame taken from a kept clip continues that shot.
   if (start?.op === 'last_frame' && start.parentId) {
@@ -323,7 +326,7 @@ export async function buildScenePromptWrite(deps: Deps, ctx: Ctx, row: Character
     facts = `${facts}\n${fill(t.prompt_writer.continue_facts, { previous: text }).trim()}`
   }
   const prompt = fill(t.prompt_writer.video_prompt, { motion, facts })
-  const format = fill(t.prompt_writer.video_format, { duration: String(input.durationSec ?? sc.video.duration), aspect: input.aspect ?? sc.video.aspect })
+  const format = fill(caughtYou && t.prompt_writer.video_format_caught_you ? t.prompt_writer.video_format_caught_you : t.prompt_writer.video_format, { duration: String(input.durationSec ?? sc.video.duration), aspect: input.aspect ?? sc.video.aspect })
   const audio = input.audio ? t.prompt_writer.video_audio_on : t.prompt_writer.video_audio_off
   return llm(system, prompt, { imageAssetIds: start?.assetId ? [start.assetId] : [], meta: { motion, directions, format, audioLine: audio, mockPrompt: mockWrittenPrompt('video', { motion, name: ch.name, subj: ch.pronouns.subj, poss: ch.pronouns.poss, format, audio }, range) } })
 }

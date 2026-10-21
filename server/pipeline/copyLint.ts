@@ -1,5 +1,5 @@
 import type { Ctx, Deps } from '../context.js'
-import { LINT_RULE_IDS, type LintLists } from '../core/copyLint.js'
+import { DEFAULT_LINT_LISTS, LINT_RULE_IDS, type LintLists } from '../core/copyLint.js'
 import { listCharacters } from './characters.js'
 import { switchesReader } from './rules.js'
 
@@ -12,7 +12,7 @@ export const LINT_SWITCH_IDS = [...LINT_RULE_IDS, 'structure-repeat'] as const
 
 export function lintLists(deps: Deps): LintLists {
   const cl = deps.config.pipeline.content.copy_lint
-  return { values: cl.values, hype: cl.hype, products: cl.products, maxHashtags: cl.max_hashtags, hookMaxWords: cl.hook_max_words, hookLabels: cl.hook_labels, jobWords: cl.job_words, endingNever: cl.ending_never }
+  return { values: cl.values, hype: cl.hype, products: cl.products, maxHashtags: cl.max_hashtags, hookMaxWords: cl.hook_max_words, hookLabels: cl.hook_labels, jobWords: cl.job_words, endingNever: cl.ending_never, setupOpeners: cl.setup_openers ?? DEFAULT_LINT_LISTS.setupOpeners, emotionWords: cl.emotion_words ?? DEFAULT_LINT_LISTS.emotionWords }
 }
 
 export async function lintSettings(deps: Deps, ctx: Ctx): Promise<{ lists: LintLists; off: string[]; offFor: Record<string, string[]> }> {

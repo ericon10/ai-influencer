@@ -298,6 +298,10 @@ const memeSpec = z.object({
   plan: planMetaSchema,
   // Section 32: what the post did once posted. Never copied.
   results: resultsSchema.nullable().default(null),
+  // A faceless character's post (UX-PLAN.md section 35, item 4): the place,
+  // the still's line, a product, the video prompt, the post's caption and
+  // hashtags, the sound picks, Posted (server/pipeline/faceless.ts reads it).
+  faceless: z.record(z.string(), z.unknown()).nullable().default(null),
   // Section 33: Approve for posting, its own day and slot, the Download day
   // zip it went into. Never copied.
   posting: postingSchema.nullable().default(null),

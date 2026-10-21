@@ -12,6 +12,7 @@ import type { CharacterSummary, PlanImportResult, PlanPostView, PlanPreview, Sti
 import { StillPaths } from './post/slideshow/StillPaths'
 import { SelectAllBox, SelectBox, SelectionCount, useSelection } from '../select'
 import { useIncoming, type Incoming } from '../importDoor'
+import { FacelessImport } from './FacelessImport'
 
 // Posts home > Launch plan (owner, 2026-10-16; UX-PLAN.md section 28): the
 // plan's CSV, previewed for free (rows by day and account, errors, what
@@ -80,7 +81,8 @@ export function PlanCard({ characters }: { characters: CharacterSummary[] }) {
       </div>
       {open && (
         <div className="st-card-body st-col" style={{ gap: 14 }}>
-          <ImportPlan key={incoming?.at ?? 0} incoming={incoming} characters={characters} hasPosts={posts.length > 0} onImported={() => void qc.invalidateQueries({ queryKey: ['plan'] })} />
+          {incoming?.kind === 'faceless' && <FacelessImport key={incoming.at} incoming={incoming} onImported={() => void qc.invalidateQueries({ queryKey: ['plan'] })} />}
+          {incoming?.kind !== 'faceless' && <ImportPlan key={incoming?.at ?? 0} incoming={incoming} characters={characters} hasPosts={posts.length > 0} onImported={() => void qc.invalidateQueries({ queryKey: ['plan'] })} />}
           {posts.length > 0 && <PlanPosts posts={posts} />}
         </div>
       )}

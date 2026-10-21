@@ -198,6 +198,9 @@ function useOlderPosts(first: string | null, lastListed: string | null, tag: str
 function cover(item: ContentItem, lib: LibraryData | undefined): { video?: string; image?: string } {
   const o = item.outputs
   if (o.imageAssetIds?.[0]) return { image: o.imageAssetIds[0] }
+  // A faceless post shows its still (section 35, item 4e).
+  const faceless = (item.spec as { faceless?: { stillAssetId?: string } | null }).faceless
+  if (faceless?.stillAssetId) return { image: faceless.stillAssetId }
   const clipId = item.kind === 'meme' ? (item.spec as unknown as MemeSpec).clipId : item.kind === 'batch' ? (item.spec as unknown as BatchSpec).clipIds?.[0] : null
   const clip = clipId ? lib?.clips.find(c => c.id === clipId) : undefined
   if (clip?.posterId) return { image: clip.posterId }

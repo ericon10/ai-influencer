@@ -1,4 +1,6 @@
 import { Hono, type Context } from 'hono'
+import { importFacelessPlan, previewFacelessPlan } from '../pipeline/facelessImport.js'
+import { createFacelessCharacter, saveFaceless } from '../pipeline/faceless.js'
 import { z } from 'zod'
 import { and, desc, eq, gt, inArray, or } from 'drizzle-orm'
 import type { Ctx, Deps, Principal } from '../context.js'
@@ -50,7 +52,7 @@ import { rulesView, setRuleSwitch } from '../pipeline/rules.js'
 import { chooseConcept } from '../pipeline/concepts.js'
 import { approveCandidate, keepStale, pickHero, rejectCandidate, reopenCandidate, setFavorite, mirrorCandidate } from '../pipeline/review.js'
 import { isValidEndpoint, MODEL_OVERRIDES_KEY, readModelOverrides } from '../providers/modelOverrides.js'
-import { attachCheckImages, attachSheetImages, exportCharacter, importCharacter, type CheckImage } from '../pipeline/files.js'
+import { attachCheckImages, attachSheetImages, clearRefImage, setRefImage, exportCharacter, importCharacter, type CheckImage } from '../pipeline/files.js'
 import { importCheck, updateBrand } from '../pipeline/brand.js'
 import { accountUsage } from '../pipeline/costs.js'
 import { providerMode, setClaudeModel, setSetting } from '../pipeline/settings.js'
@@ -230,9 +232,20 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
   app.post('/characters', async c => {
     const ctx = c.get('ctx')
     requireRole(ctx, 'member')
-    const body = parse(z.object({ name: z.string().max(80).default('') }), await json(c))
-    const row = await createCharacter(deps, ctx, { name: body.name || 'New character' })
+    // Person or Faceless, asked first (section 35, item 4a); a faceless one
+    // can start from Doug's file.
+    const body = parse(z.object({ name: z.string().max(80).default(''), kind: z.enum(['person', 'faceless']).default('person'), template: z.enum(['doug']).nullable().optional() }), await json(c))
+    const row = body.kind === 'faceless'
+      ? await createFacelessCharacter(deps, ctx, { name: body.name, template: body.template ?? null })
+      : await createCharacter(deps, ctx, { name: body.name || 'New character' })
     return c.json({ id: row.id }, 201)
+  })
+  app.put('/characters/:id/faceless', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    const body = parse(z.object({ file: z.record(z.string(), z.unknown()) }), await json(c))
+    await saveFaceless(deps, ctx, c.req.param('id'), body.file)
+    return c.json(await characterView(deps, ctx, c.req.param('id')))
   })
 
   app.get('/characters/:id', async c => c.json(await characterView(deps, c.get('ctx'), c.req.param('id'))))
@@ -473,6 +486,26 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
     requireRole(ctx, 'member')
     await keepStale(deps, ctx, c.req.param('id'), c.req.param('refId'))
     return c.json({ ok: true })
+  })
+
+  // One reference image by hand (owner, 2026-10-22; items 3c, 3d): add or
+  // replace any REF (REF-00 is the hero; any upload can be), or remove one,
+  // without a rebuild.
+  app.post('/characters/:id/refs/:refId', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    const files = await takeUploads(deps, ctx, parse(z.object({ uploads: uploadRefs }), await json(c)).uploads)
+    const f = files[0]
+    if (!f || !f.mime.startsWith('image/')) throw new AppError('bad_request', 'Attach one image.')
+    const r = await setRefImage(deps, ctx, c.req.param('id'), c.req.param('refId'), { data: f.data, mime: f.mime })
+    const checkJobId = r.unchanged || r.refId === 'REF-00' ? null : await startImportCheck(deps, ctx, c.req.param('id'), [r.refId])
+    return c.json({ ...r, checkJobId, view: await characterView(deps, ctx, c.req.param('id')) })
+  })
+  app.delete('/characters/:id/refs/:refId', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    await clearRefImage(deps, ctx, c.req.param('id'), c.req.param('refId'))
+    return c.json({ view: await characterView(deps, ctx, c.req.param('id')) })
   })
 
   // ── Character file ──
@@ -1157,6 +1190,15 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
     return c.json(await importPlan(deps, ctx, ...planArgs(parse(planBody, await json(c)))))
   })
   app.get('/plan', async c => c.json(await planView(deps, c.get('ctx'))))
+  // A faceless account's plan CSV (section 35, item 4g): free preview, import.
+  const facelessBody = z.object({ csv: z.string().max(400_000), characterId: z.string().max(60).nullable().optional(), accountTag: z.string().max(60).nullable().optional(), rows: z.array(z.string().max(60)).max(2000).optional(), existing: z.enum(['replace', 'add']).optional() })
+  app.post('/faceless/preview', async c => { const b = parse(facelessBody, await json(c)); return c.json(await previewFacelessPlan(deps, c.get('ctx'), b.csv, b)) })
+  app.post('/faceless/import', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    const b = parse(facelessBody, await json(c))
+    return c.json(await importFacelessPlan(deps, ctx, b.csv, { ...b, rows: b.rows ?? [] }))
+  })
   // Clear (owner, 2026-10-22): the plan's drafts to the Trash; dryRun counts first.
   app.post('/plan/clear', async c => {
     const ctx = c.get('ctx')

@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { ArrowRight, Check, Star } from 'lucide-react'
+import { useRef, useState } from 'react'
+import { ArrowRight, Check, Loader2, Star, Upload } from 'lucide-react'
 import { api } from '../../api'
 import { useRefresh } from '../../hooks'
 import { PriceButton } from '../../PriceButton'
@@ -45,6 +45,7 @@ export function HeroTab({ v, onEditCard, goSheet }: { v: CharacterView; onEditCa
           </div>
           <PriceButton watch={j => j.characterId === v.id && /^hero(:|$)/.test(j.purpose)} action={errors.length ? null : { type: 'hero', characterId: v.id, runsPerPrompt: runs }} label={v.heroes.length ? 'Generate more heroes' : 'Generate heroes'} variant={picked ? 'secondary' : 'primary'} size={picked ? 'normal' : 'big'} todo={errors.map(e => ({ label: e.message.replace(/\.$/, ''), onGo: () => { onEditCard(); window.setTimeout(() => scrollToField(`card-${e.field}`), 250) } }))} />
           <span className="st-hint">Pick one hero across all three prompts. Prefer one where both marks are visible; every later shot copies what REF-00 shows.</span>
+          <HeroUpload v={v} />
         </div>
       </section>
 
@@ -108,6 +109,28 @@ function CardSuggestion({ v }: { v: CharacterView }) {
         <ul style={{ margin: '0 0 10px', paddingLeft: 18, color: 'var(--st-text-2)', fontSize: 13 }}>{s.differences!.map((d, i) => <li key={i}><b>{d.field}</b>: card says {d.card_says}; image shows {d.image_shows}</li>)}</ul>
       )}
       {s.card && s.card !== v.data.card && <><p className="st-cardtext" style={{ margin: '0 0 10px' }}>{s.card}</p><button className="st-btn sm primary" onClick={apply}>Use this card</button></>}
+    </div>
+  )
+}
+
+// Any uploaded image can be the hero (owner, 2026-10-22; item 3c): it
+// becomes REF-00 at once, no generation. The fixed rule still holds: an
+// image too close to an inspiration face is refused (free face check).
+function HeroUpload({ v }: { v: CharacterView }) {
+  const toast = useToast()
+  const refresh = useRefresh()
+  const file = useRef<HTMLInputElement>(null)
+  const [busy, setBusy] = useState(false)
+  async function put(f: File | undefined) {
+    if (!f) return
+    setBusy(true)
+    try { await api.setRefImage(v.id, 'REF-00', f); refresh(v.id); toast({ tone: 'ok', text: 'Your image is REF-00, the hero. The sheet is next.' }) } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) } finally { setBusy(false) }
+  }
+  return (
+    <div className="st-row" style={{ gap: 8, flexWrap: 'wrap', alignItems: 'center' }} data-field="hero-upload">
+      <input ref={file} type="file" accept="image/*" hidden aria-label="Hero image" onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; void put(f) }} />
+      <button type="button" className="st-btn secondary" disabled={busy} onClick={() => file.current?.click()}>{busy ? <Loader2 size={15} className="st-spin" /> : <Upload size={15} />}Use my own image as the hero</button>
+      <span className="st-hint">Free. Any image you upload can be REF-00; it must still be a new person, not the inspiration's face.</span>
     </div>
   )
 }

@@ -37,7 +37,9 @@ export function VideoSection({ v, data, scene, startId, setStartId, onUseTake, u
   const clips = scene.candidates.filter(c => c.media === 'video' && c.op !== 'chain' && (c.assetId || c.status === 'failed') && (!takesFrom || fromFrame(c)))
   const start = stills.find(c => c.id === startId) ?? stills.find(c => c.status === 'approved') ?? null
   const [endId, setEndId] = useState<string | null>(null)
-  const [directions, setDirections] = useState(o.directions)
+  // Rule R3 (owner, 2026-10-22): the calm, one-take directions only for a
+  // "Caught you" scene; every other clip is free in its shots.
+  const [directions, setDirections] = useState(scene.fields.momentType === 'caught_you' ? o.directionsCaughtYou ?? o.directions : o.directions)
   const allDirections = [extraDirections.trim(), directions.trim()].filter(Boolean).join(' ')
   const [duration, setDuration] = useState(o.duration)
   const [aspect, setAspect] = useState(o.aspect)

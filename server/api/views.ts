@@ -1,4 +1,5 @@
 import { isVideoOp } from '../core/clips.js'
+import { facelessOf, kindOf } from '../pipeline/faceless.js'
 import type { Ctx, Deps } from '../context.js'
 import { validateCharacter } from '../core/character.js'
 import { hardWrap } from '../core/text.js'
@@ -38,6 +39,8 @@ export async function characterSummary(deps: Deps, ctx: Ctx, row: CharacterRow) 
   const costs = await characterCosts(deps, ctx, row.id)
   return {
     id: row.id, name: row.name, stage: row.stage, status: row.status, card: row.card,
+    // Person or faceless (section 35, item 4): a faceless card is labeled so.
+    kind: kindOf(row),
     portraitAssetId: ref00Asset, progress: state.progress, spent: costs.spent, updatedAt: row.updatedAt.toISOString(),
   }
 }
@@ -69,6 +72,7 @@ export async function characterView(deps: Deps, ctx: Ctx, id: string) {
     .orderBy(desc(jobs.completedAt)).limit(1)
   return {
     id: row.id, name: row.name, slug: row.slug, stage: row.stage, status: row.status, revision: row.revision,
+    kind: kindOf(row), faceless: kindOf(row) === 'faceless' ? facelessOf(row) : null,
     // Kept sections are shown hard-wrapped, like prompts.
     data: { ...data, sections: data.sections.map(sec => ({ ...sec, wrapped: hardWrap(sec.body, 80) })) },
     breakdown: row.breakdown, issues: validateCharacter(data),
@@ -287,7 +291,7 @@ export async function scenesView(deps: Deps, ctx: Ctx, characterId: string) {
       video: {
         model: modelInfo(await videoModel(deps, ctx)),
         models: sc.video.models.map(m => ({ ...modelInfo(m.ref), resolution: m.resolution ?? null })), durations: sc.video.durations, duration: sc.video.duration, aspect: sc.video.aspect,
-        maxTakes: sc.video.max_takes, takes: sc.video.takes, directions: sc.video.directions,
+        maxTakes: sc.video.max_takes, takes: sc.video.takes, directions: sc.video.directions, directionsCaughtYou: sc.video.directions_caught_you ?? sc.video.directions,
         test: { model: modelInfo(sc.video.test.model), duration: sc.video.test.duration, label: sc.video.test.label, note: sc.video.test.note },
         upscale: modelInfo(sc.video.upscale.model),
         endFrame: { model: modelInfo(sc.video.end_frame.model), presets: sc.video.end_frame.presets.map(e => ({ id: e.id, label: e.label, text: capitalize(withPronouns(e.text, p)) })) },

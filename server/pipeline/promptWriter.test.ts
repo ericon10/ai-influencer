@@ -149,6 +149,11 @@ describe('the prompt writer (default on)', () => {
     expect(seen.system).toMatch(/direction that shapes the face/)
     expect(seen.system).toMatch(/crunchy or over-sharpened/)
     expect(seen.system).toMatch(/the payoff in the last 2 seconds/)
+    // Rule R3 (owner, 2026-10-22): a clip that is not the "Caught you"
+    // recipe is never limited to one action, calm motion or one camera move.
+    expect(seen.system).not.toMatch(/one camera move only|one move only|the one\s+thing that interrupts|Calm, natural motion|caught you" recipe/)
+    expect(seen.system).toMatch(/as many actions, camera moves and shots as the idea needs/)
+    expect(seen.system).toMatch(/Protect Callie's face/)
     // The start frame shows the place: the setting is not handed over.
     expect(seen.prompt).not.toContain('farmers market')
     const written = (await view(sceneId)).prompts.video!
@@ -156,7 +161,7 @@ describe('the prompt writer (default on)', () => {
     const lines = written.text.split('\n')
     expect(lines.map(l => l.split(':')[0])).toEqual(['FORMAT', 'SUBJECT', 'SETTING/LIGHT', 'CAMERA', 'ACTION', 'CONTINUITY', 'AUDIO', 'CONSTRAINTS'])
     // 9:16 and sound off unless the owner turns it on.
-    expect(lines[0]).toBe('FORMAT: 5 s, 9:16, live-action personal phone video, one continuous take, no cuts.')
+    expect(lines[0]).toBe('FORMAT: 5 s, 9:16, live-action personal phone video.')
     expect(lines[6]).toBe('AUDIO: Sound off: silent, no dialogue, no music.')
     expect(written.words).toBeGreaterThanOrEqual(110)
     expect(written.words).toBeLessThanOrEqual(180)
@@ -172,6 +177,17 @@ describe('the prompt writer (default on)', () => {
     expect(text).toMatch(/\nREALISM: .{20,}/)
   })
 
+  it('rule R3: the calm, one-take lines are the "Caught you" recipe only', async () => {
+    const caught = (await createScene(h.deps, h.ctx, characterId, { brief: 'notices the camera at the market', fields: { momentType: 'caught_you', moment: 'notices the camera' } })).id
+    await run(generate(caught))
+    const still = (await sceneCandidates(h.deps, h.ctx, [caught])).find(c => c.op === 'generate' && c.assetId)!
+    const { jobs } = await run({ type: 'scene_prompt', characterId, sceneId: caught, target: 'video', motion: 'Callie notices the camera and smiles', startCandidateId: still.id })
+    const seen = (await getJob(h.deps, h.ctx, jobs[0]!.id)).request as LlmRequest
+    expect(seen.system).toMatch(/"caught you" recipe/)
+    expect(seen.system).toContain('One continuous take, no cuts.')
+    expect((await view(caught)).prompts.video!.text.split('\n')[0]).toBe('FORMAT: 5 s, 9:16, live-action personal phone video, one continuous take, no cuts.')
+  })
+
   it('Rewrite follows the director\'s notes you set; sound on writes the sound line', async () => {
     const still = (await sceneCandidates(h.deps, h.ctx, [sceneId])).find(c => c.op === 'generate' && c.assetId)!
     await updateScene(h.deps, h.ctx, sceneId, { notes: { video: 'Moment: the first bite · Hook: juice on the chin · Payoff: a laugh to the lens · Camera: slow push in' } })
@@ -182,7 +198,7 @@ describe('the prompt writer (default on)', () => {
     expect(seen.system).toContain(`The owner set these director's notes. Follow them, and return them\nunchanged as "notes": ${notes}`)
     const written = (await view(sceneId)).prompts.video!
     expect(written).toMatchObject({ notes, notesBy: 'owner' })
-    expect(written.text.split('\n')[0]).toBe('FORMAT: 10 s, 9:16, live-action personal phone video, one continuous take, no cuts.')
+    expect(written.text.split('\n')[0]).toBe('FORMAT: 10 s, 9:16, live-action personal phone video.')
     expect(written.text).toContain('AUDIO: Phone-microphone sound')
   })
 

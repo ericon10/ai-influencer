@@ -4,8 +4,10 @@
 // one): each check is a default in Settings > Rules and the word lists are
 // data (config/content.yaml, copy_lint). The em and en dash check runs on
 // every post; the rest are SideStep's and run only on posts whose product's
-// rules have lint on (`standard`; UX-PLAN.md section 29). Pure, so the
-// browser runs the same checks as you type.
+// rules have lint on (`standard`; UX-PLAN.md section 29). The line lint
+// (setup instead of a hit, no clear emotion; owner 2026-10-22) runs on every
+// post's slide 1 and on-screen line. Pure, so the browser runs the same
+// checks as you type.
 
 export const LINT_RULES = [
   { id: 'lint-dashes', title: 'No em or en dashes' },
@@ -24,6 +26,10 @@ export const LINT_RULES = [
   // last slide is an honest ending.
   { id: 'lint-hook-nojob', title: 'A hook names the job situation' },
   { id: 'lint-product-ending', title: 'A product post\'s last slide never promises replies or applying' },
+  // Line lint (owner, 2026-10-22; UX-PLAN.md section 35, item 5): on every
+  // post, any product, on slide 1 and a video's on-screen line.
+  { id: 'lint-hit-first', title: 'The line opens on the hit, not the setup' },
+  { id: 'lint-emotion', title: 'The line carries a clear emotion' },
 ] as const
 export type LintRuleId = (typeof LINT_RULES)[number]['id']
 export const LINT_RULE_IDS = LINT_RULES.map(r => r.id) as unknown as readonly [LintRuleId, ...LintRuleId[]]
@@ -41,6 +47,11 @@ export interface LintLists {
   // every hook; and what a product post's last slide never says.
   jobWords: string[]
   endingNever: string[]
+  // Line lint: how a setup opens ("So I", "When", "Story time") and the
+  // words that carry a clear emotion (angry, sad, frustrated...; a word
+  // starting with one counts, so "infuriat" finds infuriated).
+  setupOpeners: string[]
+  emotionWords: string[]
 }
 export const DEFAULT_LINT_LISTS: LintLists = {
   values: ['should', 'need to', 'needs to', 'must', 'ought'],
@@ -51,6 +62,8 @@ export const DEFAULT_LINT_LISTS: LintLists = {
   hookLabels: ['Exhibit', 'Levels of', 'Previously on', 'Calendar invite'],
   jobWords: ['job', 'interview', 'recruiter', 'offer', 'salary', 'salaries', 'resume', 'résumé', 'hiring', 'application'],
   endingNever: ['ghosted', 'ghosting', 'passed over', 'applies for you', 'apply for you', 'applies for me', 'applying for you', 'auto-apply', 'auto apply'],
+  setupOpeners: ['so', 'okay so', 'ok so', 'when', 'me when', 'story time', 'storytime', 'let me tell you', 'here\'s', 'here is', 'this is', 'imagine', 'remember when', 'once', 'one time', 'yesterday', 'today', 'the other day', 'last week', 'after', 'before', 'if you', 'what happens when', 'pov', 'day 1', 'part 1', 'a thread', 'quick story'],
+  emotionWords: ['angry', 'anger', 'furious', 'fuming', 'infuriat', 'livid', 'rage', 'raging', 'mad', 'pissed', 'seething', 'sad', 'sadness', 'cried', 'cry', 'crying', 'sobbing', 'tears', 'heartbroken', 'devastat', 'gutted', 'crushed', 'grief', 'lonely', 'frustrat', 'fed up', 'sick of', 'over it', 'exhausted', 'drained', 'burned out', 'burnt out', 'humiliat', 'embarrass', 'ashamed', 'shame', 'terrified', 'scared', 'afraid', 'panic', 'anxious', 'dread', 'hate', 'hopeless', 'defeated', 'numb', 'broken', 'shaking', 'screaming', 'scream', 'betrayed', 'insulted', 'disgust', 'miserable', 'jealous', 'bitter', 'spiral'],
 }
 
 // hook: slide 1 or a video's on-screen hook; slide: any other slide;
@@ -107,6 +120,8 @@ export function lintCopy(text: string, o: LintOptions): LintHit[] {
   const t = (text ?? '').trim()
   const out: LintHit[] = []
   const hit = (rule: LintRuleId, match: string, message: string) => { if (on(rule)) out.push({ rule, match, message }) }
+  // The line lint runs on every post, whatever its product.
+  const lineHit = (rule: LintRuleId, match: string, message: string) => { if (!off.has(rule)) out.push({ rule, match, message }) }
   if (!t && o.kind !== 'caption') return out
   if (LONG_DASH.test(t)) hit('lint-dashes', t.match(LONG_DASH)![0], 'A long dash (em or en). Use a comma, a period or "to".')
   for (const w of lists.values) {
@@ -135,6 +150,13 @@ export function lintCopy(text: string, o: LintOptions): LintHit[] {
     if (quotes.length > 1) hit('lint-hook-quotes', `${quotes.length} quotes`, `${quotes.length} quoted phrases. One at most, so it is clear on one read.`)
     const job = lists.jobWords.map(w => w.trim()).filter(Boolean)
     if (job.length && !job.some(w => new RegExp(`(^|[^\\p{L}\\p{N}])${esc(w)}`, 'iu').test(t))) hit('lint-hook-nojob', 'no job word', `No job word. Name the job situation (${job.slice(0, 8).join(', ')}): a stranger can't tell it's about the job hunt.`)
+    // Line lint (every post): the first words carry the hit, and the line
+    // carries a clear emotion. Shown, never blocking.
+    const opener = lists.setupOpeners.map(w => w.trim()).filter(Boolean).sort((a, b) => b.length - a.length).find(w => phrase(w).exec(t.replace(LEAD, ''))?.index === 0)
+    const firstWords = t.replace(LEAD, '').split(/\s+/).slice(0, 4).join(' ')
+    const feels = (x: string) => lists.emotionWords.map(w => w.trim()).filter(Boolean).some(w => new RegExp(`(^|[^\\p{L}\\p{N}])${esc(w)}`, 'iu').test(x))
+    if (opener && !feels(firstWords)) lineHit('lint-hit-first', t.replace(LEAD, '').slice(0, opener.length), `Opens on the setup ("${t.replace(LEAD, '').slice(0, opener.length)}..."). Put the hit in the first words: what happened, or how it felt.`)
+    if (lists.emotionWords.length && !feels(t)) lineHit('lint-emotion', 'no clear emotion', 'No clear emotion. Say how it felt: angry, infuriated, sad, frustrated.')
     for (const p of lists.products) {
       const m = p.trim() && t.match(phrase(p))
       if (m) { hit('lint-product-hook', m[2]!, `${m[2]!} is in the hook. Name it on slide 5 or 6, or late in the caption.`); break }

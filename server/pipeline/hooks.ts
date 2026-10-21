@@ -3,6 +3,7 @@ import { candidates, concepts, jobs, refImages } from '../db/schema.js'
 import type { Ctx, Deps } from '../context.js'
 import { newId } from '../lib/ids.js'
 import { registerJobHook, type JobOutcome, type JobRow } from '../jobs/hooks.js'
+import { registerFaceless } from './faceless.js'
 import { activateChildren, cancelChildren, childJobs } from '../jobs/runner.js'
 import { breakdownSchema, conceptsSchema } from '../core/llmSchemas.js'
 import { validateCharacter } from '../core/character.js'
@@ -212,6 +213,7 @@ export function registerPipelineHooks(): void {
   registerVoiceLines()
   registerScaleKit()
   registerSlideshow()
+  registerFaceless()
   registerPostingDay()
   registerCloseup()
   registerStorage()

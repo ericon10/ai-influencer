@@ -21,6 +21,7 @@ import { buildSlideshowStills, slideModel, slidePrice, slideStillPaths, stillPat
 import { shotShowsCharacter } from '../core/slides.js'
 import { PATH_LABELS, type StillPath } from '../core/stillModels.js'
 import { trash, type TrashRef } from './trash.js'
+import { buildFacelessStill } from './faceless.js'
 import { formatCredits } from '../costs/quotes.js'
 import { formatUsd } from '../costs/money.js'
 
@@ -413,7 +414,7 @@ export async function planView(deps: Deps, ctx: Ctx): Promise<{ posts: PlanPostV
   const since = new Date(deps.clock.now().getTime() - 10 * 60_000)
   const active = await deps.db.select({ purpose: jobs.purpose }).from(jobs).where(and(
     eq(jobs.accountId, ctx.accountId),
-    or(like(jobs.purpose, 'slide_still:%'), like(jobs.purpose, 'scene:%')),
+    or(like(jobs.purpose, 'slide_still:%'), like(jobs.purpose, 'scene:%'), like(jobs.purpose, 'faceless_still:%')),
     or(inArray(jobs.status, ACTIVE_JOBS), and(eq(jobs.status, 'completed'), eq(jobs.phase, 'checking'), gt(jobs.completedAt, since))),
   ))
   const rows = await deps.db.select().from(contentItems)
@@ -431,10 +432,10 @@ export async function planView(deps: Deps, ctx: Ctx): Promise<{ posts: PlanPostV
       const spec = slideshowSpecSchema.parse(r.spec ?? {})
       mode = spec.mode
       for (const s of slideList(spec)) { if (s.special) continue; need++; if (s.stillId) have++ }
-    } else { need = 1; have = Math.min(1, byScene.get(r.sceneId ?? '') ?? 0); mode = 'character' }
+    } else { need = 1; have = (r.spec as { stillId?: string | null }).stillId ? 1 : Math.min(1, byScene.get(r.sceneId ?? '') ?? 0); mode = 'character' }
     return { id: r.id, rowId: p.rowId, planId: p.planId, date: p.date, slot: p.slot, account: r.accountTag, format: p.format, kind: r.kind, hook: r.kind === 'slideshow' ? String((r.spec as { hook?: string }).hook ?? '') : String((r.spec as { caption?: string }).caption ?? ''), status: r.status, need, have, exported: !!(out?.imageAssetIds?.length || out?.videoAssetId), mode, line: 0 }
   })
-  const mine = new Set(rows.map(r => (r.kind === 'slideshow' ? `slide_still:${r.id}` : `scene:${r.sceneId ?? ''}`)))
+  const mine = new Set(rows.flatMap(r => (r.kind === 'slideshow' ? [`slide_still:${r.id}`] : [`scene:${r.sceneId ?? ''}`, `faceless_still:${r.id}`])))
   return { posts: scheduleOrder(posts.map((p, i) => ({ ...p, line: i }))).map(({ line: _line, ...p }) => p), running: active.filter(j => mine.has(j.purpose)).length }
 }
 
@@ -480,7 +481,10 @@ export async function buildPlanGenerate(deps: Deps, ctx: Ctx, input: { postIds: 
         const all = input.remake ? slideList(slideshowSpecSchema.parse(post.spec ?? {})).filter(x => !x.special).map(x => x.index) : undefined
         built = await buildSlideshowStills(deps, ctx, { contentId: post.id, path, ...(all?.length ? { slides: all } : {}) })
       }
-      else if (post.kind === 'meme' && post.sceneId && post.characterId) {
+      else if (post.kind === 'meme' && (post.spec as { faceless?: unknown }).faceless && !post.sceneId) {
+        // A faceless post: its still from its place or line (section 35).
+        built = await buildFacelessStill(deps, ctx, { contentId: post.id, path })
+      } else if (post.kind === 'meme' && post.sceneId && post.characterId) {
         const character = await getCharacter(deps, ctx, post.characterId)
         const model = slideModel(deps, 'character', toData(character), path)
         if (!model) throw new AppError('bad_request', `No stills model runs on ${PATH_LABELS[path]}.`)

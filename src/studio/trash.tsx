@@ -17,7 +17,7 @@ export interface Deletable extends TrashRef { label: string }
 type Warning = { id: string; kind: TrashRef['kind']; text: string }
 
 const refresh = (qc: ReturnType<typeof useQueryClient>) => {
-  for (const key of [['library'], keys.content, ['sounds'], ['trash'], ['scenes'], ['clones'], ['character'], ['voice-lines'], ['auto-clean-preview']]) void qc.invalidateQueries({ queryKey: key })
+  for (const key of [['library'], keys.content, keys.characters, ['plan'], ['sounds'], ['trash'], ['scenes'], ['clones'], ['character'], ['voice-lines'], ['auto-clean-preview']]) void qc.invalidateQueries({ queryKey: key })
 }
 
 export function useDelete() {

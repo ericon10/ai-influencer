@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowRight, CheckCircle2, Eye, FlipHorizontal2, FolderOpen, Loader2, RotateCcw, ShieldAlert, Sparkles, Download } from 'lucide-react'
+import { ArrowRight, CheckCircle2, Eye, FlipHorizontal2, FolderOpen, Loader2, RotateCcw, ShieldAlert, Sparkles, Download, Trash2, Upload } from 'lucide-react'
 import { api } from '../../api'
 import { useActiveJobs, useRefresh } from '../../hooks'
 import { filesFromDrop, sheetRefOf, typeOf } from '../../files'
@@ -234,6 +234,7 @@ function ShotDrawer({ v, shot, onClose }: { v: CharacterView; shot: Shot | null;
         <div className="st-row"><ShotBadge status={shot.status} /><span className="st-hint">{shot.framing === 'chest_up' ? 'Chest-up' : 'Full body'} · {shot.aspect} · uses {shot.attach.join(', ') || 'the hero'}</span></div>
         {shot.approved && <Img assetId={shot.approved.assetId} width={900} contain style={{ aspectRatio: shot.framing === 'full_body' ? '9/16' : '3/4' }} />}
         {shot.candidates.some(c => c.status === 'in_review') && <button className="st-btn primary" onClick={() => nav(`/studio/characters/${v.id}/review/${shot.id}`)}><Eye size={16} />Review</button>}
+        <RefImageEdit v={v} shot={shot} />
         {shot.id !== 'REF-00' && (
           <div className="st-card" style={{ padding: 14, boxShadow: 'none' }}>
             <div className="st-h3" style={{ marginBottom: 8 }}>Regenerate this shot</div>
@@ -268,6 +269,38 @@ function ShotDrawer({ v, shot, onClose }: { v: CharacterView; shot: Shot | null;
         <span className="st-hint"><Sparkles size={12} style={{ verticalAlign: -2 }} /> Every version is kept. Rejected results are archived, never deleted.</span>
       </div>
     </Drawer>
+  )
+}
+
+// Add, replace or remove this shot's image by hand (owner, 2026-10-22):
+// no rebuild; the shots built on it keep theirs, and every prompt picks
+// refs by framing from what is approved now. A replaced image gets the free
+// face and skin check; REF-00 can be replaced, never removed.
+function RefImageEdit({ v, shot }: { v: CharacterView; shot: Shot }) {
+  const toast = useToast()
+  const refresh = useRefresh()
+  const file = useRef<HTMLInputElement>(null)
+  const [busy, setBusy] = useState(false)
+  async function put(f: File | undefined) {
+    if (!f) return
+    setBusy(true)
+    try {
+      const r = await api.setRefImage(v.id, shot.id, f)
+      refresh(v.id)
+      toast({ tone: 'ok', text: r.unchanged ? `${shot.id} is already this image.` : `${shot.id} ${shot.approved ? 'replaced' : 'added'}. ${r.checkJobId ? 'The free face and skin check is running.' : ''}` })
+    } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) } finally { setBusy(false) }
+  }
+  async function remove() {
+    setBusy(true)
+    try { await api.clearRefImage(v.id, shot.id); refresh(v.id); toast({ tone: 'ok', text: `${shot.id} removed. Add an image or generate it again any time.` }) } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) } finally { setBusy(false) }
+  }
+  return (
+    <div className="st-row" style={{ gap: 8, flexWrap: 'wrap' }} data-field="ref-edit">
+      <input ref={file} type="file" accept="image/*" hidden aria-label={`Image for ${shot.id}`} onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; void put(f) }} />
+      <button type="button" className="st-btn sm secondary" disabled={busy} onClick={() => file.current?.click()}><Upload size={13} />{shot.approved ? `Replace ${shot.id}` : `Add an image as ${shot.id}`}</button>
+      {shot.approved && shot.id !== 'REF-00' && <button type="button" className="st-btn sm ghost" disabled={busy} onClick={() => void remove()}><Trash2 size={13} />Remove {shot.id}</button>}
+      <span className="st-hint" style={{ flexBasis: '100%' }}>No rebuild: the shots built on it keep their images, and new stills pick it up at once.</span>
+    </div>
   )
 }
 

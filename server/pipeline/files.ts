@@ -10,6 +10,8 @@ import { AppError } from '../lib/errors.js'
 import { getAsset, saveAsset } from '../storage/assets.js'
 import { approvedAssets, createCharacter, getCharacter, getRef, refRows, setCharacterFields, toData, updateCharacter } from './characters.js'
 import { markDependentsStale } from './review.js'
+import { scoreDistinctness } from './identity.js'
+import { liveRoute } from './settings.js'
 
 // Stage 5: character-[name].md export and import (SPEC 8).
 
@@ -85,7 +87,7 @@ export function mergeReimport(current: CharacterData, incoming: CharacterData, w
 // Approved sheet images brought in from outside (for example a sheet built
 // before the Studio). An image that replaces an approved one supersedes it
 // and marks the shots built on it for re-check, as a regeneration would.
-export async function attachSheetImages(deps: Deps, ctx: Ctx, characterId: string, images: Record<string, { data: Buffer; mime?: string }>, label?: string, unchanged: string[] = []): Promise<string[]> {
+export async function attachSheetImages(deps: Deps, ctx: Ctx, characterId: string, images: Record<string, { data: Buffer; mime?: string }>, label?: string, unchanged: string[] = [], opts: { stale?: boolean } = {}): Promise<string[]> {
   const shots = deps.config.pipeline.sheet.shots
   const name = label ?? (await getCharacter(deps, ctx, characterId)).name
   const attached: string[] = []
@@ -108,7 +110,7 @@ export async function attachSheetImages(deps: Deps, ctx: Ctx, characterId: strin
     await deps.db.insert(candidates).values({ id: candId, accountId: ctx.accountId, characterId, target: refId === 'REF-00' ? 'hero' : 'sheet', refId, assetId: asset.id, status: 'approved', reviewedBy: ctx.userId, reviewedAt: now, createdBy: ctx.userId })
     if (previous) await deps.db.update(candidates).set({ status: 'superseded', updatedAt: now }).where(and(eq(candidates.accountId, ctx.accountId), eq(candidates.id, previous)))
     await deps.db.update(refImages).set({ status: 'approved', approvedCandidateId: candId, staleReason: '', staleSince: null, updatedAt: now }).where(eq(refImages.id, ref.id))
-    if (previous) await markDependentsStale(deps, ctx, characterId, refId)
+    if (previous && opts.stale !== false) await markDependentsStale(deps, ctx, characterId, refId)
     attached.push(refId)
   }
   return attached
@@ -132,4 +134,42 @@ export async function attachCheckImages(deps: Deps, ctx: Ctx, characterId: strin
     added.push(c.name)
   }
   return added
+}
+
+// One reference image added, replaced or removed by hand (owner,
+// 2026-10-22; UX-PLAN.md section 35, items 3c and 3d), without a rebuild:
+// the shots built on it keep their images, and every prompt builder picks
+// refs by framing from what is approved now, so the new one is used at
+// once. An image uploaded as REF-00 is the hero (any upload can be): the
+// fixed rule still holds, so one too close to an inspiration face is
+// refused; the face check is free.
+export async function setRefImage(deps: Deps, ctx: Ctx, characterId: string, refId: string, img: { data: Buffer; mime?: string }): Promise<{ refId: string; unchanged: boolean }> {
+  const ch = await getCharacter(deps, ctx, characterId)
+  if (!deps.config.pipeline.sheet.shots.some(s => s.id === refId)) throw new AppError('bad_request', `Unknown shot ${refId}.`)
+  const unchanged: string[] = []
+  await attachSheetImages(deps, ctx, characterId, { [refId]: img }, ch.name, unchanged, { stale: false })
+  if (refId === 'REF-00' && !unchanged.length) {
+    const ref = await getRef(deps, ctx, characterId, 'REF-00')
+    const cand = ref.approvedCandidateId!
+    const [row] = await deps.db.select({ assetId: candidates.assetId }).from(candidates).where(eq(candidates.id, cand))
+    const qa = await scoreDistinctness(deps, ctx, { characterId, assetId: row!.assetId!, demo: false })
+    if (qa?.findings.some(f => f.code === 'too_similar' && f.severity === 'fail')) {
+      await clearRefImage(deps, ctx, characterId, 'REF-00', { allowHero: true })
+      throw new AppError('bad_request', `${qa.findings.find(f => f.code === 'too_similar')!.message} Upload another image as the hero.`)
+    }
+    if (!ch.sheetLock) {
+      const route = await liveRoute(deps, ctx, 'sheet')
+      await setCharacterFields(deps, ctx, ch.id, { sheetLock: { model: route.model, quality: deps.config.pipeline.sheet.settings.quality, resolution: deps.config.pipeline.sheet.settings.resolution } })
+    }
+    if (ch.stage < 4) await setCharacterFields(deps, ctx, ch.id, { stage: 4 })
+  }
+  return { refId, unchanged: unchanged.length > 0 }
+}
+
+export async function clearRefImage(deps: Deps, ctx: Ctx, characterId: string, refId: string, opts: { allowHero?: boolean } = {}): Promise<void> {
+  if (refId === 'REF-00' && !opts.allowHero) throw new AppError('bad_request', 'REF-00 is the face every shot copies: replace it instead of removing it.')
+  const ref = await getRef(deps, ctx, characterId, refId)
+  const now = deps.clock.now()
+  if (ref.approvedCandidateId) await deps.db.update(candidates).set({ status: 'superseded', updatedAt: now }).where(and(eq(candidates.accountId, ctx.accountId), eq(candidates.id, ref.approvedCandidateId)))
+  await deps.db.update(refImages).set({ status: 'pending', approvedCandidateId: null, staleReason: '', staleSince: null, updatedAt: now }).where(eq(refImages.id, ref.id))
 }

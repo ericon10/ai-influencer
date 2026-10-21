@@ -9,6 +9,7 @@ import { filesFromDrop, sheetRefOf, typeOf } from '../files'
 import { HowTo } from '../guide/Guide'
 import { TemplateCheckList } from './character/BrandCard'
 import type { TemplateReport } from '../types'
+import { DeleteCharacter } from './character/DeleteCharacter'
 
 export default function Characters() {
   const list = useCharacters()
@@ -18,9 +19,11 @@ export default function Characters() {
   const [importing, setImporting] = useState(params.get('import') === '1')
   const [creating, setCreating] = useState(false)
 
-  async function create() {
+  // A new character asks Person or Faceless first (owner, 2026-10-22).
+  const [asking, setAsking] = useState(false)
+  async function create(o: { kind?: 'person' | 'faceless'; name?: string; template?: 'doug' | null } = {}) {
     setCreating(true)
-    try { const { id } = await api.createCharacter('New character'); nav(`/studio/characters/${id}`) } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) } finally { setCreating(false) }
+    try { const { id } = await api.createCharacter(o.name || (o.kind === 'faceless' ? '' : 'New character'), { kind: o.kind ?? 'person', template: o.template ?? null }); await list.refetch(); nav(`/studio/characters/${id}`) } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) } finally { setCreating(false); setAsking(false) }
   }
 
   const chars = list.data?.characters ?? []
@@ -35,7 +38,7 @@ export default function Characters() {
         {/* Import first (long run part 3): most characters are built in the
             Claude project with character template v1.6. */}
         <button className="st-btn primary" onClick={() => setImporting(true)}><FileUp size={16} />Import a character file</button>
-        <button className="st-btn" onClick={create} disabled={creating}><Plus size={16} />Start from a concept</button>
+        <button className="st-btn" onClick={() => setAsking(true)} disabled={creating} data-field="new-character"><Plus size={16} />New character</button>
       </div>
 
       {list.isLoading && <div className="st-grid cards">{[0, 1, 2, 3].map(i => <div key={i} className="st-casting"><div className="st-img"><div className="st-skel" style={{ aspectRatio: '3/4' }} /></div><div className="st-casting-body"><div className="st-skel" style={{ height: 22, width: '60%' }} /></div></div>)}</div>}
@@ -47,7 +50,7 @@ export default function Characters() {
           <p className="st-realism">{REALISM_LINE}</p>
           <div className="st-row" style={{ justifyContent: 'center' }}>
             <button className="st-btn primary big" onClick={() => setImporting(true)}><FileUp size={18} />Import a character file</button>
-            <button className="st-btn" onClick={create}><Plus size={16} />Start from a concept</button>
+            <button className="st-btn" onClick={() => setAsking(true)}><Plus size={16} />New character</button>
           </div>
         </div>
       )}
@@ -59,8 +62,10 @@ export default function Characters() {
             <div className="st-casting-body">
               <div className="st-casting-name">{c.name}</div>
               <div className="st-casting-meta">
-                <span>{c.stage >= 4 ? `Sheet ${c.progress.approved}/${c.progress.total}` : STAGES[c.stage - 1]}</span>
+                <span>{c.kind === 'faceless' ? <span className="st-badge plain" data-field="faceless-label">Faceless</span> : c.stage >= 4 ? `Sheet ${c.progress.approved}/${c.progress.total}` : STAGES[c.stage - 1]}</span>
                 <span>{c.spent} spent</span>
+                <span className="st-spacer" />
+                <DeleteCharacter id={c.id} name={c.name} compact />
               </div>
             </div>
           </Link>
@@ -68,6 +73,7 @@ export default function Characters() {
       </div>
 
       <ImportDialog open={importing} onClose={() => setImporting(false)} />
+      <NewCharacter open={asking} busy={creating} onClose={() => setAsking(false)} onPick={o => void create(o)} />
     </div>
   )
 }
@@ -170,6 +176,37 @@ function ImportDialog({ open, onClose }: { open: boolean; onClose: () => void })
         )}
         {!file && <Todo items={[{ label: 'Add the character file (.md)', target: 'import-file' }]} />}
         <div className="st-row"><span className="st-spacer" />{busy && <span className="st-hint">{busy}</span>}<button className="st-btn ghost" onClick={onClose}>Cancel</button><button className="st-btn primary" disabled={!file || !!busy} onClick={submit} title={needed ? 'The template check found items to add; the import still works.' : undefined}>{busy ? 'Importing...' : updating ? `Update ${check!.match!.name}${needed ? ' anyway' : ''}` : needed ? 'Import anyway' : 'Import character'}</button></div>
+      </div>
+    </Modal>
+  )
+}
+
+// Person or Faceless, first (owner, 2026-10-22; UX-PLAN.md section 35, item
+// 4a). A person goes through inspiration, face, sheet and file; a faceless
+// account has no face at all: its file (persona, place bank, look rules,
+// voice, sound bank) is all it needs. Doug is the first one, ready to copy.
+function NewCharacter({ open, busy, onClose, onPick }: { open: boolean; busy: boolean; onClose: () => void; onPick: (o: { kind: 'person' | 'faceless'; name?: string; template?: 'doug' | null }) => void }) {
+  const [kind, setKind] = useState<'person' | 'faceless' | null>(null)
+  const [name, setName] = useState('')
+  const [doug, setDoug] = useState(true)
+  return (
+    <Modal open={open} onClose={onClose}>
+      <div className="st-col" style={{ gap: 14 }} data-field="new-character-kind">
+        <div><div className="st-kicker">New character</div><div className="st-h2">A person or faceless?</div></div>
+        <div className="st-col" style={{ gap: 8 }} role="radiogroup" aria-label="Person or Faceless">
+          <button type="button" role="radio" aria-checked={kind === 'person'} className={`st-choice ${kind === 'person' ? 'on' : ''}`} onClick={() => setKind('person')}><b>Person</b><span className="st-hint">A face that stays the same in every post: inspiration, face, a 12-shot reference sheet and the character file.</span></button>
+          <button type="button" role="radio" aria-checked={kind === 'faceless'} className={`st-choice ${kind === 'faceless' ? 'on' : ''}`} onClick={() => setKind('faceless')}><b>Faceless</b><span className="st-hint">No face, no hero, no sheet: a persona, a bank of places, look rules, a voice and a sound bank. Stills of real places, never a person.</span></button>
+        </div>
+        {kind === 'faceless' && (
+          <div className="st-col" style={{ gap: 8 }}>
+            <label className="st-col" style={{ gap: 4 }}><span className="st-label">Name (never shown on screen)</span><input className="st-input" value={name} onChange={e => setName(e.target.value)} placeholder={doug ? 'Doug' : 'Faceless account'} /></label>
+            <label className="st-row" style={{ gap: 8 }}><input type="checkbox" checked={doug} onChange={e => setDoug(e.target.checked)} />Start from Doug's file (31, Peoria IL, laid-off contract data entry, rainy Midwest everyday life)</label>
+          </div>
+        )}
+        <div className="st-row" style={{ gap: 8, justifyContent: 'flex-end' }}>
+          <button type="button" className="st-btn ghost" onClick={onClose}>Cancel</button>
+          <button type="button" className="st-btn primary" disabled={!kind || busy} onClick={() => kind && onPick({ kind, name: name.trim(), template: kind === 'faceless' && doug ? 'doug' : null })}>{kind === 'faceless' ? 'Make the faceless account' : 'Start from a concept'}</button>
+        </div>
       </div>
     </Modal>
   )

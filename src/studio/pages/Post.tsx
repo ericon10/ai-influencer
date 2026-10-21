@@ -13,6 +13,7 @@ import { StillsStep, stillsSummary } from './post/StillsStep'
 import { VideoStep, videoSummary } from './post/VideoStep'
 import { TextStep, textSummary } from './post/TextStep'
 import { FinishStep } from './post/FinishStep'
+import { FacelessPost } from './post/FacelessPost'
 import { MORE_EVENT, moreKey, type PostCtx } from './post/ctx'
 import { editorUrl, scrollKey } from './post/EditorCard'
 import { HowTo } from '../guide/Guide'
@@ -142,6 +143,7 @@ function Workspace({ item, data }: { item: ContentItem; data: ContentData }) {
           <PlanLine plan={(draft.spec as { plan?: PlanMeta }).plan} />
         </div>
       </div>
+      {item.kind === 'meme' && character.data?.kind === 'faceless' ? <FacelessPost ctx={ctx} /> : (<>
       <nav className="st-steps st-poststeps" aria-label="Steps">
         {steps.map(([k, label], i) => {
           const state = i < ci ? 'done' : i === ci ? 'current' : 'waiting'
@@ -173,6 +175,7 @@ function Workspace({ item, data }: { item: ContentItem; data: ContentData }) {
           )
         })}
       </div>
+      </>)}
     </div>
   )
 }

@@ -9,6 +9,8 @@ import { StartTab } from './character/StartTab'
 import { HeroTab } from './character/HeroTab'
 import { SheetTab } from './character/SheetTab'
 import { FileTab } from './character/FileTab'
+import { DeleteCharacter } from './character/DeleteCharacter'
+import { FacelessCharacter } from './character/FacelessFile'
 import { useNewPost } from './post/parts'
 import type { CharacterView } from '../types'
 import { HowTo } from '../guide/Guide'
@@ -46,6 +48,8 @@ export default function Character() {
   if (q.isLoading) return <div className="st-page wide"><div className="st-skel" style={{ height: 40, width: 260, marginBottom: 24 }} /><div className="st-character"><div className="st-skel" style={{ aspectRatio: '3/4', borderRadius: 26 }} /><div className="st-skel" style={{ height: 320, borderRadius: 26 }} /></div></div>
   if (!v) return <div className="st-page"><div className="st-empty"><h2 className="st-h1">Not found</h2><Link className="st-btn" to="/studio/characters">Back to characters</Link></div></div>
 
+  // A faceless character has no face steps: its page is its file.
+  if (v.kind === 'faceless' && v.faceless) return <FacelessCharacter key={v.id} v={v} />
   const current = tab ?? defaultTab(v)
   const ready = !!v.sheet.shots[0]?.approved
   const done: Record<Tab, boolean> = { start: v.stage > 2, hero: ready, sheet: v.sheet.progress.complete, file: false }
@@ -58,7 +62,10 @@ export default function Character() {
           <div className="st-kicker st-row" style={{ gap: 10 }}>Set up · revision {v.revision}<HowTo key={current} id={TAB_GUIDE[current]} /></div>
           <h1 className="st-h1">{v.data.name}</h1>
         </div>
-        {ready && <button className="st-btn primary" disabled={!!newPost.busy} onClick={() => void newPost.create('meme', { characterId: v.id })}><Film size={16} />Make a post with {v.data.name}</button>}
+        <div className="st-row" style={{ gap: 8, flexWrap: 'wrap' }}>
+          <DeleteCharacter id={v.id} name={v.data.name} />
+          {ready && <button className="st-btn primary" disabled={!!newPost.busy} onClick={() => void newPost.create('meme', { characterId: v.id })}><Film size={16} />Make a post with {v.data.name}</button>}
+        </div>
       </div>
       <nav className="st-steps st-poststeps" aria-label="Setup steps" style={{ marginBottom: 22 }}>
         {TABS.map((k, i) => {

@@ -1,6 +1,8 @@
 // Response shapes from /api/v1 (see server/api/views.ts).
 
 import type { LintLists } from '../../server/core/copyLint'
+import type { FacelessFile } from '../../server/core/faceless'
+export type { FacelessFile, FacelessPlace, FacelessSound } from '../../server/core/faceless'
 import type { PlanMeta } from '../../server/core/planMeta'
 
 export type Side = 'LEFT' | 'RIGHT'
@@ -114,7 +116,7 @@ export interface ScenesData {
     stillLevels: Array<{ id: string; label: string; quality: string; resolution: string; models?: Record<string, { quality?: string; resolution?: string }> }>; stillLevel: string; defaultVariations: number
     promptWriter: { on: boolean; model: string; words: { still: [number, number]; video: [number, number] }; realism: string; directorsPass: boolean }
     video: {
-      model: SceneModel; models: Array<SceneModel & { resolution: string | null }>; durations: number[]; duration: number; aspect: string; maxTakes: number; takes: number; directions: string
+      model: SceneModel; models: Array<SceneModel & { resolution: string | null }>; durations: number[]; duration: number; aspect: string; maxTakes: number; takes: number; directions: string; directionsCaughtYou?: string
       test: { model: SceneModel; duration: number; label: string; note: string }
       upscale: SceneModel
       endFrame: { model: SceneModel; presets: Array<{ id: string; label: string; text: string }> }
@@ -144,6 +146,8 @@ export interface Costs { spent: string; spentMicros: number; held: string; heldM
 
 export interface CharacterView {
   id: string; name: string; slug: string; stage: number; status: string; revision: number
+  // Person or faceless (UX-PLAN.md section 35, item 4) and a faceless one's file.
+  kind?: 'person' | 'faceless'; faceless?: FacelessFile | null
   data: CharacterData; breakdown: Breakdown | null; issues: Array<{ field: string; message: string; severity: 'error' | 'warning' }>
   sheetLock: { model: string } | null
   // The brand layer from the file's sections, and the file checked against
@@ -174,7 +178,7 @@ export interface TemplateReport {
   complete: boolean
 }
 
-export interface CharacterSummary { id: string; name: string; stage: number; status: string; card: string; portraitAssetId: string | null; progress: { approved: number; total: number }; spent: string; updatedAt: string }
+export interface CharacterSummary { id: string; name: string; stage: number; status: string; card: string; kind?: 'person' | 'faceless'; portraitAssetId: string | null; progress: { approved: number; total: number }; spent: string; updatedAt: string }
 
 export interface QuoteView {
   id: string; total: string; totalMicros: number; verified: boolean; status: 'open' | 'blocked'; needsConfirm: boolean; expiresAt: string
@@ -230,6 +234,8 @@ export type StudioAction =
   | { type: 'hook_variants'; hookId: string; characterIds: string[]; perCharacter?: number }
   | { type: 'slideshow_hooks'; contentId: string }
   | { type: 'plan_generate'; postIds: string[]; path?: StillPathId; stillModel?: string | null; remake?: boolean }
+  | { type: 'faceless_still'; contentId: string; placeId?: string | null; line?: string; path?: StillPathId | null; model?: string | null }
+  | { type: 'faceless_video'; contentId: string; model?: string | null; prompt?: string; durationSec?: number }
   | { type: 'slideshow_draft'; contentId: string; hook: string; pattern?: string | null; code?: string | null; effectOpen?: string | null; effectPayoff?: string | null; moment?: string; alt?: string; score?: number | null }
   | { type: 'slideshow_stills'; contentId: string; slides?: number[]; path?: StillPathId; stillModel?: string }
   | { type: 'slideshow_caption'; contentId: string }
@@ -367,6 +373,7 @@ export type StillPathId = 'account' | 'api'
 export interface SlideStillModel { ref: string; label: string; from: 'file' | 'studio' | 'cheapest'; perStill: string }
 export interface SlideStillOptions { pick: StillPathId; name: string | null; paths: Array<{ path: StillPathId; label: string; problem: string | null; character: SlideStillModel | null; empty: SlideStillModel | null }> }
 export type { PlanImportResult } from '../../server/pipeline/planImport'
+export type { FacelessPreview, FacelessPreviewRow, FacelessImportResult } from '../../server/pipeline/facelessImport'
 // Results (UX-PLAN.md section 32): a post's results and the Results view.
 export type { PostResults, Decision, ResultHint, ResultRow } from '../../server/core/results'
 export type { ResultsView, ResultsCsvPreview, ResultsCsvPreviewRow } from '../../server/pipeline/results'

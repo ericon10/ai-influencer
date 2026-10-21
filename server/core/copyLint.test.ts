@@ -5,7 +5,10 @@ import { readCode, readEffect } from './playbook.js'
 // The language lint (UX-PLAN.md section 28): free warnings, never a block.
 // These checks are SideStep's rules (section 29): `standard` on, with the
 // post's product (SideStep) as the name never in a hook.
-const rules = (text: string, kind: 'hook' | 'slide' | 'caption' = 'slide', o: Parameters<typeof lintCopy>[1] extends infer T ? Partial<T> : never = {}) => lintCopy(text, { kind, standard: true, lists: { products: ['SideStep'] }, ...o }).map(h => h.rule)
+// The line lint (setup first, no clear emotion) has its own tests below and
+// is left out of these.
+const LINE = ['lint-hit-first', 'lint-emotion']
+const rules = (text: string, kind: 'hook' | 'slide' | 'caption' = 'slide', o: Parameters<typeof lintCopy>[1] extends infer T ? Partial<T> : never = {}) => lintCopy(text, { kind, standard: true, lists: { products: ['SideStep'] }, ...o, off: [...(o.off ?? []), ...LINE] }).map(h => h.rule)
 
 describe('copy lint', () => {
   it('long dashes, values words, hustle words', () => {
@@ -47,7 +50,7 @@ describe('copy lint', () => {
 
   it('a check switched off says nothing; lintPost names the slide', () => {
     expect(rules('Every resume should sound like you', 'slide', { off: ['lint-values'] })).toEqual([])
-    const hits = lintPost({ texts: ['the job app hook', 'Slide two should land'], caption: 'Caption', hashtags: [], product: false, standard: true })
+    const hits = lintPost({ texts: ['the job app hook', 'Slide two should land'], caption: 'Caption', hashtags: [], product: false, standard: true }, { off: LINE })
     expect(hits.map(h => [h.rule, h.slide])).toEqual([['lint-values', 1]])
   })
 
@@ -79,7 +82,7 @@ describe('copy lint', () => {
     const words = (n: number) => Array.from({ length: n }, (_, i) => `w${i + 1}`).join(' ')
     expect(rules(`${words(22)} job`, 'hook')).toContain('lint-hook-long')
     expect(rules(`${words(21)} job`, 'hook')).not.toContain('lint-hook-long')
-    expect(lintCopy('one two three four five six seven eight nine job', { kind: 'hook', standard: true, lists: { hookMaxWords: 8 } }).map(h => h.match)).toEqual(['10 words'])
+    expect(lintCopy('one two three four five six seven eight nine job', { kind: 'hook', standard: true, lists: { hookMaxWords: 8 }, off: LINE }).map(h => h.match)).toEqual(['10 words'])
     // Only on a hook: a slide may open with a label.
     expect(rules('Exhibit 2: the follow-up that never came. 2:14am. "a" "b"', 'slide')).toEqual([])
     // Each is a default: switched off, it says nothing.
@@ -103,7 +106,7 @@ describe('copy lint', () => {
     expect(ending('they ghosted me after round 4', { product: true, last: false })).toEqual([])
     expect(ending('they ghosted me after round 4', { product: false, last: true })).toEqual([])
     // lintPost marks the last slide.
-    const hits = lintPost({ texts: ['the job app wanted my resume typed out AGAIN', 'two', 'three', 'and SideStep applies for you'], caption: 'Ad: it fills the app', hashtags: [], product: true, standard: true }, { lists: { products: ['SideStep'] } })
+    const hits = lintPost({ texts: ['the job app wanted my resume typed out AGAIN', 'two', 'three', 'and SideStep applies for you'], caption: 'Ad: it fills the app', hashtags: [], product: true, standard: true }, { lists: { products: ['SideStep'] }, off: LINE })
     expect(hits.map(h => [h.rule, h.slide])).toEqual([['lint-product-ending', 3]])
   })
 })
@@ -120,7 +123,7 @@ describe('playbook codes', () => {
   })
 
   it('every other post (no product, or a product that adds no rules): the long dash check only (section 29)', () => {
-    const general = (text: string, kind: 'hook' | 'slide' | 'caption' = 'hook') => lintCopy(text, { kind }).map(h => h.rule)
+    const general = (text: string, kind: 'hook' | 'slide' | 'caption' = 'hook') => lintCopy(text, { kind, off: LINE }).map(h => h.rule)
     // The Callie video post the owner saw "No job word" on.
     expect(general('Do boys even know what it\'s like to be a girl?')).toEqual([])
     expect(general('Every resume should sound like you', 'slide')).toEqual([])
@@ -130,6 +133,28 @@ describe('playbook codes', () => {
     expect(general(`Week 3 ${String.fromCharCode(8211)} week 9`, 'caption')).toEqual(['lint-dashes'])
     // The dash check can be switched off like any default.
     expect(lintCopy(`a ${String.fromCharCode(8212)} b`, { kind: 'slide', off: ['lint-dashes'] })).toEqual([])
-    expect(lintPost({ texts: ['the hook', 'two should land'], caption: 'Caption', hashtags: [], product: true })).toEqual([])
+    expect(lintPost({ texts: ['the hook', 'two should land'], caption: 'Caption', hashtags: [], product: true }, { off: LINE })).toEqual([])
+  })
+})
+
+describe('line lint (owner, 2026-10-22; UX-PLAN.md section 35, item 5)', () => {
+  const rules = (t: string, kind: 'hook' | 'slide' = 'hook') => lintCopy(t, { kind }).map(h => h.rule)
+  it('flags a line that opens on the setup, on every post (no product rules needed)', () => {
+    expect(rules('So I applied to 40 jobs this week and heard nothing')).toContain('lint-hit-first')
+    expect(rules('Story time: my manager called me into a meeting')).toContain('lint-hit-first')
+    expect(rules('When the recruiter said circle back I was furious')).toContain('lint-hit-first')
+    // A setup word with the feeling right there is a hit.
+    expect(rules('So angry I folded the rejection letter into a swan')).not.toContain('lint-hit-first')
+    expect(rules('Infuriated: the recruiter said circle back in March')).not.toContain('lint-hit-first')
+  })
+  it('flags a line with no clear emotion; a word starting with one counts', () => {
+    expect(rules('The recruiter said they would circle back in March')).toContain('lint-emotion')
+    expect(rules('I was so infuriated I closed the laptop')).not.toContain('lint-emotion')
+    expect(rules('Frustrating does not cover the third interview')).not.toContain('lint-emotion')
+    expect(rules('Sad girl hours at the bus stop')).not.toContain('lint-emotion')
+  })
+  it('runs on slide 1 and on-screen lines only, never blocks, and can be switched off', () => {
+    expect(rules('The recruiter said they would circle back', 'slide')).not.toContain('lint-emotion')
+    expect(lintCopy('So the recruiter called', { kind: 'hook', off: ['lint-hit-first', 'lint-emotion'] })).toEqual([])
   })
 })

@@ -9,7 +9,7 @@ export type GuideColor = 'orange' | 'pink' | 'violet' | 'blue' | 'teal' | 'green
 export type GuideId =
   | 'big-picture' | 'posts' | 'characters' | 'setup-start' | 'setup-face' | 'setup-sheet' | 'setup-file'
   | 'post-idea' | 'post-stills' | 'post-video' | 'post-clone' | 'post-text' | 'post-finish'
-  | 'library' | 'settings' | 'feedback' | 'realism' | 'voice' | 'hooks' | 'slideshow' | 'launch-plan' | 'products' | 'results' | 'download-day'
+  | 'library' | 'settings' | 'feedback' | 'faceless' | 'realism' | 'voice' | 'hooks' | 'slideshow' | 'launch-plan' | 'products' | 'results' | 'download-day'
 
 export interface GuideSection {
   id: GuideId
@@ -115,6 +115,24 @@ export const GUIDE: GuideSection[] = [
     ],
     tips: ['The character is always a new person, never a copy of someone in the inspiration photos.'],
     shots: [{ id: 'characters', caption: 'Your characters' }, { id: 'import-check', caption: 'Import a character file: the template check, and Update Callie' }],
+  },
+  {
+    id: 'faceless', group: 'Set up a character', title: 'Faceless characters', color: 'violet',
+    tagline: 'An account with no face: real places, a voice, a sound bank.',
+    where: 'Characters > New character > Faceless',
+    intro: 'A new character asks Person or Faceless first. A faceless one skips the hero, the sheet, the likeness checks, the Element and every face check: nothing asks for a face. Its page is its file. Doug (31, Peoria IL, laid-off contract data entry, rainy Midwest everyday life) is the first one; start from his file or an empty one.',
+    steps: [
+      'Persona: who, the town, the life details. The name is never shown on screen.',
+      'Place bank: reusable scenes, picked per post like set plates. Write the place only: no person or body part (hands read as AI) and nothing that carries text (packaging, screens, paper, mail, signs, labeled buttons): Soul writes gibberish on them.',
+      'Look rules, the voice and its line formats, and the sound bank (music beds and voiceover clips, each with its search words). Save the file.',
+      'Every still is a plain phone snapshot of a real place, upright portrait and level ("slightly tilted" made Soul rotate the frame, so tilt words are taken out), ending "Level, unedited. Sharp, real phone grain, muted color. No people." Soul 2.0, 9:16, on your plan or the API, its price shown first.',
+      'Its posts are video posts in the same workspace: Still (a place from the bank or your own words), Video (the prompt filled in from the plan row, image-to-video, any model with its price), Sound, Text (the on-screen line, the caption and the hashtags, each with Copy) and Posted. The still shows on the post card.',
+      'A product post: Soul can\'t render labels, so it switches to an edit model (Nano Banana or GPT Image) with the product photo as the reference, its price shown.',
+      'Finished damage: one still, a 7 s "just existing" clip (driving, staring, rain on the windshield), a sad song and the on-screen line. Pick it on the post.',
+      'Faceless cards say Faceless on Characters, and each account links to one character, a person or faceless (Posts home > Accounts).',
+    ],
+    tips: ['Voiceover clips from movie and TV quote sites are not searched automatically: none of them allows it with the rights to post the audio. Upload your own clips to Library > Sounds.'],
+    shots: [],
   },
   {
     id: 'setup-start', group: 'Set up a character', title: 'Step 1: Inspiration', color: 'violet',

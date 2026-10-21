@@ -136,6 +136,12 @@ copy_lint:
   # a word starting with one); a product post's last slide never says these.
   job_words: [job, interview, recruiter, offer, salary, salaries, resume, résumé, hiring, application]
   ending_never: [ghosted, ghosting, passed over, applies for you, apply for you, applies for me, applying for you, auto-apply, auto apply]
+  # Line lint (owner, 2026-10-22; UX-PLAN.md section 35, item 5), on every
+  # post's slide 1 and on-screen line: a line that opens on one of these
+  # setups (with no feeling in its first words), and a line with none of the
+  # emotion words (a word starting with one counts: infuriat, frustrat).
+  setup_openers: [so, okay so, ok so, when, me when, story time, storytime, let me tell you, "here's", here is, this is, imagine, remember when, once, one time, yesterday, today, the other day, last week, after, before, if you, what happens when, pov, day 1, part 1, a thread, quick story]
+  emotion_words: [angry, anger, furious, fuming, infuriat, livid, rage, raging, mad, pissed, seething, sad, sadness, cried, cry, crying, sobbing, tears, heartbroken, devastat, gutted, crushed, grief, lonely, frustrat, fed up, sick of, over it, exhausted, drained, burned out, burnt out, humiliat, embarrass, ashamed, shame, terrified, scared, afraid, panic, anxious, dread, hate, hopeless, defeated, numb, broken, shaking, screaming, scream, betrayed, insulted, disgust, miserable, jealous, bitter, spiral]
 
 # Results (owner, 2026-10-17; UX-PLAN.md section 32): the decision hints on
 # a post's card and in Posts home > Results, never automatic (the
