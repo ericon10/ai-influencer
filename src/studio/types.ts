@@ -132,7 +132,7 @@ export interface Candidate {
 export type ShotStatus = 'pending' | 'generating' | 'in_review' | 'approved' | 'stale'
 
 export interface Shot {
-  id: string; label: string; view: string; framing: 'chest_up' | 'full_body'; aspect: string; attach: string[]
+  id: string; label: string; view: string; framing: 'chest_up' | 'waist_up' | 'full_body'; aspect: string; attach: string[]
   status: ShotStatus; staleReason: string
   approved: { candidateId: string; assetId: string | null } | null
   candidates: Candidate[]
