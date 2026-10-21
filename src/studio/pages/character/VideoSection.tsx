@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { FINISHED_DAMAGE } from '../../../../server/core/faceless'
 import { useQuery } from '@tanstack/react-query'
 import { AlertTriangle, Check, CheckCircle2, Download, Film, Info, Loader2, RotateCcw, Wand2, XCircle } from 'lucide-react'
 import { api, ApiError, assetUrl } from '../../api'
@@ -28,7 +29,7 @@ const usable = (c: SceneStill) => c.media === 'image' && !!c.assetId && !['faile
 // from its last frame.
 // `extraDirections`: a shot slot's direction from a two-shot edit (Phase 5),
 // added to the take's directions (for example "ends with a fast whip pan").
-export function VideoSection({ v, data, scene, startId, setStartId, onUseTake, usedId = null, preferModel = null, takesFrom = null, extraDirections = '' }: { v: CharacterView; data: ScenesData; scene: SceneView; startId: string | null; setStartId: (id: string | null) => void; onUseTake?: (id: string) => void | Promise<void>; usedId?: string | null; preferModel?: string | null; takesFrom?: string | null; extraDirections?: string }) {
+export function VideoSection({ v, data, scene, startId, setStartId, onUseTake, usedId = null, preferModel = null, takesFrom = null, extraDirections = '', recipe = null }: { v: CharacterView; data: ScenesData; scene: SceneView; startId: string | null; setStartId: (id: string | null) => void; onUseTake?: (id: string) => void | Promise<void>; usedId?: string | null; preferModel?: string | null; takesFrom?: string | null; extraDirections?: string; recipe?: 'finished_damage' | null }) {
   const toast = useToast()
   const refresh = useRefresh()
   const o = data.options.video
@@ -41,7 +42,8 @@ export function VideoSection({ v, data, scene, startId, setStartId, onUseTake, u
   // "Caught you" scene; every other clip is free in its shots.
   const [directions, setDirections] = useState(scene.fields.momentType === 'caught_you' ? o.directionsCaughtYou ?? o.directions : o.directions)
   const allDirections = [extraDirections.trim(), directions.trim()].filter(Boolean).join(' ')
-  const [duration, setDuration] = useState(o.duration)
+  // Finished damage (item 4j): a 7 s just-existing take.
+  const [duration, setDuration] = useState(recipe === 'finished_damage' ? FINISHED_DAMAGE.durationSec : o.duration)
   const [aspect, setAspect] = useState(o.aspect)
   const [audio, setAudio] = useState(false)
   const [takes, setTakes] = useState(o.takes)
@@ -64,7 +66,7 @@ export function VideoSection({ v, data, scene, startId, setStartId, onUseTake, u
   // "What happens in the video" (owner, 2026-10-13: one box). "Use this
   // still" has Claude write the motion into it; edit it, or press Rewrite.
   // The take sends exactly what is in it.
-  const [motion, setMotion] = useState(written?.text ?? '')
+  const [motion, setMotion] = useState(written?.text ?? (recipe === 'finished_damage' ? FINISHED_DAMAGE.personMotion(v.data.name) : ''))
   // What the writer starts from: the box's saved text, else the idea.
   const seed = (scene.fields.moment || scene.brief || '').trim()
   const [open, setOpen] = useState<string | null>(null)
@@ -161,7 +163,7 @@ export function VideoSection({ v, data, scene, startId, setStartId, onUseTake, u
                   )}
                 </PromptBox>
               ) : (
-                <Field id="video-motion" label="What happens in the video" required done={motion.trim().length >= 3} hint="Motion only: one action and at most one camera move. Calm motion keeps the face steady.">
+                <Field id="video-motion" label="What happens in the video" required done={motion.trim().length >= 3} hint="What happens, beat by beat: as many actions, camera moves and shots as the idea needs. The face stays clear and the outfit stays the same.">
                   <textarea className="st-textarea" rows={3} style={{ minHeight: 0 }} maxLength={3000} value={motion} onChange={e => setMotion(e.target.value)} placeholder={`e.g. ${v.data.name} laughs softly and turns toward the camera`} />
                   <details className="st-directions">
                   <summary>Directions, added after it: <span className="st-muted">{allDirections || 'none'}</span></summary>
@@ -189,7 +191,7 @@ export function VideoSection({ v, data, scene, startId, setStartId, onUseTake, u
               <div className="st-form">
                 {!test && (
                   <Field label="Length" group>
-                    <div className="st-row" style={{ gap: 6, flexWrap: 'wrap' }}>{o.durations.map(d => <button key={d} type="button" className={`st-chip ${duration === d ? 'on' : ''}`} onClick={() => setDuration(d)}>{d} s</button>)}</div>
+                    <div className="st-row" style={{ gap: 6, flexWrap: 'wrap' }}>{[...new Set([...o.durations, duration])].sort((a, b) => a - b).map(d => <button key={d} type="button" className={`st-chip ${duration === d ? 'on' : ''}`} onClick={() => setDuration(d)}>{d} s</button>)}</div>
                   </Field>
                 )}
                 <Field label="Shape" group>

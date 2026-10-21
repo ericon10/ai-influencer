@@ -1,4 +1,5 @@
 import { writeFile, readFile } from 'node:fs/promises'
+import { soundToAdd } from '../core/faceless.js'
 import { join } from 'node:path'
 import { and, desc, eq, inArray, isNull, sql } from 'drizzle-orm'
 import { zipSync } from 'fflate'
@@ -302,6 +303,9 @@ const memeSpec = z.object({
   // the still's line, a product, the video prompt, the post's caption and
   // hashtags, the sound picks, Posted (server/pipeline/faceless.ts reads it).
   faceless: z.record(z.string(), z.unknown()).nullable().default(null),
+  // "Finished damage" on any video post (owner, 2026-10-22, item 4j): one
+  // still, a 7 s just-existing clip, a sad song and the on-screen line.
+  recipe: z.enum(['finished_damage']).nullable().default(null),
   // Section 33: Approve for posting, its own day and slot, the Download day
   // zip it went into. Never copied.
   posting: postingSchema.nullable().default(null),
@@ -1063,7 +1067,12 @@ export async function videoPostJson(deps: Deps, ctx: Ctx, row: ContentRow, video
   const ch = row.characterId ? toData(await getCharacter(deps, ctx, row.characterId)) : null
   const plan = s.plan
   const max = deps.config.pipeline.content.slideshow.hashtags[1]
+  // A faceless post's own caption and hashtags when it has no plan row's.
+  const f = (s.faceless ?? {}) as { postCaption?: string; hashtags?: string[]; musicName?: string; voiceover?: { search?: string } | null }
+  if (!plan.caption && f.postCaption) plan.caption = f.postCaption
+  if (!plan.hashtags.length && f.hashtags?.length) plan.hashtags = f.hashtags
   return videoPostExportJson({
+    sound: soundToAdd(f),
     post: { id: row.id, kind: row.kind, title: row.title, idea: row.idea, accountTag: row.accountTag, characterId: row.characterId, characterName: ch?.name ?? null, variationOf: row.variationOf, batchOf: row.batchOf, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString() },
     video: { file: video.file, assetId: video.assetId, durationSec: video.durationSec, onScreenText: s.caption, captionOff: s.captionOff },
     caption: { text: plan.caption, hashtags: plan.hashtags.slice(0, max), ctaLine: plan.cta, ad: plan.product, asPosted: postCaption(plan.caption, plan.hashtags, { ad: plan.product, max, cta: plan.cta }) },

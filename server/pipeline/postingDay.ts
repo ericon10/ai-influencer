@@ -1,4 +1,5 @@
 import { and, desc, eq, inArray, isNull, like, sql } from 'drizzle-orm'
+import { soundLine, soundToAdd } from '../core/faceless.js'
 import { zipSync } from 'fflate'
 import { contentItems, jobs } from '../db/schema.js'
 import type { Ctx, Deps } from '../context.js'
@@ -110,6 +111,7 @@ function dayPost(deps: Deps, row: ContentRow): DayPost {
     approved: isApproved(posting, s.review), packed: posting.packed,
     exported, exportedAt: exported ? o.renderedAt ?? null : null, rendering: row.status === 'rendering',
     missing, problem, rowId: String(s.plan?.rowId ?? ''),
+    sound: soundLine(soundToAdd((s as { faceless?: Parameters<typeof soundToAdd>[0] }).faceless)),
   }
 }
 

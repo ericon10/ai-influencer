@@ -101,7 +101,7 @@ function PostClip({ ctx }: { ctx: PostCtx }) {
           {way === 'animate' && (
             !scene || !scenes || !v ? <Callout tone="info">A video from a still starts from a photo of this post. Make one in the Stills step, or pick one there from the Library.</Callout>
               : !hasStills ? <Callout tone="info">No stills in this post yet. Make one in the Stills step above, then make the video from it here.</Callout>
-              : <VideoSection v={v} data={scenes} scene={scene} startId={spec.stillId} setStartId={id => draft.setSpec({ stillId: id })} onUseTake={use} usedId={spec.clipId} extraDirections={twoShot?.slots?.a ?? ''} />
+              : <VideoSection v={v} data={scenes} scene={scene} startId={spec.stillId} setStartId={id => draft.setSpec({ stillId: id })} onUseTake={use} usedId={spec.clipId} extraDirections={twoShot?.slots?.a ?? ''} recipe={(spec as { recipe?: 'finished_damage' | null }).recipe ?? null} key={`${scene.id}-${(spec as { recipe?: string | null }).recipe ?? ''}`} />
           )}
           {way === 'clone' && <ClonePanel ctx={ctx} onUse={use} usedIds={spec.clipId ? [spec.clipId] : []} />}
         </>

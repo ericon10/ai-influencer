@@ -96,9 +96,25 @@ export function facelessProductPrompt(base: string, product: string): string {
 // "Finished damage" (owner, 2026-10-22, item 4j): one still, a 7 s "just
 // existing" clip, a sad song and the on-screen line.
 export const FINISHED_DAMAGE = {
+  // A person character's take: the same nothing-happens clip, with them in it.
+  personMotion: (name: string) => `${name} just exists: sits still in the parked car staring ahead while rain runs down the windshield, the light barely changes, the phone propped up on the dash. Nothing else happens.`,
   durationSec: 7,
   motion: 'Nothing happens: just existing. The rain keeps running down the glass, the light barely changes, the camera holds still like a phone propped up. No cuts.',
   musicSearch: 'sad',
+}
+
+// The sound a post's export asks the owner to add in the app (owner,
+// 2026-10-22): its music bed's name and the voiceover's search words, from
+// a faceless post's fields (or any post's Finished damage note). No clip is
+// fetched or mixed: the sound is added on TikTok or Instagram.
+export function soundToAdd(f: { musicName?: unknown; voiceover?: { search?: unknown } | null } | null | undefined): { music: string; voiceover: string } | null {
+  const music = typeof f?.musicName === 'string' ? f.musicName.trim() : ''
+  const voiceover = typeof f?.voiceover?.search === 'string' ? f.voiceover.search.trim() : ''
+  return music || voiceover ? { music, voiceover } : null
+}
+export function soundLine(s: { music: string; voiceover: string } | null): string {
+  if (!s) return ''
+  return `Add this sound in the app: ${[s.music ? `music "${s.music}"` : '', s.voiceover ? `voiceover "${s.voiceover}"` : ''].filter(Boolean).join(', ')}`
 }
 
 // The file read from stored JSON (fields missing in an older one stay empty).

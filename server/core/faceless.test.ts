@@ -29,3 +29,12 @@ describe('faceless stills', () => {
     expect(readFaceless({ persona: { who: 'x' } }).places).toEqual([])
   })
 })
+
+describe('the sound to add in the app (2026-10-22)', () => {
+  it('names the music and the voiceover words; nothing when neither is set', async () => {
+    const { soundToAdd, soundLine } = await import('./faceless.js')
+    expect(soundToAdd({ musicName: 'Sad piano bed', voiceover: { search: 'it is what it is' } })).toEqual({ music: 'Sad piano bed', voiceover: 'it is what it is' })
+    expect(soundLine(soundToAdd({ musicName: 'Sad piano bed' }))).toBe('Add this sound in the app: music "Sad piano bed"')
+    expect(soundToAdd({})).toBeNull()
+  })
+})

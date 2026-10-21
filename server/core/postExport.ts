@@ -147,6 +147,8 @@ export interface VideoExportInput {
   aiLabel: string
   exportedAt: string
   results?: PostResults | null
+  // A sound to add in the app (a faceless post's music and voiceover words).
+  sound?: { music: string; voiceover: string } | null
 }
 export function videoPostExportJson(i: VideoExportInput): Record<string, unknown> {
   return {
@@ -162,6 +164,7 @@ export function videoPostExportJson(i: VideoExportInput): Record<string, unknown
     caption: { text: i.caption.text, hashtags: i.caption.hashtags, ad: i.caption.ad, cta_line: i.caption.ctaLine || null, as_posted: i.caption.asPosted },
     plan: planJson(i.plan),
     results: resultsJson(i.results),
+    ...(i.sound ? { sound_to_add: { music: i.sound.music || null, voiceover_search: i.sound.voiceover || null, note: 'Add this sound in the app.' } } : {}),
     ai_label: i.aiLabel,
   }
 }

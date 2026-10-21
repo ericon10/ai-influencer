@@ -69,6 +69,8 @@ export interface DayPost {
   problem: string | null
   // The plan's row (a tie-break in the order), or ''.
   rowId: string
+  // A sound to add in the app ("Add this sound in the app: ..."), or ''.
+  sound?: string
 }
 
 // Posting order: by the slot's clock time (a slot with no time last), then
@@ -149,14 +151,14 @@ export function dayTitle(date: string): string {
 
 // checklist.txt: one line per post in posting order, each with its account,
 // slot time, hook, Ad yes or no and "AI-generated label: on".
-export function checklistText(date: string, posts: Array<Pick<DayPost, 'id' | 'account' | 'slot' | 'hook' | 'ad' | 'kind'>>, folders: Map<string, string>, times: SlotTimes, madeAt: string): string {
+export function checklistText(date: string, posts: Array<Pick<DayPost, 'id' | 'account' | 'slot' | 'hook' | 'ad' | 'kind'> & { sound?: string }>, folders: Map<string, string>, times: SlotTimes, madeAt: string): string {
   const head = [
     `Download day: ${dayTitle(date)}`,
     `${posts.length} post${posts.length === 1 ? '' : 's'}, in posting order. Made ${madeAt}.`,
     'Post each one from its folder: the slides in number order (or video.mp4), the words in caption.txt. Turn on the AI-generated content label on every post.',
     '',
   ]
-  const lines = posts.map((p, i) => `[ ] ${i + 1}. ${p.account} | ${when(p.slot, times)} | Hook: ${hookLine(p.hook)} | Ad: ${p.ad ? 'yes' : 'no'} | AI-generated label: on | ${folders.get(p.id) ?? ''}/`)
+  const lines = posts.map((p, i) => `[ ] ${i + 1}. ${p.account} | ${when(p.slot, times)} | Hook: ${hookLine(p.hook)} | Ad: ${p.ad ? 'yes' : 'no'} | AI-generated label: on${p.sound ? ` | ${p.sound}` : ''} | ${folders.get(p.id) ?? ''}/`)
   return [...head, ...(lines.length ? lines : ['Nothing to post on this day.'])].join('\n') + '\n'
 }
 

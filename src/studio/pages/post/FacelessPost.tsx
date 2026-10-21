@@ -22,7 +22,7 @@ import { FinishStep } from './FinishStep'
 interface FacelessSpec {
   placeId?: string | null; line?: string; product?: { assetId: string; name: string } | null; videoPrompt?: string
   postCaption?: string; hashtags?: string[]; music?: string | null; voiceover?: { search: string; note: string } | null
-  posted?: boolean; recipe?: 'finished_damage' | null; stillAssetId?: string; clipAssetId?: string
+  posted?: boolean; recipe?: 'finished_damage' | null; stillAssetId?: string; clipAssetId?: string; musicName?: string
 }
 
 function Drawer({ id, icon, title, sum, open, onToggle, children }: { id: string; icon: ReactNode; title: string; sum: ReactNode; open: boolean; onToggle: () => void; children: ReactNode }) {
@@ -34,6 +34,15 @@ function Drawer({ id, icon, title, sum, open, onToggle, children }: { id: string
       {open && <div className="st-card-body st-col" style={{ gap: 12 }}>{children}</div>}
     </section>
   )
+}
+
+// A quote site's search in a new tab, the words already in it (owner,
+// 2026-10-22): a link only; nothing is fetched, scraped or downloaded.
+export const quoteSearchUrl = (site: 'PlayPhrase.me' | 'GetYarn.io', words: string) =>
+  site === 'PlayPhrase.me' ? `https://www.playphrase.me/#/search?q=${encodeURIComponent(words.trim())}` : `https://getyarn.io/yarn-find?text=${encodeURIComponent(words.trim())}`
+function QuoteSearch({ site, words }: { site: 'PlayPhrase.me' | 'GetYarn.io'; words: string }) {
+  if (!words.trim()) return <button type="button" className="st-btn sm ghost" disabled title="Type the search words first">Search {site}</button>
+  return <a className="st-btn sm ghost" href={quoteSearchUrl(site, words)} target="_blank" rel="noopener noreferrer" data-field={`search-${site}`}>Search {site}</a>
 }
 
 function CopyLine({ label, text }: { label: string; text: string }) {
@@ -160,7 +169,7 @@ export function FacelessPost({ ctx }: { ctx: PostCtx }) {
       </Drawer>
 
       <Drawer id="sound" icon={<Music size={16} />} title="Sound" open={open === 'sound'} onToggle={() => toggle('sound')}
-        sum={(spec.sound as { music?: string | null } | undefined)?.music ? `Music: ${music.find(m => m.id === (spec.sound as { music?: string }).music)?.title ?? 'picked'}` : 'No music yet'}>
+        sum={[f.musicName ? `Add in the app: ${f.musicName}` : (spec.sound as { music?: string | null } | undefined)?.music ? `Music: ${music.find(m => m.id === (spec.sound as { music?: string }).music)?.title ?? 'picked'}` : 'No sound yet', f.voiceover?.search ? `voiceover "${f.voiceover.search}"` : ''].filter(Boolean).join(' · ')}>
         <label className="st-col" style={{ gap: 4 }}><span className="st-label">Music bed (Library &gt; Sounds)</span>
           <select className="st-select" value={(spec.sound as { music?: string | null } | undefined)?.music ?? ''} aria-label="Music bed" onChange={e => draft.setSpec({ sound: { ...(spec.sound ?? {}), music: e.target.value || null } })}>
             <option value="">No music</option>
@@ -168,10 +177,19 @@ export function FacelessPost({ ctx }: { ctx: PostCtx }) {
           </select>
         </label>
         {file.sounds.filter(s => s.kind === 'music').length > 0 && <span className="st-hint">From the sound bank: {file.sounds.filter(s => s.kind === 'music').map(s => `${s.name} (search "${s.search}")`).join(', ')}.</span>}
+        <div className="st-col" style={{ gap: 4 }} data-field="faceless-sound-name">
+          <div className="st-row" style={{ gap: 8 }}><span className="st-label grow">Sound to add in the app</span><CopyLine label="sound name" text={f.musicName ?? ''} /></div>
+          <input className="st-input" list={`bank-${item.id}`} value={f.musicName ?? ''} placeholder="the song or sound's name" aria-label="Sound name" onChange={e => setF({ musicName: e.target.value })} />
+          <datalist id={`bank-${item.id}`}>{file.sounds.filter(s => s.kind === 'music').map(s => <option key={s.id} value={s.name} />)}</datalist>
+        </div>
         <div className="st-col" style={{ gap: 4 }} data-field="faceless-voiceover">
-          <span className="st-label">Voiceover clip</span>
+          <div className="st-row" style={{ gap: 8 }}><span className="st-label grow">Voiceover search words</span><CopyLine label="voiceover search words" text={f.voiceover?.search ?? ''} /></div>
           <input className="st-input" value={f.voiceover?.search ?? ''} placeholder="the line's search words" aria-label="Voiceover search words" onChange={e => setF({ voiceover: { search: e.target.value, note: f.voiceover?.note ?? '' } })} />
-          <span className="st-hint">Movie and TV quote clips are not searched automatically: none of the quote sites allows it with the rights to post the audio. Upload your own clip to Library &gt; Sounds and pick it in the Finish step's Sound row.</span>
+          <div className="st-row" style={{ gap: 8, flexWrap: 'wrap' }}>
+            <QuoteSearch site="PlayPhrase.me" words={f.voiceover?.search ?? ''} />
+            <QuoteSearch site="GetYarn.io" words={f.voiceover?.search ?? ''} />
+          </div>
+          <span className="st-hint">The buttons open the site in a new tab with the words already searched. The Studio never fetches or downloads clips; the export notes "Add this sound in the app" with the name and the words.</span>
         </div>
       </Drawer>
 

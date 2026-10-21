@@ -128,10 +128,10 @@ export const GUIDE: GuideSection[] = [
       'Every still is a plain phone snapshot of a real place, upright portrait and level ("slightly tilted" made Soul rotate the frame, so tilt words are taken out), ending "Level, unedited. Sharp, real phone grain, muted color. No people." Soul 2.0, 9:16, on your plan or the API, its price shown first.',
       'Its posts are video posts in the same workspace: Still (a place from the bank or your own words), Video (the prompt filled in from the plan row, image-to-video, any model with its price), Sound, Text (the on-screen line, the caption and the hashtags, each with Copy) and Posted. The still shows on the post card.',
       'A product post: Soul can\'t render labels, so it switches to an edit model (Nano Banana or GPT Image) with the product photo as the reference, its price shown.',
-      'Finished damage: one still, a 7 s "just existing" clip (driving, staring, rain on the windshield), a sad song and the on-screen line. Pick it on the post.',
+      'Finished damage: one still, a 7 s "just existing" clip (driving, staring, rain on the windshield), a sad song and the on-screen line. The switch is on every video post: on a person\'s post it fills the Video step\'s take (7 s, the just-existing motion, both editable) and lists what is left.',
       'Faceless cards say Faceless on Characters, and each account links to one character, a person or faceless (Posts home > Accounts).',
     ],
-    tips: ['Voiceover clips from movie and TV quote sites are not searched automatically: none of them allows it with the rights to post the audio. Upload your own clips to Library > Sounds.'],
+    tips: ['The Sound drawer keeps the sound\'s name and the voiceover\'s search words, each with Copy, and Search PlayPhrase.me and Search GetYarn.io open those sites in a new tab with the words already searched. The Studio never fetches or downloads a clip: post.json and the Download day checklist say "Add this sound in the app" with the name and the words.'],
     shots: [],
   },
   {
