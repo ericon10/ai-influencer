@@ -188,6 +188,7 @@ export interface BuiltAction {
 
 const QA_SIZE: Record<string, { width: number; height: number }> = {
   chest_up: { width: 1176, height: 1568 },
+  waist_up: { width: 1176, height: 1568 },
   full_body: { width: 882, height: 1568 },
 }
 

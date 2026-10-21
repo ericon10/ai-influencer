@@ -172,6 +172,8 @@ export const GUIDE: GuideSection[] = [
     intro: 'The sheet is REF-00 plus 11 more shots: three-quarter and profile on both sides, the back of the head, full body front, side and back, and three expressions. Stills attach the closest ones, so the face holds from any angle.',
     steps: [
       'Open a shot and press Generate (it attaches the shots it depends on).',
+      'Build refs (the switch above the sheet) adds REF-12 (front, waist-up) and REF-13 (three-quarter, waist-up), made and checked like the others; waist-up and knees-up scenes then send the closest one so the build carries. Any shot\'s drawer can Add, Replace or Remove its image without a rebuild.',
+      'Elements are made on Higgsfield. Name each one in the character file\'s Models section with the REFs that built it, for example: Higgsfield Element "Callie build": <its id>, built from REF-00, REF-12 and REF-13. A character can have several.',
       'Review the result: approve it, or pick a reason and Regenerate with the fix.',
       'Check this asks Claude to look at the marks and sides (priced). The free face match always runs.',
       'When all 12 are approved, the sheet is complete.',

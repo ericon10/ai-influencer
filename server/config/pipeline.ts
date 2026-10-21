@@ -15,17 +15,20 @@ const sheetSchema = z.object({
   settings: z.object({
     quality: z.string(),
     resolution: z.string(),
-    aspect: z.object({ chest_up: z.string(), full_body: z.string() }),
+    aspect: z.object({ chest_up: z.string(), full_body: z.string(), waist_up: z.string().default('3:4') }),
     upscale_ref00_below_px: z.number().int().positive(),
   }),
   shots: z.array(z.object({
     id: z.string().regex(/^REF-\d{2}$/),
     label: z.string(),
     view: z.string(),
-    framing: z.enum(['chest_up', 'full_body']),
+    framing: z.enum(['chest_up', 'waist_up', 'full_body']),
     expression: z.string(),
     attach: z.array(z.string()),
     source: z.enum(['hero', 'generate']).default('generate'),
+    // The build refs (owner, 2026-10-22, item 3e): REF-12 and REF-13 are
+    // made only for a character with "Build refs" on (or once one exists).
+    optional: z.boolean().default(false),
   })).min(1),
 })
 

@@ -8,7 +8,7 @@ import { newId } from '../lib/ids.js'
 import { sha256Hex } from '../lib/passwords.js'
 import { AppError } from '../lib/errors.js'
 import { getAsset, saveAsset } from '../storage/assets.js'
-import { approvedAssets, createCharacter, getCharacter, getRef, refRows, setCharacterFields, toData, updateCharacter } from './characters.js'
+import { approvedAssets, createCharacter, ensureSheet, getCharacter, getRef, refRows, setCharacterFields, toData, updateCharacter } from './characters.js'
 import { markDependentsStale } from './review.js'
 import { scoreDistinctness } from './identity.js'
 import { liveRoute } from './settings.js'
@@ -89,6 +89,8 @@ export function mergeReimport(current: CharacterData, incoming: CharacterData, w
 // and marks the shots built on it for re-check, as a regeneration would.
 export async function attachSheetImages(deps: Deps, ctx: Ctx, characterId: string, images: Record<string, { data: Buffer; mime?: string }>, label?: string, unchanged: string[] = [], opts: { stale?: boolean } = {}): Promise<string[]> {
   const shots = deps.config.pipeline.sheet.shots
+  // A character made before REF-12 and REF-13 existed gets their rows now.
+  await ensureSheet(deps, ctx, characterId)
   const name = label ?? (await getCharacter(deps, ctx, characterId)).name
   const attached: string[] = []
   const order = Object.keys(images).sort()

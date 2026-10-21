@@ -38,13 +38,15 @@ sheet:
 
 framing:
   chest_up: "Chest-up framing, from mid-chest to just above the top of the head"
+  waist_up: "Waist-up framing, from just below the waist to just above the top of the head, arms relaxed at the sides so the build reads"
   full_body: "Full-body framing, standing, the whole body visible from head to toe with a little space above and below"
 
 outfit:
   chest_up: "wearing a simple white crew-neck t-shirt"
+  waist_up: "wearing a simple white crew-neck t-shirt tucked into high-rise blue jeans"
   full_body: "wearing a simple white crew-neck t-shirt tucked into high-rise blue jeans and plain white sneakers"
 
-# Full-body shots only (SPEC 5.1 rules 9 and 10).
+# Full-body and waist-up (build ref) shots (SPEC 5.1 rules 9 and 10).
 body_line: " Build: {body}. The tee is tucked in so the waist reads."
 
 expressions:

@@ -26,6 +26,7 @@ const identitySchema = z.object({
   promptBlock: z.string().optional(),
   followUp: z.object({ name: z.string(), model: z.string().optional(), text: z.string() }).optional(),
   notes: z.string().optional(),
+  refs: z.array(z.string()).optional(),
 })
 
 const frontSchema = z.object({
@@ -104,6 +105,18 @@ function markLine(m: CharacterMark, poss: string): string {
 
 const OWNED = ['card', 'distinguishing marks', 'body', 'makeup', 'notes']
 
+// The REFs an identity line names ("Element "Wren": 4b2a..., built from
+// REF-00, REF-12 and REF-13"), in order, once each. A character can have
+// several Elements, each from its own REFs.
+export function refsIn(line: string): string[] {
+  const out: string[] = []
+  for (const m of line.matchAll(/\bREF[\s_-]*(\d{1,2})(?!\d)/gi)) {
+    const id = `REF-${m[1]!.padStart(2, '0')}`
+    if (Number(m[1]) <= 13 && !out.includes(id)) out.push(id)
+  }
+  return out
+}
+
 // One key order for identities, so exports are stable however they were built.
 function canonicalIdentity(i: CharacterIdentity): CharacterIdentity {
   const out: CharacterIdentity = { provider: i.provider, kind: i.kind, name: i.name, externalId: i.externalId, status: i.status }
@@ -111,6 +124,7 @@ function canonicalIdentity(i: CharacterIdentity): CharacterIdentity {
   if (i.promptBlock) out.promptBlock = i.promptBlock
   if (i.followUp) out.followUp = { name: i.followUp.name, ...(i.followUp.model ? { model: i.followUp.model } : {}), text: i.followUp.text }
   if (i.notes) out.notes = i.notes
+  if (i.refs?.length) out.refs = i.refs
   return out
 }
 
@@ -404,6 +418,7 @@ export function importFreeform(md: string, opts: ImportOptions = {}): ImportResu
         provider: /higgsfield|soul|element/i.test(line) ? 'higgsfield' : 'unknown',
         kind, name: line.match(/["“]([^"”]+)["”]/)?.[1] ?? name, externalId: id, status,
         ...(kind === 'trained' && modelIn(line, models) ? { model: modelIn(line, models)! } : {}),
+        ...(refsIn(line).length ? { refs: refsIn(line) } : {}),
         notes: b.value,
       })
       continue
@@ -444,6 +459,7 @@ export function importFreeform(md: string, opts: ImportOptions = {}): ImportResu
       provider: /higgsfield|soul|element/i.test(line) ? 'higgsfield' : 'unknown',
       kind, name: line.match(/["“]([^"”]+)["”]/)?.[1] ?? name, externalId: id, status: 'ready',
       ...(kind === 'trained' && modelIn(line, models) ? { model: modelIn(line, models)! } : {}),
+      ...(refsIn(line).length ? { refs: refsIn(line) } : {}),
       notes: b.value,
     })
   }
@@ -497,7 +513,7 @@ export function importFreeform(md: string, opts: ImportOptions = {}): ImportResu
   for (const i of identities) {
     const what = i.kind === 'element' ? 'Element' : `${models.find(m => m.ref === i.model)?.label ?? 'trained'} character`
     const extras = [i.promptBlock ? 'with its prompt block' : '', i.followUp ? `with a ${i.followUp.name.toLowerCase()} pass` : ''].filter(Boolean).join(' and ')
-    warnings.push(`Identity: ${i.provider === 'higgsfield' ? 'Higgsfield ' : ''}${what} "${i.name}"${extras ? `, ${extras}` : ''}${i.status !== 'ready' ? ` (${i.status})` : ''}.`)
+    warnings.push(`Identity: ${i.provider === 'higgsfield' ? 'Higgsfield ' : ''}${what} "${i.name}"${extras ? `, ${extras}` : ''}${i.refs?.length ? `, built from ${i.refs.join(', ')}` : ''}${i.status !== 'ready' ? ` (${i.status})` : ''}.`)
   }
 
   // Keep everything the Studio does not model, as written.

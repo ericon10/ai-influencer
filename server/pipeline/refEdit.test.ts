@@ -65,3 +65,35 @@ describe('characters (item 3)', () => {
     expect((await listCharacters(h.deps, h.ctx)).some(c => c.id === half)).toBe(true)
   })
 })
+
+describe('build refs (item 3e, 2026-10-22)', () => {
+  it('Build refs adds REF-12 and REF-13 to the sheet steps; their prompts are waist-up with the build; off, the sheet is complete at 12', async () => {
+    const { buildSheetPrompt } = await import('../core/prompts.js')
+    const { setBuildRefs, getCharacter, toData } = await import('./characters.js')
+    expect((await characterView(h.deps, h.ctx, callie)).sheet.progress).toMatchObject({ total: 12, complete: true })
+    await setBuildRefs(h.deps, h.ctx, callie, true)
+    const v = await characterView(h.deps, h.ctx, callie)
+    expect(v.buildRefs).toBe(true)
+    expect(v.sheet.progress).toMatchObject({ approved: 12, total: 14, complete: false })
+    expect(v.sheet.next).toMatchObject({ refId: 'REF-12', action: 'generate' })
+    const shot = h.deps.config.pipeline.sheet.shots.find(s => s.id === 'REF-13')!
+    const p = buildSheetPrompt(h.deps.config.pipeline.templates, h.deps.config.pipeline.views, shot, toData(await getCharacter(h.deps, h.ctx, callie)))
+    expect(p).toMatch(/Waist-up framing/)
+    expect(p).toMatch(/Build: /)
+    expect(p).toMatch(/Bare face, no makeup/)
+    // An imported REF-12 lands like any shot; off again, it stays (one exists).
+    await setRefImage(h.deps, h.ctx, callie, 'REF-12', { data: await renderPlaceholderPortrait('REF-12'), mime: 'image/png' })
+    await setBuildRefs(h.deps, h.ctx, callie, false)
+    expect((await characterView(h.deps, h.ctx, callie)).sheet.progress).toMatchObject({ approved: 13, total: 13 })
+  })
+
+  it('a waist-up scene sends the closest build ref; the character file names each Element and the REFs that built it', async () => {
+    const { pickSceneRefs } = await import('../core/scenes.js')
+    const { refsIn } = await import('../core/characterFile.js')
+    const cfg = h.deps.config.pipeline
+    const approved = new Set(['REF-00', 'REF-01', 'REF-06', 'REF-12', 'REF-13'])
+    const picks = pickSceneRefs(cfg.sheet.shots, cfg.views, approved, { view: 'three_quarter_left', framing: 'waist_up', expression: 'neutral' }, cfg.scenes)
+    expect(picks).toContainEqual({ refId: 'REF-13', role: 'body' })
+    expect(refsIn('Higgsfield Element "Callie build": 4b2a1c3d-0000-4000-8000-000000000001, built from REF-00, REF 12 and ref_13')).toEqual(['REF-00', 'REF-12', 'REF-13'])
+  })
+})

@@ -178,9 +178,21 @@ export async function approvedAssets(deps: Deps, ctx: Ctx, characterId: string):
   return out
 }
 
+// "Build refs" (owner, 2026-10-22; item 3e): REF-12 and REF-13 are part of
+// a character's sheet when the switch is on, or once one of them exists.
+export const buildRefsOn = (row: CharacterRow): boolean => (row.features as { buildRefs?: boolean } | null)?.buildRefs === true
+export async function setBuildRefs(deps: Deps, ctx: Ctx, characterId: string, on: boolean): Promise<void> {
+  const row = await getCharacter(deps, ctx, characterId)
+  await deps.db.update(characters).set({ features: { ...((row.features as object) ?? {}), buildRefs: on }, updatedAt: deps.clock.now() }).where(eq(characters.id, row.id))
+  if (on) await ensureSheet(deps, ctx, characterId)
+}
+
 export async function sheetState(deps: Deps, ctx: Ctx, characterId: string) {
-  const shots = deps.config.pipeline.sheet.shots
+  const all = deps.config.pipeline.sheet.shots
   const refs = await refRows(deps, ctx, characterId)
+  const row = await getCharacter(deps, ctx, characterId)
+  const used = (id: string) => { const r = refs.find(x => x.refId === id); return !!r && r.status !== 'pending' }
+  const shots = all.filter(s => !s.optional || buildRefsOn(row) || used(s.id))
   const states: ShotState[] = shots.map(s => ({ refId: s.id, status: (refs.find(r => r.refId === s.id)?.status ?? 'pending') as ShotState['status'] }))
   return { shots, refs, states, next: nextUp(shots, states), progress: sheetProgress(shots, states) }
 }

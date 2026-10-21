@@ -4,7 +4,7 @@ version: 1
 settings:
   quality: high
   resolution: 2k
-  aspect: { chest_up: "3:4", full_body: "9:16" }
+  aspect: { chest_up: "3:4", waist_up: "3:4", full_body: "9:16" }
   upscale_ref00_below_px: 1500
 shots:
   - { id: REF-00, label: "Front, close-up",          view: front,               framing: chest_up,  expression: neutral,      attach: [],               source: hero }
@@ -19,3 +19,8 @@ shots:
   - { id: REF-09, label: "Open smile, close-up",     view: front,               framing: chest_up,  expression: open_smile,   attach: [REF-00] }
   - { id: REF-10, label: "Laughing, three-quarter",  view: three_quarter_left,  framing: chest_up,  expression: laughing,     attach: [REF-00, REF-01] }
   - { id: REF-11, label: "Serious, looking down",    view: front,               framing: chest_up,  expression: serious_down, attach: [REF-00] }
+  # The build refs (owner, 2026-10-22; UX-PLAN.md section 35, item 3e): the
+  # model's build at waist height, so a scene keeps the body as well as the
+  # face. Optional: made only with "Build refs" on in the Sheet step.
+  - { id: REF-12, label: "Build, front waist-up",          view: front,              framing: waist_up, expression: neutral, attach: [REF-00, REF-06],         optional: true }
+  - { id: REF-13, label: "Build, three-quarter waist-up",  view: three_quarter_left, framing: waist_up, expression: neutral, attach: [REF-00, REF-01, REF-06], optional: true }

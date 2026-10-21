@@ -9,7 +9,7 @@ import { formatUsd, microsToUsd } from '../costs/money.js'
 import { and, desc, eq, inArray } from 'drizzle-orm'
 import { jobs } from '../db/schema.js'
 import { getAsset } from '../storage/assets.js'
-import { approvedAssets, candidatesFor, getCharacter, inspirationAssetIds, listConcepts, sheetState, toData, type CharacterRow } from '../pipeline/characters.js'
+import { buildRefsOn, approvedAssets, candidatesFor, getCharacter, inspirationAssetIds, listConcepts, sheetState, toData, type CharacterRow } from '../pipeline/characters.js'
 import { characterCosts } from '../pipeline/costs.js'
 import { claudeModels, liveRoute, providerMode, resolveRoute } from '../pipeline/settings.js'
 import { effectiveModel, readModelOverrides } from '../providers/modelOverrides.js'
@@ -73,6 +73,7 @@ export async function characterView(deps: Deps, ctx: Ctx, id: string) {
   return {
     id: row.id, name: row.name, slug: row.slug, stage: row.stage, status: row.status, revision: row.revision,
     kind: kindOf(row), faceless: kindOf(row) === 'faceless' ? facelessOf(row) : null,
+    buildRefs: buildRefsOn(row),
     // Kept sections are shown hard-wrapped, like prompts.
     data: { ...data, sections: data.sections.map(sec => ({ ...sec, wrapped: hardWrap(sec.body, 80) })) },
     breakdown: row.breakdown, issues: validateCharacter(data),

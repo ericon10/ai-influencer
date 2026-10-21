@@ -47,6 +47,7 @@ export const api = {
     const [up] = await uploadFiles([file])
     return request<{ refId: string; unchanged: boolean; checkJobId: string | null; view: CharacterView }>('POST', `/characters/${id}/refs/${refId}`, { uploads: [up] })
   },
+  setBuildRefs: (id: string, on: boolean) => request<CharacterView>('PUT', `/characters/${id}/build-refs`, { on }),
   clearRefImage: (id: string, refId: string) => request<{ view: CharacterView }>('DELETE', `/characters/${id}/refs/${refId}`),
   addInspiration: async (id: string, file: File) => {
     const [up] = await uploadFiles([file])

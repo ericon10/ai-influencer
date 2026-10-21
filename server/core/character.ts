@@ -39,6 +39,9 @@ export interface CharacterIdentity {
   // example a face-only edit that locks the face to REF-00.
   followUp?: { name: string; model?: string; text: string }
   notes?: string
+  // An Element's source images (owner, 2026-10-22, item 3e): the REFs that
+  // built it on Higgsfield ("built from REF-00, REF-12, REF-13").
+  refs?: string[]
 }
 
 // A section of the character file kept as written.

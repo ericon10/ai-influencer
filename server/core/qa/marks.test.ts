@@ -89,6 +89,18 @@ describe('mirrored-mark QA (Callie acceptance)', () => {
     expect(report.verdict).toBe('regenerate')
   })
 
+  it('a build ref (REF-12, waist-up) that came back full-body or seated is wrong framing; chest-up is a warning', () => {
+    const full = perception('REF-00')
+    full.framing = 'full_body'
+    expect(judge('REF-12', full).findings).toContainEqual(expect.objectContaining({ code: 'wrong_framing', severity: 'fail' }))
+    const close = perception('REF-00')
+    close.framing = 'chest_up'
+    expect(judge('REF-12', close).findings).toContainEqual(expect.objectContaining({ code: 'wrong_framing', severity: 'warn' }))
+    const ok = perception('REF-00')
+    ok.framing = 'waist_up'
+    expect(judge('REF-12', ok).findings.map(f => f.code)).not.toContain('wrong_framing')
+  })
+
   it('routes a logo on an otherwise correct shot to an edit, not a regenerate', () => {
     const obs = perception('REF-04')
     obs.text_or_logos = ['small brand logo on the t-shirt']

@@ -24,7 +24,7 @@ export function SheetTab({ v, goHero, goFile }: { v: CharacterView; goHero: () =
       <div className="st-col" style={{ gap: 24 }}>
       <div className="st-empty">
         <h2 className="st-h1">{imported ? <>Bring in the <em>sheet</em></> : <>Pick a hero <em>first</em></>}</h2>
-        <p className="st-sub" style={{ margin: 0 }}>{imported ? `Drop ${v.name}'s sheet folder (images named REF 00 to REF 11), or pick a new hero to build the sheet here.` : 'The sheet is built from REF-00, the hero you pick.'}</p>
+        <p className="st-sub" style={{ margin: 0 }}>{imported ? `Drop ${v.name}'s sheet folder (images named REF 00 to REF 11, and REF 12 and REF 13 when you have them), or pick a new hero to build the sheet here.` : 'The sheet is built from REF-00, the hero you pick.'}</p>
         {imported && <SheetFolderDrop v={v} />}
         <div className="st-row" style={{ justifyContent: 'center' }}>
           <button className={`st-btn ${imported ? '' : 'primary'}`} onClick={goHero}>Go to hero<ArrowRight size={15} /></button>
@@ -44,7 +44,7 @@ export function SheetTab({ v, goHero, goFile }: { v: CharacterView; goHero: () =
           <Img assetId={ref00.approved.assetId} width={360} />
           <div className="st-col" style={{ gap: 10 }}>
             <span className="st-badge ok">Sheet complete</span>
-            <div className="st-nextup-title">All 12 shots approved</div>
+            <div className="st-nextup-title">All {v.sheet.progress.total} shots approved</div>
             <p className="st-sub" style={{ margin: 0 }}>Export the character file. It records every approved shot.</p>
             <a className="st-btn primary" href={api.exportUrl(v.id)}><Download size={16} />Download character file</a>
           </div>
@@ -61,6 +61,7 @@ export function SheetTab({ v, goHero, goFile }: { v: CharacterView; goHero: () =
       <ToCheck v={v} />
       {!v.sheet.progress.complete && <SheetFolderDrop v={v} compact />}
 
+      <BuildRefs v={v} />
       <section>
         <div className="st-section-head"><div className="st-h2">Reference sheet</div><span className="st-muted">{v.sheet.progress.approved} of {v.sheet.progress.total} approved{v.sheet.progress.stale ? `, ${v.sheet.progress.stale} to re-check` : ''}</span><span className="st-spacer" />{v.sheetLock && <span className="st-badge plain" title="One model for the whole sheet (SPEC 5.1 rule 7)">{v.sheetLock.model}</span>}</div>
         <div className="st-grid sheet">
@@ -231,7 +232,7 @@ function ShotDrawer({ v, shot, onClose }: { v: CharacterView; shot: Shot | null;
   return (
     <Drawer open onClose={onClose} title={<span>{shot.id} · {shot.label}</span>}>
       <div className="st-col" style={{ gap: 16 }}>
-        <div className="st-row"><ShotBadge status={shot.status} /><span className="st-hint">{shot.framing === 'chest_up' ? 'Chest-up' : 'Full body'} · {shot.aspect} · uses {shot.attach.join(', ') || 'the hero'}</span></div>
+        <div className="st-row"><ShotBadge status={shot.status} /><span className="st-hint">{shot.framing === 'chest_up' ? 'Chest-up' : shot.framing === 'waist_up' ? 'Waist-up' : 'Full body'} · {shot.aspect} · uses {shot.attach.join(', ') || 'the hero'}</span></div>
         {shot.approved && <Img assetId={shot.approved.assetId} width={900} contain style={{ aspectRatio: shot.framing === 'full_body' ? '9/16' : '3/4' }} />}
         {shot.candidates.some(c => c.status === 'in_review') && <button className="st-btn primary" onClick={() => nav(`/studio/characters/${v.id}/review/${shot.id}`)}><Eye size={16} />Review</button>}
         <RefImageEdit v={v} shot={shot} />
@@ -358,5 +359,26 @@ function ToCheck({ v }: { v: CharacterView }) {
         ))}
       </div>
     </section>
+  )
+}
+
+// Build refs (owner, 2026-10-22; item 3e): REF-12 (front, waist-up) and
+// REF-13 (three-quarter, waist-up) join the sheet, made and checked like
+// the others. Waist-up and knees-up scenes then send the closest one, so
+// the model's build carries. Elements stay made on Higgsfield; the
+// character file names each Element and the REFs that built it.
+function BuildRefs({ v }: { v: CharacterView }) {
+  const toast = useToast()
+  const refresh = useRefresh()
+  const [busy, setBusy] = useState(false)
+  const on = !!v.buildRefs
+  return (
+    <label className="st-row" style={{ gap: 10, cursor: 'pointer', alignItems: 'flex-start' }} data-field="build-refs">
+      <button type="button" role="switch" aria-checked={on} aria-label="Build refs" disabled={busy} className={`st-switch ${on ? 'on' : ''}`} onClick={async () => {
+        setBusy(true)
+        try { await api.setBuildRefs(v.id, !on); refresh(v.id); toast({ tone: 'ok', text: on ? 'Build refs off: REF-12 and REF-13 leave the sheet steps (any approved one stays).' : 'Build refs on: REF-12 and REF-13 are in the sheet steps.' }) } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) } finally { setBusy(false) }
+      }}><span /></button>
+      <span className="st-col" style={{ gap: 2 }}><b>Build refs</b><span className="st-hint">Adds REF-12 (front, waist-up) and REF-13 (three-quarter, waist-up) so the build carries in waist-up and knees-up scenes. Name the Element on Higgsfield in the character file with the REFs that built it ("built from REF-00, REF-12, REF-13").</span></span>
+    </label>
   )
 }

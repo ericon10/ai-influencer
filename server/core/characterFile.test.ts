@@ -118,6 +118,14 @@ describe("Callie's character file", () => {
     expect(c.disclosure).toBe("Label all posted content as AI-generated per each platform's rules.")
   })
 
+  it('reads several Elements, each with the REFs that built it (item 3e)', () => {
+    const md = readFileSync(join(process.cwd(), 'fixtures', 'callie', 'character-callie.md'), 'utf8')
+      .replace(/(##\s*Models[^\n]*\n)/i, '$1- Higgsfield Element "Callie build": 11111111-2222-4333-8444-555555555555, built from REF-00, REF-12 and REF-13\n')
+    const els = importCharacterFile(md).character.identities.filter(i => i.kind === 'element')
+    expect(els.find(e => e.name === 'Callie build')).toMatchObject({ externalId: '11111111-2222-4333-8444-555555555555', refs: ['REF-00', 'REF-12', 'REF-13'] })
+    expect(els.length).toBeGreaterThanOrEqual(2)
+  })
+
   it('reads her trained Soul character with its prompt block and drift lock, and her Element', () => {
     expect(c.identities).toHaveLength(2)
     const [soul, element] = c.identities

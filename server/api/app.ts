@@ -15,7 +15,7 @@ import { verifyAssetSignature } from '../jobs/assetUrls.js'
 import { cancelJob, getJob, resolveJob, resumeCapWaits, wakeFromWebhook } from '../jobs/runner.js'
 import { wakeWorker } from '../jobs/wake.js'
 import { actionSchema, estimateAction, runAction } from '../pipeline/actions.js'
-import { createCharacter, getCandidate, getCharacter, linkInspiration, listCharacters, setCharacterFields, toData, updateCharacter } from '../pipeline/characters.js'
+import { setBuildRefs, createCharacter, getCandidate, getCharacter, linkInspiration, listCharacters, setCharacterFields, toData, updateCharacter } from '../pipeline/characters.js'
 import { cleanVoiceCard } from '../core/voiceCard.js'
 import type { CharacterData } from '../core/character.js'
 import { approveSceneCandidate, archiveScene, copyScene, createScene, cropCandidate, saveVideoModel, updateScene } from '../pipeline/scenes.js'
@@ -500,6 +500,14 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
     const r = await setRefImage(deps, ctx, c.req.param('id'), c.req.param('refId'), { data: f.data, mime: f.mime })
     const checkJobId = r.unchanged || r.refId === 'REF-00' ? null : await startImportCheck(deps, ctx, c.req.param('id'), [r.refId])
     return c.json({ ...r, checkJobId, view: await characterView(deps, ctx, c.req.param('id')) })
+  })
+  // Build refs (item 3e): REF-12 and REF-13 join this character's sheet.
+  app.put('/characters/:id/build-refs', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    const body = parse(z.object({ on: z.boolean() }), await json(c))
+    await setBuildRefs(deps, ctx, c.req.param('id'), body.on)
+    return c.json(await characterView(deps, ctx, c.req.param('id')))
   })
   app.delete('/characters/:id/refs/:refId', async c => {
     const ctx = c.get('ctx')

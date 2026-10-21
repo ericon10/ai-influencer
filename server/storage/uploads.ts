@@ -75,5 +75,5 @@ export function sheetRefOf(name: string): string | null {
   const m = name.toUpperCase().match(/REF[\s_-]*(\d{1,2})(?!\d)/)
   if (!m) return null
   const n = Number(m[1])
-  return n >= 0 && n <= 11 ? `REF-${String(n).padStart(2, '0')}` : null
+  return n >= 0 && n <= 13 ? `REF-${String(n).padStart(2, '0')}` : null
 }

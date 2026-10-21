@@ -240,6 +240,13 @@ export function evaluateSheetShot(input: EvaluateInput): QaReport {
     } else if (obs.framing === 'waist_up') {
       findings.push({ code: 'wrong_framing', severity: 'warn', message: 'Asked for chest-up; this is closer to waist-up.' })
     }
+  } else if (shot.framing === 'waist_up') {
+    // A build ref (REF-12, REF-13): waist-up, the build in view.
+    if (['seated', 'full_body', 'three_quarter_length'].includes(obs.framing)) {
+      findings.push({ code: 'wrong_framing', severity: 'fail', message: `Asked for waist-up, got ${obs.framing.replace(/_/g, ' ')}.` })
+    } else if (obs.framing === 'chest_up') {
+      findings.push({ code: 'wrong_framing', severity: 'warn', message: 'Asked for waist-up; this is closer to chest-up, so the build barely shows.' })
+    }
   } else if (shot.framing === 'full_body' && (obs.framing !== 'full_body' || !obs.standing)) {
     findings.push({ code: 'wrong_framing', severity: 'fail', message: `Asked for a standing full-body shot, got ${obs.framing.replace(/_/g, ' ')}${obs.standing ? '' : ', not standing'}.` })
   }

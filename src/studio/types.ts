@@ -148,6 +148,8 @@ export interface CharacterView {
   id: string; name: string; slug: string; stage: number; status: string; revision: number
   // Person or faceless (UX-PLAN.md section 35, item 4) and a faceless one's file.
   kind?: 'person' | 'faceless'; faceless?: FacelessFile | null
+  // REF-12 and REF-13 in the sheet (item 3e).
+  buildRefs?: boolean
   data: CharacterData; breakdown: Breakdown | null; issues: Array<{ field: string; message: string; severity: 'error' | 'warning' }>
   sheetLock: { model: string } | null
   // The brand layer from the file's sections, and the file checked against

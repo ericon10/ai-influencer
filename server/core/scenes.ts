@@ -99,7 +99,7 @@ export function pickSceneRefs(shots: SheetShot[], views: ViewsConfig, approved: 
     const roleOf = (id: string): RefPick['role'] => {
       const s = shots.find(x => x.id === id)
       if (s?.source === 'hero') return 'face'
-      if (s?.framing === 'full_body') return 'body'
+      if (s?.framing === 'full_body' || s?.framing === 'waist_up') return 'body'
       return s && s.expression !== 'neutral' && s.expression !== 'none' ? 'expression' : 'angle'
     }
     return own.slice(0, sc.settings.max_refs).map(id => ({ refId: id, role: roleOf(id) }))
@@ -119,6 +119,13 @@ export function pickSceneRefs(shots: SheetShot[], views: ViewsConfig, approved: 
     ? shots.find(s => s.framing === 'chest_up' && calm(s) && views.views[s.view]?.turn === view.turn && s.id !== face?.id && approved.has(s.id))
     : undefined
   add(sameView && approved.has(sameView.id) ? sameView : sameSide, 'angle')
+  // The build refs (REF-12, REF-13; item 3e, 2026-10-22): a waist-up or
+  // knees-up scene gets the build ref closest to its angle, when one is
+  // approved, so the model's build carries without the sheet's jeans.
+  if (f.framing === 'waist_up' || f.framing === 'knees_up') {
+    const builds = shots.filter(s => s.framing === 'waist_up' && approved.has(s.id))
+    add(builds.find(s => s.view === f.view) ?? (view && view.turn !== 'none' ? builds.find(s => views.views[s.view]?.turn !== 'none') : undefined) ?? builds[0], 'body')
+  }
   // A body ref only for a framing that shows the body (scenes.yaml
   // body_ref_framings): a full-body sheet shot drags the sheet outfit into
   // a closer shot, so chest-up and waist-up get face refs only.

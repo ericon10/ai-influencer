@@ -9,7 +9,7 @@ export function sheetRefOf(name: string): string | null {
   const m = name.replace(/\.[a-z0-9]+$/i, '').toUpperCase().match(/REF[\s_-]*(\d{1,2})(?!\d)/)
   if (!m) return null
   const n = Number(m[1])
-  return n >= 0 && n <= 11 ? `REF-${String(n).padStart(2, '0')}` : null
+  return n >= 0 && n <= 13 ? `REF-${String(n).padStart(2, '0')}` : null
 }
 
 const IMAGE_EXT: Record<string, string> = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp' }

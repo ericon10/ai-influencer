@@ -111,13 +111,13 @@ export function buildHeroPrompts(t: TemplatesConfig, views: ViewsConfig, ch: Pic
   })), 'hero', ch, o))
 }
 
-// Sheet shots (REF-01 to REF-11) are bare-faced too.
+// Sheet shots (REF-01 to REF-13) are bare-faced too.
 export function buildSheetPrompt(t: TemplatesConfig, views: ViewsConfig, shot: SheetShot, ch: Pick<CharacterData, 'marks' | 'pronouns' | 'body'> & RealismSource, addendum = '', o: BuildOptions = {}): string {
   const view = views.views[shot.view]
   if (!view) throw new Error(`Unknown view "${shot.view}" for ${shot.id}.`)
   const pv = pronounVars(ch.pronouns)
   const expression = t.expressions[shot.expression] ?? ''
-  const body = shot.framing === 'full_body' ? fill(t.body_line, { ...pv, body: ch.body }) : ''
+  const body = shot.framing === 'full_body' || shot.framing === 'waist_up' ? fill(t.body_line, { ...pv, body: ch.body }) : ''
   const prompt = fill(t.sheet.base, {
     ...pv,
     framing: t.framing[shot.framing]!,
