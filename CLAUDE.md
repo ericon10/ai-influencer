@@ -102,6 +102,25 @@ applies to, and anything with no product works with neutral defaults
 post is an ad for its product is a separate switch (#ad, a plan row's
 ad column). UX-PLAN.md section 29 has the details.
 
+## Rules R1 to R5 (owner, 2026-10-22; UX-PLAN.md section 35)
+
+- **R1. Nothing covers a face.** Nothing the Studio places on an image or
+  video (captions, hooks, labels, stickers, drawn screens) ever covers a
+  face. Every overlay checks face boxes first, on stills and across the
+  whole clip on video.
+- **R2. "Fixed" means working on production**
+  (character-studio-pi.vercel.app). Report the production version checked
+  and a screenshot. Every UI fix ships with a browser test that clicks the
+  visible thing like a person and fails before the fix.
+- **R3. Never limit shots.** The one-action, calm, one-camera-move rules
+  live ONLY inside the "caught you" recipe. Every other video and clip
+  prompt builder (clip library, imported clip rows, image-to-video) keeps
+  only: start from an approved still, same face and outfit, protect the
+  face. Add Multi Shot where a model has it.
+- **R4. Every paid step shows its price and waits for the owner's click.**
+  Every feature works on the API path, not only on a Higgsfield plan.
+- **R5. One post workspace with drawers.** No bolted-on pages.
+
 This file gives a new Claude Code session enough context to be useful
 immediately. Read this first before making changes.
 

@@ -15,13 +15,16 @@ import { getSetting, putCacheSetting } from './settings.js'
 // is a candidate (its status becomes "trashed"); B-roll and sounds are
 // archived; a render is the post's outputs (the post goes back to a draft).
 // Auto-clean puts a post's never-kept takes here N days after the post is
-// finished; starred takes never.
+// finished; starred takes never. A whole post (Clear on the Launch plan, a
+// Replace on an import again) and a whole character (Delete character)
+// come here too (owner, 2026-10-22): archived, restorable for 7 days; after
+// that they stay archived (their stills and takes have their own items).
 
 export const TRASH_DAYS = 7
 export const DEFAULT_AUTO_CLEAN_DAYS = 14
 const DAY = 86_400_000
 
-export type TrashKind = 'candidate' | 'broll' | 'sound' | 'render'
+export type TrashKind = 'candidate' | 'broll' | 'sound' | 'render' | 'post' | 'character'
 export interface TrashRef { kind: TrashKind; id: string }
 export interface TrashWarning { id: string; kind: TrashKind; text: string }
 export interface TrashView {
@@ -171,8 +174,14 @@ async function snapshot(deps: Deps, ctx: Ctx, ref: TrashRef): Promise<{ label: s
     if (!s || s.archivedAt) return null
     return { label: `${s.kind === 'music' ? 'Music' : s.kind === 'voice' ? 'Voice line' : 'Ambience'}: ${s.title || 'sound'}`, characterId: s.characterId, assetIds: s.assetId ? [s.assetId] : [], restore: {} }
   }
+  if (ref.kind === 'character') {
+    const [ch] = await deps.db.select().from(characters).where(and(eq(characters.accountId, acct), eq(characters.id, ref.id)))
+    if (!ch || ch.archivedAt) return null
+    return { label: `Character: ${ch.name || 'unnamed'}`, characterId: ch.id, assetIds: [], restore: { status: ch.status } }
+  }
   const [p] = await deps.db.select().from(contentItems).where(and(eq(contentItems.accountId, acct), eq(contentItems.id, ref.id)))
   if (!p || p.archivedAt) return null
+  if (ref.kind === 'post') return { label: `Post: ${postName(p)}`, characterId: p.characterId, assetIds: [], restore: { status: p.status } }
   const o = (p.outputs ?? {}) as ContentOutputs
   const ids = [o.videoAssetId, o.zipAssetId, ...(o.imageAssetIds ?? []), ...(o.videos ?? []).map(v => v?.assetId), ...(o.zipParts ?? []).map(z => z.assetId)].filter((x): x is string => !!x)
   if (!ids.length) return null
@@ -190,6 +199,8 @@ export async function trash(deps: Deps, ctx: Ctx, refs: TrashRef[], opts: { reas
     if (ref.kind === 'candidate') await deps.db.update(candidates).set({ status: 'trashed', updatedAt: now }).where(and(eq(candidates.accountId, ctx.accountId), eq(candidates.id, ref.id)))
     else if (ref.kind === 'broll') await deps.db.update(brollClips).set({ archivedAt: now, updatedAt: now }).where(and(eq(brollClips.accountId, ctx.accountId), eq(brollClips.id, ref.id)))
     else if (ref.kind === 'sound') await deps.db.update(sounds).set({ archivedAt: now, updatedAt: now }).where(and(eq(sounds.accountId, ctx.accountId), eq(sounds.id, ref.id)))
+    else if (ref.kind === 'post') await deps.db.update(contentItems).set({ archivedAt: now, updatedAt: now }).where(and(eq(contentItems.accountId, ctx.accountId), eq(contentItems.id, ref.id)))
+    else if (ref.kind === 'character') await deps.db.update(characters).set({ archivedAt: now, status: 'archived', updatedAt: now }).where(and(eq(characters.accountId, ctx.accountId), eq(characters.id, ref.id)))
     else await deps.db.update(contentItems).set({ outputs: {}, status: 'draft', updatedAt: now }).where(and(eq(contentItems.accountId, ctx.accountId), eq(contentItems.id, ref.id)))
     const id = newId('trash')
     ids.push(id)
@@ -213,6 +224,8 @@ export async function restore(deps: Deps, ctx: Ctx, trashIds: string[]): Promise
     if (t.kind === 'candidate') await deps.db.update(candidates).set({ status: r.status ?? 'approved', updatedAt: now }).where(and(eq(candidates.accountId, ctx.accountId), eq(candidates.id, t.refId)))
     else if (t.kind === 'broll') await deps.db.update(brollClips).set({ archivedAt: null, updatedAt: now }).where(and(eq(brollClips.accountId, ctx.accountId), eq(brollClips.id, t.refId)))
     else if (t.kind === 'sound') await deps.db.update(sounds).set({ archivedAt: null, updatedAt: now }).where(and(eq(sounds.accountId, ctx.accountId), eq(sounds.id, t.refId)))
+    else if (t.kind === 'post') await deps.db.update(contentItems).set({ archivedAt: null, updatedAt: now }).where(and(eq(contentItems.accountId, ctx.accountId), eq(contentItems.id, t.refId)))
+    else if (t.kind === 'character') await deps.db.update(characters).set({ archivedAt: null, status: r.status ?? 'draft', updatedAt: now }).where(and(eq(characters.accountId, ctx.accountId), eq(characters.id, t.refId)))
     else await deps.db.update(contentItems).set({ outputs: r.outputs ?? {}, status: r.status ?? 'ready', updatedAt: now }).where(and(eq(contentItems.accountId, ctx.accountId), eq(contentItems.id, t.refId)))
     await deps.db.update(trashItems).set({ restoredAt: now }).where(eq(trashItems.id, t.id))
   }
@@ -393,7 +406,7 @@ export async function autoClean(deps: Deps, ctx: Ctx, days: number | null): Prom
 
 export function parseRefs(input: unknown): TrashRef[] {
   if (!Array.isArray(input) || input.length > 200) throw new AppError('bad_request', 'Pick between 1 and 200 items.')
-  const kinds: TrashKind[] = ['candidate', 'broll', 'sound', 'render']
+  const kinds: TrashKind[] = ['candidate', 'broll', 'sound', 'render', 'post', 'character']
   return input.map(x => {
     const r = x as { kind?: unknown; id?: unknown }
     if (!kinds.includes(r.kind as TrashKind) || typeof r.id !== 'string' || r.id.length > 60) throw new AppError('bad_request', 'That is not an item of the Library.')

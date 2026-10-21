@@ -10,6 +10,8 @@ import { useProductList } from '../products'
 import { HowTo } from '../guide/Guide'
 import type { CharacterSummary, PlanImportResult, PlanPostView, PlanPreview, StillPathId } from '../types'
 import { StillPaths } from './post/slideshow/StillPaths'
+import { SelectAllBox, SelectBox, SelectionCount, useSelection } from '../select'
+import { useIncoming, type Incoming } from '../importDoor'
 
 // Posts home > Launch plan (owner, 2026-10-16; UX-PLAN.md section 28): the
 // plan's CSV, previewed for free (rows by day and account, errors, what
@@ -57,6 +59,9 @@ export function PlanCard({ characters }: { characters: CharacterSummary[] }) {
     if (wasRunning.current && !running) void qc.invalidateQueries({ queryKey: ['plan'] })
     wasRunning.current = running
   }, [running, qc])
+  // A plan sent by Import on Posts home opens here with its preview.
+  const [incoming, setIncoming] = useState<Incoming | null>(null)
+  useIncoming(['plan', 'faceless'], f => { setOpen(true); setIncoming(f) })
   const have = posts.filter(p => p.need > 0 && p.have >= p.need).length
   const exported = posts.filter(p => p.exported).length
 
@@ -75,7 +80,7 @@ export function PlanCard({ characters }: { characters: CharacterSummary[] }) {
       </div>
       {open && (
         <div className="st-card-body st-col" style={{ gap: 14 }}>
-          <ImportPlan characters={characters} hasPosts={posts.length > 0} onImported={() => void qc.invalidateQueries({ queryKey: ['plan'] })} />
+          <ImportPlan key={incoming?.at ?? 0} incoming={incoming} characters={characters} hasPosts={posts.length > 0} onImported={() => void qc.invalidateQueries({ queryKey: ['plan'] })} />
           {posts.length > 0 && <PlanPosts posts={posts} />}
         </div>
       )}
@@ -83,31 +88,37 @@ export function PlanCard({ characters }: { characters: CharacterSummary[] }) {
   )
 }
 
-function ImportPlan({ characters, hasPosts, onImported }: { characters: CharacterSummary[]; hasPosts: boolean; onImported: () => void }) {
+function ImportPlan({ characters, hasPosts, onImported, incoming = null }: { characters: CharacterSummary[]; hasPosts: boolean; onImported: () => void; incoming?: Incoming | null }) {
   const toast = useToast()
   const qc = useQueryClient()
   const products = useProductList()
-  const [show, setShow] = useState(!hasPosts)
-  const [csv, setCsv] = useState('')
-  const [name, setName] = useState('')
+  const [show, setShow] = useState(!hasPosts || !!incoming)
+  const [csv, setCsv] = useState(incoming?.text ?? '')
+  const [name, setName] = useState(incoming?.name ?? '')
   const [paste, setPaste] = useState(false)
   const [draw, setDraw] = useState(false)
   const [store, setStore] = useState<Record<string, string>>({})
   const [path, setPath] = useState<StillPathId | null>(null)
   // The plan's product (section 29): '' not picked yet, 'none' No product.
   const [product, setProduct] = useState('')
-  const [picked, setPicked] = useState<Set<string>>(new Set())
   const [day, setDay] = useState('')
   const [account, setAccount] = useState('')
   const [preview, setPreview] = useState<PlanPreview | null>(null)
+  // Rows that match posts already made (2026-10-22): Replace or Add as new.
+  const [existing, setExisting] = useState<'replace' | 'add' | null>(null)
   const [done, setDone] = useState<PlanImportResult | null>(null)
   const file = useRef<HTMLInputElement>(null)
+  const good = (preview?.rows ?? []).filter(r => r.state !== 'problem')
+  const shown = good.filter(r => (!day || r.date === day) && (!account || r.account === account))
+  const sel = useSelection(useMemo(() => shown.map(r => r.rowId), [shown.map(r => r.rowId).join('|')])) // eslint-disable-line react-hooks/exhaustive-deps
   const productArg = (p: string) => (p === 'none' ? null : p || undefined)
   async function load(f: File | undefined) {
     if (!f) return
     if (f.size > 400_000) { toast({ tone: 'bad', text: `${f.name} is over 400 KB. Split it.` }); return }
-    setCsv(await f.text()); setName(f.name); setPaste(false); setPreview(null); setDone(null); setPicked(new Set())
+    setCsv(await f.text()); setName(f.name); setPaste(false); setPreview(null); setDone(null); sel.clear(); setExisting(null)
   }
+  // A file sent by Import on Posts home: its free preview at once.
+  useEffect(() => { if (incoming) void check() }, []) // eslint-disable-line react-hooks/exhaustive-deps
   async function check(o: { draw?: boolean; store?: Record<string, string>; path?: StillPathId | null; product?: string } = {}) {
     try {
       const p = o.product ?? product
@@ -118,21 +129,20 @@ function ImportPlan({ characters, hasPosts, onImported }: { characters: Characte
       setDone(null)
     } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) }
   }
-  if (!show) return <button type="button" className="st-btn sm ghost" style={{ alignSelf: 'flex-start' }} onClick={() => setShow(true)}><Upload size={13} />Import plan rows again</button>
+  if (!show) return <button type="button" className="st-btn sm ghost" style={{ alignSelf: 'flex-start' }} onClick={() => setShow(true)}><Upload size={13} />Import a CSV</button>
   const lines = csv.split('\n').filter(l => l.trim()).length
-  const rows = preview?.rows ?? []
-  const good = rows.filter(r => r.state === 'new' || r.state === 'update')
-  const shown = good.filter(r => (!day || r.date === day) && (!account || r.account === account))
-  const ticked = good.filter(r => picked.has(r.rowId))
+  const ticked = good.filter(r => sel.has(r.rowId))
+  const matching = ticked.filter(r => r.state === 'update' || r.state === 'kept')
+  const matchingPictures = matching.filter(r => r.state === 'kept').length
   const stills = ticked.reduce((a, r) => a + r.photos, 0)
   const usdTicked = ticked.reduce((a, r) => a + r.priceUsd, 0)
   const creditsTicked = ticked.reduce((a, r) => a + r.credits, 0)
-  const toggle = (id: string) => setPicked(s => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n })
   // The plan's pick fills only the rows that name no product of their own.
   const needsPick = ticked.some(r => r.productFrom === 'plan')
   const todo: TodoItem[] = [
     ...(!product && needsPick ? [{ label: 'Pick the plan\'s product (or No product) for the rows that name none', target: 'plan-product' }] : []),
     ...(!ticked.length ? [{ label: 'Tick the rows to import', target: 'plan-rows' }] : []),
+    ...(matching.length && !existing ? [{ label: `Pick Replace them or Add as new posts for the ${matching.length} matching row${matching.length === 1 ? '' : 's'}`, target: 'plan-existing' }] : []),
   ]
   return (
     <div className="st-col" style={{ gap: 12 }} data-field="plan-import">
@@ -203,25 +213,22 @@ function ImportPlan({ characters, hasPosts, onImported }: { characters: Characte
             <div className="st-row" style={{ gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
               <select className="st-select" style={{ width: 'auto' }} value={day} onChange={e => setDay(e.target.value)} aria-label="Day"><option value="">Every day</option>{preview.days.map(d => <option key={d} value={d}>{dayLabel(d)}</option>)}</select>
               <select className="st-select" style={{ width: 'auto' }} value={account} onChange={e => setAccount(e.target.value)} aria-label="Account"><option value="">Every account</option>{preview.accounts.map(a => <option key={a.tag} value={a.tag}>{a.tag}</option>)}</select>
-              <button type="button" className="st-btn sm ghost" disabled={!shown.length} onClick={() => setPicked(s => new Set([...s, ...shown.map(r => r.rowId)]))}>Tick the {shown.length} shown</button>
-              <button type="button" className="st-btn sm ghost" disabled={!good.length} onClick={() => setPicked(new Set(good.map(r => r.rowId)))}>Tick all {good.length}</button>
-              {picked.size > 0 && <button type="button" className="st-btn sm ghost" onClick={() => setPicked(new Set())}>Clear</button>}
-              <span className="st-hint">{ticked.length} ticked</span>
+              <SelectionCount sel={sel} />
             </div>
             <div className="st-tablewrap" style={{ maxHeight: 420, overflow: 'auto' }}>
               <table className="st-table st-planrows">
-                <thead><tr><th aria-label="Tick" /><th>Row</th><th>Day</th><th>Account</th><th>Format</th><th>Product</th><th>Hook</th><th>Notes</th></tr></thead>
+                <thead><tr><th><SelectAllBox sel={sel} label={`Tick the ${shown.length} rows shown`} disabled={!shown.length} /></th><th>Row</th><th>Day</th><th>Account</th><th>Format</th><th>Product</th><th>Hook</th><th>Notes</th></tr></thead>
                 <tbody>
                   {shown.map(r => (
                     <tr key={r.line} data-field={`plan-row-${r.rowId}`}>
-                      <td><input type="checkbox" checked={picked.has(r.rowId)} onChange={() => toggle(r.rowId)} aria-label={`Import ${r.rowId}`} /></td>
+                      <td><SelectBox sel={sel} id={r.rowId} label={`Import ${r.rowId}`} /></td>
                       <td>{r.rowId}</td>
                       <td style={{ whiteSpace: 'nowrap' }}>{dayLabel(r.date)} {r.slot}</td>
                       <td>{r.account}</td>
                       <td>{short(r.format)}</td>
                       <td style={{ whiteSpace: 'nowrap' }}>{r.productFrom === 'row' ? r.product : r.product ? <span className="st-muted">{r.product} (plan)</span> : <span className="st-muted">{product ? 'None' : 'The plan\'s pick'}</span>}{r.ad ? <span className="st-chip xs" style={{ marginLeft: 6 }}>Ad</span> : null}</td>
                       <td style={{ maxWidth: 380 }}><span className="st-clamp1" title={r.hook}>{r.hook}</span></td>
-                      <td>{r.state === 'update' ? <span className="st-hint">A draft exists (updated)</span> : null}{[...r.warnings, ...r.lint].length ? <span className="st-lint compact" title={[...r.warnings, ...r.lint].join('\n')}>{[...r.warnings, ...r.lint].length} note{[...r.warnings, ...r.lint].length === 1 ? '' : 's'}</span> : null}</td>
+                      <td>{r.state === 'update' ? <span className="st-hint">Matches a draft you have</span> : r.state === 'kept' ? <span className="st-hint">Matches a post with pictures</span> : null}{[...r.warnings, ...r.lint].length ? <span className="st-lint compact" title={[...r.warnings, ...r.lint].join('\n')}>{[...r.warnings, ...r.lint].length} note{[...r.warnings, ...r.lint].length === 1 ? '' : 's'}</span> : null}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -235,7 +242,16 @@ function ImportPlan({ characters, hasPosts, onImported }: { characters: Characte
               {preview.rows.filter(r => r.errors.length).slice(0, 20).map(r => <span key={r.line} className="st-hint st-warntext">Line {r.line} ({r.rowId || 'no id'}): {r.errors.join('; ')}</span>)}
             </div>
           )}
-          {preview.totals.kept > 0 && <span className="st-hint">{preview.totals.kept} row{preview.totals.kept === 1 ? ' is' : 's are'} already made with pictures and stay as they are.</span>}
+          {matching.length > 0 && (
+            <div className="st-col st-callout" style={{ gap: 8 }} data-field="plan-existing" role="group" aria-label="Rows that match posts you already have">
+              <b>{matching.length} row{matching.length === 1 ? ' matches posts' : 's match posts'} you already have{matchingPictures ? ` (${matchingPictures} with pictures)` : ''}.</b>
+              <div className="st-row" style={{ gap: 8, flexWrap: 'wrap' }}>
+                <button type="button" className={`st-btn sm ${existing === 'replace' ? '' : 'secondary'}`} aria-pressed={existing === 'replace'} onClick={() => setExisting('replace')}>Replace them (their pictures go to Trash)</button>
+                <button type="button" className={`st-btn sm ${existing === 'add' ? '' : 'secondary'}`} aria-pressed={existing === 'add'} onClick={() => setExisting('add')}>Add as new posts</button>
+              </div>
+              <span className="st-hint">Replace moves the old posts and their pictures to Library &gt; Trash (restorable for 7 days) and makes new drafts. Add keeps the old posts and makes new drafts next to them.</span>
+            </div>
+          )}
           <details>
             <summary className="st-hint" style={{ cursor: 'pointer' }}>The plan by day and account</summary>
             <PlanGrid preview={preview} />
@@ -249,19 +265,22 @@ function ImportPlan({ characters, hasPosts, onImported }: { characters: Characte
             <span className="st-label">4 · Import</span>
             <AsyncButton className="st-btn" disabled={todo.length > 0} title={todo.length ? todo.map(t => t.label).join('; ') : undefined} busyLabel={`Importing ${ticked.length} rows...`} onClick={async () => {
               try {
-                const r = await api.planImport(csv, { drawSpecials: draw, store, productId: productArg(product), rows: ticked.map(x => x.rowId) })
-                setDone(r)
-                setPicked(new Set())
+                const r = await api.planImport(csv, { drawSpecials: draw, store, productId: productArg(product), rows: ticked.map(x => x.rowId), ...(matching.length && existing ? { existing } : {}) })
+                sel.clear()
+                setExisting(null)
                 onImported()
                 await qc.invalidateQueries({ queryKey: keys.content })
-                toast({ tone: 'ok', text: `${r.created} drafts made${r.updated ? `, ${r.updated} updated` : ''}.` })
+                // The preview again (its matches are new now), then the next step.
+                await check()
+                setDone(r)
+                toast({ tone: 'ok', text: `${r.created + r.replaced} drafts made${r.replaced ? ` (${r.replaced} replaced)` : ''}.` })
               } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) }
             }}>Import {ticked.length || ''} row{ticked.length === 1 ? '' : 's'} (free)</AsyncButton>
             <Todo items={todo} />
           </div>
         </div>
       )}
-      {done && <span className="st-hint" role="status" data-field="plan-done">{done.created} drafts made, {done.updated} updated{done.kept ? `, ${done.kept} kept (they have pictures)` : ''}{done.skipped ? `, ${done.skipped} skipped` : ''}. They are in the list below and on Posts home: tick them there and generate, or open any post.</span>}
+      {done && <ImportDone done={done} onStarted={onImported} />}
     </div>
   )
 }
@@ -294,38 +313,62 @@ function PlanGrid({ preview }: { preview: PlanPreview }) {
   )
 }
 
-// The plan's posts after import: tick, generate (one price, ten at a time),
+// After an import, the last line is the next step (owner, 2026-10-22):
+// "10 drafts made. Next: Generate 10 posts, $X" with the button.
+function ImportDone({ done, onStarted }: { done: PlanImportResult; onStarted: () => void }) {
+  const made = done.created + done.replaced
+  const ids = done.next.postIds.slice(0, 100)
+  return (
+    <div className="st-col" style={{ gap: 8 }} data-field="plan-done">
+      <span className="st-hint" role="status">
+        {made} draft{made === 1 ? '' : 's'} made{done.replaced ? ` (${done.replaced} replaced; ${done.trashedPictures} old picture${done.trashedPictures === 1 ? '' : 's'} in the Trash)` : ''}{done.skipped ? `, ${done.skipped} skipped` : ''}.
+        {ids.length ? ` Next: Generate ${ids.length} post${ids.length === 1 ? '' : 's'} (${done.next.stills} still${done.next.stills === 1 ? '' : 's'}).` : ''}
+      </span>
+      {ids.length > 0 && (
+        <PriceButton label={`Generate ${ids.length} post${ids.length === 1 ? '' : 's'}`} action={{ type: 'plan_generate', postIds: ids }}
+          onStarted={onStarted} onDone={onStarted} />
+      )}
+    </div>
+  )
+}
+
+// The plan's posts after import: tick (Select all, shift-click), generate
+// the ones that need pictures (one price, ten at a time), remake the ones
+// that have them (the old pictures go to the Trash), Clear to the Trash,
 // open any post.
 function PlanPosts({ posts }: { posts: PlanPostView[] }) {
   const qc = useQueryClient()
+  const toast = useToast()
   const [day, setDay] = useState('')
   const [account, setAccount] = useState('')
-  const [picked, setPicked] = useState<Set<string>>(new Set())
   const models = useQuery({ queryKey: ['slide-still-models', null], queryFn: () => api.slideStillModels(null), staleTime: 60_000 })
   const [path, setPath] = useState<StillPathId | null>(null)
   const days = useMemo(() => [...new Set(posts.map(p => p.date))], [posts])
   const accounts = useMemo(() => [...new Set(posts.map(p => p.account))], [posts])
   const shown = posts.filter(p => (!day || p.date === day) && (!account || p.account === account))
-  const needing = shown.filter(p => p.have < p.need)
-  const ids = [...picked].filter(id => posts.some(p => p.id === id && p.have < p.need))
+  const sel = useSelection(useMemo(() => shown.map(p => p.id), [shown.map(p => p.id).join('|')])) // eslint-disable-line react-hooks/exhaustive-deps
+  const ticked = posts.filter(p => sel.has(p.id))
+  const ids = ticked.filter(p => p.have < p.need).map(p => p.id)
+  const remake = ticked.filter(p => p.need > 0 && p.have > 0)
+  const remakePictures = remake.reduce((a, p) => a + p.need, 0)
   const pick = path ?? models.data?.pick ?? null
   const on = models.data?.paths.find(p => p.path === pick)
-  const toggle = (id: string) => setPicked(s => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n })
+  const refresh = () => { sel.clear(); void qc.invalidateQueries({ queryKey: ['plan'] }) }
   return (
     <div className="st-col" style={{ gap: 10 }} data-field="plan-posts">
       <div className="st-row" style={{ gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
         <select className="st-select" style={{ width: 'auto' }} value={day} onChange={e => setDay(e.target.value)} aria-label="Day"><option value="">Every day</option>{days.map(d => <option key={d} value={d}>{dayLabel(d)}</option>)}</select>
         <select className="st-select" style={{ width: 'auto' }} value={account} onChange={e => setAccount(e.target.value)} aria-label="Account"><option value="">Every account</option>{accounts.map(a => <option key={a} value={a}>{a}</option>)}</select>
-        <button type="button" className="st-btn sm ghost" disabled={!needing.length} onClick={() => setPicked(s => new Set([...s, ...needing.map(p => p.id)]))}>Tick the {needing.length} shown that need pictures</button>
-        {picked.size > 0 && <button type="button" className="st-btn sm ghost" onClick={() => setPicked(new Set())}>Clear</button>}
+        <SelectionCount sel={sel} />
+        <ClearPlan posts={posts} ticked={ticked.map(p => p.id)} onCleared={() => { refresh(); void qc.invalidateQueries({ queryKey: keys.content }); toast({ tone: 'ok', text: 'Moved to Library > Trash. Restore them there within 7 days.' }) }} />
       </div>
       <div className="st-tablewrap">
         <table className="st-table st-planposts">
-          <thead><tr><th aria-label="Pick" /><th>Day</th><th>Account</th><th>Format</th><th>Hook</th><th>Pictures</th><th /></tr></thead>
+          <thead><tr><th><SelectAllBox sel={sel} label={`Pick the ${shown.length} posts shown`} disabled={!shown.length} /></th><th>Day</th><th>Account</th><th>Format</th><th>Hook</th><th>Pictures</th><th /></tr></thead>
           <tbody>
             {shown.slice(0, 200).map(p => (
               <tr key={p.id} data-field={`plan-post-${p.rowId}`}>
-                <td><input type="checkbox" checked={picked.has(p.id)} disabled={p.have >= p.need} onChange={() => toggle(p.id)} aria-label={`Pick ${p.rowId}`} /></td>
+                <td><SelectBox sel={sel} id={p.id} label={`Pick ${p.rowId}`} /></td>
                 <td style={{ whiteSpace: 'nowrap' }}>{dayLabel(p.date)} {p.slot}</td>
                 <td>{p.account}</td>
                 <td>{short(p.format)}</td>
@@ -342,10 +385,60 @@ function PlanPosts({ posts }: { posts: PlanPostView[] }) {
           models={on?.empty ? [{ who: 'Slides with no one', model: on.empty }] : []} />
       )}
       <PriceButton label={`Generate ${ids.length} post${ids.length === 1 ? '' : 's'}`} action={ids.length ? { type: 'plan_generate', postIds: ids.slice(0, 100), ...(pick ? { path: pick } : {}) } : null}
-        todo={ids.length ? [] : [{ label: 'Tick the posts to generate' }]} onStarted={() => { setPicked(new Set()); void qc.invalidateQueries({ queryKey: ['plan'] }) }}
+        todo={ids.length ? [] : [{ label: 'Tick the posts that need pictures' }]} onStarted={refresh}
         onDone={() => void qc.invalidateQueries({ queryKey: ['plan'] })} />
+      {remake.length > 0 && (
+        <div data-field="plan-remake">
+          <PriceButton label={`Remake ${remakePictures} picture${remakePictures === 1 ? '' : 's'}`} action={{ type: 'plan_generate', postIds: remake.map(p => p.id).slice(0, 100), remake: true, ...(pick ? { path: pick } : {}) }}
+            onStarted={refresh} onDone={() => void qc.invalidateQueries({ queryKey: ['plan'] })} />
+          <span className="st-hint">{remake.length} ticked post{remake.length === 1 ? ' has' : 's have'} pictures: Remake makes every photo slide again, and the old pictures go to Library &gt; Trash (restorable for 7 days) when it starts.</span>
+        </div>
+      )}
       <span className="st-hint">A slideshow gets a still for every photo slide (drawn slides are free), a clip its opening still; its take is made in the post with its own price after you pick the still. A slide with a character in it, and a clip's opening still, use the stills model in that character's file, on the path picked above. More than 10 posts run ten at a time.{ids.length > 100 ? ' At most 100 in one go.' : ''}</span>
     </div>
   )
 }
 
+// Clear (owner, 2026-10-22): the plan's drafts to the Trash, restorable.
+// All drafts in one import, only the ones with no pictures yet, or the
+// ticked ones; one confirm that says how many have pictures you paid for.
+function ClearPlan({ posts, ticked, onCleared }: { posts: PlanPostView[]; ticked: string[]; onCleared: () => void }) {
+  const toast = useToast()
+  const plans = useMemo(() => [...new Set(posts.map(p => p.planId))].sort().reverse(), [posts])
+  const [open, setOpen] = useState(false)
+  const [scope, setScope] = useState<'all' | 'empty' | 'ids'>('empty')
+  const [planId, setPlanId] = useState('')
+  const [count, setCount] = useState<{ posts: number; withPictures: number } | null>(null)
+  const plan = planId || plans[0] || ''
+  const args = { scope, planId: scope === 'ids' ? null : plan || null, ...(scope === 'ids' ? { ids: ticked } : {}) }
+  useEffect(() => {
+    if (!open) return
+    if (scope === 'ids' && !ticked.length) { setCount({ posts: 0, withPictures: 0 }); return }
+    let live = true
+    api.planClear({ ...args, dryRun: true }).then(c => { if (live) setCount(c) }).catch(() => { if (live) setCount(null) })
+    return () => { live = false }
+  }, [open, scope, plan, ticked.join('|')]) // eslint-disable-line react-hooks/exhaustive-deps
+  if (!open) return <button type="button" className="st-btn sm ghost" onClick={() => { setOpen(true); if (ticked.length) setScope('ids') }}>Clear...</button>
+  return (
+    <div className="st-col st-callout" style={{ gap: 8, flexBasis: '100%' }} data-field="plan-clear" role="group" aria-label="Clear drafts">
+      <b>Clear drafts to the Trash</b>
+      <label className="st-row" style={{ gap: 6 }}><input type="radio" name="plan-clear" checked={scope === 'all'} onChange={() => setScope('all')} />All drafts in this import</label>
+      <label className="st-row" style={{ gap: 6 }}><input type="radio" name="plan-clear" checked={scope === 'empty'} onChange={() => setScope('empty')} />Only drafts with no images</label>
+      <label className="st-row" style={{ gap: 6 }}><input type="radio" name="plan-clear" checked={scope === 'ids'} onChange={() => setScope('ids')} />The ticked ones ({ticked.length})</label>
+      {scope !== 'ids' && plans.length > 1 && (
+        <select className="st-select" style={{ width: 'auto' }} value={plan} onChange={e => setPlanId(e.target.value)} aria-label="Which import">
+          {plans.map(p => <option key={p} value={p}>{p.replace(/^plan-?/, 'Plan from ') || 'Plan'}</option>)}
+        </select>
+      )}
+      <span className="st-hint" role="status" data-field="plan-clear-count">
+        {count ? `${count.posts} post${count.posts === 1 ? '' : 's'} go to Library > Trash (restorable for 7 days).${count.withPictures ? ` ${count.withPictures} of these ${count.withPictures === 1 ? 'has' : 'have'} images you paid for.` : ''}` : 'Counting...'}
+      </span>
+      <div className="st-row" style={{ gap: 8 }}>
+        <AsyncButton className="st-btn sm" disabled={!count?.posts} busyLabel="Clearing..." onClick={async () => {
+          try { await api.planClear(args); setOpen(false); setCount(null); onCleared() } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) }
+        }}>Clear {count?.posts ?? ''} post{count?.posts === 1 ? '' : 's'}</AsyncButton>
+        <button type="button" className="st-btn sm ghost" onClick={() => setOpen(false)}>Cancel</button>
+      </div>
+    </div>
+  )
+}

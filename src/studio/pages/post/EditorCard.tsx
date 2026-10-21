@@ -84,7 +84,7 @@ export function EditorCard({ ctx }: { ctx: PostCtx }) {
           <div className="st-hint">
             {edited
               ? `Edited in the editor ${ago(edited)}. Done there saves the video here.`
-              : 'Your clips, B-roll and captions, laid out for you. Open the editor to place edits exactly where you want them; double-click a caption there to change its words.'}
+              : 'Your clips, B-roll and captions, laid out for you. Open the editor to place edits exactly where you want them; click a caption there, then click it again or type to change its words.'}
           </div>
         </div>
       </div>

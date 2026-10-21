@@ -38,7 +38,7 @@ import { addCloneSource, cloneOptions, cloneStills, keepClone, pickCloneStill, p
 import { editorLibrary } from '../pipeline/editorMedia.js'
 import { addRecreateRow, recreateBatch, recreateFor, reviewTakeAgain, setRecreateRows, startRecreate, useCloneTake } from '../pipeline/recreate.js'
 import { jobViews } from '../jobs/jobView.js'
-import { importPlan, planView, previewPlan } from '../pipeline/planImport.js'
+import { clearPlan, importPlan, planView, previewPlan } from '../pipeline/planImport.js'
 import { applyResultsCsv, previewResultsCsv, resultsView, setPostResults } from '../pipeline/results.js'
 import { DECISIONS } from '../core/results.js'
 import { dayView, saveSlotTimes, setPosting, slotTimes, startPack } from '../pipeline/postingDay.js'
@@ -140,7 +140,7 @@ function capCheckDue(accountId: string, now: number): boolean {
 }
 
 // The plan routes' body as the import functions take it.
-const planArgs = (b: { csv: string; drawSpecials?: boolean; store?: Record<string, string>; stillModel?: string | null; path?: 'account' | 'api' | null; productId?: string | null; rows?: string[] }) => [b.csv, { drawSpecials: b.drawSpecials, store: b.store, stillModel: b.stillModel, path: b.path, productId: b.productId, rows: b.rows }] as const
+const planArgs = (b: { csv: string; drawSpecials?: boolean; store?: Record<string, string>; stillModel?: string | null; path?: 'account' | 'api' | null; productId?: string | null; rows?: string[]; existing?: 'replace' | 'add' }) => [b.csv, { drawSpecials: b.drawSpecials, store: b.store, stillModel: b.stillModel, path: b.path, productId: b.productId, rows: b.rows, existing: b.existing }] as const
 
 export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
   const app = new Hono<Env>().basePath('/api/v1')
@@ -265,8 +265,10 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
     const ctx = c.get('ctx')
     requireRole(ctx, 'admin')
     await getCharacter(deps, ctx, c.req.param('id'))
-    await setCharacterFields(deps, ctx, c.req.param('id'), { archivedAt: deps.clock.now(), status: 'archived' })
-    return c.json({ ok: true })
+    // To the Trash, restorable for 7 days (owner, 2026-10-22), half-built
+    // characters too.
+    const moved = await trash(deps, ctx, [{ kind: 'character', id: c.req.param('id') }])
+    return c.json({ ok: true, trashIds: moved.ids })
   })
 
   async function uploadedFile(c: Context, field: string): Promise<{ data: Buffer; mime: string; name: string }> {
@@ -1147,7 +1149,7 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
   app.get('/slideshow/still-models', async c => c.json(await slideStillOptions(deps, c.get('ctx'), c.req.query('characterId') || null)))
   // The launch plan (section 28): the free preview, the drafts (free), and
   // the plan's posts in schedule order.
-  const planBody = z.object({ csv: z.string().max(400_000), drawSpecials: z.boolean().optional(), store: z.record(z.string().max(60), z.string().max(60)).optional(), stillModel: z.string().max(80).nullable().optional(), path: z.enum(['account', 'api']).nullable().optional(), productId: z.string().max(60).nullable().optional(), rows: z.array(z.string().max(60)).max(2000).optional() })
+  const planBody = z.object({ csv: z.string().max(400_000), drawSpecials: z.boolean().optional(), store: z.record(z.string().max(60), z.string().max(60)).optional(), stillModel: z.string().max(80).nullable().optional(), path: z.enum(['account', 'api']).nullable().optional(), productId: z.string().max(60).nullable().optional(), rows: z.array(z.string().max(60)).max(2000).optional(), existing: z.enum(['replace', 'add']).optional() })
   app.post('/plan/preview', async c => c.json(await previewPlan(deps, c.get('ctx'), ...planArgs(parse(planBody, await json(c))))))
   app.post('/plan/import', async c => {
     const ctx = c.get('ctx')
@@ -1155,6 +1157,13 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
     return c.json(await importPlan(deps, ctx, ...planArgs(parse(planBody, await json(c)))))
   })
   app.get('/plan', async c => c.json(await planView(deps, c.get('ctx'))))
+  // Clear (owner, 2026-10-22): the plan's drafts to the Trash; dryRun counts first.
+  app.post('/plan/clear', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    const body = parse(z.object({ scope: z.enum(['all', 'empty', 'ids']), planId: z.string().max(60).nullable().optional(), ids: z.array(z.string().max(60)).max(500).optional(), dryRun: z.boolean().optional() }), await json(c))
+    return c.json(await clearPlan(deps, ctx, body))
+  })
   // Results (section 32): typed on a post's card or Finish step, pasted
   // from a CSV by row_id (a free preview, then Apply), and the Results view.
   const count = z.number().int().min(0).max(100_000_000_000).nullable()

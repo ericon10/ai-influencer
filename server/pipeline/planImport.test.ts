@@ -8,7 +8,8 @@ import { registerPipelineHooks } from './hooks.js'
 import { estimateAction, runAction } from './actions.js'
 import { importCharacter } from './files.js'
 import { getContent, startRender, type ContentOutputs } from './content.js'
-import { importPlan, planView, previewPlan } from './planImport.js'
+import { clearPlan, importPlan, planView, previewPlan } from './planImport.js'
+import { listTrash, restore } from './trash.js'
 import { importKit, starterKit } from './scaleKit.js'
 import { getScene } from './scenes.js'
 import { renderPlaceholderPortrait } from '../providers/mock.js'
@@ -85,9 +86,11 @@ describe('the launch plan', () => {
     expect(p.rows.flatMap(r => r.errors).join(' ')).toMatch(/is not YYYY-MM-DD/)
   })
 
-  it('Import every row for SideStep (free): every word as written, the plan fields kept, the plan\'s product on each; an import again updates instead of doubling', async () => {
+  it('Import every row for SideStep (free): every word as written, the plan fields kept, the plan\'s product on each; an import again asks Replace or Add, never updates silently; Clear goes to the Trash', async () => {
     const r = await importPlan(h.deps, h.ctx, CSV, { productId: sideStep, rows: allRows })
-    expect(r).toMatchObject({ created: 140, updated: 0, skipped: 0 })
+    expect(r).toMatchObject({ created: 140, replaced: 0, skipped: 0 })
+    expect(r.next.postIds).toHaveLength(140)
+    expect(r.next.stills).toBeGreaterThan(140)
     const { posts } = await planView(h.deps, h.ctx)
     expect(posts).toHaveLength(140)
     expect(posts[0]!.date).toBe('2026-10-19')
@@ -142,9 +145,32 @@ describe('the launch plan', () => {
     expect((scene.prompts as { video?: { text: string } }).video?.text).toContain('bar penlight')
     expect((scene.fields as { outfit?: string }).outfit).toContain('linen button-up')
 
-    const again = await importPlan(h.deps, h.ctx, CSV, { productId: sideStep, rows: allRows })
-    expect(again).toMatchObject({ created: 0, updated: 140 })
+    // An import again (owner, 2026-10-22): the preview names the matches,
+    // the import waits for Replace or Add as new, never updates silently.
+    const pv = await previewPlan(h.deps, h.ctx, CSV, { productId: sideStep })
+    expect(pv.totals.matches).toBe(140)
+    await expect(importPlan(h.deps, h.ctx, CSV, { productId: sideStep, rows: allRows })).rejects.toThrow(/140 rows match posts you already have/)
+    const oldP1 = byRow(posts, 'P001').id
+    const again = await importPlan(h.deps, h.ctx, CSV, { productId: sideStep, rows: allRows, existing: 'replace' })
+    expect(again).toMatchObject({ created: 0, replaced: 140 })
+    const after = (await planView(h.deps, h.ctx)).posts
+    expect(after).toHaveLength(140)
+    expect(byRow(after, 'P001').id).not.toBe(oldP1)
+    // The old post is in the Trash and comes back with Restore.
+    const tr = (await listTrash(h.deps, h.ctx)).find(t => t.kind === 'post' && t.refId === oldP1)!
+    expect(tr.label).toMatch(/^Post: /)
+    await restore(h.deps, h.ctx, [tr.id])
+    expect((await planView(h.deps, h.ctx)).posts).toHaveLength(141)
+    // Add as new: one more post for the row.
+    const add = await importPlan(h.deps, h.ctx, CSV, { productId: sideStep, rows: ['P002'], existing: 'add' })
+    expect(add).toMatchObject({ created: 1, replaced: 0 })
+    expect((await planView(h.deps, h.ctx)).posts.filter(p => p.rowId === 'P002')).toHaveLength(2)
+    // Clear: a dry run counts, then the drafts go to the Trash.
+    const ids = [oldP1, add.posts[0]!.id]
+    expect(await clearPlan(h.deps, h.ctx, { scope: 'ids', ids, dryRun: true })).toMatchObject({ posts: 2, withPictures: 0, trashed: 0 })
+    expect(await clearPlan(h.deps, h.ctx, { scope: 'ids', ids })).toMatchObject({ posts: 2, trashed: 2 })
     expect((await planView(h.deps, h.ctx)).posts).toHaveLength(140)
+    expect((await clearPlan(h.deps, h.ctx, { scope: 'empty', dryRun: true })).posts).toBe(140)
   })
 
   it('Generate N posts: one price, ten posts at a time, each still into its slide; then the export carries the plan in post.json', async () => {
@@ -191,11 +217,29 @@ describe('the launch plan', () => {
     expect(json.plan).toMatchObject({ row_id: first.rowId, structure: { code: expect.any(String) }, hook_score: expect.any(Number), moment_id: expect.stringMatching(/^F2-M/) })
     expect(json.caption.cta_line).toBeTruthy()
     expect(Buffer.from(zip['caption.txt']!).toString()).toContain(json.caption.cta_line)
+
+    // Remake (owner, 2026-10-22): a post with pictures can be made again;
+    // the price never moves anything, the run sends the old pictures to the
+    // Trash and fills every photo slide anew.
+    const second = after[1]!
+    const oldStills = ((await getContent(h.deps, h.ctx, second.id)).spec as SlideshowSpec).stillIds.filter(Boolean)
+    expect(oldStills.length).toBe(second.need)
+    const remake = { type: 'plan_generate' as const, postIds: [second.id], remake: true }
+    const est = await estimateAction(h.deps, h.ctx, remake)
+    expect(est.preview.title).toMatch(new RegExp(`^Remake ${second.need} pictures`))
+    expect(((await getContent(h.deps, h.ctx, second.id)).spec as SlideshowSpec).stillIds.filter(Boolean)).toEqual(oldStills)
+    await runAction(h.deps, h.ctx, remake, est.quote.id, true)
+    const trashed = (await listTrash(h.deps, h.ctx)).filter(t => t.kind === 'candidate').map(t => t.refId)
+    for (const id of oldStills) expect(trashed).toContain(id)
+    await drain(h, 60)
+    const fresh = ((await getContent(h.deps, h.ctx, second.id)).spec as SlideshowSpec).stillIds.filter(Boolean)
+    expect(fresh).toHaveLength(second.need)
+    expect(fresh.some(id => oldStills.includes(id))).toBe(false)
   }, 240_000)
 
   it('a product slideshow is an ad: "Ad:" first in the caption as posted', async () => {
     const { posts } = await planView(h.deps, h.ctx)
-    const rows = await h.deps.db.select({ id: sql<string>`id` }).from(sql`content_items`).where(and(sql`spec->'plan'->>'product' = 'true'`, eq(sql`kind`, 'slideshow')))
+    const rows = await h.deps.db.select({ id: sql<string>`id` }).from(sql`content_items`).where(and(sql`spec->'plan'->>'product' = 'true'`, sql`archived_at is null`, eq(sql`kind`, 'slideshow')))
     expect(rows.length).toBeGreaterThan(0)
     const s = (await getContent(h.deps, h.ctx, rows[0]!.id)).spec as SlideshowSpec
     expect(s.ad).toBe(true)

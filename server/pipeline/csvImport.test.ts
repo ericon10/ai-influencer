@@ -8,6 +8,7 @@ import { registerPipelineHooks } from './hooks.js'
 import { importCharacter } from './files.js'
 import { createContent, getContent, type ContentOutputs, type MemeSpec } from './content.js'
 import { addClip } from './clips.js'
+import { csvKind } from '../core/csvImport.js'
 import { previewImport, runImport } from './csvImport.js'
 import { renderPlaceholderPortrait } from '../providers/mock.js'
 import { makeClip } from '../media/testClips.js'
@@ -55,6 +56,14 @@ describe('importing a spreadsheet into a batch', () => {
     expect(p.totals.usd).toBe(p.rows[1]!.priceUsd)
     expect(p.priceNote).toMatch(/still/)
     expect(p.rows[2]!.problems).toEqual(['No character named "Mara"'])
+  })
+
+  it('refuses a launch plan, a faceless plan or a results sheet with where it goes (one import door, 2026-10-22)', async () => {
+    const plan = 'row_id,date,slot,account,format,hook,scene\nP1,2026-10-20,AM,CALLIE,character clip,when the alarm goes off,her desk\n'
+    await expect(previewImport(h.deps, h.ctx, batchId, plan)).rejects.toThrow(/a launch plan.*Use Import on Posts home/)
+    await expect(previewImport(h.deps, h.ctx, batchId, 'row_id,moment,hook,video_prompt,still_job_id\nD1,rain,ok,slow pan,\n')).rejects.toThrow(/faceless/)
+    await expect(previewImport(h.deps, h.ctx, batchId, 'row_id,views_72h\nP1,100\n')).rejects.toThrow(/results sheet/)
+    expect(csvKind(CSV)).toBe('batch')
   })
 
   it('makes one video post per good row and exports the free ones', async () => {

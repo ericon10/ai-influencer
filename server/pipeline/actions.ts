@@ -35,7 +35,7 @@ import { buildHookVariants } from './scaleKit.js'
 import { buildSlideshowBatch, buildSlideshowCaption, buildSlideshowDraft, buildSlideshowHooks, buildSlideshowStills, buildSlideshowVariations, saveSlideStillPath, stillPathFor } from './slideshow.js'
 import { PATTERN_IDS } from '../core/slides.js'
 import { EFFECT_CODES, STRUCTURE_CODES } from '../core/playbook.js'
-import { buildPlanGenerate } from './planImport.js'
+import { buildPlanGenerate, remakeStarted } from './planImport.js'
 import { saferPrompt } from '../core/wording.js'
 
 // Every paid step is an action. The same builder produces the job specs for
@@ -154,7 +154,7 @@ export const actionSchema = z.discriminatedUnion('type', [
   // Section 30: `path` is the stills path (the plan or the API); each
   // slide's model follows who is in it. `stillModel` (a model ref) is read
   // as its path, for a page from before.
-  z.object({ type: z.literal('plan_generate'), postIds: z.array(z.string().max(60)).min(1).max(100), path: z.enum(['account', 'api']).optional(), stillModel: z.string().max(80).nullable().optional() }),
+  z.object({ type: z.literal('plan_generate'), postIds: z.array(z.string().max(60)).min(1).max(100), path: z.enum(['account', 'api']).optional(), stillModel: z.string().max(80).nullable().optional(), remake: z.boolean().optional() }),
   z.object({ type: z.literal('slideshow_stills'), contentId: z.string().max(60), slides: z.array(z.number().int().min(0).max(11)).max(12).optional(), path: z.enum(['account', 'api']).optional(), stillModel: z.string().max(80).optional() }),
   z.object({ type: z.literal('slideshow_caption'), contentId: z.string().max(60) }),
   z.object({ type: z.literal('slideshow_variations'), contentId: z.string().max(60), count: z.number().int().min(1).max(10) }),
@@ -550,6 +550,8 @@ async function afterStart(deps: Deps, ctx: Ctx, action: StudioAction, built: Bui
     await saveSlideStillPath(deps, ctx, await stillPathFor(deps, ctx, null, { path: action.path, stillModel: action.stillModel })).catch(() => undefined)
   }
   if (action.type === 'plan_generate') {
+    // A remake: the old pictures go to the Trash now that the run started.
+    if (action.remake) await remakeStarted(deps, ctx, action.postIds)
     for (const j of jobs) if (/^scene:/.test(j.purpose)) await markSceneBusy(deps, ctx, j.purpose.split(':')[1]!).catch(() => undefined)
   }
   // "Make the video" on a still keeps that still; "Fix this face" picks the

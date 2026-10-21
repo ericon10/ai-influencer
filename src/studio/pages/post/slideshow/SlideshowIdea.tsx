@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { SelectAllBox, SelectBox, SelectionCount, useSelection } from '../../../select'
 import { Link } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeftRight, Check, ChevronDown, ChevronRight, ExternalLink, Layers, RefreshCw, ThumbsDown, ThumbsUp } from 'lucide-react'
@@ -223,9 +224,24 @@ function BatchReview({ ctx, items, assets, refetch }: { ctx: PostCtx; items: Sli
     try { await api.reviewSlideBatch(ctx.item.id, id, decision); refetch(); await qc.invalidateQueries({ queryKey: keys.content }) } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) }
   }
   const counts = { approved: items.filter(x => x.spec.review === 'approved').length, rejected: items.filter(x => x.spec.review === 'rejected').length }
+  // Select all (owner, 2026-10-22): tick rows (shift-click a range), then
+  // approve or reject the ticked ones together.
+  const sel = useSelection(useMemo(() => items.map(x => x.id), [items]))
+  const ready = (x: SlideBatch['items'][number]) => x.spec.review !== 'approved' && x.spec.review !== 'rejected' && !slideList(x.spec).some(s => !s.stillId && !s.special)
+  const pickedReady = items.filter(x => sel.has(x.id) && ready(x))
+  const pickedOpen = items.filter(x => sel.has(x.id) && x.spec.review !== 'rejected')
+  async function decideAll(list: typeof items, decision: 'approve' | 'reject') {
+    try { for (const x of list) await api.reviewSlideBatch(ctx.item.id, x.id, decision); sel.clear(); refetch(); await qc.invalidateQueries({ queryKey: keys.content }) } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) }
+  }
   return (
     <div className="st-col" style={{ gap: 10 }} data-field="batch-review">
       <span className="st-label">Review ({items.length} slideshows · {counts.approved} approved · {counts.rejected} rejected)</span>
+      <div className="st-row" style={{ gap: 8, flexWrap: 'wrap', alignItems: 'center' }} data-field="batch-select">
+        <label className="st-row" style={{ gap: 6 }}><SelectAllBox sel={sel} label={`Select all ${items.length}`} />Select all {items.length}</label>
+        <SelectionCount sel={sel} />
+        {sel.picked.size > 0 && <AsyncButton className="st-btn sm primary" disabled={!pickedReady.length} onClick={() => decideAll(pickedReady, 'approve')} icon={<ThumbsUp size={13} />}>Approve {pickedReady.length}<span className="st-price">Free</span></AsyncButton>}
+        {sel.picked.size > 0 && <AsyncButton className="st-btn sm ghost" disabled={!pickedOpen.length} onClick={() => decideAll(pickedOpen, 'reject')} icon={<ThumbsDown size={13} />}>Reject {pickedOpen.length}</AsyncButton>}
+      </div>
       {items.map((x, n) => {
         const list = slideList(x.spec)
         const missing = list.filter(s => !s.stillId && !s.special).length
@@ -233,6 +249,7 @@ function BatchReview({ ctx, items, assets, refetch }: { ctx: PostCtx; items: Sli
         return (
           <div key={x.id} className={`st-batchrow ${state}`} data-field={`batch-row-${n}`}>
             <div className="st-row" style={{ gap: 8, flexWrap: 'wrap' }}>
+              <SelectBox sel={sel} id={x.id} label={`Select slideshow ${n + 1}`} />
               <b style={{ flex: 1, minWidth: 0 }}>{n + 1}. {x.spec.hook || x.idea}</b>
               <span className="st-hint">{state === 'approved' ? (x.status === 'ready' ? 'Approved, exported' : x.status === 'rendering' ? 'Approved, exporting...' : 'Approved') : state === 'rejected' ? 'Rejected' : missing ? `${missing} still${missing === 1 ? '' : 's'} coming` : 'Ready to review'}</span>
               <Link className="st-btn ghost sm" to={`/studio/posts/${x.id}`}><ExternalLink size={13} />Open</Link>

@@ -7,6 +7,7 @@ import { keys } from '../../hooks'
 import type { ImportPreview } from '../../types'
 import { AsyncButton, errorMessage, useToast } from '../../ui'
 import type { PostCtx } from './ctx'
+import { takeBatchSheet } from '../../importDoor'
 
 // Spreadsheet import (overnight item 3, UX-PLAN section 11): one CSV row
 // per post. Preview first (free): each row's status and the total price.
@@ -22,7 +23,8 @@ export function ImportCard({ ctx }: { ctx: PostCtx }) {
   const { item } = ctx
   const toast = useToast()
   const qc = useQueryClient()
-  const [csv, setCsv] = useState('')
+  // A batch sheet sent by Import on Posts home waits here (one import door).
+  const [csv, setCsv] = useState(() => takeBatchSheet()?.text ?? '')
   const [preview, setPreview] = useState<ImportPreview | null>(null)
   const [exportFree, setExportFree] = useState(true)
   const [done, setDone] = useState<{ created: Array<{ line: number; id: string; status: string }>; exporting: number; skipped: number; notExported: Array<{ line: number; id: string; reason: string }> } | null>(null)

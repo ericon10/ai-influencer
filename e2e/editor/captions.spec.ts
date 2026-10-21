@@ -115,7 +115,9 @@ test.describe('captions', () => {
     await page.waitForTimeout(600)
     // Same caption, same place.
     await expect(captionBlock(page, CAPTION)).toBeVisible()
-    await page.mouse.click(p.x, p.y)
+    // Selected from its block (a second click on the selected words would
+    // edit them, owner 2026-10-22).
+    await captionBlock(page, CAPTION).click()
     await expect(textBox(page)).toBeVisible()
     const after = await centerOf(textBox(page))
     expect(Math.abs(after.y - before.y)).toBeLessThan(4)
@@ -149,7 +151,9 @@ test.describe('captions', () => {
     await page.keyboard.type('so true')
     await page.keyboard.press('Enter')
     const p = await framePoint(page, 0.5, 0.26)
-    await page.mouse.click(p.x, p.y)
+    // Still selected after the edit (a click on it now would edit again).
+    await expect(textBox(page)).toBeVisible()
+    await page.waitForTimeout(300)
     const before = (await textBox(page).boundingBox())!
     const f = await frame(page)
     const band = { x: f.x, y: f.y + f.height * 0.12, width: f.width, height: f.height * 0.3 }
@@ -176,7 +180,7 @@ test.describe('captions', () => {
     await page.waitForTimeout(400)
     const smallWhite = await countColor(page, band, [255, 255, 255], 8)
     expect(bigWhite).toBeGreaterThan(smallWhite * 1.3)
-    await page.mouse.click(p.x, p.y)
+    await captionBlock(page, 'so true').click()
     const undone = (await textBox(page).boundingBox())!
     expect(Math.abs(undone.width - before.width)).toBeLessThan(3)
     // A big drag keeps the caption inside the frame (it wraps instead).

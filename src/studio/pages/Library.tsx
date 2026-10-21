@@ -66,7 +66,7 @@ export default function Library() {
   useEffect(() => { sel.stop() }, [tab, characterId, filterKey]) // eslint-disable-line react-hooks/exhaustive-deps
   const still = (s: { id: string; sceneTitle: string }): Deletable => ({ kind: 'candidate', id: s.id, label: s.sceneTitle || 'Still' })
   const clip = (c: { id: string; title: string }): Deletable => ({ kind: 'candidate', id: c.id, label: c.title || 'Clip' })
-  const pick = <T,>(to: (x: T) => Deletable) => sel.on ? { has: sel.has, toggle: (x: T) => sel.toggle(to(x)) } : null
+  const pick = <T,>(to: (x: T) => Deletable) => sel.on ? { has: sel.has, toggle: (x: T, e?: { shiftKey?: boolean }) => sel.toggle(to(x), e) } : null
   const everything: Deletable[] = tab === 'stills' ? stills.map(still) : tab === 'clips' ? clips.filter(c => c.status !== 'generating').map(clip) : []
 
   return (
@@ -215,7 +215,7 @@ function SoundCard({ s, sel, del }: { s: SoundItem; sel: Sel; del: Del }) {
   const on = sel.has(s.id)
   return (
     <div className={`st-sounditem ${on ? 'picked' : ''}`}>
-      {sel.on && <input type="checkbox" className="st-checkbox" checked={on} onChange={() => sel.toggle(soundRef(s))} aria-label={`Select ${s.title}`} />}
+      {sel.on && <input type="checkbox" className="st-checkbox" checked={on} onChange={() => undefined} onClick={e => sel.toggle(soundRef(s), e)} aria-label={`Select ${s.title}`} />}
       {s.kind === 'music' ? <Music size={16} /> : <Wind size={16} />}
       <input className="st-input" style={{ maxWidth: 240 }} value={title} onChange={e => setTitle(e.target.value)} onBlur={() => title !== s.title && void save({ title })} aria-label="Title" />
       <input className="st-input" style={{ maxWidth: 160 }} value={tag} onChange={e => setTag(e.target.value)} onBlur={() => tag !== s.tag && void save({ tag })} placeholder="Tag, e.g. cafe" aria-label="Tag" />
@@ -245,7 +245,7 @@ function ExportedPosts({ data, characterId, sel, del }: { data: ContentData; cha
         const on = sel.has(i.id)
         return (
           <div key={i.id} className={`st-card st-col st-postcard ${on ? 'on' : ''}`} style={{ gap: 8, padding: 10 }}>
-            {sel.on && <button type="button" className="st-tile-open st-postcard-select" aria-pressed={on} aria-label={`Select ${postName(i)}`} onClick={() => sel.toggle(renderRef(i))}><TileCheck on={on} /></button>}
+            {sel.on && <button type="button" className="st-tile-open st-postcard-select" aria-pressed={on} aria-label={`Select ${postName(i)}`} onClick={e => sel.toggle(renderRef(i), e)}><TileCheck on={on} /></button>}
             {o.videoAssetId ? <video className="st-content-result sm" src={assetUrl(o.videoAssetId)} controls playsInline preload="metadata" />
               : o.imageAssetIds?.[0] ? <Img assetId={o.imageAssetIds[0]} width={320} style={{ aspectRatio: '9 / 16' }} />
               : o.videos?.find(v => v) ? <video className="st-content-result sm" src={assetUrl(o.videos.find(v => v)!.assetId)} controls playsInline preload="metadata" /> : null}
@@ -351,7 +351,7 @@ function BrollCard({ b, products, sel, del }: { b: BrollClip; products: ProductB
   const on = sel.has(b.id)
   return (
     <div className={`st-card st-col st-postcard ${on ? 'on' : ''}`} style={{ gap: 8, padding: 10 }}>
-      {sel.on && <button type="button" className="st-tile-open st-postcard-select" aria-pressed={on} aria-label={`Select ${b.title || 'B-roll'}`} onClick={() => sel.toggle(brollRef(b))}><TileCheck on={on} /></button>}
+      {sel.on && <button type="button" className="st-tile-open st-postcard-select" aria-pressed={on} aria-label={`Select ${b.title || 'B-roll'}`} onClick={e => sel.toggle(brollRef(b), e)}><TileCheck on={on} /></button>}
       {b.status === 'ready' && b.assetId ? <video className="st-content-result sm" src={assetUrl(b.assetId)} controls muted playsInline preload="metadata" />
         : b.status === 'processing' ? <div className="st-content-processing"><Loader2 size={18} className="st-spin" />Preparing...</div>
         : <div className="st-content-processing bad">{b.error ?? 'This upload failed.'}</div>}

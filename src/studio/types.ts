@@ -229,7 +229,7 @@ export type StudioAction =
   | { type: 'voice_convert'; soundIds: string[] }
   | { type: 'hook_variants'; hookId: string; characterIds: string[]; perCharacter?: number }
   | { type: 'slideshow_hooks'; contentId: string }
-  | { type: 'plan_generate'; postIds: string[]; path?: StillPathId; stillModel?: string | null }
+  | { type: 'plan_generate'; postIds: string[]; path?: StillPathId; stillModel?: string | null; remake?: boolean }
   | { type: 'slideshow_draft'; contentId: string; hook: string; pattern?: string | null; code?: string | null; effectOpen?: string | null; effectPayoff?: string | null; moment?: string; alt?: string; score?: number | null }
   | { type: 'slideshow_stills'; contentId: string; slides?: number[]; path?: StillPathId; stillModel?: string }
   | { type: 'slideshow_caption'; contentId: string }
@@ -366,7 +366,7 @@ export type { PlanPreview, PlanPreviewRow, PlanPostView, PlanAccountView } from 
 export type StillPathId = 'account' | 'api'
 export interface SlideStillModel { ref: string; label: string; from: 'file' | 'studio' | 'cheapest'; perStill: string }
 export interface SlideStillOptions { pick: StillPathId; name: string | null; paths: Array<{ path: StillPathId; label: string; problem: string | null; character: SlideStillModel | null; empty: SlideStillModel | null }> }
-export interface PlanImportResult { created: number; updated: number; kept: number; skipped: number; posts: Array<{ rowId: string; id: string; state: 'new' | 'update' }> }
+export type { PlanImportResult } from '../../server/pipeline/planImport'
 // Results (UX-PLAN.md section 32): a post's results and the Results view.
 export type { PostResults, Decision, ResultHint, ResultRow } from '../../server/core/results'
 export type { ResultsView, ResultsCsvPreview, ResultsCsvPreviewRow } from '../../server/pipeline/results'
@@ -603,7 +603,7 @@ export interface AutoCleanItem {
   id: string; kind: 'take' | 'still'; label: string; assetId: string | null; media: 'image' | 'video'
   characterId: string; postId: string; postName: string; finishedAt: string
 }
-export interface TrashRef { kind: 'candidate' | 'broll' | 'sound' | 'render'; id: string }
+export interface TrashRef { kind: 'candidate' | 'broll' | 'sound' | 'render' | 'post' | 'character'; id: string }
 export interface TrashItem {
   id: string; kind: TrashRef['kind']; refId: string; label: string; characterId: string | null; reason: 'owner' | 'auto'
   assetId: string | null; media: 'image' | 'video' | 'audio' | 'file' | null

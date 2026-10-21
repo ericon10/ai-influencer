@@ -1376,3 +1376,59 @@ tabs. No new page or step. Everything here is free.
 or its saved editor timeline: the same check the Delete warning makes
 (section 22). A deleted item leaves its collections' view while it is in
 the Trash and comes back with Restore.
+
+## 35. The Oct 22 build: unblock posting, faceless characters, importer quality (owner, 2026-10-22)
+
+Shipped in tier order; each tier is tested, pushed and live on production
+before the next starts. New ideas found while building go to the report
+and LATER.md, never into the build.
+
+### Standing rules (owner, 2026-10-22; also in CLAUDE.md)
+
+- **R1. Nothing covers a face.** Nothing the Studio places on an image or a
+  video (captions, hooks, labels, stickers, drawn screens) ever covers a
+  face. Every overlay checks the face boxes first: on a still, its faces;
+  on a video, the faces across the whole clip.
+- **R2. Fixed means fixed on production.** A fix is done when it works on
+  character-studio-pi.vercel.app; the report names the production version
+  checked and shows a screenshot. Every UI fix ships with a browser test
+  that clicks the visible thing like a person and fails before the fix.
+- **R3. Never limit shots.** The one-action, calm, one-camera-move rules
+  live only inside the "caught you" recipe. Every other video and clip
+  prompt builder (clip library, imported clip rows, image-to-video) keeps
+  only: start from an approved still, same face and outfit, protect the
+  face. Multi Shot is offered where a model has it.
+- **R4. Price first, every feature on the API path.** Every paid step shows
+  its price and waits for the owner's click. Every feature works on the API
+  path, not only on a Higgsfield plan.
+- **R5. One post workspace with drawers.** No bolted-on pages: new work
+  fits the post workspace, its drawers, Posts home, Characters, Library or
+  Settings.
+
+### Tier 1: unblock posting
+
+| # | Piece | Where | How it works |
+|---|---|---|---|
+| 1 | Editor text like CapCut | The editor (OpenReel fork), Text tab and every caption | The words render inside their selection box at every zoom and aspect, whatever the preset's alignment (the fork's renderer centers the text block on its position; alignment lines the rows up inside the block). A new line grows the box. One click on the words selects them, a drag moves them, a second click (without dragging) or typing a letter edits them in place, and a double-click edits too. Checked on every Text preset (Heading, Subtitle, Lower Third, Caption, Hero, Quote, Outline, Badge) on a 9:16 post (`e2e/editor/textpresets.spec.ts`) |
+| 2a | Re-import asks | Launch plan import preview | Rows whose row_id matches posts already made show "N rows match posts you already have" with **Replace them (their pictures go to Trash)** or **Add as new posts**. Nothing is updated silently |
+| 2b | Remake pictures | Launch plan list | Posts that already have pictures can be ticked and remade ("Remake 6 pictures, $X"); the old pictures go to Trash |
+| 2c | Import a CSV | Launch plan card | The button reads "Import a CSV" |
+| 2d | Clear | Launch plan card | Clear: all drafts in this import, only drafts with no images, or the ticked ones. One confirm, to Trash (restorable); the confirm says "3 of these have images you paid for" |
+| 2e | Select all | Launch plan list, Posts home, Library, Trash, batch review | A header checkbox that respects the filters, "12 selected" with Clear selection, shift-click for a range |
+| 2f | Next step | After an import | The last line is the next step: "10 drafts made. Next: Generate 10 posts, $X" with the button |
+| 2g | One import door | Posts home | One Import button reads the file and routes slideshow, photo, clip and plan rows (and faceless rows, item 4g) to the right place, with a clear message. A plan CSV is never read as the older video batch sheet |
+| 3a | Import a finished character | Characters | Upload the character file plus REF-00 to REF-11 (REF-12 and REF-13 when present) in one go; no hero generation, no inspiration likeness check; lands on a complete character |
+| 3b | Delete character | Every character, half-built ones too | To Trash, restorable |
+| 3c | Any upload as hero | Character setup | An uploaded image can always be picked as the hero |
+| 3d | Edit refs | Any character's sheet | Add, replace or remove any reference image without a rebuild; prompt builders pick refs by framing, so new refs are used at once |
+| 3e | Build refs | Character setup, Settings per character | "Build the models shrink" adds REF-12 (front waist-up) and REF-13 (3/4 waist-up) to the sheet steps and the import; Element creation takes several images (face plus build) |
+| 4 | Faceless characters | Characters (Person or Faceless first), the post workspace | A faceless character's file (persona, place bank, look rules, voice and line formats, sound bank); its stills follow the faceless still rules (no person or body part, no text-carrying objects, a plain level upright phone snapshot, the fixed ending "Level, unedited. Sharp, real phone grain, muted color. No people.", Soul 2.0, 9:16); no hero, sheet, likeness gates, Element or face checks; posts use the same workspace (Still, Video, Sound, Text, Posted); products switch to an edit model; plan rows route to it; each account links to one character; voiceover clips (only if a source allows automated access); the "Finished damage" recipe |
+| 5 | Line lint | Every on-screen line and slide 1 | Flags a line that reads as setup instead of a hit in its first words, or carries no clear emotion (angry, infuriated, sad, frustrated). Shows the flag, never blocks, free |
+
+### Tier 2: importer and quality
+
+Items 6 to 17 of the owner's list (the scene from new CSV columns, Stills
+on kept, captions off faces on stills and video, drawn screens from text
+lines, slide image columns, mixed framing, the slide's image line wins,
+Punch up, SideStep lines need a screenshot, the free pre-check, the Notes
+badge and the "need to" lint). Each is planned here before it is built.

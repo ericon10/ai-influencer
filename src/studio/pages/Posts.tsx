@@ -12,11 +12,13 @@ import { batchProgress } from './post/batchProgress'
 import { HowTo, QuickStartBanner } from '../guide/Guide'
 import { AccountsCard } from './AccountsCard'
 import { PlanCard } from './PlanCard'
+import { ImportDoor } from '../importDoor'
 import { ResultsCard } from './ResultsCard'
 import { DownloadDayCard } from './DownloadDayCard'
 import { PostingChips } from '../posting'
 import { ResultsRow, useResultsView } from '../results'
 import type { ResultHint } from '../types'
+import { SelectBar, SelectToggle, TileCheck, useSelection } from '../trash'
 
 // Home (UX-PLAN.md): every post, newest work first, filtered by account,
 // character and product (section 29). One click opens a post where it was
@@ -47,7 +49,20 @@ export default function Posts() {
   const hints = useResultsView().data?.hints ?? {}
   const nav = useNavigate()
   const toast = useToast()
+  const qc = useQueryClient()
   const [setting, setSetting] = useState(false)
+  // Select many (owner, 2026-10-22): tick posts, Select all respects the
+  // filters, shift-click a range; the ticked ones go to the Trash together.
+  const sel = useSelection<ContentItem>()
+  async function trashPicked() {
+    const n = sel.items.length
+    try {
+      await api.trash(sel.items.map(i => ({ kind: 'post' as const, id: i.id })))
+      sel.stop()
+      await qc.invalidateQueries({ queryKey: keys.content })
+      toast({ tone: 'ok', text: `${n} post${n === 1 ? '' : 's'} moved to Library > Trash. Restore within 7 days.` })
+    } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) }
+  }
   async function setUp() {
     setSetting(true)
     try { const { id } = await api.createCharacter('New character'); nav(`/studio/characters/${id}`) } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) } finally { setSetting(false) }
@@ -61,7 +76,8 @@ export default function Posts() {
           <h1 className="st-h1">Your posts</h1>
           <p className="st-sub">Each post goes from an idea to an exported video or slideshow on one page.</p>
         </div>
-        <div className="st-row" style={{ gap: 8 }}>
+        <div className="st-row" style={{ gap: 8, flexWrap: 'wrap' }}>
+          {characters.length > 0 && <ImportDoor newBatch={async () => { await newPost.create('batch'); return 'batch' }} />}
           {NEW_POST.map(([kind, label]) => {
             const Icon = KIND_ICON[kind]
             return <button key={kind} className={`st-btn ${kind === 'meme' ? 'primary' : ''}`} disabled={!!newPost.busy} onClick={() => void newPost.create(kind)}>{newPost.busy === kind ? <Loader2 size={15} className="st-spin" /> : <Icon size={15} />}{label}</button>
@@ -130,8 +146,17 @@ export default function Posts() {
       ) : (
         <>
           {shown.length > 0 && (
+            <div className="st-row" style={{ gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
+              <SelectToggle sel={sel} />
+            </div>
+          )}
+          <SelectBar sel={sel} all={shown} help="posts">
+            <button type="button" className="st-btn sm bad" disabled={!sel.items.length} onClick={() => void trashPicked()}>Move {sel.items.length || ''} to the Trash</button>
+          </SelectBar>
+          {shown.length > 0 && (
             <div className="st-grid cards">
-              {shown.map(i => <PostCard key={i.id} item={i} lib={lib.data} characterName={characters.find(c => c.id === i.characterId)?.name ?? ''} productName={products.find(p => p.id === i.productId)?.name ?? ''} hints={hints[i.id]} />)}
+              {shown.map(i => <PostCard key={i.id} item={i} lib={lib.data} characterName={characters.find(c => c.id === i.characterId)?.name ?? ''} productName={products.find(p => p.id === i.productId)?.name ?? ''} hints={hints[i.id]}
+                select={sel.on ? { on: sel.has(i.id), toggle: e => sel.toggle(i, e) } : null} />)}
             </div>
           )}
           {older.more && (
@@ -187,7 +212,7 @@ const STATUS: Record<ContentItem['status'], { label: string; tone: string }> = {
   draft: { label: 'Draft', tone: '' }, rendering: { label: 'Rendering', tone: 'accent live' }, ready: { label: 'Exported', tone: 'ok' }, failed: { label: 'Export failed', tone: 'bad' },
 }
 
-function PostCard({ item, lib, characterName, productName, hints }: { item: ContentItem; lib: LibraryData | undefined; characterName: string; productName: string; hints?: ResultHint[] }) {
+function PostCard({ item, lib, characterName, productName, hints, select }: { item: ContentItem; lib: LibraryData | undefined; characterName: string; productName: string; hints?: ResultHint[]; select?: { on: boolean; toggle: (e: { shiftKey: boolean }) => void } | null }) {
   const toast = useToast()
   const qc = useQueryClient()
   const duplicate = useDuplicate()
@@ -198,7 +223,8 @@ function PostCard({ item, lib, characterName, productName, hints }: { item: Cont
     try { await api.archiveContent(item.id); await qc.invalidateQueries({ queryKey: keys.content }); toast({ tone: '', text: 'Post archived.' }) } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) }
   }
   return (
-    <div className="st-casting st-postcard">
+    <div className={`st-casting st-postcard ${select?.on ? 'picked' : ''}`}>
+      {select && <button type="button" className="st-tile-open st-postcard-select" aria-pressed={select.on} aria-label={`Select ${postName(item)}`} onClick={e => select.toggle(e)}><TileCheck on={select.on} /></button>}
       <Link to={`/studio/posts/${item.id}`} className="st-postcard-cover" aria-label={`Open ${postName(item)}`}>
         {c.video ? <video src={`${assetUrl(c.video)}#t=0.1`} muted playsInline preload="metadata" /> : <Img assetId={c.image} width={520} />}
         <span className={`st-badge ${st.tone}`}>{item.status === 'draft' && step ? `Draft · ${step}` : st.label}</span>

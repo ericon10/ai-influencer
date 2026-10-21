@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import type { Ctx, Deps } from '../context.js'
 import { AppError } from '../lib/errors.js'
-import { csvRows, planRows, type PlannedRow } from '../core/csvImport.js'
+import { CSV_KIND_LABEL, csvKind, csvRows, planRows, type PlannedRow } from '../core/csvImport.js'
 import { estimateGen } from '../costs/pricebook.js'
 import { listCharacters } from './characters.js'
 import { libraryView } from './clips.js'
@@ -27,6 +27,10 @@ async function plan(deps: Deps, ctx: Ctx, batchId: string, csv: string) {
   if (csv.length > MAX_BYTES) throw new AppError('bad_request', 'That file is too big for one import (200 KB). Split it.')
   const batch = await getContent(deps, ctx, batchId)
   if (batch.kind !== 'batch') throw new AppError('bad_request', 'Import a spreadsheet from a batch.')
+  // Another kind of file is refused with where it goes (owner, 2026-10-22):
+  // a plan CSV here once skipped every row and put one character on all.
+  const kind = csvKind(csv)
+  if (kind !== 'batch' && kind !== 'unknown') throw new AppError('bad_request', `This file is ${CSV_KIND_LABEL[kind]}, not a video batch sheet. Use Import on Posts home: it reads the file and sends each row to the right place.`)
   const parsed = csvRows(csv)
   const [chars, lib] = await Promise.all([listCharacters(deps, ctx), libraryView(deps, ctx)])
   const rows = planRows(parsed.rows, {

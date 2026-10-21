@@ -16,7 +16,7 @@ import type { LibraryClip, LibraryStill } from './types'
 
 const firstFrame = (id: string) => `${assetUrl(id)}#t=0.1`
 // Select mode (Library, owner 2026-10-15): the tile toggles its checkbox.
-export interface GridSelect<T> { has: (id: string) => boolean; toggle: (x: T) => void }
+export interface GridSelect<T> { has: (id: string) => boolean; toggle: (x: T, e?: { shiftKey?: boolean }) => void }
 // The viewer's own buttons for an item; `close` closes it first.
 export type ViewActions<T> = (x: T, close: () => void) => ReactNode
 
@@ -42,7 +42,7 @@ export function StillGrid({ stills, picked = [], onPick, action, viewActions, sh
         const name = s.sceneTitle || 'Still'
         return (
           <div key={s.id} className={`st-tile st-scene-tile ${n >= 0 || on ? 'picked' : ''} ${isFresh(s.createdAt) ? 'st-new' : ''}`} data-id={s.id}>
-            {select ? <button type="button" className="st-tile-open" onClick={() => select.toggle(s)} aria-pressed={on} aria-label={`Select ${name}`}>{body}</button>
+            {select ? <button type="button" className="st-tile-open" onClick={e => select.toggle(s, e)} aria-pressed={on} aria-label={`Select ${name}`}>{body}</button>
               : onPick ? <button type="button" className="st-tile-open" onClick={() => onPick(s)} aria-pressed={n >= 0} aria-label={`Pick ${name}`}>{body}</button>
               : <button type="button" className="st-tile-open" onClick={() => v.open(s.id)} aria-label={`View ${name}`}>{body}</button>}
             {onPick && !select && <ViewButton onClick={() => v.open(s.id)} label={name} />}
@@ -101,7 +101,7 @@ export function ClipGrid({ clips, picked = [], onPick, action, viewActions, show
         )
         return (
           <div key={c.id} className={`st-tile st-scene-tile ${n >= 0 || on ? 'picked' : ''} ${isFresh(c.createdAt) ? 'st-new' : ''}`} data-id={c.id}>
-            {select ? <button type="button" className="st-tile-open" onClick={() => select.toggle(c)} aria-pressed={on} aria-label={`Select ${c.title}`}>{body}</button>
+            {select ? <button type="button" className="st-tile-open" onClick={e => select.toggle(c, e)} aria-pressed={on} aria-label={`Select ${c.title}`}>{body}</button>
               : onPick && ok ? <button type="button" className="st-tile-open" onClick={() => onPick(c)} aria-pressed={n >= 0} aria-label={`Pick ${c.title}`}>{body}</button>
               : ok ? <button type="button" className="st-tile-open" onClick={() => v.open(c.id)} aria-label={`View ${c.title}`}>{body}</button>
               : <div className="st-tile-open">{body}</div>}

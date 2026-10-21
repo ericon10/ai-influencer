@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { AlertTriangle, AudioLines, CheckSquare, File, Loader2, RotateCcw, Square, Star, Trash2, X } from 'lucide-react'
 import { api, assetUrl } from './api'
@@ -72,15 +72,32 @@ export function useDelete() {
 
 // Select many: a Select button turns the grid's tiles into checkboxes; the
 // bar below counts them, selects all, and deletes (or restores) them.
+// A shift-click ticks or unticks the range from the last tile clicked, in
+// the order the bar's list shows them (owner, 2026-10-22).
 export function useSelection<T extends { id: string }>() {
   const [on, setOn] = useState(false)
   const [picked, setPicked] = useState<Map<string, T>>(new Map())
+  const order = useRef<T[]>([])
+  const last = useRef<string | null>(null)
   return {
     on,
+    order,
     start: () => setOn(true),
-    stop: () => { setOn(false); setPicked(new Map()) },
+    stop: () => { setOn(false); setPicked(new Map()); last.current = null },
     has: (id: string) => picked.has(id),
-    toggle: (item: T) => setPicked(m => { const n = new Map(m); if (n.has(item.id)) n.delete(item.id); else n.set(item.id, item); return n }),
+    toggle: (item: T, e?: { shiftKey?: boolean }) => {
+      const list = order.current
+      const a = last.current ? list.findIndex(x => x.id === last.current) : -1
+      const b = list.findIndex(x => x.id === item.id)
+      setPicked(m => {
+        const n = new Map(m)
+        const add = !n.has(item.id)
+        const range = e?.shiftKey && a >= 0 && b >= 0 ? list.slice(Math.min(a, b), Math.max(a, b) + 1) : [item]
+        for (const x of range) { if (add) n.set(x.id, x); else n.delete(x.id) }
+        return n
+      })
+      last.current = item.id
+    },
     setAll: (items: T[]) => setPicked(new Map(items.map(i => [i.id, i]))),
     clear: () => setPicked(new Map()),
     items: [...picked.values()],
@@ -95,17 +112,34 @@ export function SelectToggle({ sel, disabled = false }: { sel: { on: boolean; st
 }
 
 export function SelectBar<T extends { id: string }>({ sel, all, children, help = 'library' }: { sel: Selection<T>; all: T[]; children: ReactNode; help?: GuideId }) {
+  sel.order.current = all
   if (!sel.on) return null
-  const every = all.length > 0 && all.every(x => sel.has(x.id))
   return (
     <div className="st-selectbar" role="toolbar" aria-label="Selected items" data-field="library-selectbar">
+      <SelectAll sel={sel} all={all} />
       <b>{sel.items.length} selected</b>
-      <button type="button" className="st-btn sm ghost" onClick={() => (every ? sel.clear() : sel.setAll(all))}>{every ? 'Select none' : `Select all ${all.length}`}</button>
+      {sel.items.length > 0 && <button type="button" className="st-btn sm ghost" onClick={sel.clear}>Clear selection</button>}
       <span className="st-spacer" />
       {children}
       <button type="button" className="st-btn sm ghost" onClick={sel.stop}>Cancel</button>
       <HowTo id={help} label="About Select" />
     </div>
+  )
+}
+
+// Select all (owner, 2026-10-22): one checkbox ticks every item the filters
+// show, or unticks them; half-ticked when some are.
+export function SelectAll<T extends { id: string }>({ sel, all }: { sel: Selection<T>; all: T[] }) {
+  const ref = useRef<HTMLInputElement>(null)
+  const n = all.filter(x => sel.has(x.id)).length
+  const every = all.length > 0 && n === all.length
+  useEffect(() => { if (ref.current) ref.current.indeterminate = n > 0 && !every }, [n, every])
+  return (
+    <label className="st-row" style={{ gap: 6, cursor: 'pointer' }}>
+      <input ref={ref} type="checkbox" checked={every} disabled={!all.length} data-field="select-all"
+        onChange={() => (every ? sel.setAll(sel.items.filter(x => !all.some(a => a.id === x.id))) : sel.setAll([...sel.items, ...all.filter(x => !sel.has(x.id))]))} />
+      Select all {all.length}
+    </label>
   )
 }
 
@@ -180,7 +214,7 @@ export function TrashTab({ characterId }: { characterId: string | null }) {
               )
               return (
                 <div key={t.id} className={`st-tile st-scene-tile ${on ? 'picked' : ''}`}>
-                  {sel.on ? <button type="button" className="st-tile-open" aria-pressed={on} aria-label={`Select ${t.label}`} onClick={() => sel.toggle(t)}>{media}</button> : <div className="st-tile-open">{media}</div>}
+                  {sel.on ? <button type="button" className="st-tile-open" aria-pressed={on} aria-label={`Select ${t.label}`} onClick={e => sel.toggle(t, e)}>{media}</button> : <div className="st-tile-open">{media}</div>}
                   <div className="st-col" style={{ gap: 2, padding: '0 4px 2px' }}>
                     <span className="st-tile-label">{t.label}</span>
                     <span className="st-hint">{t.reason === 'auto' ? 'Auto-clean' : 'Deleted by you'} · {new Date(t.deletedAt).toLocaleDateString()}</span>

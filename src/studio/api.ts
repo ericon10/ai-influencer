@@ -179,7 +179,8 @@ export const api = {
   slideStillModels: (characterId?: string | null) => request<SlideStillOptions>('GET', `/slideshow/still-models${characterId ? `?characterId=${encodeURIComponent(characterId)}` : ''}`),
   // The launch plan (section 28).
   planPreview: (csv: string, o: { drawSpecials?: boolean; store?: Record<string, string>; path?: StillPathId | null; productId?: string | null } = {}) => request<PlanPreview>('POST', '/plan/preview', { csv, ...o }),
-  planImport: (csv: string, o: { drawSpecials?: boolean; store?: Record<string, string>; productId?: string | null; rows: string[] }) => request<PlanImportResult>('POST', '/plan/import', { csv, ...o }),
+  planImport: (csv: string, o: { drawSpecials?: boolean; store?: Record<string, string>; productId?: string | null; rows: string[]; existing?: 'replace' | 'add' }) => request<PlanImportResult>('POST', '/plan/import', { csv, ...o }),
+  planClear: (o: { scope: 'all' | 'empty' | 'ids'; planId?: string | null; ids?: string[]; dryRun?: boolean }) => request<{ posts: number; withPictures: number; trashed: number }>('POST', '/plan/clear', o),
   plan: () => request<{ posts: PlanPostView[]; running: number }>('GET', '/plan'),
   saveSlideStillPath: (path: StillPathId) => request<{ ok: true }>('PUT', '/slideshow/still-model', { path }),
   // Results (section 32): typed on a post, pasted from a CSV, the view.

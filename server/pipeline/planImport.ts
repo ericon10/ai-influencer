@@ -20,6 +20,7 @@ import { getCharacter } from './characters.js'
 import { buildSlideshowStills, slideModel, slidePrice, slideStillPaths, stillPathFor } from './slideshow.js'
 import { shotShowsCharacter } from '../core/slides.js'
 import { PATH_LABELS, type StillPath } from '../core/stillModels.js'
+import { trash, type TrashRef } from './trash.js'
 import { formatCredits } from '../costs/quotes.js'
 import { formatUsd } from '../costs/money.js'
 
@@ -43,7 +44,10 @@ const QUEUE = 10
 // rows: the row_ids to import (the preview always reads every row).
 // path: the stills path for the preview's prices (section 30; stillModel is
 // a model ref from a page from before, read as its path).
-interface Opts { drawSpecials?: boolean; store?: Record<string, string>; stillModel?: string | null; path?: StillPath | null; productId?: string | null; rows?: string[] }
+// existing: what an import does with ticked rows whose row_id matches posts
+// already made (owner, 2026-10-22: never update silently): replace them
+// (the old posts and their pictures go to the Trash) or add new posts.
+interface Opts { drawSpecials?: boolean; store?: Record<string, string>; stillModel?: string | null; path?: StillPath | null; productId?: string | null; rows?: string[]; existing?: 'replace' | 'add' }
 
 export interface PlanAccountView { tag: string; kind: 'character' | 'topic'; characterId: string | null; characterName: string; rows: number; problem: string | null }
 export interface PlanPreviewRow {
@@ -58,7 +62,9 @@ export interface PlanPreviewRow {
 }
 export interface PlanPreview {
   rows: PlanPreviewRow[]; accounts: PlanAccountView[]; days: string[]; problems: string[]
-  totals: { rows: number; ok: number; problem: number; kept: number; slideshows: number; photos: number; clips: number; stills: number; usd: number; credits: number; price: string }
+  // matches: good rows whose row_id matches posts already made (kept: of
+  // those, the ones with pictures).
+  totals: { rows: number; ok: number; problem: number; kept: number; matches: number; slideshows: number; photos: number; clips: number; stills: number; usd: number; credits: number; price: string }
   // Section 30: the picked path, the two paths, and the model each kind of
   // slide uses on it (each character's own default, the cheapest for no one).
   still: { path: StillPath; pathLabel: string; problem: string | null; paths: Array<{ path: StillPath; label: string; problem: string | null }>; models: Array<{ who: string; label: string; perStill: string; from: 'file' | 'studio' | 'cheapest' }> }
@@ -74,15 +80,46 @@ export interface PlanPreview {
 const norm = (s: string) => s.trim().toLowerCase()
 const charByName = (chars: CharacterRow[], tag: string) => chars.find(c => norm(c.name) === norm(tag.replace(/^@+/, '')))
 
-// Plan posts already made, by row and account (an import again updates the
-// drafts that have no pictures yet instead of doubling them).
-async function existing(deps: Deps, ctx: Ctx): Promise<Map<string, ContentRow>> {
+// Plan posts already made, by row and account (an import again asks what
+// to do with them: Replace or Add as new; owner, 2026-10-22). After an Add
+// a row can have more than one post.
+async function existing(deps: Deps, ctx: Ctx): Promise<Map<string, ContentRow[]>> {
   const rows = await deps.db.select().from(contentItems)
     .where(and(eq(contentItems.accountId, ctx.accountId), isNull(contentItems.archivedAt), sql`coalesce(${contentItems.spec}->'plan'->>'rowId', '') <> ''`))
-  return new Map(rows.map(r => [`${norm(r.accountTag)}|${String((r.spec as { plan?: { rowId?: string } }).plan?.rowId ?? '')}`, r]))
+  const out = new Map<string, ContentRow[]>()
+  for (const r of rows) {
+    const k = `${norm(r.accountTag)}|${String((r.spec as { plan?: { rowId?: string } }).plan?.rowId ?? '')}`
+    out.set(k, [...(out.get(k) ?? []), r])
+  }
+  return out
 }
 
-// A post that already has pictures (or a clip) keeps its own words.
+// The pictures a post has made: a slideshow's stills, a clip post's stills
+// and takes (its own scene). They go to the Trash with a Replace or a
+// remake, restorable for 7 days.
+export async function postPictures(deps: Deps, ctx: Ctx, row: ContentRow): Promise<TrashRef[]> {
+  if (row.kind === 'slideshow') return [...new Set(((row.spec as { stillIds?: string[] }).stillIds ?? []).filter(Boolean))].map(id => ({ kind: 'candidate' as const, id }))
+  if (!row.sceneId) return []
+  const list = await deps.db.select({ id: candidates.id }).from(candidates)
+    .where(and(eq(candidates.accountId, ctx.accountId), eq(candidates.sceneId, row.sceneId), sql`${candidates.status} not in ('trashed', 'purged')`))
+  return list.map(c => ({ kind: 'candidate' as const, id: c.id }))
+}
+
+// The posts among these that have pictures: their own (generated) or, for
+// a clip post, a still or take made in its scene and not picked yet.
+async function withPictures(deps: Deps, ctx: Ctx, rows: ContentRow[]): Promise<Set<string>> {
+  const out = new Set(rows.filter(generated).map(r => r.id))
+  const scenes = rows.filter(r => !out.has(r.id) && r.kind !== 'slideshow' && r.sceneId).map(r => r.sceneId!)
+  if (scenes.length) {
+    const hit = await deps.db.select({ sceneId: candidates.sceneId }).from(candidates)
+      .where(and(eq(candidates.accountId, ctx.accountId), inArray(candidates.sceneId, scenes), sql`${candidates.assetId} is not null`, sql`${candidates.status} not in ('trashed', 'purged')`))
+    const has = new Set(hit.map(h => h.sceneId))
+    for (const r of rows) if (r.sceneId && has.has(r.sceneId)) out.add(r.id)
+  }
+  return out
+}
+
+// A post that already has pictures (or a clip) of its own.
 function generated(row: ContentRow): boolean {
   const s = (row.spec ?? {}) as { stillIds?: string[]; stillId?: string | null; clipId?: string | null }
   if (row.kind === 'slideshow') return (s.stillIds ?? []).some(Boolean) || !!(row.outputs as { imageAssetIds?: string[] } | null)?.imageAssetIds?.length
@@ -169,6 +206,7 @@ export async function previewPlan(deps: Deps, ctx: Ctx, csv: string, opts: Opts 
   const { product, std } = await postWriting(deps, ctx, opts.productId)
   const { raw, checked, accounts, problems, rowProduct, chars } = await plan(deps, ctx, csv, opts, std)
   const made = await existing(deps, ctx)
+  const pictured = await withPictures(deps, ctx, [...made.values()].flat())
   // Section 30: each still priced by its own model on the picked path.
   const { paths } = await slideStillPaths(deps, ctx)
   const path = await stillPathFor(deps, ctx, null, { path: opts.path, stillModel: opts.stillModel }).catch(() => paths.find(p => !p.problem)?.path ?? 'account')
@@ -218,9 +256,11 @@ export async function previewPlan(deps: Deps, ctx: Ctx, csv: string, opts: Opts 
       add('character')
       lintHits = lintPost({ texts: [rawRow.cells.hook], caption: rawRow.cells.caption, hashtags: hashtagsOf(rawRow.cells.hashtags), product: r.ad, standard }, { lists, off: lint.off }).map(h => `${h.slide == null ? 'Caption' : 'On-screen text'}: ${h.message}`)
     }
-    const post = made.get(`${norm(r.account)}|${r.rowId}`) ?? null
-    const state: PlanPreviewRow['state'] = r.errors.length ? 'problem' : post ? (generated(post) ? 'kept' : 'update') : 'new'
-    const free = state === 'problem' || state === 'kept'
+    const posts = made.get(`${norm(r.account)}|${r.rowId}`) ?? []
+    const post = posts[0] ?? null
+    // update: it matches drafts with no pictures; kept: one of them has pictures.
+    const state: PlanPreviewRow['state'] = r.errors.length ? 'problem' : posts.length ? (posts.some(p => pictured.has(p.id)) ? 'kept' : 'update') : 'new'
+    const free = state === 'problem'
     return {
       line: r.line, rowId: r.rowId, date: r.date, slot: r.slot, account: r.account, format: r.format, kind: r.kind,
       product: name, productFrom: own ? 'row' as const : 'plan' as const, ad: r.ad,
@@ -228,7 +268,7 @@ export async function previewPlan(deps: Deps, ctx: Ctx, csv: string, opts: Opts 
       errors: r.errors, warnings: r.warnings, lint: lintHits, postId: post?.id ?? null, state,
     }
   })
-  const ok = rows.filter(r => r.state === 'new' || r.state === 'update')
+  const ok = rows.filter(r => r.state !== 'problem')
   const usd = ok.reduce((a, r) => a + r.priceUsd, 0)
   const credits = Math.round(ok.reduce((a, r) => a + r.credits, 0) * 100) / 100
   // The product the plan's accounts agree on (each account's product on the
@@ -240,6 +280,7 @@ export async function previewPlan(deps: Deps, ctx: Ctx, csv: string, opts: Opts 
     days: [...new Set(scheduleOrder(rows).map(r => r.date))],
     totals: {
       rows: rows.length, ok: ok.length, problem: rows.filter(r => r.state === 'problem').length, kept: rows.filter(r => r.state === 'kept').length,
+      matches: rows.filter(r => r.state === 'update' || r.state === 'kept').length,
       slideshows: ok.filter(r => r.kind === 'topic_slideshow' || r.kind === 'character_slideshow').length, photos: ok.filter(r => r.kind === 'photo').length, clips: ok.filter(r => r.kind === 'clip').length,
       stills: ok.reduce((a, r) => a + r.photos, 0), usd: Math.round(usd * 100) / 100, credits, price: priceText(credits, Math.round(usd * 1e6)),
     },
@@ -250,7 +291,7 @@ export async function previewPlan(deps: Deps, ctx: Ctx, csv: string, opts: Opts 
     planId: planIdOf(checked),
     product: product ? { id: product.id, name: product.name, writingLabel: std?.label ?? 'General standard', notes: !!std?.lint } : null,
     suggestedProductId: linked.size === 1 ? [...linked][0]! : null,
-    blankProductRows: rows.filter(r => r.productFrom === 'plan' && (r.state === 'new' || r.state === 'update')).length,
+    blankProductRows: rows.filter(r => r.productFrom === 'plan' && r.state !== 'problem').length,
   }
 }
 
@@ -266,10 +307,12 @@ const planIdOf = (rows: CheckedRow[]) => {
 }
 
 // "Import N rows" (free): each ticked good row becomes a draft in its flow,
-// with its words as written and the plan's product. Rows already made
-// without pictures are updated; rows that already have pictures are kept
-// as they are. Rows not ticked are left out (no draft).
-export async function importPlan(deps: Deps, ctx: Ctx, csv: string, opts: Opts = {}): Promise<{ created: number; updated: number; kept: number; skipped: number; posts: Array<{ rowId: string; id: string; state: 'new' | 'update' }> }> {
+// with its words as written and the plan's product. A ticked row whose
+// row_id matches posts already made needs the owner's choice (2026-10-22):
+// Replace (the old posts and their pictures go to the Trash, restorable) or
+// Add as new posts. Nothing is updated silently. Rows not ticked are left out.
+export interface PlanImportResult { created: number; replaced: number; trashedPictures: number; skipped: number; posts: Array<{ rowId: string; id: string; state: 'new' | 'replaced' }>; next: { postIds: string[]; stills: number } }
+export async function importPlan(deps: Deps, ctx: Ctx, csv: string, opts: Opts = {}): Promise<PlanImportResult> {
   const picked = new Set((opts.rows ?? []).map(x => x.trim()).filter(Boolean))
   if (!picked.size) throw new AppError('invalid_request', 'Tick the rows to import first.')
   const planProduct = opts.productId === undefined ? undefined : await checkProduct(deps, ctx, opts.productId)
@@ -278,8 +321,10 @@ export async function importPlan(deps: Deps, ctx: Ctx, csv: string, opts: Opts =
   // The plan's pick is needed only for ticked rows that name no product.
   if (planProduct === undefined && checked.some(r => picked.has(r.rowId) && !r.errors.length && !rowProduct.has(r.line))) throw new AppError('invalid_request', 'Pick the plan\'s product first (or No product): some ticked rows name no product of their own.')
   const made = await existing(deps, ctx)
+  const matching = checked.filter(r => picked.has(r.rowId) && !r.errors.length && (made.get(`${norm(r.account)}|${r.rowId}`) ?? []).length)
+  if (matching.length && !opts.existing) throw new AppError('invalid_request', `${matching.length} row${matching.length === 1 ? ' matches posts' : 's match posts'} you already have. Pick Replace them (their pictures go to Trash) or Add as new posts.`)
   const planId = planIdOf(checked)
-  const out = { created: 0, updated: 0, kept: 0, skipped: 0, posts: [] as Array<{ rowId: string; id: string; state: 'new' | 'update' }> }
+  const out: PlanImportResult = { created: 0, replaced: 0, trashedPictures: 0, skipped: 0, posts: [], next: { postIds: [], stills: 0 } }
   const order = scheduleOrder(checked.map((r, i) => ({ ...r, i })))
   for (const r of order) {
     const rawRow = raw[r.i]!
@@ -287,49 +332,69 @@ export async function importPlan(deps: Deps, ctx: Ctx, csv: string, opts: Opts =
     if (r.errors.length || !r.kind) { out.skipped++; continue }
     const productId = rowProduct.get(r.line)?.id ?? planProduct ?? null
     const account = accounts.find(a => a.tag === r.account)!
-    const post = made.get(`${norm(r.account)}|${r.rowId}`) ?? null
-    if (post && generated(post)) { out.kept++; continue }
+    const old = made.get(`${norm(r.account)}|${r.rowId}`) ?? []
+    let state: 'new' | 'replaced' = 'new'
+    if (old.length && opts.existing === 'replace') {
+      for (const p of old) {
+        const pics = await postPictures(deps, ctx, p)
+        out.trashedPictures += (await trash(deps, ctx, pics)).moved
+        await trash(deps, ctx, [{ kind: 'post', id: p.id }])
+      }
+      state = 'replaced'
+    }
     const meta = metaOf(rawRow, r, planId)
     const title = `${r.rowId}: ${r.hook}`.slice(0, 120)
     const c = rawRow.cells
+    let id: string
     if (r.kind === 'clip') {
       const parts = sceneParts(c.scene)
       const firstBeat = c.clip_action.split(/(?<=[.!?])\s+/)[0] ?? ''
       const fields = { setting: parts.common.slice(0, 400), outfit: parts.outfit.slice(0, 300), hair: parts.hair.slice(0, 160), moment: (firstBeat || c.moment).slice(0, 400) }
       const spec = { caption: r.hook.slice(0, 400), plan: meta }
-      if (post) {
-        if (post.sceneId) await updateScene(deps, ctx, post.sceneId, { brief: c.scene, fields, ...(c.clip_action ? { prompts: { video: c.clip_action } } : {}) })
-        await updateContent(deps, ctx, post.id, { title, idea: c.moment, spec, productId })
-        out.updated++; out.posts.push({ rowId: r.rowId, id: post.id, state: 'update' })
-        continue
-      }
       const scene = await createScene(deps, ctx, account.characterId!, { brief: c.scene, title: r.rowId, fields })
       if (c.clip_action) await updateScene(deps, ctx, scene.id, { prompts: { video: c.clip_action } })
-      const row = await createContent(deps, ctx, { kind: 'meme', characterId: account.characterId!, title, idea: c.moment, accountTag: r.account, sceneId: scene.id, step: 'stills', spec, productId })
-      out.created++; out.posts.push({ rowId: r.rowId, id: row.id, state: 'new' })
-      continue
+      id = (await createContent(deps, ctx, { kind: 'meme', characterId: account.characterId!, title, idea: c.moment, accountTag: r.account, sceneId: scene.id, step: 'stills', spec, productId })).id
+      out.next.stills += 1
+    } else {
+      const s = slidesOf(deps, rawRow, r.kind, !!opts.drawSpecials)
+      const spec: Partial<SlideshowSpec> = {
+        hook: s.texts[0]!.slice(0, 200), slides: s.texts.slice(1).map(t => t.slice(0, 300)),
+        slideCount: Math.max(3, Math.min(10, s.texts.length)),
+        mode: r.kind === 'topic_slideshow' ? 'topic' : 'character',
+        shots: s.shots, specials: s.specials, stillIds: [], textPos: [],
+        // A photo row is the character's photo, whatever its moment says.
+        people: r.kind === 'photo' ? ['character'] : [],
+        lock: slideshowSpecSchema.shape.lock.parse({ place: s.parts.common.slice(0, 1000), outfit: r.kind === 'topic_slideshow' ? '' : s.parts.outfit.slice(0, 300), hair: r.kind === 'topic_slideshow' ? '' : s.parts.hair.slice(0, 200), ownerSet: ['place', 'outfit', 'hair', 'light', 'camera', 'details'] }),
+        caption: c.caption.slice(0, 2200), hashtags: hashtagsOf(c.hashtags).slice(0, 15), ctaLine: c.cta.slice(0, 300), ad: r.ad,
+        cta: { kind: 'own', handle: '', word: '' }, pattern: null, hookIdeas: [], hookReview: null, plan: meta,
+      }
+      id = (await createContent(deps, ctx, { kind: 'slideshow', characterId: account.characterId!, title, idea: c.moment, accountTag: r.account, step: 'stills', spec, productId })).id
+      out.next.stills += s.specials.filter(x => !x).length
     }
-    const s = slidesOf(deps, rawRow, r.kind, !!opts.drawSpecials)
-    const spec: Partial<SlideshowSpec> = {
-      hook: s.texts[0]!.slice(0, 200), slides: s.texts.slice(1).map(t => t.slice(0, 300)),
-      slideCount: Math.max(3, Math.min(10, s.texts.length)),
-      mode: r.kind === 'topic_slideshow' ? 'topic' : 'character',
-      shots: s.shots, specials: s.specials, stillIds: [], textPos: [],
-      // A photo row is the character's photo, whatever its moment says.
-      people: r.kind === 'photo' ? ['character'] : [],
-      lock: slideshowSpecSchema.shape.lock.parse({ place: s.parts.common.slice(0, 1000), outfit: r.kind === 'topic_slideshow' ? '' : s.parts.outfit.slice(0, 300), hair: r.kind === 'topic_slideshow' ? '' : s.parts.hair.slice(0, 200), ownerSet: ['place', 'outfit', 'hair', 'light', 'camera', 'details'] }),
-      caption: c.caption.slice(0, 2200), hashtags: hashtagsOf(c.hashtags).slice(0, 15), ctaLine: c.cta.slice(0, 300), ad: r.ad,
-      cta: { kind: 'own', handle: '', word: '' }, pattern: null, hookIdeas: [], hookReview: null, plan: meta,
-    }
-    if (post) {
-      await updateContent(deps, ctx, post.id, { title, idea: c.moment, spec, productId })
-      out.updated++; out.posts.push({ rowId: r.rowId, id: post.id, state: 'update' })
-      continue
-    }
-    const row = await createContent(deps, ctx, { kind: 'slideshow', characterId: account.characterId!, title, idea: c.moment, accountTag: r.account, step: 'stills', spec, productId })
-    out.created++; out.posts.push({ rowId: r.rowId, id: row.id, state: 'new' })
+    if (state === 'replaced') out.replaced++
+    else out.created++
+    out.posts.push({ rowId: r.rowId, id, state })
+    out.next.postIds.push(id)
   }
   return out
+}
+
+// Clear on the Launch plan card (owner, 2026-10-22): the plan's drafts to
+// the Trash (restorable), by scope: every post of one import (planId), only
+// the ones with no pictures yet, or the ticked ones. dryRun counts them and
+// how many have pictures that were paid for, for the one confirm.
+export async function clearPlan(deps: Deps, ctx: Ctx, input: { scope: 'all' | 'empty' | 'ids'; planId?: string | null; ids?: string[]; dryRun?: boolean }): Promise<{ posts: number; withPictures: number; trashed: number }> {
+  const rows = await deps.db.select().from(contentItems)
+    .where(and(eq(contentItems.accountId, ctx.accountId), isNull(contentItems.archivedAt), sql`coalesce(${contentItems.spec}->'plan'->>'rowId', '') <> ''`))
+  const planOf = (r: ContentRow) => String((r.spec as { plan?: PlanMeta }).plan?.planId ?? '')
+  const ids = new Set(input.ids ?? [])
+  const pictured = await withPictures(deps, ctx, rows)
+  const pick = rows.filter(r => input.scope === 'ids' ? ids.has(r.id) : (!input.planId || planOf(r) === input.planId) && (input.scope === 'all' || !pictured.has(r.id)))
+  if (input.scope === 'ids' && !pick.length) throw new AppError('invalid_request', 'Tick the posts to clear first.')
+  const paid = pick.filter(r => pictured.has(r.id)).length
+  if (input.dryRun) return { posts: pick.length, withPictures: paid, trashed: 0 }
+  const moved = await trash(deps, ctx, pick.map(r => ({ kind: 'post' as const, id: r.id })))
+  return { posts: pick.length, withPictures: paid, trashed: moved.moved }
 }
 
 // The plan's posts after import, in schedule order, with what each still
@@ -375,9 +440,25 @@ export async function planView(deps: Deps, ctx: Ctx): Promise<{ posts: PlanPostV
 
 // ── Generate N posts (priced): ten at a time ──────────────────────────
 
+// A remake has started: each post's old pictures go to the Trash, and a
+// slideshow's slides are emptied so the new stills fill them.
+export async function remakeStarted(deps: Deps, ctx: Ctx, postIds: string[]): Promise<number> {
+  let moved = 0
+  for (const id of postIds) {
+    const post = await getContent(deps, ctx, id).catch(() => null)
+    if (!post) continue
+    moved += (await trash(deps, ctx, await postPictures(deps, ctx, post))).moved
+    if (post.kind === 'slideshow') await updateContent(deps, ctx, post.id, { spec: { stillIds: [] } as Partial<SlideshowSpec> })
+  }
+  return moved
+}
+
 type Built = { purpose: string; characterId: string | null; specs: JobSpec[]; preview: { title: string; prompts: Array<{ label: string; text: string; wrapped: string }>; warnings: RuleViolation[]; invalidates: string[] } }
 
-export async function buildPlanGenerate(deps: Deps, ctx: Ctx, input: { postIds: string[]; path?: StillPath | null; stillModel?: string | null }): Promise<Built> {
+// remake (owner, 2026-10-22): posts that already have pictures are made
+// again, every photo slide; the old pictures go to the Trash when the run
+// starts (remakeStarted), never at the price.
+export async function buildPlanGenerate(deps: Deps, ctx: Ctx, input: { postIds: string[]; path?: StillPath | null; stillModel?: string | null; remake?: boolean }): Promise<Built> {
   const ids = [...new Set(input.postIds)].slice(0, 100)
   if (!ids.length) throw new AppError('invalid_request', 'Tick the posts to generate first.')
   const posts: ContentRow[] = []
@@ -395,7 +476,10 @@ export async function buildPlanGenerate(deps: Deps, ctx: Ctx, input: { postIds: 
     const rowId = String((post.spec as { plan?: PlanMeta }).plan?.rowId ?? post.id)
     let built: { specs: JobSpec[]; preview: Built['preview'] } | null = null
     try {
-      if (post.kind === 'slideshow') built = await buildSlideshowStills(deps, ctx, { contentId: post.id, path })
+      if (post.kind === 'slideshow') {
+        const all = input.remake ? slideList(slideshowSpecSchema.parse(post.spec ?? {})).filter(x => !x.special).map(x => x.index) : undefined
+        built = await buildSlideshowStills(deps, ctx, { contentId: post.id, path, ...(all?.length ? { slides: all } : {}) })
+      }
       else if (post.kind === 'meme' && post.sceneId && post.characterId) {
         const character = await getCharacter(deps, ctx, post.characterId)
         const model = slideModel(deps, 'character', toData(character), path)
@@ -416,7 +500,7 @@ export async function buildPlanGenerate(deps: Deps, ctx: Ctx, input: { postIds: 
   if (group > 1 || (group === 1 && inGroup > 0)) warnings.push({ ruleId: 'plan-queue', title: 'Ten at a time', message: `${posts_} posts run ten at a time: the next ten start when the ten before them are done.`, severity: 'warning', spec: '28' } as RuleViolation)
   return {
     purpose: `plan_generate:${ids.length}`, characterId: null,
-    preview: { title: `Generate ${posts_} post${posts_ === 1 ? '' : 's'}: ${specs.length} still${specs.length === 1 ? '' : 's'}`, prompts: prompts.map(p => ({ ...p, wrapped: p.wrapped || hardWrap(p.text) })), warnings, invalidates: [] },
+    preview: { title: input.remake ? `Remake ${specs.length} picture${specs.length === 1 ? '' : 's'} (${posts_} post${posts_ === 1 ? '' : 's'}; the old pictures go to Trash)` : `Generate ${posts_} post${posts_ === 1 ? '' : 's'}: ${specs.length} still${specs.length === 1 ? '' : 's'}`, prompts: prompts.map(p => ({ ...p, wrapped: p.wrapped || hardWrap(p.text) })), warnings, invalidates: [] },
     specs,
   }
 }

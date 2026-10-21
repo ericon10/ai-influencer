@@ -181,7 +181,7 @@ describe('products', () => {
     expect(plain.rows.flatMap(r => r.warnings).join(' ')).not.toMatch(/same structure/)
     // Only the ticked rows.
     const r = await importPlan(h.deps, h.ctx, CSV, { productId: sideStep, rows: ['P001', 'P005', 'P016'] })
-    expect(r).toMatchObject({ created: 3, updated: 0 })
+    expect(r).toMatchObject({ created: 3, replaced: 0 })
     expect(r.posts.map(x => x.rowId).sort()).toEqual(['P001', 'P005', 'P016'])
     for (const x of r.posts) expect((await getContent(h.deps, h.ctx, x.id)).productId).toBe(sideStep)
     // P001 is a pure-pain row (product = no): written for SideStep, not an ad.
@@ -208,14 +208,14 @@ describe('products', () => {
     // Glow adds no rules: its rows get the dash check only, never "No job word".
     expect(by('P001').lint.join(' ')).not.toMatch(/job word/)
     // Rows that all name their own product need no plan pick.
-    const r1 = await importPlan(h.deps, h.ctx, file, { rows: ['P001', 'P006'] })
-    expect(r1.created + r1.updated).toBe(2)
+    const r1 = await importPlan(h.deps, h.ctx, file, { rows: ['P001', 'P006'], existing: 'replace' })
+    expect(r1.created + r1.replaced).toBe(2)
     for (const x of r1.posts) expect((await getContent(h.deps, h.ctx, x.id)).productId).toBe(glow)
     expect((await spec(r1.posts.find(x => x.rowId === 'P001')!.id)).ad).toBe(false)
     expect((await spec(r1.posts.find(x => x.rowId === 'P006')!.id)).ad).toBe(true)
     // A blank row needs the plan's pick.
     await expect(importPlan(h.deps, h.ctx, file, { rows: ['P016'] })).rejects.toThrow(/some ticked rows name no product/)
-    const r2 = await importPlan(h.deps, h.ctx, file, { rows: ['P016'], productId: null })
+    const r2 = await importPlan(h.deps, h.ctx, file, { rows: ['P016'], productId: null, existing: 'replace' })
     expect((await getContent(h.deps, h.ctx, r2.posts[0]!.id)).productId).toBeNull()
     // A row naming a product not in Products never imports.
     expect((await importPlan(h.deps, h.ctx, file, { rows: ['P005'], productId: sideStep })).skipped).toBe(1)

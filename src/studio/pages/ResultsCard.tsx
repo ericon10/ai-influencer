@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useIncoming, type Incoming } from '../importDoor'
 import { Link } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { BarChart3, ChevronDown, ChevronRight, ExternalLink, Upload } from 'lucide-react'
@@ -26,6 +27,9 @@ export function ResultsCard({ tag, character, product, filtered }: { tag: string
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
   const [dim, setDim] = useState<Dimension>('account')
+  // A results sheet sent by Import on Posts home opens here.
+  const [incoming, setIncoming] = useState<Incoming | null>(null)
+  useIncoming(['results'], f => { setOpen(true); setIncoming(f) })
   const view = useResultsView({ from: from || null, to: to || null, tag, character, product })
   const v = view.data
   const t = v?.totals
@@ -86,7 +90,7 @@ export function ResultsCard({ tag, character, product, filtered }: { tag: string
             <span className="st-hint">Sorted by follows per post: decide by follows first, then saves and shares, never by views alone. Hook structure is the plan's code (or the hook's, from Use this hook).</span>
           </div>
 
-          <PasteResults />
+          <PasteResults key={incoming?.at ?? 0} incoming={incoming} />
         </div>
       )}
     </section>
@@ -113,11 +117,11 @@ function Breakdown({ rows, label }: { rows: ResultRow[]; label: string }) {
 
 // Paste or upload a CSV by row_id (or post_id): a free preview of what
 // changes, then Apply.
-function PasteResults() {
+function PasteResults({ incoming = null }: { incoming?: Incoming | null }) {
   const toast = useToast()
   const qc = useQueryClient()
-  const [csv, setCsv] = useState('')
-  const [name, setName] = useState('')
+  const [csv, setCsv] = useState(incoming?.text ?? '')
+  const [name, setName] = useState(incoming?.name ?? '')
   const [preview, setPreview] = useState<ResultsCsvPreview | null>(null)
   const [done, setDone] = useState<string | null>(null)
   const file = useRef<HTMLInputElement>(null)

@@ -49,7 +49,7 @@ test('the launch plan: upload the CSV, Preview (free), the plan\'s product, tick
   test.setTimeout(420_000)
   const sideStep = await sideStepId()
   const card = await openPlan(page)
-  const again = card.getByRole('button', { name: /Import plan rows again/ })
+  const again = card.getByRole('button', { name: /^Import a CSV$/ })
   if (await again.isVisible({ timeout: 2000 }).catch(() => false)) await again.click()
   await card.locator('[data-field="plan-import"] input[type="file"]').setInputFiles(CSV)
   // The file shows as its name and rows, not its raw text.
@@ -71,14 +71,13 @@ test('the launch plan: upload the CSV, Preview (free), the plan\'s product, tick
   // Tick F2's rows (28), each with its product and Ad on its ad rows.
   const rows = card.locator('[data-field="plan-rows"]')
   await rows.getByLabel('Account').selectOption('F2')
-  await rows.getByRole('button', { name: /^Tick the \d+ shown/ }).click()
+  await rows.getByLabel(/^Tick the \d+ rows shown/).check()
   const totals = card.locator('[data-field="plan-totals"]')
   await expect(totals).toContainText(/^\d+ of \d+ rows ticked/)
   const t = await totals.innerText()
   const ticked = Number(t.match(/^(\d+) of/)![1])
   expect(ticked).toBeGreaterThan(0)
   expect(ticked).toBeLessThanOrEqual(28)
-  // (Rows made with pictures in an earlier run are kept and not listed.)
   const listed = await rows.locator('tbody tr[data-field^="plan-row-"]').evaluateAll(els => els.map(e => e.getAttribute('data-field')!.replace('plan-row-', '')))
   expect(listed.length).toBe(ticked)
   await expect(rows.locator(`[data-field="plan-row-${listed[0]}"]`)).toContainText('SideStep (plan)')
@@ -87,7 +86,10 @@ test('the launch plan: upload the CSV, Preview (free), the plan\'s product, tick
   await rows.scrollIntoViewIfNeeded()
   await snap(page, info, 'the plan\'s product and F2\'s rows ticked')
 
-  // Import (free): only the ticked rows, each written for SideStep; nothing paid runs.
+  // Import (free): only the ticked rows, each written for SideStep; nothing
+  // paid runs. Rows already made in an earlier run are added as new posts.
+  const existing = card.locator('[data-field="plan-existing"]')
+  if (await existing.isVisible({ timeout: 1000 }).catch(() => false)) await existing.getByRole('button', { name: 'Add as new posts' }).click()
   await expect(importBtn).toHaveText(`Import ${ticked} rows (free)`)
   await importBtn.click()
   await expect(card.locator('[data-field="plan-done"]')).toContainText(/drafts made/, { timeout: 120_000 })
