@@ -4,6 +4,8 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { expect, type Locator, type Page, type TestInfo } from '@playwright/test'
 import { SEED_FILE, type Seed } from '../seed'
+import { parseCsv } from '../../server/core/csvImport'
+import { planKind, readPlan, rowScene } from '../../server/core/planImport'
 
 // Helpers for the browser suite. Everything a test does to the Studio and
 // the editor goes through the mouse and keyboard; the API is used to read
@@ -288,4 +290,25 @@ export function exportFrame(mp4: string, t: number, name: string): string {
 
 export function duration(mp4: string): number {
   return Number(execFileSync('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', mp4], { encoding: 'utf8' }))
+}
+
+// The launch plan file with a shot line for every photo slide (the free
+// pre-check, UX-PLAN.md section 35 item 16, blocks a slide with none): the
+// rows as written plus slide_N_image for the slides that had no line, in
+// e2e/.out. Every other cell is as written.
+export function planWithShots(): string {
+  const src = join(process.cwd(), 'docs', 'content', 'launch-plan-v2-posts.csv')
+  const out = join(process.cwd(), 'e2e', '.out', 'launch-plan-v2-posts.csv')
+  const table = parseCsv(readFileSync(src, 'utf8'))
+  const rows = readPlan(readFileSync(src, 'utf8')).rows
+  const cols = [1, 2, 3, 4, 5, 6].map(i => `slide_${i}_image`)
+  const q = (v: string) => (/[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v)
+  const lines = [[...table[0]!, ...cols]]
+  table.slice(1).filter(r => r.some(Boolean)).forEach((r, k) => {
+    const sc = rowScene(rows[k]!.cells, planKind(rows[k]!.cells.format))
+    lines.push([...r, ...cols.map((_, i) => (sc.lines[i + 1] ? '' : `the same place, a different corner, photo ${i + 1}`))])
+  })
+  mkdirSync(dirname(out), { recursive: true })
+  writeFileSync(out, lines.map(l => l.map(q).join(',')).join('\n'))
+  return out
 }

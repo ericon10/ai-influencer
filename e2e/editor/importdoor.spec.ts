@@ -18,10 +18,10 @@ function planFile(): string {
   mkdirSync(OUT, { recursive: true })
   const file = join(OUT, `plan-${tag}.csv`)
   writeFileSync(file, [
-    'row_id,date,slot,account,format,hook,scene',
-    `${ids[0]},2026-11-02,AM,CALLIE,character photo,When the alarm goes off for the third interview,her desk at dawn`,
-    `${ids[1]},2026-11-02,PM,CALLIE,character photo,The recruiter said they would circle back in March,a kitchen at night`,
-    `${ids[2]},2026-11-03,AM,CALLIE,character photo,I was so angry I folded the rejection into a swan,a bus stop in rain`,
+    'row_id,date,slot,account,format,hook,scene,outfit,moment',
+    `${ids[0]},2026-11-02,AM,CALLIE,character photo,When the alarm goes off for the third interview,her desk at dawn,a gray hoodie,Callie at her desk at dawn`,
+    `${ids[1]},2026-11-02,PM,CALLIE,character photo,The recruiter said they would circle back in March,a kitchen at night,a black tee,Callie at the kitchen counter`,
+    `${ids[2]},2026-11-03,AM,CALLIE,character photo,I was so angry I folded the rejection into a swan,a bus stop in rain,a rain jacket,Callie at a bus stop in the rain`,
   ].join('\n'))
   return file
 }

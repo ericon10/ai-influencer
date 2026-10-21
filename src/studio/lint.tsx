@@ -39,8 +39,8 @@ export function NotesBadge({ notes, label, field }: { notes: string[]; label?: s
   const [open, setOpen] = useState(false)
   if (!notes.length) return null
   return (
-    <span className="st-notes" data-field={field ?? 'notes'}>
-      <button type="button" className="st-lint compact" aria-expanded={open} title={notes.join('\n')} onClick={e => { e.stopPropagation(); setOpen(o => !o) }}>
+    <span className="st-notes" data-field={field ?? 'notes'} title={notes.join('\n')}>
+      <button type="button" className="st-lint compact" aria-expanded={open} onClick={e => { e.stopPropagation(); setOpen(o => !o) }}>
         <AlertTriangle size={11} />{label ?? `${notes.length} note${notes.length === 1 ? '' : 's'}`}
       </button>
       {open && <span className="st-lint st-notes-list" role="note">{notes.map((n, i) => <span key={i}>{n}</span>)}</span>}

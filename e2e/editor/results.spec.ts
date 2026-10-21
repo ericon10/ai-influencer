@@ -29,9 +29,9 @@ test('results: typed on a card, pasted from a CSV by row_id, the Results view an
   // A character to file the topic posts' pictures under, and the plan.
   await api('POST', '/characters', { name: `Res ${stamp}` })
   const plan = csvOf([
-    [rid(1), '2031-03-10', 'AM', tag, 'slideshow story', `M${stamp}1`, 'S3', 'the recruiter said friday. it is march', 'two', 'three', 'four', 'five', 'six', 'An office at night. Slide 1: a laptop', 'cap one', 'jobtok'],
-    [rid(2), '2031-03-10', 'PM', tag, 'slideshow story', `M${stamp}2`, 'S11', 'entry level. 5 years required. founded in 2029', 'two', 'three', 'four', 'five', 'six', 'A bus at 8am. Slide 1: a phone', 'cap two', 'jobtok'],
-    [rid(3), '2031-03-11', 'AM', tag, 'slideshow story', `M${stamp}3`, 'S3', 'my offer letter had a typo in my salary', 'two', 'three', 'four', 'five', 'six', 'A kitchen. Slide 1: a letter', 'cap three', 'jobtok'],
+    [rid(1), '2031-03-10', 'AM', tag, 'slideshow story', `M${stamp}1`, 'S3', 'the recruiter said friday. it is march', 'two', 'three', 'four', 'five', 'six', 'An office at night. Slide 1: a laptop. Slides 2 to 6: the desk lamp and a mug', 'cap one', 'jobtok'],
+    [rid(2), '2031-03-10', 'PM', tag, 'slideshow story', `M${stamp}2`, 'S11', 'entry level. 5 years required. founded in 2029', 'two', 'three', 'four', 'five', 'six', 'A bus at 8am. Slide 1: a phone. Slides 2 to 6: the bus window and a seat', 'cap two', 'jobtok'],
+    [rid(3), '2031-03-11', 'AM', tag, 'slideshow story', `M${stamp}3`, 'S3', 'my offer letter had a typo in my salary', 'two', 'three', 'four', 'five', 'six', 'A kitchen. Slide 1: a letter. Slides 2 to 6: the kettle and a sink', 'cap three', 'jobtok'],
   ])
   const imported = await api<{ created: number; posts: Array<{ rowId: string; id: string }> }>('POST', '/plan/import', { csv: plan, productId: null, rows: [rid(1), rid(2), rid(3)] })
   expect(imported.created).toBe(3)

@@ -2,7 +2,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { expect, test, type Locator, type Page } from '@playwright/test'
 import { unzipSync } from 'fflate'
-import { API, api, seedData, snap } from './helpers'
+import { API, api, planWithShots, seedData, snap } from './helpers'
 
 // Launch ready (UX-PLAN.md sections 28 and 29), like a user, in demo mode:
 // the plan CSV uploaded (shown as its name and rows), Preview (free), the
@@ -14,7 +14,9 @@ import { API, api, seedData, snap } from './helpers'
 // The seed has Solei (Callie's file with the name replaced) so the plan's
 // SOLEI rows match, as they do in production.
 
-const CSV = join(process.cwd(), 'docs', 'content', 'launch-plan-v2-posts.csv')
+// The plan as written, plus a shot line where a slide had none (the
+// free pre-check blocks those), under the same file name.
+const CSV = planWithShots()
 
 interface PlanPost { id: string; rowId: string; account: string; need: number; have: number }
 const planPosts = async () => (await api<{ posts: PlanPost[] }>('GET', '/plan')).posts
@@ -256,7 +258,7 @@ test('a mock screen drawn by code and the owner\'s Product screenshot, then the 
   // The last slide: the owner's own screenshot of the product.
   const last = page.locator(`[data-field="slide-card-${n - 1}"]`)
   await last.locator('select[aria-label$="picture"]').selectOption('product_shot')
-  await expect(last.locator(`[data-field="product-shot-${n - 1}"]`)).toContainText('The Studio never draws a product screen')
+  await expect(last.locator(`[data-field="product-shot-${n - 1}"]`)).toContainText('The Studio never draws or generates a product screen')
   mkdirSync(info.outputDir, { recursive: true })
   const shot = join(info.outputDir, 'product-screenshot.png')
   writeFileSync(shot, await screenshotPng(page))

@@ -40,7 +40,7 @@ test('Download day: the preview in posting order, the zip (folders, checklist.tx
   const A = `dd-a-${stamp.toLowerCase()}`, B = `dd-b-${stamp.toLowerCase()}`
   const rid = (n: number) => `D${stamp}${n}`
   await api('POST', '/characters', { name: `Day ${stamp}` })
-  const row = (n: number, account: string, slot: string, ad: string) => [rid(n), day, slot, account, 'slideshow story', `${rid(n)} the recruiter said friday`, 'two', 'three', 'four', 'five', 'six', 'An office at night. Slide 1: a laptop', `${rid(n)} caption`, 'jobtok', ad]
+  const row = (n: number, account: string, slot: string, ad: string) => [rid(n), day, slot, account, 'slideshow story', `${rid(n)} the recruiter said friday`, 'two', 'three', 'four', 'five', 'six', 'An office at night. Slide 1: a laptop. Slides 2 to 6: the desk lamp and a mug', `${rid(n)} caption`, 'jobtok', ad]
   const imported = await api<{ created: number; posts: Array<{ rowId: string; id: string }> }>('POST', '/plan/import', { csv: csvOf([row(1, A, 'AM', 'no'), row(2, B, 'PM', 'yes'), row(3, A, 'PM', 'no')]), productId: null, rows: [rid(1), rid(2), rid(3)] })
   expect(imported.created).toBe(3)
   const ids = imported.posts.map(p => p.id)
