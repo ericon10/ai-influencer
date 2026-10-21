@@ -186,8 +186,8 @@ export const api = {
   // Section 30: the two stills paths, and for a character what each makes.
   slideStillModels: (characterId?: string | null) => request<SlideStillOptions>('GET', `/slideshow/still-models${characterId ? `?characterId=${encodeURIComponent(characterId)}` : ''}`),
   // The launch plan (section 28).
-  planPreview: (csv: string, o: { drawSpecials?: boolean; store?: Record<string, string>; path?: StillPathId | null; productId?: string | null } = {}) => request<PlanPreview>('POST', '/plan/preview', { csv, ...o }),
-  planImport: (csv: string, o: { drawSpecials?: boolean; store?: Record<string, string>; productId?: string | null; rows: string[]; existing?: 'replace' | 'add' }) => request<PlanImportResult>('POST', '/plan/import', { csv, ...o }),
+  planPreview: (csv: string, o: { lines?: Record<string, Record<string, string>>; drawSpecials?: boolean; store?: Record<string, string>; path?: StillPathId | null; productId?: string | null } = {}) => request<PlanPreview>('POST', '/plan/preview', { csv, ...o }),
+  planImport: (csv: string, o: { lines?: Record<string, Record<string, string>>; drawSpecials?: boolean; store?: Record<string, string>; productId?: string | null; path?: StillPathId | null; rows: string[]; existing?: 'replace' | 'add' }) => request<PlanImportResult>('POST', '/plan/import', { csv, ...o }),
   facelessPreview: (csv: string, o: { characterId?: string | null; accountTag?: string | null } = {}) => request<FacelessPreview>('POST', '/faceless/preview', { csv, ...o }),
   facelessImport: (csv: string, o: { characterId?: string | null; accountTag?: string | null; rows: string[]; existing?: 'replace' | 'add' }) => request<FacelessImportResult>('POST', '/faceless/import', { csv, ...o }),
   planClear: (o: { scope: 'all' | 'empty' | 'ids'; planId?: string | null; ids?: string[]; dryRun?: boolean }) => request<{ posts: number; withPictures: number; trashed: number }>('POST', '/plan/clear', o),
@@ -204,6 +204,7 @@ export const api = {
   // Download day (section 33).
   setPosting: (id: string, patch: { approved?: boolean; date?: string; slot?: string }) => request<{ posting: unknown }>('PUT', `/content/${id}/posting`, patch),
   postingSlots: () => request<{ slots: Array<{ slot: string; time: string }> }>('GET', '/posting/slots'),
+  autoPlace: (id: string) => request<{ placed: Array<{ slide: number; how: string }> }>('POST', `/content/${id}/auto-place`, {}),
   savePostingSlots: (times: Record<string, string>) => request<{ slots: Array<{ slot: string; time: string }> }>('PUT', '/posting/slots', { times }),
   postingDay: (q: { date: string; includePacked?: boolean; tz?: string | null }) => request<PostingDayView>('GET', `/posting/day?${new URLSearchParams({ date: q.date, packed: q.includePacked ? '1' : '0', ...(q.tz ? { tz: q.tz } : {}) })}`),
   postingPack: (body: { date: string; includePacked?: boolean; tz?: string | null }) => request<{ jobId: string; posts: number }>('POST', '/posting/day/pack', body),

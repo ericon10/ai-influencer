@@ -42,6 +42,7 @@ const DEFAULTS: Record<string, LlmResponder> = {
   // Demo mode: the builder passes a plan made from the owner's words.
   scene_plan: req => req.meta?.mockPlan ?? {},
   scene_ideas: req => req.meta?.mockIdeas ?? { options: [] },
+  punch_up_lines: req => req.meta?.mockLines ?? { lines: [] },
   scene_prompt: req => ({ prompt: req.meta?.mockPrompt ?? '', ...(req.meta?.mockNotes ? { notes: req.meta.mockNotes } : {}) }),
   content_slides: req => req.meta?.mockSlides ?? { hook: '', slides: [], caption: '', hashtags: [] },
   content_captions: req => req.meta?.mockCaptions ?? { captions: [] },

@@ -7,7 +7,9 @@ import { hardWrap } from '../core/text.js'
 import type { RuleViolation } from '../core/rules.js'
 import { lintPost } from '../core/copyLint.js'
 import type { PlanMeta } from '../core/planMeta.js'
-import { checkRow, hashtagsOf, isCharacterKind, planYes, readPlan, repeatedCodes, sceneParts, scheduleOrder, specialFor, type CheckedRow, type PlanKind, type PlanRow } from '../core/planImport.js'
+import { checkRow, hashtagsOf, isCharacterKind, namesProduct, planYes, readPlan, repeatedCodes, rowScene, scheduleOrder, screenFor, type CheckedRow, type PlanKind, type PlanRow } from '../core/planImport.js'
+import { emptySpecial } from '../core/slides.js'
+import { isThin } from '../core/punchUp.js'
 import { slideList, type SpecialSlide } from '../core/slides.js'
 import { slideshowSpecSchema, type SlideshowSpec } from '../core/slideshowSpec.js'
 import { listCharacters, toData, type CharacterRow } from './characters.js'
@@ -48,7 +50,9 @@ const QUEUE = 10
 // existing: what an import does with ticked rows whose row_id matches posts
 // already made (owner, 2026-10-22: never update silently): replace them
 // (the old posts and their pictures go to the Trash) or add new posts.
-interface Opts { drawSpecials?: boolean; store?: Record<string, string>; stillModel?: string | null; path?: StillPath | null; productId?: string | null; rows?: string[]; existing?: 'replace' | 'add' }
+// lines: image lines the owner OK'd after Punch up (row_id, then the slide
+// number 1 to 6), used as that slide's slide_N_image.
+interface Opts { lines?: Record<string, Record<string, string>>; drawSpecials?: boolean; store?: Record<string, string>; stillModel?: string | null; path?: StillPath | null; productId?: string | null; rows?: string[]; existing?: 'replace' | 'add' }
 
 export interface PlanAccountView { tag: string; kind: 'character' | 'topic'; characterId: string | null; characterName: string; rows: number; problem: string | null }
 export interface PlanPreviewRow {
@@ -56,6 +60,11 @@ export interface PlanPreviewRow {
   // The stills' price on the picked path (section 30): plan credits on the
   // plan, dollars on the API (priceUsd is the dollar part), and as shown.
   hook: string; photos: number; specials: Array<{ slide: number; type: string }>; priceUsd: number; credits: number; price: string
+  // Slides whose line names a product (item 15): the owner's screenshot,
+  // never generated or priced.
+  screenshots: Array<{ slide: number; product: string }>
+  // Each photo slide's image line, and whether it is thin (Punch up, item 14).
+  lines: Array<{ slide: number; text: string; thin: boolean }>
   // The row's product: its own (row) or the plan's pick (plan), by name ('' : none); and the ad switch.
   product: string; productFrom: 'row' | 'plan'; ad: boolean
   errors: string[]; warnings: string[]; lint: string[]
@@ -148,6 +157,10 @@ async function plan(deps: Deps, ctx: Ctx, csv: string, opts: Opts, std: WritingS
   if (read.unknown.length) problems.push(`Columns not used: ${read.unknown.join(', ')}.`)
   if (read.rows.length > MAX_ROWS) problems.push(`Only the first ${MAX_ROWS} rows are read.`)
   const raw = read.rows.slice(0, MAX_ROWS)
+  for (const r of raw) {
+    const own = opts.lines?.[r.cells.row_id]
+    if (own) for (const [n, text] of Object.entries(own)) if (/^[1-6]$/.test(n) && text.trim()) (r.cells as Record<string, string>)[`slide_${n}_image`] = text.trim().slice(0, 800)
+  }
   const checked = raw.map(checkRow)
   const repeats = repeatedCodes(checked)
   const ids = new Map<string, number>()
@@ -172,21 +185,42 @@ async function plan(deps: Deps, ctx: Ctx, csv: string, opts: Opts, std: WritingS
     if (hit) rowProduct.set(r.line, hit)
     else r.errors.push(`Product "${r.productName}" is not in Products (Library > Hooks): add it there, or fix the row`)
   }
-  return { raw, checked, accounts, problems, chars, rowProduct }
+  return { raw, checked, accounts, problems, chars, rowProduct, productNames: list.map(x => x.name) }
 }
 
-// What a slideshow row's slides become: a photo (made in topic or
-// character mode) or, with the switch, a mock screen drawn by code.
-function slidesOf(deps: Deps, raw: PlanRow, kind: PlanKind, drawSpecials: boolean) {
+// What a slideshow row's slides become (2026-10-22, items 10, 11, 15): a
+// photo from the slide's image line (its own column, else "Slide N:" in the
+// scene), a screen drawn by code when the line is mostly on-screen text
+// (generic names; the switch, on by default, turns it off), or the owner's
+// own screenshot when the line names one of the account's products (never
+// generated or priced).
+function slidesOf(deps: Deps, raw: PlanRow, kind: PlanKind, drawSpecials: boolean, productNames: string[]) {
   const c = raw.cells
-  const parts = sceneParts(c.scene)
+  const scene = rowScene(c, kind)
   const texts = kind === 'photo' ? [c.hook] : [c.hook, c.slide_2, c.slide_3, c.slide_4, c.slide_5, c.slide_6]
   while (texts.length > 1 && !texts[texts.length - 1]!.trim()) texts.pop()
   const n = texts.length
   const cfg = deps.config.pipeline.content.slideshow
-  const shots = Array.from({ length: n }, (_, i) => (kind === 'photo' ? c.moment : parts.slides[i + 1] ?? '').slice(0, 300))
-  const specials = Array.from({ length: n }, (_, i): SpecialSlide | null => (drawSpecials && kind === 'topic_slideshow' && parts.slides[i + 1] ? specialFor(parts.slides[i + 1]!, { brands: cfg.brand_names, generic: cfg.generic_names }) : null))
-  return { parts, texts, shots, specials }
+  const shots = Array.from({ length: n }, (_, i) => (scene.lines[i + 1] ?? '').slice(0, 800))
+  const asWritten = Array.from({ length: n }, (_, i) => !!scene.own[i + 1] && kind !== 'topic_slideshow')
+  const screenshots: Array<{ slide: number; product: string }> = []
+  const specials = Array.from({ length: n }, (_, i): SpecialSlide | null => {
+    const line = scene.lines[i + 1] ?? ''
+    if (!line) return null
+    const product = namesProduct(line, productNames)
+    if (product) { screenshots.push({ slide: i + 1, product }); return { ...emptySpecial('product_shot'), title: product } }
+    return drawSpecials ? screenFor(line, { brands: cfg.brand_names, generic: cfg.generic_names }) : null
+  })
+  return { scene, texts, shots, specials, asWritten, screenshots }
+}
+
+// A plan's light words: a light preset when they name one, else words kept
+// with the place (the lock's light is a preset id).
+function lightOf(deps: Deps, words: string): { id: string; words: string } {
+  const w = words.trim().toLowerCase()
+  if (!w) return { id: '', words: '' }
+  const hit = deps.config.pipeline.scenes.lights.find(l => l.id === w.replace(/\s+/g, '_') || l.label.toLowerCase() === w)
+  return hit ? { id: hit.id, words: '' } : { id: '', words: words.trim() }
 }
 
 function metaOf(raw: PlanRow, r: CheckedRow, planId: string): PlanMeta {
@@ -205,7 +239,7 @@ function metaOf(raw: PlanRow, r: CheckedRow, planId: string): PlanMeta {
 
 export async function previewPlan(deps: Deps, ctx: Ctx, csv: string, opts: Opts = {}): Promise<PlanPreview> {
   const { product, std } = await postWriting(deps, ctx, opts.productId)
-  const { raw, checked, accounts, problems, rowProduct, chars } = await plan(deps, ctx, csv, opts, std)
+  const { raw, checked, accounts, problems, rowProduct, chars, productNames } = await plan(deps, ctx, csv, opts, std)
   const made = await existing(deps, ctx)
   const pictured = await withPictures(deps, ctx, [...made.values()].flat())
   // Section 30: each still priced by its own model on the picked path.
@@ -237,6 +271,8 @@ export async function previewPlan(deps: Deps, ctx: Ctx, csv: string, opts: Opts 
     let photos = 0
     const specials: PlanPreviewRow['specials'] = []
     let lintHits: string[] = []
+    let screenshots: PlanPreviewRow['screenshots'] = []
+    let lines: PlanPreviewRow['lines'] = []
     // Each photo's price by who is in it (section 30): a topic row's are
     // the cheapest model, a character's slides their file's default.
     const acct = accounts.find(a => a.tag === r.account)
@@ -245,7 +281,9 @@ export async function previewPlan(deps: Deps, ctx: Ctx, csv: string, opts: Opts 
     let credits = 0, micros = 0
     const add = (who: 'character' | 'none') => { const p = stillFor(acct?.characterId ?? null, who); credits += p.credits ?? 0; micros += p.credits == null ? p.micros : 0 }
     if (r.kind && r.kind !== 'clip') {
-      const s = slidesOf(deps, rawRow, r.kind, !!opts.drawSpecials)
+      const s = slidesOf(deps, rawRow, r.kind, opts.drawSpecials !== false, productNames)
+      screenshots = s.screenshots
+      lines = s.shots.map((text, k) => ({ slide: k + 1, text, thin: !s.specials[k] && isThin(text) })).filter((l, k) => !s.specials[k] && l.text)
       s.specials.forEach((sp, k) => {
         if (sp) { specials.push({ slide: k + 1, type: sp.type }); return }
         photos++
@@ -265,7 +303,7 @@ export async function previewPlan(deps: Deps, ctx: Ctx, csv: string, opts: Opts 
     return {
       line: r.line, rowId: r.rowId, date: r.date, slot: r.slot, account: r.account, format: r.format, kind: r.kind,
       product: name, productFrom: own ? 'row' as const : 'plan' as const, ad: r.ad,
-      hook: r.hook, photos, specials, priceUsd: free ? 0 : micros / 1e6, credits: free ? 0 : credits, price: free ? 'Free' : priceText(credits, micros),
+      hook: r.hook, photos, specials, screenshots, lines, priceUsd: free ? 0 : micros / 1e6, credits: free ? 0 : credits, price: free ? 'Free' : priceText(credits, micros),
       errors: r.errors, warnings: r.warnings, lint: lintHits, postId: post?.id ?? null, state,
     }
   })
@@ -318,7 +356,7 @@ export async function importPlan(deps: Deps, ctx: Ctx, csv: string, opts: Opts =
   if (!picked.size) throw new AppError('invalid_request', 'Tick the rows to import first.')
   const planProduct = opts.productId === undefined ? undefined : await checkProduct(deps, ctx, opts.productId)
   const { std } = await postWriting(deps, ctx, planProduct)
-  const { raw, checked, accounts, rowProduct } = await plan(deps, ctx, csv, opts, std)
+  const { raw, checked, accounts, rowProduct, productNames } = await plan(deps, ctx, csv, opts, std)
   // The plan's pick is needed only for ticked rows that name no product.
   if (planProduct === undefined && checked.some(r => picked.has(r.rowId) && !r.errors.length && !rowProduct.has(r.line))) throw new AppError('invalid_request', 'Pick the plan\'s product first (or No product): some ticked rows name no product of their own.')
   const made = await existing(deps, ctx)
@@ -348,24 +386,31 @@ export async function importPlan(deps: Deps, ctx: Ctx, csv: string, opts: Opts =
     const c = rawRow.cells
     let id: string
     if (r.kind === 'clip') {
-      const parts = sceneParts(c.scene)
+      const sc = rowScene(c, r.kind)
+      const light = lightOf(deps, sc.light)
       const firstBeat = c.clip_action.split(/(?<=[.!?])\s+/)[0] ?? ''
-      const fields = { setting: parts.common.slice(0, 400), outfit: parts.outfit.slice(0, 300), hair: parts.hair.slice(0, 160), moment: (firstBeat || c.moment).slice(0, 400) }
+      const setting = [sc.place, light.words, sc.details.length ? `Also in the place: ${sc.details.join(', ')}` : ''].filter(Boolean).join('. ')
+      const fields = { setting: setting.slice(0, 400), outfit: sc.outfit.slice(0, 300), hair: sc.hair.slice(0, 160), moment: (firstBeat || c.moment).slice(0, 400), ...(light.id ? { light: light.id } : {}) }
       const spec = { caption: r.hook.slice(0, 400), plan: meta }
       const scene = await createScene(deps, ctx, account.characterId!, { brief: c.scene, title: r.rowId, fields })
       if (c.clip_action) await updateScene(deps, ctx, scene.id, { prompts: { video: c.clip_action } })
       id = (await createContent(deps, ctx, { kind: 'meme', characterId: account.characterId!, title, idea: c.moment, accountTag: r.account, sceneId: scene.id, step: 'stills', spec, productId })).id
       out.next.stills += 1
     } else {
-      const s = slidesOf(deps, rawRow, r.kind, !!opts.drawSpecials)
+      const s = slidesOf(deps, rawRow, r.kind, opts.drawSpecials !== false, productNames)
+      const light = lightOf(deps, s.scene.light)
+      const topic = r.kind === 'topic_slideshow'
       const spec: Partial<SlideshowSpec> = {
         hook: s.texts[0]!.slice(0, 200), slides: s.texts.slice(1).map(t => t.slice(0, 300)),
         slideCount: Math.max(3, Math.min(10, s.texts.length)),
         mode: r.kind === 'topic_slideshow' ? 'topic' : 'character',
-        shots: s.shots, specials: s.specials, stillIds: [], textPos: [],
+        shots: s.shots, specials: s.specials, asWritten: s.asWritten, stillIds: [], textPos: [],
+        // The "Stills on" pick of the preview, kept on every post (item 7).
+        stillPath: opts.path ?? null,
         // A photo row is the character's photo, whatever its moment says.
         people: r.kind === 'photo' ? ['character'] : [],
-        lock: slideshowSpecSchema.shape.lock.parse({ place: s.parts.common.slice(0, 1000), outfit: r.kind === 'topic_slideshow' ? '' : s.parts.outfit.slice(0, 300), hair: r.kind === 'topic_slideshow' ? '' : s.parts.hair.slice(0, 200), ownerSet: ['place', 'outfit', 'hair', 'light', 'camera', 'details'] }),
+        // The scene columns over the scene cell (item 6).
+        lock: slideshowSpecSchema.shape.lock.parse({ place: [s.scene.place, light.words].filter(Boolean).join('. ').slice(0, 1000), light: light.id, details: s.scene.details.map(d => d.slice(0, 160)), outfit: topic ? '' : s.scene.outfit.slice(0, 300), hair: topic ? '' : s.scene.hair.slice(0, 200), ownerSet: ['place', 'outfit', 'hair', 'light', 'camera', 'details'] }),
         caption: c.caption.slice(0, 2200), hashtags: hashtagsOf(c.hashtags).slice(0, 15), ctaLine: c.cta.slice(0, 300), ad: r.ad,
         cta: { kind: 'own', handle: '', word: '' }, pattern: null, hookIdeas: [], hookReview: null, plan: meta,
       }

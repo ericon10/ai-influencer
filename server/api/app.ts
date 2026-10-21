@@ -1,3 +1,4 @@
+import { autoPlace } from '../pipeline/facePlace.js'
 import { Hono, type Context } from 'hono'
 import { importFacelessPlan, previewFacelessPlan } from '../pipeline/facelessImport.js'
 import { createFacelessCharacter, saveFaceless } from '../pipeline/faceless.js'
@@ -142,7 +143,7 @@ function capCheckDue(accountId: string, now: number): boolean {
 }
 
 // The plan routes' body as the import functions take it.
-const planArgs = (b: { csv: string; drawSpecials?: boolean; store?: Record<string, string>; stillModel?: string | null; path?: 'account' | 'api' | null; productId?: string | null; rows?: string[]; existing?: 'replace' | 'add' }) => [b.csv, { drawSpecials: b.drawSpecials, store: b.store, stillModel: b.stillModel, path: b.path, productId: b.productId, rows: b.rows, existing: b.existing }] as const
+const planArgs = (b: { csv: string; lines?: Record<string, Record<string, string>>; drawSpecials?: boolean; store?: Record<string, string>; stillModel?: string | null; path?: 'account' | 'api' | null; productId?: string | null; rows?: string[]; existing?: 'replace' | 'add' }) => [b.csv, { lines: b.lines, drawSpecials: b.drawSpecials, store: b.store, stillModel: b.stillModel, path: b.path, productId: b.productId, rows: b.rows, existing: b.existing }] as const
 
 export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
   const app = new Hono<Env>().basePath('/api/v1')
@@ -1190,7 +1191,7 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
   app.get('/slideshow/still-models', async c => c.json(await slideStillOptions(deps, c.get('ctx'), c.req.query('characterId') || null)))
   // The launch plan (section 28): the free preview, the drafts (free), and
   // the plan's posts in schedule order.
-  const planBody = z.object({ csv: z.string().max(400_000), drawSpecials: z.boolean().optional(), store: z.record(z.string().max(60), z.string().max(60)).optional(), stillModel: z.string().max(80).nullable().optional(), path: z.enum(['account', 'api']).nullable().optional(), productId: z.string().max(60).nullable().optional(), rows: z.array(z.string().max(60)).max(2000).optional(), existing: z.enum(['replace', 'add']).optional() })
+  const planBody = z.object({ csv: z.string().max(400_000), lines: z.record(z.string().max(60), z.record(z.string().max(2), z.string().max(800))).optional(), drawSpecials: z.boolean().optional(), store: z.record(z.string().max(60), z.string().max(60)).optional(), stillModel: z.string().max(80).nullable().optional(), path: z.enum(['account', 'api']).nullable().optional(), productId: z.string().max(60).nullable().optional(), rows: z.array(z.string().max(60)).max(2000).optional(), existing: z.enum(['replace', 'add']).optional() })
   app.post('/plan/preview', async c => c.json(await previewPlan(deps, c.get('ctx'), ...planArgs(parse(planBody, await json(c))))))
   app.post('/plan/import', async c => {
     const ctx = c.get('ctx')
@@ -1235,6 +1236,12 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
   // Download day (section 33): a post's Approve for posting and its own day
   // and slot; the slot times; a day's preview (free) and its zip (free, on
   // the worker).
+  // R1 (item 8): every slide's words off the faces in its still; free.
+  app.post('/content/:id/auto-place', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    return c.json({ placed: await autoPlace(deps, ctx, c.req.param('id')) })
+  })
   app.put('/content/:id/posting', async c => {
     const ctx = c.get('ctx')
     requireRole(ctx, 'member')

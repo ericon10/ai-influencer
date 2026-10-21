@@ -12,6 +12,7 @@ tasks:
   card_update:   { model: anthropic/claude-sonnet-5-5, effort: medium, label: Card check, hint: Compares the card with the picked hero. }
   scene_plan:    { model: anthropic/claude-sonnet-5-5, effort: medium, label: Scene planner, hint: Fills a scene's fields from your words (Plan it). }
   scene_ideas:   { model: anthropic/claude-sonnet-5-5, effort: low, label: Punch it up, hint: Three specific moments from a rough idea. }
+  punch_up:      { model: anthropic/claude-sonnet-5-5, effort: low, label: Punch up, hint: Rewrites thin image lines to the density rule (before and after). }
   qa_perception: { model: anthropic/claude-sonnet-5-5, effort: medium, label: Check this, hint: The on-demand Claude check of a still or a take. }
   prompt_writer: { model: anthropic/claude-sonnet-5-5, effort: medium, label: Prompt writer, hint: Turns the scene details into the final still or video prompt., rule: scene-prompt-writer }
   content_writer: { model: anthropic/claude-sonnet-5-5, effort: low, label: Slides and captions, hint: Writes slideshow text and batch captions for the content builder. }

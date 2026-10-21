@@ -241,6 +241,7 @@ export type StudioAction =
   | { type: 'slideshow_draft'; contentId: string; hook: string; pattern?: string | null; code?: string | null; effectOpen?: string | null; effectPayoff?: string | null; moment?: string; alt?: string; score?: number | null }
   | { type: 'slideshow_stills'; contentId: string; slides?: number[]; path?: StillPathId; stillModel?: string }
   | { type: 'slideshow_caption'; contentId: string }
+  | { type: 'punch_up_lines'; contentId?: string; lines?: Array<{ id: string; text: string }> }
   | { type: 'slideshow_variations'; contentId: string; count: number }
   | { type: 'slideshow_batch'; contentId: string }
 
@@ -491,6 +492,8 @@ export interface RecreateBatchView {
 }
 export type PostStep = 'idea' | 'stills' | 'video' | 'text' | 'finish'
 export interface ContentOutputs {
+  // R1 (item 9): face boxes across the clip, shares of the frame.
+  faceBoxes?: Array<{ x: number; y: number; w: number; h: number }>
   videoAssetId?: string; imageAssetIds?: string[]; videos?: Array<{ caption: string; assetId: string; clipId?: string; brollId?: string | null } | null>; zipAssetId?: string
   done?: number; failed?: number; total?: number; dropped?: string[]; renderedAt?: string
   durationSec?: number; sound?: { layers: Array<'clip' | 'ambience' | 'music'>; targetLufs: number | null; ducked: boolean }
@@ -524,7 +527,7 @@ export interface ContentData {
     hookVariants?: { max: number; seconds: number }
     hookEdits?: Array<{ id: string; label: string }>
     meme: { max_clip_seconds: number; broll_seconds: number; max_broll_seconds: number; order: 'clip_first' | 'broll_first' }
-    slideshow: { slides: [number, number]; maxStills: number; draftSlides?: number; hashtagsMax?: number; maxVariations?: number; batchMax?: number; hooks?: number; instagram?: { width: number; height: number }; brandNames?: string[]; genericNames?: string[] }
+    slideshow: { slides: [number, number]; maxStills: number; draftSlides?: number; hashtagsMax?: number; maxVariations?: number; batchMax?: number; hooks?: number; instagram?: { width: number; height: number }; brandNames?: string[]; genericNames?: string[]; framingMix?: Array<{ id: string; label: string }> }
     batch: { max: number; default_count: number }
     maxUploadMb: number
     cut?: { max_seconds: number; max_shots: number; max_captions: number }

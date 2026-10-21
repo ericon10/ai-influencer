@@ -6,6 +6,8 @@ import { api } from '../api'
 import { keys, useActiveJobs } from '../hooks'
 import { PriceButton } from '../PriceButton'
 import { AsyncButton, Todo, errorMessage, useToast, type TodoItem } from '../ui'
+import { NotesBadge } from '../lint'
+import { PunchUp } from '../punchUp'
 import { useProductList } from '../products'
 import { HowTo } from '../guide/Guide'
 import type { CharacterSummary, PlanImportResult, PlanPostView, PlanPreview, StillPathId } from '../types'
@@ -98,7 +100,9 @@ function ImportPlan({ characters, hasPosts, onImported, incoming = null }: { cha
   const [csv, setCsv] = useState(incoming?.text ?? '')
   const [name, setName] = useState(incoming?.name ?? '')
   const [paste, setPaste] = useState(false)
-  const [draw, setDraw] = useState(false)
+  const [draw, setDraw] = useState(true)
+  // Lines OK'd after Punch up (item 14): row_id, then slide number.
+  const [punched, setPunched] = useState<Record<string, Record<string, string>>>({})
   const [store, setStore] = useState<Record<string, string>>({})
   const [path, setPath] = useState<StillPathId | null>(null)
   // The plan's product (section 29): '' not picked yet, 'none' No product.
@@ -117,14 +121,14 @@ function ImportPlan({ characters, hasPosts, onImported, incoming = null }: { cha
   async function load(f: File | undefined) {
     if (!f) return
     if (f.size > 400_000) { toast({ tone: 'bad', text: `${f.name} is over 400 KB. Split it.` }); return }
-    setCsv(await f.text()); setName(f.name); setPaste(false); setPreview(null); setDone(null); sel.clear(); setExisting(null)
+    setCsv(await f.text()); setName(f.name); setPaste(false); setPreview(null); setDone(null); sel.clear(); setExisting(null); setPunched({})
   }
   // A file sent by Import on Posts home: its free preview at once.
   useEffect(() => { if (incoming) void check() }, []) // eslint-disable-line react-hooks/exhaustive-deps
-  async function check(o: { draw?: boolean; store?: Record<string, string>; path?: StillPathId | null; product?: string } = {}) {
+  async function check(o: { draw?: boolean; store?: Record<string, string>; path?: StillPathId | null; product?: string; lines?: Record<string, Record<string, string>> } = {}) {
     try {
       const p = o.product ?? product
-      const next = await api.planPreview(csv, { drawSpecials: o.draw ?? draw, store: o.store ?? store, path: o.path ?? path, productId: productArg(p) })
+      const next = await api.planPreview(csv, { lines: o.lines ?? punched, drawSpecials: o.draw ?? draw, store: o.store ?? store, path: o.path ?? path, productId: productArg(p) })
       setPreview(next)
       // The product the plan's accounts agree on pre-fills the pick.
       if (!p && next.suggestedProductId) { setProduct(next.suggestedProductId); void check({ ...o, product: next.suggestedProductId }) }
@@ -166,8 +170,8 @@ function ImportPlan({ characters, hasPosts, onImported, incoming = null }: { cha
         <div className="st-row" style={{ gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
           <AsyncButton className="st-btn sm" disabled={!csv.trim()} title={csv.trim() ? undefined : 'Upload or paste the plan first'} busyLabel="Reading the plan..." onClick={() => check()}>Preview (free)</AsyncButton>
           <label className="st-row" style={{ gap: 8, cursor: 'pointer', flex: '1 1 320px', minWidth: 0, alignItems: 'flex-start' }}>
-            <button type="button" role="switch" aria-checked={draw} className={`st-switch ${draw ? 'on' : ''}`} onClick={() => { setDraw(!draw); if (preview) void check({ draw: !draw }) }}><span /></button>
-            <span className="st-hint">Draw mock screens by code: a slide whose scene describes a phone screen, an email, a placard or a form is drawn by the Studio (free, the exact words). Off: every slide is a photo made from its scene.</span>
+            <button type="button" role="switch" aria-checked={draw} aria-label="Draw screens by code" className={`st-switch ${draw ? 'on' : ''}`} onClick={() => { setDraw(!draw); if (preview) void check({ draw: !draw }) }}><span /></button>
+            <span className="st-hint">Draw screens by code (on by default): a slide whose image line is mostly on-screen text (a job posting, an email, a text thread, a bank app, a placard, a form) is drawn by the Studio, free, its words from the line and generic company names. Off: every slide is a photo made from its line. A line that names your product is always your own screenshot, never generated or priced.</span>
           </label>
         </div>
       </div>
@@ -210,6 +214,13 @@ function ImportPlan({ characters, hasPosts, onImported, incoming = null }: { cha
           </div>
           <span className="st-hint">A topic account's pictures are filed under a character only for storage: nothing of that character (face, voice, name) goes into its posts.</span>
 
+          <PunchUp field="plan-punch-up" lines={ticked.flatMap(r => r.lines.filter(l => l.thin).map(l => ({ id: `${r.rowId}|${l.slide}`, text: l.text, label: `${r.rowId}, slide ${l.slide}` }))).slice(0, 60)}
+            onUse={next => {
+              const merged = { ...punched }
+              for (const [key, text] of Object.entries(next)) { const [row, slide] = key.split('|'); merged[row!] = { ...(merged[row!] ?? {}), [slide!]: text } }
+              setPunched(merged); void check({ lines: merged })
+            }} />
+
           <div className="st-col" style={{ gap: 8 }} data-field="plan-rows">
             <span className="st-label">Tick the rows to import</span>
             <div className="st-row" style={{ gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -230,7 +241,7 @@ function ImportPlan({ characters, hasPosts, onImported, incoming = null }: { cha
                       <td>{short(r.format)}</td>
                       <td style={{ whiteSpace: 'nowrap' }}>{r.productFrom === 'row' ? r.product : r.product ? <span className="st-muted">{r.product} (plan)</span> : <span className="st-muted">{product ? 'None' : 'The plan\'s pick'}</span>}{r.ad ? <span className="st-chip xs" style={{ marginLeft: 6 }}>Ad</span> : null}</td>
                       <td style={{ maxWidth: 380 }}><span className="st-clamp1" title={r.hook}>{r.hook}</span></td>
-                      <td>{r.state === 'update' ? <span className="st-hint">Matches a draft you have</span> : r.state === 'kept' ? <span className="st-hint">Matches a post with pictures</span> : null}{[...r.warnings, ...r.lint].length ? <span className="st-lint compact" title={[...r.warnings, ...r.lint].join('\n')}>{[...r.warnings, ...r.lint].length} note{[...r.warnings, ...r.lint].length === 1 ? '' : 's'}</span> : null}</td>
+                      <td>{r.state === 'update' ? <span className="st-hint">Matches a draft you have</span> : r.state === 'kept' ? <span className="st-hint">Matches a post with pictures</span> : null}{r.screenshots?.length ? <span className="st-chip xs" data-field={`needs-screenshot-${r.rowId}`} title="A line that names the product: your own screenshot goes there. Never generated, never priced.">Needs your screenshot: slide {r.screenshots.map(x => x.slide).join(', ')}</span> : null}<NotesBadge notes={[...r.warnings, ...r.lint]} field={`notes-${r.rowId}`} /></td>
                     </tr>
                   ))}
                 </tbody>
@@ -267,7 +278,7 @@ function ImportPlan({ characters, hasPosts, onImported, incoming = null }: { cha
             <span className="st-label">4 · Import</span>
             <AsyncButton className="st-btn" disabled={todo.length > 0} title={todo.length ? todo.map(t => t.label).join('; ') : undefined} busyLabel={`Importing ${ticked.length} rows...`} onClick={async () => {
               try {
-                const r = await api.planImport(csv, { drawSpecials: draw, store, productId: productArg(product), rows: ticked.map(x => x.rowId), ...(matching.length && existing ? { existing } : {}) })
+                const r = await api.planImport(csv, { lines: punched, drawSpecials: draw, store, productId: productArg(product), path: preview?.still.path ?? path, rows: ticked.map(x => x.rowId), ...(matching.length && existing ? { existing } : {}) })
                 sel.clear()
                 setExisting(null)
                 onImported()
@@ -282,7 +293,7 @@ function ImportPlan({ characters, hasPosts, onImported, incoming = null }: { cha
           </div>
         </div>
       )}
-      {done && <ImportDone done={done} onStarted={onImported} />}
+      {done && <ImportDone done={done} path={preview?.still.path ?? path} onStarted={onImported} />}
     </div>
   )
 }
@@ -317,7 +328,8 @@ function PlanGrid({ preview }: { preview: PlanPreview }) {
 
 // After an import, the last line is the next step (owner, 2026-10-22):
 // "10 drafts made. Next: Generate 10 posts, $X" with the button.
-function ImportDone({ done, onStarted }: { done: PlanImportResult; onStarted: () => void }) {
+// The preview's "Stills on" pick runs the stills too (item 7).
+function ImportDone({ done, path, onStarted }: { done: PlanImportResult; path: StillPathId | null; onStarted: () => void }) {
   const made = done.created + done.replaced
   const ids = done.next.postIds.slice(0, 100)
   return (
@@ -327,7 +339,7 @@ function ImportDone({ done, onStarted }: { done: PlanImportResult; onStarted: ()
         {ids.length ? ` Next: Generate ${ids.length} post${ids.length === 1 ? '' : 's'} (${done.next.stills} still${done.next.stills === 1 ? '' : 's'}).` : ''}
       </span>
       {ids.length > 0 && (
-        <PriceButton label={`Generate ${ids.length} post${ids.length === 1 ? '' : 's'}`} action={{ type: 'plan_generate', postIds: ids }}
+        <PriceButton label={`Generate ${ids.length} post${ids.length === 1 ? '' : 's'}`} action={{ type: 'plan_generate', postIds: ids, ...(path ? { path } : {}) }}
           onStarted={onStarted} onDone={onStarted} />
       )}
     </div>

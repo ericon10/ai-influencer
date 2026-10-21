@@ -153,6 +153,8 @@ export function textLayout(style: TextStyleId, text: string, frame: Frame, pos: 
     // A long text shrinks until it fits 6 lines (down to 70%).
     while (lines.length > 6 && size > def.size(ws.length, w) * 0.7) { size = Math.round(size * 0.92); lines = wrapWidth(ws, size, def.weight, def.maxWidth(w), draw) }
   }
+  // A size step down when the words had to shrink to miss a face (R1).
+  if (pos?.scale && pos.scale < 1) size = Math.max(8, Math.round(size * pos.scale))
   const lineH = Math.round(size * def.lineH)
   const textW = Math.max(...lines.map(l => draw.measure(l, size, def.weight)))
   let bw: number, bh: number

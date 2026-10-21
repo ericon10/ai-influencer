@@ -99,6 +99,33 @@ export interface CaptionLook {
   pill?: boolean
   // The lit word drawn this much bigger (a pop).
   pop?: number
+  // R1 (item 9): every face box found across the clip, as shares of the
+  // frame. The caption goes in a clear band of the safe zone instead.
+  faces?: Array<{ x: number; y: number; w: number; h: number }>
+}
+
+// R1 on video (owner, 2026-10-22; UX-PLAN.md section 35, item 9): the
+// caption's top inside the safe zone, clear of every face box grown by 4%:
+// where it was when that is clear, else the largest clear band (above the
+// faces first), else just under the lowest chin, above the buttons zone.
+export function clearTop(top: number, blockH: number, area: { top: number; bottom: number }, frame: { width: number; height: number }, faces: Array<{ x: number; y: number; w: number; h: number }>): { top: number; how: 'kept' | 'above' | 'below' | 'chin' } {
+  if (!faces.length) return { top, how: 'kept' }
+  const g = 0.04 * frame.height
+  const boxes = faces.map(f => [f.y * frame.height - g, (f.y + f.h) * frame.height + g] as const).sort((a, b) => a[0] - b[0])
+  const clear = (t: number) => boxes.every(([a, b]) => t + blockH <= a || t >= b)
+  if (clear(top)) return { top, how: 'kept' }
+  const free: Array<{ top: number; bottom: number }> = []
+  let at = area.top
+  for (const [a, b] of boxes) { if (a > at) free.push({ top: at, bottom: Math.min(a, area.bottom) }); at = Math.max(at, b) }
+  if (area.bottom > at) free.push({ top: at, bottom: area.bottom })
+  const fits = free.filter(b => b.bottom - b.top >= blockH)
+  const firstFace = boxes[0]![0]
+  const above = fits.filter(b => b.bottom <= firstFace).sort((a, b) => (b.bottom - b.top) - (a.bottom - a.top))[0]
+  if (above) return { top: Math.round((above.top + above.bottom - blockH) / 2), how: 'above' }
+  const below = fits.sort((a, b) => (b.bottom - b.top) - (a.bottom - a.top))[0]
+  if (below) return { top: Math.round((below.top + below.bottom - blockH) / 2), how: 'below' }
+  const chin = Math.max(...faces.map(f => (f.y + f.h) * frame.height)) + 0.01 * frame.height
+  return { top: Math.round(Math.min(area.bottom - blockH, chin)), how: 'chin' }
 }
 
 // Where the caption block starts, for a block this tall.
@@ -135,7 +162,7 @@ export function captionSvg(text: string, content: Pick<ContentConfig, 'canvas' |
   const lineRuns = lines.map(l => runs(fonts, l, dropped))
   const lineH = Math.round(size * cap.line_height)
   const blockH = lines.length * lineH + 2 * cap.box.pad_y
-  const top = blockTop(cap.position, area, blockH, c.height)
+  const top = clearTop(blockTop(cap.position, area, blockH, c.height), blockH, area, c, look.faces ?? []).top
   const main = fonts[0]!
   const scale = size / main.unitsPerEm
   const textH = (main.ascender - main.descender) * scale

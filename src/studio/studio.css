@@ -1607,3 +1607,10 @@ a.st-chip.st-packed:hover { border-color: var(--st-text-3); }
   .st-libfilters .st-select { max-width: none; flex: 1 1 140px; }
   .st-chip-x { width: 32px; height: 32px; }
 }
+/* A notes badge opens its list on a tap (item 17). */
+.st-notes { display: inline-flex; flex-direction: column; gap: 4px; align-items: flex-start; max-width: 100%; }
+.st-notes > button.st-lint.compact { border: 0; cursor: pointer; font: inherit; font-size: 11px; }
+.st-notes-list { padding: 6px 8px; border-radius: 8px; background: var(--st-warn-soft); white-space: normal; min-width: 220px; }
+/* R1 (item 9): face boxes over a video preview. */
+.st-faceboxes { position: relative; width: fit-content; max-width: 100%; }
+.st-facebox { position: absolute; border: 2px dashed rgba(255, 196, 0, 0.9); border-radius: 6px; pointer-events: none; box-sizing: border-box; }

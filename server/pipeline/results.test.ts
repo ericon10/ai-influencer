@@ -29,7 +29,7 @@ function planCsv(rows: Array<Partial<Record<(typeof PLAN_COLUMNS)[number], strin
 }
 const row = (row_id: string, account: string, date: string, slot: string, o: Record<string, string> = {}) => ({
   row_id, date, slot, account, format: account === 'CALLIE' ? 'character slideshow' : 'slideshow story', hook: `${row_id} hook: the recruiter said friday`,
-  slide_2: 'two', slide_3: 'three', slide_4: 'four', slide_5: 'five', slide_6: 'six', scene: 'A kitchen at night. Slide 1: phone on the counter', caption: `${row_id} caption`, hashtags: 'jobtok', ...o,
+  slide_2: 'two', slide_3: 'three', slide_4: 'four', slide_5: 'five', slide_6: 'six', scene: 'A kitchen at night. Slide 1: phone on the counter. Slides 2 to 6: the sink and a kettle. Outfit: a gray hoodie', caption: `${row_id} caption`, hashtags: 'jobtok', ...o,
 })
 
 beforeAll(async () => {

@@ -4,6 +4,7 @@ import { api } from '../api'
 import { keys } from '../hooks'
 import { PriceButton } from '../PriceButton'
 import { AsyncButton, Todo, errorMessage, useToast, type TodoItem } from '../ui'
+import { NotesBadge } from '../lint'
 import { HowTo } from '../guide/Guide'
 import { SelectAllBox, SelectBox, SelectionCount, useSelection } from '../select'
 import type { Incoming } from '../importDoor'
@@ -60,7 +61,7 @@ export function FacelessImport({ incoming, onImported }: { incoming: Incoming; o
                   <td>{r.rowId}</td>
                   <td style={{ maxWidth: 360 }}><span className="st-clamp1" title={r.hook}>{r.hook}</span></td>
                   <td>{r.still === 'job' ? 'From Higgsfield' : r.still === 'url' ? 'From its link' : 'Made from the scene'}</td>
-                  <td>{r.errors.length ? <span className="st-warntext">{r.errors.join('; ')}</span> : r.state === 'update' ? 'Matches a draft you have' : r.state === 'kept' ? 'Matches a post with a still' : null}{r.lint.length ? <span className="st-lint compact" title={r.lint.join('\n')}>{r.lint.length} note{r.lint.length === 1 ? '' : 's'}</span> : null}</td>
+                  <td>{r.errors.length ? <span className="st-warntext">{r.errors.join('; ')}</span> : r.state === 'update' ? 'Matches a draft you have' : r.state === 'kept' ? 'Matches a post with a still' : null}<NotesBadge notes={r.lint} field={`notes-${r.rowId}`} /></td>
                 </tr>
               ))}
             </tbody>

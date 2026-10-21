@@ -1,3 +1,5 @@
+import { PunchUp } from '../../../punchUp'
+import { isThin } from '../../../../../server/core/punchUp'
 import { useMemo, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, ArrowRight, Bookmark, Camera, Images, Loader2, Plus, Trash2, Upload, X } from 'lucide-react'
@@ -57,10 +59,13 @@ export function SlideshowStills({ ctx }: { ctx: PostCtx }) {
     ...(on?.empty && (topic || people.includes('none')) ? [{ who: topic ? 'No one in these photos' : 'Slides with no one', model: on.empty }] : []),
   ]
   const brands = { names: ctx.data.options.slideshow.brandNames ?? [], generic: ctx.data.options.slideshow.genericNames ?? [] }
+  const framingMix = ctx.data.options.slideshow.framingMix ?? []
 
   function edit(op: SlideEdit) { draft.setSpec(editSlides(spec, op) as never) }
-  function setSlide(i: number, patch: { still?: string; shot?: string; special?: SlideshowSpec['specials'][number]; who?: SlidePerson }) {
+  function setSlide(i: number, patch: { still?: string; shot?: string; special?: SlideshowSpec['specials'][number]; who?: SlidePerson; framing?: string; written?: boolean }) {
     const out: Partial<SlideshowSpec> = {}
+    if (patch.framing !== undefined) out.framings = setAt(spec.framings ?? [], i, patch.framing, '')
+    if (patch.written !== undefined) out.asWritten = setAt(spec.asWritten ?? [], i, patch.written, false)
     if (patch.who !== undefined) out.people = setAt(spec.people ?? [], i, patch.who, '')
     if (patch.still !== undefined) out.stillIds = setAt(list.map(s => s.stillId ?? ''), i, patch.still, '')
     if (patch.shot !== undefined) out.shots = setAt(spec.shots ?? [], i, patch.shot, '')
@@ -115,6 +120,12 @@ export function SlideshowStills({ ctx }: { ctx: PostCtx }) {
           onDone={() => { if (item.characterId) refresh(item.characterId); void qc.invalidateQueries({ queryKey: ['estimate'] }) }}
           onStarted={() => void ctx.advance('stills')}
         />
+        <PunchUp contentId={item.id} lines={list.filter(s => !s.special && isThin(s.shot)).map(s => ({ id: String(s.index), text: s.shot, label: `Slide ${s.index + 1}` }))}
+          onUse={next => {
+            let shots = spec.shots ?? [], written = spec.asWritten ?? []
+            for (const [i, text] of Object.entries(next)) { shots = setAt(shots, Number(i), text, ''); written = setAt(written, Number(i), true, false) }
+            draft.setSpec({ shots, asWritten: written } as never)
+          }} />
         <span className="st-hint">One still for each slide with no picture, all in the locked scene, at {spec.made === 'instagram' ? '3:4' : '9:16'}. {topic ? 'No one in them.' : `${v?.data.name ?? 'The character'} from ${v?.data.pronouns.poss ?? 'their'} sheet, the same outfit in every photo; the free face and skin checks run on each.`} Special slides are drawn free.</span>
       </div>
 
@@ -144,7 +155,21 @@ export function SlideshowStills({ ctx }: { ctx: PostCtx }) {
                         <option value="none">No one in it{on?.empty ? ` · ${on.empty.label}` : ''}</option>
                       </select>
                     )}
-                    <textarea className="st-textarea" aria-label={`Slide ${s.index + 1} shot`} maxLength={300} value={spec.shots?.[s.index] ?? ''} onChange={e => setSlide(s.index, { shot: e.target.value })} placeholder={s.text ? `e.g. ${topic ? 'the desk' : 'her'} ${s.index ? 'later that day' : 'at the start'}` : 'What the photo shows'} />
+                    {!topic && slidePerson(spec, s.index, who) === 'character' && (
+                      <div className="st-row" style={{ gap: 4, flexWrap: 'wrap', alignItems: 'center' }}>
+                        <select className="st-select sm" style={{ flex: 1, minWidth: 0 }} aria-label={`Slide ${s.index + 1} framing`} data-field={`slide-framing-${s.index}`} value={spec.framings?.[s.index] ?? ''}
+                          title="Character slides mix framing in turn: close-up, mid, wide, hands only, over the shoulder. Pick one for this slide."
+                          onChange={e => setSlide(s.index, { framing: e.target.value })}>
+                          <option value="">{`Mix: ${framingMix[s.index % Math.max(1, framingMix.length)]?.label ?? 'in turn'}`}</option>
+                          {framingMix.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
+                          <option value="scene">The post's scene framing</option>
+                        </select>
+                        <label className="st-row st-hint" style={{ gap: 4, cursor: 'pointer' }} title="The line goes to the model as written, with only the reference, 21+, outfit, mark and REALISM lines.">
+                          <input type="checkbox" checked={!!spec.asWritten?.[s.index]} onChange={e => setSlide(s.index, { written: e.target.checked })} aria-label={`Slide ${s.index + 1}: send the line as written`} />As written
+                        </label>
+                      </div>
+                    )}
+                    <textarea className="st-textarea" aria-label={`Slide ${s.index + 1} shot`} maxLength={800} value={spec.shots?.[s.index] ?? ''} onChange={e => setSlide(s.index, { shot: e.target.value })} placeholder={s.text ? `e.g. ${topic ? 'the desk' : 'her'} ${s.index ? 'later that day' : 'at the start'}` : 'What the photo shows'} />
                     <div className="st-row" style={{ gap: 4, flexWrap: 'wrap' }}>
                       {item.characterId && <PriceButton size="sm" variant="secondary" icon={false} compact label={asset ? 'Reroll' : 'Make it'} action={draft.saving ? null : { type: 'slideshow_stills', contentId: item.id, slides: [s.index], ...(path ? { path } : {}) }} waiting={draft.saving ? 'Saving...' : undefined} todo={todo} />}
                     </div>
@@ -157,7 +182,7 @@ export function SlideshowStills({ ctx }: { ctx: PostCtx }) {
                 ) : s.special.type === 'product_shot' ? (
                   <div className="st-col" style={{ gap: 4 }} data-field={`product-shot-${s.index}`}>
                     <button type="button" className="st-btn ghost xs" disabled={uploading != null} onClick={() => { setUploadFor(s.index); file.current?.click() }}>{uploading === s.index ? <Loader2 size={12} className="st-spin" /> : <Upload size={12} />}{s.special.assetId ? 'Replace the screenshot' : 'Upload the screenshot'}</button>
-                    <span className="st-hint">Your own screenshot, placed as it is. The Studio never draws a product screen. Size and place it in the Slides step.</span>
+                    <span className="st-hint">{s.special.assetId ? 'Your own screenshot, placed as it is.' : <b>Needs your screenshot{s.special.title ? ` of ${s.special.title}` : ''}.</b>} The Studio never draws or generates a product screen, and it is never priced. Size and place it in the Slides step.</span>
                   </div>
                 ) : <span className="st-hint">Drawn by code, free. Edit its words in the Slides step.</span>}
                 <div className="st-row" style={{ gap: 2, justifyContent: 'center' }}>

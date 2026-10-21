@@ -15,6 +15,11 @@ export const PLAN_COLUMNS = [
   'row_id', 'date', 'slot', 'account', 'format', 'tension', 'pillar', 'audience', 'product', 'ad', 'mention_mother',
   'structure', 'effect_open', 'effect_payoff', 'hook_score', 'moment_id', 'moment', 'hook', 'alt_hook',
   'slide_2', 'slide_3', 'slide_4', 'slide_5', 'slide_6', 'scene', 'clip_action', 'caption', 'hashtags', 'cta', 'stat_source', 'notes',
+  // The scene in its own columns (owner, 2026-10-22; UX-PLAN.md section 35,
+  // item 6), over what the scene cell says, and each slide's own image line
+  // (item 11). All optional.
+  'place', 'light', 'outfit', 'detail_1', 'detail_2',
+  'slide_1_image', 'slide_2_image', 'slide_3_image', 'slide_4_image', 'slide_5_image', 'slide_6_image',
 ] as const
 export type PlanColumn = (typeof PLAN_COLUMNS)[number]
 const REQUIRED: PlanColumn[] = ['row_id', 'date', 'account', 'format', 'hook']
@@ -94,6 +99,26 @@ export function sceneParts(scene: string): SceneParts {
   return { common: tidy(text), slides, outfit, hair }
 }
 
+// The scene of a row: the scene cell split, with the place, light, outfit
+// and detail columns over it (item 6), and each slide's image line, its own
+// column first (slide_N_image, item 11), else "Slide N:" in the scene cell.
+// A photo row's one slide is its moment.
+export interface RowScene { place: string; light: string; outfit: string; hair: string; details: string[]; lines: Record<number, string>; own: Record<number, boolean> }
+export function rowScene(c: Record<PlanColumn, string>, kind: PlanKind | null): RowScene {
+  const parts = sceneParts(c.scene)
+  const lines: Record<number, string> = {}, own: Record<number, boolean> = {}
+  for (let i = 1; i <= 6; i++) {
+    const col = tidy(c[`slide_${i}_image` as PlanColumn] ?? '')
+    const line = col || parts.slides[i] || ''
+    if (line) { lines[i] = line; own[i] = true }
+  }
+  if (kind === 'photo' && !lines[1] && c.moment.trim()) lines[1] = tidy(c.moment)
+  return {
+    place: tidy(c.place) || parts.common, light: tidy(c.light), outfit: tidy(c.outfit) || parts.outfit, hair: parts.hair,
+    details: [c.detail_1, c.detail_2].map(tidy).filter(Boolean), lines, own,
+  }
+}
+
 // ── Mock screens the Studio draws ─────────────────────────────────────
 
 // A slide's words that describe one of the screens the Studio draws (a
@@ -140,6 +165,26 @@ export function specialFor(desc: string, names: { brands: string[]; generic: str
   }
 }
 
+// A shot line that is mostly on-screen text (item 10): a screen the words
+// name (a job posting, an email, a text thread, a bank app...) and either
+// "mock", or quoted words making up a good share of the line, or the screen
+// named in its first words. A person doing something with a screen in the
+// background stays a photo.
+export function screenFor(line: string, names: { brands: string[]; generic: string[] }): SpecialSlide | null {
+  const sp = specialFor(line, names)
+  if (!sp) return null
+  const quotedChars = quoted(line).join('').length
+  const head = line.split(/\s+/).slice(0, 8).join(' ')
+  const mostly = /\bmock\b/i.test(line) || quotedChars / Math.max(1, line.length) >= 0.2 || SPECIAL_WORDS.some(([t, re]) => t === sp.type && re.test(head))
+  return mostly ? sp : null
+}
+
+// A line naming one of the account's products (item 15): that picture is
+// the owner's own screenshot, never generated or priced.
+export function namesProduct(line: string, products: string[]): string | null {
+  return products.find(p => p.trim().length >= 3 && new RegExp(`\\b${p.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(line)) ?? null
+}
+
 // ── A row checked ─────────────────────────────────────────────────────
 
 const yes = (s: string) => /^(?:y|yes|true|1)$/i.test(s.trim())
@@ -173,6 +218,18 @@ export function checkRow(r: PlanRow): CheckedRow {
     if (slides.every(s => !s)) errors.push('A slideshow row has no slides 2 to 6')
     else if (slides.some(s => !s)) warnings.push(`Slide${slides.filter(s => !s).length === 1 ? '' : 's'} ${slides.map((s, i) => (s ? null : i + 2)).filter(Boolean).join(', ')} empty`)
   }
+  // The free pre-check (item 16): rows that would make bad pictures are
+  // blocked, with the fix. A character post needs its outfit (feeder rows
+  // may leave the scene blank); every photo slide needs its shot line.
+  const sc = rowScene(c, kind)
+  if (kind && kind !== 'topic_slideshow' && !sc.outfit) errors.push('A character post needs an outfit: fill the outfit column (or "Outfit:" in the scene)')
+  if (kind === 'topic_slideshow' || kind === 'character_slideshow') {
+    const texts = [c.hook, ...slides]
+    while (texts.length > 1 && !texts[texts.length - 1]!.trim()) texts.pop()
+    const bare = texts.map((t, i) => (!sc.lines[i + 1] ? i + 1 : null)).filter((n): n is number => n !== null)
+    if (bare.length) errors.push(`Slide${bare.length === 1 ? '' : 's'} ${bare.join(', ')} ${bare.length === 1 ? 'has' : 'have'} no shot line: fill slide_N_image (or "Slide N:" in the scene)`)
+  }
+  if (kind === 'photo' && !sc.lines[1]) errors.push('A photo row has no shot line: fill slide_1_image or the moment')
   if (kind === 'clip' && !c.clip_action) warnings.push('A clip row with no clip_action: write the motion in the post')
   const code = readCode(c.structure)
   if (c.structure && !code) warnings.push(`Structure "${c.structure}" is not a code S1 to S12 or L13 to L25`)

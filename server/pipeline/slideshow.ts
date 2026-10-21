@@ -12,7 +12,7 @@ import { lintPrompt, type RuleViolation } from '../core/rules.js'
 import { realismBlock, realismBlockers, type RealismWarning } from '../core/realism.js'
 import { EXPLICIT_MESSAGE, findExplicitTerms } from '../core/safety.js'
 import { identityForModel } from '../core/identity.js'
-import { buildScenePrompt, sceneFieldsSchema, type ReferenceMode, type SceneFields } from '../core/scenes.js'
+import { assembleSlideLine, buildScenePrompt, sceneFieldsSchema, type ReferenceMode, type SceneFields } from '../core/scenes.js'
 import { catalogWording } from '../core/wording.js'
 import { cleanVoiceCard, voiceCardText } from '../core/voiceCard.js'
 import { claimsText, languageText } from '../core/scriptKit.js'
@@ -26,6 +26,7 @@ import { postExportJson } from '../core/postExport.js'
 import { EFFECT_CODES, STRUCTURE_CODES, codeLabel, effectLabel, readCode, readEffect, type EffectCode, type StructureCode } from '../core/playbook.js'
 import type { PlanMeta } from '../core/planMeta.js'
 import { accountStructures } from './playbook.js'
+import { autoPlace } from './facePlace.js'
 import { renderSlide, fontDraw } from '../media/slideRender.js'
 import type { GenRequest } from '../providers/types.js'
 import { formatCredits } from '../costs/quotes.js'
@@ -571,7 +572,7 @@ export function draftPatch(deps: Deps, spec: SlideshowSpec, d: DraftOut, meta: H
     ...(meta.score ? { hookScore: meta.score } : {}),
   }
   return {
-    hook: texts[0]!, slides: texts.slice(1), shots, specials, textPos: [], people: [], lock,
+    hook: texts[0]!, slides: texts.slice(1), shots, specials, textPos: [], people: [], asWritten: [], framings: [], lock,
     pattern: meta.pattern, slideCount: Math.min(10, Math.max(3, n)),
     stillIds: spec.stillIds.slice(0, n),
     caption: clean(d.caption, 2200), hashtags: tags(d.hashtags, cfg.hashtags[1]), ctaLine: clean(d.cta, 300),
@@ -764,11 +765,28 @@ export function shotMoment(shot: string, name: string | null): string {
   return `${name}, ${t}`
 }
 
-// One slide's still request: the locked scene and this slide's shot.
-function slideRequest(deps: Deps, c: StillCtx, shot: string, seed: number, realism: RealismWarning[]): { prompt: string; request: GenRequest; warnings: RuleViolation[] } {
+// The outfit lock says the place changes from photo to photo (item 13).
+const PLACE_CHANGES = /\b(?:place|location|setting|room|spot|scene)s?\b[^.;]{0,40}\b(?:changes?|changing|varies|vary|different|moves?)\b|\bdifferent (?:places?|locations?|settings?|rooms?|spots?)\b/i
+
+// A character slide's framing (item 12): its own pick on the slide card,
+// else the mix in turn by slide number.
+export function slideFraming(deps: Deps, s: Pick<SlideshowSpec, 'framings'>, index: number): { framing: string; camera?: string } | null {
+  const mix = deps.config.pipeline.content.slideshow.framing_mix
+  if (!mix.length) return null
+  const own = s.framings?.[index] ?? ''
+  if (own === 'scene') return null
+  const m = (own && mix.find(x => x.id === own)) || mix[index % mix.length]!
+  return { framing: m.framing, ...(m.camera ? { camera: m.camera } : {}) }
+}
+
+// One slide's still request: the locked scene and this slide's shot. With
+// `index`, the slide's own image line wins when it has one (item 13) and a
+// character slide takes its framing from the mix (item 12).
+function slideRequest(deps: Deps, c: StillCtx, shot: string, seed: number, realism: RealismWarning[], o: { index?: number } = {}): { prompt: string; request: GenRequest; warnings: RuleViolation[] } {
   const t = deps.config.pipeline.templates
   const { scenes: sc, views, rules } = deps.config.pipeline
   const s = c.spec
+  const space = ` ${t.slideshow_caption_space}`
   const moment = shot.trim().length >= 3 ? shot.trim() : (s.hook.trim() || 'an ordinary moment of the day')
   if (c.who === 'none') {
     const lock = s.lock
@@ -782,7 +800,7 @@ function slideRequest(deps: Deps, c: StillCtx, shot: string, seed: number, reali
       aspect: c.aspect,
     })
     const look = s.lock.lookAssetId && c.entry.max_refs > 0 ? s.lock.lookAssetId : null
-    const prompt = withModelLines(deps, c.model, `${body}${look ? t.slideshow_same_place : ''}\n${realismBlock(t.slideshow_topic_realism)}`).replace(/\n?Bare natural lips, no gloss\.?/, '')
+    const prompt = withModelLines(deps, c.model, `${body}${look ? t.slideshow_same_place : ''}${space}\n${realismBlock(t.slideshow_topic_realism)}`).replace(/\n?Bare natural lips, no gloss\.?/, '')
     const request: GenRequest = {
       kind: look ? 'image_edit' : 'image', model: c.run.model, modelRef: c.model, prompt, aspect: c.aspect, quality: c.level.quality, resolution: c.level.resolution, seed,
       ...(look ? { refs: [{ assetId: look }] } : {}), ...(c.run.billing ? { billing: c.run.billing } : {}),
@@ -790,11 +808,17 @@ function slideRequest(deps: Deps, c: StillCtx, shot: string, seed: number, reali
     const warnings = lintPrompt(rules, prompt, { stage: 'slideshow', kind: request.kind, request: { ...request, model: c.model }, switches: c.sw })
     return { prompt, request, warnings }
   }
-  const f: SceneFields = { ...c.base!, moment: shotMoment(moment, c.ch.name).slice(0, 400) }
+  const framed = o.index == null ? null : slideFraming(deps, s, o.index)
+  const f: SceneFields = { ...c.base!, moment: shotMoment(moment, c.ch.name).slice(0, 400), ...(framed && sc.framings.some(x => x.id === framed.framing) ? { framing: framed.framing } : {}), ...(framed?.camera && sc.cameras.some(x => x.id === framed.camera) ? { camera: framed.camera } : {}) }
   const identity = identityForModel(c.ch.identities, c.model)
   const sceneRules = { outfitOverride: c.sw.on('scene-outfit-override'), brandFree: c.sw.on('scene-brand-free'), colors: c.sw.on('scene-colors'), referenceLine: c.sw.on('scene-reference-slot') }
   const element = c.element ? ` ${fill(t.slideshow_element, { noun: c.ch.pronouns.noun || 'person', name: c.ch.name, element: c.element })}` : ''
-  const prompt = withModelLines(deps, c.model, buildScenePrompt(t, sc, views, f, c.ch, c.mode!, { identityBlock: identity?.promptBlock, warnings: realism, addendum: `${t.slideshow_set}${element}`, rules: sceneRules, flawDose: c.sw.on('realism-flaw-dose') }))
+  const written = o.index != null && !!s.asWritten?.[o.index] && shot.trim().length >= 3
+  const outfit = s.lock.outfit.trim() || c.base!.outfit || ''
+  const set = written && PLACE_CHANGES.test(`${s.lock.outfit} ${s.lock.place}`) ? t.slideshow_set_outfit : t.slideshow_set
+  const prompt = withModelLines(deps, c.model, written
+    ? assembleSlideLine(t, sc, views, f, c.ch, c.mode!, shot, { identityBlock: identity?.promptBlock, warnings: realism, outfit, hair: s.lock.hair, addendum: `${set}${element}${space}`, rules: sceneRules, flawDose: c.sw.on('realism-flaw-dose') })
+    : buildScenePrompt(t, sc, views, f, c.ch, c.mode!, { identityBlock: identity?.promptBlock, warnings: realism, addendum: `${t.slideshow_set}${element}${space}`, rules: sceneRules, flawDose: c.sw.on('realism-flaw-dose') }))
   const kind: GenRequest['kind'] = c.mode === 'refs' ? 'image_edit' : 'image'
   const request: GenRequest = {
     kind, model: c.run.model, modelRef: c.model, prompt, aspect: c.aspect, quality: c.level.quality, resolution: c.level.resolution, seed,
@@ -841,7 +865,7 @@ export async function buildSlideshowStills(deps: Deps, ctx: Ctx, input: { conten
     const shot = slide?.shot || slide?.text || ''
     // A new seed each time a still of this post lands, so a reroll draws a
     // new picture (the same between the price and the run).
-    const r = slideRequest(deps, c, shot, 1 + i + 37 * made, realism)
+    const r = slideRequest(deps, c, shot, 1 + i + 37 * made, realism, { index: i })
     warnings.push(...checked(r.warnings, `Slide ${i + 1}`))
     if (prompts.length < 2) prompts.push({ label: `Slide ${i + 1} prompt (${c.label})`, text: r.prompt, wrapped: hardWrap(r.prompt) })
     specs.push({ type: 'gen', stage: c.who === 'none' ? 'slideshow' : 'scene', purpose: `slide_still:${row.id}`, label: `Slideshow still ${specs.length + 1} of ${total} (slide ${i + 1}), ${c.label}`, request: { ...r.request, slide: { slide: i, postId: row.id, sceneId: c.who === 'none' ? null : c.row.sceneId ?? null, path } } })
@@ -900,6 +924,9 @@ async function onSlideStill(deps: Deps, ctx: Ctx, job: JobRow, out: JobOutcome):
     await deps.db.update(candidates).set({ assetId: asset.id, status: 'in_review' }).where(eq(candidates.id, id))
   }
   await setSlideStill(deps, ctx, postId, slide, id)
+  // R1 (item 8): the slide's words off any face in the new still. Free;
+  // a problem here never fails the still.
+  await autoPlace(deps, ctx, postId, { slides: [slide] }).catch(() => undefined)
 }
 
 // Puts a still in one slide, under a row lock so stills landing together
@@ -995,7 +1022,7 @@ export async function buildSlideshowVariations(deps: Deps, ctx: Ctx, input: { co
         const s = list[from]!
         if (s.special) continue
         const c = await ctxs.get(slidePerson(spec, from, ctxs.who))
-        const r = slideRequest(deps, c, s.shot || s.text, 101 + k * 31 + to, realism)
+        const r = slideRequest(deps, c, s.shot || s.text, 101 + k * 31 + to, realism, { index: from })
         warnings.push(...checked(r.warnings, `Variation ${k + 1}, slide ${to + 1}`))
         if (prompts.length < 2) prompts.push({ label: `Variation 1, slide ${to + 1} prompt (${c.label})`, text: r.prompt, wrapped: hardWrap(r.prompt) })
         specs.push({ type: 'gen', stage: c.who === 'none' ? 'slideshow' : 'scene', purpose: `slide_still:${row.id}:v`, label: `Variation still ${specs.length} of ${count * photos.length} (variation ${k + 1}, slide ${to + 1}), ${c.label}`, parentIndex: 0, request: { ...r.request, slide: { slide: to, variant: k, sceneId: c.who === 'none' ? null : c.row.sceneId ?? null, path } } })
@@ -1167,7 +1194,7 @@ async function onSlideDraft(deps: Deps, ctx: Ctx, job: JobRow, out: JobOutcome):
     const i = (ch.request as GenRequest).slide?.slide ?? 0
     const s = list[i]
     if (!s || s.special) { await cancelWaiting(deps, ch.id, `${NOT_NEEDED} this slide became a special slide (drawn free), so no still was made. Nothing was charged for it.`); continue }
-    const r = slideRequest(deps, c, s.shot || s.text, (ch.request as GenRequest).seed ?? i + 1, [])
+    const r = slideRequest(deps, c, s.shot || s.text, (ch.request as GenRequest).seed ?? i + 1, [], { index: i })
     const problems = [...realismBlockers(r.prompt, { kind: r.request.kind, stage: ch.stage }), ...(findExplicitTerms(r.prompt).length ? [EXPLICIT_MESSAGE] : [])]
     if (problems.length) { await cancelWaiting(deps, ch.id, `The written shot was refused: ${problems.join(' ')} Nothing was charged for this still.`); continue }
     prompts.set(ch.id, r.prompt)

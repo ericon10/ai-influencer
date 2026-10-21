@@ -96,6 +96,7 @@ const JUST = /(?:^|[.!?:;,"“(]\s*|\b(?:and|so|then|can|could|gotta|simply|shou
 // The sentences of a text: split at . ! ? and line breaks.
 const sentences = (t: string) => t.split(/(?<=[.!?])\s+|\n+/).map(s => s.trim()).filter(Boolean)
 const YOU_START = /^["'“‘(*\s]*(you\b[a-z']*)/i
+const AT_YOU = /\b(?:you|your|you're|youre|yours|yourself|y'all|ya)\b/i
 
 // A timestamp or date a hook opens with: "2:14am", "11:52 PM", "Sunday
 // 9:40pm", "Tue, 4pm", "Oct 19", "10/19".
@@ -124,9 +125,14 @@ export function lintCopy(text: string, o: LintOptions): LintHit[] {
   const lineHit = (rule: LintRuleId, match: string, message: string) => { if (!off.has(rule)) out.push({ rule, match, message }) }
   if (!t && o.kind !== 'caption') return out
   if (LONG_DASH.test(t)) hit('lint-dashes', t.match(LONG_DASH)![0], 'A long dash (em or en). Use a comma, a period or "to".')
-  for (const w of lists.values) {
-    const m = t.match(phrase(w))
-    if (m) { hit('lint-values', m[2]!, `"${m[2]!}" is values language. Turn it into a feeling, a fact or a joke.`); break }
+  // Values language aimed at the reader only (owner, 2026-10-22, item 17):
+  // "you need to apply early" is flagged, "I need to sleep" is not.
+  values: for (const sentence of sentences(t)) {
+    if (!AT_YOU.test(sentence)) continue
+    for (const w of lists.values) {
+      const m = sentence.match(phrase(w))
+      if (m) { hit('lint-values', m[2]!, `"${m[2]!}" aimed at "you" is values language. Turn it into a feeling, a fact or a joke.`); break values }
+    }
   }
   const j = t.match(JUST)
   if (j) hit('lint-just', j[1]!, `"${j[1]!}" reads as an order. Drop "just", or ask it as a question.`)

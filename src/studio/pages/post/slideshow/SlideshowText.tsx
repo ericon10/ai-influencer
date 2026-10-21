@@ -3,7 +3,8 @@ import { useQueryClient } from '@tanstack/react-query'
 import { Copy, Plus, RotateCcw, X } from 'lucide-react'
 import { keys } from '../../../hooks'
 import { PriceButton } from '../../../PriceButton'
-import { Field, useToast, type TodoItem } from '../../../ui'
+import { Field, errorMessage, useToast, type TodoItem } from '../../../ui'
+import { api } from '../../../api'
 import { HowTo } from '../../../guide/Guide'
 import { CTA_KINDS, TEXT_STYLES, backdropFor, cleanSpecial, ctaText, editSlides, fullSpecial, isProductPost, postCaption, setAt, slideList, type CtaKind, type SlidePos, type SpecialSlide, type TextStyleId } from '../../../../../server/core/slides'
 import { wordsNote } from '../../../../../server/core/slideSvg'
@@ -46,6 +47,19 @@ export function SlideshowText({ ctx }: { ctx: PostCtx }) {
 
   const setText = (i: number, value: string) => draft.setSpec((i === 0 ? { hook: value } : { slides: setAt(spec.slides, i - 1, value, '') }) as never)
   const setPos = (i: number, pos: SlidePos | null) => draft.setSpec({ textPos: setAt(spec.textPos ?? [], i, pos, null) } as never)
+  // R1 (item 8): every slide's words off the faces in its still, on the
+  // server (free). A place you dragged stays; a slide with no face keeps its place.
+  const [placing, setPlacing] = useState(false)
+  async function placeAll(quiet = false) {
+    setPlacing(true)
+    try {
+      await draft.flush()
+      const r = await api.autoPlace(item.id)
+      await qc.invalidateQueries({ queryKey: keys.content })
+      const moved = r.placed.filter(p => p.how !== 'kept' && p.how !== 'owner').length
+      if (!quiet) toast({ tone: 'ok', text: moved ? `Moved the words off a face on ${moved} slide${moved === 1 ? '' : 's'}.` : 'No slide had words on a face.' })
+    } catch (e) { if (!quiet) toast({ tone: 'bad', text: errorMessage(e) }) } finally { setPlacing(false) }
+  }
   const setSpecial = (i: number, patch: Partial<SpecialSlide>) => { const s = list[i]?.special; if (s) draft.setSpec({ specials: setAt(spec.specials ?? [], i, { ...s, ...patch }, null) } as never) }
   function setCta(kind: CtaKind, o: { handle?: string; word?: string } = {}) {
     const cta = { ...spec.cta, kind, ...o }
@@ -86,7 +100,7 @@ export function SlideshowText({ ctx }: { ctx: PostCtx }) {
       <Field label="Text style" group>
         <div className="st-stylepick" role="radiogroup" aria-label="Text style" data-field="text-style">
           {TEXT_STYLES.map(s => (
-            <button key={s.id} type="button" role="radio" aria-checked={spec.textStyle === s.id} aria-label={`${s.label}: ${s.line}`} className={spec.textStyle === s.id ? 'on' : ''} onClick={() => draft.setSpec({ textStyle: s.id } as never)} title={s.line}>
+            <button key={s.id} type="button" role="radio" aria-checked={spec.textStyle === s.id} aria-label={`${s.label}: ${s.line}`} className={spec.textStyle === s.id ? 'on' : ''} onClick={() => { draft.setSpec({ textStyle: s.id } as never); void placeAll(true) }} title={s.line}>
               {fonts ? <SlideFrame slide={{ ...(cur ?? SAMPLE), special: null, pos: null, text: cur?.text || SAMPLE.text }} assetId={asset(cur?.stillId)} style={s.id as TextStyleId} ad={false} width={92} /> : <div className="st-skel" style={{ width: 92, height: 164 }} />}
               <b>{s.label}</b><span className="st-muted">{s.line}</span>
             </button>
@@ -124,7 +138,11 @@ export function SlideshowText({ ctx }: { ctx: PostCtx }) {
           </div>
           {cur && (
             <div className="st-col" style={{ gap: 8, alignItems: 'center' }} data-field="slide-preview">
-              {fonts ? <SlideFrame slide={cur} assetId={pic(cur)} style={spec.textStyle} ad={spec.ad && cur.index === 0} width={300} frame={frame} safe={safe} brands={brands} onMove={p => setPos(cur.index, p)} /> : <div className="st-skel" style={{ width: 300, height: 533 }} />}
+              {fonts ? <SlideFrame slide={cur} assetId={pic(cur)} style={spec.textStyle} ad={spec.ad && cur.index === 0} width={300} frame={frame} safe={safe} brands={brands} onMove={p => setPos(cur.index, { ...p, by: 'owner' })} /> : <div className="st-skel" style={{ width: 300, height: 533 }} />}
+              <div className="st-row" style={{ gap: 8, flexWrap: 'wrap', alignItems: 'center' }} data-field="auto-place">
+                <button type="button" className="st-btn sm secondary" disabled={placing || draft.saving} onClick={() => void placeAll()}>{placing ? 'Placing...' : 'Auto-place all'}</button>
+                <span className="st-hint">Moves every slide's words off the faces in its photo (free). A place you dragged stays.</span>
+              </div>
               <div className="st-row" style={{ gap: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
                 <label className="st-row" style={{ gap: 6 }}><input type="checkbox" checked={safe} onChange={e => setSafe(e.target.checked)} />Safe zones</label>
                 <div className="st-seg sm" role="radiogroup" aria-label="Preview size">

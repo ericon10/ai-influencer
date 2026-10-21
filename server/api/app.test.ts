@@ -359,7 +359,7 @@ describe('Studio API', () => {
   it('runs every Claude task on Sonnet 5.5 by default; any one can switch to Opus, per account', async () => {
     const before = await call('GET', '/settings', { cookie: cookieA })
     const tasks = before.json.claude.tasks as Array<{ task: string; label: string; model: string; changed: boolean }>
-    expect(tasks.map(t => t.task).sort()).toEqual(['breakdown', 'card_update', 'concepts', 'content_writer', 'prompt_writer', 'qa_perception', 'scene_ideas', 'scene_plan'])
+    expect(tasks.map(t => t.task).sort()).toEqual(['breakdown', 'card_update', 'concepts', 'content_writer', 'prompt_writer', 'punch_up', 'qa_perception', 'scene_ideas', 'scene_plan'])
     // The prompt writer is on by default and has its own switch.
     expect(tasks.find(t => t.task === 'prompt_writer')).toMatchObject({ label: 'Prompt writer', rule: { id: 'scene-prompt-writer', on: true } })
     for (const t of tasks) expect(t).toMatchObject({ model: 'anthropic/claude-sonnet-5-5', changed: false })

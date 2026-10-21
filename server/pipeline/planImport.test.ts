@@ -15,7 +15,8 @@ import { getScene } from './scenes.js'
 import { renderPlaceholderPortrait } from '../providers/mock.js'
 import { readAsset } from '../storage/assets.js'
 import { contentItems, jobs } from '../db/schema.js'
-import { readPlan } from '../core/planImport.js'
+import { planKind, readPlan, rowScene } from '../core/planImport.js'
+import { parseCsv } from '../core/csvImport.js'
 import { slideList } from '../core/slides.js'
 import type { SlideshowSpec } from '../core/slideshowSpec.js'
 
@@ -30,7 +31,25 @@ let solei: string
 // The plan's product (section 29) and every row ticked.
 let sideStep: string
 let allRows: string[]
-const CSV = readFileSync(join(process.cwd(), 'docs', 'content', 'launch-plan-v2-posts.csv'), 'utf8')
+const RAW = readFileSync(join(process.cwd(), 'docs', 'content', 'launch-plan-v2-posts.csv'), 'utf8')
+// The file as written has 56 rows whose slides share one place with no
+// shot line of their own; the free pre-check (item 16) blocks them. The
+// tests give those slides a shot line in slide_N_image (item 11).
+const CSV = withShotLines(RAW)
+function withShotLines(text: string): string {
+  const table = parseCsv(text)
+  const header = table[0]!
+  const q = (v: string) => (/[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v)
+  const cols = [1, 2, 3, 4, 5, 6].map(i => `slide_${i}_image`)
+  const rows = readPlan(text).rows
+  const out = [[...header, ...cols]]
+  table.slice(1).filter(r => r.some(Boolean)).forEach((r, k) => {
+    const row = rows[k]!
+    const sc = rowScene(row.cells, planKind(row.cells.format))
+    out.push([...r, ...cols.map((_, i) => (sc.lines[i + 1] ? '' : `the same place, a different corner, photo ${i + 1}`))])
+  })
+  return out.map(r => r.map(q).join(',')).join('\n')
+}
 const byRow = (posts: Awaited<ReturnType<typeof planView>>['posts'], id: string) => posts.find(p => p.rowId === id)!
 
 beforeAll(async () => {
@@ -71,10 +90,11 @@ describe('the launch plan', () => {
     expect(accounts.F2).toMatchObject({ kind: 'topic', characterId: callie })
     expect(accounts.CALLIE).toMatchObject({ kind: 'character', characterId: callie })
     expect(accounts.SOLEI).toMatchObject({ kind: 'character', characterId: solei })
-    // Mock screens stay photos unless the switch is on.
-    expect(p.rows.find(r => r.rowId === 'P001')!.specials).toEqual([])
-    const drawn = await previewPlan(h.deps, h.ctx, CSV, { drawSpecials: true })
-    expect(drawn.rows.find(r => r.rowId === 'P001')!.specials.map(s => s.type)).toContain('museum_placard')
+    // A line that is mostly on-screen text becomes a drawn screen (item 10,
+    // on by default); the switch off keeps every slide a photo.
+    expect(p.rows.find(r => r.rowId === 'P001')!.specials.map(s => s.type)).toContain('museum_placard')
+    const photos = await previewPlan(h.deps, h.ctx, CSV, { drawSpecials: false })
+    expect(photos.rows.find(r => r.rowId === 'P001')!.specials).toEqual([])
   })
 
   it('a row with a problem is named and skipped; a character with no match is an error', async () => {

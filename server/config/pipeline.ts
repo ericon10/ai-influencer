@@ -157,6 +157,7 @@ const templatesSchema = z.object({
   edit: z.object({ base: z.string(), face_ref: z.string() }),
   scene_plan: z.object({ system: z.string(), prompt: z.string() }),
   scene_ideas: z.object({ system: z.string(), prompt: z.string() }),
+  punch_up_lines: z.object({ system: z.string(), prompt: z.string() }),
   video: z.object({ base: z.string(), silent: z.string(), end_frame: z.string(), continue: z.string() }),
   clone: z.object({ swap: z.string(), image: z.string(), replace: z.string(), scene_still: z.string(), recreate_still: z.string(), recreate_not_like: z.string(), recreate_element_api: z.string(), recreate_realism: z.string(), face_pass: z.string(), face_pass_refs: z.string().default(" (the face in the other images)"), recreate_keep: z.string(), outfit_keep_named: z.string(), outfit_hers_named: z.string(), motion: z.string(), motion_scene: z.string(), motion_what: z.string(), outfit_source: z.string(), outfit_hers: z.string(), target_main: z.string(), target_at: z.string() }),
   clone_traits: z.object({ system: z.string(), prompt: z.string() }),
@@ -189,6 +190,11 @@ const templatesSchema = z.object({
   slideshow_same_place: z.string(),
   slideshow_set: z.string(),
   slideshow_element: z.string(),
+  // Every slide still leaves room for its words (item 8, R1).
+  slideshow_caption_space: z.string().default('Leave clear space in the top third of the frame for a caption.'),
+  // A slide whose image line wins drops "the same place" when its outfit
+  // lock says the place changes (item 13).
+  slideshow_set_outfit: z.string().default('This photo is one of a set from the same day: the same outfit in every photo of the set.'),
   prompt_writer: z.object({
     still_system: z.string(), still_prompt: z.string(), video_system: z.string(), video_prompt: z.string(),
     end_frame: z.string(),
@@ -310,6 +316,16 @@ const contentSchema = z.object({
     draft_slides: z.number().int().min(3).max(10).default(6),
     instagram: z.object({ width: z.number().int().positive(), height: z.number().int().positive() }).default({ width: 1080, height: 1440 }),
     empty_still_models: z.array(z.string()).min(1).default(['higgsfield/gpt-image-2.5-flare', 'higgsfield/nano-banana-2.1']),
+    // A character slideshow's framings in turn, slide by slide (item 12): a
+    // framing preset and, for over the shoulder, a camera. A default; the
+    // slide card picks one.
+    framing_mix: z.array(z.object({ id: z.string(), label: z.string(), framing: z.string(), camera: z.string().optional() })).default([
+      { id: 'close', label: 'Close-up', framing: 'chest_up' },
+      { id: 'mid', label: 'Mid', framing: 'waist_up' },
+      { id: 'wide', label: 'Wide', framing: 'wide_small' },
+      { id: 'hands', label: 'Hands only', framing: 'hands_only' },
+      { id: 'over_shoulder', label: 'Over the shoulder', framing: 'waist_up', camera: 'over_shoulder' },
+    ]),
     max_variations: z.number().int().min(1).max(10).default(5),
     // A batch post stores at most 10 hooks (slideshowSpec batchHooks).
     batch_max: z.number().int().min(1).max(10).default(10),

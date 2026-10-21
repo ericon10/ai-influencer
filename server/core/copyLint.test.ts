@@ -15,7 +15,10 @@ describe('copy lint', () => {
     expect(rules(`Rent is due ${String.fromCharCode(8212)} again`)).toContain('lint-dashes')
     expect(rules(`Week 3 ${String.fromCharCode(8211)} week 9`)).toContain('lint-dashes')
     expect(rules('Every resume should sound like you')).toContain('lint-values')
-    expect(rules('Recruiters need to call back')).toContain('lint-values')
+    // Only lines aimed at "you" (owner, 2026-10-22, item 17).
+    expect(rules('You need to call them back')).toContain('lint-values')
+    expect(rules('Recruiters need to call back')).not.toContain('lint-values')
+    expect(rules('I need to sleep. Then I apply again')).not.toContain('lint-values')
     expect(rules('I thought it was a great fit')).not.toContain('lint-values')
     expect(rules('Land your dream job this week')).toContain('lint-hype')
     expect(rules('A real game-changer for applications')).toContain('lint-hype')
@@ -50,7 +53,7 @@ describe('copy lint', () => {
 
   it('a check switched off says nothing; lintPost names the slide', () => {
     expect(rules('Every resume should sound like you', 'slide', { off: ['lint-values'] })).toEqual([])
-    const hits = lintPost({ texts: ['the job app hook', 'Slide two should land'], caption: 'Caption', hashtags: [], product: false, standard: true }, { off: LINE })
+    const hits = lintPost({ texts: ['the job app hook', 'Then your boss should call'], caption: 'Caption', hashtags: [], product: false, standard: true }, { off: LINE })
     expect(hits.map(h => [h.rule, h.slide])).toEqual([['lint-values', 1]])
   })
 

@@ -251,7 +251,7 @@ export function cleanSpecial(s: SpecialSlide, brands: string[], generic: string[
 
 // ── The slides of a post ──────────────────────────────────────────────
 
-export interface SlidePos { x: number; y: number }
+export interface SlidePos { x: number; y: number; by?: 'owner' | 'auto'; scale?: number }
 export interface SlideshowSlides {
   hook: string
   slides: string[]
@@ -262,6 +262,8 @@ export interface SlideshowSlides {
   // Who a slide's photo shows, picked by the owner on the slide card
   // (section 30): the character, no one, or '' (read from the shot).
   people?: SlidePerson[]
+  asWritten?: boolean[]
+  framings?: string[]
 }
 export type SlidePerson = '' | 'character' | 'none'
 export interface Slide { index: number; text: string; stillId: string | null; special: SpecialSlide | null; shot: string; pos: SlidePos | null }
@@ -354,17 +356,18 @@ export function postCaption(caption: string, hashtags: string[], o: { ad: boolea
 // move, go or arrive as one. A repeated picture of an older post becomes
 // its own slot first.
 export type SlideEdit = { move: [number, number] } | { remove: number } | { add: number }
-export function editSlides(s: SlideshowSlides, op: SlideEdit): { hook: string; slides: string[]; stillIds: string[]; shots: string[]; specials: Array<SpecialSlide | null>; textPos: Array<SlidePos | null>; people: SlidePerson[] } {
+export function editSlides(s: SlideshowSlides, op: SlideEdit): { hook: string; slides: string[]; stillIds: string[]; shots: string[]; specials: Array<SpecialSlide | null>; textPos: Array<SlidePos | null>; people: SlidePerson[]; asWritten: boolean[]; framings: string[] } {
   const list = slideList(s)
-  let rows = list.map(x => ({ text: [s.hook, ...s.slides][x.index] ?? '', still: x.stillId ?? '', shot: s.shots?.[x.index] ?? '', special: s.specials?.[x.index] ?? null, pos: s.textPos?.[x.index] ?? null, who: s.people?.[x.index] ?? '' }))
+  let rows = list.map(x => ({ text: [s.hook, ...s.slides][x.index] ?? '', still: x.stillId ?? '', shot: s.shots?.[x.index] ?? '', special: s.specials?.[x.index] ?? null, pos: s.textPos?.[x.index] ?? null, who: s.people?.[x.index] ?? '', written: !!s.asWritten?.[x.index], framing: s.framings?.[x.index] ?? '' }))
   if ('move' in op) {
     const [from, to] = op.move
     if (from >= 0 && from < rows.length && to >= 0 && to < rows.length && from !== to) { const [r] = rows.splice(from, 1); rows.splice(to, 0, r!) }
   } else if ('remove' in op) rows = rows.filter((_, i) => i !== op.remove)
-  else rows.splice(Math.min(Math.max(0, op.add), rows.length), 0, { text: '', still: '', shot: '', special: null, pos: null, who: '' })
+  else rows.splice(Math.min(Math.max(0, op.add), rows.length), 0, { text: '', still: '', shot: '', special: null, pos: null, who: '', written: false, framing: '' })
   return {
     hook: rows[0]?.text ?? '', slides: rows.slice(1).map(r => r.text),
     stillIds: rows.map(r => r.still), shots: rows.map(r => r.shot), specials: rows.map(r => r.special), textPos: rows.map(r => r.pos), people: rows.map(r => r.who),
+    asWritten: rows.map(r => r.written), framings: rows.map(r => r.framing),
   }
 }
 

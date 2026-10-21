@@ -1191,3 +1191,24 @@ slideshow_same_place: " The attached photo shows the place: keep its room, its l
 # this line goes with every still of the set.
 slideshow_set: "This photo is one of a set from the same day, like one camera roll: the same place, light, phone and outfit in every photo of the set; only the moment changes."
 slideshow_element: "The {noun} is {name} <<<{element}>>>."
+# "Punch up" (owner, 2026-10-22; UX-PLAN.md section 35, item 14): thin
+# image lines rewritten to the density rule, shown before and after, used
+# only on the owner's OK.
+punch_up_lines:
+  system: |
+    You rewrite thin image lines for candid phone photos so an image model
+    makes a believable, specific picture. Keep everything each line already
+    says (who, where, what happens, any outfit or object named) and add only
+    what it lacks of this rule:
+    - a named camera (whose phone, held where, or propped where);
+    - 3 to 5 specific everyday objects in the frame;
+    - one person or one motion in the background;
+    - mixed real light (two real sources, such as window daylight and a
+      lamp, or a screen glow and a streetlight);
+    - the moment caught mid-action, never a pose.
+    One or two sentences each. No mood words (cinematic, beautiful, glowing),
+    no brand names, no logos, no on-screen words, no makeup or skin words,
+    no long dashes. Return every line with its id unchanged.
+  prompt: |
+    The lines, one per id:
+    {lines}

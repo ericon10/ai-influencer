@@ -16,7 +16,10 @@ import { postingSchema } from './postingDay.js'
 const id = z.string().max(60)
 const str = (max: number) => z.string().max(max).default('')
 
-export const slidePosSchema = z.object({ x: z.number().min(0).max(1), y: z.number().min(0).max(1) })
+// A slide's words: where they sit, who put them there (a drag by the owner
+// sticks; R1's auto-place moves only its own) and a size step when the
+// words had to shrink to miss a face (item 8).
+export const slidePosSchema = z.object({ x: z.number().min(0).max(1), y: z.number().min(0).max(1), by: z.enum(['owner', 'auto']).optional(), scale: z.number().min(0.5).max(1).optional() })
 
 export const specialSchema = z.object({
   type: z.enum(SPECIAL_IDS),
@@ -103,7 +106,14 @@ export const slideshowSpecSchema = z.object({
   lock: sceneLockSchema,
   // The shape the stills are made in: TikTok 9:16 or Instagram 3:4.
   made: z.enum(['tiktok', 'instagram']).default('tiktok'),
-  shots: z.array(z.string().max(300)).max(12).default([]),
+  shots: z.array(z.string().max(800)).max(12).default([]),
+  // A slide whose shot is its own image line (a plan's slide_N_image or
+  // "Slide N:"; item 13): sent as written with only the Studio's fixed
+  // lines. Kept with its slide when slides move.
+  asWritten: z.array(z.boolean()).max(12).default([]),
+  // Each character slide's framing from the mix (config slideshow
+  // framing_mix; '' takes the mix in turn; item 12).
+  framings: z.array(z.string().max(40)).max(12).default([]),
   specials: z.array(specialSchema.nullable()).max(12).default([]),
   textStyle: z.enum(TEXT_STYLE_IDS).default('classic'),
   textPos: z.array(slidePosSchema.nullable()).max(12).default([]),

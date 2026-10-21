@@ -1507,3 +1507,36 @@ which reads the product's name from the line.
   outline, spacing, shadow); Caption is 56 px on a 9:16 post, was 24.
 - **Price book**: a Soul 2.0 still is 0.12 plan credits, confirmed from
   the account's transactions of 2026-10-21.
+
+### Tier 2 built (2026-10-22)
+
+- **6**: `place`, `light`, `outfit`, `detail_1`, `detail_2` fill the lock
+  (`rowScene` in `server/core/planImport.ts`); a light naming a preset is
+  that preset, other light words stay with the place.
+- **7**: the preview's Stills on pick goes with the import (`spec.stillPath`)
+  and with Generate right after it.
+- **8**: `server/core/facePlace.ts` (placement), `server/pipeline/facePlace.ts`
+  (face boxes kept on each still's candidate, `autoPlace`), run when a slide
+  still lands, from Auto-place all (`POST /content/:id/auto-place`) and on a
+  text style change; a drag is `by: 'owner'` and sticks. Still prompts add
+  `slideshow_caption_space`. The Instagram 3:4 set reuses the 9:16 place.
+- **9**: `clipFaces` samples every 0.5 s (up to 120 frames) at export;
+  `clearTop` in `server/core/overlay.ts` keeps the caption clear inside the
+  safe zone, else under the chin; `outputs.faceBoxes` drawn on the Finish
+  preview. The editor's own captions are placed by the owner (not moved).
+- **10**: `screenFor` (mostly on-screen text) on every slideshow; the switch
+  is on by default.
+- **11**: `slide_1_image` to `slide_6_image`.
+- **12**: `slideshow.framing_mix` in `config/content.yaml` defaults (close-up,
+  mid, wide, hands only, over the shoulder; the `hands_only` framing preset),
+  per slide on the slide card (`spec.framings`).
+- **13**: `assembleSlideLine` in `server/core/scenes.ts`; `spec.asWritten` per
+  slide, set by the import for plan image lines; "As written" on the card.
+- **14**: `punch_up_lines` (route `punch_up`), `src/studio/punchUp.tsx` on the
+  Stills step and the plan preview; OK'd lines go to the import as `lines`.
+- **15**: a line naming one of the account's products becomes a Product
+  screenshot slide with no upload ("Needs your screenshot"), never priced.
+- **16**: `checkRow` blocks no outfit on character rows and slides with no
+  shot line. The launch-plan-v2 file as written has 56 such rows.
+- **17**: `NotesBadge` (tap to open); `lint-values` only in sentences aimed
+  at "you".

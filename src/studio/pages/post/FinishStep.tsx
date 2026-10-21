@@ -1,3 +1,4 @@
+import { useState, type ReactNode } from 'react'
 import { CopyPlus, Download, RotateCcw } from 'lucide-react'
 import { api, assetUrl, downloadUrl } from '../../api'
 import { AsyncButton, Img, errorMessage, scrollToField, useToast, type TodoItem } from '../../ui'
@@ -78,7 +79,7 @@ export function FinishStep({ ctx }: { ctx: PostCtx }) {
       <ExportPanel item={item} todo={todo} saving={draft.saving} flush={draft.flush} label={label} onStart={() => void ctx.advance('finish')}>
         {item.kind === 'meme' && item.status === 'ready' && o.videoAssetId && (
           <div className="st-row" style={{ gap: 14, alignItems: 'flex-start', flexWrap: 'wrap' }}>
-            <video className="st-content-result" src={assetUrl(o.videoAssetId)} controls playsInline />
+            <FaceBoxes boxes={o.faceBoxes ?? []}><video className="st-content-result" src={assetUrl(o.videoAssetId)} controls playsInline /></FaceBoxes>
             <div className="st-col" style={{ gap: 6 }}>
               <DownloadLink assetId={o.videoAssetId} name={`${name}.mp4`}>Download MP4</DownloadLink>
               {o.jsonAssetId && <DownloadLink assetId={o.jsonAssetId} name={`${name}.post.json`}>post.json</DownloadLink>}
@@ -153,5 +154,21 @@ function PostResultsCard({ ctx }: { ctx: PostCtx }) {
         <ResultsFields item={ctx.item} />
       </div>
     </section>
+  )
+}
+
+// R1 (item 9): the face boxes found across the clip, drawn over the
+// preview (a switch), so you can see the caption stays clear of them.
+function FaceBoxes({ boxes, children }: { boxes: Array<{ x: number; y: number; w: number; h: number }>; children: ReactNode }) {
+  const [show, setShow] = useState(true)
+  if (!boxes.length) return <>{children}</>
+  return (
+    <div className="st-col" style={{ gap: 6 }} data-field="face-boxes">
+      <div className="st-faceboxes">
+        {children}
+        {show && boxes.map((b, i) => <span key={i} className="st-facebox" style={{ left: `${b.x * 100}%`, top: `${b.y * 100}%`, width: `${b.w * 100}%`, height: `${b.h * 100}%` }} />)}
+      </div>
+      <label className="st-row st-hint" style={{ gap: 6, cursor: 'pointer' }}><input type="checkbox" checked={show} onChange={e => setShow(e.target.checked)} />Show face boxes ({boxes.length} across the clip): the caption stays clear of them</label>
+    </div>
   )
 }

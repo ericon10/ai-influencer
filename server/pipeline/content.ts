@@ -391,6 +391,9 @@ export interface ContentOutputs {
   zipParts?: Array<{ assetId: string; from: number; to: number }>
   // What the edit did (Phase 5), in plain words.
   editNote?: string | null
+  // R1 (item 9): the face boxes found across the clip (shares of the
+  // frame), shown on the preview; the captions stay clear of them.
+  faceBoxes?: Array<{ x: number; y: number; w: number; h: number }>
   // Exported from the OpenReel editor (G29) rather than rendered here.
   fromEditor?: boolean
   // Rendered here from the post's timeline (editor phase D, G32), and what
@@ -731,13 +734,16 @@ async function renderCut(deps: Deps, ctx: Ctx, job: JobRow, fullCut: Cut, input:
     }
     const captions: TimelineCaption[] = []
     const dropped: string[] = []
+    // R1 (item 9): faces across the whole clip, about every 0.5 s; the
+    // captions stay clear of every box (free, when the face models are on).
+    const faceBoxes = await clipFaces(deps, shots, dir)
     const baseCaptions = plan?.prepared ? plan.prepared.captions : cut.captions.map(c => ({ text: c.text ?? input.caption, start: c.start, end: c.end, position: undefined as CaptionPosition | undefined }))
     // A hook variant: the hook over the first seconds, in place of a caption there.
     const captionList = input.hook ? hookCaptions(baseCaptions, input.hook, base.hook_variants.seconds, (text, start, end) => ({ text, start, end, position: undefined as CaptionPosition | undefined })) : baseCaptions
     for (const [j, c] of captionList.entries()) {
       const text = (c.text ?? input.caption).trim()
       if (!text) continue
-      const overlay = await captionPng(text, c.position ? { ...cfg, caption: { ...cfg.caption, position: c.position } } : cfg)
+      const overlay = await captionPng(text, c.position ? { ...cfg, caption: { ...cfg.caption, position: c.position } } : cfg, { faces: faceBoxes })
       const png = join(dir, `caption${j}.png`)
       await writeFile(png, overlay.png)
       captions.push({ png, start: c.start, end: c.end })
@@ -788,7 +794,7 @@ async function renderCut(deps: Deps, ctx: Ctx, job: JobRow, fullCut: Cut, input:
     // The preset's bitrate cap: encoded again only when the file is over it.
     const capped = input.preset ? await capBitrate(out, join(dir, 'capped.mp4'), input.preset.video_kbps) : null
     const asset = await saveAsset(deps, ctx, { data: await readFile(capped ? join(dir, 'capped.mp4') : out), mime: 'video/mp4', origin: 'derived', label: input.label, sourceJobId: job.id })
-    return { assetId: asset.id, dropped, durationSec, editNote, capped: !!capped?.capped, sound: { layers: bed.layers, targetLufs: bed.targetLufs, ducked: bed.ducked } }
+    return { assetId: asset.id, dropped, durationSec, editNote, capped: !!capped?.capped, sound: { layers: bed.layers, targetLufs: bed.targetLufs, ducked: bed.ducked }, faceBoxes }
   })
 }
 
@@ -851,6 +857,32 @@ async function runEdit(deps: Deps, ctx: Ctx, a: { style: EditStyle; edit: EditSp
   }
   const r = await applyEdit({ style: a.style, video: a.picture, out: a.out, workDir: a.dir, canvas: cfg.content.canvas, params, cuts, payoff, face, beats, mask, background: a.background, variant: a.edit.variant || def.variants?.[0]?.id })
   return { ...r, note: r.note || maskNote ? `${r.note ?? ''}${maskNote}`.trim() : null, payoff, mask }
+}
+
+// Every face box across the shots, sampled about every 0.5 s (at most 120
+// frames), as shares of the frame (R1, item 9). [] when the face models are
+// off or a frame cannot be read.
+export async function clipFaces(deps: Deps, shots: Array<{ path: string; in: number; out: number | null }>, dir: string): Promise<Array<{ x: number; y: number; w: number; h: number }>> {
+  try {
+    if (!(await deps.faces.status()).available) return []
+    const sharp = (await import('sharp')).default
+    const out: Array<{ x: number; y: number; w: number; h: number }> = []
+    let n = 0
+    for (const [k, sh] of shots.entries()) {
+      const end = sh.out ?? (await probeFile(sh.path)).durationSec ?? 0
+      for (let t = sh.in; t < end && n < 120; t += 0.5, n++) {
+        const png = join(dir, `faces-${k}-${Math.round(t * 1000)}.png`)
+        try {
+          await extractFrameAt(sh.path, t, png)
+          const img = await readFile(png)
+          const meta = await sharp(img).metadata()
+          if (!meta.width || !meta.height) continue
+          for (const f of await deps.faces.detect(img)) out.push({ x: f.box.x / meta.width, y: f.box.y / meta.height, w: f.box.w / meta.width, h: f.box.h / meta.height })
+        } catch { /* a frame that cannot be read is skipped */ }
+      }
+    }
+    return out
+  } catch { return [] }
 }
 
 // Where her face is in a frame, as a share of the frame; null when the face
@@ -1042,7 +1074,7 @@ export async function exportPostNow(deps: Deps, ctx: Ctx, job: JobRow, row: Cont
       })
       const json = await videoPostJson(deps, ctx, row, { file: `${name}.mp4`, assetId: v.assetId, durationSec: v.durationSec ?? null })
       const jsonAsset = await saveAsset(deps, ctx, { data: Buffer.from(`${JSON.stringify(json, null, 2)}\n`), mime: 'application/json', origin: 'derived', label: `Video post ${name} (post.json)`, sourceJobId: job.id })
-      const outputs: ContentOutputs = { videoAssetId: v.assetId, jsonAssetId: jsonAsset.id, dropped: v.dropped, durationSec: v.durationSec, sound: v.sound, editNote: v.editNote, renderedAt: deps.clock.now().toISOString(), preset: preset.id, ...(v.capped ? { capped: true } : {}), ...(timeline ? { fromTimeline: true } : {}), ...(notes.length ? { editorOnly: notes } : {}) }
+      const outputs: ContentOutputs = { videoAssetId: v.assetId, jsonAssetId: jsonAsset.id, dropped: v.dropped, faceBoxes: (v.faceBoxes ?? []).slice(0, 400), durationSec: v.durationSec, sound: v.sound, editNote: v.editNote, renderedAt: deps.clock.now().toISOString(), preset: preset.id, ...(v.capped ? { capped: true } : {}), ...(timeline ? { fromTimeline: true } : {}), ...(notes.length ? { editorOnly: notes } : {}) }
       await setOutputs(deps, itemId, outputs, 'ready')
       return outputs
     }
@@ -1442,6 +1474,7 @@ export async function contentView(deps: Deps, ctx: Ctx) {
         slides: cfg.slideshow.slides, maxStills: cfg.slideshow.max_stills, draftSlides: cfg.slideshow.draft_slides, hashtagsMax: cfg.slideshow.hashtags[1],
         maxVariations: cfg.slideshow.max_variations, batchMax: cfg.slideshow.batch_max, hooks: cfg.slideshow.hooks, instagram: cfg.slideshow.instagram,
         brandNames: cfg.slideshow.brand_names, genericNames: cfg.slideshow.generic_names,
+        framingMix: cfg.slideshow.framing_mix.map(m => ({ id: m.id, label: m.label })),
       },
       // The language lint (section 28): word lists and switched-off checks.
       lint,

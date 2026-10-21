@@ -36,6 +36,7 @@ import { buildSlideshowBatch, buildSlideshowCaption, buildSlideshowDraft, buildS
 import { PATTERN_IDS } from '../core/slides.js'
 import { EFFECT_CODES, STRUCTURE_CODES } from '../core/playbook.js'
 import { buildPlanGenerate, remakeStarted } from './planImport.js'
+import { buildPunchUp } from './punchUp.js'
 import { buildFacelessStill, buildFacelessVideo } from './faceless.js'
 import { saferPrompt } from '../core/wording.js'
 
@@ -158,6 +159,8 @@ export const actionSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('plan_generate'), postIds: z.array(z.string().max(60)).min(1).max(100), path: z.enum(['account', 'api']).optional(), stillModel: z.string().max(80).nullable().optional(), remake: z.boolean().optional() }),
   z.object({ type: z.literal('slideshow_stills'), contentId: z.string().max(60), slides: z.array(z.number().int().min(0).max(11)).max(12).optional(), path: z.enum(['account', 'api']).optional(), stillModel: z.string().max(80).optional() }),
   z.object({ type: z.literal('slideshow_caption'), contentId: z.string().max(60) }),
+  // Punch up (section 35, item 14): a post's thin image lines, or a plan's.
+  z.object({ type: z.literal('punch_up_lines'), contentId: z.string().max(60).optional(), lines: z.array(z.object({ id: z.string().max(40), text: z.string().max(800) })).max(400).optional() }),
   // A faceless post (UX-PLAN.md section 35, item 4): its still and its video.
   z.object({ type: z.literal('faceless_still'), contentId: z.string().max(60), placeId: z.string().max(60).nullable().optional(), line: z.string().max(800).optional(), path: z.enum(['account', 'api']).nullable().optional(), model: z.string().max(80).nullable().optional() }),
   z.object({ type: z.literal('faceless_video'), contentId: z.string().max(60), model: z.string().max(80).nullable().optional(), prompt: z.string().max(2000).optional(), durationSec: z.number().int().min(3).max(15).optional() }),
@@ -271,6 +274,7 @@ export async function buildAction(deps: Deps, ctx: Ctx, action: StudioAction): P
   if (action.type === 'faceless_still') return buildFacelessStill(deps, ctx, action)
   if (action.type === 'faceless_video') return buildFacelessVideo(deps, ctx, action)
   if (action.type === 'slideshow_caption') return buildSlideshowCaption(deps, ctx, action.contentId)
+  if (action.type === 'punch_up_lines') return buildPunchUp(deps, ctx, action)
   if (action.type === 'slideshow_variations') return buildSlideshowVariations(deps, ctx, action)
   if (action.type === 'slideshow_batch') return buildSlideshowBatch(deps, ctx, action)
   const row = await getCharacter(deps, ctx, action.characterId)

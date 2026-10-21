@@ -117,6 +117,8 @@ framings:
   - { id: knees_up, label: "Knees up", text: "framed from the knees up", skin: natural }
   - { id: full_body, label: "Full body", text: "full-body framing with a little space around {obj}", skin: none }
   - { id: wide_small, label: "Wide, small in frame", text: "wide shot, {subj} is small in the frame", identity: skip, skin: none }
+  # A slideshow's hands-only slide (item 12, 2026-10-22): the face is out of shot.
+  - { id: hands_only, label: "Hands only", text: "close on {poss} hands and what they hold, {poss} face out of the frame", identity: skip, skin: none }
 
 lights:
   # The owner's own words describe the light: no light line is added.

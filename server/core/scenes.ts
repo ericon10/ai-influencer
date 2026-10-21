@@ -410,6 +410,23 @@ export function assembleAsWritten(t: TemplatesConfig, sc: ScenesConfig, f: Scene
   return finishPrompt(normalizePrompt(body), 'scene', ch, { ...o, makeup: f.makeup, skin: skinFor(sc, f.framing) })
 }
 
+// A slide's own image line wins (owner, 2026-10-22; UX-PLAN.md section 35,
+// item 13): the line as written with only the Studio's fixed lines, the
+// reference line, the 21+ line, the outfit lock (and its hair), the mark
+// line and REALISM. No generic background, expression, camera or hair
+// line; the set line only when given (the caller drops "the same place"
+// when the outfit lock says the place changes).
+export function assembleSlideLine(t: TemplatesConfig, sc: ScenesConfig, views: ViewsConfig, f: SceneFields, ch: SceneCharacter, mode: ReferenceMode, text: string, o: BuildOptions & { outfit?: string; hair?: string; addendum?: string; rules?: SceneRuleOptions } = {}): string {
+  const p = sceneParts(t, sc, views, f, ch, mode, o)
+  const reference = mode === 'refs' ? (o.rules?.referenceLine === false ? '' : fill(t.scene.reference.as_written, p.pv)) : p.reference
+  const outfit = sentence(o.outfit ?? '')
+  const wearing = outfit ? wearingLine(t, { ...f, outfit, footwear: '', jewelry: '' }, { ...p, override: mode === 'refs' && !!outfit, dropSheet: false }, { jewelry: false, override: true }) : ''
+  const hair = sentence(o.hair ?? '')
+  const body = [reference, p.adult, `${capitalize(cleanWritten(text)).replace(/[.\s]+$/, '')}.`, wearing, hair ? `Hair: ${hair}.` : '', p.marks, o.addendum ?? ''].filter(Boolean).join(' ')
+  const done = finishPrompt(normalizePrompt(body), 'scene', ch, { ...o, makeup: f.makeup, skin: skinFor(sc, f.framing) })
+  return done.replace(/\s*Ordinary background, not a professional shoot\./, '')
+}
+
 // What the owner's words already say about the shot (shotParse.ts), as
 // scene fields: layered over the defaults and under the owner's own
 // choices, so a selfie in a black tank stays one.
