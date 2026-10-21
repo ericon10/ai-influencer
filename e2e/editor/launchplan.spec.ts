@@ -198,7 +198,8 @@ test('Write 10 with Claude on a SideStep post, to THE STANDARD: a moment, a code
   await expect(first).toContainText(/Alt:/)
   await expect(first).toContainText(/Pain [78]\/10/)
   // Every hook shown reads to THE STANDARD: no language notes on the cards.
-  await expect(page.locator('[data-field="hook-ideas"] [data-field="lint"]')).toHaveCount(0)
+  // (The line lint of every post may still note a missing emotion, 2026-10-22.)
+  for (const note of await page.locator('[data-field="hook-ideas"] [data-field="lint"]').all()) await expect(note).toHaveAttribute('title', /^(?:Opens on the setup|No clear emotion)[^\n]*(?:\n(?:Opens on the setup|No clear emotion)[^\n]*)?$/)
   await snap(page, info, 'the playbook hook cards, reviewed')
 
   // The language notes as you type (free, warnings only).

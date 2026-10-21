@@ -116,6 +116,22 @@ bottom of the list they belong to.
   it yet; clips uploaded before today have no first-frame picture (the
   old video tile).
 
+### From the Oct 22 build (ideas only, not built)
+
+- The editor's Text presets are sized for 1080p landscape (Caption is 24 px,
+  a few pixels tall on a 9:16 phone frame): scale them to the project's
+  height so a new caption is readable at once.
+- Faceless voiceovers from the owner's own recordings or an ElevenLabs
+  voice (lines read in Doug's voice card), since quote sites can't be used.
+- A Clip.Cafe or Find Scene search for reference only (paid API, no audio
+  in the export), if the owner clears the rights question.
+- A faceless place bank picker with thumbnails: one free still per place,
+  kept as its set plate.
+- Remake a single slide from the Launch plan list (today Remake makes every
+  photo slide of a ticked post).
+- The import door could also take a ZIP of a character file and its REF
+  folder (today the Import dialog on Characters).
+
 ### Asked of the owner
 
 - Instagram reels for older job seekers in Facebook-comment voice (the

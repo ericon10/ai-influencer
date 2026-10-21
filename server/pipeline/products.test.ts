@@ -177,7 +177,8 @@ describe('products', () => {
     expect(ssPrev.product).toMatchObject({ id: sideStep, notes: true })
     expect(ssPrev.rows.find(r => r.rowId === 'P001')!.lint.join(' ')).toMatch(/No job word|Opens with "Exhibit/)
     const plain = await previewPlan(h.deps, h.ctx, CSV, { productId: null })
-    expect(plain.rows.flatMap(r => r.lint).every(l => /long dash/.test(l))).toBe(true)
+    // No product: the long dash check, plus the line lint every post gets (2026-10-22).
+    expect(plain.rows.flatMap(r => r.lint).every(l => /long dash|Opens on the setup|No clear emotion/.test(l))).toBe(true)
     expect(plain.rows.flatMap(r => r.warnings).join(' ')).not.toMatch(/same structure/)
     // Only the ticked rows.
     const r = await importPlan(h.deps, h.ctx, CSV, { productId: sideStep, rows: ['P001', 'P005', 'P016'] })

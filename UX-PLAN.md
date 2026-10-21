@@ -1432,3 +1432,37 @@ on kept, captions off faces on stills and video, drawn screens from text
 lines, slide image columns, mixed framing, the slide's image line wins,
 Punch up, SideStep lines need a screenshot, the free pre-check, the Notes
 badge and the "need to" lint). Each is planned here before it is built.
+
+### Built in this run (2026-10-22)
+
+- **Item 1**: built. The fork's renderer centers every text block on its
+  position (Caption and Lower Third were drawn a block above their box);
+  a second click, a typed letter or a double-click edits in place; the edit
+  box grows with its lines. Fork commit 1032533 pinned in
+  `editor/openreel.json`.
+- **Item 2**: built (2a to 2g). Posts and characters are Trash items now
+  (`trash.ts` kinds `post` and `character`); Select all with shift-click on
+  the Launch plan (rows and posts), Posts home (Select), Library, Trash and
+  the batch review; Import on Posts home (`src/studio/importDoor.tsx`,
+  `csvKind`).
+- **Item 3**: 3a (the Import dialog already took the file and REF-00 to
+  REF-11 in one go and lands complete), 3b, 3c and 3d built. **3e not
+  built**: REF-12 and REF-13 need a waist-up framing in the sheet graph,
+  its prompts, aspect and mark checks, and Element creation from several
+  images is not in the Studio yet (Elements are made on Higgsfield and
+  named in the file). Planned for its own session.
+- **Item 4**: 4a, 4b, 4c, 4d, 4e, 4f, 4g, 4h (an account already links to
+  one character on the Accounts card; faceless ones are listed) and 4j for
+  faceless posts built. **4i stopped** as the owner asked: PlayPhrase.me
+  and GetYarn.io forbid automated access; Clip.Cafe and Find Scene sell an
+  API, but none of the four grants the right to put the clips' audio in
+  posted videos. The Sound drawer keeps the row's search words and says
+  so; voiceover clips are uploaded to Library > Sounds. **4j for person
+  characters not built** (the recipe is a switch on faceless posts).
+- **Item 5**: built (`lint-hit-first`, `lint-emotion`, word lists in
+  `config/content.yaml` copy_lint).
+- **Rule R3**: the video writer, its director's pass, the FORMAT line and
+  the default directions no longer limit shots; the "Caught you" recipe
+  (a scene whose moment is Caught you) keeps them. Multi Shot is not
+  offered yet: no model in `config/models.yaml` documents it.
+- **Tier 2**: not started in this run.
