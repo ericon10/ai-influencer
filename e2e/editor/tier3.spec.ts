@@ -100,7 +100,7 @@ async function recreateStills(page: Page, info: TestInfo, phone: boolean) {
   // Item 22: every priced button stays inside its card, tile or choice.
   const panel = page.locator('.st-clone')
   await pricesIn(page, panel)
-  await page.locator('.st-grid.scenes').first().scrollIntoViewIfNeeded()
+  await page.locator('[data-field="recreate-stills"] .st-grid.scenes').first().scrollIntoViewIfNeeded()
   await snap(page, info, phone ? 'phone: recreate stills row' : 'recreate stills row')
   expect(await spills(page)).toEqual([])
   await page.unrouteAll({ behavior: 'ignoreErrors' })

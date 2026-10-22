@@ -57,7 +57,8 @@ async function stillsGrid(page: Page, info: TestInfo, phone: boolean) {
   const line = page.locator('[data-field="failure-line"]').filter({ hasText: 'blocked by the filter' })
   await expect(line).toHaveText(/4 blocked by the filter, refunded; 2 face passes not run\. Nothing charged\./)
   // The run just started keeps its failure as a tile; the earlier six are folded.
-  const grid = page.locator('.st-grid.scenes').first()
+  // The Recreate stills grid (the Stills step has its own grid, which can render first).
+  const grid = page.locator('[data-field="recreate-stills"] .st-grid.scenes').first()
   await expect(grid.locator('.st-tile')).toHaveCount(2)
   // A refusal names the likely trigger words and offers the safer retry.
   const bad = grid.locator('.st-tile').filter({ hasText: 'Likely trigger words' })
