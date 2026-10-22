@@ -141,7 +141,9 @@ test('every path opens the editor with the take: Recreate review, a finished pos
   await page.getByRole('button', { name: /^Export MP4/ }).click()
   const row = page.locator('.st-run.live').first()
   await expect(row).toBeVisible({ timeout: 30_000 })
-  expect(await row.evaluate(e => getComputedStyle(e).animationName)).toBe('st-run-pulse')
+  // Asserted on the locator, not a one-off evaluate: the row re-renders as
+  // the jobs poll ticks, and a detached node reads an empty animation name.
+  await expect(row).toHaveCSS('animation-name', 'st-run-pulse', { timeout: 10_000 })
   await row.scrollIntoViewIfNeeded({ timeout: 3000 }).catch(() => undefined)
   await snap(page, info, 'the run row pulses while it renders')
   await expect(page.getByRole('button', { name: /Export MP4 again/ })).toBeVisible({ timeout: 180_000 })
