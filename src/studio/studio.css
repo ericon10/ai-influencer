@@ -1649,3 +1649,12 @@ a.st-chip.st-packed:hover { border-color: var(--st-text-3); }
 /* R1 (item 9): face boxes over a video preview. */
 .st-faceboxes { position: relative; width: fit-content; max-width: 100%; }
 .st-facebox { position: absolute; border: 2px dashed rgba(255, 196, 0, 0.9); border-radius: 6px; pointer-events: none; box-sizing: border-box; }
+
+/* The line bank (UX-PLAN section 36, item 29). */
+.st-bankline { display: flex; flex-direction: column; gap: 8px; padding: 12px; border: 1px solid var(--st-line); border-radius: 10px; background: var(--st-surface-2); min-width: 0; }
+.st-bankline.kept { border-color: var(--st-ok); }
+.st-bankline.rejected { opacity: 0.6; }
+.st-bankline-text { font-size: 17px; font-weight: 700; line-height: 1.3; overflow-wrap: anywhere; }
+.st-bankline-source { margin: 0; padding: 6px 10px; border-left: 3px solid var(--st-line-2); font-size: 13px; color: var(--st-text-2); overflow-wrap: anywhere; }
+.st-bankline .st-badge { display: inline-flex; align-items: center; gap: 4px; max-width: 100%; overflow-wrap: anywhere; white-space: normal; }
+.st-weeklist { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; font-size: 13px; overflow-wrap: anywhere; }

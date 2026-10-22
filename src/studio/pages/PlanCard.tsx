@@ -14,6 +14,7 @@ import type { CharacterSummary, PlanImportResult, PlanPostView, PlanPreview, Sti
 import { StillPaths } from './post/slideshow/StillPaths'
 import { SelectAllBox, SelectBox, SelectionCount, useSelection } from '../select'
 import { useIncoming, type Incoming } from '../importDoor'
+import { WriteTheWeek } from './post/LineBank'
 import { FacelessImport } from './FacelessImport'
 
 // Posts home > Launch plan (owner, 2026-10-16; UX-PLAN.md section 28): the
@@ -85,6 +86,7 @@ export function PlanCard({ characters }: { characters: CharacterSummary[] }) {
         <div className="st-card-body st-col" style={{ gap: 14 }}>
           {incoming?.kind === 'faceless' && <FacelessImport key={incoming.at} incoming={incoming} onImported={() => void qc.invalidateQueries({ queryKey: ['plan'] })} />}
           {incoming?.kind !== 'faceless' && <ImportPlan key={incoming?.at ?? 0} incoming={incoming} characters={characters} hasPosts={posts.length > 0} onImported={() => void qc.invalidateQueries({ queryKey: ['plan'] })} />}
+          {posts.length > 0 && <WriteTheWeek accountTags={[...new Set(posts.map(p => p.account).filter(Boolean))]} />}
           {posts.length > 0 && <PlanPosts posts={posts} />}
         </div>
       )}

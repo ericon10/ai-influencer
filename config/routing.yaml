@@ -16,15 +16,15 @@ tasks:
   qa_perception: { model: anthropic/claude-sonnet-5-5, effort: medium, label: Check this, hint: The on-demand Claude check of a still or a take. }
   prompt_writer: { model: anthropic/claude-sonnet-5-5, effort: medium, label: Prompt writer, hint: Turns the scene details into the final still or video prompt., rule: scene-prompt-writer }
   content_writer: { model: anthropic/claude-sonnet-5-5, effort: low, label: Slides and captions, hint: Writes slideshow text and batch captions for the content builder. }
-  # The line bank (UX-PLAN section 36, item 29): Haiku tags the comments,
-  # Sonnet writes the lines, a separate Sonnet call reviews them, and Sonnet
-  # puts a line in a character's voice.
-  line_tagger:   { model: anthropic/claude-haiku-5-5, effort: low, label: Line bank tags, hint: Tags each kept comment (emotion, topic, pain point, who it fits, format, fight flag). }
+  # The line bank (UX-PLAN section 36, item 29): one call tags the
+  # comments, one writes the lines, a separate call reviews them, and one
+  # puts a line in a character's voice (Sonnet, like every Claude task).
+  line_tagger:   { model: anthropic/claude-sonnet-5-5, effort: low, label: Line bank tags, hint: Tags each kept comment (emotion, topic, pain point, who it fits, format, fight flag). }
   line_writer:   { model: anthropic/claude-sonnet-5-5, effort: medium, label: Line bank writer, hint: Turns each comment into an on-screen line. }
   line_reviewer: { model: anthropic/claude-sonnet-5-5, effort: low, label: Line bank reviewer, hint: Scores each line; under 8 never shows. }
   line_voice:    { model: anthropic/claude-sonnet-5-5, effort: low, label: Line in a voice, hint: Puts a bank line in the character's voice and checks it against their facts. }
 # Models a Claude task can be switched to in Settings.
-claude_choices: [anthropic/claude-sonnet-5-5, anthropic/claude-opus-5-5, anthropic/claude-haiku-5-5]
+claude_choices: [anthropic/claude-sonnet-5-5, anthropic/claude-opus-5-5]
 mock:
   image: mock/image
   video: mock/video

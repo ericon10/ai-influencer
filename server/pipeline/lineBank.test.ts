@@ -66,7 +66,7 @@ describe('the free first pass', () => {
   it('who tells a line, and the reviewer\'s bar', () => {
     expect(cleanLine('"laid off on a call"')).toBe('laid off on a call')
     expect(cleanLine("'we regret to inform you' for an app from a YEAR ago")).toBe("'we regret to inform you' for an app from a YEAR ago")
-    expect(cleanLine('6 rounds — then nothing')).toBe('6 rounds, then nothing')
+    expect(cleanLine('6 rounds \u2014 then nothing')).toBe('6 rounds, then nothing')
     expect(stanceFrom('23, laid off from a marketing job in March', cfg)).toBe('first')
     expect(stanceFrom('a nurse who roasts her friends\' job hunts', cfg)).toBe('secondhand')
     expect(passes({ gut: 8, specific: 9, real: 8, setup: false, meh: false, note: '' }, 8)).toBe(true)

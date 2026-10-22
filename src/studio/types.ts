@@ -230,6 +230,9 @@ export type StudioAction =
   | { type: 'recreate_batch'; contentId: string; step: 'stills' | 'face' | 'video'; facePass?: boolean }
   | { type: 'mass_fetch'; contentId: string }
   | { type: 'mass_recreate'; contentId: string; step: 'stills' | 'video' }
+  | { type: 'bank_run'; importId?: string | null; limit?: number | null }
+  | { type: 'bank_use'; lineId: string; contentId: string }
+  | { type: 'bank_week'; accountTag: string }
   | { type: 'clone_still'; contentId: string; characterId: string; outfit?: 'source' | 'hers'; look?: string; takes?: number; facePass?: boolean; stillModel?: string }
   | { type: 'clone_face'; contentId: string; characterId: string; candidateId: string; takes?: number }
   | { type: 'clone_traits'; contentId: string; characterId: string }
@@ -652,3 +655,9 @@ export interface MassView {
   total: { stills: { micros: number; credits: number | null; rows: number }; video: { micros: number; credits: number | null; rows: number }; ticked: number }
   toFetch: number
 }
+
+// The line bank (UX-PLAN.md section 36, item 29).
+export type { BankImport } from '../../server/pipeline/lineBank'
+export type BankView = Awaited<ReturnType<typeof import('../../server/pipeline/lineBank').bankView>>
+export type BankLineView = BankView['lines'][number]
+export type BankWeek = Awaited<ReturnType<typeof import('../../server/pipeline/lineBank').weekPlan>>

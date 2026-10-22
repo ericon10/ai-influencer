@@ -209,7 +209,7 @@ export function cleanLine(v: unknown): string {
   // at the start keeps both of its marks).
   let s = clean(v, 200)
   while (/^["“'].*["”']$/.test(s) && s.length > 1 && !/^["“'][^"“”']*["”'][^"“”']/.test(s)) s = s.slice(1, -1).trim()
-  return s.replace(/\s*[—–]\s*/g, ', ').trim()
+  return s.replace(/\s*[\u2014\u2013]\s*/g, ', ').trim()
 }
 
 // ── The calls' JSON schemas ───────────────────────────────────────────

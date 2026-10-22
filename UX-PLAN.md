@@ -1629,7 +1629,7 @@ a page of its own.
 |---|---|---|
 | 29a | Import | The drawer's Import: an Apify comment scrape as a CSV file or a Google Sheet link (columns comment, comment_likes, replies, video_account, video_views, video_url; any order, extra columns ignored) plus, optionally, the same run's videos CSV (url, text: the captions), joined to each comment by its video's URL. A private Sheet cannot be read by link: the drawer says "Share it as Anyone with the link, or download the tab as CSV". Each import picks the product whose writing rules apply (the post's product, else the plan's) |
 | 29b | The free first pass | Code only, on the import: duplicates (same words after case, spaces, emoji and punctuation), not English (another script, or no common English words), about the video itself (the sound, her outfit, the edit, "who's here", tags of friends only), 0 or 1 likes, under 4 words, and off the job search (no word from the topic list in `config/content.yaml`). Kept comments go in the bank; the drop counts by reason show on the import |
-| 29c | Tags (priced) | Batches of 40 kept comments, Claude Haiku (route `line_tagger`): emotion (infuriated, angry, sad, crying, frustrated), topic (layoff, ghosting, interviews, applications, money, family, burnout, entry level, AI, bosses, quitting, small wins), the ICP pain point from the product's writing rules (`pains` of its standard; "none" for a product without), who it fits (unemployed first person, secondhand for the girls, both), format fit (finished damage, meme setup, question, list), and a fight flag (race, religion, politics) with a reason. Flagged lines never go into Write the week |
+| 29c | Tags (priced) | Batches of 30 kept comments, Claude Sonnet like every Claude task (route `line_tagger`): emotion (infuriated, angry, sad, crying, frustrated), topic (layoff, ghosting, interviews, applications, money, family, burnout, entry level, AI, bosses, quitting, small wins), the ICP pain point from the product's writing rules (`pains` of its standard; "none" for a product without), who it fits (unemployed first person, secondhand for the girls, both), format fit (finished damage, meme setup, question, list), and a fight flag (race, religion, politics) with a reason. Flagged lines never go into Write the week |
 | 29d | Writer and reviewer (priced) | Each tag batch then goes to the writer (Sonnet, route `line_writer`): one on-screen line per comment in Gen Z vernacular, the comment's own truth and its specific detail, starting at 70 (the first words are the hit, no setup), readable in about 2 seconds (12 words or fewer). A separate reviewer call (route `line_reviewer`) scores each line 1 to 10 on gut punch, specificity and "would a real person post this", and marks setup or meh. A line passes when all three are 8 or more and it is neither; rejected lines never show (only their count). Tag, write and review are one price, one click, chained per batch |
 | 29e | The bank view | Filters: character (lines that fit how the character speaks), emotion, topic, pain point; sorted by the source comment's likes; each line shows its source comment, its likes and its three scores; flagged lines carry their reason |
 | 29f | Use | On a post, Pick from the bank lists lines that fit the post's character and are not used on another account. Use this line (priced, one small Sonnet call) rewrites it in the character's voice card and against their facts (the voice card's who and point of view): a line that contradicts them is edited to fit, or skipped with the reason. The result is placed: a slideshow's hook, a video post's caption, a batch's next caption. Write the week (Launch plan card, per account, priced): the account's posts dated in the next 7 days without a bank line each get the best unused fitting line, rewritten in one call. A line used on one account never shows for another |
@@ -1641,3 +1641,35 @@ reader, the first pass, the fit rules, the schemas), the jobs and storage
 in `server/pipeline/lineBank.ts` (a `bank_lines` table and a
 `line_bank_imports` setting), the drawer in
 `src/studio/pages/post/LineBank.tsx`.
+
+### Tier 5 built (2026-10-22)
+
+- **29a, 29b**: `readComments`, `readCaptions`, `withCaptions` and
+  `firstPass` in `server/core/lineBank.ts`; `importBank` in
+  `server/pipeline/lineBank.ts` (`POST /line-bank/import`, free); the
+  `bank_lines` table (migration 0018); imports kept in the
+  `line_bank_imports` setting with their drop counts. The word lists are
+  `line_bank` in `config/content.yaml`.
+- **29c, 29d**: the `bank_run` action: per batch of 30, `bank_tag:`
+  (route `line_tagger`), `bank_write:` and `bank_review:` (routes
+  `line_writer` and `line_reviewer`; all on Sonnet, switchable to Opus), chained with `parentIndex`
+  and held in one quote; templates `line_bank_tags`, `line_bank_writer`,
+  `line_bank_reviewer` in `config/templates.yaml`. The writer is told its
+  own rules win over the product's hook standard (a 6 s clip has no later
+  slides). Pass: all three scores at `pass_score` (8) or more, not setup,
+  not meh.
+- **29e, 29f**: `bankView` (`GET /line-bank`), the stance per character
+  (`line_bank_stances`, from the voice card's who and point of view),
+  `bank_use` and `bank_week` (route `line_voice`, template
+  `line_bank_voice`), `weekPlan` (`GET /line-bank/week`); the drawer
+  `src/studio/pages/post/LineBank.tsx`: Pick from the bank in a
+  slideshow's Idea step and in the Caption step of a video post or batch,
+  Write the week on the Launch plan card.
+- **29g**: `setLineCall` (`PUT /line-bank/lines/:id/call`), the latest
+  calls as examples in the writer and the reviewer; Results' Source truth
+  (`truth` in `server/core/results.ts`, from `sourcesFor`).
+- **29h**: on the owner's sheet: 5,350 comments with words (25 empty),
+  2,208 kept by the first pass (1,636 with 0 or 1 likes, 1,129 off the
+  job search, 251 too short, 96 duplicates, 20 about the video, 10 not
+  English); the full run quotes $5.82 (74 batches). The paid run itself
+  waits on an Anthropic key in Settings and the production worker.

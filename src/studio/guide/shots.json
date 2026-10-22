@@ -3372,5 +3372,97 @@
         "label": "Everything in one zip, with the caption"
       }
     ]
+  },
+  "line-bank": {
+    "w": 759,
+    "h": 449,
+    "spots": [
+      {
+        "n": 1,
+        "x": 2.6,
+        "y": 5.3,
+        "w": 94.7,
+        "h": 4,
+        "label": "What passed; what the reviewer rejected never shows"
+      },
+      {
+        "n": 2,
+        "x": 2.6,
+        "y": 12.5,
+        "w": 94.7,
+        "h": 17.6,
+        "label": "Filter by character (how they tell lines), emotion, topic and pain point"
+      },
+      {
+        "n": 3,
+        "x": 4.3,
+        "y": 49,
+        "w": 91.3,
+        "h": 4.9,
+        "label": "The line, starting at 70"
+      },
+      {
+        "n": 4,
+        "x": 4.3,
+        "y": 55.7,
+        "w": 91.3,
+        "h": 11.4,
+        "label": "Its source comment and likes"
+      },
+      {
+        "n": 5,
+        "x": 4.3,
+        "y": 75.5,
+        "w": 8.1,
+        "h": 5.3,
+        "label": "Keep or Reject: the writer and the reviewer learn from it"
+      },
+      {
+        "n": 6,
+        "x": 4.3,
+        "y": 88,
+        "w": 26.1,
+        "h": 6.7,
+        "label": "Use this line: in her voice, placed on slide 1"
+      }
+    ]
+  },
+  "write-the-week": {
+    "w": 1082,
+    "h": 184,
+    "spots": [
+      {
+        "n": 1,
+        "x": 81.2,
+        "y": 7.1,
+        "w": 17.6,
+        "h": 15.2,
+        "label": "How the line bank works"
+      },
+      {
+        "n": 2,
+        "x": 1.2,
+        "y": 26.6,
+        "w": 17,
+        "h": 17.9,
+        "label": "The account"
+      },
+      {
+        "n": 3,
+        "x": 1.2,
+        "y": 48.9,
+        "w": 97.6,
+        "h": 23.4,
+        "label": "Its posts dated in the next 7 days, each with the line it gets"
+      },
+      {
+        "n": 4,
+        "x": 1.2,
+        "y": 76.6,
+        "w": 24.6,
+        "h": 16.3,
+        "label": "One price: every line in its character's voice, placed"
+      }
+    ]
   }
 }

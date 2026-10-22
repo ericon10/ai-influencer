@@ -10,6 +10,7 @@ import type { PostCtx } from './ctx'
 import { SlideshowText } from './slideshow/SlideshowText'
 import { TEXT_STYLES, postCaption, slideList } from '../../../../server/core/slides'
 import { LintNote, useLint } from '../../lint'
+import { LineBankButton } from './LineBank'
 
 // The Text step: the caption of a video post, the hook and slides of a
 // slideshow (Claude writes them, priced), or the captions of a batch (pasted,
@@ -62,7 +63,7 @@ function Caption({ ctx }: { ctx: PostCtx }) {
           </div>
         ) : (
           <Field id="post-caption" group label="Words (optional)" hint={`Leave it empty for a video with no caption; you can add text in the editor. In the upper third, kept clear of her mouth and hands and of TikTok's buttons. Up to ${data.options.caption.maxChars} characters; emoji work.`}
-            extra={<button type="button" className="st-btn sm ghost" onClick={() => setHooks(true)}><Sparkles size={13} />Pick a hook</button>}>
+            extra={<span className="st-row" style={{ gap: 6, flexWrap: 'wrap' }}><button type="button" className="st-btn sm ghost" onClick={() => setHooks(true)}><Sparkles size={13} />Pick a hook</button><LineBankButton className="st-btn sm ghost" post={{ id: item.id, kind: item.kind, characterId: item.characterId, accountTag: item.accountTag }} /></span>}>
             <textarea className="st-textarea" rows={3} aria-label="Caption" maxLength={data.options.caption.maxChars} value={spec.caption ?? ''} onChange={e => draft.setSpec({ caption: e.target.value })} placeholder="e.g. me when the code finally works and I have no idea why 💀" />
             <LintNote hits={lint(spec.caption ?? '', 'hook', { product })} field="hook-lint" />
           </Field>
@@ -110,7 +111,10 @@ function Captions({ ctx }: { ctx: PostCtx }) {
             onStarted={() => void ctx.advance('text')}
           />
         </div>
-        <span className="st-hint">About "{topic || 'your idea'}". Or paste your own below.</span>
+        <div className="st-row" style={{ gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+          <span className="st-hint">About "{topic || 'your idea'}". Or paste your own below, or add one from the bank.</span>
+          <LineBankButton className="st-btn sm ghost" post={{ id: item.id, kind: item.kind, characterId: item.characterId, accountTag: item.accountTag }} />
+        </div>
         <Field id="batch-captions" label={`Captions, one per line, optional (${captions.length}${captions.length > max ? `, the first ${max} are used` : ''})`} hint={spec.captionOff ? 'No caption is drawn on the videos. Lines here still count them; with none, How many does.' : 'Each line becomes one video. With none, How many counts the videos and they have no caption.'}>
           <textarea className="st-textarea" rows={8} value={text}
             onFocus={() => { editing.current = true }}

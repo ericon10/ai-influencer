@@ -70,10 +70,14 @@ async function lineBank(page: Page, info: TestInfo, phone: boolean) {
   const postId = await slideshow(page, tag)
   await press(phone, page.getByRole('button', { name: 'Pick from the bank' }))
   const drawer = page.locator('.st-drawer')
-  await expect(drawer.getByText('Line bank')).toBeVisible()
+  await expect(drawer.locator('.st-drawer-head .st-titlerow')).toContainText('Line bank')
   // Import (free): the comments and the videos as CSV files.
   const imp = drawer.locator('[data-field="line-bank-import"]')
-  if (!(await imp.getAttribute('open'))) await press(phone, imp.locator('summary'))
+  // The bank has loaded (its box says what to import) before the box is read.
+  await expect(imp.locator('summary')).toBeVisible()
+  await expect(drawer.locator('.st-skel')).toHaveCount(0)
+  if (!(await imp.evaluate(el => (el as HTMLDetailsElement).open))) await press(phone, imp.locator('summary'))
+  await expect.poll(() => imp.evaluate(el => (el as HTMLDetailsElement).open)).toBe(true)
   await imp.getByLabel('The comments as a CSV file').setInputFiles({ name: `apify-${run}.csv`, mimeType: 'text/csv', buffer: Buffer.from(csvFor(run)) })
   await imp.getByLabel('The videos as a CSV file').setInputFiles({ name: 'videos.csv', mimeType: 'text/csv', buffer: Buffer.from(videos) })
   await press(phone, imp.getByRole('button', { name: 'Import (free)' }))
@@ -103,12 +107,16 @@ async function lineBank(page: Page, info: TestInfo, phone: boolean) {
   await press(phone, drawer.locator('[data-field="line-bank-stance"]').getByRole('radio', { name: 'First person (out of work)' }))
   await expect(drawer.locator('[data-field="line-bank-stance"]').getByRole('radio', { name: 'First person (out of work)' })).toHaveAttribute('aria-checked', 'true')
   // Keep and Reject are logged on the line.
-  await press(phone, first.getByRole('button', { name: 'Keep' }))
-  await expect(lines.first()).toHaveAttribute('data-call', 'kept')
+  // (a line nobody has called yet: Keep on a kept line takes the call back)
+  const fresh = drawer.locator('[data-field="bank-line"][data-call=""]').first()
+  const freshId = (await fresh.getAttribute('data-id'))!
+  await press(phone, fresh.getByRole('button', { name: 'Keep' }))
+  await expect(drawer.locator(`[data-field="bank-line"][data-id="${freshId}"]`)).toHaveAttribute('data-call', 'kept')
   expect(await priceInside(page)).toBe(0)
   // Use this line: priced, in Callie's voice, placed on slide 1.
   const pick = lines.first()
   const text = (await pick.locator('.st-bankline-text').textContent())!.trim()
+  const lineId = (await pick.getAttribute('data-id'))!
   await press(phone, pick.getByRole('button', { name: 'Use this line' }))
   const use = pick.locator('.st-pricebtn').getByRole('button', { name: /^Use this line/ })
   await expect(use).toContainText(/\$\d/)
@@ -125,10 +133,13 @@ async function lineBank(page: Page, info: TestInfo, phone: boolean) {
   await press(phone, use)
   await expect(drawer).toBeHidden({ timeout: 60_000 })
   await expect.poll(async () => ((await api('GET', `/content/${postId}`)).item.spec.hook as string), { timeout: 60_000 }).toBe(text)
-  await expect(page.getByLabel(/Hook \(slide 1\)/).or(page.locator('#post-hook input')).first()).toHaveValue(text)
+  // The hook box on the page shows it (no reload).
+  await expect(page.locator('[data-field="slideshow-hook"] input.st-input').first()).toHaveValue(text)
   // Never for another account.
   const other = await api('GET', `/line-bank?characterId=${seedData().callie}&accountTag=someone.else${run}`)
-  expect(other.lines.some((l: { line: string }) => l.line === text)).toBe(false)
+  expect(other.lines.some((l: { id: string }) => l.id === lineId)).toBe(false)
+  const here = await api('GET', `/line-bank?characterId=${seedData().callie}&accountTag=${tag}`)
+  expect(here.lines.some((l: { id: string }) => l.id === lineId)).toBe(true)
 }
 
 async function writeTheWeek(page: Page, info: TestInfo, phone: boolean) {
@@ -139,8 +150,8 @@ async function writeTheWeek(page: Page, info: TestInfo, phone: boolean) {
   for (const [i, n] of [1, 2].entries()) await api('POST', '/content', { kind: 'slideshow', characterId: seedData().callie, accountTag: tag, idea: `week ${i}`, spec: { plan: { rowId: `W${run}${i}`, date: day(n), format: 'character slideshow' } } })
   // Lines to fill them (the drawer's run, through the API here).
   await api('POST', '/line-bank/import', { comments: { csv: csvFor(`w${run}`) }, productId: seedData().sideStep })
-  const est = await api('POST', '/estimate', { action: { type: 'bank_run', limit: null } })
-  await api('POST', '/run', { action: { type: 'bank_run', limit: null }, quoteId: est.quote.id, confirmed: true })
+  const est = await api('POST', '/actions/estimate', { action: { type: 'bank_run', limit: null } })
+  await api('POST', '/actions/run', { action: { type: 'bank_run', limit: null }, quoteId: est.quote.id, confirmed: true })
   await expect.poll(async () => (await api('GET', '/line-bank')).counts.running, { timeout: 120_000 }).toBe(0)
   await page.goto('/studio')
   const plan = page.locator('[data-field="launch-plan"]')
@@ -153,6 +164,7 @@ async function writeTheWeek(page: Page, info: TestInfo, phone: boolean) {
   await expect(go).toContainText(/\$\d/)
   await snap(page, info, `${phone ? 'phone: ' : ''}write the week`)
   if (!phone && process.env.GUIDE_SHOTS) await guideShot(page, week, 'write-the-week', [
+    [week.locator('.gd-howto'), 'How the line bank works'],
     [week.getByLabel('Account'), 'The account'],
     [week.locator('.st-weeklist'), 'Its posts dated in the next 7 days, each with the line it gets'],
     [go, 'One price: every line in its character\'s voice, placed'],

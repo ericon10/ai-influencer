@@ -21,7 +21,7 @@ import type { BuiltAction } from './actions.js'
 
 // The line bank (owner, 2026-10-22; UX-PLAN.md section 36, item 29): an
 // Apify comment scrape in, the free first pass, then one priced run that
-// tags each kept comment (Haiku), writes its on-screen line (Sonnet) and has
+// tags each kept comment, writes its on-screen line and has
 // a separate reviewer score it (rejected lines never show). The owner's
 // Keep or Reject on a line teaches the writer and the reviewer. A line is
 // used once: put in a character's voice and placed on a post, it never

@@ -8,7 +8,7 @@ export type GuideColor = 'orange' | 'pink' | 'violet' | 'blue' | 'teal' | 'green
 
 export type GuideId =
   | 'big-picture' | 'posts' | 'characters' | 'setup-start' | 'setup-face' | 'setup-sheet' | 'setup-file'
-  | 'post-idea' | 'post-stills' | 'post-video' | 'post-clone' | 'post-mass' | 'post-text' | 'post-finish'
+  | 'post-idea' | 'post-stills' | 'post-video' | 'post-clone' | 'post-mass' | 'line-bank' | 'post-text' | 'post-finish'
   | 'library' | 'settings' | 'feedback' | 'faceless' | 'realism' | 'voice' | 'hooks' | 'slideshow' | 'launch-plan' | 'products' | 'results' | 'download-day'
 
 export interface GuideSection {
@@ -365,6 +365,32 @@ export const GUIDE: GuideSection[] = [
     cost: 'Reading the sheet and the folder, the Drive fetch and the first pass are free. A TikTok fetch is about $0.01 a clip on Apify (not confirmed until the first run). Stills and the face pass cost what a Recreate costs on the row\'s stills model (Nano Banana 2.1: 1.5 credits a still on the plan, $0.034 on Google AI Studio); the video costs the motion model\'s price for the clip\'s length. The total is on the page before you click.',
     shots: [
       { id: 'mass-rows', caption: 'Mass recreate: the sheet and folder, the rows with their first pass and prices, the total' },
+    ],
+  },
+  {
+    id: 'line-bank', group: 'Grow your accounts', title: 'The line bank: lines from real comments', color: 'teal',
+    tagline: 'Every post starts from a line that hits hard, written from what real people said.',
+    where: 'A slideshow > Idea > Pick from the bank; a video post or batch > Caption > Pick from the bank; Posts home > Launch plan > Write the week',
+    intro: 'The line bank turns an Apify comment scrape into on-screen lines. A free first pass keeps the comments worth reading; one priced run tags each one (emotion, topic, the product\'s pain point, who it fits, format), writes its line in Gen Z vernacular starting at 70 (the hit in the first words, readable in about 2 seconds), and a separate reviewer scores every line on gut punch, specificity and "would a real person post this". Only lines at 8 or more on all three, and not setup or meh, ever show. Pick one on a post and it is put in the character\'s voice and placed; Write the week fills an account\'s week at once.',
+    steps: [
+      'Import (free): open Pick from the bank and Import comments. Choose the comments CSV (columns comment, comment_likes, replies, video_account, video_views, video_url) or paste the comments tab\'s Sheet link (shared as Anyone with the link). Add the same run\'s videos (url and text) for each comment\'s caption. Pick the product whose pain points tag it (SideStep\'s rules have their own list).',
+      'The first pass, free and code only: duplicates, comments with 0 or 1 likes, under 4 words, not English, about the video itself (the sound, her outfit, "who\'s here") and off the job search are dropped; the import says how many of each. A comment already in the bank is never added twice.',
+      'Tag, write and review: one priced button for the comments not run yet (all, or the top 30, 100 or 300 by likes). Each batch of 30 is one tag call, one writer call and one reviewer call (Sonnet, switchable to Opus in Settings, Claude models), quoted together. A comment with no usable truth (a joke, advice, an opinion with nothing that happened) is passed over by the writer.',
+      'Filter by character (first person and out of work, or secondhand about a friend: read from the voice card, switch it in the drawer), emotion, topic and pain point. Lines are sorted by their source comment\'s likes; each shows its source comment, its tags and its three scores.',
+      'Keep or Reject any line. Your latest calls go to the writer and the reviewer as examples on the next run, so the bank learns what you like.',
+      'Use this line (priced, one small call): the line is put in the character\'s voice card and checked against their facts (who they are, their point of view). A line that contradicts them is edited to fit, or skipped with the reason. It lands on slide 1 of a slideshow, the caption of a video post, or the next caption of a batch.',
+      'Write the week (Launch plan card): pick an account; its posts dated in the next 7 days without a bank line each get the best unused line that fits their character (kept lines first, then by likes), all rewritten in one priced click. The list shows what each post gets, and which words it replaces.',
+    ],
+    tips: [
+      'A line used on one account never shows for another account.',
+      'Lines that could start a fight over race, religion or politics are flagged with the reason, and never used by Write the week.',
+      'Results > Source truth: follows per post by the comment each post\'s line came from, so you see which truths perform.',
+      'A private Google Sheet cannot be read by link. Download the tab as CSV (File, Download, Comma separated values) and choose the file.',
+    ],
+    cost: 'The import and the first pass are free. The run is priced before it starts: for a 5,375-comment scrape (2,208 kept), the quote is $5.82 for all 74 batches (the tags about $1.62, the writer about $2.18, the reviewer about $2.02; a quote holds the most each call can cost, the real charge is lower). Use this line is about $0.01; Write the week about $0.01 to $0.03 an account.',
+    shots: [
+      { id: 'line-bank', caption: 'The line bank: what passed, the filters, a line with its source comment and scores, Keep or Reject, Use this line' },
+      { id: 'write-the-week', caption: 'Write the week: an account\'s dated posts and the line each gets, one price' },
     ],
   },
   {
@@ -751,6 +777,8 @@ export const GUIDE: GuideSection[] = [
 ]
 
 export const GLOSSARY: Array<[string, string]> = [
+  ['Line bank', 'On-screen lines written from real comments (an Apify scrape): a free first pass, then one priced run that tags, writes and reviews. Only lines the separate reviewer scores 8 or more on gut punch, specificity and "would a real person post this" ever show.'],
+  ['Source truth', 'The real comment a post\'s line came from (the line bank). Results groups follows per post by it.'],
   ['Results', 'What a post did once posted: its link, when it went up, its first 72 hours (views, follows, saves, shares), your decision and notes. Typed on its card or in Finish, or pasted from a CSV by row_id. Free.'],
   ['Follows per post', 'The follows of the posts with results, divided by how many there are. The headline of the Results card: decide by it first, then saves and shares.'],
   ['Decision', 'Yours, on each post: Make 3 variations, Keep, One more try or Drop. A colored chip on the card.'],

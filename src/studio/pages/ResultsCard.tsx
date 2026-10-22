@@ -18,7 +18,7 @@ import type { ResultRow, ResultsCsvPreview } from '../types'
 // preview, then Apply). Follows the Posts home filters. Collapsed by default.
 
 const KEY = 'st-results-open'
-const DIMS: Dimension[] = ['account', 'product', 'character', 'structure']
+const DIMS: Dimension[] = ['account', 'product', 'character', 'structure', 'truth']
 const n = (v: number | null) => (v == null ? 'n/a' : v.toLocaleString())
 
 export function ResultsCard({ tag, character, product, filtered }: { tag: string | null; character: string | null; product: string | null; filtered: boolean }) {
@@ -87,7 +87,7 @@ export function ResultsCard({ tag, character, product, filtered }: { tag: string
               {DIMS.map(d => <button key={d} type="button" className={`st-chip ${dim === d ? 'on' : ''}`} aria-pressed={dim === d} onClick={() => setDim(d)}>{DIMENSION_LABEL[d]}</button>)}
             </div>
             {v && <Breakdown rows={v.by[dim]} label={DIMENSION_LABEL[dim]} />}
-            <span className="st-hint">Sorted by follows per post: decide by follows first, then saves and shares, never by views alone. Hook structure is the plan's code (or the hook's, from Use this hook).</span>
+            <span className="st-hint">Sorted by follows per post: decide by follows first, then saves and shares, never by views alone. Hook structure is the plan's code (or the hook's, from Use this hook). Source truth is the real comment a post's line came from (the line bank).</span>
           </div>
 
           <PasteResults key={incoming?.at ?? 0} incoming={incoming} />

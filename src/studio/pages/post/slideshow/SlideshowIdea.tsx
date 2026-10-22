@@ -17,6 +17,7 @@ import type { SlideBatch, SlideshowSpec } from '../../../types'
 import type { PostCtx } from '../ctx'
 import { SlideFrame, slideViewerItems } from './SlideFrame'
 import { Viewer, useViewer } from '../../../viewer'
+import { LineBankButton } from '../LineBank'
 import { useSlideFonts } from './draw'
 
 // The slideshow's Idea step, hook first (UX-PLAN.md section 27): the hook
@@ -95,6 +96,7 @@ export function SlideshowIdea({ ctx }: { ctx: PostCtx }) {
             <PriceButton size="sm" variant="secondary" label="Write 10 with Claude" action={draft.saving ? null : { type: 'slideshow_hooks', contentId: item.id }} waiting={draft.saving ? 'Saving...' : undefined}
               watch={j => j.purpose.startsWith(`slideshow_hooks:${item.id}`)} onDone={() => void qc.invalidateQueries({ queryKey: keys.content })} />
           )}
+          {item.characterId && <LineBankButton className="st-btn sm secondary" post={{ id: item.id, kind: item.kind, characterId: item.characterId, accountTag: item.accountTag }} />}
         </div>
         {rules.review
           ? <span className="st-hint">From the vault: {rules.name}'s own hooks and the buyers' words, recast into patterns by code (press again for more). With Claude, to the general standard plus {rules.name}'s rules (THE STANDARD, playbook v1.2, its pass and fail examples as the guide): each hook names the job situation and says exactly what happened, pain 7 or more, in the group-chat voice; each with its moment and structure or lens for slides 2 to 6, its effects, and the runner-up as the alt hook. Then a separate reviewer runs the five-check stop test (stops a stranger, clearly a job, exactly what happened, pain 7 or more, sounds like a friend) and scores each 1 to 5; only the 1s and 2s show.{spec.mode === 'topic' ? '' : ` ${name}'s voice card goes in.`}</span>

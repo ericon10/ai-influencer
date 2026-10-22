@@ -42,6 +42,16 @@ bottom of the list they belong to.
 
 ## Next (after the launch)
 
+Ideas from the Oct 22 build, Tier 5 (UX-PLAN section 36; not built):
+
+- Line bank: read a private Google Sheet through a Google sign-in, so the
+  comments tab imports by link without sharing it.
+- Line bank: about two in three of the most liked comments are jokes,
+  advice or opinions the writer passes on; a free pre-filter for "nothing
+  happened" would save part of the writer's cost.
+- Line bank: a second voice pass for lines a character kept, to make
+  variations for her other accounts.
+
 Ideas from the Oct 22 build, Tier 4 (UX-PLAN section 36; not built):
 
 - Three platforms: a sound for the reel picked in the Studio (today it is

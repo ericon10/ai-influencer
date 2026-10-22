@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { AlertTriangle, CalendarRange, CheckCircle2, Library, Sheet, Upload, X } from 'lucide-react'
 import { api } from '../../api'
@@ -125,7 +125,7 @@ function LineCard({ l, post, using, onUse, onCall, onPlaced }: { l: BankLineView
   const call = async (c: 'kept' | 'rejected' | null) => { try { await api.lineBankCall(l.id, c); onCall() } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) } }
   const usedHere = !!post && l.usedPostId === post.id
   return (
-    <div className={`st-bankline ${l.call ?? ''}`} data-field="bank-line" data-call={l.call ?? ''}>
+    <div className={`st-bankline ${l.call ?? ''}`} data-field="bank-line" data-id={l.id} data-call={l.call ?? ''}>
       <div className="st-bankline-text">{l.line}</div>
       <blockquote className="st-bankline-source">
         <span className="st-hint">From a comment with {short(l.likes)} likes{l.videoAccount ? ` on @${l.videoAccount}` : ''}:</span> {l.comment}
@@ -184,8 +184,11 @@ function ImportBox({ open, last, onDone }: { open: boolean; last: BankImport | n
   const [done, setDone] = useState<BankImport | null>(null)
   const shown = done ?? last
   const product = productId || products.data?.products[0]?.id || ''
+  // Open by itself while the bank is empty; then yours to open and close.
+  const [shown_, setShown] = useState(open)
+  useEffect(() => { if (open) setShown(true) }, [open])
   return (
-    <details className="st-card st-col" style={{ padding: 12, gap: 10 }} open={open || undefined} data-field="line-bank-import">
+    <details className="st-card st-col" style={{ padding: 12, gap: 10 }} open={shown_} onToggle={e => setShown((e.currentTarget as HTMLDetailsElement).open)} data-field="line-bank-import">
       <summary className="st-row" style={{ gap: 8, cursor: 'pointer' }}><Upload size={14} /><b>Import comments</b><span className="st-hint">free</span></summary>
       <span className="st-hint">An Apify comment scrape: columns comment, comment_likes, replies, video_account, video_views, video_url. Add the same run's videos (url and text) for each comment's caption. A private Google Sheet cannot be read by link: share it as Anyone with the link, or download the tab as CSV and choose the file.</span>
       <div className="st-row" style={{ gap: 8, flexWrap: 'wrap' }}>
@@ -232,7 +235,7 @@ function FilePick({ label, aria, onPick }: { label: string; aria: string; onPick
   )
 }
 
-const DROPS: Array<[keyof BankImport['dropped'], string]> = [['likes', '0 or 1 likes'], ['topic', 'off the job search'], ['short', 'too short'], ['duplicate', 'duplicates'], ['video', 'about the video itself'], ['language', 'not English']]
+const DROPS: Array<[keyof BankImport['dropped'], string]> = [['likes', 'with 0 or 1 likes'], ['topic', 'off the job search'], ['short', 'too short'], ['duplicate', 'duplicates'], ['video', 'about the video itself'], ['language', 'not English']]
 
 function ImportSummary({ i }: { i: BankImport }) {
   return (
