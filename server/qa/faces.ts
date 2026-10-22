@@ -37,6 +37,9 @@ export interface FaceMatcher {
   // The main (largest) face and its embedding, or null when there is none.
   // `cacheKey` (for example an asset checksum) skips repeat work.
   analyze(image: Buffer, cacheKey?: string): Promise<FaceAnalysis | null>
+  // Every face with its embedding, left to right (two-person recreates,
+  // item 24). Optional: test fakes may leave it out.
+  analyzeAll?(image: Buffer): Promise<Array<{ face: DetectedFace; embedding: Float32Array }>>
 }
 
 export function unavailableFaceMatcher(reason: string): FaceMatcher {
@@ -276,6 +279,13 @@ export function createFaceMatcher(opts: FaceMatcherOptions): FaceMatcher {
       }
     },
     detect: image => serial(async () => detectIn(await decode(image))),
+    analyzeAll: image => serial(async () => {
+      const img = await decode(image)
+      const faces = (await detectIn(img)).sort((p, q) => p.box.x - q.box.x)
+      const out: Array<{ face: DetectedFace; embedding: Float32Array }> = []
+      for (const face of faces) out.push({ face, embedding: await embed(img, face) })
+      return out
+    }),
     analyze: (image, cacheKey) => serial(async () => {
       if (cacheKey && cache.has(cacheKey)) return cache.get(cacheKey)!
       const img = await decode(image)

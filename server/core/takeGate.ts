@@ -1,3 +1,5 @@
+import { vs } from './gateText.js'
+
 // The video rule for a Recreate take (owner, 2026-10-15): the still rule's
 // numbers (face against REF-00, the margin over the clip's person, the
 // likeness to that person), read over the whole take from the face every
@@ -44,9 +46,10 @@ export function takeGateFor(g: GateNumbers, samples: TakeSample[], opts: { demo?
   if (opts.demo) return { ok: true, face, likeness, margin, frames: faces.length, reasons: [], note: 'Demo mode: the face is not checked on mock takes.' }
   const reasons: string[] = []
   if (face == null) reasons.push('No face to match with REF-00 was found in the take.')
-  else if (face < g.face_min) reasons.push(`Face match ${two(face)}, needs ${two(g.face_min)} or more.`)
-  if (margin != null && margin < g.margin) reasons.push(`Beats the clip's person by ${two(margin)}, needs ${two(g.margin)} or more.`)
-  if (likeness != null && likeness >= g.source_max) reasons.push(`Likeness to the clip's person ${two(likeness)}, must stay under ${two(g.source_max)}.`)
+  // Each number with the decimals that show the miss (item 21).
+  else if (face < g.face_min) { const [a, b] = vs(face, g.face_min); reasons.push(`Face match ${a}, needs ${b} or more.`) }
+  if (margin != null && margin < g.margin) { const [a, b] = vs(margin, g.margin); reasons.push(`Beats the clip's person by ${a}, needs ${b} or more.`) }
+  if (likeness != null && likeness >= g.source_max) { const [a, b] = vs(likeness, g.source_max); reasons.push(`Likeness to the clip's person ${a}, must stay under ${b}.`) }
   const note = face != null && likeness == null ? 'No face showed in the clip at the same moments, so the margin was not checked.' : null
   return { ok: !reasons.length, face, likeness, margin, frames: faces.length, reasons, note }
 }

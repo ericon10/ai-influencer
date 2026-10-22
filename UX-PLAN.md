@@ -1540,3 +1540,51 @@ which reads the product's name from the line.
   shot line. The launch-plan-v2 file as written has 56 such rows.
 - **17**: `NotesBadge` (tap to open); `lint-values` only in sentences aimed
   at "you".
+
+## 36. The Oct 22 build, part 2: providers and recreates, small fixes, the line bank (owner, 2026-10-22)
+
+Same standing rules as section 35 (R1 to R5). Shipped in tier order; each
+tier tested, pushed and live before the next. New ideas go to the report and
+LATER.md, never into the build. Rule two: everything here is neutral (every
+product, character and account) except the line bank's ICP pain points,
+which come from the product's own writing rules.
+
+### Tier 3: providers and recreates (planned 2026-10-22)
+
+| # | What | Where | Plan |
+|---|---|---|---|
+| 18 | No GPT Image 2.5 on a recreate | Recreate stills (the model choice) | OpenAI refuses edits of a real person's photo. The stills choices are Nano Banana 2.1 on the plan, Nano Banana 2.1 on Google AI Studio, Seedream 4.5 edit on fal (the fallback, "untested for recreates"). Default Nano Banana 2.1 (the plan when connected, else the first API path with a key). Flare stays for heroes, sheets and slideshow stills |
+| 19 | The API path's providers | `server/providers/google.ts`, `fal.ts`; Settings > Provider keys | Google AI Studio (Gemini API generateContent) for Nano Banana 2.1; fal (queue API) for Seedream 4.5 edit, Wan 2.2 Animate replace and Kling 3.0 Motion Control. Keys made in each provider's dashboard and pasted in Settings only (sealed in the vault). A price on every button: each stills choice and motion model shows its own price |
+| 20 | Stills before a clone | Replace the person | "Stills first" is on by default: the replace starts from a kept still that passed the gates, ahead of REF-00. Off: a warning on the panel and on the price, before the click |
+| 21 | Gate decimals; your call on every take | Recreate stills and takes; Settings > Rules | A score next to its limit gets the decimals that show the fail (0.448 against 0.450, never 0.45 against 0.45). Every take asks Keep or Reject, a passing one too; each call is logged with the take's scores (Your calls on takes) |
+| 22 | Priced buttons inside their cards | Every priced button | The button, its price, the model tag and today's spend wrap inside the card, tile or choice. A browser sweep checks every priced button on every page and post step at desktop and phone width |
+| 23 | Genjutsu replace's real price | Price book | "Higgsfield Genjutsu - Object Swap" in the account's transactions: 77 and 35 credits, 7 a second (was a 3 a second placeholder) |
+| 24 | Mass recreate | A batch post > Video > Recreate a batch of clips | A Google Sheet of TikTok links (link, character, keep place or new set, motion model, notes) or a synced Drive folder; fetched one at a time (TikTok through the owner's Apify, priced; Drive free); cleaned; skipped with a reason on failure. A free first pass: a clear adult (an age model on every face; no clear adult, skipped), people, length, the row's price. Tick rows, one total, one click for the stills; Keep or Reject each still; one click for the kept rows' videos. One queue group per row, so a long run waits at the daily cap and goes on after midnight (a daily cron resumes it). Two-person rows: two characters, left to right, Swap. The review queue plays the source and the result side by side. Works on the API path |
+
+### Tier 3 built (2026-10-22)
+
+- **18**: `recreateStillChoices` in `server/pipeline/clone.ts` (`scene_still`
+  in `config/content.yaml`: `model`, `api_model` Google, `fallback_model`
+  fal); a saved GPT Image 2.5 pick is ignored; `saveRecreateStillModel`
+  refuses it.
+- **19**: adapters with unit tests on fake networks (`apiPath.test.ts`);
+  models in `config/models.yaml`, prices in `config/pricebook.yaml` (list
+  prices, unconfirmed until each one's first paid run); download hosts in
+  `config/runtime.yaml`. The motion picker shows fal models with their
+  path ("fal") and price.
+- **20**: `noStills` on the clone action; `clone-no-stills` shown under the
+  price.
+- **21**: `server/core/gateText.ts` (`vs`, `scoreAgainst`) in the still gate,
+  the video rule and the badges; `TAKE_CALLS_KEY` log, `GET
+  /recreate/take-calls`, the TakeCallsCard in Settings > Rules.
+- **22**: `.st-pricebtn` and `.st-pricebtn-row` in `studio.css`; the sweep in
+  `e2e/editor/tier3.spec.ts` (111 priced buttons on desktop, 114 on phone,
+  every post step).
+- **23**: `genjutsu-replace` at 7 credits a second, `charge_names: [Higgsfield
+  Genjutsu - Object Swap]` so each run's real charge is matched.
+- **24**: `server/pipeline/massRecreate.ts`, `src/studio/pages/post/
+  MassRecreate.tsx`, the age check in `server/qa/age.ts` (the ONNX zoo's age
+  GoogLeNet, fetched by `npm run models`), Apify in
+  `server/providers/apify.ts`, the pair still (`recreate_pair`) and its
+  scoring by side (`pairScores`), the new set line (`recreate_new_set`), the
+  cron `GET /api/v1/cron/cap-resume` (`vercel.json` crons, 00:05 UTC).

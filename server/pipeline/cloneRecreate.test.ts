@@ -80,7 +80,7 @@ describe('the free read of the clip suggests the route', () => {
     expect(await cloneModel(h.deps, h.ctx, 'motion')).toBe('higgsfield/wan-3.0-motion')
     const o = await cloneOptions(h.deps, h.ctx, postId)
     const motion = o.models.filter(m => m.mode === 'motion').map(m => m.label)
-    expect(motion).toEqual(['Genjutsu', 'Wan 3.0', 'Wan 3.0 Prime', 'Kling 3.0 Motion Control'])
+    expect(motion).toEqual(['Genjutsu', 'Wan 3.0', 'Wan 3.0 Prime', 'Kling 3.0 Motion Control', 'Kling 3.0 Motion Control'])
   })
 })
 

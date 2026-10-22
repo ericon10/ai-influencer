@@ -72,6 +72,12 @@ export interface GenRequest {
   // A slideshow still (UX-PLAN.md section 27): the post and the slide it
   // lands in, the scene it belongs to, and which variation or batch row
   // made it. Never sent to a provider.
+  // Mass recreate (item 24): a TikTok link fetched as the video (Apify).
+  // Priced per clip, not per second.
+  fetchUrl?: string
+  // Two characters in one Recreate still (item 24): the left and the right
+  // person, left to right. Never sent to a provider.
+  pair?: { left: string; right: string }
   slide?: { slide: number; postId?: string; sceneId?: string | null; variant?: number; row?: number; path?: 'account' | 'api' }
 }
 

@@ -18,6 +18,9 @@ downloads:
   # are always refused, whatever this list says.
   allowed_hosts:
     higgsfield: [higgsfield.ai, cloudfront.net]
+    # fal's result files (Google's stills come back in the answer itself).
+    fal: [fal.media, fal.run, fal.ai]
+    apify: [apify.com]
     # Clip links for Recreate from a real clip: direct video files on
     # Higgsfield's own hosts only (no scraping; anything else is uploaded).
     clip_links: [higgsfield.ai, cloudfront.net]

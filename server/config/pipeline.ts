@@ -159,7 +159,7 @@ const templatesSchema = z.object({
   scene_ideas: z.object({ system: z.string(), prompt: z.string() }),
   punch_up_lines: z.object({ system: z.string(), prompt: z.string() }),
   video: z.object({ base: z.string(), silent: z.string(), end_frame: z.string(), continue: z.string() }),
-  clone: z.object({ swap: z.string(), image: z.string(), replace: z.string(), scene_still: z.string(), recreate_still: z.string(), recreate_not_like: z.string(), recreate_element_api: z.string(), recreate_realism: z.string(), face_pass: z.string(), face_pass_refs: z.string().default(" (the face in the other images)"), recreate_keep: z.string(), outfit_keep_named: z.string(), outfit_hers_named: z.string(), motion: z.string(), motion_scene: z.string(), motion_what: z.string(), outfit_source: z.string(), outfit_hers: z.string(), target_main: z.string(), target_at: z.string() }),
+  clone: z.object({ swap: z.string(), image: z.string(), replace: z.string(), scene_still: z.string(), recreate_still: z.string(), recreate_not_like: z.string(), recreate_element_api: z.string(), recreate_realism: z.string(), face_pass: z.string(), face_pass_refs: z.string().default(" (the face in the other images)"), recreate_keep: z.string(), recreate_pair: z.string(), recreate_pair_element: z.string(), recreate_new_set: z.string(), recreate_new_set_default: z.string(), outfit_keep_named: z.string(), outfit_hers_named: z.string(), motion: z.string(), motion_scene: z.string(), motion_what: z.string(), outfit_source: z.string(), outfit_hers: z.string(), target_main: z.string(), target_at: z.string() }),
   clone_traits: z.object({ system: z.string(), prompt: z.string() }),
   clone_outfit: z.object({ system: z.string(), prompt: z.string() }),
   content_slides: z.object({ system: z.string(), prompt: z.string() }),
@@ -362,7 +362,9 @@ const contentSchema = z.object({
     motion_model: z.string(),
     outfit: z.enum(['source', 'hers']).default('source'),
     face_refs: z.array(z.string()).min(1).default(['REF-00', 'REF-01', 'REF-02']),
-    scene_still: z.object({ model: z.string(), api_model: z.string(), api_note: z.string().default('') }),
+    // Mass recreate (item 24): the model that fetches a TikTok link.
+    mass: z.object({ fetch_model: z.string() }).default({ fetch_model: 'apify/tiktok-video' }),
+    scene_still: z.object({ model: z.string(), api_model: z.string(), fallback_model: z.string().optional(), fallback_note: z.string().default('') }),
     // Recreate from a real clip (owner, 2026-10-14).
     recreate: z.object({
       frame_at: z.number().min(0).max(5), takes: z.number().int().min(1).max(4), face_takes: z.number().int().min(1).max(4), face_pass: z.boolean().default(true), dark_luma: z.number(), busy_motion: z.number(),

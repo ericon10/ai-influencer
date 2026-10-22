@@ -15,6 +15,8 @@ import type { PostCtx } from './ctx'
 import { HowTo } from '../../guide/Guide'
 import { SentButton } from '../character/SentPanel'
 import { StarButton } from '../../trash'
+import { scoreAgainst } from '../../../../server/core/gateText'
+import { MassRecreate } from './MassRecreate'
 
 // Recreate from a real clip (owner, 2026-10-14; UX-PLAN.md sections 15 and
 // 16), in the Video step. Step 2: what to keep from the frame and the traits
@@ -28,7 +30,6 @@ import { StarButton } from '../../trash'
 // clip, in sync, the face every half second, text found, cuts; "Use this
 // take" opens the Text step.
 
-const pct = (n: number | null) => (n == null ? '?' : n.toFixed(2))
 
 export function RecreatePanel({ ctx, source, o, takes }: { ctx: PostCtx; source: CloneSource; o: CloneOptions | undefined; takes: { still: number; face: number } }) {
   const { item } = ctx
@@ -60,7 +61,7 @@ export function RecreatePanel({ ctx, source, o, takes }: { ctx: PostCtx; source:
       <Field id="recreate-keep" label="2. What to keep, what to drop" group hint="Read from the frame; every chip is yours to change.">
         <StepTwo ctx={ctx} source={source} />
       </Field>
-      <Field id="recreate-stills" label={`3. ${takes.still} stills of ${name} and the face pass`} group done={!!keptStill?.gate.ok} hint="Pick the stills model: Nano Banana 2.1 on your plan or GPT Image 2.5 on the API, with the same prompts, face pass and gates. One price for the stills and the face pass on the best one (switch it off to skip; it is also skipped, and not charged, when the best still already beats the clip's person by 0.30 or more). The face pass edits the still: outside the face it must still match it, or it is marked not usable. Each shows its face match to REF-00, its likeness to the person in the clip, and the margin between them. Fix this face redoes only the face on any other still.">
+      <Field id="recreate-stills" label={`3. ${takes.still} stills of ${name} and the face pass`} group done={!!keptStill?.gate.ok} hint="Pick the stills model: Nano Banana 2.1 on your Higgsfield plan or on Google AI Studio, or Seedream 4.5 edit on fal (the fallback, untested for recreates), with the same prompts, face pass and gates. One price for the stills and the face pass on the best one (switch it off to skip; it is also skipped, and not charged, when the best still already beats the clip's person by 0.30 or more). The face pass edits the still: outside the face it must still match it, or it is marked not usable. Each shows its face match to REF-00, its likeness to the person in the clip, and the margin between them. Fix this face redoes only the face on any other still.">
         <StillsStep ctx={ctx} list={list} kept={kept} takes={takes} picked={picked} opts={o} />
       </Field>
       <Field id="recreate-model" label="5. The motion model" group hint={`The still as the image, the cleaned clip as the motion, 720p, 9:16, audio off. Price for this ${source.durationSec ?? ''} s clip; your last pick is selected.`}>
@@ -198,8 +199,9 @@ function StillsStep({ ctx, list: all, kept, takes, picked, opts }: { ctx: PostCt
   // The face pass on the best still rides with the stills, in one price
   // (owner, round 17); the switch skips it.
   const [facePass, setFacePass] = useState<boolean>(opts?.facePass ?? true)
-  // The stills model (owner, round 18): Nano Banana 2.1 on the plan or GPT
-  // Image 2.5 on the API; same prompts, face pass and gates. Last pick kept.
+  // The stills model (owner, round 18; item 18): Nano Banana 2.1 on the plan
+  // or on Google AI Studio, or Seedream 4.5 edit on fal (the fallback); same
+  // prompts, face pass and gates. Last pick kept. Never GPT Image 2.5.
   const [stillModel, setStillModel] = useState<string | null>(null)
   const choices = opts?.stillModels ?? []
   const chosen = choices.find(c => c.ref === (stillModel ?? opts?.stillModel.ref)) ?? null
@@ -207,7 +209,7 @@ function StillsStep({ ctx, list: all, kept, takes, picked, opts }: { ctx: PostCt
     setStillModel(ref)
     api.setRecreateStillModel(ref).catch(() => undefined)
   }
-  const untested = chosen?.path === 'api' ? `${chosen.label}, ${chosen.note ?? 'untested for recreates'}` : null
+  const untested = chosen?.note ? `${chosen.label}, ${chosen.note}` : null
   // A face pass skipped because the best still was already clear (owner,
   // 2026-10-15): one line, nothing charged.
   const skipped = all.find(x => x.status === 'skipped')
@@ -248,9 +250,10 @@ function StillsStep({ ctx, list: all, kept, takes, picked, opts }: { ctx: PostCt
               )}
               <div className="st-row" style={{ gap: 6, padding: '0 4px', flexWrap: 'wrap' }}>
                 <span className="st-tile-label">{x.pass === 'face' ? 'Face pass' : 'Still'}</span>
-                {x.faceScore != null && <span className="st-badge plain" title="Face match to REF-00 (higher is better)">Face {pct(x.faceScore)}</span>}
-                {x.sourceScore != null && <span className="st-badge plain" title="Likeness to the person in the clip (must stay low)">Clip {pct(x.sourceScore)}</span>}
-                {x.gate.margin != null && <span className={`st-badge ${x.gate.margin >= (gateMargin ?? 0) ? 'plain' : 'bad'}`} title="How much more it looks like her than the person in the clip (face minus clip)">Margin {pct(x.gate.margin)}</span>}
+                {/* The decimals that show a fail (item 21): 0.448 against 0.45, never 0.45. */}
+                {x.faceScore != null && <span className={`st-badge ${opts?.gate && x.faceScore < opts.gate.face_min ? 'bad' : 'plain'}`} title="Face match to REF-00 (higher is better)">Face {scoreAgainst(x.faceScore, opts?.gate.face_min)}</span>}
+                {x.sourceScore != null && <span className={`st-badge ${opts?.gate && x.sourceScore >= opts.gate.source_max ? 'bad' : 'plain'}`} title="Likeness to the person in the clip (must stay low)">Clip {scoreAgainst(x.sourceScore, opts?.gate.source_max)}</span>}
+                {x.gate.margin != null && <span className={`st-badge ${x.gate.margin >= (gateMargin ?? 0) ? 'plain' : 'bad'}`} title="How much more it looks like her than the person in the clip (face minus clip)">Margin {scoreAgainst(x.gate.margin, gateMargin)}</span>}
               </div>
               {x.error ? <span className="st-hint" style={{ color: 'var(--st-bad)', padding: '0 4px' }}>{x.error}</span> : <GatePill gate={x.gate} />}
               {/* A refusal: the likely trigger words and the same still with
@@ -295,6 +298,7 @@ function StillsStep({ ctx, list: all, kept, takes, picked, opts }: { ctx: PostCt
             return (
               <button key={c.ref} type="button" role="radio" aria-checked={on} className={`st-choice ${on ? 'on' : ''}`} onClick={() => pickStill(c.ref)} disabled={!!c.problem}>
                 <span className="st-row" style={{ gap: 8 }}><b>{c.label}</b><span className="st-spacer" />{on && <Check size={14} />}</span>
+                {c.display && <span className="st-model-price">{c.display}{!c.verified ? <span className="st-muted" style={{ fontWeight: 400 }}> (not confirmed)</span> : null}</span>}
                 <span className="st-hint">{c.pathLabel}{c.note ? `, ${c.note}` : ''}</span>
                 {c.problem && <span className="st-hint" style={{ color: 'var(--st-bad)' }}>{c.problem}</span>}
               </button>
@@ -431,7 +435,7 @@ function TakeReview({ ctx, c }: { ctx: PostCtx; c: CloneResult }) {
         <b className="grow">{c.label}</b>
         {c.model && <span className="st-badge plain">{c.model}</span>}
         {c.assetId && <StarButton id={c.id} on={c.favorite} />}
-        {c.status === 'approved' ? <span className="st-badge ok">Kept</span> : waiting ? <span className="st-badge warn">{c.gate && !c.gate.ok ? 'Misses the video rule' : 'Your call'}</span> : failed ? <span className="st-badge bad">Did not finish</span> : null}
+        {c.decision === 'tried_again' ? <span className="st-badge bad">You rejected it</span> : c.status === 'approved' ? <span className="st-badge ok">{c.decision === 'kept' ? 'You kept it' : 'Kept'}</span> : waiting ? <span className="st-badge warn">{c.gate && !c.gate.ok ? 'Misses the video rule' : 'Your call'}</span> : failed ? <span className="st-badge bad">Did not finish</span> : null}
       </div>
       {c.error && <Callout tone="bad">{c.error}</Callout>}
       {c.oldReject && waiting && <Callout tone="info">The old check marked this take Not kept: "{c.oldReject.split('. ')[0]!.replace(/\.$/, '')}." That check is gone. A paid take is never rejected now: keep it or try again.</Callout>}
@@ -443,11 +447,19 @@ function TakeReview({ ctx, c }: { ctx: PostCtx; c: CloneResult }) {
       {waiting && c.assetId && (
         <div className="st-row" style={{ gap: 8, flexWrap: 'wrap', alignItems: 'center' }} data-field="take-call">
           <AsyncButton className="st-btn primary" onClick={keepTake} icon={<CheckCircle2 size={15} />}>Keep this take</AsyncButton>
-          <AsyncButton className="st-btn" onClick={tryAgain} icon={<RotateCcw size={15} />}>Try again</AsyncButton>
-          <span className="st-hint">{c.decision === 'tried_again' ? 'You tried again on this take; it stays here if you change your mind.' : 'Your call counts toward the gate check. Try again spends nothing until you make the video.'}</span>
+          <AsyncButton className="st-btn" onClick={tryAgain} icon={<RotateCcw size={15} />}>Reject, try again</AsyncButton>
+          <span className="st-hint">{c.decision === 'tried_again' ? 'You rejected this take; it stays here if you change your mind.' : 'Your call is logged with the scores and counts toward the gate check. Rejecting spends nothing; make the video again when you are ready.'}</span>
         </div>
       )}
-      {c.status === 'approved' && c.assetId && (
+      {/* Your call on every take (item 21), a passing one too: logged with its scores. */}
+      {c.status === 'approved' && c.assetId && c.decision !== 'kept' && (
+        <div className="st-row" style={{ gap: 8, flexWrap: 'wrap', alignItems: 'center' }} data-field="take-call">
+          <span className="st-hint">{c.decision === 'tried_again' ? 'You rejected this take. Changed your mind?' : 'It passed the video rule. Your call:'}</span>
+          <AsyncButton className="st-btn sm" onClick={keepTake} icon={<CheckCircle2 size={14} />}>Keep</AsyncButton>
+          {c.decision !== 'tried_again' && <AsyncButton className="st-btn sm ghost" onClick={tryAgain} icon={<RotateCcw size={14} />}>Reject</AsyncButton>}
+        </div>
+      )}
+      {c.status === 'approved' && c.assetId && c.decision !== 'tried_again' && (
         <div className="st-row" style={{ gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
           {used ? <span className="st-badge ok"><CheckCircle2 size={12} /> In this post</span> : <AsyncButton className="st-btn primary" onClick={() => useTake()} icon={<CheckCircle2 size={15} />}>Use this take</AsyncButton>}
           <span className="st-hint">Opens the Text step. No music unless you add one.</span>
@@ -632,8 +644,9 @@ export function RecreateBatch({ ctx, onTakes }: { ctx: PostCtx; onTakes: (ids: s
   useEffect(() => { void qc.invalidateQueries({ queryKey: ['estimate'] }) }, [where, qc])
   return (
     <div className="st-col" style={{ gap: 14 }}>
+      <MassRecreate ctx={ctx} models={options.data?.models ?? []} />
       <div className="st-row" style={{ gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-        <span className="st-hint grow">Each row is a clip and a character in its own video post. Up to {view.data?.max ?? 20} rows.</span>
+        <span className="st-hint grow">Or add rows by hand: each row is a clip and a character in its own video post. Up to {view.data?.max ?? 20} rows.</span>
         <HowTo id="post-clone" label="How a recreate batch works" />
       </div>
       {rows.length > 0 && (

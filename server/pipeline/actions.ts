@@ -26,6 +26,7 @@ import { buildSceneEndFrame, buildSceneIdeas, buildScenePlan, buildScenePromptWr
 import { markSceneBusy, saveVideoModel } from './scenes.js'
 import { buildContentCaptions, buildContentSlides } from './content.js'
 import { afterRecreateBatch, buildRecreateBatch } from './recreate.js'
+import { afterMassFetchStarted, buildMassFetch, buildMassRecreate } from './massRecreate.js'
 import { addCloneSpend, buildClone, buildCloneCaption, buildCloneFace, buildCloneOutfit, buildCloneStill, buildCloneTraits, checkCloneCap, saveCloneModel, useCloneStill } from './clone.js'
 import { ruleSwitches } from './rules.js'
 import { readBilling } from '../providers/billing.js'
@@ -126,6 +127,8 @@ export const actionSchema = z.discriminatedUnion('type', [
     // Recreate: the still each character's video starts from ("Make the
     // video" on a still picks it in the same click).
     stills: z.record(z.string().max(60), z.string().max(60)).optional(),
+    // Replace without stills (item 20): only when the owner switched them off.
+    noStills: z.boolean().optional(),
   }),
   // "Recreate from a real clip": stills of the character in the clip's
   // frame (4 by default), shown before the motion run; then a face-only pass
@@ -137,6 +140,10 @@ export const actionSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('clone_outfit'), characterId: z.string(), contentId: z.string() }),
   // A batch of recreates: one priced run for every row at the step.
   z.object({ type: z.literal('recreate_batch'), contentId: z.string(), step: z.enum(['stills', 'face', 'video']), facePass: z.boolean().optional() }),
+  // Mass recreate (item 24): fetch the sheet's TikTok links one at a time,
+  // then the ticked rows' stills, then the kept rows' videos.
+  z.object({ type: z.literal('mass_fetch'), contentId: z.string() }),
+  z.object({ type: z.literal('mass_recreate'), contentId: z.string(), step: z.enum(['stills', 'video']) }),
   // Voice lines: the owner's takes in the character's voice, with word
   // timings (ElevenLabs), one quote with a line per take.
   z.object({ type: z.literal('voice_convert'), soundIds: z.array(z.string().max(60)).min(1).max(50) }),
@@ -265,6 +272,8 @@ export async function buildAction(deps: Deps, ctx: Ctx, action: StudioAction): P
   if (action.type === 'clone_still') return buildCloneStill(deps, ctx, action)
   if (action.type === 'clone_face') return buildCloneFace(deps, ctx, action)
   if (action.type === 'recreate_batch') return buildRecreateBatch(deps, ctx, action)
+  if (action.type === 'mass_fetch') return buildMassFetch(deps, ctx, action)
+  if (action.type === 'mass_recreate') return buildMassRecreate(deps, ctx, action)
   if (action.type === 'voice_convert') return buildVoiceConvert(deps, ctx, action.soundIds)
   if (action.type === 'hook_variants') return buildHookVariants(deps, ctx, action)
   if (action.type === 'slideshow_hooks') return buildSlideshowHooks(deps, ctx, action.contentId)
@@ -574,6 +583,7 @@ async function afterStart(deps: Deps, ctx: Ctx, action: StudioAction, built: Bui
     // Each row's model counts as used (the next run starts there).
     if (action.step === 'video') for (const m of new Set(built.ran.map(r => r.model))) await saveCloneModel(deps, ctx, m).catch(() => undefined)
   }
+  if (action.type === 'mass_fetch') await afterMassFetchStarted(deps, ctx, action.contentId)
   if (action.type === 'voice_convert') await markConverting(deps, ctx, action.soundIds, new Map(jobs.map(j => [j.purpose.split(':')[1]!, j.id])))
   if (action.type === 'hero') {
     const row = await getCharacter(deps, ctx, action.characterId)

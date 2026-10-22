@@ -77,7 +77,11 @@ export function ClonePanel({ ctx, onUse, usedIds, batch = false }: { ctx: PostCt
     setCharacterIds(ids => (ids.includes(id) ? ids.filter(x => x !== id) : [...ids, id].slice(0, o?.maxCharacters ?? 5)))
   }
 
-  const needStill = m === 'motion' ? characterIds.filter(id => !kept[id]) : []
+  // Stills first (item 20): a replace starts from a kept still too, unless
+  // switched off; then its price warns that it runs without stills.
+  const [stillsFirst, setStillsFirst] = useState(true)
+  const replaceStills = m === 'replace' && stillsFirst && !batch
+  const needStill = m === 'motion' || replaceStills ? characterIds.filter(id => !kept[id]) : []
   const todo: TodoItem[] = [
     ...(!ready ? [{ label: 'Choose the TikTok or Reel', target: 'clone-source' }] : []),
     ...(!characterIds.length ? [{ label: 'Pick a character', target: 'clone-characters' }] : []),
@@ -133,8 +137,18 @@ export function ClonePanel({ ctx, onUse, usedIds, batch = false }: { ctx: PostCt
         </div>
       </Field>
 
-      {m === 'motion' && ready && (
-        <Field id="clone-still" label="The still the motion goes onto" required done={!needStill.length} group hint={`${name} in the clip's first frame (about 0.2 s in). Pick one; the clip's real motion is copied onto it, never onto a bare sheet image.`}>
+      {m === 'replace' && ready && !batch && (
+        <label className="st-row" style={{ gap: 10, cursor: 'pointer' }} data-field="clone-stills-first">
+          <button type="button" role="switch" aria-checked={stillsFirst} aria-label="Stills first" className={`st-switch ${stillsFirst ? 'on' : ''}`} onClick={() => setStillsFirst(v => !v)}><span /></button>
+          <span className="st-col" style={{ gap: 0 }}><b>Stills first</b><span className="st-hint">{stillsFirst ? `On: ${name} in the clip's frame first, checked against REF-00 for free, then the replace starts from the still you keep.` : `Off: the replace gets only ${name}'s sheet and no face checks run first. Its price says so.`}</span></span>
+        </label>
+      )}
+      {m === 'replace' && ready && !batch && !stillsFirst && (
+        <Callout tone="warn">This clone runs without stills: no face check before the money step, and faces drift more. Switch Stills first back on to start from a still that passed the gates.</Callout>
+      )}
+
+      {(m === 'motion' || replaceStills) && ready && (
+        <Field id="clone-still" label={m === 'motion' ? 'The still the motion goes onto' : 'The still the replace starts from'} required done={!needStill.length} group hint={m === 'motion' ? `${name} in the clip's first frame (about 0.2 s in). Pick one; the clip's real motion is copied onto it, never onto a bare sheet image.` : `${name} in the clip's first frame (about 0.2 s in). Pick one; it leads the images the replace model gets, ahead of REF-00.`}>
           <RecreateSteps ctx={ctx} source={source!} characterIds={characterIds} outfit={wear} look={looks[item.characterId ?? ''] ?? null} list={stills.data?.stills ?? []} kept={kept} takes={o?.takes ?? { still: 4, face: 2 }} />
         </Field>
       )}
@@ -149,7 +163,7 @@ export function ClonePanel({ ctx, onUse, usedIds, batch = false }: { ctx: PostCt
                 <button key={x.ref} type="button" role="radio" aria-checked={on} className={`st-choice ${on ? 'on' : ''}`} onClick={() => pick(x.ref)} disabled={!ok} title={x.note || undefined}>
                   <span className="st-row" style={{ gap: 8 }}><b>{x.label}</b><span className="st-spacer" />{on && <Check size={14} />}</span>
                   <span className="st-model-price">{x.display ?? 'No price yet'}{x.display && !x.verified ? <span className="st-muted" style={{ fontWeight: 400 }}> (not confirmed)</span> : null}</span>
-                  <span className="st-hint">{x.path === 'account' ? 'Your Higgsfield plan' : 'Higgsfield API'}{x.resolution ? ` · ${x.resolution}` : ''}</span>
+                  <span className="st-hint">{x.pathLabel}{x.resolution ? ` · ${x.resolution}` : ''}</span>
                   {!ok && <span className="st-hint" style={{ color: 'var(--st-warn)' }}>Takes {x.minSec} to {x.maxSec} s clips</span>}
                   {ok && x.problem && <span className="st-hint" style={{ color: 'var(--st-warn)' }}>{x.problem}</span>}
                 </button>
@@ -169,7 +183,7 @@ export function ClonePanel({ ctx, onUse, usedIds, batch = false }: { ctx: PostCt
       <PriceButton
         label={characterIds.length > 1 ? `Clone it for ${characterIds.length} characters` : 'Clone it'}
         todo={todo}
-        action={{ type: 'clone', contentId: item.id, characterIds, mode: m, ...(picked ? { model: picked.ref } : {}), outfit: wear, looks, keepSound }}
+        action={{ type: 'clone', contentId: item.id, characterIds, mode: m, ...(picked ? { model: picked.ref } : {}), outfit: wear, looks, keepSound, ...(m === 'replace' && !replaceStills ? { noStills: true } : {}) }}
         watch={j => j.purpose.startsWith(`clone:${item.id}:`)}
       />
 

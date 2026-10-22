@@ -8,6 +8,9 @@ import { newId } from '../lib/ids.js'
 import { registerJobHook, registerLocalJob, type JobOutcome, type JobRow } from '../jobs/hooks.js'
 import { activateChildren, cancelChildren, childJobs, enqueueLocalJob, quoteItemsFor, type JobSpec } from '../jobs/runner.js'
 import { displayPrice } from '../costs/quotes.js'
+import { digitsFor, vs } from '../core/gateText.js'
+import { afterMassClipReady } from './massRecreate.js'
+import { estimateGen, findPrice, splitRef } from '../costs/pricebook.js'
 import { isVideoOp, GONE_STATUSES } from '../core/clips.js'
 import { capitalize, fill, hardWrap } from '../core/text.js'
 import { buildEditPrompt, hairColorFrom } from '../core/scenes.js'
@@ -221,6 +224,7 @@ async function runCloneSource(deps: Deps, ctx: Ctx, job: JobRow): Promise<unknow
     if (uploadId) await deps.store.delete(uploadKey(ctx.accountId, uploadId)).catch(() => undefined)
     if (seconds < cfg.min_seconds) {
       await write({ status: 'failed', error: `This clip is ${seconds} s long. A clone needs at least ${cfg.min_seconds} s of video.` })
+      await afterMassClipReady(deps, ctx, postId).catch(() => undefined)
       return { seconds }
     }
     await write({
@@ -229,9 +233,12 @@ async function runCloneSource(deps: Deps, ctx: Ctx, job: JobRow): Promise<unknow
       cleanup: made.clean ? { endCardSec: made.clean.endCardSec, spots: made.clean.spots, on: true } : null,
       rawFrameId: made.rawFrame, motionAssetId: made.motion ?? made.asset.id, look: made.look, motionFrameIds: made.motionFrames,
     })
+    // A mass recreate row (item 24): its free first pass now.
+    await afterMassClipReady(deps, ctx, postId).catch(e => ctx.log.error({ err: e }, 'mass check not queued'))
     return { assetId: used.id, seconds, cleanup: made.clean ? { endCardSec: made.clean.endCardSec, spots: made.clean.spots } : null }
   } catch (e) {
     await write({ status: 'failed', error: `This file could not be read as a video (${(e as Error).message.slice(0, 200)}).` })
+    await afterMassClipReady(deps, ctx, postId).catch(() => undefined)
     throw e
   }
 }
@@ -426,6 +433,11 @@ export type MotionPath = { billing: HiggsfieldBilling | null; problem: string | 
 // plan lapses. Null, with one line why, when neither works.
 export async function motionPath(deps: Deps, ctx: Ctx, ref: string): Promise<MotionPath> {
   const entry = modelEntry(deps, ref)
+  // fal (item 19): the API only, on the account's own fal key.
+  if (ref.startsWith('fal/')) {
+    if ((await providerMode(deps.db, ctx.accountId)) !== 'live') return { billing: 'api', problem: null }
+    return (await listCredentials(deps.db, ctx.accountId)).some(c => c.provider === 'fal') ? { billing: 'api', problem: null } : { billing: null, problem: 'Needs your fal key: Settings > Provider keys.' }
+  }
   const onPlan = !!entry.mcp_id && !!entry.mcp
   const onApi = entry.api !== false && !!entry.endpoint
   const prefer = (await readBilling(deps.db, ctx.accountId)).default
@@ -480,7 +492,7 @@ export async function cloneOptions(deps: Deps, ctx: Ctx, contentId: string) {
     const billing = path.billing ?? (entry.api === false || !entry.endpoint ? 'account' : 'api')
     const base = {
       ref: m.ref, label: entry.label, mode: entry.clone.mode, resolution: m.resolution ?? null, background: entry.clone.background, minSec: entry.clone.min_sec, maxSec: entry.clone.max_sec,
-      path: billing, pathLabel: billing === 'account' ? 'Your Higgsfield plan' : 'Higgsfield API', note: entry.notes ?? '', takesPrompt: entry.clone.prompt !== 'none' && !(billing === 'account' && entry.mcp?.tool === 'motion_control'),
+      path: billing, pathLabel: billing === 'account' ? 'Your Higgsfield plan' : m.ref.startsWith('fal/') ? 'fal' : 'Higgsfield API', note: entry.notes ?? '', takesPrompt: entry.clone.prompt !== 'none' && !(billing === 'account' && entry.mcp?.tool === 'motion_control'),
     }
     if (path.problem) return { ...base, display: null, verified: false, problem: path.problem }
     if (source?.durationSec && (source.durationSec < entry.clone.min_sec - 0.05 || source.durationSec > entry.clone.max_sec + 0.05)) {
@@ -508,7 +520,22 @@ export async function cloneOptions(deps: Deps, ctx: Ctx, contentId: string) {
     ...await (async () => {
       const { choices, pick } = await recreateStillChoices(deps, ctx)
       const c = choices.find(x => x.ref === pick)!
-      return { stillModels: choices, stillModel: { ref: c.ref, label: c.label, onPlan: c.path === 'account', note: c.note } }
+      // The price of one still on each choice, on its card (item 19: a price
+      // on every button). Free estimates.
+      const priced = choices.map(x => {
+        // The real model's price from the price book (never the demo mock):
+        // plan credits on the plan, dollars on the API.
+        try {
+          const level = stillLevelFor(deps, x.ref)
+          const e = estimateGen(deps.config, { kind: 'image_edit', model: x.ref, prompt: '', aspect: '9:16', quality: level.quality, resolution: level.resolution })
+          const entry = findPrice(deps.config.pricebook, ...Object.values(splitRef(x.ref)) as [string, string], 'image', { resolution: level.resolution, quality: level.quality, aspect: '9:16' })
+          const display = x.path === 'account' && entry?.credits != null ? `${entry.credits} credit${entry.credits === 1 ? '' : 's'} a still` : `${displayPrice([{ amountMicros: e.totalMicros, credits: null }])} a still`
+          return { ...x, display, verified: x.path === 'account' ? !!entry?.credits_verified : e.verified }
+        } catch {
+          return { ...x, display: null as string | null, verified: false }
+        }
+      })
+      return { stillModels: priced, stillModel: { ref: c.ref, label: c.label, onPlan: c.path === 'account', note: c.note } }
     })(),
     cap: source ? { credits: source.capCredits, spent: Math.round(source.spentCredits * 100) / 100 } : null,
     mode, outfit: cfg.outfit, defaults, model: defaults[mode], models, seconds,
@@ -534,6 +561,9 @@ export interface CloneInput {
   keepSound: boolean
   // Recreate: the still each character's video starts from (else the kept one).
   stills?: Record<string, string>
+  // Replace runs from the kept still when there is one (item 20, stills on
+  // by default); true only when the owner switched the stills off.
+  noStills?: boolean
 }
 
 // REF-00 and the first approved three-quarter view (content.yaml
@@ -599,7 +629,6 @@ export async function addCloneSpend(deps: Deps, ctx: Ctx, action: { type: string
 
 export interface StillGate { ok: boolean; face: number | null; likeness: number | null; margin: number | null; reasons: string[]; note: string | null }
 
-const two = (n: number) => n.toFixed(2)
 
 // The chosen still must match REF-00 (face_min or more), its face match
 // must beat its likeness to the person in the clip by a clear margin, and
@@ -618,9 +647,10 @@ export function gateFor(g: { face_min: number; margin: number; source_max: numbe
   // 2026-10-15: both came back as studio portraits).
   if (still.unchecked) reasons.push('This face pass was made before the scene check, so it may not match its still. Make the face pass again, or use a still.')
   if (face == null) reasons.push('No face to match with REF-00 was found on it.')
-  else if (face < g.face_min) reasons.push(`Face match ${two(face)}, needs ${two(g.face_min)} or more.`)
-  if (margin != null && margin < g.margin) reasons.push(`Beats the clip's person by ${two(margin)} (face ${two(face!)}, likeness ${two(likeness!)}), needs ${two(g.margin)} or more.`)
-  if (likeness != null && likeness >= g.source_max) reasons.push(`Likeness to the clip's person ${two(likeness)}, must stay under ${two(g.source_max)}.`)
+  // Each number with the decimals that show the fail (item 21).
+  else if (face < g.face_min) { const [a, b] = vs(face, g.face_min); reasons.push(`Face match ${a}, needs ${b} or more.`) }
+  if (margin != null && margin < g.margin) { const [a, b] = vs(margin, g.margin); const d = digitsFor(margin, g.margin); reasons.push(`Beats the clip's person by ${a} (face ${face!.toFixed(d)}, likeness ${likeness!.toFixed(d)}), needs ${b} or more.`) }
+  if (likeness != null && likeness >= g.source_max) { const [a, b] = vs(likeness, g.source_max); reasons.push(`Likeness to the clip's person ${a}, must stay under ${b}.`) }
   const note = likeness == null && !reasons.length ? 'No face showed in the clip\'s frame to compare with, so the margin was not checked.' : null
   return { ok: !reasons.length, face, likeness, margin, reasons, note }
 }
@@ -714,6 +744,18 @@ export async function buildClone(deps: Deps, ctx: Ctx, input: CloneInput) {
     let template: string
     if (mode === 'replace') {
       refs = replaceRefs(deps, approved)
+      // Stills first (item 20): the kept still (the character already in the
+      // clip's frame, past the face gates) leads the images; without one the
+      // price warns before the run.
+      const keptId = input.noStills ? null : input.stills?.[cid] ?? source.stills[cid] ?? null
+      const kept = keptId ? await getCandidate(deps, ctx, keptId).catch(() => null) : null
+      if (kept?.assetId && kept.characterId === cid && kept.op === 'clone_still') {
+        const gate = await stillGate(deps, ctx, kept)
+        if (!gate.ok) throw new AppError('gate_failed', `${row.name}'s still is not ready: ${gate.reasons.join(' ')} Fix the face again, make new stills, or switch Stills first off.`, { gate })
+        refs = [kept.assetId, ...refs]
+      } else {
+        warnings.push(warn('clone-no-stills', `Runs without stills for ${row.name}`, `The model gets only ${row.name}'s sheet (REF-00 and one three-quarter view), never ${ch.pronouns.obj} in the clip's own frame, and none of the free face checks run before the money step. Faces drift more this way. Make the stills first (Stills first, on by default) to start from a still that passed the gates.`))
+      }
       let outfit = fill(t.clone.outfit_source, pronounVars(ch.pronouns))
       const lookId = input.looks[cid]
       if ((input.outfit ?? cfg.outfit) === 'hers') {
@@ -790,10 +832,19 @@ export async function buildClone(deps: Deps, ctx: Ctx, input: CloneInput) {
 
 // ── Recreate from a real clip: the stills (owner, 2026-10-14) ───────
 
-export interface CloneStillInput { contentId: string; characterId: string; outfit?: 'source' | 'hers'; look?: string; takes?: number; facePass?: boolean; facePassTakes?: number; stillModel?: string }
+export interface CloneStillInput {
+  contentId: string; characterId: string; outfit?: 'source' | 'hers'; look?: string; takes?: number; facePass?: boolean; facePassTakes?: number; stillModel?: string
+  // Mass recreate (item 24): a second character for the person on the
+  // right (characterId is the one on the left), and a new place for the
+  // scene ("new set": the words, or true for a fitting everyday place).
+  pairWith?: string | null
+  newSet?: string | boolean | null
+}
 
 // The character's element on the plan (a Higgsfield element named in the
 // character file), used through its placeholder in the prompt.
+const onPlanStill = (run: { billing?: string }) => run.billing === 'account'
+
 function planElement(ch: ReturnType<typeof toData>) {
   return ch.identities.find(i => i.kind === 'element' && i.status === 'ready' && i.provider === 'higgsfield') ?? null
 }
@@ -809,29 +860,41 @@ const STILL_MODEL_KEY = 'recreate_still_model'
 
 export interface StillChoice { ref: string; label: string; path: 'account' | 'api'; pathLabel: string; problem: string | null; note: string | null }
 
-// The Recreate stills' model (owner, round 18): Nano Banana 2.1 on the plan
-// (what the proven runs used; the API does not offer it) or GPT Image 2.5 on
-// the API (untested for recreates). Same prompts, face pass and gates. The
-// last pick is kept; Nano Banana 2.1 when the plan is connected, else GPT
-// Image 2.5. A choice that cannot run is grey with one line why.
+// The Recreate stills' model (owner, round 18; item 18, 2026-10-22): Nano
+// Banana 2.1 on the plan (what the proven runs used), Nano Banana 2.1 on
+// Google AI Studio (the same model on the API, pay per image), or Seedream
+// 4.5 edit on fal (the fallback, untested for recreates). GPT Image 2.5 is
+// never offered here: OpenAI refuses edits of a real person's photo. Same
+// prompts, face pass and gates. The last pick is kept; else the first that
+// can run, in that order. A choice that cannot run is grey with one line why.
 export async function recreateStillChoices(deps: Deps, ctx: Ctx): Promise<{ choices: StillChoice[]; pick: string }> {
   const cfg = deps.config.pipeline.content.clone.scene_still
   const live = (await providerMode(deps.db, ctx.accountId)) === 'live'
-  const plan = (await listCredentials(deps.db, ctx.accountId)).some(c => c.provider === ACCOUNT_PROVIDER)
-  const api = !live || await apiKeyReady(deps, ctx)
+  const creds = await listCredentials(deps.db, ctx.accountId)
+  const has = (provider: string) => !live || creds.some(c => c.provider === provider)
   const label = (ref: string) => deps.config.models.models.find(m => m.ref === ref)?.label ?? ref
+  const keyProblem = (ref: string) => {
+    const p = ref.split('/')[0]!
+    const name = ({ google: 'Google AI Studio', fal: 'fal' } as Record<string, string>)[p] ?? p
+    return has(p) ? null : `Needs your ${name} key: Settings > Provider keys.`
+  }
+  const pathLabel = (ref: string) => ({ google: 'Google AI Studio', fal: 'fal' } as Record<string, string>)[ref.split('/')[0]!] ?? 'Higgsfield API'
   const choices: StillChoice[] = [
-    { ref: cfg.model, label: label(cfg.model), path: 'account', pathLabel: 'Your Higgsfield plan', problem: !live || plan ? null : 'Runs only on your Higgsfield plan (the API does not offer it): connect it in Settings > Connected accounts.', note: null },
-    { ref: cfg.api_model, label: label(cfg.api_model), path: 'api', pathLabel: 'Higgsfield API', problem: api ? null : 'Needs your Higgsfield API key: Settings > Connected accounts.', note: cfg.api_note || null },
+    { ref: cfg.model, label: label(cfg.model), path: 'account', pathLabel: 'Your Higgsfield plan', problem: has(ACCOUNT_PROVIDER) ? null : 'Runs only on your Higgsfield plan: connect it in Settings > Connected accounts.', note: null },
+    { ref: cfg.api_model, label: label(cfg.api_model), path: 'api', pathLabel: pathLabel(cfg.api_model), problem: keyProblem(cfg.api_model), note: null },
+    ...(cfg.fallback_model ? [{ ref: cfg.fallback_model, label: label(cfg.fallback_model), path: 'api' as const, pathLabel: pathLabel(cfg.fallback_model), problem: keyProblem(cfg.fallback_model), note: cfg.fallback_note || null }] : []),
   ]
   const saved = await getSetting<string | null>(deps.db, ctx.accountId, STILL_MODEL_KEY, null)
-  const pick = choices.find(c => c.ref === saved && !c.problem)?.ref ?? (plan ? cfg.model : cfg.api_model)
+  // The plan when it is connected (demo mode too), else the first API
+  // choice that can run.
+  const plan = creds.some(c => c.provider === ACCOUNT_PROVIDER)
+  const pick = choices.find(c => c.ref === saved && !c.problem)?.ref ?? (plan ? cfg.model : choices.find(c => c.path === 'api' && !c.problem)?.ref) ?? cfg.model
   return { choices, pick }
 }
 
 export async function saveRecreateStillModel(deps: Deps, ctx: Ctx, ref: string): Promise<void> {
   const cfg = deps.config.pipeline.content.clone.scene_still
-  if (ref !== cfg.model && ref !== cfg.api_model) throw new AppError('invalid_request', `"${ref}" is not one of the Recreate stills models.`)
+  if (ref !== cfg.model && ref !== cfg.api_model && ref !== cfg.fallback_model) throw new AppError('invalid_request', `"${ref}" is not one of the Recreate stills models.`)
   await setSetting(deps, ctx, STILL_MODEL_KEY, ref)
 }
 
@@ -914,28 +977,56 @@ export async function buildCloneStill(deps: Deps, ctx: Ctx, input: CloneStillInp
   const realism: RealismWarning[] = []
   const { face, hair } = faceWords(ch)
   const notLike = source.notLike.trim()
-  const change = fill(t.clone.recreate_still, {
+  let change = fill(t.clone.recreate_still, {
     ...pv, name: ch.name, target: cloneTargetWords(deps, source), face, hair_color: hair,
     element: element ? ` <<<${element.externalId}>>>` : t.clone.recreate_element_api,
     not_like: `${notLike ? fill(t.clone.recreate_not_like, { ...pv, traits: notLike }) : ''}${keep.length ? fill(t.clone.recreate_keep, { keep: keep.join(', ') }) : ''}`,
     outfit,
   })
+  // Two people (item 24): the left one is this character, the right one
+  // the pair's; each face from its own element or REF-00, left to right.
+  let pair: { left: string; right: string } | null = null
+  if (input.pairWith && input.pairWith !== row.id) {
+    const rrow = await getCharacter(deps, ctx, input.pairWith)
+    const rch = toData(rrow)
+    const tooYoung = adultProblem(rch.age)
+    if (tooYoung) throw new AppError('bad_request', `${rrow.name}: ${tooYoung}`)
+    const rApproved = await approvedAssets(deps, ctx, rrow.id)
+    if (!rApproved.get('REF-00')) throw new AppError('bad_request', `${rrow.name} has no face yet. Set up REF-00 first.`)
+    const rElement = onPlanStill(run) ? planElement(rch) : null
+    const leftRef = element ? null : approved.get('REF-00')!
+    const rightRef = rElement ? null : rApproved.get('REF-00')!
+    refs.length = 1
+    if (leftRef) refs.push(leftRef)
+    if (rightRef) refs.push(rightRef)
+    const lw = faceWords(ch), rw = faceWords(rch)
+    change = fill(t.clone.recreate_pair, {
+      name_left: ch.name, face_left: lw.face, hair_left: lw.hair, element_left: element ? ` <<<${element.externalId}>>>` : fill(t.clone.recreate_pair_element, { n: '2' }),
+      name_right: rch.name, face_right: rw.face, hair_right: rw.hair, element_right: rElement ? ` <<<${rElement.externalId}>>>` : fill(t.clone.recreate_pair_element, { n: String(refs.length) }),
+      outfit: outfit ? 'Keep both outfits exactly as in the first image.' : '',
+    })
+    pair = { left: row.id, right: rrow.id }
+  }
+  // A new set (item 24): the pose and the framing stay; the place changes.
+  if (input.newSet) change += fill(t.clone.recreate_new_set, { place: typeof input.newSet === 'string' && input.newSet.trim() ? input.newSet.trim().replace(/[.\s]+$/, '') : t.clone.recreate_new_set_default })
   const prompt = buildEditPrompt(t, change, ch, false, { warnings: realism, flawDose: sw.on('realism-flaw-dose'), realismLine: t.clone.recreate_realism })
   const request: GenRequest = {
     kind: 'image_edit', model: run.model, modelRef: model, prompt, aspect: portrait ? '9:16' : '16:9', quality: level.quality, resolution: level.resolution,
     refs: refs.slice(0, entry.max_refs).map(assetId => ({ assetId })),
     ...(run.billing ? { billing: run.billing } : {}),
+    ...(pair ? { pair } : {}),
   }
   warnings.push(...lintOrThrow(lintPrompt(rules, prompt, { stage: 'edit', kind: 'image_edit', request: { ...request, model }, switches: sw }), 'Recreate still'))
   for (const w of realism) warnings.push(w)
   if (!notLike) warnings.push(warn('clone-not-like', 'Nothing named to keep away', `Naming the person's traits (hair color, eye color, piercings, makeup) keeps ${row.name}'s face from drifting toward theirs. Optional.`))
-  if (cfg.scene_still.api_note && model === cfg.scene_still.api_model) warnings.push(warn('clone-still-untested', `${entry.label}, ${cfg.scene_still.api_note}`, `Nano Banana 2.1 made the proven recreates and runs only on your Higgsfield plan (the API does not offer it). These stills run on ${entry.label} on the Higgsfield API, which has not been proven for a recreate yet: same prompts, same face pass, same gates. Pick Nano Banana 2.1 above the button to use the plan.`))
+  if (cfg.scene_still.fallback_note && model === cfg.scene_still.fallback_model) warnings.push(warn('clone-still-untested', `${entry.label}, ${cfg.scene_still.fallback_note}`, `Nano Banana 2.1 made the proven recreates (on your Higgsfield plan or Google AI Studio). These stills run on ${entry.label} on fal, which has not been proven for a recreate yet: same prompts, same face pass, same gates. Pick Nano Banana 2.1 above the button when either path is set up.`))
   const specs: JobSpec[] = Array.from({ length: takes }, (_, v) => ({ type: 'gen' as const, stage: 'edit', purpose: `clone_still:${post.id}:${row.id}`, label: `Still ${v + 1} of ${takes} for ${row.name}`, request: { ...request, seed: v + 1 }, characterId: row.id }))
   const prompts = [{ label: 'Still prompt', text: prompt, wrapped: hardWrap(prompt) }]
   // The face pass on the best still, in the same price (owner, round 17):
   // waiting children of the first still, started on the best one when all
   // the stills are in, or canceled (hold released) if none is usable.
-  const withFace = input.facePass ?? cfg.recreate.face_pass
+  // A pair has no face pass (it edits one face); each face is scored on its own.
+  const withFace = pair ? false : input.facePass ?? cfg.recreate.face_pass
   if (withFace) {
     const fp = await facePassRun(deps, ctx, { postId: post.id, characterId: row.id, still: 'auto', assetId: frameId, aspect: request.aspect!, takes: input.facePassTakes, model })
     for (const sp of fp.specs) specs.push({ ...sp, parentIndex: 0 })
@@ -1159,6 +1250,16 @@ async function onCloneStill(deps: Deps, ctx: Ctx, job: JobRow, out: JobOutcome):
       findings.push(...p.findings.filter(f => !findings.some(x => x.code === f.code && x.message === f.message)))
       scores.sourceScore = p.identity?.score ?? null
     }
+    // Two people (item 24): each face, left to right, against its own
+    // character's REF-00 and the clip's person on the same side. The
+    // still's numbers are the weaker side's: the lower face match and the
+    // higher likeness.
+    if (req.pair && !demo && deps.faces.analyzeAll && frameId0(source)) {
+      const sides = await pairScores(deps, ctx, asset.id, frameId0(source)!, req.pair)
+      scores.faceScore = sides.face
+      scores.sourceScore = sides.likeness
+      if (sides.note) findings.push({ code: 'uncertain', severity: 'warn', message: sides.note })
+    }
   } catch (e) {
     findings.push({ code: 'uncertain', severity: 'warn', message: `The free checks could not run on this still (${(e as Error).message.slice(0, 160)}). Look at the face yourself.` })
   }
@@ -1195,6 +1296,28 @@ async function onCloneStill(deps: Deps, ctx: Ctx, job: JobRow, out: JobOutcome):
     await updateContent(deps, ctx, postId, { spec: { clone: { ...now, stills: { ...now.stills, [characterId]: id } } } })
   }
   if (!face) await startAutoFace(deps, ctx, job, postId, characterId)
+}
+
+const frameId0 = (source: CloneSource | null) => source?.rawFrameId ?? source?.firstFrameId ?? null
+
+// The two faces of a pair still against their characters and the clip's
+// two people, matched by side (left to right).
+async function pairScores(deps: Deps, ctx: Ctx, stillId: string, frameId: string, pair: { left: string; right: string }): Promise<{ face: number | null; likeness: number | null; note: string | null }> {
+  const all = deps.faces.analyzeAll!
+  const mine = await all((await readAsset(deps, ctx, stillId)).data)
+  const theirs = await all((await readAsset(deps, ctx, frameId)).data)
+  if (mine.length < 2) return { face: null, likeness: null, note: `Two people were asked for; ${mine.length} face${mine.length === 1 ? ' was' : 's were'} found on this still.` }
+  const sides = [mine[0]!, mine[mine.length - 1]!]
+  const src = theirs.length >= 2 ? [theirs[0]!, theirs[theirs.length - 1]!] : []
+  const faces: number[] = [], likes: number[] = []
+  for (const [i, cid] of [pair.left, pair.right].entries()) {
+    const ref = (await approvedAssets(deps, ctx, cid)).get('REF-00')
+    const r = ref ? await deps.faces.analyze((await readAsset(deps, ctx, ref)).data, `ref:${ref}`) : null
+    if (r) faces.push(cosineSimilarity(sides[i]!.embedding, r.embedding))
+    if (src[i]) likes.push(cosineSimilarity(sides[i]!.embedding, src[i]!.embedding))
+  }
+  const r3 = (n: number) => Math.round(n * 1000) / 1000
+  return { face: faces.length === 2 ? r3(Math.min(...faces)) : null, likeness: likes.length ? r3(Math.max(...likes)) : null, note: src.length < 2 ? 'The clip\'s frame shows fewer than two faces, so the likeness was checked on what was found.' : null }
 }
 
 const DONE = new Set(['completed', 'failed', 'canceled', 'needs_attention'])
@@ -1523,8 +1646,17 @@ export async function postClones(deps: Deps, ctx: Ctx, contentId: string): Promi
 export async function keepClone(deps: Deps, ctx: Ctx, candidateId: string, acknowledge = false): Promise<{ ok: true }> {
   const cand = await getCandidate(deps, ctx, candidateId)
   if (cand.op !== 'clone' || !cand.assetId) throw new AppError('bad_request', 'That is not a finished clone.')
-  if (cand.status === 'approved') return { ok: true }
-  const meta = (cand.meta ?? {}) as { review?: CloneReview; gate?: TakeGate | null; decision?: unknown }
+  const meta = (cand.meta ?? {}) as { review?: CloneReview; gate?: TakeGate | null; decision?: { kind?: string } | null }
+  // A take that passed was kept by the Studio; the owner's own keep is
+  // still recorded on it (item 21: every take gets your call).
+  if (cand.status === 'approved') {
+    if (meta.decision?.kind !== 'kept') {
+      const now = deps.clock.now()
+      await deps.db.update(candidates).set({ reviewedBy: ctx.userId, reviewedAt: now, updatedAt: now, meta: { ...meta, decision: { kind: 'kept', at: now.toISOString() } } }).where(eq(candidates.id, cand.id))
+      await logTakeCall(deps, ctx, cand, 'kept')
+    }
+    return { ok: true }
+  }
   // Read again with today's numbers when the review found faces; else the
   // gate stored with the take (a demo take passes with a note).
   const stored = meta.review?.gate ?? meta.gate ?? null
@@ -1535,7 +1667,31 @@ export async function keepClone(deps: Deps, ctx: Ctx, candidateId: string, ackno
   const report = cand.qaReport as QaReport | null
   const qaReport = report ? { ...report, findings: report.findings.map(f => (f.severity === 'fail' && (f.code === 'too_similar' || f.code === 'face_drift') ? { ...f, severity: 'warn' as const, message: `${f.message} Kept by you.` } : f)) } : report
   await deps.db.update(candidates).set({ status: 'approved', qaReport, rejectNote: '', reviewedBy: ctx.userId, reviewedAt: now, updatedAt: now, meta: { ...meta, decision: { kind: 'kept', at: now.toISOString() } } }).where(eq(candidates.id, cand.id))
+  await logTakeCall(deps, ctx, cand, 'kept')
   return { ok: true }
+}
+
+// The owner's call on every take (item 21): kept or rejected, with the
+// take's scores and model, newest first, the last 500 per account. The gate
+// check reads the calls from the takes; this log keeps them in one list,
+// even after a take goes to the Trash.
+export const TAKE_CALLS_KEY = 'recreate_take_calls'
+export interface TakeCall { candidateId: string; postId: string | null; characterId: string | null; model: string | null; call: 'kept' | 'rejected'; face: number | null; likeness: number | null; margin: number | null; passed: boolean | null; at: string }
+
+async function logTakeCall(deps: Deps, ctx: Ctx, cand: Awaited<ReturnType<typeof getCandidate>>, call: 'kept' | 'rejected'): Promise<void> {
+  const meta = (cand.meta ?? {}) as { review?: CloneReview; gate?: TakeGate | null }
+  const gate = meta.review?.gate ?? meta.gate ?? null
+  const [run] = cand.jobId ? await deps.db.select({ purpose: jobs.purpose, request: jobs.request }).from(jobs).where(eq(jobs.id, cand.jobId)) : []
+  const entry: TakeCall = {
+    candidateId: cand.id, postId: run?.purpose.split(':')[1] ?? null, characterId: cand.characterId, model: (run?.request as GenRequest | undefined)?.modelRef ?? null,
+    call, face: gate?.face ?? null, likeness: gate?.likeness ?? null, margin: gate?.margin ?? null, passed: gate ? gate.ok : null, at: deps.clock.now().toISOString(),
+  }
+  const all = await getSetting<TakeCall[]>(deps.db, ctx.accountId, TAKE_CALLS_KEY, [])
+  await setSetting(deps, ctx, TAKE_CALLS_KEY, [entry, ...all.filter(x => x.candidateId !== cand.id)].slice(0, 500))
+}
+
+export async function takeCalls(deps: Deps, ctx: Ctx): Promise<TakeCall[]> {
+  return getSetting<TakeCall[]>(deps.db, ctx.accountId, TAKE_CALLS_KEY, [])
 }
 
 // "Try again": the owner passes on this take (recorded for the gate
@@ -1546,6 +1702,7 @@ export async function tryCloneAgain(deps: Deps, ctx: Ctx, candidateId: string): 
   const meta = (cand.meta ?? {}) as Record<string, unknown>
   const now = deps.clock.now()
   await deps.db.update(candidates).set({ reviewedBy: ctx.userId, reviewedAt: now, updatedAt: now, meta: { ...meta, decision: { kind: 'tried_again', at: now.toISOString() } } }).where(eq(candidates.id, cand.id))
+  await logTakeCall(deps, ctx, cand, 'rejected')
   return { ok: true }
 }
 

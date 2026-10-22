@@ -162,6 +162,11 @@ export async function settingsView(deps: Deps, ctx: Ctx) {
         // The owner's account can run on the server key (ELEVENLABS_API_KEY).
         serverKey: !!(await serverKeyFor(deps.db, { ownerEmail: deps.env.STUDIO_OWNER_EMAIL || 'owner@studio.local', elevenlabs: deps.env.ELEVENLABS_API_KEY }, ctx.accountId, 'elevenlabs')),
       },
+      // The API path for Recreate without a Higgsfield plan (item 19): keys
+      // made in each provider's own dashboard, pasted here only.
+      { id: 'google', label: 'Google AI Studio', hint: 'An API key from aistudio.google.com (Get API key), on a project with billing on.', placeholder: 'e.g. AIza...', usedFor: 'Nano Banana 2.1 Recreate stills and the face pass on the API' },
+      { id: 'apify', label: 'Apify', hint: 'Your API token from Apify (Settings, API and Integrations).', placeholder: 'e.g. apify_api_...', usedFor: 'Mass recreate: fetching each TikTok link in your sheet as its video' },
+      { id: 'fal', label: 'fal', hint: 'An API key from fal.ai (Dashboard, Keys), with a balance.', placeholder: 'e.g. 1a2b...:3c4d...', usedFor: 'Seedream 4.5 edit stills (the fallback), Wan 2.2 Animate replace and Kling 3.0 Motion Control on the API' },
     ],
     budgets: {
       job: microsToUsd(b.jobCapMicros), character: microsToUsd(b.characterCapMicros), month: microsToUsd(b.monthCapMicros),

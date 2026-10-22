@@ -198,6 +198,9 @@ clone:
     - { ref: higgsfield/kling-3.0-motion-control, resolution: 720p }
     - { ref: higgsfield/genjutsu-replace, resolution: 720p }
     - { ref: higgsfield/seedance-2.5-video-edit, resolution: 720p }
+    # The API path without a Higgsfield plan (item 19): fal.
+    - { ref: fal/wan-2.2-animate-replace, resolution: 720p }
+    - { ref: fal/kling-3.0-motion-control }
     - { ref: higgsfield/kling-o3-video-edit }
   # The outfit: the one in the clip (default) or one of the character's
   # stills.
@@ -212,13 +215,20 @@ clone:
   face_refs: [REF-00, REF-01, REF-02]
   # The scene still for "Copy the moves": the clip's first frame edited to
   # put the character in place of the person you picked.
+  # Mass recreate (owner, 2026-10-22, item 24): a TikTok link in the sheet
+  # is fetched as its video through the owner's Apify account.
+  mass:
+    fetch_model: apify/tiktok-video
   scene_still:
     model: higgsfield/nano-banana-2.1
-    api_model: higgsfield/gpt-image-2.5
-    # Nano Banana 2.1 is plan-only (the Higgsfield API does not offer it), so
-    # without the plan the stills run on GPT Image 2.5, never proven for a
-    # recreate; its button says so (owner, round 17).
-    api_note: untested for recreates
+    # Without the plan, Nano Banana 2.1 runs on Google AI Studio (the same
+    # model, pay per image), then Seedream 4.5 edit on fal as the fallback.
+    # GPT Image 2.5 is out of Recreate (owner, 2026-10-22, item 18): OpenAI
+    # refuses edits of a real person's photo. Flare stays for heroes, sheets
+    # and slideshow stills.
+    api_model: google/nano-banana-2.1
+    fallback_model: fal/seedream-4.5-edit
+    fallback_note: untested for recreates
   # Recreate from a real clip: the frame (seconds in), the takes, and what
   # suggests the route (a dark clip or a lot of movement, read free).
   recreate:

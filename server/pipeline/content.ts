@@ -251,6 +251,8 @@ const memeSpec = z.object({
   // The Idea step's two ways in (owner, 2026-10-14): "Describe it" or
   // "Start from a real clip" (Recreate).
   start: z.enum(['describe', 'clip']).default('describe'),
+  // A post made by a mass recreate row (item 24): its batch and row.
+  massOf: z.object({ batchId: id, rowId: z.string().max(40) }).nullable().default(null),
   clipId: id.nullable().default(null),
   // The still the clip was made from, when it was made in this post.
   stillId: id.nullable().default(null),
@@ -340,6 +342,9 @@ const batchObject = z.object({
   // A batch of recreates (owner, 2026-10-14): up to 20 rows, each a clip
   // and a character in its own video post, with its own motion model.
   recreate: z.object({ rows: z.array(z.object({ postId: id, model: z.string().max(80).nullable().default(null) })).max(50).default([]) }).nullable().default(null),
+  // Mass recreate (item 24; server/pipeline/massRecreate.ts reads it): the
+  // sheet and folder, and each row from fetch to take.
+  mass: z.record(z.string(), z.unknown()).nullable().default(null),
   // Section 32: what the batch did once posted. Never copied.
   results: resultsSchema.nullable().default(null),
 })

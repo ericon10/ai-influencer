@@ -3256,5 +3256,147 @@
         "label": "Download the original file, or use it in a new post"
       }
     ]
+  },
+  "mass-rows": {
+    "w": 1086,
+    "h": 677,
+    "spots": [
+      {
+        "n": 1,
+        "x": 1.4,
+        "y": 3.5,
+        "w": 71.2,
+        "h": 5,
+        "label": "The sheet: a link, or its CSV"
+      },
+      {
+        "n": 2,
+        "x": 1.4,
+        "y": 10.3,
+        "w": 83.8,
+        "h": 5,
+        "label": "Or a Drive folder of clips, synced"
+      },
+      {
+        "n": 3,
+        "x": 1.4,
+        "y": 42.7,
+        "w": 97.2,
+        "h": 20.4,
+        "label": "A row: its clip, characters (Swap), place, model, the free first pass and its price"
+      },
+      {
+        "n": 4,
+        "x": 1.4,
+        "y": 64.2,
+        "w": 97.2,
+        "h": 14.5,
+        "label": "A skipped row says why"
+      },
+      {
+        "n": 5,
+        "x": 1.4,
+        "y": 80.5,
+        "w": 97.2,
+        "h": 9.9,
+        "label": "The ticked rows' one total"
+      },
+      {
+        "n": 6,
+        "x": 1.4,
+        "y": 92.2,
+        "w": 27.8,
+        "h": 5.6,
+        "label": "One click: the stills, one row at a time"
+      }
+    ]
+  },
+  "recreate-stillmodel": {
+    "w": 1086,
+    "h": 119,
+    "spots": [
+      {
+        "n": 1,
+        "x": 0,
+        "y": 0,
+        "w": 19.4,
+        "h": 100,
+        "label": "Nano Banana 2.1 on your Higgsfield plan (credits)"
+      },
+      {
+        "n": 2,
+        "x": 20.1,
+        "y": 0,
+        "w": 19.4,
+        "h": 100,
+        "label": "Nano Banana 2.1 on Google AI Studio (dollars)"
+      },
+      {
+        "n": 3,
+        "x": 40.3,
+        "y": 0,
+        "w": 19.4,
+        "h": 100,
+        "label": "Seedream 4.5 edit on fal, the fallback"
+      }
+    ]
+  },
+  "clone-stills-first": {
+    "w": 1086,
+    "h": 717,
+    "spots": [
+      {
+        "n": 1,
+        "x": 0,
+        "y": 3.3,
+        "w": 100,
+        "h": 5.4,
+        "label": "Stills first: on by default"
+      },
+      {
+        "n": 2,
+        "x": 1.3,
+        "y": 12.7,
+        "w": 85.3,
+        "h": 2.7,
+        "label": "Off: a warning on the panel"
+      },
+      {
+        "n": 3,
+        "x": 0,
+        "y": 91.6,
+        "w": 100,
+        "h": 5,
+        "label": "and on the price, before the click"
+      }
+    ]
+  },
+  "take-call": {
+    "w": 1086,
+    "h": 55,
+    "spots": [
+      {
+        "n": 1,
+        "x": 0.1,
+        "y": 43.6,
+        "w": 99.8,
+        "h": 54.5,
+        "label": "Your call on every take, a passing one too: Keep or Reject"
+      }
+    ]
+  },
+  "take-calls": {
+    "w": 1124,
+    "h": 91,
+    "spots": [
+      {
+        "n": 1,
+        "x": 1.9,
+        "y": 26.5,
+        "w": 96.3,
+        "h": 47,
+        "label": "Each call with the take's scores, to three decimals"
+      }
+    ]
   }
 }

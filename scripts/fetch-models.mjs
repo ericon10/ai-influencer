@@ -15,6 +15,9 @@ const MODELS = [
   // Recreate's review (logos, @handles and captions on a take).
   { file: 'eng.traineddata', url: 'https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/main/eng.traineddata', sha256: '7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2' },
   { file: 'human_segmentation_pphumanseg_2023mar.onnx', url: 'https://media.githubusercontent.com/media/opencv/opencv_zoo/main/models/human_segmentation_pphumanseg/human_segmentation_pphumanseg_2023mar.onnx', sha256: '552d8a984054e59b5d773d24b9b12022b22046ceb2bbc4c9aaeaceb36a9ddf24' },
+  // The free adult check before a mass recreate (item 24): the age
+  // classifier from the ONNX model zoo (GoogLeNet, eight age groups).
+  { file: 'age_googlenet.onnx', url: 'https://media.githubusercontent.com/media/onnx/models/main/validated/vision/body_analysis/age_gender/models/age_googlenet.onnx', sha256: 'fa2a3228e425056aa2b080b3afd3cf607327c86616e952602ed67b5fc16ab356' },
 ]
 
 mkdirSync(DIR, { recursive: true })

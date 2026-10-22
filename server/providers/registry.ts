@@ -9,6 +9,9 @@ import { createMockLlm, type LlmResponder } from './mockLlm.js'
 import { createAnthropicLlm } from './anthropic.js'
 import { createHiggsfieldAdapter } from './higgsfield.js'
 import { createElevenLabsAdapter } from './elevenlabs.js'
+import { createFalAdapter } from './fal.js'
+import { createApifyAdapter } from './apify.js'
+import { createGoogleAdapter } from './google.js'
 import { createHiggsfieldAccountAdapter, type AccountBalance, type LivePriceStore } from './higgsfieldAccount.js'
 import { getSetting, putCacheSetting } from '../pipeline/settings.js'
 import { accountTokenSource, readAccountTokens } from './higgsfieldOAuth.js'
@@ -147,6 +150,15 @@ export function createRegistry(o: RegistryOptions): ProviderRegistry & { mockFor
         if (key) return createElevenLabsAdapter({ ...base, apiKey: key })
         if (o.voiceMock) return createElevenLabsAdapter({ ...base, mock: true })
         throw new AppError('provider_not_configured', 'Voice lines need an ElevenLabs key: add ELEVENLABS_API_KEY to the server (Vercel and Railway), or your ElevenLabs key in Settings.')
+      }
+      // fal and Google AI Studio (item 19): the account's own key from
+      // Settings > Provider keys only, never a server key.
+      if (p === 'fal' || p === 'google' || p === 'apify') {
+        const key = await readSecret(o.db, o.vault, accountId, p)
+        if (!key) throw new AppError('provider_not_configured', `Add your ${({ fal: 'fal', google: 'Google AI Studio', apify: 'Apify' } as Record<string, string>)[p]} key in Settings > Provider keys to run this on the API.`)
+        if (p === 'apify') return createApifyAdapter({ apiKey: key, config: o.config, fetchImpl: o.fetchImpl })
+        if (p === 'fal') return createFalAdapter({ apiKey: key, config: o.config, fetchImpl: o.fetchImpl })
+        return createGoogleAdapter({ apiKey: key, config: o.config, store: o.store, loadAsset: id => o.loadAsset(accountId, id), fetchImpl: o.fetchImpl })
       }
       // The account's own key first; the owner's account can also use the
       // server key (HF_CREDENTIALS).

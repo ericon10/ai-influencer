@@ -430,10 +430,11 @@ describe('account adapter edge cases', () => {
       ],
     })
     // Higgsfield cannot price it before the clip is uploaded: the price
-    // book answers (3 credits per second, not confirmed), with no call.
+    // book answers (7 credits per second, the Object Swap charges in the
+    // account's transactions, so confirmed), with no call.
     const est = await a.estimate(req)
-    expect(est.credits).toBe(30)
-    expect(est.verified).toBe(false)
+    expect(est.credits).toBe(70)
+    expect(est.verified).toBe(true)
     expect(fake.calls).toHaveLength(0)
     const { jobId } = await a.submit(req, { idempotencyKey: 'k-replace' })
     expect(jobId).toBeTruthy()

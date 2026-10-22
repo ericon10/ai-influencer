@@ -46,6 +46,7 @@ export function RulesPanel() {
             </div>
           </section>
           <GateCheckCard />
+          <TakeCallsCard />
           {ORDER.filter(a => defaults.some(r => r.area === a)).map(area => (
             <section key={area} className="st-card">
               <div className="st-card-head"><div className="grow"><div className="st-h2">{q.data.areas[area] ?? area}</div><div className="st-hint">Defaults. Pre-filled and editable; a warning at most.</div></div></div>
@@ -211,3 +212,40 @@ function VideoGateSection({ v }: { v: VideoGateView }) {
     </div>
   )
 }
+
+// Your call on every Recreate take (item 21): kept or rejected, with the
+// take's scores, newest first.
+function TakeCallsCard() {
+  const q = useQuery({ queryKey: ['take-calls'], queryFn: api.takeCalls, retry: false })
+  const calls = q.data?.calls ?? []
+  const kept = calls.filter(c => c.call === 'kept').length
+  return (
+    <section className="st-card" data-field="take-calls">
+      <div className="st-card-head"><div className="grow"><div className="st-h2">Your calls on takes</div><div className="st-hint">Every Recreate take you kept or rejected, with its scores. A take that passed the video rule still asks for your call.</div></div><HowTo id="post-clone" label="How takes are reviewed" /></div>
+      <div className="st-card-body st-col" style={{ gap: 8 }}>
+        {!calls.length ? <span className="st-hint">No calls yet. Keep or Reject on a take shows here.</span> : (<>
+          <span>{kept} kept, {calls.length - kept} rejected.</span>
+          <div className="st-scroll-x">
+            <table className="st-table">
+              <thead><tr><th>When</th><th>Call</th><th>Face</th><th>Likeness</th><th>Margin</th><th>Video rule</th><th>Model</th></tr></thead>
+              <tbody>
+                {calls.slice(0, 50).map(c => (
+                  <tr key={c.candidateId}>
+                    <td>{new Date(c.at).toLocaleString()}</td>
+                    <td>{c.call === 'kept' ? 'Kept' : 'Rejected'}</td>
+                    <td>{n3(c.face)}</td><td>{n3(c.likeness)}</td><td>{n3(c.margin)}</td>
+                    <td>{c.passed == null ? 'not read' : c.passed ? 'passed' : 'missed'}</td>
+                    <td>{c.model ?? ''}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>)}
+      </div>
+    </section>
+  )
+}
+
+const n3 = (v: number | null) => (v == null ? 'none' : v.toFixed(3))
+

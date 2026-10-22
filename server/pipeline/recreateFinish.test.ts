@@ -71,10 +71,11 @@ beforeAll(async () => {
 afterAll(async () => { await rm(dir, { recursive: true, force: true }) })
 
 describe('the motion model picker', () => {
-  it('offers Genjutsu, Wan 3.0, Wan 3.0 Prime and Kling 3.0 Motion Control, each priced with its path', async () => {
+  it('offers Genjutsu, Wan 3.0, Wan 3.0 Prime and Kling 3.0 Motion Control (Higgsfield and fal), each priced with its path', async () => {
     const o = await cloneOptions(h.deps, h.ctx, postId)
     const motion = o.models.filter(m => m.mode === 'motion')
-    expect(motion.map(m => m.label)).toEqual(['Genjutsu', 'Wan 3.0', 'Wan 3.0 Prime', 'Kling 3.0 Motion Control'])
+    expect(motion.map(m => m.label)).toEqual(['Genjutsu', 'Wan 3.0', 'Wan 3.0 Prime', 'Kling 3.0 Motion Control', 'Kling 3.0 Motion Control'])
+    expect(motion.map(m => m.pathLabel).at(-1)).toBe('fal')
     expect(motion.every(m => m.problem === null && m.display && (m.path === 'api' || m.path === 'account'))).toBe(true)
     expect(o.model === 'higgsfield/wan-3.0-motion' || o.mode === 'replace').toBe(true)
   })
@@ -83,9 +84,10 @@ describe('the motion model picker', () => {
     await setSetting(h.deps, h.ctx, 'provider_mode', 'live')
     try {
       const off = (await cloneOptions(h.deps, h.ctx, postId)).models.filter(m => m.mode === 'motion')
-      expect(off.every(m => m.problem === 'Needs your Higgsfield API key or plan: Settings > Connected accounts.')).toBe(true)
+      expect(off.filter(m => m.pathLabel !== 'fal').every(m => m.problem === 'Needs your Higgsfield API key or plan: Settings > Connected accounts.')).toBe(true)
+      expect(off.find(m => m.pathLabel === 'fal')!.problem).toBe('Needs your fal key: Settings > Provider keys.')
       await saveCredential(h.deps, h.ctx, 'higgsfield', 'kid_test:secret_test')
-      const on = (await cloneOptions(h.deps, h.ctx, postId)).models.filter(m => m.mode === 'motion')
+      const on = (await cloneOptions(h.deps, h.ctx, postId)).models.filter(m => m.mode === 'motion' && m.pathLabel !== 'fal')
       // Every model the API offers works on the API alone (the plan may lapse).
       expect(on.map(m => [m.label, m.path, m.pathLabel])).toEqual([
         ['Genjutsu', 'api', 'Higgsfield API'], ['Wan 3.0', 'api', 'Higgsfield API'], ['Wan 3.0 Prime', 'api', 'Higgsfield API'], ['Kling 3.0 Motion Control', 'api', 'Higgsfield API'],
@@ -220,13 +222,13 @@ describe('step 2, the stills and the gates', () => {
     expect(cardForPhotoEdit('Distinguishing mark: small mole above her left brow. Style: a regular girl whose style evolves; natural glow.')).toBe('Distinguishing mark: small mole above her left brow.')
   })
 
-  it('the stills stay on Nano Banana 2.1 on the plan whenever it is connected, even with the API as the billing default', async () => {
+  it('the stills stay on Nano Banana 2.1 on the plan whenever it is connected, even with the API as the billing default; without it Nano Banana 2.1 on Google AI Studio, never GPT Image 2.5', async () => {
     await saveBilling(h.deps, h.ctx, { default: 'api', creditUsd: 0 })
     const off = await buildCloneStill(h.deps, h.ctx, { contentId: postId, characterId: callie })
-    expect((off.specs[0]!.request as GenRequest).modelRef).toBe('higgsfield/gpt-image-2.5')
-    // Without the plan the stills say they are untested for a recreate.
-    expect(off.preview.warnings.find(w => w.ruleId === 'clone-still-untested')).toMatchObject({ title: 'GPT Image 2.5, untested for recreates' })
-    expect((await cloneOptions(h.deps, h.ctx, postId)).stillModel).toEqual({ ref: 'higgsfield/gpt-image-2.5', label: 'GPT Image 2.5', onPlan: false, note: 'untested for recreates' })
+    expect((off.specs[0]!.request as GenRequest).modelRef).toBe('google/nano-banana-2.1')
+    expect(off.specs.every(sp => !/gpt-image/.test((sp.request as GenRequest).modelRef ?? ''))).toBe(true)
+    expect(off.preview.warnings.some(w => w.ruleId === 'clone-still-untested')).toBe(false)
+    expect((await cloneOptions(h.deps, h.ctx, postId)).stillModel).toEqual({ ref: 'google/nano-banana-2.1', label: 'Nano Banana 2.1', onPlan: false, note: null })
     await storeSecret(h.deps, h.ctx, ACCOUNT_PROVIDER, JSON.stringify({ accessToken: 'at-1', refreshToken: 'rt-1', expiresAt: Date.now() + 3600_000, clientId: 'client-1' }), 'Higgsfield account', '')
     try {
       const on = await buildCloneStill(h.deps, h.ctx, { contentId: postId, characterId: callie })
@@ -307,20 +309,22 @@ describe('step 2, the stills and the gates', () => {
     expect((post.spec as MemeSpec).sound.music).toBeNull()
   })
 
-  it('the stills model is a choice even on the plan: GPT Image 2.5 on the API, with the same face pass and gates', async () => {
+  it('the stills model is a choice even on the plan: Nano Banana 2.1 on Google AI Studio or Seedream 4.5 edit on fal, with the same face pass and gates; GPT Image 2.5 is refused', async () => {
     await storeSecret(h.deps, h.ctx, ACCOUNT_PROVIDER, JSON.stringify({ accessToken: 'at-1', refreshToken: 'rt-1', expiresAt: Date.now() + 3600_000, clientId: 'client-1' }), 'Higgsfield account', '')
     try {
       const o = await cloneOptions(h.deps, h.ctx, postId)
-      expect(o.stillModels.map(c => [c.label, c.path, c.problem])).toEqual([['Nano Banana 2.1', 'account', null], ['GPT Image 2.5', 'api', null]])
+      expect(o.stillModels.map(c => [c.label, c.path, c.pathLabel, c.problem])).toEqual([
+        ['Nano Banana 2.1', 'account', 'Your Higgsfield plan', null], ['Nano Banana 2.1', 'api', 'Google AI Studio', null], ['Seedream 4.5 edit', 'api', 'fal', null],
+      ])
       expect(o.stillModel.ref).toBe('higgsfield/nano-banana-2.1')
-      const api = await buildCloneStill(h.deps, h.ctx, { contentId: postId, characterId: callie, stillModel: 'higgsfield/gpt-image-2.5' })
-      // The stills and the face pass that follows both run on GPT Image 2.5.
-      expect(api.specs.map(sp => (sp.request as GenRequest).modelRef)).toEqual(Array(6).fill('higgsfield/gpt-image-2.5'))
-      expect(api.preview.warnings.some(w => w.ruleId === 'clone-still-untested')).toBe(true)
+      const api = await buildCloneStill(h.deps, h.ctx, { contentId: postId, characterId: callie, stillModel: 'fal/seedream-4.5-edit' })
+      // The stills and the face pass that follows both run on Seedream.
+      expect(api.specs.map(sp => (sp.request as GenRequest).modelRef)).toEqual(Array(6).fill('fal/seedream-4.5-edit'))
+      expect(api.preview.warnings.find(w => w.ruleId === 'clone-still-untested')).toMatchObject({ title: 'Seedream 4.5 edit, untested for recreates' })
       // The pick is remembered.
-      await saveRecreateStillModel(h.deps, h.ctx, 'higgsfield/gpt-image-2.5')
-      expect((await cloneOptions(h.deps, h.ctx, postId)).stillModel).toMatchObject({ ref: 'higgsfield/gpt-image-2.5', onPlan: false, note: 'untested for recreates' })
-      await expect(saveRecreateStillModel(h.deps, h.ctx, 'higgsfield/seedance-2.5')).rejects.toThrow(/not one of the Recreate stills models/)
+      await saveRecreateStillModel(h.deps, h.ctx, 'google/nano-banana-2.1')
+      expect((await cloneOptions(h.deps, h.ctx, postId)).stillModel).toMatchObject({ ref: 'google/nano-banana-2.1', onPlan: false, note: null })
+      await expect(saveRecreateStillModel(h.deps, h.ctx, 'higgsfield/gpt-image-2.5')).rejects.toThrow(/not one of the Recreate stills models/)
       await saveRecreateStillModel(h.deps, h.ctx, 'higgsfield/nano-banana-2.1')
     } finally {
       await revokeCredential(h.deps, h.ctx, ACCOUNT_PROVIDER)

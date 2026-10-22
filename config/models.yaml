@@ -72,6 +72,41 @@ models:
     params: { resolution: [1k, 2k, 4k], thinking_level: true, inpaint: mask }
     use_for: [scene_still, expression_edit]
     notes: Best for scene stills and expression edits; held face and hair well with refs (verified live 2026-10-12). Re-composes the frame, so never use it to upscale.
+  # ── The API path without a Higgsfield plan (owner, 2026-10-22, item 19) ──
+  # Nano Banana 2.1 through Google AI Studio (the Gemini API), the model the
+  # proven recreates used: generateContent with responseModalities IMAGE and
+  # imageConfig { aspectRatio, imageSize } (ai.google.dev, image
+  # generation; the model id from Google's release, 2026-10-06). The key is
+  # the account's own (Settings > Provider keys). Unconfirmed until its
+  # first paid run, like every new model.
+  - ref: google/nano-banana-2.1
+    label: Nano Banana 2.1
+    kinds: [image, image_edit]
+    max_refs: 4
+    reference: https://ai.google.dev/gemini-api/docs/image-generation
+    endpoint: gemini-nano-banana-2.1
+    input_map: gemini_image
+    verified: false
+    elements: false
+    aliases: [Nano Banana 2.1 (Google AI Studio)]
+    params: { resolution: [1k, 2k, 4k] }
+    use_for: [scene_still]
+    notes: Google AI Studio, pay per image. The same model as on your Higgsfield plan; REF-00 and one three-quarter view carry the face (no element).
+  # Seedream 4.5 edit on fal, the stills' fallback when neither Nano Banana
+  # path works (fal-ai/bytedance/seedream/v4.5/edit: prompt, image_urls up
+  # to 10, image_size, seed; fal.ai docs).
+  - ref: fal/seedream-4.5-edit
+    label: Seedream 4.5 edit
+    kinds: [image_edit]
+    max_refs: 10
+    reference: https://fal.ai/models/fal-ai/bytedance/seedream/v4.5/edit/api
+    endpoint: fal-ai/bytedance/seedream/v4.5/edit
+    input_map: fal_seedream_edit
+    verified: false
+    elements: false
+    aliases: [Seedream 4.5 edit, Seedream 4.5]
+    use_for: [scene_still]
+    notes: fal, pay per image. The fallback for Recreate stills; not proven for a recreate yet.
   - ref: higgsfield/nano-banana-2
     label: Nano Banana 2
     kinds: [image, image_edit]
@@ -258,6 +293,7 @@ models:
     mcp: { params: [resolution], roles: { refs: image_references, video: video_references } }
     clone: { mode: replace, background: [video], image_refs: 3, min_sec: 3, max_sec: 30, prompt: optional }
     aliases: [Genjutsu replace, hf_mult_replace_object]
+    charge_names: [Higgsfield Genjutsu - Object Swap]
     params: { resolution: [480p, 720p, 1080p] }
     use_for: [video_clone]
     notes: Your Higgsfield plan. Swaps only the person you pick and keeps the clip's place, light, crowd and outfit.
@@ -349,6 +385,51 @@ models:
     params: { resolution: [720p, 1080p] }
     use_for: [video_clone]
     notes: The character follows the clip's motion and camera. On your plan it takes no prompt.
+  # Wan 2.2 Animate, replace mode, on fal (fal-ai/wan/v2.2-14b/animate/
+  # replace: video_url, image_url, resolution 480p, 580p or 720p; billed per
+  # second of output at 16 fps; fal.ai docs): the clip keeps its place,
+  # light and motion and the person becomes the kept still's. The API path's
+  # "keep the place" motion step (item 19).
+  - ref: fal/wan-2.2-animate-replace
+    label: Wan 2.2 Animate replace
+    kinds: [video_clone]
+    max_refs: 1
+    reference: https://fal.ai/models/fal-ai/wan/v2.2-14b/animate/replace/api
+    endpoint: fal-ai/wan/v2.2-14b/animate/replace
+    input_map: fal_wan_animate_replace
+    verified: false
+    clone: { mode: replace, background: [video], image_refs: 1, min_sec: 1, max_sec: 30, prompt: none }
+    aliases: [Wan 2.2 Animate, Wan Animate replace]
+    params: { resolution: [480p, 580p, 720p] }
+    use_for: [video_clone]
+    notes: fal, pay per second. Keeps the clip's place, light and moves; the person becomes the kept still's.
+  # Kling 3.0 Motion Control (Pro) on fal (fal-ai/kling-video/v3/pro/
+  # motion-control: image_url, video_url, character_orientation, prompt;
+  # orientation "video" takes clips up to 30 s; fal.ai docs).
+  - ref: fal/kling-3.0-motion-control
+    label: Kling 3.0 Motion Control
+    kinds: [video_clone]
+    max_refs: 1
+    reference: https://fal.ai/models/fal-ai/kling-video/v3/pro/motion-control/api
+    endpoint: fal-ai/kling-video/v3/pro/motion-control
+    input_map: fal_kling_motion_control
+    verified: false
+    clone: { mode: motion, background: [image], image_refs: 1, min_sec: 3, max_sec: 30, prompt: optional }
+    aliases: [Kling 3.0 Motion Control (fal)]
+    use_for: [video_clone]
+    notes: fal, pay per second. The clip's motion and camera onto the kept still, in the still's place.
+  # Mass recreate (item 24): a TikTok link from the sheet fetched as its
+  # video through the owner's Apify account (clockworks/tiktok-scraper with
+  # shouldDownloadVideos). Priced per clip; the clip's own sound is kept.
+  - ref: apify/tiktok-video
+    label: TikTok clip (Apify)
+    kinds: [video]
+    max_refs: 0
+    reference: https://apify.com/clockworks/tiktok-scraper
+    endpoint: clockworks~tiktok-scraper
+    input_map: apify_tiktok
+    verified: false
+    notes: Fetches the video at a TikTok link through your Apify account; never scraped by the Studio itself.
   - ref: higgsfield/kling-3.0-motion-control-pro
     label: Kling 3.0 Motion Control Pro
     kinds: [video_clone]

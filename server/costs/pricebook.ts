@@ -32,6 +32,7 @@ function line(label: string, quantity: number, unit: string, entry: PriceEntry):
 export class PriceMissingError extends Error {}
 
 function genUnit(req: GenRequest): { unit: PriceEntry['unit']; quantity: number; label: string } {
+  if (req.fetchUrl) return { unit: 'call', quantity: 1, label: 'clip fetched' }
   if (req.kind === 'video' || req.kind === 'video_extend' || req.kind === 'video_clone') {
     const seconds = req.durationSec ?? 5
     return { unit: 'second', quantity: seconds, label: `${seconds}s of video` }

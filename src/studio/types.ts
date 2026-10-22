@@ -226,8 +226,10 @@ export type StudioAction =
   | { type: 'content_slides'; characterId: string; contentId: string }
   | { type: 'content_captions'; characterId: string; contentId: string }
   | { type: 'clone_caption'; characterId: string; contentId: string }
-  | { type: 'clone'; contentId: string; characterIds: string[]; model?: string; mode?: CloneMode; background?: 'video' | 'image'; outfit?: 'source' | 'hers'; looks: Record<string, string>; keepSound: boolean; stills?: Record<string, string> }
+  | { type: 'clone'; contentId: string; characterIds: string[]; model?: string; mode?: CloneMode; background?: 'video' | 'image'; outfit?: 'source' | 'hers'; looks: Record<string, string>; keepSound: boolean; stills?: Record<string, string>; noStills?: boolean }
   | { type: 'recreate_batch'; contentId: string; step: 'stills' | 'face' | 'video'; facePass?: boolean }
+  | { type: 'mass_fetch'; contentId: string }
+  | { type: 'mass_recreate'; contentId: string; step: 'stills' | 'video' }
   | { type: 'clone_still'; contentId: string; characterId: string; outfit?: 'source' | 'hers'; look?: string; takes?: number; facePass?: boolean; stillModel?: string }
   | { type: 'clone_face'; contentId: string; characterId: string; candidateId: string; takes?: number }
   | { type: 'clone_traits'; contentId: string; characterId: string }
@@ -411,8 +413,8 @@ export interface CloneSource {
   keep?: string[]; outfit?: { choice: 'source' | 'hers'; text: string; lookId: string | null }; motion?: string
   capCredits?: number | null; spentCredits?: number; from?: string
 }
-// Recreate's stills model: Nano Banana 2.1 on the plan or GPT Image 2.5 on the API.
-export interface StillChoice { ref: string; label: string; path: 'account' | 'api'; pathLabel: string; problem: string | null; note: string | null }
+// Recreate's stills model: Nano Banana 2.1 on the plan or Google AI Studio, or Seedream 4.5 edit on fal.
+export interface StillChoice { ref: string; label: string; path: 'account' | 'api'; pathLabel: string; problem: string | null; note: string | null; display?: string | null; verified?: boolean }
 export type GateNumbers = { face_min: number; margin: number; source_max: number }
 export interface GateSample { postId: string; candidateId: string; assetId: string | null; pass: 'still' | 'face'; face: number | null; likeness: number | null; margin: number | null; model: string | null; at: string }
 // A take's scores over the whole take (the video rule) and the gate
@@ -620,4 +622,29 @@ export interface TrashItem {
   id: string; kind: TrashRef['kind']; refId: string; label: string; characterId: string | null; reason: 'owner' | 'auto'
   assetId: string | null; media: 'image' | 'video' | 'audio' | 'file' | null
   deletedAt: string; purgeAfter: string; daysLeft: number
+}
+
+// The owner's call on a Recreate take (item 21): kept or rejected, with its scores.
+export interface TakeCall { candidateId: string; postId: string | null; characterId: string | null; model: string | null; call: 'kept' | 'rejected'; face: number | null; likeness: number | null; margin: number | null; passed: boolean | null; at: string }
+
+// Mass recreate (item 24): a batch's rows from a sheet or a Drive folder,
+// from fetch to take, with each row's prices and the ticked rows' total.
+export interface MassRowView {
+  id: string
+  source: { kind: 'tiktok' | 'drive' | 'link'; url: string; driveId: string | null; name: string }
+  characters: string[]; characterNames: string[]; place: 'keep' | 'new'; model: string | null; modelLabel: string; notes: string
+  status: 'to_fetch' | 'fetching' | 'checking' | 'ready' | 'skipped'; reason: string | null; postId: string | null
+  check: { adult: boolean | null; people: number | null; seconds: number | null; notes: string[] } | null
+  ticked: boolean; stillCall: 'kept' | 'rejected' | null
+  frameId: string | null; sourceAssetId: string | null
+  stage: 'fetch' | 'wait' | 'stills' | 'working' | 'call' | 'video' | 'review' | 'done' | 'out'
+  still: { id: string; assetId: string | null; gateOk: boolean; reasons: string[]; face: number | null; likeness: number | null; margin: number | null } | null
+  take: { id: string; assetId: string | null; status: string; decision: string | null } | null
+  price: { stills: { display: string; micros: number; credits: number | null } | null; video: { display: string; micros: number; credits: number | null } | null }
+}
+export interface MassView {
+  sheet: string | null; folder: string | null; syncedAt: string | null; rows: MassRowView[]; defaultModel: string; max: number
+  counts: { all: number; ready: number; skipped: number; fetching: number }
+  total: { stills: { micros: number; credits: number | null; rows: number }; video: { micros: number; credits: number | null; rows: number }; ticked: number }
+  toFetch: number
 }

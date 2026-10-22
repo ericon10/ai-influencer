@@ -167,6 +167,14 @@ clone:
   # Higgsfield element on the plan, or the reference images otherwise.
   recreate_still: "Use the first image only for the place, the light, the camera angle, the framing, the pose and the outfit. Replace {target} in it completely with {name}{element}: {face}. {Poss} hair is {hair_color}.{not_like} Keep the head angle and the gaze of the first image. Remove all caption text, the TikTok logo and the username, leaving no text or watermark anywhere in the image. {outfit}"
   recreate_not_like: " {Subj} must not have that person's {traits}."
+  # Mass recreate (owner, 2026-10-22, item 24). Two people in the clip: two
+  # characters, left to right, each named with the reference image that
+  # carries the face. A "new set" row keeps the pose and the framing and
+  # changes only the place.
+  recreate_pair: "Use the first image only for the place, the light, the camera angle, the framing, the poses and the outfits. Replace the person on the left in it completely with {name_left}{element_left}: {face_left}. {name_left}'s hair is {hair_left}. Replace the person on the right in it completely with {name_right}{element_right}: {face_right}. {name_right}'s hair is {hair_right}. Keep each head angle and gaze of the first image. Remove all caption text, the TikTok logo and the username, leaving no text or watermark anywhere in the image. {outfit}"
+  recreate_pair_element: " (the person in reference image {n})"
+  recreate_new_set: " Move the scene to a new place: {place}. Keep the poses, the camera angle and the framing of the first image; only the place and its light change."
+  recreate_new_set_default: "a different everyday place that fits the people in it"
   recreate_element_api: " (the person in the other reference images)"
   # The short REALISM line for Recreate stills and the face pass (owner,
   # 2026-10-15), in place of the full REALISM and AVOID blocks.

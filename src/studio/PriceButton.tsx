@@ -108,6 +108,8 @@ export function PriceButton({ action, label, variant = 'primary', size = 'normal
   // provider's filter often blocks (it goes as typed, G46).
   const realism = (est.data?.preview.warnings ?? []).filter(w => (w as { ruleId?: string }).ruleId?.startsWith('realism'))
   const risky = (est.data?.preview.warnings ?? []).filter(w => (w as { ruleId?: string }).ruleId === 'wording-risky')
+  // A clone with no stills says so before the click (item 20).
+  const noStills = (est.data?.preview.warnings ?? []).filter(w => w.ruleId === 'clone-no-stills')
   // The clip reader's outfit names no garment type (UX-PLAN section 26):
   // the warning, with its one-tap fix priced on its own button.
   const garment = (est.data?.preview.warnings ?? []).filter(w => w.ruleId === 'outfit-garment')
@@ -167,11 +169,11 @@ export function PriceButton({ action, label, variant = 'primary', size = 'normal
     : estimateError ? <span className="st-price">No price</span>
     : null
   return (
-    <div className="st-col" style={{ gap: 8, alignItems: 'flex-start' }}>
+    <div className="st-col st-pricebtn" style={{ gap: 8, alignItems: 'flex-start' }}>
       <Todo items={blockers} />
       {!worker.ready && <span className="st-hint st-warntext" role="status"><AlertTriangle size={12} style={{ verticalAlign: -2 }} /> {worker.reason}</span>}
       {waiting && !blockers.length && <span className="st-hint st-row" style={{ gap: 6 }}><Loader2 size={13} className="st-spin" />{waiting}</span>}
-      <div className="st-row" style={{ gap: 6 }}>
+      <div className="st-row st-pricebtn-row" style={{ gap: 6 }}>
         <button className={cls} disabled={disabled} onClick={go} title={blockers.map(b => b.label).join(', ') || estimateError || undefined}>
           {running ? <Loader2 size={16} className="st-spin" /> : icon && <Sparkles size={16} />}
           {running ? 'Submitting...' : confirming ? `Confirm ${quote?.display}` : label}
@@ -203,6 +205,7 @@ export function PriceButton({ action, label, variant = 'primary', size = 'normal
       )}
       {!noStatus && !compact && <RunStatus ids={started} match={watch} pending={running} hideEarlier={hideEarlier} />}
       {realism.map((w, i) => <span key={i} className="st-hint" style={{ color: 'var(--st-warn)' }}><AlertTriangle size={12} style={{ verticalAlign: -2 }} /> {w.message}</span>)}
+      {noStills.map((w, i) => <span key={`s${i}`} className="st-hint" data-field="clone-no-stills" style={{ color: 'var(--st-warn)' }}><AlertTriangle size={12} style={{ verticalAlign: -2 }} /> {w.title}: {w.message}</span>)}
       {risky.map((w, i) => <span key={`r${i}`} className="st-hint" data-field="wording-risky" style={{ color: 'var(--st-warn)' }}><AlertTriangle size={12} style={{ verticalAlign: -2 }} /> {w.title}: {w.message}</span>)}
       {!compact && garment.map((w, i) => (
         <div key={`g${i}`} className="st-col" style={{ gap: 6 }} data-field="outfit-garment">

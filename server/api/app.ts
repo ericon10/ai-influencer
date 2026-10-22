@@ -3,7 +3,7 @@ import { Hono, type Context } from 'hono'
 import { importFacelessPlan, previewFacelessPlan } from '../pipeline/facelessImport.js'
 import { createFacelessCharacter, saveFaceless } from '../pipeline/faceless.js'
 import { z } from 'zod'
-import { and, desc, eq, gt, inArray, or } from 'drizzle-orm'
+import { and, desc, eq, gt, inArray, or, sql } from 'drizzle-orm'
 import type { Ctx, Deps, Principal } from '../context.js'
 import { hasRole } from '../context.js'
 import { AppError } from '../lib/errors.js'
@@ -37,8 +37,9 @@ import { addHook, archiveHook, archiveProduct, archiveVariant, importKit, produc
 import { deleteStyle, editorManifest, listStyles, saveFromEditor, saveStyle } from '../pipeline/openreel.js'
 import { previewImport, runImport } from '../pipeline/csvImport.js'
 import { answerGateCheck, gateCheck } from '../pipeline/gateCheck.js'
-import { addCloneSource, cloneOptions, cloneStills, keepClone, pickCloneStill, postClones, postFromClone, saveCloneModel, saveRecreateStillModel, setCloneChoices, setCloneCleanup, setCloneNotLike, setCloneTarget, trimClone, tryCloneAgain, useCloneStill } from '../pipeline/clone.js'
+import { addCloneSource, cloneOptions, cloneStills, keepClone, pickCloneStill, postClones, postFromClone, saveCloneModel, takeCalls, saveRecreateStillModel, setCloneChoices, setCloneCleanup, setCloneNotLike, setCloneTarget, trimClone, tryCloneAgain, useCloneStill } from '../pipeline/clone.js'
 import { editorLibrary } from '../pipeline/editorMedia.js'
+import { massView, readMassSheet, setMassRows, syncMassFolder } from '../pipeline/massRecreate.js'
 import { addRecreateRow, recreateBatch, recreateFor, reviewTakeAgain, setRecreateRows, startRecreate, useCloneTake } from '../pipeline/recreate.js'
 import { jobViews } from '../jobs/jobView.js'
 import { clearPlan, importPlan, planView, previewPlan } from '../pipeline/planImport.js'
@@ -171,6 +172,19 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
   app.post('/webhooks/:provider/:jobId', async c => {
     const ok = await wakeFromWebhook(deps, c.req.param('provider'), c.req.param('jobId'), c.req.query('t') ?? '')
     return ok ? c.json({ ok: true }) : c.json({ error: { code: 'not_found', message: 'Unknown webhook.' } }, 404)
+  })
+
+  // The daily cron (vercel.json, 00:05 UTC): queues that waited on the daily
+  // cap start again on the new day (a mass recreate goes on overnight, item
+  // 24). It only starts runs already quoted and approved, within each
+  // account's cap; with CRON_SECRET set, only Vercel's cron can call it.
+  app.get('/cron/cap-resume', async c => {
+    const secret = process.env.CRON_SECRET
+    if (secret && c.req.header('authorization') !== `Bearer ${secret}`) return c.json({ error: { code: 'forbidden', message: 'Not the cron.' } }, 403)
+    const rows = await deps.db.selectDistinct({ accountId: jobs.accountId }).from(jobs).where(and(eq(jobs.status, 'waiting'), sql`${jobs.error} ->> 'capWait' = 'true'`))
+    let started = 0
+    for (const r of rows) started += (await resumeCapWaits(deps, r.accountId).catch(() => [] as string[])).length
+    return c.json({ ok: true, accounts: rows.length, started })
   })
 
   app.get('/public/assets/:id', async c => {
@@ -830,6 +844,31 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
     const body = parse(z.object({ all: z.string().max(80).nullable().optional(), row: z.object({ postId: z.string().max(60), model: z.string().max(80).nullable() }).optional(), remove: z.string().max(60).optional() }), await json(c))
     return c.json(await setRecreateRows(deps, c.get('ctx'), c.req.param('id'), body))
   })
+  // Mass recreate (item 24): the rows and their prices, the sheet read, the
+  // folder synced, and the owner's picks on the rows.
+  app.get('/content/:id/mass', async c => c.json(await massView(deps, c.get('ctx'), c.req.param('id'))))
+  app.post('/content/:id/mass/sheet', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    const body = parse(z.object({ link: z.string().max(2000).optional(), csv: z.string().max(2_000_000).optional() }), await json(c))
+    return c.json(await readMassSheet(deps, ctx, c.req.param('id'), body))
+  })
+  app.post('/content/:id/mass/folder', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    const body = parse(z.object({ link: z.string().max(2000).optional() }), await json(c))
+    return c.json(await syncMassFolder(deps, ctx, c.req.param('id'), body))
+  })
+  app.put('/content/:id/mass/rows', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    const body = parse(z.object({
+      tick: z.object({ id: z.string().max(40), on: z.boolean() }).optional(), all: z.boolean().optional(), swap: z.string().max(40).optional(),
+      model: z.object({ id: z.string().max(40), ref: z.string().max(80).nullable() }).optional(), place: z.object({ id: z.string().max(40), place: z.enum(['keep', 'new']) }).optional(),
+      call: z.object({ id: z.string().max(40), call: z.enum(['kept', 'rejected']).nullable(), stillId: z.string().max(60).optional() }).optional(), remove: z.string().max(40).optional(),
+    }), await json(c))
+    return c.json(await setMassRows(deps, ctx, c.req.param('id'), body))
+  })
   app.post('/content/:id/clones/:cid/use', async c => {
     const ctx = c.get('ctx')
     requireRole(ctx, 'member')
@@ -842,6 +881,11 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
     const ctx = c.get('ctx')
     requireRole(ctx, 'member')
     return c.json(await tryCloneAgain(deps, ctx, c.req.param('cid')))
+  })
+  // Every take's call, kept or rejected, with its scores (item 21).
+  app.get('/recreate/take-calls', async c => {
+    const ctx = c.get('ctx')
+    return c.json({ calls: await takeCalls(deps, ctx) })
   })
   app.post('/content/:id/clones/:cid/review', async c => {
     const ctx = c.get('ctx')

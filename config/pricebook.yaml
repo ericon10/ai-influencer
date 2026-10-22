@@ -56,7 +56,13 @@ entries:
   # $0.084/s (Pro), so motion control is expected near those.
   - { provider: higgsfield, model: kling-3.0-motion-control, unit: second, price: 0.12, verified: false, credits: 2, when: { resolution: 720p }, source: "Placeholder: 48 credits were reserved for a 30 s clip on the plan (1.6 a second) and refunded when the run failed (2026-10-14); set at 2 until a run finishes. API dollars near Kling 3.0 Standard image to video ($0.063/s), set high." }
   - { provider: higgsfield, model: kling-3.0-motion-control, unit: second, price: 0.16, verified: false, credits: 3, source: "Placeholder credits per second at 1080p." }
-  - { provider: higgsfield, model: genjutsu-replace, unit: second, price: 0.15, verified: false, credits: 3, source: "Placeholder credits per second, set high until the first run shows the charge (the live price needs the uploaded clip)." }
+  # Genjutsu replace (hf_mult_replace_object) is charged as "Higgsfield
+  # Genjutsu - Object Swap" in the account's transactions: 77 four times on
+  # 2026-10-14 (one refunded, a failed run) and 77 and 35 on 2026-10-18.
+  # Every charge is a multiple of 7, the same 7 credits a second as Motion
+  # Transfer (11 s and 5 s clips), so the old 3 a second undercharged by
+  # more than half (owner, 2026-10-22, item 23).
+  - { provider: higgsfield, model: genjutsu-replace, unit: second, price: 0.4375, verified: false, credits: 7, credits_verified: true, source: "7 plan credits a second: Higgsfield Genjutsu - Object Swap charges of 77 and 35 in the owner's Higgsfield transactions (2026-10-14 and 18). Dollars at the API's rate." }
   - { provider: higgsfield, model: kling-3.0-motion-control-pro, unit: second, price: 0.11, verified: false, source: "Placeholder near Kling 3.0 Pro image to video ($0.084/s)." }
   - { provider: higgsfield, model: kling-3.0-motion-control-standard, unit: second, price: 0.08, verified: false, source: "Placeholder near Kling 3.0 Standard image to video ($0.063/s)." }
   - { provider: higgsfield, model: genjutsu-motion-transfer, unit: second, price: 0.15, verified: false, source: "Placeholder." }
@@ -101,7 +107,26 @@ entries:
   # Mock: small non-zero prices so tests exercise the ledger end to end.
   - { provider: mock, model: image, unit: image, price: 0.04, verified: true }
   - { provider: mock, model: video, unit: second, price: 0.10, verified: true }
+  # A mass recreate clip fetch in demo mode (item 24): per clip.
+  - { provider: mock, model: video, unit: call, price: 0.01, verified: true }
   - { provider: mock, model: llm, unit: mtok_in, price: 1.00, verified: true }
   - { provider: mock, model: llm, unit: mtok_out, price: 5.00, verified: true }
   - { provider: mock, model: llm, unit: mtok_cache_read, price: 0.10, verified: true }
   - { provider: mock, model: llm, unit: mtok_cache_write, price: 1.25, verified: true }
+  # The API path without a Higgsfield plan (owner, 2026-10-22, item 19).
+  # List prices read 2026-10-22 from the providers' pages as reported (the
+  # pages themselves could not be opened from the build); unconfirmed until
+  # the first paid run of each, so every button says so.
+  - { provider: google, model: nano-banana-2.1, unit: image, price: 0.0336, verified: false, when: { resolution: 1k }, source: "Google AI Studio list price at 1K ($0.0336 an image, Gemini API pricing, 2026-10)." }
+  - { provider: google, model: nano-banana-2.1, unit: image, price: 0.0504, verified: false, when: { resolution: 2k }, source: "Google AI Studio list price at 2K ($0.0504 an image)." }
+  - { provider: google, model: nano-banana-2.1, unit: image, price: 0.113, verified: false, source: "4K and anything else priced at the highest reported 4K price ($0.113) until a run shows the charge." }
+  - { provider: fal, model: seedream-4.5-edit, unit: image, price: 0.04, verified: false, source: "fal list price, $0.04 an image." }
+  - { provider: fal, model: wan-2.2-animate-replace, unit: second, price: 0.08, verified: false, when: { resolution: 720p }, source: "fal list price, $0.08 a second of output at 720p (16 fps)." }
+  - { provider: fal, model: wan-2.2-animate-replace, unit: second, price: 0.06, verified: false, when: { resolution: 580p }, source: "fal list price, $0.06 a second at 580p." }
+  - { provider: fal, model: wan-2.2-animate-replace, unit: second, price: 0.04, verified: false, when: { resolution: 480p }, source: "fal list price, $0.04 a second at 480p." }
+  - { provider: fal, model: wan-2.2-animate-replace, unit: second, price: 0.08, verified: false, source: "Priced as 720p." }
+  - { provider: fal, model: kling-3.0-motion-control, unit: second, price: 0.168, verified: false, source: "fal list price for Kling 3.0 Pro Motion Control, $0.168 a second (as reported; matches Kling's own 1080p price)." }
+  # Mass recreate (item 24): one TikTok clip fetched through Apify. The
+  # scraper is billed per result plus the video download; set high until
+  # the first run shows the charge.
+  - { provider: apify, model: tiktok-video, unit: call, price: 0.01, verified: false, source: "Apify's TikTok scraper, per result with the video kept: placeholder at $0.01 a clip until a run shows the charge." }

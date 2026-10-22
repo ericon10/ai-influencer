@@ -20,6 +20,7 @@ import { registerContent } from './content.js'
 import { registerClips } from './clips.js'
 import { registerClone } from './clone.js'
 import { registerRecreate } from './recreate.js'
+import { registerMassRecreate } from './massRecreate.js'
 import { registerOpenReel } from './openreel.js'
 import { registerChain } from './chain.js'
 import { registerSounds } from './sounds.js'
@@ -207,6 +208,7 @@ export function registerPipelineHooks(): void {
   registerClips()
   registerClone()
   registerRecreate()
+  registerMassRecreate()
   registerOpenReel()
   registerChain()
   registerSounds()
