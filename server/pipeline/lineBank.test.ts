@@ -12,7 +12,7 @@ import { renderPlaceholderPortrait } from '../providers/mock.js'
 import { bankLines, jobs } from '../db/schema.js'
 import { loadConfig } from '../config/load.js'
 import { bankView, importBank, setLineCall, setStance, sourcesFor, weekPlan } from './lineBank.js'
-import { cleanLine, firstPass, passes, readCaptions, readComments, stanceFrom, videoKey, withCaptions, type LineBankConfig } from '../core/lineBank.js'
+import { cleanLine, firstPass, passes, readCaptions, readComments, readTags, stanceFrom, videoKey, withCaptions, type LineBankConfig } from '../core/lineBank.js'
 
 // The line bank (UX-PLAN.md section 36, item 29) in demo mode: the import
 // and its free first pass, the priced run (tags, writer, reviewer chained per
@@ -229,5 +229,12 @@ describe('a short answer', () => {
     const rows = await h2.deps.db.select().from(bankLines).where(eq(bankLines.accountId, h2.ctx.accountId))
     expect(rows.filter(r => r.state === 'failed')).toHaveLength(6)
     expect((await bankView(h2.deps, h2.ctx, {})).counts.waiting).toBe(6)
+  })
+})
+
+describe('quotes in a pain point', () => {
+  it('the tag sent back with single quotes is read as the pain point itself', () => {
+    const pains = ['lowball pay and "competitive" salary']
+    expect(readTags({ pain: "lowball pay and 'competitive' salary", topic: cfg.topics[0], format: cfg.formats[0] }, cfg, pains)?.pain).toBe(pains[0])
   })
 })

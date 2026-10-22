@@ -27,6 +27,11 @@ export function apiSchema(schema: unknown): unknown {
   for (const [k, v] of Object.entries(s)) {
     if (k === 'maxItems') continue
     if (k === 'minItems') { if (typeof v === 'number' && v >= 1) out[k] = 1; continue }
+    // A double quote inside an enum value comes back unescaped and breaks
+    // the JSON (production, 2026-10-22: the pain point
+    // 'lowball pay and "competitive" salary'). It goes as a single quote;
+    // the readers match either.
+    if (k === 'enum' && Array.isArray(v)) { out[k] = v.map(x => (typeof x === 'string' ? x.replace(/"/g, "'") : x)); continue }
     out[k] = apiSchema(v)
   }
   if (n) out.description = [typeof s.description === 'string' ? s.description : '', `Exactly ${n} entries, one for each numbered item, numbered 1 to ${n}, in order. Never fewer.`].filter(Boolean).join(' ')

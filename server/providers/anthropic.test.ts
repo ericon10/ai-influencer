@@ -47,6 +47,10 @@ describe('the schemas sent to Anthropic', () => {
     expect(JSON.stringify(sent).split('"emotion":{').length - 1).toBe(1)
   })
 
+  it('a double quote in an enum value goes as a single quote (sent as is, it came back unescaped and broke the JSON)', () => {
+    expect(apiSchema({ type: 'string', enum: ['lowball pay and "competitive" salary', 'none'] })).toEqual({ type: 'string', enum: ["lowball pay and 'competitive' salary", 'none'] })
+  })
+
   it('keeps everything else, and a minItems of 1 or 0', () => {
     expect(apiSchema({ type: 'array', minItems: 1, maxItems: 4, items: { type: 'string', enum: ['a'] } })).toEqual({ type: 'array', minItems: 1, items: { type: 'string', enum: ['a'] } })
     expect(apiSchema({ type: 'array', minItems: 0, items: { type: 'string' } })).toEqual({ type: 'array', items: { type: 'string' } })

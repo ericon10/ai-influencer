@@ -182,9 +182,12 @@ export const reviewScore = (r: BankReview | null | undefined) => (r ? Math.round
 
 // ── Reading the calls' answers ────────────────────────────────────────
 
+// Matched with quotes read alike (an enum value is sent with its double
+// quotes as single quotes).
+const sameQuotes = (v: unknown) => String(v ?? '').trim().toLowerCase().replace(/["\u201c\u201d\u2018\u2019]/g, "'")
 const pick = (v: unknown, list: readonly string[], fallback: string) => {
-  const s = String(v ?? '').trim().toLowerCase()
-  return list.find(x => x.toLowerCase() === s) ?? fallback
+  const s = sameQuotes(v)
+  return list.find(x => sameQuotes(x) === s) ?? fallback
 }
 const score = (v: unknown) => { const n = Math.round(Number(v)); return Number.isFinite(n) ? Math.min(10, Math.max(1, n)) : 1 }
 const clean = (v: unknown, max: number) => String(v ?? '').replace(/\s+/g, ' ').trim().slice(0, max)
