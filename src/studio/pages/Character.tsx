@@ -59,8 +59,8 @@ export default function Character() {
       <Link to="/studio/characters" className="st-btn ghost sm" style={{ marginBottom: 14 }}><ArrowLeft size={14} />Characters</Link>
       <div className="st-pagehead" style={{ marginBottom: 18 }}>
         <div className="grow">
-          <div className="st-kicker st-row" style={{ gap: 10 }}>Set up · revision {v.revision}<HowTo key={current} id={TAB_GUIDE[current]} /></div>
-          <h1 className="st-h1">{v.data.name}</h1>
+          <div className="st-kicker">Set up · revision {v.revision}</div>
+          <div className="st-titlerow"><h1 className="st-h1">{v.data.name}</h1><HowTo key={current} id={TAB_GUIDE[current]} /></div>
         </div>
         <div className="st-row" style={{ gap: 8, flexWrap: 'wrap' }}>
           <DeleteCharacter id={v.id} name={v.data.name} />

@@ -67,29 +67,52 @@ export function RunStatus({ ids = [], match, pending = false, className = '', hi
   const seen = useRef(new Map<string, string>())
 
   // Done or failed while scrolled away: a small toast that brings it back.
+  // Runs of one post toast once, when the post's last one ends ("P007: 6 of
+  // 6 stills done"), never one toast per still (item 26).
   useEffect(() => {
+    const ended: JobView[] = []
     for (const j of list) {
       const before = seen.current.get(j.id)
       seen.current.set(j.id, j.status)
       if (!before || !ACTIVE.includes(before) || ACTIVE.includes(j.status) || announced.has(j.id)) continue
       announced.add(j.id)
-      const r = box.current?.getBoundingClientRect()
-      const visible = !!r && r.bottom > 0 && r.top < window.innerHeight
-      if (visible) continue
-      const ok = j.status === 'completed'
-      toast({ tone: ok ? 'ok' : 'bad', text: `${j.label}: ${ok ? 'done' : 'failed'}.`, action: { label: 'Show', run: () => box.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }) } })
+      ended.push(j)
+    }
+    if (!ended.length) return
+    const r = box.current?.getBoundingClientRect()
+    const visible = !!r && r.bottom > 0 && r.top < window.innerHeight
+    const show = { label: 'Show', run: () => box.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }) }
+    const posts = new Map<string, JobView[]>()
+    for (const j of ended) {
+      if (!j.postId) {
+        if (visible) continue
+        const ok = j.status === 'completed'
+        toast({ tone: ok ? 'ok' : 'bad', text: `${j.label}: ${ok ? 'done' : 'failed'}.`, action: show })
+        continue
+      }
+      posts.set(j.postId, [...(posts.get(j.postId) ?? []), j])
+    }
+    for (const [postId] of posts) {
+      const all = list.filter(x => x.postId === postId)
+      if (all.some(x => ACTIVE.includes(x.status)) || visible) continue
+      const p = postProgress(all)
+      toast({ tone: p.failed ? 'bad' : 'ok', text: `${p.label}: ${p.done} of ${p.total} ${p.noun} done${p.failed ? `, ${p.failed} failed` : ''}.`, action: show })
     }
   }) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!current.length && !old.length && !missing.length && !pending) return null
-  // Many runs of one kind (a batch, several stills) read as one line.
+  // Many runs of one kind (a batch, several stills) read as one line; runs
+  // of one post read as one line per post ("P007: 4 of 6 stills").
   const groups = new Map<string, JobView[]>()
-  for (const j of current) groups.set(j.purpose, [...(groups.get(j.purpose) ?? []), j])
+  const perPost = new Map<string, number>()
+  for (const j of current) if (j.postId) perPost.set(j.postId, (perPost.get(j.postId) ?? 0) + 1)
+  const keyOf = (j: JobView) => (j.postId && (perPost.get(j.postId) ?? 0) > 1 ? `post:${j.postId}` : j.purpose)
+  for (const j of current) groups.set(keyOf(j), [...(groups.get(keyOf(j)) ?? []), j])
   return (
     <div className={`st-runs ${className}`} ref={box} aria-live="polite">
       {(pending || missing.length > 0) && !list.length && <div className="st-run live" data-live="true"><Loader2 size={15} className="st-spin" /><span className="st-run-text"><b>Submitting...</b></span></div>}
-      {[...groups.values()].map(g => (g.length > 3
-        ? <RunGroup key={g[0]!.purpose} jobs={g} onDismiss={() => setDismissed(d => [...d, ...g.map(x => x.id)])} />
+      {[...groups.entries()].map(([k, g]) => (g.length > 3 || (k.startsWith('post:') && g.length > 1)
+        ? <RunGroup key={k} jobs={g} post={k.startsWith('post:')} onDismiss={() => setDismissed(d => [...d, ...g.map(x => x.id)])} />
         : g.map(j => <RunRow key={j.id} j={j} onDismiss={() => setDismissed(d => [...d, j.id])} />)))}
       {old.length > 0 && (
         <FailureLine
@@ -193,12 +216,27 @@ export function FailureLine({ text, open, onToggle, onClear }: { text: string; o
   )
 }
 
-function RunGroup({ jobs, onDismiss }: { jobs: JobView[]; onDismiss: () => void }) {
+// A post's runs in one line (item 26): its short name, done of all, what.
+const NOUN: Record<string, string> = { image: 'stills', image_edit: 'stills', upscale: 'upscales', video: 'takes', video_extend: 'takes', video_clone: 'takes', llm: 'writes', audio: 'voice lines' }
+export function postProgress(jobs: JobView[]) {
+  const nouns = [...new Set(jobs.map(j => NOUN[j.kind] ?? 'runs'))]
+  const released = jobs.filter(notNeeded).length
+  return {
+    label: jobs.find(j => j.postLabel)?.postLabel ?? 'This post',
+    done: jobs.filter(j => j.phase === 'done').length,
+    failed: jobs.filter(j => ['failed', 'canceled', 'needs_attention'].includes(j.phase) && !notNeeded(j)).length,
+    total: jobs.length - released,
+    noun: nouns.length === 1 ? nouns[0]! : 'runs',
+  }
+}
+
+function RunGroup({ jobs, onDismiss, post = false }: { jobs: JobView[]; onDismiss: () => void; post?: boolean }) {
   const done = jobs.filter(j => j.phase === 'done').length
   const released = jobs.filter(notNeeded).length
   const failed = jobs.filter(j => ['failed', 'canceled', 'needs_attention'].includes(j.phase) && !notNeeded(j))
   const running = jobs.filter(j => ACTIVE.includes(j.status))
-  const label = jobs[0]!.label.replace(/\s*\d+\s+of\s+\d+.*$|,\s*still\s+\d+$/i, '')
+  const pp = post ? postProgress(jobs) : null
+  const label = pp ? pp.label : jobs[0]!.label.replace(/\s*\d+\s+of\s+\d+.*$|,\s*still\s+\d+$/i, '')
   const lead = running.find(j => j.phase === 'generating') ?? running[0]
   // A queued group waiting on the daily cap says why, as written (section 31).
   const capWait = running.find(j => j.phase === 'waiting' && /^Waits:/.test(j.phaseLabel))
@@ -206,7 +244,7 @@ function RunGroup({ jobs, onDismiss }: { jobs: JobView[]; onDismiss: () => void 
     <div className="st-col" style={{ gap: 6 }}>
       <div className={`st-run ${running.length ? 'live' : failed.length ? 'bad' : 'ok'}`} data-live={running.length ? 'true' : undefined}>
         {running.length ? <Loader2 size={15} className="st-spin" /> : failed.length ? <XCircle size={15} /> : <CheckCircle2 size={15} />}
-        <span className="st-run-text"><b>{label}: </b>{done} of {jobs.length - released} done{released ? ` (${released} not needed)` : ''}{failed.length ? `, ${failed.length} failed` : ''}{capWait ? '.' : lead ? `; ${lead.phaseLabel.toLowerCase()}.` : '.'}{capWait && <span data-field="cap-wait"> {capWait.phaseLabel}</span>}</span>
+        <span className="st-run-text" data-field={pp ? 'post-progress' : undefined}><b>{label}: </b>{done} of {jobs.length - released} {pp ? `${pp.noun} ` : ''}done{released ? ` (${released} not needed)` : ''}{failed.length ? `, ${failed.length} failed` : ''}{capWait ? '.' : lead ? `; ${lead.phaseLabel.toLowerCase()}.` : '.'}{capWait && <span data-field="cap-wait"> {capWait.phaseLabel}</span>}</span>
         {!running.length && <button type="button" className="st-btn icon ghost sm" aria-label="Hide" onClick={onDismiss}><X size={13} /></button>}
       </div>
       {failed.map(j => <RunRow key={j.id} j={j} />)}

@@ -312,3 +312,30 @@ export function planWithShots(): string {
   writeFileSync(out, lines.map(l => l.map(q).join(',')).join('\n'))
   return out
 }
+
+// A Guide screenshot (CLAUDE.md: every feature ships with its guide): the
+// element cut to WebP in public/studio-guide, its numbered hotspots in
+// src/studio/guide/shots.json, measured from the elements on the page.
+export async function guideShot(page: Page, box: Locator, id: string, spots: Array<[Locator, string]>) {
+  const sharp = (await import('sharp')).default
+  // The sticky bars stay out of the picture.
+  const hide = await page.addStyleTag({ content: '.st-poststeps, .st-sticky, [data-sticky] { visibility: hidden !important; }' })
+  await box.scrollIntoViewIfNeeded()
+  const outer = (await box.boundingBox())!
+  const rects: Array<{ x: number; y: number; width: number; height: number }> = []
+  for (const [l] of spots) { const r = await l.first().boundingBox(); if (r) rects.push(r) }
+  // The part of the box the hotspots are in, with room around them.
+  const pad = 24
+  const top = Math.max(outer.y, Math.min(...rects.map(r => r.y)) - pad), bottom = Math.min(outer.y + outer.height, Math.max(...rects.map(r => r.y + r.height)) + pad)
+  const b = { x: outer.x, y: top, width: outer.width, height: bottom - top }
+  const scrollY = await page.evaluate(() => window.scrollY)
+  const png = await page.screenshot({ fullPage: true, clip: { x: b.x, y: b.y + scrollY, width: b.width, height: b.height } })
+  writeFileSync(join(process.cwd(), 'public', 'studio-guide', `${id}.webp`), await sharp(png).webp({ quality: 82 }).toBuffer())
+  const pct = (v: number) => Math.round(v * 1000) / 10
+  const out = spots.map(([, label], i) => ({ label, r: rects[i] })).filter(x => x.r).map((x, i) => ({ n: i + 1, x: pct((x.r!.x - b.x) / b.width), y: pct((x.r!.y - b.y) / b.height), w: pct(x.r!.width / b.width), h: pct(x.r!.height / b.height), label: x.label }))
+  const file = join(process.cwd(), 'src', 'studio', 'guide', 'shots.json')
+  const all = JSON.parse(readFileSync(file, 'utf8')) as Record<string, unknown>
+  all[id] = { w: Math.round(b.width), h: Math.round(b.height), spots: out }
+  writeFileSync(file, `${JSON.stringify(all, null, 2)}\n`)
+  await hide.evaluate(el => (el as Element).remove())
+}

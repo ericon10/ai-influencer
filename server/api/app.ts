@@ -40,6 +40,7 @@ import { answerGateCheck, gateCheck } from '../pipeline/gateCheck.js'
 import { addCloneSource, cloneOptions, cloneStills, keepClone, pickCloneStill, postClones, postFromClone, saveCloneModel, takeCalls, saveRecreateStillModel, setCloneChoices, setCloneCleanup, setCloneNotLike, setCloneTarget, trimClone, tryCloneAgain, useCloneStill } from '../pipeline/clone.js'
 import { editorLibrary } from '../pipeline/editorMedia.js'
 import { massView, readMassSheet, setMassRows, syncMassFolder } from '../pipeline/massRecreate.js'
+import { startPlatforms } from '../pipeline/platforms.js'
 import { addRecreateRow, recreateBatch, recreateFor, reviewTakeAgain, setRecreateRows, startRecreate, useCloneTake } from '../pipeline/recreate.js'
 import { jobViews } from '../jobs/jobView.js'
 import { clearPlan, importPlan, planView, previewPlan } from '../pipeline/planImport.js'
@@ -1344,6 +1345,12 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
   })
 
   // Rendering is local and free (ffmpeg and sharp on the worker).
+  // One post, three platforms (item 28): free, on the worker.
+  app.post('/content/:id/platforms', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    return c.json(await startPlatforms(deps, ctx, c.req.param('id')))
+  })
   app.post('/content/:id/render', async c => {
     const ctx = c.get('ctx')
     requireRole(ctx, 'member')

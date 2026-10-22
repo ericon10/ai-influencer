@@ -28,7 +28,7 @@ export default function Settings() {
   }
   return (
     <div className="st-page">
-      <div className="st-pagehead"><div className="grow"><div className="st-kicker st-row" style={{ gap: 10 }}>Settings<HowTo id="settings" /></div><h1 className="st-h1">Studio settings</h1></div></div>
+      <div className="st-pagehead"><div className="grow"><div className="st-kicker">Settings</div><div className="st-titlerow"><h1 className="st-h1">Studio settings</h1><HowTo id="settings" /></div></div></div>
       <div className="st-seg st-tabs" role="tablist" style={{ marginBottom: 20 }}>
         {TABS.map(([k, label]) => <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => open(k)}>{label}</button>)}
       </div>

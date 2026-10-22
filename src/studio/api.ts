@@ -161,6 +161,7 @@ export const api = {
   clones: (contentId: string) => request<{ clones: CloneResult[] }>('GET', `/content/${contentId}/clones`),
   keepClone: (id: string, acknowledge = false) => request<{ ok: true }>('POST', `/clones/${id}/keep`, { acknowledge }),
   tryCloneAgain: (contentId: string, cloneId: string) => request<{ ok: true }>('POST', `/content/${contentId}/clones/${cloneId}/try-again`),
+  makePlatforms: (contentId: string) => request<{ ok: true }>('POST', `/content/${contentId}/platforms`),
   takeCalls: () => request<{ calls: TakeCall[] }>('GET', '/recreate/take-calls'),
   massView: (contentId: string) => request<MassView>('GET', `/content/${contentId}/mass`),
   massSheet: (contentId: string, body: { link?: string; csv?: string }) => request<{ added: number; skipped: number; already: number }>('POST', `/content/${contentId}/mass/sheet`, body),

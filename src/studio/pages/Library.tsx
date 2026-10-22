@@ -72,7 +72,7 @@ export default function Library() {
   return (
     <div className="st-page wide">
       <div className="st-pagehead">
-        <div className="grow"><div className="st-kicker st-row" style={{ gap: 10 }}>Library<HowTo key={tab} id={tab === 'voice' ? 'voice' : tab === 'hooks' ? 'hooks' : 'library'} /></div><h1 className="st-h1">Everything you made</h1><p className="st-sub">Stills, clips, B-roll, sounds, voice lines, hooks and exported posts. Start a new post from any still, clip or hook. Deleted items wait 7 days in the Trash.</p></div>
+        <div className="grow"><div className="st-kicker">Library</div><div className="st-titlerow"><h1 className="st-h1">Everything you made</h1><HowTo key={tab} id={tab === 'voice' ? 'voice' : tab === 'hooks' ? 'hooks' : 'library'} /></div><p className="st-sub">Stills, clips, B-roll, sounds, voice lines, hooks and exported posts. Start a new post from any still, clip or hook. Deleted items wait 7 days in the Trash.</p></div>
       </div>
       <div className="st-row" style={{ gap: 12, flexWrap: 'wrap', marginBottom: 18 }}>
         <div className="st-seg st-tabstrip" role="tablist">

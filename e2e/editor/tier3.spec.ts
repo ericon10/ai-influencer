@@ -1,7 +1,7 @@
 import { expect, test, type Locator, type Page, type TestInfo } from '@playwright/test'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { api, seedData, snap as attach } from './helpers'
+import { api, guideShot, seedData, snap as attach } from './helpers'
 
 // Tier 3 (owner, 2026-10-22; UX-PLAN section 36): the Recreate stills models
 // (no GPT Image 2.5; Nano Banana 2.1 on the plan or Google AI Studio, then
@@ -186,7 +186,7 @@ async function sweep(page: Page, info: TestInfo, phone: boolean) {
   const { basePost, callie, recreatePost } = seedData()
   const slideshow = (await api<{ items: Array<{ id: string; kind: string }> }>('GET', '/content')).items.find(i => i.kind === 'slideshow')
   const pages: Array<[string, string]> = [
-    ['/studio/posts', 'Posts home'], [`/studio/posts/${basePost}`, 'a video post'], [`/studio/posts/${recreatePost}`, 'a Recreate post'],
+    ['/studio', 'Posts home'], [`/studio/posts/${basePost}`, 'a video post'], [`/studio/posts/${recreatePost}`, 'a Recreate post'],
     [`/studio/characters/${callie}`, 'a character'], ['/studio/library', 'Library'], ['/studio/settings', 'Settings'],
     ...(slideshow ? [[`/studio/posts/${slideshow.id}`, 'a slideshow'] as [string, string]] : []),
   ]
@@ -210,34 +210,6 @@ async function sweep(page: Page, info: TestInfo, phone: boolean) {
   console.log(`[sweep] ${checked} priced buttons checked on ${pages.length} pages`)
   expect(checked).toBeGreaterThan(10)
   expect([...new Set(found)]).toEqual([])
-}
-
-// A Guide screenshot (CLAUDE.md: every feature ships with its guide): the
-// element cut to WebP in public/studio-guide, its numbered hotspots in
-// src/studio/guide/shots.json, measured from the elements on the page.
-async function guideShot(page: Page, box: Locator, id: string, spots: Array<[Locator, string]>) {
-  const sharp = (await import('sharp')).default
-  const { readFileSync } = await import('node:fs')
-  // The sticky bars stay out of the picture.
-  const hide = await page.addStyleTag({ content: '.st-poststeps, .st-sticky, [data-sticky] { visibility: hidden !important; }' })
-  await box.scrollIntoViewIfNeeded()
-  const outer = (await box.boundingBox())!
-  const rects: Array<{ x: number; y: number; width: number; height: number }> = []
-  for (const [l] of spots) { const r = await l.first().boundingBox(); if (r) rects.push(r) }
-  // The part of the box the hotspots are in, with room around them.
-  const pad = 24
-  const top = Math.max(outer.y, Math.min(...rects.map(r => r.y)) - pad), bottom = Math.min(outer.y + outer.height, Math.max(...rects.map(r => r.y + r.height)) + pad)
-  const b = { x: outer.x, y: top, width: outer.width, height: bottom - top }
-  const scrollY = await page.evaluate(() => window.scrollY)
-  const png = await page.screenshot({ fullPage: true, clip: { x: b.x, y: b.y + scrollY, width: b.width, height: b.height } })
-  writeFileSync(join(process.cwd(), 'public', 'studio-guide', `${id}.webp`), await sharp(png).webp({ quality: 82 }).toBuffer())
-  const pct = (v: number) => Math.round(v * 1000) / 10
-  const out = spots.map(([, label], i) => ({ label, r: rects[i] })).filter(x => x.r).map((x, i) => ({ n: i + 1, x: pct((x.r!.x - b.x) / b.width), y: pct((x.r!.y - b.y) / b.height), w: pct(x.r!.width / b.width), h: pct(x.r!.height / b.height), label: x.label }))
-  const file = join(process.cwd(), 'src', 'studio', 'guide', 'shots.json')
-  const all = JSON.parse(readFileSync(file, 'utf8')) as Record<string, unknown>
-  all[id] = { w: Math.round(b.width), h: Math.round(b.height), spots: out }
-  writeFileSync(file, `${JSON.stringify(all, null, 2)}\n`)
-  await hide.evaluate(el => (el as Element).remove())
 }
 
 // Item 24, mass recreate, like a person: the sheet's CSV chosen, the

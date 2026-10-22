@@ -71,47 +71,39 @@
   },
   "posts-home": {
     "w": 1196,
-    "h": 900,
+    "h": 1303,
     "spots": [
       {
         "n": 1,
-        "x": 67.3,
-        "y": 11.3,
-        "w": 29.7,
-        "h": 4.2,
-        "label": "Start a post right here too"
+        "x": 16.9,
+        "y": 1.8,
+        "w": 11.3,
+        "h": 2.1,
+        "label": "The Guide for this page, right after its title"
       },
       {
         "n": 2,
         "x": 3,
-        "y": 34.1,
+        "y": 26.7,
         "w": 94,
-        "h": 8.2,
-        "label": "Accounts: each account's product, tracked link or promo code, signups"
+        "h": 5.7,
+        "label": "Launch plan: import the plan's CSV, then generate its posts"
       },
       {
         "n": 3,
         "x": 3,
-        "y": 44.3,
-        "w": 94,
-        "h": 8.2,
-        "label": "Launch plan: import the plan's CSV, then generate its posts"
+        "y": 57.2,
+        "w": 22.5,
+        "h": 41,
+        "label": "A post: open it to keep going where you left off"
       },
       {
         "n": 4,
-        "x": 3,
-        "y": 62.5,
-        "w": 94,
-        "h": 3.1,
-        "label": "Filter by account, character or product"
-      },
-      {
-        "n": 5,
-        "x": 3,
-        "y": 67.7,
-        "w": 22.5,
-        "h": 32.3,
-        "label": "A post: open it to keep going where you left off"
+        "x": 69.4,
+        "y": 58.1,
+        "w": 2.8,
+        "h": 2.6,
+        "label": "Its picture full size, in the viewer"
       }
     ]
   },
@@ -154,31 +146,23 @@
     ]
   },
   "characters": {
-    "w": 1140,
-    "h": 900,
+    "w": 1196,
+    "h": 613,
     "spots": [
       {
         "n": 1,
-        "x": 82.6,
-        "y": 12.5,
-        "w": 13.2,
-        "h": 4.2,
-        "label": "New character: start from inspiration photos"
+        "x": 23.5,
+        "y": 3.9,
+        "w": 11.3,
+        "h": 4.6,
+        "label": "The Guide for this page, right after its title"
       },
       {
         "n": 2,
-        "x": 72.5,
-        "y": 12.5,
-        "w": 8.7,
-        "h": 4.2,
-        "label": "Import a character file you already have"
-      },
-      {
-        "n": 3,
-        "x": 4.2,
-        "y": 19.9,
-        "w": 21.8,
-        "h": 45.9,
+        "x": 3,
+        "y": 22.4,
+        "w": 22.5,
+        "h": 73.7,
         "label": "A character: open it to see the setup steps"
       }
     ]
@@ -790,64 +774,32 @@
     ]
   },
   "library": {
-    "w": 1140,
-    "h": 1000,
+    "w": 1196,
+    "h": 1773,
     "spots": [
       {
         "n": 1,
-        "x": 4.6,
-        "y": 19.3,
-        "w": 6.5,
-        "h": 3,
-        "label": "Stills you made"
+        "x": 30.9,
+        "y": 1.4,
+        "w": 11.3,
+        "h": 1.6,
+        "label": "The Guide for this page, right after its title"
       },
       {
         "n": 2,
-        "x": 11.3,
-        "y": 19.3,
-        "w": 6.5,
-        "h": 3,
-        "label": "Kept clips: takes, uploads and clones"
+        "x": 3.3,
+        "y": 8,
+        "w": 6.2,
+        "h": 1.7,
+        "label": "Stills you made"
       },
       {
         "n": 3,
-        "x": 18,
-        "y": 19.3,
-        "w": 6.8,
-        "h": 3,
-        "label": "B-roll: screen recordings and phone videos"
-      },
-      {
-        "n": 4,
-        "x": 33,
-        "y": 19.3,
-        "w": 9.6,
-        "h": 3,
-        "label": "Voice lines: your takes in the character's voice"
-      },
-      {
-        "n": 5,
-        "x": 42.7,
-        "y": 19.3,
-        "w": 7.2,
-        "h": 3,
-        "label": "Hooks: the vault, the claims sheet and buyer language"
-      },
-      {
-        "n": 6,
-        "x": 50,
-        "y": 19.3,
-        "w": 6.8,
-        "h": 3,
-        "label": "Finished posts and their exports"
-      },
-      {
-        "n": 7,
-        "x": 4.2,
-        "y": 24.5,
-        "w": 17.3,
-        "h": 45.4,
-        "label": "Open any item, or start a new post from it"
+        "x": 3,
+        "y": 20.7,
+        "w": 94,
+        "h": 78,
+        "label": "Open any item full size, or start a new post from it"
       }
     ]
   },
@@ -2064,48 +2016,40 @@
     ]
   },
   "library-trash": {
-    "w": 1360,
-    "h": 900,
+    "w": 1196,
+    "h": 533,
     "spots": [
       {
         "n": 1,
-        "x": 64.9,
-        "y": 21.4,
-        "w": 5.7,
-        "h": 3.3,
-        "label": "Library > Trash"
+        "x": 85.4,
+        "y": 4.5,
+        "w": 11.6,
+        "h": 5.2,
+        "label": "About the Trash"
       },
       {
         "n": 2,
-        "x": 21.7,
-        "y": 39.1,
-        "w": 6.3,
-        "h": 2.4,
-        "label": "Days left before it is removed for good"
+        "x": 3.8,
+        "y": 14.6,
+        "w": 16.4,
+        "h": 65.2,
+        "label": "Tap one to see it full size (Restore is there too)"
       },
       {
         "n": 3,
-        "x": 21.5,
-        "y": 76.8,
-        "w": 12.6,
-        "h": 2,
-        "label": "Deleted by you, or by Auto-clean"
+        "x": 4.3,
+        "y": 15.7,
+        "w": 7.2,
+        "h": 4.1,
+        "label": "Days left before it is removed for good"
       },
       {
         "n": 4,
-        "x": 21.4,
-        "y": 79.9,
-        "w": 12.9,
-        "h": 3.3,
+        "x": 3.9,
+        "y": 89.9,
+        "w": 16,
+        "h": 5.6,
         "label": "Restore puts it back where it was"
-      },
-      {
-        "n": 5,
-        "x": 20.6,
-        "y": 32.3,
-        "w": 6.2,
-        "h": 3.3,
-        "label": "Select restores many at once"
       }
     ]
   },
@@ -3396,6 +3340,36 @@
         "w": 96.3,
         "h": 47,
         "label": "Each call with the take's scores, to three decimals"
+      }
+    ]
+  },
+  "slideshow-platforms": {
+    "w": 1086,
+    "h": 694,
+    "spots": [
+      {
+        "n": 1,
+        "x": 37,
+        "y": 2.2,
+        "w": 16.9,
+        "h": 4.3,
+        "label": "One free click: the carousel, the reel and the Shorts copy"
+      },
+      {
+        "n": 2,
+        "x": 1.4,
+        "y": 55.6,
+        "w": 14.7,
+        "h": 41,
+        "label": "The reel: 2 to 3 s a slide, a slow zoom, silent (add the sound in the app)"
+      },
+      {
+        "n": 3,
+        "x": 1.4,
+        "y": 20.3,
+        "w": 17.2,
+        "h": 4.3,
+        "label": "Everything in one zip, with the caption"
       }
     ]
   }

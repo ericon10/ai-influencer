@@ -49,11 +49,11 @@ export function ProductPicker({ item }: { item: ContentItem }) {
     <div className="st-col" style={{ gap: 6 }} data-field="post-product">
       <div className="st-row" style={{ gap: 6, flexWrap: 'wrap', alignItems: 'center' }} role="radiogroup" aria-label="Product">
         <span className="st-label" style={{ marginRight: 4 }}><Package size={13} style={{ verticalAlign: '-2px' }} /> Product</span>
+        <HowTo id="products" label="About products" />
         <button type="button" role="radio" aria-checked={!current} className={`st-chip ${!current ? 'on' : ''}`} disabled={busy} onClick={() => void pick(null)}>{!current && <Check size={12} />}No product</button>
         {list.map(p => (
           <button key={p.id} type="button" role="radio" aria-checked={current === p.id} className={`st-chip ${current === p.id ? 'on' : ''}`} disabled={busy} onClick={() => void pick(p.id)}>{current === p.id && <Check size={12} />}{p.name}</button>
         ))}
-        <HowTo id="products" label="About products" />
       </div>
       <span className="st-hint" data-field="post-product-rules">{writingLine(on)}</span>
     </div>

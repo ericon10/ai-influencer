@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
-import { Archive, CopyPlus, FileUp, Film, Images, Layers, Loader2, Plus } from 'lucide-react'
+import { Archive, CopyPlus, FileUp, Film, Images, Layers, Loader2, Maximize2, Plus } from 'lucide-react'
 import { api, assetUrl } from '../api'
 import { keys, useCharacters, useContent, useLibrary } from '../hooks'
 import { Callout, Img, errorMessage, useToast } from '../ui'
@@ -19,6 +19,7 @@ import { PostingChips } from '../posting'
 import { ResultsRow, useResultsView } from '../results'
 import type { ResultHint } from '../types'
 import { SelectBar, SelectToggle, TileCheck, useSelection } from '../trash'
+import { Viewer, useViewer } from '../viewer'
 
 // Home (UX-PLAN.md): every post, newest work first, filtered by account,
 // character and product (section 29). One click opens a post where it was
@@ -54,6 +55,7 @@ export default function Posts() {
   // Select many (owner, 2026-10-22): tick posts, Select all respects the
   // filters, shift-click a range; the ticked ones go to the Trash together.
   const sel = useSelection<ContentItem>()
+  const view = useViewer()
   async function trashPicked() {
     const n = sel.items.length
     try {
@@ -72,8 +74,8 @@ export default function Posts() {
     <div className="st-page wide">
       <div className="st-pagehead">
         <div className="grow">
-          <div className="st-kicker st-row" style={{ gap: 10 }}>Posts<HowTo id="posts" /></div>
-          <h1 className="st-h1">Your posts</h1>
+          <div className="st-kicker">Posts</div>
+          <div className="st-titlerow"><h1 className="st-h1">Your posts</h1><HowTo id="posts" /></div>
           <p className="st-sub">Each post goes from an idea to an exported video or slideshow on one page.</p>
         </div>
         <div className="st-row" style={{ gap: 8, flexWrap: 'wrap' }}>
@@ -156,9 +158,13 @@ export default function Posts() {
           {shown.length > 0 && (
             <div className="st-grid cards">
               {shown.map(i => <PostCard key={i.id} item={i} lib={lib.data} characterName={characters.find(c => c.id === i.characterId)?.name ?? ''} productName={products.find(p => p.id === i.productId)?.name ?? ''} hints={hints[i.id]}
-                select={sel.on ? { on: sel.has(i.id), toggle: e => sel.toggle(i, e) } : null} />)}
+                select={sel.on ? { on: sel.has(i.id), toggle: e => sel.toggle(i, e) } : null} onView={() => view.open(i.id)} />)}
             </div>
           )}
+          {/* Each post's picture full size (the viewer, item 27); arrows go from post to post. */}
+          <Viewer items={shown.flatMap(i => { const c = cover(i, lib.data); const assetId = c.image ?? c.video; return assetId ? [{ id: i.id, assetId, media: (c.video ? 'video' : 'image') as 'image' | 'video', name: postName(i), thumbId: c.image ?? null, createdAt: i.updatedAt, characterName: characters.find(x => x.id === i.characterId)?.name ?? null }] : [] })}
+            openId={view.openId} onOpen={view.open} onClose={view.close}
+            actions={(x, close) => <button type="button" className="st-btn primary" onClick={() => { close(); nav(`/studio/posts/${x.id}`) }}>Open the post</button>} />
           {older.more && (
             <div className="st-row" style={{ gap: 10, justifyContent: 'center', marginTop: 18, flexWrap: 'wrap' }} data-field="posts-older">
               {!shown.length && <span className="st-hint">None of the newest {items.length} posts match these filters.</span>}
@@ -215,7 +221,7 @@ const STATUS: Record<ContentItem['status'], { label: string; tone: string }> = {
   draft: { label: 'Draft', tone: '' }, rendering: { label: 'Rendering', tone: 'accent live' }, ready: { label: 'Exported', tone: 'ok' }, failed: { label: 'Export failed', tone: 'bad' },
 }
 
-function PostCard({ item, lib, characterName, productName, hints, select }: { item: ContentItem; lib: LibraryData | undefined; characterName: string; productName: string; hints?: ResultHint[]; select?: { on: boolean; toggle: (e: { shiftKey: boolean }) => void } | null }) {
+function PostCard({ item, lib, characterName, productName, hints, select, onView }: { item: ContentItem; lib: LibraryData | undefined; characterName: string; productName: string; hints?: ResultHint[]; select?: { on: boolean; toggle: (e: { shiftKey: boolean }) => void } | null; onView?: () => void }) {
   const toast = useToast()
   const qc = useQueryClient()
   const duplicate = useDuplicate()
@@ -232,6 +238,7 @@ function PostCard({ item, lib, characterName, productName, hints, select }: { it
         {c.video ? <video src={`${assetUrl(c.video)}#t=0.1`} muted playsInline preload="metadata" /> : <Img assetId={c.image} width={520} />}
         <span className={`st-badge ${st.tone}`}>{item.status === 'draft' && step ? `Draft · ${step}` : st.label}</span>
       </Link>
+      {onView && !select && (c.image || c.video) && <button type="button" className="st-postcard-view" onClick={onView} aria-label={`View ${postName(item)} full size`} title="Full size"><Maximize2 size={14} /></button>}
       <div className="st-casting-body">
         <Link to={`/studio/posts/${item.id}`} className="st-postcard-name">{postName(item)}</Link>
         <div className="st-casting-meta">

@@ -1,5 +1,5 @@
-import { and, eq, gt, inArray, sql } from 'drizzle-orm'
-import { jobs } from '../db/schema.js'
+import { and, eq, gt, inArray, or, sql } from 'drizzle-orm'
+import { contentItems, jobs } from '../db/schema.js'
 import type { Deps } from '../context.js'
 import { formatUsd } from '../costs/money.js'
 import { modelLabel } from '../costs/quotes.js'
@@ -26,6 +26,9 @@ export interface JobViewRow {
   // was sent, and whether "Retry with safer wording" can run (G46).
   triggers: string[]; safer: boolean
   createdAt: string; completedAt: string | null
+  // The post the run belongs to and its short name (the plan's row id, such
+  // as P007, else its title or idea), so progress reads per post (item 26).
+  postId: string | null; postLabel: string | null
 }
 
 // The provider's content filter refused it (the same words explainFailure
@@ -118,10 +121,39 @@ async function typicalTimes(deps: Deps, accountId: string, rows: JobRow[]): Prom
   return out
 }
 
+// The post a run belongs to: the slide's post, a post id in the purpose,
+// or the post whose scene it is.
+function postRef(j: JobRow): { postId: string | null; sceneId: string | null } {
+  const req = j.request as { slide?: { postId?: string }; postId?: string } | null
+  const parts = j.purpose.split(':')
+  const postId = req?.slide?.postId ?? req?.postId ?? parts.find(x => /^cnt_[a-z0-9]+$/.test(x)) ?? null
+  return { postId, sceneId: postId ? null : parts.find(x => /^scn_[a-z0-9]+$/.test(x)) ?? null }
+}
+
+async function postLabels(deps: Deps, accountId: string, rows: JobRow[]) {
+  const refs = rows.map(postRef)
+  const postIds = [...new Set(refs.map(r => r.postId).filter((x): x is string => !!x))]
+  const sceneIds = [...new Set(refs.map(r => r.sceneId).filter((x): x is string => !!x))]
+  if (!postIds.length && !sceneIds.length) return { refs, posts: new Map<string, { id: string; label: string }>() }
+  const found = await deps.db.select({ id: contentItems.id, title: contentItems.title, idea: contentItems.idea, spec: contentItems.spec, sceneId: contentItems.sceneId }).from(contentItems)
+    .where(and(eq(contentItems.accountId, accountId), or(inArray(contentItems.id, postIds.length ? postIds : ['']), inArray(contentItems.sceneId, sceneIds.length ? sceneIds : ['']))))
+  const posts = new Map<string, { id: string; label: string }>()
+  for (const r of found) {
+    const rowId = (r.spec as { plan?: { rowId?: string } } | null)?.plan?.rowId
+    const words = (r.title || r.idea).trim()
+    const label = rowId || (words.length > 32 ? `${words.slice(0, 30).trim()}...` : words) || 'This post'
+    posts.set(r.id, { id: r.id, label })
+    if (r.sceneId) posts.set(r.sceneId, { id: r.id, label })
+  }
+  return { refs, posts }
+}
+
 export async function jobViews(deps: Deps, accountId: string, rows: JobRow[], labels: Map<string, string>): Promise<JobViewRow[]> {
   const typical = await typicalTimes(deps, accountId, rows)
+  const { refs, posts } = await postLabels(deps, accountId, rows)
   const fallback = deps.config.runtime.jobs.typical_sec
-  return rows.map(j => {
+  return rows.map((j, i) => {
+    const post = posts.get(refs[i]!.postId ?? refs[i]!.sceneId ?? '') ?? null
     const phase = phaseOf(j)
     const ref = `${j.provider}/${j.model}`
     const name = j.provider === LOCAL ? 'the worker' : j.provider === 'mock' ? 'the demo' : modelLabel(deps, ref)
@@ -150,6 +182,7 @@ export async function jobViews(deps: Deps, accountId: string, rows: JobRow[], la
       retry,
       triggers, safer: retry && triggers.length > 0,
       createdAt: j.createdAt.toISOString(), completedAt: j.completedAt?.toISOString() ?? null,
+      postId: post?.id ?? null, postLabel: post?.label ?? null,
     }
   })
 }

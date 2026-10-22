@@ -169,6 +169,7 @@ export function StillUpload({ characters, characterId, contentId, onUploaded }: 
         <button type="button" className="st-btn" disabled={!!busy || !forId} onClick={() => input.current?.click()}>
           {busy ? <Loader2 size={15} className="st-spin" /> : <Upload size={15} />}Upload images
         </button>
+        <HowTo id={contentId ? 'post-stills' : 'library'} label="About uploads" />
         {!contentId && characters.length > 1 && (
           <label className="st-row" style={{ gap: 6 }}>
             <span className="st-hint">For</span>
@@ -179,7 +180,6 @@ export function StillUpload({ characters, characterId, contentId, onUploaded }: 
         )}
       </div>
       <span className="st-hint">{busy ?? `Several at once: drop them here, or pick them (the camera roll on a phone). PNG, JPEG or WebP. Kept exactly as uploaded, at full resolution, as stills of ${forName}.`}</span>
-      <HowTo id={contentId ? 'post-stills' : 'library'} label="About uploads" />
     </div>
   )
 }

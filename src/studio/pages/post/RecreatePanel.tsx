@@ -54,8 +54,8 @@ export function RecreatePanel({ ctx, source, o, takes }: { ctx: PostCtx; source:
   return (
     <div className="st-col" style={{ gap: 18 }}>
       <div className="st-row" style={{ gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-        <div className="grow"><CapLine ctx={ctx} source={source} /></div>
-        <HowTo id="post-clone" label="How Recreate works" />
+        <span className="st-titlerow grow"><b>Recreate from a real clip</b><HowTo id="post-clone" label="How Recreate works" /></span>
+        <CapLine ctx={ctx} source={source} />
       </div>
       <GateCheckNotice />
       <Field id="recreate-keep" label="2. What to keep, what to drop" group hint="Read from the frame; every chip is yours to change.">

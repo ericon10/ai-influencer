@@ -1588,3 +1588,30 @@ which come from the product's own writing rules.
   `server/providers/apify.ts`, the pair still (`recreate_pair`) and its
   scoring by side (`pairScores`), the new set line (`recreate_new_set`), the
   cron `GET /api/v1/cron/cap-resume` (`vercel.json` crons, 00:05 UTC).
+
+### Tier 4: small (planned 2026-10-22)
+
+| # | What | Where | Plan |
+|---|---|---|---|
+| 25 | Help chips never on a title | Every page and post step | Each chip sits inline right after its title (`.st-titlerow`, `.st-label:has(> .gd-howto)`) or right-aligned at the end of its header row. A browser sweep checks every chip against every title on every page and post step, dark and light, desktop and phone |
+| 26 | Progress grouped by post | The run list and toasts | Runs carry their post (`postId`, `postLabel`: the plan row id, else the title or idea). One line per post ("P007: 4 of 6 stills done") and one toast when the post's last run ends, never one per still |
+| 27 | The viewer on Trash and Posts | Library > Trash; Posts home | A Trash tile opens the viewer with Restore in it; a post's cover has a full-size button that opens the viewer with Open the post. The Guide's pictures of Posts home, Library, its Trash and Characters made again |
+| 28 | One post, three platforms | Slideshow > Finish | One free click on the worker makes the Instagram carousel (1080 x 1440), a reel (1080 x 1920, 2 to 3 s a slide by its words, a slow zoom, cut, silent) and a Shorts copy within Shorts' caps, in one zip with caption.txt |
+
+### Tier 4 built (2026-10-22)
+
+- **25**: chips moved on Posts, Characters (and its Import dialog),
+  Character, Settings, Library, the voice card, the faceless file,
+  Finished damage, Products and the uploads row; the sweep in
+  `e2e/editor/tier4.spec.ts` (`chipOverlaps`: no overlap with any title,
+  and inline after it or last in its header row).
+- **26**: `postRef` and `postLabels` in `server/jobs/jobView.ts`;
+  `postProgress` and the post groups in `src/studio/runs.tsx`.
+- **27**: `src/studio/trash.tsx`, `src/studio/pages/Posts.tsx`
+  (`.st-postcard-view`); the four Guide pictures made with `GUIDE_SHOTS=1`.
+- **28**: `server/pipeline/platforms.ts` (`slideSeconds`, `reelFilter`, the
+  local job `platforms:<postId>`, `outputs.platforms`), `POST
+  /content/:id/platforms`, the card in `SlideshowFinish.tsx`;
+  `renderInstagramSet` taken out of `server/pipeline/slideshow.ts`. The
+  test checks the files with ffprobe (1080 x 1920, no sound, the slides'
+  length) and the zip's carousel at 1080 x 1440.

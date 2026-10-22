@@ -258,6 +258,8 @@ export interface JobView {
   // sent, and whether "Retry with safer wording" can run (G46).
   triggers: string[]; safer: boolean
   createdAt: string; completedAt: string | null
+  // The post the run belongs to and its short name (P007, else its title).
+  postId?: string | null; postLabel?: string | null
 }
 
 export interface Me { email: string; role: string; accountId: string; mode: 'demo' | 'live'; auth: string }
@@ -507,6 +509,8 @@ export interface ContentOutputs {
   cover?: { assetId: string; at: number; text: string }; coverRunning?: boolean
   // A slideshow (section 27): the Instagram set and post.json.
   instagramAssetIds?: string[]; jsonAssetId?: string
+  // One post, three platforms (item 28).
+  platforms?: { carouselIds: string[]; reelId: string; shortsId: string; zipId: string; slideSec: number[]; reelSec: number; madeAt: string }
 }
 export interface ContentItem {
   id: string; kind: ContentKind; characterId: string | null; title: string; spec: Record<string, unknown>

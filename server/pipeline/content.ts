@@ -380,6 +380,9 @@ export interface ContentOutputs {
   // post.json (UX-PLAN.md section 27).
   instagramAssetIds?: string[]
   jsonAssetId?: string
+  // One post, three platforms (item 28): the Instagram carousel, the reel,
+  // the Shorts copy and their zip.
+  platforms?: { carouselIds: string[]; reelId: string; shortsId: string; zipId: string; slideSec: number[]; reelSec: number; madeAt: string }
   // A batch, by caption order (a failed video leaves a gap), with the clip
   // and B-roll each one used (they rotate).
   videos?: Array<{ caption: string; assetId: string; clipId?: string; brollId?: string | null } | null>

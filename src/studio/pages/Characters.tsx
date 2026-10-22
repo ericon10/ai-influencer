@@ -31,8 +31,8 @@ export default function Characters() {
     <div className="st-page wide">
       <div className="st-pagehead">
         <div className="grow">
-          <div className="st-kicker st-row" style={{ gap: 10 }}>Setup<HowTo id="characters" /></div>
-          <h1 className="st-h1">Your characters</h1>
+          <div className="st-kicker">Setup</div>
+          <div className="st-titlerow"><h1 className="st-h1">Your characters</h1><HowTo id="characters" /></div>
           <p className="st-sub">Set each one up once: inspiration, face, a 12-shot reference sheet and a character file. Posts use them after that.</p>
         </div>
         {/* Import first (long run part 3): most characters are built in the
@@ -143,7 +143,7 @@ function ImportDialog({ open, onClose }: { open: boolean; onClose: () => void })
   return (
     <Modal open={open} onClose={close}>
       <div className="st-card-body st-col" style={{ gap: 16 }}>
-        <div><div className="st-kicker st-row" style={{ gap: 10 }}>Import<HowTo id="characters" /></div><div className="st-h2">Import a character file</div><p className="st-sub">The character file (.md) from the Claude project, made with character template v1.6, and its sheet folder. Images named REF 00 to REF 11 (or REF-00) become the approved sheet. The file is checked against the template for free before anything is imported.</p></div>
+        <div><div className="st-kicker">Import</div><div className="st-titlerow"><div className="st-h2">Import a character file</div><HowTo id="characters" /></div><p className="st-sub">The character file (.md) from the Claude project, made with character template v1.6, and its sheet folder. Images named REF 00 to REF 11 (or REF-00) become the approved sheet. The file is checked against the template for free before anything is imported.</p></div>
         <Field id="import-file" label="Character file (.md)" required done={!!file} group hint="The sheet images are optional; add them now or later.">
         <label className={`st-drop ${over ? 'over' : ''}`} onDragOver={e => { e.preventDefault(); setOver(true) }} onDragLeave={() => setOver(false)} onDrop={e => { e.preventDefault(); setOver(false); void drop(e.dataTransfer) }}>
           <Upload size={22} />

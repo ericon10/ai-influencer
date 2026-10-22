@@ -35,8 +35,8 @@ export function FacelessCharacter({ v }: { v: CharacterView }) {
       <Link to="/studio/characters" className="st-btn ghost sm" style={{ marginBottom: 14 }}><ArrowLeft size={14} />Characters</Link>
       <div className="st-pagehead" style={{ marginBottom: 18 }}>
         <div className="grow">
-          <div className="st-kicker st-row" style={{ gap: 10 }}><span className="st-badge plain">Faceless</span>Its file<HowTo id="faceless" /></div>
-          <h1 className="st-h1">{v.name}</h1>
+          <div className="st-kicker st-row" style={{ gap: 10 }}><span className="st-badge plain">Faceless</span>Its file</div>
+          <div className="st-titlerow"><h1 className="st-h1">{v.name}</h1><HowTo id="faceless" /></div>
           <p className="st-sub">No face, no hero, no sheet, no face checks. Stills are real places with no one in them; posts pick a place from the bank or write their own.</p>
         </div>
         <div className="st-row" style={{ gap: 8, flexWrap: 'wrap' }}>

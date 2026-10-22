@@ -7,6 +7,7 @@ import { Callout, Drawer, Img, Modal, errorMessage, useToast } from './ui'
 import { HowTo } from './guide/Guide'
 import type { AutoCleanItem, TrashItem, TrashRef } from './types'
 import type { GuideId } from './guide/content'
+import { Viewer, useViewer } from './viewer'
 
 // Delete, Select and the Trash (owner, 2026-10-15; UX-PLAN.md section 22).
 // Deleting moves an item to the Trash for 7 days, restorable; then the daily
@@ -174,7 +175,10 @@ export function StarButton({ id, on, size = 'sm' }: { id: string; on: boolean; s
 
 // Library > Trash: what was deleted, by you or by Auto-clean, with the days
 // left before it is removed for good. Restore one or many.
+const viewable = (t: TrashItem) => !!t.assetId && (t.media === 'image' || t.media === 'video')
+
 export function TrashTab({ characterId }: { characterId: string | null }) {
+  const view = useViewer()
   const qc = useQueryClient()
   const toast = useToast()
   const q = useQuery({ queryKey: ['trash'], queryFn: api.trashList })
@@ -214,7 +218,10 @@ export function TrashTab({ characterId }: { characterId: string | null }) {
               )
               return (
                 <div key={t.id} className={`st-tile st-scene-tile ${on ? 'picked' : ''}`}>
-                  {sel.on ? <button type="button" className="st-tile-open" aria-pressed={on} aria-label={`Select ${t.label}`} onClick={e => sel.toggle(t, e)}>{media}</button> : <div className="st-tile-open">{media}</div>}
+                  {/* A tap opens it full size (the viewer, item 27); Select picks instead. */}
+                  {sel.on ? <button type="button" className="st-tile-open" aria-pressed={on} aria-label={`Select ${t.label}`} onClick={e => sel.toggle(t, e)}>{media}</button>
+                    : viewable(t) ? <button type="button" className="st-tile-open" aria-label={`View ${t.label} full size`} onClick={() => view.open(t.id)}>{media}</button>
+                    : <div className="st-tile-open">{media}</div>}
                   <div className="st-col" style={{ gap: 2, padding: '0 4px 2px' }}>
                     <span className="st-tile-label">{t.label}</span>
                     <span className="st-hint">{t.reason === 'auto' ? 'Auto-clean' : 'Deleted by you'} · {new Date(t.deletedAt).toLocaleDateString()}</span>
@@ -228,6 +235,9 @@ export function TrashTab({ characterId }: { characterId: string | null }) {
       <SelectBar sel={sel} all={list}>
         <button type="button" className="st-btn sm primary" disabled={busy || !sel.items.length} onClick={() => void restore(sel.items)}><RotateCcw size={13} />Restore {sel.items.length || ''}</button>
       </SelectBar>
+      <Viewer items={list.filter(viewable).map(t => ({ id: t.id, assetId: t.assetId!, media: t.media as 'image' | 'video', name: t.label, thumbId: t.media === 'image' ? t.assetId : null, createdAt: t.deletedAt }))}
+        openId={view.openId} onOpen={view.open} onClose={view.close}
+        actions={(x, close) => <button type="button" className="st-btn" disabled={busy} onClick={() => { const t = list.find(y => y.id === x.id); if (t) { close(); void restore([t]) } }}><RotateCcw size={15} />Restore</button>} />
     </div>
   )
 }

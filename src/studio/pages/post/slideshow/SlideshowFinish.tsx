@@ -1,11 +1,12 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { AlertTriangle, ExternalLink, GitBranch } from 'lucide-react'
-import { api, downloadUrl } from '../../../api'
-import { keys } from '../../../hooks'
+import { AlertTriangle, ExternalLink, GitBranch, Layers3 } from 'lucide-react'
+import { api, assetUrl, downloadUrl } from '../../../api'
+import { keys, useLiveJobs } from '../../../hooks'
 import { PriceButton } from '../../../PriceButton'
-import { Callout, Img } from '../../../ui'
+import { AsyncButton, Callout, Img, errorMessage, useToast } from '../../../ui'
+import { RunStatus } from '../../../runs'
 import { HowTo } from '../../../guide/Guide'
 import type { SlideshowSpec } from '../../../types'
 import type { PostCtx } from '../ctx'
@@ -31,6 +32,7 @@ export function SlideshowOutputs({ ctx, name }: { ctx: PostCtx; name: string }) 
       <div className="st-content-strip">
         {o.imageAssetIds.map((id, i) => <a key={id} href={downloadUrl(id, `${String(i + 1).padStart(2, '0')}-${name}.jpg`)} title={`Download slide ${i + 1}`}><Img assetId={id} width={320} style={{ width: 120, aspectRatio: '9 / 16' }} /></a>)}
       </div>
+      <ThreePlatforms ctx={ctx} name={name} />
       {!!o.instagramAssetIds?.length && (
         <>
           <span className="st-label">Instagram, 1080 x 1440</span>
@@ -38,6 +40,46 @@ export function SlideshowOutputs({ ctx, name }: { ctx: PostCtx; name: string }) 
             {o.instagramAssetIds.map((id, i) => <a key={id} href={downloadUrl(id, `${String(i + 1).padStart(2, '0')}-${name}-instagram.jpg`)} title={`Download slide ${i + 1} for Instagram`}><Img assetId={id} width={320} style={{ width: 120, aspectRatio: '3 / 4' }} /></a>)}
           </div>
         </>
+      )}
+    </div>
+  )
+}
+
+// One post, three platforms (item 28): one free click makes the Instagram
+// carousel, a reel (2 to 3 s a slide, a slow zoom, silent) and a Shorts copy
+// from the finished slides, all in one zip.
+function ThreePlatforms({ ctx, name }: { ctx: PostCtx; name: string }) {
+  const toast = useToast()
+  const qc = useQueryClient()
+  const p = ctx.item.outputs.platforms
+  // The post reads its outputs again when the worker is done.
+  const live = useLiveJobs()
+  const doneAt = (live.data?.jobs ?? []).filter(j => j.purpose === `platforms:${ctx.item.id}` && j.status === 'completed').map(j => j.completedAt ?? '').sort().at(-1) ?? null
+  useEffect(() => { if (doneAt && (!p || p.madeAt < doneAt)) void qc.invalidateQueries({ queryKey: keys.content }) }, [doneAt]) // eslint-disable-line react-hooks/exhaustive-deps
+  return (
+    <div className="st-card st-col" style={{ gap: 10, padding: 14 }} data-field="three-platforms">
+      <div className="st-row" style={{ gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+        <span className="st-titlerow grow"><b>Instagram, Reels and Shorts</b><HowTo id="slideshow" label="About three platforms" /></span>
+        <AsyncButton className={`st-btn sm ${p ? '' : 'primary'}`} icon={<Layers3 size={14} />} onClick={async () => {
+          try { await api.makePlatforms(ctx.item.id); void qc.invalidateQueries({ queryKey: ['jobs'] }) } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) }
+        }}>{p ? 'Make them again (free)' : 'Make all three (free)'}</AsyncButton>
+      </div>
+      <span className="st-hint">From these slides: the Instagram carousel (1080 x 1440), a reel (1080 x 1920, 2 to 3 s a slide with a slow zoom, silent: add the sound in the app) and a Shorts copy. Made on the worker, free.</span>
+      <RunStatus match={j => j.purpose === `platforms:${ctx.item.id}` && (!p || (j.completedAt ?? '9') > p.madeAt || !j.completedAt)} />
+      {p && (
+        <div className="st-col" style={{ gap: 10 }} data-field="platform-set">
+          <div className="st-row" style={{ gap: 8, flexWrap: 'wrap' }}>
+            <DownloadLink assetId={p.zipId} name={`${name}-three-platforms.zip`}>Download all three (zip)</DownloadLink>
+          </div>
+          <span className="st-label">Instagram carousel, 1080 x 1440</span>
+          <div className="st-content-strip">
+            {p.carouselIds.map((id, i) => <a key={id} href={downloadUrl(id, `${String(i + 1).padStart(2, '0')}-${name}-carousel.jpg`)} title={`Download carousel image ${i + 1}`}><Img assetId={id} width={320} style={{ width: 120, aspectRatio: '3 / 4' }} /></a>)}
+          </div>
+          <div className="st-row" style={{ gap: 12, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+            <figure className="st-platform-video"><video src={`/api/v1/assets/${p.reelId}/content`} poster={ctx.item.outputs.imageAssetIds?.[0] ? assetUrl(ctx.item.outputs.imageAssetIds[0], 480) : undefined} muted playsInline controls preload="metadata" /><figcaption>Reel, {p.reelSec} s · <a href={downloadUrl(p.reelId, `${name}-reel.mp4`)}>Download</a></figcaption></figure>
+            <figure className="st-platform-video"><video src={`/api/v1/assets/${p.shortsId}/content`} poster={ctx.item.outputs.imageAssetIds?.[0] ? assetUrl(ctx.item.outputs.imageAssetIds[0], 480) : undefined} muted playsInline controls preload="metadata" /><figcaption>Shorts · <a href={downloadUrl(p.shortsId, `${name}-shorts.mp4`)}>Download</a></figcaption></figure>
+          </div>
+        </div>
       )}
     </div>
   )

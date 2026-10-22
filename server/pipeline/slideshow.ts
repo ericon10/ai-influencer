@@ -1316,6 +1316,36 @@ export function slideshowProblems(spec: SlideshowSpec): string[] {
 
 export const AI_LABEL_LINE = 'Turn on the AI-generated content label (TikTok and Instagram).'
 
+// What each slide is drawn from: its photo (a special slide sits over the
+// nearest slide's photo, blurred), its special drawing, its words. Shared
+// by the export and the platform set (item 28), so both draw the same.
+export async function slideInputs(deps: Deps, ctx: Ctx, row: ContentRow) {
+  const spec = parse(row)
+  const cfg = deps.config.pipeline.content
+  const list = slideList(spec)
+  const out = []
+  for (const s of list) {
+    const photo = s.special ? backdropFor(list, s.index) : s.stillId
+    const still = photo ? (await readAsset(deps, ctx, await candidateAsset(deps, ctx, photo, row.characterId!, 'image'))).data : null
+    const special = s.special ? cleanSpecial(s.special, cfg.slideshow.brand_names, cfg.slideshow.generic_names) : null
+    const shot = special?.type === 'product_shot' && special.assetId ? (await readAsset(deps, ctx, special.assetId)).data : null
+    out.push({ s, still, special, input: { still, shot, text: s.text, style: spec.textStyle, pos: s.pos, special, ad: spec.ad && s.index === 0 } })
+  }
+  return out
+}
+
+// The 1080 x 1440 Instagram set of a slideshow, drawn like the export.
+export async function renderInstagramSet(deps: Deps, ctx: Ctx, row: ContentRow, jobId: string): Promise<string[]> {
+  const cfg = deps.config.pipeline.content
+  const draw = fontDraw(cfg.caption)
+  const out: string[] = []
+  for (const { s, input } of await slideInputs(deps, ctx, row)) {
+    const b = await renderSlide(input, { width: cfg.slideshow.instagram.width, height: cfg.slideshow.instagram.height }, cfg, draw)
+    out.push((await saveAsset(deps, ctx, { data: b, mime: 'image/jpeg', origin: 'derived', label: `Slide ${s.index + 1} (Instagram)`, sourceJobId: jobId })).id)
+  }
+  return out
+}
+
 export async function renderSlideshow(deps: Deps, ctx: Ctx, job: JobRow, row: ContentRow, name: string): Promise<ContentOutputs> {
   const spec = parse(row)
   const cfg = deps.config.pipeline.content
@@ -1323,18 +1353,11 @@ export async function renderSlideshow(deps: Deps, ctx: Ctx, job: JobRow, row: Co
   // Slideshows are TikTok only (THE STANDARD v1.2): the 1080 x 1440 set is
   // made only when the post asks for it (off by default).
   const insta = spec.instagramSet ? { width: cfg.slideshow.instagram.width, height: cfg.slideshow.instagram.height } : null
-  const list = slideList(spec)
   const draw = fontDraw(cfg.caption)
   const images: string[] = [], instagram: string[] = []
   const files: Record<string, Uint8Array> = {}
   const slides: Parameters<typeof postExportJson>[0]['slides'] = []
-  for (const s of list) {
-    // A special slide sits over the nearest slide's photo (blurred).
-    const photo = s.special ? backdropFor(list, s.index) : s.stillId
-    const still = photo ? (await readAsset(deps, ctx, await candidateAsset(deps, ctx, photo, row.characterId!, 'image'))).data : null
-    const special = s.special ? cleanSpecial(s.special, cfg.slideshow.brand_names, cfg.slideshow.generic_names) : null
-    const shot = special?.type === 'product_shot' && special.assetId ? (await readAsset(deps, ctx, special.assetId)).data : null
-    const input = { still, shot, text: s.text, style: spec.textStyle, pos: s.pos, special, ad: spec.ad && s.index === 0 }
+  for (const { s, still, special, input } of await slideInputs(deps, ctx, row)) {
     const nn = String(s.index + 1).padStart(2, '0')
     const fileT = `tiktok/${nn}-${name}.jpg`, fileI = insta ? `instagram/${nn}-${name}.jpg` : null
     const a = await renderSlide(input, tiktok, cfg, draw)

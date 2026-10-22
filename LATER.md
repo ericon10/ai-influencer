@@ -39,12 +39,18 @@ bottom of the list they belong to.
 - A "Generate the rest of this day" button on the plan list.
 - The plan grid could open a row's post on a click (today: the list below
   the import).
-- Guide screenshots to refresh after the cleanup build: Posts home (the
-  new Results, Download day and Approve for posting chips on the cards)
-  and Library (the filter row; the new viewer, filter and collection
-  shots are in).
 
 ## Next (after the launch)
+
+Ideas from the Oct 22 build, Tier 4 (UX-PLAN section 36; not built):
+
+- Three platforms: a sound for the reel picked in the Studio (today it is
+  silent so the sound is added in the app), and the cover frame of the
+  reel chosen like the video cover.
+- Progress grouped by post: the same grouping on Posts home's cards (a
+  small "4 of 6" on the card while it runs).
+- The viewer: next and previous across the Trash and across Posts home's
+  covers.
 
 ### Results and growth
 
@@ -252,6 +258,9 @@ bottom of the list they belong to.
 ## Done or replaced
 
 Taken off the lists on 2026-10-17; kept here so the history stays.
+
+- Refresh the Guide's screenshots of Posts home and Library after the
+  cleanup build: made again on 2026-10-22 (UX-PLAN section 36, item 27).
 
 - Refresh the Guide's screenshots for the rough cut and the Sound row:
   the rough cut panel was replaced by the editor (G29).
