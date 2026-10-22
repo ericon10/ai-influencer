@@ -27,6 +27,7 @@ import { markSceneBusy, saveVideoModel } from './scenes.js'
 import { buildContentCaptions, buildContentSlides } from './content.js'
 import { afterRecreateBatch, buildRecreateBatch } from './recreate.js'
 import { afterMassFetchStarted, buildMassFetch, buildMassRecreate } from './massRecreate.js'
+import { buildBankRun, buildBankUse, buildBankWeek } from './lineBank.js'
 import { addCloneSpend, buildClone, buildCloneCaption, buildCloneFace, buildCloneOutfit, buildCloneStill, buildCloneTraits, checkCloneCap, saveCloneModel, useCloneStill } from './clone.js'
 import { ruleSwitches } from './rules.js'
 import { readBilling } from '../providers/billing.js'
@@ -144,6 +145,10 @@ export const actionSchema = z.discriminatedUnion('type', [
   // then the ticked rows' stills, then the kept rows' videos.
   z.object({ type: z.literal('mass_fetch'), contentId: z.string() }),
   z.object({ type: z.literal('mass_recreate'), contentId: z.string(), step: z.enum(['stills', 'video']) }),
+  // The line bank (UX-PLAN section 36, item 29).
+  z.object({ type: z.literal('bank_run'), importId: z.string().max(60).nullable().optional(), limit: z.number().int().min(1).max(20000).nullable().optional() }),
+  z.object({ type: z.literal('bank_use'), lineId: z.string().max(60), contentId: z.string().max(60) }),
+  z.object({ type: z.literal('bank_week'), accountTag: z.string().max(60) }),
   // Voice lines: the owner's takes in the character's voice, with word
   // timings (ElevenLabs), one quote with a line per take.
   z.object({ type: z.literal('voice_convert'), soundIds: z.array(z.string().max(60)).min(1).max(50) }),
@@ -274,6 +279,9 @@ export async function buildAction(deps: Deps, ctx: Ctx, action: StudioAction): P
   if (action.type === 'recreate_batch') return buildRecreateBatch(deps, ctx, action)
   if (action.type === 'mass_fetch') return buildMassFetch(deps, ctx, action)
   if (action.type === 'mass_recreate') return buildMassRecreate(deps, ctx, action)
+  if (action.type === 'bank_run') return buildBankRun(deps, ctx, action)
+  if (action.type === 'bank_use') return buildBankUse(deps, ctx, action)
+  if (action.type === 'bank_week') return buildBankWeek(deps, ctx, action)
   if (action.type === 'voice_convert') return buildVoiceConvert(deps, ctx, action.soundIds)
   if (action.type === 'hook_variants') return buildHookVariants(deps, ctx, action)
   if (action.type === 'slideshow_hooks') return buildSlideshowHooks(deps, ctx, action.contentId)

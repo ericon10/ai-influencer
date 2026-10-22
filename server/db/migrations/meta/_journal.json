@@ -127,6 +127,13 @@
       "when": 1792247741540,
       "tag": "0017_products",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1792638951216,
+      "tag": "0018_line_bank",
+      "breakpoints": true
     }
   ]
 }

@@ -1615,3 +1615,29 @@ which come from the product's own writing rules.
   `renderInstagramSet` taken out of `server/pipeline/slideshow.ts`. The
   test checks the files with ffprobe (1080 x 1920, no sound, the slides'
   length) and the zip's carousel at 1080 x 1440.
+
+### Tier 5: the line bank (planned 2026-10-22)
+
+Every post starts from a line that hits hard on the ICP's pain, written
+from what real people said in the comments. Built fresh (branch
+`claude/friendly-thompson-692xlp` ignored). It lives inside the Studio: a
+drawer in the post workspace (the Idea step of a slideshow, the Caption
+step of a video post or batch) and on Posts home's Launch plan card, never
+a page of its own.
+
+| # | What | Plan |
+|---|---|---|
+| 29a | Import | The drawer's Import: an Apify comment scrape as a CSV file or a Google Sheet link (columns comment, comment_likes, replies, video_account, video_views, video_url; any order, extra columns ignored) plus, optionally, the same run's videos CSV (url, text: the captions), joined to each comment by its video's URL. A private Sheet cannot be read by link: the drawer says "Share it as Anyone with the link, or download the tab as CSV". Each import picks the product whose writing rules apply (the post's product, else the plan's) |
+| 29b | The free first pass | Code only, on the import: duplicates (same words after case, spaces, emoji and punctuation), not English (another script, or no common English words), about the video itself (the sound, her outfit, the edit, "who's here", tags of friends only), 0 or 1 likes, under 4 words, and off the job search (no word from the topic list in `config/content.yaml`). Kept comments go in the bank; the drop counts by reason show on the import |
+| 29c | Tags (priced) | Batches of 40 kept comments, Claude Haiku (route `line_tagger`): emotion (infuriated, angry, sad, crying, frustrated), topic (layoff, ghosting, interviews, applications, money, family, burnout, entry level, AI, bosses, quitting, small wins), the ICP pain point from the product's writing rules (`pains` of its standard; "none" for a product without), who it fits (unemployed first person, secondhand for the girls, both), format fit (finished damage, meme setup, question, list), and a fight flag (race, religion, politics) with a reason. Flagged lines never go into Write the week |
+| 29d | Writer and reviewer (priced) | Each tag batch then goes to the writer (Sonnet, route `line_writer`): one on-screen line per comment in Gen Z vernacular, the comment's own truth and its specific detail, starting at 70 (the first words are the hit, no setup), readable in about 2 seconds (12 words or fewer). A separate reviewer call (route `line_reviewer`) scores each line 1 to 10 on gut punch, specificity and "would a real person post this", and marks setup or meh. A line passes when all three are 8 or more and it is neither; rejected lines never show (only their count). Tag, write and review are one price, one click, chained per batch |
+| 29e | The bank view | Filters: character (lines that fit how the character speaks), emotion, topic, pain point; sorted by the source comment's likes; each line shows its source comment, its likes and its three scores; flagged lines carry their reason |
+| 29f | Use | On a post, Pick from the bank lists lines that fit the post's character and are not used on another account. Use this line (priced, one small Sonnet call) rewrites it in the character's voice card and against their facts (the voice card's who and point of view): a line that contradicts them is edited to fit, or skipped with the reason. The result is placed: a slideshow's hook, a video post's caption, a batch's next caption. Write the week (Launch plan card, per account, priced): the account's posts dated in the next 7 days without a bank line each get the best unused fitting line, rewritten in one call. A line used on one account never shows for another |
+| 29g | Learning | Keep or Reject on every line in the bank is logged; the last kept and rejected lines (up to 8 each) go to the writer and the reviewer as examples. A used line keeps its post; Results gets a "Source truth" breakdown (follows per post by the comment each post's line came from) |
+| 29h | The real test | Eric's sheet ("TIKTOK APIFY RUN FOR SIDESTEP", tab comments, 5,375 comments; tab run1_ranked, 876 videos with captions) through the import and the first pass; the full run's price from the quote; the top 30 lines with their source comments and scores |
+
+Where each part lives: the pure parts in `server/core/lineBank.ts` (the
+reader, the first pass, the fit rules, the schemas), the jobs and storage
+in `server/pipeline/lineBank.ts` (a `bank_lines` table and a
+`line_bank_imports` setting), the drawer in
+`src/studio/pages/post/LineBank.tsx`.

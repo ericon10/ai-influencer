@@ -8,6 +8,7 @@ import {
 } from '../core/results.js'
 import { listCharacters } from './characters.js'
 import { getContent } from './content.js'
+import { sourcesFor } from './lineBank.js'
 
 // Results (owner, 2026-10-17; UX-PLAN.md section 32): each post's results,
 // typed on its card (or in its Finish step) or pasted from a CSV by row_id;
@@ -65,15 +66,17 @@ async function loadPosts(deps: Deps, ctx: Ctx): Promise<Loaded[]> {
     listCharacters(deps, ctx),
     deps.db.select({ id: products.id, name: products.name }).from(products).where(eq(products.accountId, ctx.accountId)),
   ])
+  const truths = await sourcesFor(deps, ctx, rows.map(r => r.id))
   return rows.map(r => {
     const plan = r.plan ?? {}
+    const truth = truths.get(r.id)
     const words = r.kind === 'slideshow' ? r.hook : r.kind === 'meme' ? r.caption : ''
     return {
       id: r.id, kind: r.kind,
       name: r.title.trim() || (words ?? '').trim().slice(0, 80) || r.idea.trim().slice(0, 60) || `Untitled ${KIND[r.kind] ?? 'post'}`,
       accountTag: r.accountTag, productId: r.productId, productName: prods.find(p => p.id === r.productId)?.name ?? '',
       characterId: r.characterId, characterName: chars.find(c => c.id === r.characterId)?.name ?? '', topic: r.kind === 'slideshow' && r.mode === 'topic',
-      structure: plan.structure ?? null, variationOf: r.variationOf, momentId: String(plan.momentId ?? ''), rowId: String(plan.rowId ?? ''),
+      structure: plan.structure ?? null, truth: truth ? { id: truth.id, label: `${truth.comment.slice(0, 140)}${truth.comment.length > 140 ? '...' : ''} (${truth.likes.toLocaleString('en-US')} likes)` } : null, variationOf: r.variationOf, momentId: String(plan.momentId ?? ''), rowId: String(plan.rowId ?? ''),
       results: readResults(r.results),
     }
   })

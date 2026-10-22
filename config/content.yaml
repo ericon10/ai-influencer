@@ -117,6 +117,62 @@ writing_standards:
     endings: true
     # The playbook's structures per account (playbook above).
     structures: true
+    # The ICP's pain points (the kit's buyer language, section 2, and the
+    # honest endings): the line bank tags each comment with one of these.
+    pains:
+      - applied everywhere and heard nothing back
+      - ghosted after the interviews
+      - ghost jobs and reposted listings
+      - entry level that wants years of experience
+      - rejected by a bot before a human saw it
+      - endless interview rounds and unpaid take-homes
+      - retyping the resume into boxes
+      - rewriting the resume for every job
+      - hours on jobs you don't fit
+      - lowball pay and "competitive" salary
+      - money running out while searching
+      - family and friends asking how the search is going
+      - feeling like it's you
+      - laid off out of nowhere
+
+# The line bank (owner, 2026-10-22; UX-PLAN.md section 36, item 29): the
+# free first pass on an Apify comment scrape (code only), the tags Claude
+# gives each kept comment, and the reviewer's bar. Every list is data.
+line_bank:
+  # The free first pass drops comments with fewer likes, fewer words, or
+  # none of the topic words (the job search).
+  min_likes: 2
+  min_words: 4
+  # An on-screen line reads in about 2 seconds (6 s clips): this many words.
+  max_words: 12
+  # The reviewer's bar: gut punch, specificity and "would a real person
+  # post this" all at least this (1 to 10), and not setup or meh.
+  pass_score: 8
+  # Comments per batch: one tag call, one writer call and one reviewer call
+  # each.
+  tag_batch: 30
+  # Kept and rejected lines given to the writer and the reviewer.
+  examples: 8
+  emotions: [infuriated, angry, sad, crying, frustrated]
+  topics: [layoff, ghosting, interviews, applications, money, family, burnout, entry level, AI, bosses, quitting, small wins]
+  formats: [finished damage, meme setup, question, list]
+  fits:
+    - { id: first, label: Unemployed, first person }
+    - { id: secondhand, label: Secondhand (for the girls) }
+    - { id: both, label: Both }
+  # On the job search: a comment needs one of these (whole words; a phrase
+  # matches as written), or a theme from the scrape's themes column.
+  topic_words: [job, jobs, work, working, worked, workplace, laid me off, laid us off, laid her off, let me go, let go, fired me, my replacement, hire, hired, hiring, interview, interviews, interviewed, recruiter, recruiters, resume, resumes, cv, application, applications, apply, applied, applying, unemployed, unemployment, laid off, layoff, layoffs, fired, boss, bosses, manager, hr, salary, paycheck, pay, paid, wage, wages, minimum wage, rent, bills, quit, quitting, career, degree, graduate, graduated, grad, college, entry level, intern, internship, linkedin, indeed, offer, rejected, rejection, rejections, ghosted, ghosting, onboarding, promotion, company, office, shift, shifts, coworker, coworkers, severance, benefits, ai, experience, qualified, overqualified, underqualified, position, role, employer, employed, broke, savings, retail, corporate, 9 to 5, 9-5, two weeks notice, contract, non-compete, hours, payroll, workforce, job market, market]
+  # About the video itself, not the job search (dropped).
+  video_words: [this audio, the audio, this sound, the sound, this song, the song, the music, this video, the video, ur video, your video, the edit, this edit, the filter, the trend, the caption, part 2, pt 2, who's here, whos here, your outfit, her outfit, your hair, her hair, your nails, her nails, your makeup, her makeup, your voice, her voice, your face, her face, the way she, the way you said, your eyes, so pretty, so cute, you're gorgeous, ur gorgeous, slay, ate this]
+  # Another language in Latin letters: two or more of these, and no more
+  # English words than them, is not English.
+  foreign_words: [na, ng, ko, po, ang, mga, sa, kasi, tas, naman, nga, yung, lang, talaga, ako, ikaw, que, el, los, las, por, para, pero, muy, mi, tu, es, una, uno, con, del, nao, não, você, voce, mas, isso, eu, ich, und, nicht, das, ist, je, pas, est, les, une]
+  english_words: [the, a, i, you, my, me, to, and, of, is, it, in, that, for, was, on, they, so, but, just, like, at, this, have, be, are, not, with, what, we, when, all, do, don't, i'm, im, get, got, if, no, she, he, her, his, them, or, how, why, ur, u]
+  # The voice card's who and point of view: one of these means the
+  # character tells the line in the first person (unemployed); otherwise
+  # secondhand.
+  first_person_words: [unemployed, laid off, job hunting, job-hunting, looking for work, job search, job seeker, between jobs, out of work, applying, fresh grad, new grad, recent grad]
 
 # The language lint (owner, 2026-10-16; UX-PLAN.md section 28): free
 # warnings on the hooks, slides and captions of posts whose product's

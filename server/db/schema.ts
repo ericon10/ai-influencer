@@ -597,3 +597,46 @@ export const socialAccounts = pgTable('social_accounts', {
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 }, t => [uniqueIndex('social_accounts_tag_uq').on(t.accountId, t.tag)])
+
+// The line bank (UX-PLAN.md section 36, item 29): one row per comment kept
+// by the free first pass of an import; its tags, its on-screen line and the
+// reviewer's scores once the priced run reaches it; the owner's call; the
+// post it went to (one account only).
+export const bankLines = pgTable('bank_lines', {
+  id: text('id').primaryKey(),
+  accountId: text('account_id').notNull().references(() => accounts.id),
+  importId: text('import_id').notNull(),
+  // The product whose writing rules tag it (its pain points), or null.
+  productId: text('product_id'),
+  comment: text('comment').notNull(),
+  likes: integer('likes').notNull().default(0),
+  replies: integer('replies').notNull().default(0),
+  videoAccount: text('video_account').notNull().default(''),
+  videoViews: integer('video_views').notNull().default(0),
+  videoUrl: text('video_url').notNull().default(''),
+  videoCaption: text('video_caption').notNull().default(''),
+  // new, tagged, written (passed or not), failed (a call failed; runs again).
+  state: text('state').notNull().default('new'),
+  // { emotion, topic, pain, fits, format, fight, fightReason }
+  tags: jsonb('tags'),
+  line: text('line').notNull().default(''),
+  // The writer passed on the comment (no usable truth): why.
+  skipped: text('skipped').notNull().default(''),
+  // { gut, specific, real, setup, meh, note }
+  review: jsonb('review'),
+  passed: boolean('passed'),
+  // The owner's Keep or Reject.
+  call: text('call'),
+  calledAt: timestamp('called_at', { withTimezone: true }),
+  // Where it was used: the post, its account, the character and the words
+  // placed (the line in that character's voice).
+  usedPostId: text('used_post_id'),
+  usedAccountTag: text('used_account_tag'),
+  usedCharacterId: text('used_character_id'),
+  usedText: text('used_text').notNull().default(''),
+  usedAt: timestamp('used_at', { withTimezone: true }),
+  // Characters whose facts it contradicts (never offered to them again).
+  skips: jsonb('skips').notNull().default([]),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+}, t => [index('bank_lines_account_idx').on(t.accountId, t.likes), index('bank_lines_import_idx').on(t.accountId, t.importId)])

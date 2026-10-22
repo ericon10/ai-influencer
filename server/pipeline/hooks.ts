@@ -22,6 +22,7 @@ import { registerClone } from './clone.js'
 import { registerRecreate } from './recreate.js'
 import { registerMassRecreate } from './massRecreate.js'
 import { registerPlatforms } from './platforms.js'
+import { registerLineBank } from './lineBank.js'
 import { registerOpenReel } from './openreel.js'
 import { registerChain } from './chain.js'
 import { registerSounds } from './sounds.js'
@@ -211,6 +212,7 @@ export function registerPipelineHooks(): void {
   registerRecreate()
   registerMassRecreate()
   registerPlatforms()
+  registerLineBank()
   registerOpenReel()
   registerChain()
   registerSounds()

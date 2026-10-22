@@ -177,6 +177,11 @@ const templatesSchema = z.object({
   // product is on the SideStep standard use them.
   sidestep_slideshow_hooks: z.object({ system: z.string(), prompt: z.string() }),
   sidestep_slideshow_hooks_review: z.object({ system: z.string(), prompt: z.string() }),
+  // The line bank (UX-PLAN section 36, item 29): tags, writer, reviewer, voice.
+  line_bank_tags: z.object({ system: z.string(), prompt: z.string() }),
+  line_bank_writer: z.object({ system: z.string(), prompt: z.string() }),
+  line_bank_reviewer: z.object({ system: z.string(), prompt: z.string() }),
+  line_bank_voice: z.object({ system: z.string(), prompt: z.string() }),
   sidestep_slideshow_draft: z.object({ system: z.string(), prompt: z.string() }),
   sidestep_playbook_menu: z.string(),
   sidestep_hook_standard: z.string(),
@@ -344,7 +349,28 @@ const contentSchema = z.object({
   writing_standards: z.record(z.string(), z.object({
     label: z.string(), names: z.array(z.string()).default([]),
     review: z.boolean().default(false), lint: z.boolean().default(false), endings: z.boolean().default(false), structures: z.boolean().default(false),
+    // The ICP's pain points (the line bank's tags, UX-PLAN section 36, 29c).
+    pains: z.array(z.string()).default([]),
   })).default({}),
+  // The line bank (UX-PLAN section 36, item 29): the free first pass's word
+  // lists, the tags, the batch sizes and the reviewer's bar.
+  line_bank: z.object({
+    min_likes: z.number().int().min(0).default(2),
+    min_words: z.number().int().min(1).default(4),
+    max_words: z.number().int().min(4).max(30).default(12),
+    pass_score: z.number().int().min(1).max(10).default(8),
+    tag_batch: z.number().int().min(5).max(100).default(30),
+    examples: z.number().int().min(0).max(20).default(8),
+    emotions: z.array(z.string()).min(1),
+    topics: z.array(z.string()).min(1),
+    formats: z.array(z.string()).min(1),
+    fits: z.array(z.object({ id: z.enum(['first', 'secondhand', 'both']), label: z.string() })).length(3),
+    topic_words: z.array(z.string()).min(1),
+    video_words: z.array(z.string()).default([]),
+    foreign_words: z.array(z.string()).default([]),
+    english_words: z.array(z.string()).min(1),
+    first_person_words: z.array(z.string()).default([]),
+  }),
   // The language lint's word lists (section 28; the checks are rules), for
   // the writing standards with lint on.
   copy_lint: z.object({ values: z.array(z.string()), hype: z.array(z.string()), products: z.array(z.string()), max_hashtags: z.number().int().min(0).max(30), hook_max_words: z.number().int().min(4).max(40).default(22), hook_labels: z.array(z.string()).default([]), job_words: z.array(z.string()).default([]), ending_never: z.array(z.string()).default([]), setup_openers: z.array(z.string()).optional(), emotion_words: z.array(z.string()).optional() })

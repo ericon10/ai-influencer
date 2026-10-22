@@ -71,6 +71,7 @@ import { characterSummary, characterView, scenesView, settingsView } from './vie
 import { createUploadSlots, receiveUpload, sheetRefOf, takeUploads, MAX_UPLOAD_BYTES, type UploadedFile } from '../storage/uploads.js'
 import { corsRules } from '../storage/blobStore.js'
 import { startImportCheck } from '../pipeline/importCheck.js'
+import { bankView, importBank, setLineCall, setStance, weekPlan } from '../pipeline/lineBank.js'
 
 // The Studio API (/api/v1). Every route except webhooks and signed public
 // asset links requires a signed-in principal; every query is scoped to that
@@ -884,6 +885,33 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
     return c.json(await tryCloneAgain(deps, ctx, c.req.param('cid')))
   })
   // Every take's call, kept or rejected, with its scores (item 21).
+  // The line bank (UX-PLAN section 36, item 29).
+  app.get('/line-bank', async c => {
+    const q = c.req.query()
+    return c.json(await bankView(deps, c.get('ctx'), { characterId: q.characterId || null, emotion: q.emotion || null, topic: q.topic || null, pain: q.pain || null, importId: q.importId || null, accountTag: q.accountTag ?? null, limit: q.limit ? Number(q.limit) : undefined }))
+  })
+  app.post('/line-bank/import', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    const src = z.object({ link: z.string().max(2000).optional(), csv: z.string().max(8_000_000).optional() })
+    const body = parse(z.object({ comments: src, videos: src.nullable().optional(), name: z.string().max(120).optional(), productId: z.string().max(60).nullable().optional() }), await json(c))
+    return c.json(await importBank(deps, ctx, body))
+  })
+  app.put('/line-bank/lines/:id/call', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    const body = parse(z.object({ call: z.enum(['kept', 'rejected']).nullable() }), await json(c))
+    await setLineCall(deps, ctx, c.req.param('id'), body.call)
+    return c.json({ ok: true })
+  })
+  app.put('/line-bank/stance', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    const body = parse(z.object({ characterId: z.string().max(60), stance: z.enum(['first', 'secondhand']).nullable() }), await json(c))
+    await setStance(deps, ctx, body.characterId, body.stance)
+    return c.json({ ok: true })
+  })
+  app.get('/line-bank/week', async c => c.json(await weekPlan(deps, c.get('ctx'), c.req.query('accountTag') ?? '')))
   app.get('/recreate/take-calls', async c => {
     const ctx = c.get('ctx')
     return c.json({ calls: await takeCalls(deps, ctx) })
