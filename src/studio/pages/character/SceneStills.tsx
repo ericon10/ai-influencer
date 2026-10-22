@@ -225,7 +225,7 @@ function CopyScene({ v, scene, open, onClose }: { v: CharacterView; scene: Scene
   }
   return (
     <Modal open={open} onClose={onClose}>
-      <div className="st-card-body st-col" style={{ gap: 14 }}>
+      <div className="st-col" style={{ gap: 14 }}>
         <div><div className="st-kicker">Use for other characters</div><div className="st-h2">{scene.title || 'This scene'}</div><p className="st-sub" style={{ margin: '6px 0 0' }}>The words and choices carry over with the name swapped. Each character uses their own sheet and signature pieces. Free; nothing runs until you generate.</p></div>
         {done.length ? (
           <div className="st-col" style={{ gap: 8 }}>

@@ -32,7 +32,7 @@ export function DeleteCharacter({ id, name, compact = false }: { id: string; nam
         <Trash2 size={compact ? 14 : 15} />{compact ? null : 'Delete character'}
       </button>
       <Modal open={open} onClose={() => setOpen(false)}>
-        <div className="st-col" style={{ gap: 14, padding: 4 }} data-field="delete-character-confirm">
+        <div className="st-col" style={{ gap: 14 }} data-field="delete-character-confirm">
           <div className="st-h2">Delete {name || 'this character'}?</div>
           <span className="st-sub" style={{ margin: 0 }}>It goes to Library &gt; Trash for 7 days; Restore brings it back with its sheet and file. Its posts, stills and takes stay where they are.</span>
           <div className="st-row" style={{ gap: 8, justifyContent: 'flex-end' }}>

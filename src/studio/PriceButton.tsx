@@ -220,7 +220,7 @@ export function PriceButton({ action, label, variant = 'primary', size = 'normal
 
       <Modal open={details} onClose={() => setDetails(false)} className="st-quote">
         {quote && est.data && (
-          <div className="st-card-body">
+          <div>
             <div className="st-kicker">Estimate</div>
             <div className="st-h2" style={{ marginBottom: 12 }}>{est.data.preview.title}</div>
             {quote.items.map((it, i) => (

@@ -27,7 +27,7 @@ test('Person or Faceless: Doug from his file; a post\'s still and video; the sti
   await ask.getByRole('radio', { name: /Faceless/ }).click()
   await ask.getByRole('textbox').fill(`Doug ${tag}`)
   await snap(page, info, 'Person or Faceless, Doug\'s file')
-  await ask.getByRole('button', { name: 'Make the faceless account' }).click()
+  await ask.getByRole('button', { name: 'Set up the persona' }).click()
   const pageEl = page.locator('[data-field="faceless-character"]')
   await expect(pageEl).toBeVisible({ timeout: 30_000 })
   await expect(page.locator('[data-field="faceless-places"]').getByLabel('Place name').first()).toHaveValue('Car, rain on the windshield')

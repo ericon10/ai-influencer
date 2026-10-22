@@ -54,7 +54,7 @@ export function useDelete() {
   const dialog = (
     <Modal open={!!pending} onClose={() => !busy && setPending(null)}>
       {pending && (
-        <div className="st-col" style={{ gap: 14, padding: 22, maxWidth: 520 }} data-field="trash-warn">
+        <div className="st-col" style={{ gap: 14 }} data-field="trash-warn">
           <div className="st-row" style={{ gap: 10 }}><AlertTriangle size={18} style={{ color: 'var(--st-warn)' }} /><div className="st-h3 grow">{pending.items.length === 1 ? `Delete "${pending.items[0]!.label}"?` : `Delete ${pending.items.length} items?`}</div></div>
           <ul className="st-col st-trash-warnings" style={{ gap: 8 }}>
             {pending.warnings.map((w, i) => <li key={i}><b>{label(w.id)}</b>: {w.text}</li>)}

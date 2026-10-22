@@ -48,7 +48,7 @@ export function CropTool({ assetId, candidateId, aspect, onClose, onCropped }: {
   const maxWidth = size ? Math.min(1, (ratio * size.h) / size.w) : 1
   return (
     <Modal open onClose={onClose} className="st-crop">
-      <div className="st-card-body st-col" style={{ gap: 14 }}>
+      <div className="st-col" style={{ gap: 14 }}>
         <div className="st-row"><Crop size={16} /><div className="st-h2">Crop closer</div><span className="st-spacer" /><span className="st-badge plain">{aspect}</span></div>
         <div
           ref={stage}

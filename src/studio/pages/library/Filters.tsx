@@ -146,7 +146,7 @@ function AddToCollection({ open, onClose, items, onDone }: { open: boolean; onCl
   }
   return (
     <Modal open={open} onClose={onClose}>
-      <div className="st-col" style={{ gap: 14, padding: 22 }} data-field="add-to-collection-dialog" aria-label="Add to collection">
+      <div className="st-col" style={{ gap: 14 }} data-field="add-to-collection-dialog" aria-label="Add to collection">
         <div className="st-h2">Add {items.length} {items.length === 1 ? 'item' : 'items'} to a collection</div>
         {list === null ? <Loader2 size={16} className="st-spin" /> : list.length > 0 && (
           <div className="st-row" style={{ gap: 6, flexWrap: 'wrap' }} role="radiogroup" aria-label="Collections">

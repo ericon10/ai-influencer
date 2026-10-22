@@ -57,7 +57,7 @@ export function SentButton({ candidateId, jobId, size = 'sm' }: { candidateId?: 
     <>
       <button type="button" className={`st-btn ghost ${size === 'xs' ? 'xs' : 'sm'}`} onClick={() => setOpen(true)} title="The prompt, images, model and cost of this run"><FileSearch size={13} />What was sent</button>
       <Modal open={open} onClose={() => setOpen(false)} className="st-sent-modal">
-        <div className="st-card-body st-col" style={{ gap: 12 }}>
+        <div className="st-col" style={{ gap: 12 }}>
           <div className="st-row" style={{ gap: 8 }}><div className="st-h2 grow">What was sent</div><HowTo id="feedback" label="How prices and real cost work" /><button className="st-btn ghost sm" onClick={() => setOpen(false)}>Close</button></div>
           {open && <SentPanel candidateId={candidateId} jobId={jobId} />}
         </div>

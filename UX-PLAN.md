@@ -1673,3 +1673,20 @@ in `server/pipeline/lineBank.ts` (a `bank_lines` table and a
   job search, 251 too short, 96 duplicates, 20 about the video, 10 not
   English); the full run quotes $5.82 (74 batches). The paid run itself
   waits on an Anthropic key in Settings and the production worker.
+
+### Modal fix (owner, 2026-10-22)
+
+- Every modal has one padding on all four sides, set on `.st-modal` (22 px,
+  16 px on a phone); a modal's contents add none of their own. Its buttons
+  sit in `.st-modal-actions`: inside the modal, at the right, wrapping on a
+  phone.
+- New character: nothing is picked to start and the button waits ("Pick
+  one first"); the picked card has the accent border, its fill and a check,
+  under the mouse too (the hover style no longer hides the pick); the arrow
+  keys move the pick like any radio group; the button names the next step,
+  "Start from a concept" for a person and "Set up the persona" for a
+  faceless account.
+- `e2e/editor/modals.spec.ts` opens every modal a person reaches (New
+  character, Import a character file, Edit card, Voice, Delete character,
+  a price's Details) at desktop and phone width and checks the padding,
+  that left and right match, and that nothing sticks out.

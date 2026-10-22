@@ -110,7 +110,7 @@ export const GUIDE: GuideSection[] = [
       'Import a character file (the first button): drop the .md from the Claude project and its sheet folder. Images named REF 00 to REF 11 (or REF-00) become the approved sheet.',
       'Before anything is imported, the file is checked against character template v1.6, for free: every UNIVERSAL section (Realism principle, Models, Scene rules, Video rules, the candid and recreate recipes), the age (21 or older), one distinguishing mark, REF-00 to REF-11 labeled in the Reference sheet, and the Element ID when the file names an Element. Each shows a tick or what to add; optional sections that are missing are listed in gray, and so are sections still holding [brackets]. Nothing blocks: with something missing the button reads "Import anyway".',
       'A character of the same name already here? "Update Callie" is chosen for you: the file\'s words replace the old ones, and her posts, takes, stills and sheet stay. The combo log is merged, every saved identity is kept, and a sheet image identical to the approved one is skipped, so nothing goes stale. "Import as a new character" is the other choice.',
-      'Start from a concept (the second button) begins with inspiration photos and three concepts (Inspiration step).',
+      'New character (the second button) asks Person or Faceless first; nothing is picked until you pick (a tap, or the arrow keys), and the picked card shows a check. Person: Start from a concept begins with inspiration photos and three concepts (Inspiration step). Faceless: Set up the persona opens its file.',
       'Open a character to see its four setup steps.',
       'Voice (next to Edit card on the character page): the character\'s ElevenLabs voice and how they talk. The writers and voice lines use it.',
     ],
@@ -121,7 +121,7 @@ export const GUIDE: GuideSection[] = [
     id: 'faceless', group: 'Set up a character', title: 'Faceless characters', color: 'violet',
     tagline: 'An account with no face: real places, a voice, a sound bank.',
     where: 'Characters > New character > Faceless',
-    intro: 'A new character asks Person or Faceless first. A faceless one skips the hero, the sheet, the likeness checks, the Element and every face check: nothing asks for a face. Its page is its file. Doug (31, Peoria IL, laid-off contract data entry, rainy Midwest everyday life) is the first one; start from his file or an empty one.',
+    intro: 'A new character asks Person or Faceless first (pick Faceless, then Set up the persona). A faceless one skips the hero, the sheet, the likeness checks, the Element and every face check: nothing asks for a face. Its page is its file. Doug (31, Peoria IL, laid-off contract data entry, rainy Midwest everyday life) is the first one; start from his file or an empty one.',
     steps: [
       'Persona: who, the town, the life details. The name is never shown on screen.',
       'Place bank: reusable scenes, picked per post like set plates. Write the place only: no person or body part (hands read as AI) and nothing that carries text (packaging, screens, paper, mail, signs, labeled buttons): Soul writes gibberish on them.',

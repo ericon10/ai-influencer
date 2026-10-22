@@ -392,10 +392,16 @@ button.st-chip:hover { color: var(--st-text); border-color: var(--st-text-3); }
 .st-modal {
   position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 90;
   width: min(560px, calc(100vw - 32px)); max-height: calc(100vh - 48px); overflow-y: auto;
+  /* One padding for every modal, on all four sides (its contents add none). */
+  padding: 22px;
   background: var(--st-surface); border: 1px solid var(--st-line-2); border-radius: var(--st-r-xl);
   box-shadow: 0 40px 80px -30px rgba(0, 0, 0, 0.8); animation: st-pop 0.18s ease;
 }
 .st-quote { width: min(400px, calc(100vw - 32px)); }
+@media (max-width: 560px) { .st-modal { padding: 16px; } }
+/* A modal's buttons: in the modal, at its right, wrapping on a phone. */
+.st-modal-actions { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+.st-modal-actions .st-btn { max-width: 100%; white-space: normal; }
 .st-quote-line { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; padding: 6px 0; color: var(--st-text-2); font-variant-numeric: tabular-nums; }
 .st-quote-total { display: flex; justify-content: space-between; align-items: baseline; padding-top: 10px; margin-top: 4px; border-top: 1px solid var(--st-line); }
 .st-quote-total b { font-size: 26px; font-family: var(--st-serif); font-weight: 400; }
@@ -557,7 +563,6 @@ button.st-chip:hover { color: var(--st-text); border-color: var(--st-text-3); }
 .st-scene-title:hover { border-color: var(--st-line); }
 .st-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 16px; }
 .st-form .wide { grid-column: 1 / -1; }
-.st-choice.on { border-color: rgba(255, 106, 61, 0.65); background: var(--st-accent-soft); }
 .st-choice:disabled { opacity: 0.55; cursor: not-allowed; }
 .st-refpick { display: grid; gap: 4px; justify-items: center; font-size: 10.5px; color: var(--st-text-3); }
 .st-refpick .st-img { width: 44px; height: 58px; border-radius: 8px; }
@@ -618,7 +623,10 @@ button.st-chip:hover { color: var(--st-text); border-color: var(--st-text-3); }
 .st-choices { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .st-choice { display: grid; gap: 6px; text-align: left; padding: 14px 16px; border-radius: 14px; background: var(--st-surface-2); border: 1px solid var(--st-line); color: var(--st-text); cursor: pointer; font: inherit; transition: border-color 0.15s ease, background 0.15s ease; }
 .st-choice:hover:not(:disabled) { border-color: var(--st-text-2); }
-.st-choice.on { border-color: var(--st-accent); background: var(--st-accent-soft); }
+/* The picked choice keeps its accent under the mouse too (hover never hides the pick). */
+.st-choice.on, .st-choice.on:hover:not(:disabled) { border-color: var(--st-accent); background: var(--st-accent-soft); box-shadow: inset 0 0 0 1px var(--st-accent); }
+.st-choice-head { display: flex; align-items: center; gap: 8px; }
+.st-choice-check { margin-left: auto; color: var(--st-accent); flex: none; }
 .st-choice:disabled { cursor: not-allowed; opacity: 0.6; }
 .st-choice:focus-visible { outline: 2px solid var(--st-accent); outline-offset: 2px; }
 .st-choice-status { font-size: 12.5px; color: var(--st-text-2); }

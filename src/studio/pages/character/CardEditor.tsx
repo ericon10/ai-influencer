@@ -33,7 +33,7 @@ export function CardEditor({ v, open, onClose }: { v: CharacterView; open: boole
 
   return (
     <Modal open={open} onClose={onClose}>
-      <div className="st-card-body st-col" style={{ gap: 14 }}>
+      <div className="st-col" style={{ gap: 14 }}>
         <div><div className="st-kicker">Character card</div><div className="st-h2">The source of truth for every prompt</div></div>
         <div className="st-grid two" style={{ gap: 12 }}>
           <Field id="card-name" label="Name" required done={!!form.name.trim()}><input className="st-input" value={form.name} placeholder="e.g. Callie" onChange={e => setForm({ ...form, name: e.target.value })} /></Field>

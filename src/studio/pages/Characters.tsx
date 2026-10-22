@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { FileUp, FolderOpen, Plus, Upload } from 'lucide-react'
+import { CheckCircle2, FileUp, FolderOpen, Plus, Upload } from 'lucide-react'
 import { api } from '../api'
 import { useCharacters, useRefresh } from '../hooks'
 import { Callout, Field, Img, Modal, STAGES, Todo, errorMessage, useToast } from '../ui'
@@ -130,7 +130,7 @@ function ImportDialog({ open, onClose }: { open: boolean; onClose: () => void })
   if (done) {
     return (
       <Modal open={open} onClose={close}>
-        <div className="st-card-body st-col" style={{ gap: 16 }}>
+        <div className="st-col" style={{ gap: 16 }}>
           <div><div className="st-kicker">{done.updated ? 'Updated' : 'Imported'}</div><div className="st-h2">Here is what the Studio read</div><p className="st-sub">{done.updated ? 'The file\'s words replaced the old ones; posts, takes and the sheet stayed, and the combo log was merged. ' : ''}{done.importedShots.length ? `${done.importedShots.length} approved sheet shot${done.importedShots.length === 1 ? '' : 's'}: ${done.importedShots.join(', ')}.` : done.unchangedShots.length ? '' : 'No sheet images yet. Add them any time from the Sheet tab.'}{done.unchangedShots.length ? ` Already in the sheet, unchanged: ${done.unchangedShots.length === 12 ? 'all 12' : done.unchangedShots.join(', ')}.` : ''}{done.checkShots.length ? ` To check with QA: ${done.checkShots.join(', ')}.` : ''}</p></div>
           {done.checkJobId && <Callout tone="info">Checking each image against REF-00: face match and skin texture. It is free and runs in the background; any failures show on the Sheet tab.</Callout>}
           {done.warnings.length > 0 && <ul className="st-notes">{done.warnings.map((w, i) => <li key={i}>{w}</li>)}</ul>}
@@ -142,7 +142,7 @@ function ImportDialog({ open, onClose }: { open: boolean; onClose: () => void })
 
   return (
     <Modal open={open} onClose={close}>
-      <div className="st-card-body st-col" style={{ gap: 16 }}>
+      <div className="st-col" style={{ gap: 16 }}>
         <div><div className="st-kicker">Import</div><div className="st-titlerow"><div className="st-h2">Import a character file</div><HowTo id="characters" /></div><p className="st-sub">The character file (.md) from the Claude project, made with character template v1.6, and its sheet folder. Images named REF 00 to REF 11 (or REF-00) become the approved sheet. The file is checked against the template for free before anything is imported.</p></div>
         <Field id="import-file" label="Character file (.md)" required done={!!file} group hint="The sheet images are optional; add them now or later.">
         <label className={`st-drop ${over ? 'over' : ''}`} onDragOver={e => { e.preventDefault(); setOver(true) }} onDragLeave={() => setOver(false)} onDrop={e => { e.preventDefault(); setOver(false); void drop(e.dataTransfer) }}>
@@ -186,26 +186,48 @@ function ImportDialog({ open, onClose }: { open: boolean; onClose: () => void })
 // account has no face at all: its file (persona, place bank, look rules,
 // voice, sound bank) is all it needs. Doug is the first one, ready to copy.
 function NewCharacter({ open, busy, onClose, onPick }: { open: boolean; busy: boolean; onClose: () => void; onPick: (o: { kind: 'person' | 'faceless'; name?: string; template?: 'doug' | null }) => void }) {
+  // Nothing is picked to start; the button waits for a pick (owner, 2026-10-22).
   const [kind, setKind] = useState<'person' | 'faceless' | null>(null)
   const [name, setName] = useState('')
   const [doug, setDoug] = useState(true)
+  useEffect(() => { if (!open) setKind(null) }, [open])
+  const kinds = [
+    { id: 'person' as const, title: 'Person', text: 'A face that stays the same in every post: inspiration, face, a 12-shot reference sheet and the character file.' },
+    { id: 'faceless' as const, title: 'Faceless', text: 'No face, no hero, no sheet: a persona, a bank of places, look rules, a voice and a sound bank. Stills of real places, never a person.' },
+  ]
+  const refs = useRef<Array<HTMLButtonElement | null>>([])
+  // A radio group: the arrow keys move the pick and the focus; Tab reaches
+  // the picked card (or the first when none is picked).
+  const onKey = (e: KeyboardEvent, i: number) => {
+    const step = e.key === 'ArrowDown' || e.key === 'ArrowRight' ? 1 : e.key === 'ArrowUp' || e.key === 'ArrowLeft' ? -1 : 0
+    if (!step) return
+    e.preventDefault()
+    const next = (i + step + kinds.length) % kinds.length
+    setKind(kinds[next]!.id)
+    refs.current[next]?.focus()
+  }
   return (
     <Modal open={open} onClose={onClose}>
       <div className="st-col" style={{ gap: 14 }} data-field="new-character-kind">
         <div><div className="st-kicker">New character</div><div className="st-h2">A person or faceless?</div></div>
         <div className="st-col" style={{ gap: 8 }} role="radiogroup" aria-label="Person or Faceless">
-          <button type="button" role="radio" aria-checked={kind === 'person'} className={`st-choice ${kind === 'person' ? 'on' : ''}`} onClick={() => setKind('person')}><b>Person</b><span className="st-hint">A face that stays the same in every post: inspiration, face, a 12-shot reference sheet and the character file.</span></button>
-          <button type="button" role="radio" aria-checked={kind === 'faceless'} className={`st-choice ${kind === 'faceless' ? 'on' : ''}`} onClick={() => setKind('faceless')}><b>Faceless</b><span className="st-hint">No face, no hero, no sheet: a persona, a bank of places, look rules, a voice and a sound bank. Stills of real places, never a person.</span></button>
+          {kinds.map((k, i) => (
+            <button key={k.id} ref={el => { refs.current[i] = el }} type="button" role="radio" aria-checked={kind === k.id} tabIndex={kind ? (kind === k.id ? 0 : -1) : i === 0 ? 0 : -1}
+              className={`st-choice ${kind === k.id ? 'on' : ''}`} onClick={() => setKind(k.id)} onKeyDown={e => onKey(e, i)}>
+              <span className="st-choice-head"><b>{k.title}</b>{kind === k.id && <CheckCircle2 size={18} className="st-choice-check" aria-hidden data-field="choice-check" />}</span>
+              <span className="st-hint">{k.text}</span>
+            </button>
+          ))}
         </div>
         {kind === 'faceless' && (
           <div className="st-col" style={{ gap: 8 }}>
             <label className="st-col" style={{ gap: 4 }}><span className="st-label">Name (never shown on screen)</span><input className="st-input" value={name} onChange={e => setName(e.target.value)} placeholder={doug ? 'Doug' : 'Faceless account'} /></label>
-            <label className="st-row" style={{ gap: 8 }}><input type="checkbox" checked={doug} onChange={e => setDoug(e.target.checked)} />Start from Doug's file (31, Peoria IL, laid-off contract data entry, rainy Midwest everyday life)</label>
+            <label className="st-row" style={{ gap: 8, alignItems: 'flex-start', flexWrap: 'nowrap' }}><input type="checkbox" style={{ flex: 'none', marginTop: 3 }} checked={doug} onChange={e => setDoug(e.target.checked)} /><span>Start from Doug's file (31, Peoria IL, laid-off contract data entry, rainy Midwest everyday life)</span></label>
           </div>
         )}
-        <div className="st-row" style={{ gap: 8, justifyContent: 'flex-end' }}>
+        <div className="st-modal-actions">
           <button type="button" className="st-btn ghost" onClick={onClose}>Cancel</button>
-          <button type="button" className="st-btn primary" disabled={!kind || busy} onClick={() => kind && onPick({ kind, name: name.trim(), template: kind === 'faceless' && doug ? 'doug' : null })}>{kind === 'faceless' ? 'Make the faceless account' : 'Start from a concept'}</button>
+          <button type="button" className="st-btn primary" data-field="new-character-go" disabled={!kind || busy} onClick={() => kind && onPick({ kind, name: name.trim(), template: kind === 'faceless' && doug ? 'doug' : null })}>{kind === 'faceless' ? 'Set up the persona' : kind === 'person' ? 'Start from a concept' : 'Pick one first'}</button>
         </div>
       </div>
     </Modal>
