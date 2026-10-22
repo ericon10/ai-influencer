@@ -93,10 +93,14 @@ export function createAnthropicLlm(apiKey: string, config: StudioConfig): LlmPro
       if (res.stop_reason === 'max_tokens') {
         throw new ProviderError('The model ran out of room before finishing. Raise max tokens for this task.', { retryable: false, submitted: 'no', code: 'max_tokens', usage })
       }
-      const text = res.content.flatMap(b => (b.type === 'text' ? [b.text] : [])).join('')
+      const texts = res.content.flatMap(b => (b.type === 'text' ? [b.text] : []))
+      const text = texts.join('')
       let data: unknown
-      try { data = JSON.parse(text) } catch {
-        throw new ProviderError('The model returned malformed JSON.', { retryable: true, submitted: 'no', code: 'bad_json', usage })
+      try { data = JSON.parse(text) } catch (e) {
+        // What came back, so the failure can be read on the job (its start
+        // and end, the block types and why it stopped).
+        const seen = `stop ${res.stop_reason}, blocks ${res.content.map(b => b.type).join('+')}, ${text.length} chars, ${(e as Error).message}; starts ${JSON.stringify(text.slice(0, 160))}; ends ${JSON.stringify(text.slice(-160))}`
+        throw new ProviderError(`The model returned malformed JSON (${seen}).`, { retryable: true, submitted: 'no', code: 'bad_json', usage })
       }
       return { data, usage }
     },
