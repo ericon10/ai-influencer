@@ -179,7 +179,9 @@ export class ProviderError extends Error {
   constructor(
     message: string,
     // `detail`: the provider's own answer, when it sent one (a tool error's body).
-    readonly opts: { retryable: boolean; submitted: 'no' | 'unknown'; status?: number; code?: string; detail?: unknown } = { retryable: false, submitted: 'no' },
+    // `usage`: an LLM answer that came back unusable (cut off, refused) was
+    // still billed; the runner records its cost.
+    readonly opts: { retryable: boolean; submitted: 'no' | 'unknown'; status?: number; code?: string; detail?: unknown; usage?: LlmUsage } = { retryable: false, submitted: 'no' },
   ) {
     super(message)
     this.name = 'ProviderError'

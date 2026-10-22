@@ -1,7 +1,7 @@
 import { and, eq } from 'drizzle-orm'
 import type { Ctx, Deps } from '../context.js'
 import type { ModelEntry } from '../config/load.js'
-import { fill, hardWrap, normalizePrompt } from '../core/text.js'
+import { dropMentions, fill, hardWrap, normalizePrompt } from '../core/text.js'
 import { blocking, lintPrompt, type RuleViolation } from '../core/rules.js'
 import { identityForModel } from '../core/identity.js'
 import { pronounVars } from '../core/prompts.js'
@@ -79,13 +79,14 @@ export function stillLevelFor(deps: Deps, model: string, id?: string): { quality
 
 // The model's own prompt lines (models.yaml prompt_lines: Flare's "Bare
 // natural lips, no gloss."), before the REALISM block, once.
+// Then the words the model must never see (models.yaml prompt_never: Soul's
+// text, letters, labels, logos, watermarks) come out, clause by clause.
 export function withModelLines(deps: Deps, model: string, prompt: string): string {
-  const lines = (deps.config.models.models.find(x => x.ref === model)?.prompt_lines ?? []).filter(l => !prompt.toLowerCase().includes(l.toLowerCase()))
-  if (!lines.length) return prompt
-  const add = lines.join(' ')
+  const entry = deps.config.models.models.find(x => x.ref === model)
+  const lines = (entry?.prompt_lines ?? []).filter(l => !prompt.toLowerCase().includes(l.toLowerCase()))
   const at = prompt.search(/\n?REALISM:/)
-  if (at < 0) return `${prompt.trimEnd()} ${add}`
-  return `${prompt.slice(0, at).trimEnd()} ${add}${prompt.slice(at)}`
+  const added = !lines.length ? prompt : at < 0 ? `${prompt.trimEnd()} ${lines.join(' ')}` : `${prompt.slice(0, at).trimEnd()} ${lines.join(' ')}${prompt.slice(at)}`
+  return dropMentions(added, entry?.prompt_never ?? [])
 }
 
 // The model that runs (the mock in demo mode) and the Higgsfield billing

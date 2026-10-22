@@ -7,7 +7,7 @@ import { assets } from '../db/schema.js'
 import type { GenRequest } from '../providers/types.js'
 import { AppError } from '../lib/errors.js'
 import { formatUsd } from '../costs/money.js'
-import { hardWrap } from '../core/text.js'
+import { dropMentions, hardWrap } from '../core/text.js'
 import { lintPrompt, blocking, type RuleViolation } from '../core/rules.js'
 import { finalizeImagePrompt } from '../core/realism.js'
 import { renderPlaceholderPortrait, renderVideo } from '../providers/mock.js'
@@ -78,7 +78,9 @@ export async function buildModelTest(deps: Deps, ctx: Ctx, modelRef: string): Pr
   } else {
     // Every image prompt carries a REALISM line, tests included; the test
     // shot has no person, so it is the plain one (never the skin block).
-    request = { kind: 'image', model: entry.ref, prompt: finalizeImagePrompt(PROMPTS.image, { person: false, plainLine: deps.config.pipeline.templates.slideshow_topic_realism }).prompt, aspect: '1:1', resolution, modelTest: true }
+    // A model that draws the words it is given (Soul) never sees its
+    // prompt_never words, not even in the AVOID line.
+    request = { kind: 'image', model: entry.ref, prompt: dropMentions(finalizeImagePrompt(PROMPTS.image, { person: false, plainLine: deps.config.pipeline.templates.slideshow_topic_realism }).prompt, entry.prompt_never), aspect: '1:1', resolution, modelTest: true }
   }
   const violations = lintPrompt(deps.config.pipeline.rules, request.prompt, { kind: request.kind, request })
   const errors = blocking(violations)
@@ -212,7 +214,7 @@ export async function buildModelSuite(deps: Deps, ctx: Ctx): Promise<BuiltModelT
         ? [await image('mug:1:1', () => renderStillLife('mug', '1:1'), 'Model test: mug'), await image('plant:1:1', () => renderStillLife('plant', '1:1'), 'Model test: plant')].slice(0, t.refs)
         : []
       // Every image prompt carries the REALISM block, tests included.
-      const prompt = finalizeImagePrompt(refs.length ? SUITE_PROMPTS.refs : SUITE_PROMPTS.image, { person: false, plainLine: deps.config.pipeline.templates.slideshow_topic_realism }).prompt
+      const prompt = dropMentions(finalizeImagePrompt(refs.length ? SUITE_PROMPTS.refs : SUITE_PROMPTS.image, { person: false, plainLine: deps.config.pipeline.templates.slideshow_topic_realism }).prompt, entry.prompt_never)
       request = { kind: 'image', model: entry.ref, prompt, ...(refs.length ? { refs: refs.map(assetId => ({ assetId })) } : {}), aspect, resolution: t.resolution, modelTest: true }
     }
     if (onAccount) request = { ...request, billing: 'account' }

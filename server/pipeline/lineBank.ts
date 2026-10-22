@@ -212,6 +212,8 @@ async function writerVars(deps: Deps, ctx: Ctx, productId: string | null) {
   return { standard: String(templateFor(deps, std, 'hook_standard')).trim(), examples: await examples(deps, ctx), max_words: String(cfg.max_words), pass_score: String(cfg.pass_score) }
 }
 
+// Token budgets from production (2026-10-22): a tag is about 60 output
+// tokens, a line or a review about 80; the limit leaves room for each.
 // "Tag, write and review": the comments not run yet (most liked first, up
 // to `limit`), in batches; each batch is a tag call, then its writer, then
 // its reviewer, quoted together and held up front.
@@ -247,9 +249,9 @@ export async function buildBankRun(deps: Deps, ctx: Ctx, input: { importId?: str
       const reviewPrompt = fill(t.line_bank_reviewer.prompt, { lines: comments })
       const at = specs.length
       specs.push(
-        { type: 'llm', stage: 'content', purpose: `bank_tag:${key}`, label: `Line bank: tag ${n} comments`, request: { model: tagRoute.model, system: tagSystem, prompt: tagPrompt, schema: tagsJsonSchema(n, cfg, v.pains), schemaName: 'line_bank_tags', maxTokens: 80 + 50 * n, effort: tagRoute.effort ?? 'low', meta: { ids, productId: pid || null, mockTags: mockTags(group, cfg, v.pains) } } },
-        { type: 'llm', stage: 'content', purpose: `bank_write:${key}`, label: `Line bank: write ${n} lines`, parentIndex: at, request: { model: writeRoute.model, system: writeSystem, prompt: writePrompt, schema: writerJsonSchema(n), schemaName: 'line_bank_writer', maxTokens: 120 + 70 * n, effort: writeRoute.effort ?? 'medium', meta: { ids } } },
-        { type: 'llm', stage: 'content', purpose: `bank_review:${key}`, label: `Line bank: review ${n} lines`, parentIndex: at + 1, request: { model: reviewRoute.model, system: reviewSystem, prompt: reviewPrompt, schema: reviewerJsonSchema(n), schemaName: 'line_bank_reviewer', maxTokens: 120 + 70 * n, effort: reviewRoute.effort ?? 'low', meta: { ids } } },
+        { type: 'llm', stage: 'content', purpose: `bank_tag:${key}`, label: `Line bank: tag ${n} comments`, request: { model: tagRoute.model, system: tagSystem, prompt: tagPrompt, schema: tagsJsonSchema(n, cfg, v.pains), schemaName: 'line_bank_tags', maxTokens: 200 + 90 * n, effort: tagRoute.effort ?? 'low', meta: { ids, productId: pid || null, mockTags: mockTags(group, cfg, v.pains) } } },
+        { type: 'llm', stage: 'content', purpose: `bank_write:${key}`, label: `Line bank: write ${n} lines`, parentIndex: at, request: { model: writeRoute.model, system: writeSystem, prompt: writePrompt, schema: writerJsonSchema(n), schemaName: 'line_bank_writer', maxTokens: 200 + 110 * n, effort: writeRoute.effort ?? 'medium', meta: { ids } } },
+        { type: 'llm', stage: 'content', purpose: `bank_review:${key}`, label: `Line bank: review ${n} lines`, parentIndex: at + 1, request: { model: reviewRoute.model, system: reviewSystem, prompt: reviewPrompt, schema: reviewerJsonSchema(n), schemaName: 'line_bank_reviewer', maxTokens: 200 + 110 * n, effort: reviewRoute.effort ?? 'low', meta: { ids } } },
       )
       if (!previews.length) previews.push({ label: 'Tags (first batch)', text: `${tagSystem}\n${tagPrompt}` }, { label: 'Writer (first batch)', text: `${writeSystem}\n${writePrompt}` }, { label: 'Reviewer', text: `${reviewSystem}\n(the batch's lines, each under its source comment)` })
     }
@@ -343,7 +345,7 @@ async function voiceSpec(deps: Deps, ctx: Ctx, voice: Voice, rows: BankRow[], pu
   const t = deps.config.pipeline.templates.line_bank_voice
   const system = fill(t.system, { max_words: String(cfg.max_words), voice: voice.voice || `${voice.name} has no voice card yet: keep the line's own voice.`, facts: voice.facts, stance: voice.stance === 'first' ? 'in the first person: they are the one out of work' : 'secondhand: about a friend, a sister or a roommate, never as their own job search' })
   const prompt = fill(t.prompt, { lines: rows.map((r, i) => `${i + 1}. ${r.line}`).join('\n') })
-  return { type: 'llm', stage: 'content', purpose, label: rows.length === 1 ? `Line in ${voice.name}'s voice` : `${rows.length} lines in ${voice.name}'s voice`, characterId: voice.characterId, request: { model: route.model, system, prompt, schema: voiceJsonSchema(rows.length), schemaName: 'line_bank_voice', maxTokens: 80 + 60 * rows.length, effort: route.effort ?? 'low', meta: { ids: rows.map(r => r.id), characterId: voice.characterId, assignments, mockVoice: mockVoice(rows.map(r => r.line)) } } }
+  return { type: 'llm', stage: 'content', purpose, label: rows.length === 1 ? `Line in ${voice.name}'s voice` : `${rows.length} lines in ${voice.name}'s voice`, characterId: voice.characterId, request: { model: route.model, system, prompt, schema: voiceJsonSchema(rows.length), schemaName: 'line_bank_voice', maxTokens: 200 + 100 * rows.length, effort: route.effort ?? 'low', meta: { ids: rows.map(r => r.id), characterId: voice.characterId, assignments, mockVoice: mockVoice(rows.map(r => r.line)) } } }
 }
 
 function usableFor(r: BankRow, voice: Voice, accountTag: string, auto: boolean): string | null {

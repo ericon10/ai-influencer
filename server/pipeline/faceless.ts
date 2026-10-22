@@ -3,7 +3,7 @@ import { candidates, characters, contentItems } from '../db/schema.js'
 import type { Ctx, Deps } from '../context.js'
 import { AppError } from '../lib/errors.js'
 import { newId } from '../lib/ids.js'
-import { hardWrap } from '../core/text.js'
+import { dropMentions, hardWrap } from '../core/text.js'
 import { realismBlock } from '../core/realism.js'
 import type { RuleViolation } from '../core/rules.js'
 import type { GenRequest } from '../providers/types.js'
@@ -104,7 +104,8 @@ export async function buildFacelessStill(deps: Deps, ctx: Ctx, input: { contentI
   const body = product ? facelessProductPrompt(still.prompt, product.name) : still.prompt
   // Rule zero holds: every image prompt carries a REALISM line; with no
   // person in frame it is the plain one, and the faceless ending comes last.
-  const prompt = facelessFinal(body, realismBlock(deps.config.pipeline.templates.slideshow_topic_realism))
+  // Soul never sees text, label, logo or watermark words (not even negated).
+  const prompt = dropMentions(facelessFinal(body, realismBlock(deps.config.pipeline.templates.slideshow_topic_realism)), modelEntry(deps, model).prompt_never)
   const request: GenRequest = {
     kind: product ? 'image_edit' : 'image', model: run.model, modelRef: model, prompt, aspect: FACELESS_ASPECT, quality: level.quality, resolution: level.resolution,
     ...(product ? { refs: [{ assetId: product.assetId }] } : {}),

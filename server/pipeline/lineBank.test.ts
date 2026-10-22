@@ -188,3 +188,26 @@ describe('the line bank', () => {
     expect((await weekPlan(h.deps, h.ctx, 'callie.week')).posts).toEqual([])
   })
 })
+
+describe('a billed answer that cannot be used', () => {
+  it('a tag call cut off at its token limit fails, and its cost is recorded (Anthropic bills it)', async () => {
+    const { ProviderError } = await import('../providers/types.js')
+    const usage = { inputTokens: 4000, outputTokens: 1580, cacheReadTokens: 0, cacheWriteTokens: 0, servedModel: 'llm' }
+    const h2 = await createHarness({ mockLlmResponders: { line_bank_tags: () => { throw new ProviderError('The model ran out of room before finishing. Raise max tokens for this task.', { retryable: false, submitted: 'no', code: 'max_tokens', usage }) } } })
+    await importBank(h2.deps, h2.ctx, { comments: { csv } })
+    const { quote } = await estimateAction(h2.deps, h2.ctx, { type: 'bank_run' })
+    await runAction(h2.deps, h2.ctx, { type: 'bank_run' }, quote.id, true)
+    await drain(h2, 30)
+    const all = await h2.deps.db.select().from(jobs).where(eq(jobs.accountId, h2.ctx.accountId))
+    const tag = all.find(j => j.purpose.startsWith('bank_tag'))!
+    expect(tag.status).toBe('failed')
+    expect(Number(tag.actualMicros)).toBeGreaterThan(0)
+    const { ledgerEntries } = await import('../db/schema.js')
+    const charges = await h2.deps.db.select().from(ledgerEntries).where(and(eq(ledgerEntries.jobId, tag.id), eq(ledgerEntries.entryType, 'charge')))
+    expect(charges).toHaveLength(1)
+    expect(Number(charges[0]!.amountMicros)).toBe(Number(tag.actualMicros))
+    // Its write and review never ran, and the comments go back in the queue.
+    expect(all.filter(j => /^bank_(write|review)/.test(j.purpose)).every(j => j.status === 'canceled')).toBe(true)
+    expect((await bankView(h2.deps, h2.ctx, {})).counts.waiting).toBe(9)
+  })
+})

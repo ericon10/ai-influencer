@@ -18,7 +18,7 @@ import { getAsset, readAsset, saveAsset, type AssetRow } from '../storage/assets
 import { probeFile } from '../media/ffmpeg.js'
 import { stripAudio } from '../media/edit.js'
 import { headMaskAsset } from '../pipeline/videoAssets.js'
-import { ProviderError, type CostEstimate, type GenRequest, type LlmImage, type LlmRequest, type Output, type ProviderAdapter } from '../providers/types.js'
+import { ProviderError, type CostEstimate, type GenRequest, type LlmImage, type LlmRequest, type LlmUsage, type Output, type ProviderAdapter } from '../providers/types.js'
 import { withBilling } from '../providers/billing.js'
 import { realismBlockers } from '../core/realism.js'
 import { EXPLICIT_MESSAGE, findExplicitTerms } from '../core/safety.js'
@@ -513,7 +513,24 @@ async function runLlm(deps: Deps, job: JobRow): Promise<void> {
     if (job.provider !== 'mock') await update(deps, job, { costCheck: compareCost({ micros: job.estimateMicros }, { micros: cost.totalMicros, source: 'tokens' }, deps.clock.now()) })
     await runHook(deps, ctx, job, { status: 'completed', data: result.data })
   } catch (e) {
+    // A billed answer that could not be used: its cost is charged now (the
+    // hold stays for a retry; a final failure releases it as usual).
+    const usage = e instanceof ProviderError ? e.opts.usage : undefined
+    if (usage) await chargeAttempt(deps, job, usage, (e as Error).message)
     await handleProviderError(deps, job, e, attempts, 'llm')
+  }
+}
+
+async function chargeAttempt(deps: Deps, job: JobRow, usage: LlmUsage, why: string): Promise<void> {
+  try {
+    const req = job.request as LlmJobRequest
+    const llm = await deps.providers.llm(job.accountId, req.model)
+    const { imageAssetIds: _ids, mirrorImages: _m, estimateImages: _e, ...rest } = req
+    const micros = llm.actualCost({ ...rest, images: [] }, usage).totalMicros
+    await appendLedger(deps.db, [{ accountId: job.accountId, userId: job.userId, characterId: job.characterId, jobId: job.id, quoteId: job.quoteId, stage: job.stage, provider: job.provider, model: job.model, entryType: 'charge', amountMicros: micros, source: 'computed', note: `${usage.inputTokens} in, ${usage.outputTokens} out; unusable answer: ${why.slice(0, 120)}` }])
+    await update(deps, job, { actualMicros: (job.actualMicros ?? 0) + micros, actualSource: 'computed' })
+  } catch (err) {
+    deps.log.warn({ jobId: job.id, err }, 'could not record the cost of an unusable answer')
   }
 }
 
@@ -583,7 +600,8 @@ async function recordPlanCost(deps: Deps, job: JobRow, adapter: ProviderAdapter,
 async function finishWithoutCharge(deps: Deps, job: JobRow, status: 'failed' | 'canceled', message: string): Promise<void> {
   await deps.db.transaction(async tx => {
     await appendLedger(tx as unknown as Db, [{ accountId: job.accountId, userId: job.userId, characterId: job.characterId, jobId: job.id, quoteId: job.quoteId, stage: job.stage, provider: job.provider, model: job.model, entryType: 'release', amountMicros: -job.estimateMicros, source: 'estimate', note: `${status}: hold released` }])
-    await tx.update(jobs).set({ status, actualMicros: 0, actualSource: 'computed', completedAt: deps.clock.now(), lockedUntil: null, nextPollAt: null, error: { message }, updatedAt: deps.clock.now() }).where(eq(jobs.id, job.id))
+    // A billed but unusable LLM answer already recorded its cost: kept.
+    await tx.update(jobs).set({ status, actualMicros: sql`coalesce(${jobs.actualMicros}, 0)`, actualSource: 'computed', completedAt: deps.clock.now(), lockedUntil: null, nextPollAt: null, error: { message }, updatedAt: deps.clock.now() }).where(eq(jobs.id, job.id))
   })
   await event(deps.db, job, status, { message })
   await runHook(deps, systemCtx(deps, job), job, { status, error: message })

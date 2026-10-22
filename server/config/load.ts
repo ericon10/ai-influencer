@@ -36,6 +36,10 @@ const modelsSchema = z.object({
     // Lines every prompt for this model carries (Flare: bare natural lips,
     // owner 2026-10-14), added before the REALISM block.
     prompt_lines: z.array(z.string()).default([]),
+    // Words never in this model's prompts, in any form, not even negated
+    // (Soul draws them: owner, 2026-10-22). A clause that mentions one is
+    // left out (server/core/text.ts dropMentions).
+    prompt_never: z.array(z.string()).default([]),
     // False when a Higgsfield element (<<<id>>> in the prompt) does not work
     // with the model (Flare: its refs carry the face, character template).
     elements: z.boolean().optional(),

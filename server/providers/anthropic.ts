@@ -8,19 +8,50 @@ import { ProviderError, type LlmProvider, type LlmRequest } from './types.js'
 // output_config.format; server-side refusal fallbacks enabled by default.
 
 // Structured output takes a subset of JSON Schema: an array's minItems may
-// only be 0 or 1, and maxItems is not taken. The builders keep the exact
-// counts (they say what the prompt asks for and price the call); the copy
-// sent to Anthropic drops them, and the readers already take what comes back.
+// only be 0 or 1, and maxItems is not taken. A list the builders need at an
+// exact size (minItems = maxItems = n, more than 1: 30 tags for 30
+// comments) is sent as an object with n required entries "1" to "n", which
+// the model must all fill, and turned back into the list on the way out.
+// Any other count is dropped (a minItems above 1 becomes 1). Production,
+// 2026-10-22: with the counts simply dropped, a tag call came back with one
+// tag for 30 comments.
+const fixedSize = (s: Record<string, unknown>) => s.type === 'array' && typeof s.minItems === 'number' && s.minItems > 1 && s.minItems === s.maxItems ? s.minItems : 0
+
 export function apiSchema(schema: unknown): unknown {
   if (Array.isArray(schema)) return schema.map(apiSchema)
   if (!schema || typeof schema !== 'object') return schema
+  const s = schema as Record<string, unknown>
+  const n = fixedSize(s)
+  if (n) {
+    const keys = Array.from({ length: n }, (_, i) => String(i + 1))
+    const item = apiSchema(s.items)
+    return { type: 'object', additionalProperties: false, required: keys, properties: Object.fromEntries(keys.map(k => [k, item])) }
+  }
   const out: Record<string, unknown> = {}
-  for (const [k, v] of Object.entries(schema as Record<string, unknown>)) {
+  for (const [k, v] of Object.entries(s)) {
     if (k === 'maxItems') continue
     if (k === 'minItems') { if (typeof v === 'number' && v >= 1) out[k] = 1; continue }
     out[k] = apiSchema(v)
   }
   return out
+}
+
+// The model's answer in the builders' own shape: each exact-size list sent
+// as an object comes back as the list, in order.
+export function fromApi(schema: unknown, data: unknown): unknown {
+  if (!schema || typeof schema !== 'object' || data == null) return data
+  const s = schema as Record<string, unknown>
+  const n = fixedSize(s)
+  if (n && typeof data === 'object' && !Array.isArray(data)) {
+    const obj = data as Record<string, unknown>
+    return Array.from({ length: n }, (_, i) => obj[String(i + 1)]).filter(v => v !== undefined).map(v => fromApi(s.items, v))
+  }
+  if (Array.isArray(data)) return data.map(v => fromApi(s.items, v))
+  if (typeof data === 'object' && s.properties && typeof s.properties === 'object') {
+    const props = s.properties as Record<string, unknown>
+    return Object.fromEntries(Object.entries(data as Record<string, unknown>).map(([k, v]) => [k, k in props ? fromApi(props[k], v) : v]))
+  }
+  return data
 }
 
 export function createAnthropicLlm(apiKey: string, config: StudioConfig): LlmProvider {
@@ -68,27 +99,27 @@ export function createAnthropicLlm(apiKey: string, config: StudioConfig): LlmPro
         throw e
       }
 
+      const usage = {
+        inputTokens: res.usage.input_tokens,
+        outputTokens: res.usage.output_tokens,
+        cacheReadTokens: res.usage.cache_read_input_tokens ?? 0,
+        cacheWriteTokens: res.usage.cache_creation_input_tokens ?? 0,
+        servedModel: res.model,
+      }
+      // An answer that came back but cannot be used was still billed: its
+      // usage rides on the error, so the run records what it cost.
       if (res.stop_reason === 'refusal') {
-        throw new ProviderError('The model declined this request.', { retryable: false, submitted: 'no', code: 'refusal' })
+        throw new ProviderError('The model declined this request.', { retryable: false, submitted: 'no', code: 'refusal', usage })
       }
       if (res.stop_reason === 'max_tokens') {
-        throw new ProviderError('The model ran out of room before finishing. Raise max tokens for this task.', { retryable: false, submitted: 'no', code: 'max_tokens' })
+        throw new ProviderError('The model ran out of room before finishing. Raise max tokens for this task.', { retryable: false, submitted: 'no', code: 'max_tokens', usage })
       }
       const text = res.content.flatMap(b => (b.type === 'text' ? [b.text] : [])).join('')
       let data: unknown
       try { data = JSON.parse(text) } catch {
-        throw new ProviderError('The model returned malformed JSON.', { retryable: true, submitted: 'no', code: 'bad_json' })
+        throw new ProviderError('The model returned malformed JSON.', { retryable: true, submitted: 'no', code: 'bad_json', usage })
       }
-      return {
-        data,
-        usage: {
-          inputTokens: res.usage.input_tokens,
-          outputTokens: res.usage.output_tokens,
-          cacheReadTokens: res.usage.cache_read_input_tokens ?? 0,
-          cacheWriteTokens: res.usage.cache_creation_input_tokens ?? 0,
-          servedModel: res.model,
-        },
-      }
+      return { data: fromApi(req.schema, data), usage }
     },
 
     async verifyCredentials() {

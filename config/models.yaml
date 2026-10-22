@@ -131,6 +131,9 @@ models:
     mcp_id: soul_2
     mcp: { params: [aspect_ratio, soul_id], fixed: { quality: 2k } }
     aliases: [Soul 2.0, Soul]
+    # Soul draws whatever words it is given, even negated ones (owner,
+    # 2026-10-21, 100 faceless stills): its prompts never name these.
+    prompt_never: [text, texts, letter, letters, lettering, label, labels, labeled, labelled, logo, logos, watermark, watermarks, writing, written, words, caption, captions, typography, signage, sign, signs]
     notes: Soul 2.0 identity training failed or sat queued for hours (2026-10-12); never block on it. Use Elements instead.
   - ref: higgsfield/bytedance-upscale
     label: ByteDance image upscale (2k)
