@@ -7,6 +7,22 @@ import { ProviderError, type LlmProvider, type LlmRequest } from './types.js'
 // server side with the account's own key. Structured JSON output via
 // output_config.format; server-side refusal fallbacks enabled by default.
 
+// Structured output takes a subset of JSON Schema: an array's minItems may
+// only be 0 or 1, and maxItems is not taken. The builders keep the exact
+// counts (they say what the prompt asks for and price the call); the copy
+// sent to Anthropic drops them, and the readers already take what comes back.
+export function apiSchema(schema: unknown): unknown {
+  if (Array.isArray(schema)) return schema.map(apiSchema)
+  if (!schema || typeof schema !== 'object') return schema
+  const out: Record<string, unknown> = {}
+  for (const [k, v] of Object.entries(schema as Record<string, unknown>)) {
+    if (k === 'maxItems') continue
+    if (k === 'minItems') { if (typeof v === 'number' && v >= 1) out[k] = 1; continue }
+    out[k] = apiSchema(v)
+  }
+  return out
+}
+
 export function createAnthropicLlm(apiKey: string, config: StudioConfig): LlmProvider {
   const client = new Anthropic({ apiKey, maxRetries: 2 })
 
@@ -40,7 +56,7 @@ export function createAnthropicLlm(apiKey: string, config: StudioConfig): LlmPro
           fallbacks: 'default',
           system,
           messages: [{ role: 'user', content }],
-          output_config: { effort: req.effort ?? 'medium', format: { type: 'json_schema', schema: req.schema } },
+          output_config: { effort: req.effort ?? 'medium', format: { type: 'json_schema', schema: apiSchema(req.schema) as Record<string, unknown> } },
         })
       } catch (e) {
         if (e instanceof Anthropic.AuthenticationError) throw new ProviderError('The Anthropic key was rejected. Check it in Settings.', { retryable: false, submitted: 'no', status: 401 })
