@@ -136,7 +136,10 @@ test('Batch from hooks: paste, Make 3 (one price), review with Approve and Rejec
   await pay(page, card.getByRole('button', { name: /Make 3 slideshows/ }), false, card)
   await expect(page.locator('[data-field="batch-row-2"]')).toBeVisible({ timeout: 180_000 })
   await expect(page.locator('[data-field="batch-review"]')).not.toContainText(/\d+ stills? coming/, { timeout: 180_000 })
-  await expect(card).toContainText(/Batch still: \d+ of \d+ done \(\d+ not needed\)/)
+  // One progress line per post (UX-PLAN section 36, item 26): each
+  // slideshow's stills, and the slides that needed none counted apart.
+  await expect(card.locator('[data-field="post-progress"]').filter({ hasText: /: \d+ of \d+ stills done/ })).toHaveCount(3)
+  await expect(card).toContainText(/\(\d+ not needed\)/)
   await page.locator('[data-field="batch-row-0"]').getByRole('button', { name: /^Approve/ }).click()
   await page.locator('[data-field="batch-row-2"]').getByRole('button', { name: /Reject/ }).click()
   await expect(page.locator('[data-field="batch-row-0"]')).toContainText('Approved, exported', { timeout: 120_000 })
