@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { DOUG, FACELESS_ENDING, facelessProductPrompt, facelessStillPrompt, readFaceless } from './faceless.js'
+import { DOUG, FACELESS_ENDING, facelessFinal, facelessProductPrompt, facelessStillPrompt, readFaceless } from './faceless.js'
+import { NO_PERSON_REALISM, PERSON_WORDS } from './realism.js'
 
 // Faceless still rules (owner, 2026-10-22; UX-PLAN.md section 35, item 4c).
 describe('faceless stills', () => {
@@ -36,5 +37,17 @@ describe('the sound to add in the app (2026-10-22)', () => {
     expect(soundToAdd({ musicName: 'Sad piano bed', voiceover: { search: 'it is what it is' } })).toEqual({ music: 'Sad piano bed', voiceover: 'it is what it is' })
     expect(soundLine(soundToAdd({ musicName: 'Sad piano bed' }))).toBe('Add this sound in the app: music "Sad piano bed"')
     expect(soundToAdd({})).toBeNull()
+  })
+  it('the full still prompt: the place, the plain REALISM line, then the faceless ending last; no skin words, with or without a product', () => {
+    const plain = facelessFinal(facelessStillPrompt({ line: 'a car cup holder in the rain' }).prompt, NO_PERSON_REALISM)
+    expect(plain.endsWith(FACELESS_ENDING)).toBe(true)
+    expect(plain.split(FACELESS_ENDING)).toHaveLength(2)
+    expect(plain).toContain(`\n${NO_PERSON_REALISM}\n`)
+    expect(plain).not.toMatch(PERSON_WORDS)
+    const product = facelessFinal(facelessProductPrompt(facelessStillPrompt({ line: 'a car cup holder in the rain' }).prompt, 'Gatorade bottle'), NO_PERSON_REALISM)
+    expect(product).toMatch(/label and packaging unchanged and readable\.\nREALISM: /)
+    expect(product.endsWith(FACELESS_ENDING)).toBe(true)
+    expect(product).not.toMatch(/No people\..*No people\./s)
+    expect(product).not.toMatch(PERSON_WORDS)
   })
 })

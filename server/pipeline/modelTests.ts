@@ -76,8 +76,9 @@ export async function buildModelTest(deps: Deps, ctx: Ctx, modelRef: string): Pr
   } else if (kind === 'audio') {
     request = { kind: 'audio', model: entry.ref, prompt: PROMPTS.audio, durationSec: 3, modelTest: true }
   } else {
-    // Every image prompt carries the REALISM block, tests included.
-    request = { kind: 'image', model: entry.ref, prompt: finalizeImagePrompt(PROMPTS.image).prompt, aspect: '1:1', resolution, modelTest: true }
+    // Every image prompt carries a REALISM line, tests included; the test
+    // shot has no person, so it is the plain one (never the skin block).
+    request = { kind: 'image', model: entry.ref, prompt: finalizeImagePrompt(PROMPTS.image, { person: false, plainLine: deps.config.pipeline.templates.slideshow_topic_realism }).prompt, aspect: '1:1', resolution, modelTest: true }
   }
   const violations = lintPrompt(deps.config.pipeline.rules, request.prompt, { kind: request.kind, request })
   const errors = blocking(violations)
@@ -211,7 +212,7 @@ export async function buildModelSuite(deps: Deps, ctx: Ctx): Promise<BuiltModelT
         ? [await image('mug:1:1', () => renderStillLife('mug', '1:1'), 'Model test: mug'), await image('plant:1:1', () => renderStillLife('plant', '1:1'), 'Model test: plant')].slice(0, t.refs)
         : []
       // Every image prompt carries the REALISM block, tests included.
-      const prompt = finalizeImagePrompt(refs.length ? SUITE_PROMPTS.refs : SUITE_PROMPTS.image).prompt
+      const prompt = finalizeImagePrompt(refs.length ? SUITE_PROMPTS.refs : SUITE_PROMPTS.image, { person: false, plainLine: deps.config.pipeline.templates.slideshow_topic_realism }).prompt
       request = { kind: 'image', model: entry.ref, prompt, ...(refs.length ? { refs: refs.map(assetId => ({ assetId })) } : {}), aspect, resolution: t.resolution, modelTest: true }
     }
     if (onAccount) request = { ...request, billing: 'account' }

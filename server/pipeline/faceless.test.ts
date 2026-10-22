@@ -7,6 +7,7 @@ import { createFacelessCharacter, facelessOf, kindOf, saveFaceless } from './fac
 import { getCharacter } from './characters.js'
 import { characterSummary } from '../api/views.js'
 import { DOUG, FACELESS_ENDING } from '../core/faceless.js'
+import { PERSON_WORDS } from '../core/realism.js'
 import { saveAsset } from '../storage/assets.js'
 import { renderPlaceholderPortrait } from '../providers/mock.js'
 
@@ -43,8 +44,11 @@ describe('faceless', () => {
     expect(quote.id).toBeTruthy()
     const p = preview.prompts[0]!.text
     expect(p).toMatch(/^the inside of a parked used sedan/)
-    expect(p).toContain(FACELESS_ENDING)
     expect(p).toMatch(/REALISM:/)
+    // No person in frame: no skin, face or body words, and the faceless
+    // ending comes last (owner, 2026-10-22).
+    expect(p.trim().endsWith(FACELESS_ENDING)).toBe(true)
+    expect(p).not.toMatch(PERSON_WORDS)
     expect(preview.title).toMatch(/Soul 2\.0|Soul/)
     const ran = await runAction(h.deps, h.ctx, action, quote.id, true)
     expect(ran.jobs).toHaveLength(1)

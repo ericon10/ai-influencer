@@ -18,6 +18,16 @@ export const DEFAULT_REALISM_BLOCK =
 export const DEFAULT_AVOID_BLOCK =
   'AVOID: airbrushed or plastic skin, skin smoothing, beauty filters, studio lighting, perfect symmetry, text, watermarks.'
 
+// A shot with no person in frame (owner, 2026-10-22): never the skin
+// block. Soul read its skin words on "a white mug" and drew a face on the
+// mug. No-person shots (faceless characters, places, products, objects)
+// get a plain photo-realism line and an AVOID line with no skin, face or
+// body words. The REALISM label stays, so the runner's guard still holds.
+export const NO_PERSON_REALISM = 'REALISM: A real phone photo with natural grain, real textures and uneven everyday light, not retouched or polished.'
+export const NO_PERSON_AVOID = 'AVOID: a CGI or 3D render look, studio lighting, text, watermarks.'
+// Words about a person's skin, face or body: none in a no-person prompt.
+export const PERSON_WORDS = /\b(?:skin|pores?|peach fuzz|faces?|facial|cheeks?|jaw|nose|brows?|eyebrows?|hairline|baby hairs?|makeup|lips?|body|bodies)\b/i
+
 // Words that ask a model to smooth or beautify. Stripped from prompts by the
 // builder (with a warning) and refused outright if one still reaches a run.
 export const BANNED_REALISM_TERMS = [
@@ -260,10 +270,16 @@ export interface FinalPrompt {
 // out heavier flaw words the character does not have. `plainBackground`
 // (default rule sheet-background) drops a REALISM background clause from
 // hero and sheet prompts, which use their own background.
-export function finalizeImagePrompt(prompt: string, opts: { stage?: string; realism?: string | null; avoid?: string | null; allowedFlaws?: string; flawDose?: boolean; plainBackground?: boolean; makeup?: string; skin?: SkinDetail; realismLine?: string } = {}): FinalPrompt {
+export function finalizeImagePrompt(prompt: string, opts: { stage?: string; realism?: string | null; avoid?: string | null; allowedFlaws?: string; flawDose?: boolean; plainBackground?: boolean; makeup?: string; skin?: SkinDetail; realismLine?: string; person?: boolean; plainLine?: string } = {}): FinalPrompt {
   const warnings: RealismWarning[] = []
   const stripped = stripBannedTerms(prompt)
   let out = stripped.prompt
+  // No person in frame: the plain line and its AVOID line, never the skin block.
+  if (opts.person === false) {
+    if (!hasRealismBlock(out)) out = `${out}\n${opts.plainLine?.trim() ? realismBlock(opts.plainLine) : NO_PERSON_REALISM}`
+    if (!/\bAVOID:/.test(out)) out = `${out}\n${NO_PERSON_AVOID}`
+    return { prompt: out.trim(), warnings }
+  }
   const heavy = opts.flawDose === false ? { prompt: out, removed: [] as string[] } : stripHits(out, heavyFlawHits(out, opts.allowedFlaws ?? ''))
   out = heavy.prompt
   if (heavy.removed.length) {

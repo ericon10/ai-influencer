@@ -9,7 +9,7 @@ import type { RuleViolation } from '../core/rules.js'
 import type { GenRequest } from '../providers/types.js'
 import type { JobSpec } from '../jobs/runner.js'
 import { registerJobHook, type JobOutcome, type JobRow } from '../jobs/hooks.js'
-import { DOUG, EMPTY_FACELESS, FACELESS_ASPECT, FACELESS_PRODUCT_MODELS, FACELESS_STILL_MODEL, FINISHED_DAMAGE, facelessProductPrompt, facelessStillPrompt, readFaceless, type FacelessFile } from '../core/faceless.js'
+import { DOUG, EMPTY_FACELESS, FACELESS_ASPECT, FACELESS_PRODUCT_MODELS, FACELESS_STILL_MODEL, FINISHED_DAMAGE, facelessFinal, facelessProductPrompt, facelessStillPrompt, readFaceless, type FacelessFile } from '../core/faceless.js'
 import { createCharacter, getCharacter, type CharacterRow } from './characters.js'
 import { getContent, type ContentRow } from './content.js'
 import { modelEntry, runModel, stillLevelFor } from './sceneActions.js'
@@ -102,8 +102,9 @@ export async function buildFacelessStill(deps: Deps, ctx: Ctx, input: { contentI
   const run = await runModel(deps, ctx, model, product ? 'image_edit' : 'image')
   const level = stillLevelFor(deps, model)
   const body = product ? facelessProductPrompt(still.prompt, product.name) : still.prompt
-  // Rule zero holds: every image prompt carries the REALISM line.
-  const prompt = `${body}\n${realismBlock(deps.config.pipeline.templates.slideshow_topic_realism)}`
+  // Rule zero holds: every image prompt carries a REALISM line; with no
+  // person in frame it is the plain one, and the faceless ending comes last.
+  const prompt = facelessFinal(body, realismBlock(deps.config.pipeline.templates.slideshow_topic_realism))
   const request: GenRequest = {
     kind: product ? 'image_edit' : 'image', model: run.model, modelRef: model, prompt, aspect: FACELESS_ASPECT, quality: level.quality, resolution: level.resolution,
     ...(product ? { refs: [{ assetId: product.assetId }] } : {}),

@@ -86,6 +86,14 @@ export function facelessStillPrompt(input: { place?: FacelessPlace | null; line?
   return { prompt, warnings }
 }
 
+// The full still prompt: the place, then the plain REALISM line (no skin
+// words: there is no person), then the faceless ending, last (owner,
+// 2026-10-22: faceless stills end with it).
+export function facelessFinal(body: string, realismLine: string): string {
+  const rest = body.replace(FACELESS_ENDING, ' ').replace(/\s*Level, unedited\. Sharp, real phone grain, muted color\.\s*/, ' ').replace(/\s*No people\.\s*$/, '').replace(/\s{2,}/g, ' ').trim()
+  return `${rest}\n${realismLine}\n${FACELESS_ENDING}`
+}
+
 // A product on a faceless post (item 4f): Soul can't render labels, so the
 // still is made by an edit model with the product photo as the reference.
 export const FACELESS_PRODUCT_MODELS = ['higgsfield/nano-banana-2.1', 'higgsfield/gpt-image-2.5'] as const

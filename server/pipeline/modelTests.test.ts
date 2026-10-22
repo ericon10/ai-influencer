@@ -8,6 +8,7 @@ import { MODEL_OVERRIDES_KEY, effectiveModel, readModelOverrides } from '../prov
 import { ProviderError, type GenRequest, type ProviderAdapter } from '../providers/types.js'
 import { ACCOUNT_PROVIDER } from '../providers/higgsfieldOAuth.js'
 import { storeSecret } from '../providers/credentials.js'
+import { PERSON_WORDS } from '../core/realism.js'
 import { estimateGen } from '../costs/pricebook.js'
 
 // The owner's rule: a Higgsfield model counts as confirmed only after its
@@ -75,6 +76,13 @@ describe('model confirmation by a small paid test', () => {
     expect(quote.items[0]!.model).toBe(REF)
     expect(preview.title).toMatch(/marketing-studio\/image\/flare/)
     expect(seen.at(-1)).toMatchObject({ model: REF, kind: 'image', modelTest: true, billing: 'api' })
+    // The test shot is a mug, no person (owner, 2026-10-22: Soul drew a face
+    // on it from the skin block): the plain REALISM line, no skin words.
+    const sent = String(seen.at(-1)!.prompt)
+    expect(sent).toMatch(/^A plain white ceramic mug/)
+    expect(sent).toMatch(/\nREALISM: /)
+    expect(sent).not.toMatch(PERSON_WORDS)
+    expect(preview.prompts[0]!.text).not.toMatch(PERSON_WORDS)
     const o = (await readModelOverrides(h.deps.db, h.ctx.accountId))[REF]!
     expect(o.lastTest).toMatchObject({ ok: true })
     expect(o.confirmedAt).toBeTruthy()
