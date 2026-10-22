@@ -211,3 +211,23 @@ describe('a billed answer that cannot be used', () => {
     expect((await bankView(h2.deps, h2.ctx, {})).counts.waiting).toBe(9)
   })
 })
+
+describe('a short answer', () => {
+  it('comments the tagger left out go back in the queue and never reach the writer; the prompts name the count', async () => {
+    const h2 = await createHarness({ mockLlmResponders: { line_bank_tags: req => ({ tags: ((req.meta?.mockTags as { tags: unknown[] }).tags).slice(0, 3) }) } })
+    await importBank(h2.deps, h2.ctx, { comments: { csv } })
+    const { quote } = await estimateAction(h2.deps, h2.ctx, { type: 'bank_run' })
+    await runAction(h2.deps, h2.ctx, { type: 'bank_run' }, quote.id, true)
+    await drain(h2, 30)
+    const all = await h2.deps.db.select().from(jobs).where(eq(jobs.accountId, h2.ctx.accountId))
+    const tag = all.find(j => j.purpose.startsWith('bank_tag'))!
+    expect((tag.request as { prompt: string }).prompt).toMatch(/There are 9 comments\. Tag every one of them/)
+    const write = all.find(j => j.purpose.startsWith('bank_write'))!
+    expect(write.status).toBe('completed')
+    expect((write.request as { meta: { ids: string[] } }).meta.ids).toHaveLength(3)
+    expect((write.request as { prompt: string }).prompt).toMatch(/There are 3 comments\./)
+    const rows = await h2.deps.db.select().from(bankLines).where(eq(bankLines.accountId, h2.ctx.accountId))
+    expect(rows.filter(r => r.state === 'failed')).toHaveLength(6)
+    expect((await bankView(h2.deps, h2.ctx, {})).counts.waiting).toBe(6)
+  })
+})

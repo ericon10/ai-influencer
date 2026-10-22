@@ -8,13 +8,14 @@ import { ProviderError, type LlmProvider, type LlmRequest } from './types.js'
 // output_config.format; server-side refusal fallbacks enabled by default.
 
 // Structured output takes a subset of JSON Schema: an array's minItems may
-// only be 0 or 1, and maxItems is not taken. A list the builders need at an
-// exact size (minItems = maxItems = n, more than 1: 30 tags for 30
-// comments) is sent as an object with n required entries "1" to "n", which
-// the model must all fill, and turned back into the list on the way out.
-// Any other count is dropped (a minItems above 1 becomes 1). Production,
-// 2026-10-22: with the counts simply dropped, a tag call came back with one
-// tag for 30 comments.
+// only be 0 or 1, and maxItems is not taken. Any other count is dropped (a
+// minItems above 1 becomes 1). A list the builders need at an exact size
+// (minItems = maxItems = n, more than 1: 30 tags for 30 comments) keeps its
+// count as the list's description, which the model reads; the callers also
+// name the count in the prompt and treat a missing entry as not done.
+// Production, 2026-10-22: with the counts simply dropped, a tag call came
+// back with one tag for 30 comments; sent as an object with 30 required
+// keys instead, Anthropic refused it ("The compiled grammar is too large").
 const fixedSize = (s: Record<string, unknown>) => s.type === 'array' && typeof s.minItems === 'number' && s.minItems > 1 && s.minItems === s.maxItems ? s.minItems : 0
 
 export function apiSchema(schema: unknown): unknown {
@@ -22,36 +23,14 @@ export function apiSchema(schema: unknown): unknown {
   if (!schema || typeof schema !== 'object') return schema
   const s = schema as Record<string, unknown>
   const n = fixedSize(s)
-  if (n) {
-    const keys = Array.from({ length: n }, (_, i) => String(i + 1))
-    const item = apiSchema(s.items)
-    return { type: 'object', additionalProperties: false, required: keys, properties: Object.fromEntries(keys.map(k => [k, item])) }
-  }
   const out: Record<string, unknown> = {}
   for (const [k, v] of Object.entries(s)) {
     if (k === 'maxItems') continue
     if (k === 'minItems') { if (typeof v === 'number' && v >= 1) out[k] = 1; continue }
     out[k] = apiSchema(v)
   }
+  if (n) out.description = [typeof s.description === 'string' ? s.description : '', `Exactly ${n} entries, one for each numbered item, numbered 1 to ${n}, in order. Never fewer.`].filter(Boolean).join(' ')
   return out
-}
-
-// The model's answer in the builders' own shape: each exact-size list sent
-// as an object comes back as the list, in order.
-export function fromApi(schema: unknown, data: unknown): unknown {
-  if (!schema || typeof schema !== 'object' || data == null) return data
-  const s = schema as Record<string, unknown>
-  const n = fixedSize(s)
-  if (n && typeof data === 'object' && !Array.isArray(data)) {
-    const obj = data as Record<string, unknown>
-    return Array.from({ length: n }, (_, i) => obj[String(i + 1)]).filter(v => v !== undefined).map(v => fromApi(s.items, v))
-  }
-  if (Array.isArray(data)) return data.map(v => fromApi(s.items, v))
-  if (typeof data === 'object' && s.properties && typeof s.properties === 'object') {
-    const props = s.properties as Record<string, unknown>
-    return Object.fromEntries(Object.entries(data as Record<string, unknown>).map(([k, v]) => [k, k in props ? fromApi(props[k], v) : v]))
-  }
-  return data
 }
 
 export function createAnthropicLlm(apiKey: string, config: StudioConfig): LlmProvider {
@@ -119,7 +98,7 @@ export function createAnthropicLlm(apiKey: string, config: StudioConfig): LlmPro
       try { data = JSON.parse(text) } catch {
         throw new ProviderError('The model returned malformed JSON.', { retryable: true, submitted: 'no', code: 'bad_json', usage })
       }
-      return { data: fromApi(req.schema, data), usage }
+      return { data, usage }
     },
 
     async verifyCredentials() {

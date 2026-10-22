@@ -240,13 +240,13 @@ export async function buildBankRun(deps: Deps, ctx: Ctx, input: { importId?: str
       const ids = group.map(r => r.id), n = group.length, key = ids[0]!
       const comments = listComments(group)
       const tagSystem = fill(t.line_bank_tags.system, { emotions: cfg.emotions.join(', '), topics: cfg.topics.join(', '), pains: v.pains.length ? v.pains.map(p => `  - ${p}`).join('\n') : '  (this product has no pain points: none)' })
-      const tagPrompt = fill(t.line_bank_tags.prompt, { comments })
+      const tagPrompt = fill(t.line_bank_tags.prompt, { comments, count: String(n) })
       const { pains: _pains, ...words } = v
       const writeSystem = fill(t.line_bank_writer.system, words)
-      const writePrompt = fill(t.line_bank_writer.prompt, { comments })
+      const writePrompt = fill(t.line_bank_writer.prompt, { comments, count: String(n) })
       const reviewSystem = fill(t.line_bank_reviewer.system, words)
       // Priced on the comments as the lines' stand-in (a line is shorter).
-      const reviewPrompt = fill(t.line_bank_reviewer.prompt, { lines: comments })
+      const reviewPrompt = fill(t.line_bank_reviewer.prompt, { lines: comments, count: String(n) })
       const at = specs.length
       specs.push(
         { type: 'llm', stage: 'content', purpose: `bank_tag:${key}`, label: `Line bank: tag ${n} comments`, request: { model: tagRoute.model, system: tagSystem, prompt: tagPrompt, schema: tagsJsonSchema(n, cfg, v.pains), schemaName: 'line_bank_tags', maxTokens: 200 + 90 * n, effort: tagRoute.effort ?? 'low', meta: { ids, productId: pid || null, mockTags: mockTags(group, cfg, v.pains) } } },
@@ -292,9 +292,13 @@ async function onTagged(deps: Deps, ctx: Ctx, job: JobRow, out: JobOutcome): Pro
     const tags = readTags(got.get(i + 1), cfg, pains)
     await setRow(deps, r.id, { tags, state: tags ? 'tagged' : 'failed' })
   }
-  const tagged = await rowsIn(deps, ctx, idsOf(job))
+  // A comment the answer left out goes back in the queue (failed) and is
+  // not sent to the writer.
+  const tagged = (await rowsIn(deps, ctx, idsOf(job))).filter(r => r.state === 'tagged')
+  if (!tagged.length) { await cancelChildren(deps, job.id, 'No comment came back tagged, so nothing was written or reviewed. Nothing was charged for those steps; the comments go back in the queue.'); return }
   await activateChildren(deps, job.id, () => ({
-    prompt: fill(deps.config.pipeline.templates.line_bank_writer.prompt, { comments: listTagged(tagged) }),
+    prompt: fill(deps.config.pipeline.templates.line_bank_writer.prompt, { comments: listTagged(tagged), count: String(tagged.length) }),
+    schema: writerJsonSchema(tagged.length),
     meta: { ids: tagged.map(r => r.id), mockLines: mockLines(tagged, cfg.max_words) },
   }))
 }
@@ -306,9 +310,10 @@ async function onWritten(deps: Deps, ctx: Ctx, job: JobRow, out: JobOutcome): Pr
   const written: BankRow[] = []
   for (const [i, r] of rows.entries()) {
     const w = got.get(i + 1)
-    const line = cleanLine(w?.line)
-    if (!w || w.skip === true || !line) {
-      await setRow(deps, r.id, { line: '', skipped: String(w?.why ?? 'no line came back').slice(0, 240) || 'no usable truth', state: 'written', passed: null })
+    if (!w) { await setRow(deps, r.id, { state: 'failed' }); continue }
+    const line = cleanLine(w.line)
+    if (w.skip === true || !line) {
+      await setRow(deps, r.id, { line: '', skipped: String(w.why ?? '').slice(0, 240) || 'no usable truth', state: 'written', passed: null })
       continue
     }
     await setRow(deps, r.id, { line, skipped: '' })
@@ -317,7 +322,7 @@ async function onWritten(deps: Deps, ctx: Ctx, job: JobRow, out: JobOutcome): Pr
   if (!written.length) { await cancelChildren(deps, job.id, 'The writer passed on every comment, so there was nothing to review. Nothing was charged for the review.'); return }
   const listed = written.map((r, i) => `${i + 1}. Line: ${r.line}\n   Source comment (${r.likes} likes): ${r.comment.slice(0, 400)}`).join('\n')
   await activateChildren(deps, job.id, () => ({
-    prompt: fill(deps.config.pipeline.templates.line_bank_reviewer.prompt, { lines: listed }),
+    prompt: fill(deps.config.pipeline.templates.line_bank_reviewer.prompt, { lines: listed, count: String(written.length) }),
     schema: reviewerJsonSchema(written.length),
     meta: { ids: written.map(r => r.id), mockReview: mockReviews(written.length) },
   }))
@@ -329,6 +334,7 @@ async function onReviewed(deps: Deps, ctx: Ctx, job: JobRow, out: JobOutcome): P
   const rows = await rowsIn(deps, ctx, idsOf(job))
   const got = byN((out.data as { reviews?: unknown })?.reviews)
   for (const [i, r] of rows.entries()) {
+    if (!got.has(i + 1)) { await setRow(deps, r.id, { state: 'failed' }); continue }
     const review = readReview(got.get(i + 1))
     await setRow(deps, r.id, { review, passed: passes(review, cfg.pass_score), state: 'written' })
   }
@@ -344,7 +350,7 @@ async function voiceSpec(deps: Deps, ctx: Ctx, voice: Voice, rows: BankRow[], pu
   const route = await resolveRoute(deps, ctx, 'line_voice')
   const t = deps.config.pipeline.templates.line_bank_voice
   const system = fill(t.system, { max_words: String(cfg.max_words), voice: voice.voice || `${voice.name} has no voice card yet: keep the line's own voice.`, facts: voice.facts, stance: voice.stance === 'first' ? 'in the first person: they are the one out of work' : 'secondhand: about a friend, a sister or a roommate, never as their own job search' })
-  const prompt = fill(t.prompt, { lines: rows.map((r, i) => `${i + 1}. ${r.line}`).join('\n') })
+  const prompt = fill(t.prompt, { lines: rows.map((r, i) => `${i + 1}. ${r.line}`).join('\n'), count: String(rows.length) })
   return { type: 'llm', stage: 'content', purpose, label: rows.length === 1 ? `Line in ${voice.name}'s voice` : `${rows.length} lines in ${voice.name}'s voice`, characterId: voice.characterId, request: { model: route.model, system, prompt, schema: voiceJsonSchema(rows.length), schemaName: 'line_bank_voice', maxTokens: 200 + 100 * rows.length, effort: route.effort ?? 'low', meta: { ids: rows.map(r => r.id), characterId: voice.characterId, assignments, mockVoice: mockVoice(rows.map(r => r.line)) } } }
 }
 

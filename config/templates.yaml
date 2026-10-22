@@ -1249,7 +1249,8 @@ line_bank_tags:
     the comment):
     {comments}
 
-    Tag every comment, in order, with its number.
+    There are {count} comments. Tag every one of them, in order, with its
+    number: {count} entries, never fewer.
 line_bank_writer:
   system: |
     You write on-screen lines for 6 second TikTok clips, from real comments
@@ -1279,7 +1280,8 @@ line_bank_writer:
     each with its emotion and topic:
     {comments}
 
-    Write one line for every comment, in order, with its number.
+    There are {count} comments. Write one entry for every one of them, in
+    order, with its number: {count} entries, never fewer.
 line_bank_reviewer:
   system: |
     You are a separate reviewer: you did not write these lines. Each one is
@@ -1304,7 +1306,8 @@ line_bank_reviewer:
     The lines, numbered, each under its source comment:
     {lines}
 
-    Score every line, in order, with its number.
+    There are {count} lines. Score every one of them, in order, with its
+    number: {count} entries, never fewer.
 line_bank_voice:
   system: |
     You put on-screen lines into one character's voice for their TikTok
@@ -1322,4 +1325,5 @@ line_bank_voice:
     The lines, numbered:
     {lines}
 
-    Rewrite every line, in order, with its number.
+    There are {count} lines. Rewrite every one of them, in order, with its
+    number: {count} entries, never fewer.
