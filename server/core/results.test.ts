@@ -197,3 +197,11 @@ describe('hook families and the hints', () => {
     expect(shortCount(980)).toBe('980')
   })
 })
+
+describe('Results by life or job (UX-PLAN.md section 42 D)', () => {
+  it('splits follows per post by the plan row\'s life_or_job, untagged apart', () => {
+    const post = (id: string, lifeOrJob: string | null, follows: number) => ({ id, name: id, kind: 'meme', accountTag: 'a', productId: null, productName: '', characterId: null, characterName: '', topic: false, structure: null, variationOf: null, momentId: '', lifeOrJob, results: { ...emptyResults(), follows72h: follows, views72h: 100 } })
+    const agg = aggregateResults([post('1', 'life', 10), post('2', 'life', 20), post('3', 'job', 6), post('4', null, 1)])
+    expect(agg.by.blend.map(r => [r.label, r.posts, r.followsPerPost])).toEqual([['Life', 2, 15], ['Job', 1, 6], ['Not tagged', 1, 1]])
+  })
+})

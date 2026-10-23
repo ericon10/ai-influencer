@@ -79,7 +79,7 @@ export function ComfyCard() {
             </label>
             <div className="st-comfy-status" data-field="comfy-status">
               <div><span className="st-muted">Last heartbeat</span><b>{ago(v.lastSeen)}</b></div>
-              <div><span className="st-muted">GPU</span><b>{v.agent?.gpu ?? 'unknown'}</b>{v.agent?.vramTotalMb != null && <span className="st-hint">{gb(v.agent.vramFreeMb)} free of {gb(v.agent.vramTotalMb)}</span>}</div>
+              <div><span className="st-muted">GPU</span><b>{v.agent?.gpu ?? 'unknown'}</b>{v.agent?.vramTotalMb != null && <span className="st-hint">{gb(v.agent.vramFreeMb)} free of {gb(v.agent.vramTotalMb)}{v.agent.gpuUse != null ? `, ${Math.round(v.agent.gpuUse)}% in use` : ''}</span>}</div>
               <div><span className="st-muted">Queue</span><b>{v.queue.queued} waiting, {v.queue.running} running</b><span className="st-hint">ComfyUI's own queue: {v.agent?.comfyQueue ?? 0}</span></div>
               <div><span className="st-muted">Models found</span><b>{v.agent?.models.length ?? 0}</b>{v.agent?.loadedFamily && <span className="st-hint">Loaded: {v.agent.loadedFamily}</span>}</div>
               <div><span className="st-muted">Failure rate (7 days)</span><b>{v.failureRate == null ? 'no runs yet' : `${Math.round(v.failureRate * 100)}%`}</b></div>

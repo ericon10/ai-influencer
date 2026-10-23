@@ -119,9 +119,13 @@ export function createAgent(opts = {}) {
     try { stats = await comfyJson('/system_stats'); queue = await comfyJson('/queue') } catch (e) { comfyError = e.message }
     if (!measured || opts.remeasure) measured = await measureEnv()
     const dev = stats?.devices?.[0]
+    // GPU use in percent, when nvidia-smi is there (it is in the image).
+    let gpuUse
+    try { gpuUse = Number(execFileSync('nvidia-smi', ['--query-gpu=utilization.gpu', '--format=csv,noheader,nounits'], { encoding: 'utf8', timeout: 3000 }).split('\n')[0]) } catch { /* no nvidia-smi */ }
     const body = {
       agentVersion: AGENT_VERSION, comfyOk: !!stats, ...(comfyError ? { comfyError } : {}),
       ...(dev ? { gpu: dev.name, vramTotalMb: Math.round((dev.vram_total ?? 0) / 1048576), vramFreeMb: Math.round((dev.vram_free ?? 0) / 1048576) } : {}),
+      ...(Number.isFinite(gpuUse) ? { gpuUse } : {}),
       comfyQueue: queue ? (queue.queue_running?.length ?? 0) + (queue.queue_pending?.length ?? 0) : undefined,
       models: await modelList(), env: measured, loadedFamily, localPause: existsSync(pauseFile), running: [...running.entries()].map(([id, t]) => ({ id, claimToken: t.claimToken })),
     }

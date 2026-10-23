@@ -94,7 +94,6 @@ export async function buildCompare(deps: Deps, ctx: Ctx, a: { characterId: strin
   const prompts = [...new Set(rows.map(r => r.prompt).filter(p => p && p.includes('REALISM')))].slice(0, a.count ?? 10)
   if (!prompts.length) throw new AppError('bad_request', `${ch.name} has no scene stills yet. Make a few, then compare providers on her real prompts.`)
   const krea = await activeLora(deps.db, ctx.accountId, ch.id, 'krea2')
-  const run = newId('que')
   const specs: JobSpec[] = []
   for (const [i, prompt] of prompts.entries()) {
     for (const model of BAKEOFF_MODELS) {
@@ -104,13 +103,13 @@ export async function buildCompare(deps: Deps, ctx: Ctx, a: { characterId: strin
       // Demo mode runs the free mock in each one's place; modelRef keeps
       // the compared model. Never routed through the lever or the picks.
       const ran = (await forMode(deps, ctx, { model, kind } as never) as { model: string }).model
-      specs.push({ type: 'gen', stage: 'scene', purpose: `bakeoff:${run}:${i}`, label: `Compare ${i + 1}: ${deps.config.models.models.find(m => m.ref === model)?.label}`, request: { kind, model: ran, modelRef: model, prompt, aspect: '9:16', resolution: '2k', ...(text ? {} : { refs }) } })
+      specs.push({ type: 'gen', stage: 'scene', purpose: `bakeoff:${ch.id}:${i}`, label: `Compare ${i + 1}: ${deps.config.models.models.find(m => m.ref === model)?.label}`, request: { kind, model: ran, modelRef: model, prompt, aspect: '9:16', resolution: '2k', ...(text ? {} : { refs }) } })
     }
   }
   const warnings: RuleViolation[] = []
   if (!krea) warnings.push(warn('bakeoff-krea', 'No Krea 2 LoRA yet', `Krea 2 Turbo is text to image: its face comes from ${ch.name}'s Krea 2 LoRA. Train one to add it to the comparison.`))
   if (!(await activeLora(deps.db, ctx.accountId, ch.id, 'qwen'))) warnings.push(warn('bakeoff-qwen', 'No Qwen LoRA yet', 'Qwen-Image-Edit runs with her refs only. Train her Qwen LoRA for the fair comparison.'))
-  return { purpose: `bakeoff:${run}`, characterId: ch.id, specs, preview: { title: `Compare providers: ${prompts.length} of ${ch.name}'s prompts`, prompts: [], warnings, invalidates: [] } }
+  return { purpose: `bakeoff:${ch.id}`, characterId: ch.id, specs, preview: { title: `Compare providers: ${prompts.length} of ${ch.name}'s prompts`, prompts: [], warnings, invalidates: [] } }
 }
 
 // Each still's face score against REF-00 and its skin texture against
@@ -133,10 +132,12 @@ const onBakeoff: JobHook = async (deps, ctx, job, outcome) => {
 }
 
 export async function compareView(deps: Deps, ctx: Ctx, characterId: string) {
+  // One comparison is one quote: the latest run's jobs (the purpose is the
+  // same each time, so the estimate and the run always match).
   const rows = await deps.db.select().from(jobs).where(and(eq(jobs.accountId, ctx.accountId), eq(jobs.characterId, characterId), like(jobs.purpose, 'bakeoff:%'))).orderBy(desc(jobs.createdAt)).limit(200)
-  const runId = rows[0]?.purpose.split(':')[1]
+  const runId = rows[0]?.quoteId ?? rows[0]?.id
   if (!runId) return { run: null }
-  const mine = rows.filter(r => r.purpose.split(':')[1] === runId)
+  const mine = rows.filter(r => (r.quoteId ?? r.id) === runId)
   const { jobOutputs } = await import('../db/schema.js')
   const outs = await deps.db.select().from(jobOutputs).where(inArray(jobOutputs.jobId, mine.map(m => m.id)))
   const label = (ref: string) => deps.config.models.models.find(m => m.ref === ref)?.label ?? ref

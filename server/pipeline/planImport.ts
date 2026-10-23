@@ -340,8 +340,10 @@ export function priceText(credits: number, micros: number): string {
   return parts.join(' + ')
 }
 
+// The plan's first day, from good dates only: an error row's bad date
+// ("11/03/2026") never names the plan (section 42 E, a post.json gap).
 const planIdOf = (rows: CheckedRow[]) => {
-  const dates = rows.map(r => r.date).filter(Boolean).sort()
+  const dates = rows.map(r => r.date).filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d ?? '')).sort()
   return dates.length ? `plan-${dates[0]}` : 'plan'
 }
 

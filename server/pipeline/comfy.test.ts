@@ -380,3 +380,80 @@ describe('character LoRAs, the bake-off and the engine lever', () => {
     expect(await r('kie/kling-3.0-pro', 'video', 'video')).toMatchObject({ ref: 'higgsfield/kling-3.0-pro', source: 'engine', billing: 'account' })
   })
 })
+
+describe('the brief\'s checklist (E6, E7, item 4, item 12)', () => {
+  it('E6: a task past its hard timeout is Failed, and the agent\'s next heartbeat is told to stop it', async () => {
+    const wf = loadRepoWorkflows().find(w => w.manifest.id === 'qwen-image-edit-2511')!
+    await heartbeat(h.deps, h.ctx.accountId, h.clock.now(), { env: repoLock() })
+    await enqueue(h.deps, h.ctx.accountId, h.clock.now(), { key: 'slow', jobId: null, characterId: null, userId: null, kind: 'workflow', workflow: wf, graph: wf.graph, inputs: {}, recipe: {} })
+    const { task } = await claim(h.deps, h.ctx.accountId, h.clock.now(), {})
+    const { progress } = await import('./comfy.js')
+    // It keeps reporting progress (the lease stays fresh) but runs too long.
+    for (let i = 0; i < 13; i++) { h.clock.advance(80_000); await progress(h.deps, h.ctx.accountId, h.clock.now(), task!.id, { claimToken: task!.claimToken, progress: 0.5 }) }
+    const r = await heartbeat(h.deps, h.ctx.accountId, h.clock.now(), { env: repoLock(), running: [{ id: task!.id, claimToken: task!.claimToken }] })
+    expect(r.cancel).toEqual([task!.id])
+    expect((await h.deps.db.select().from(comfyTasks))[0]).toMatchObject({ state: 'failed', failReason: 'timeout', error: 'Stopped at the hard timeout (15 min).' })
+    expect((await comfyView(h.deps, h.ctx)).failedTasks[0]).toMatchObject({ reason: 'timeout' })
+  })
+
+  it('E7: the status card has the GPU, its memory and use, the queue, the time per workflow and the failure rate', async () => {
+    await start()
+    const ids = await refs(1)
+    const { rows } = await run([still(ids)], null)
+    await tick(h.deps, 10)
+    await Promise.all(await agent().tick())
+    await settle(rows[0]!.id)
+    await heartbeat(h.deps, h.ctx.accountId, h.clock.now(), { env: repoLock(), gpu: 'NVIDIA RTX 6000 Ada', vramTotalMb: 49140, vramFreeMb: 40000, gpuUse: 37, comfyQueue: 0 })
+    const v = await comfyView(h.deps, h.ctx)
+    expect(v.agent).toMatchObject({ gpu: 'NVIDIA RTX 6000 Ada', vramTotalMb: 49140, vramFreeMb: 40000, gpuUse: 37, comfyQueue: 0 })
+    expect(v.queue).toMatchObject({ queued: 0, running: 0, done: 1 })
+    expect(v.workflows.find(w => w.id === 'qwen-image-edit-2511')).toMatchObject({ done: 1, avgSec: expect.any(Number) })
+    expect(v.failureRate).toBe(0)
+  })
+
+  it('item 4: a new workflow uploads with its manifest (checked, no rebuild) and a broken one says why', async () => {
+    const { uploadWorkflow, workflowsFor } = await import('./comfy.js')
+    const base = loadRepoWorkflows().find(w => w.manifest.id === 'wan-2.2-i2v')!
+    const manifest = { ...base.manifest, id: 'wan-2.2-i2v-fast', label: 'Wan 2.2 I2V fast', ref: 'comfy/wan-2.2-i2v', est_sec: 120 }
+    await expect(uploadWorkflow(h.deps, h.ctx, { manifest, graph: base.graph })).resolves.toEqual({ id: 'wan-2.2-i2v-fast', version: 1 })
+    expect((await workflowsFor(h.deps.db, h.ctx.accountId)).find(w => w.manifest.id === 'wan-2.2-i2v-fast')).toMatchObject({ source: 'uploaded' })
+    expect((await comfyView(h.deps, h.ctx)).workflows.find(w => w.id === 'wan-2.2-i2v-fast')).toMatchObject({ source: 'uploaded', confirmed: false })
+    // Uploading it again makes v2.
+    await expect(uploadWorkflow(h.deps, h.ctx, { manifest, graph: base.graph })).resolves.toEqual({ id: 'wan-2.2-i2v-fast', version: 2 })
+    const broken = { ...manifest, id: 'broken', inputs: { ...manifest.inputs, prompt: { node: '99', field: 'text' } } }
+    await expect(uploadWorkflow(h.deps, h.ctx, { manifest: broken, graph: base.graph })).rejects.toMatchObject({ message: expect.stringMatching(/prompt is bound to node 99, which is not in the graph/) })
+  })
+
+  it('item 12: Compare providers scores every still: the face against REF-00 and the skin texture', async () => {
+    const { registerPipelineHooks } = await import('./hooks.js')
+    const { estimateAction, runAction } = await import('./actions.js')
+    const { compareView } = await import('./comfyActions.js')
+    const { candidates } = await import('../db/schema.js')
+    const { newId } = await import('../lib/ids.js')
+    const { readFileSync } = await import('node:fs')
+    const { importCharacter } = await import('./files.js')
+    registerPipelineHooks()
+    // Face matching on: one embedding for every face (a perfect match).
+    const faces = { status: async () => ({ available: true }), detect: async () => [], analyze: async () => ({ face: { box: { x: 0, y: 0, w: 200, h: 200 }, landmarks: [], score: 1 }, faces: 1, embedding: new Float32Array([1, 0, 0]) }) }
+    const h2 = await createHarness({ faces: faces as never })
+    try {
+      const md = readFileSync(join(process.cwd(), 'fixtures/callie/character-callie.md'), 'utf8')
+      const images: Record<string, { data: Buffer }> = {}
+      for (let i = 0; i <= 11; i++) images[`REF-${String(i).padStart(2, '0')}`] = { data: await renderPlaceholderPortrait(`REF-${i}`) }
+      const callie = (await importCharacter(h2.deps, h2.ctx, md, { images })).characterId
+      for (let i = 0; i < 3; i++) await h2.deps.db.insert(candidates).values({ id: newId('cand'), accountId: h2.ctx.accountId, characterId: callie, target: 'scene', op: 'generate', status: 'approved', prompt: finalizeImagePrompt(`Scene ${i}: she reads on a bench, wearing a gray hoodie.`).prompt })
+      // Demo mode: free mocks stand in for each compared model.
+      const action = { type: 'compare_providers' as const, characterId: callie }
+      const est = await estimateAction(h2.deps, h2.ctx, action)
+      const ran = await runAction(h2.deps, h2.ctx, action, est.quote.id, true) as { jobs: Array<{ id: string }> }
+      expect(ran.jobs).toHaveLength(6)
+      const { drain } = await import('../testing/harness.js')
+      await drain(h2, 40)
+      const v = await compareView(h2.deps, h2.ctx, callie)
+      expect(v.models!.map(m => m.ref)).toEqual(['kie/nano-banana-2.1', 'comfy/qwen-image-edit-2511'])
+      expect(v.rows).toHaveLength(3)
+      for (const r of v.rows!) for (const m of v.models!) expect(r.cells[m.ref]).toMatchObject({ status: 'completed', assetId: expect.any(String), face: 1, texture: expect.any(Number) })
+      expect(v.models![0]).toMatchObject({ face: 1, texture: expect.any(Number) })
+    } finally { await h2.close() }
+  }, 180_000)
+})

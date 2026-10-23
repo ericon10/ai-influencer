@@ -65,6 +65,17 @@ beforeAll(async () => {
 }, 180_000)
 
 describe('the launch plan', () => {
+  it('the plan id comes from good dates only: an error row\'s bad date never names the plan', async () => {
+    const good = await previewPlan(h.deps, h.ctx, CSV)
+    const lines = CSV.trimEnd().split('\n')
+    const head = parseCsv(lines[0]!)[0]!
+    const bad = parseCsv(lines[1]!)[0]!.map((v, i) => (head[i] === 'date' ? '11/03/2026' : head[i] === 'row_id' ? 'BAD1' : v))
+    const withBad = await previewPlan(h.deps, h.ctx, [lines[0], bad.map(v => (/[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v)).join(','), ...lines.slice(1)].join('\n'))
+    expect(withBad.totals.problem).toBe(good.totals.problem + 1)
+    expect(good.planId).toMatch(/^plan-\d{4}-\d{2}-\d{2}$/)
+    expect(withBad.planId).toBe(good.planId)
+  })
+
   it('Preview (free): 140 rows by day and account, the feeders as topic accounts, a price for everything', async () => {
     const p = await previewPlan(h.deps, h.ctx, CSV)
     expect(p.problems).toEqual([])
@@ -237,6 +248,12 @@ describe('the launch plan', () => {
     expect(json.plan).toMatchObject({ row_id: first.rowId, structure: { code: expect.any(String) }, hook_score: expect.any(Number), moment_id: expect.stringMatching(/^F2-M/) })
     expect(json.caption.cta_line).toBeTruthy()
     expect(Buffer.from(zip['caption.txt']!).toString()).toContain(json.caption.cta_line)
+    // A topic slideshow names no character and carries the general AI label
+    // (its pictures are filed under Callie; section 42 E).
+    expect(json.slideshow.photos_of).toBe('topic')
+    expect(json.post.character).toBeNull()
+    expect(json.ai_label).toBe('Label all posts as AI-generated')
+    expect(json.plan.plan_id).toMatch(/^plan-\d{4}-\d{2}-\d{2}$/)
 
     // Remake (owner, 2026-10-22): a post with pictures can be made again;
     // the price never moves anything, the run sends the old pictures to the
