@@ -76,3 +76,10 @@ export async function defaultProductFor(deps: Deps, ctx: Ctx, tag: string | null
   const [acct] = await deps.db.select({ productId: socialAccounts.productId }).from(socialAccounts).where(and(eq(socialAccounts.accountId, ctx.accountId), eq(socialAccounts.tag, t)))
   return acct?.productId ? (await productOf(deps, ctx, acct.productId))?.id ?? null : null
 }
+
+// A post's product by id and name, for post.json (section 42 E).
+export async function productRef(deps: Deps, ctx: Ctx, productId: string | null): Promise<{ id: string; name: string } | null> {
+  if (!productId) return null
+  const [p] = await deps.db.select({ id: products.id, name: products.name }).from(products).where(and(eq(products.accountId, ctx.accountId), eq(products.id, productId)))
+  return p ?? null
+}

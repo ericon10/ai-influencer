@@ -20,6 +20,8 @@ export interface PostExportInput {
     characterId: string | null; characterName: string | null
     variationOf: string | null; batchOf: string | null
     createdAt: string; updatedAt: string
+    // The post's product (section 42 E: a post.json gap), or none.
+    product?: { id: string; name: string } | null
   }
   slideshow: {
     mode: 'character' | 'topic'; pattern: HookPattern | null; hook: string
@@ -97,6 +99,7 @@ export function postExportJson(i: PostExportInput): Record<string, unknown> {
       idea: i.post.idea,
       account: i.post.accountTag || null,
       character: i.post.characterId ? { id: i.post.characterId, name: i.post.characterName } : null,
+      product: i.post.product ?? null,
       variation_of: i.post.variationOf,
       batch_of: i.post.batchOf,
       created_at: i.post.createdAt,
@@ -160,6 +163,7 @@ export function videoPostExportJson(i: VideoExportInput): Record<string, unknown
     post: {
       id: i.post.id, kind: i.post.kind, title: i.post.title, idea: i.post.idea, account: i.post.accountTag || null,
       character: i.post.characterId ? { id: i.post.characterId, name: i.post.characterName } : null,
+      product: i.post.product ?? null,
       variation_of: i.post.variationOf, batch_of: i.post.batchOf, created_at: i.post.createdAt, updated_at: i.post.updatedAt,
     },
     video: { file: i.video.file, asset_id: i.video.assetId, duration_sec: i.video.durationSec, on_screen_text: i.video.captionOff ? null : i.video.onScreenText || null },

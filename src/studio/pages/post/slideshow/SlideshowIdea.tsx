@@ -241,6 +241,8 @@ function BatchReview({ ctx, items, assets, refetch }: { ctx: PostCtx; items: Sli
       <div className="st-row" style={{ gap: 8, flexWrap: 'wrap', alignItems: 'center' }} data-field="batch-select">
         <label className="st-row" style={{ gap: 6 }}><SelectAllBox sel={sel} label={`Select all ${items.length}`} />Select all {items.length}</label>
         <SelectionCount sel={sel} />
+        {/* Approve all that have every picture, in one click (section 42 E). */}
+        {items.some(ready) && <AsyncButton field="batch-approve-ready" className="st-btn sm primary" onClick={() => decideAll(items.filter(ready), 'approve')} icon={<ThumbsUp size={13} />}>Approve all {items.filter(ready).length} with every picture<span className="st-price">Free</span></AsyncButton>}
         {sel.picked.size > 0 && <AsyncButton className="st-btn sm primary" disabled={!pickedReady.length} onClick={() => decideAll(pickedReady, 'approve')} icon={<ThumbsUp size={13} />}>Approve {pickedReady.length}<span className="st-price">Free</span></AsyncButton>}
         {sel.picked.size > 0 && <AsyncButton className="st-btn sm ghost" disabled={!pickedOpen.length} onClick={() => decideAll(pickedOpen, 'reject')} icon={<ThumbsDown size={13} />}>Reject {pickedOpen.length}</AsyncButton>}
       </div>

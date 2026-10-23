@@ -1,3 +1,4 @@
+import { productRef } from './products.js'
 import { writeFile, readFile } from 'node:fs/promises'
 import { soundToAdd } from '../core/faceless.js'
 import { join } from 'node:path'
@@ -1122,7 +1123,7 @@ export async function videoPostJson(deps: Deps, ctx: Ctx, row: ContentRow, video
   return videoPostExportJson({
     // A plan row's sound_name and sound_type when the post has no faceless sound (section 42 D).
     sound: soundToAdd(f) ?? (plan.soundName ? { music: plan.soundName, voiceover: '', type: plan.soundType || '' } : null),
-    post: { id: row.id, kind: row.kind, title: row.title, idea: row.idea, accountTag: row.accountTag, characterId: row.characterId, characterName: ch?.name ?? null, variationOf: row.variationOf, batchOf: row.batchOf, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString() },
+    post: { id: row.id, kind: row.kind, title: row.title, idea: row.idea, accountTag: row.accountTag, characterId: row.characterId, characterName: ch?.name ?? null, variationOf: row.variationOf, batchOf: row.batchOf, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString(), product: await productRef(deps, ctx, row.productId) },
     video: { file: video.file, assetId: video.assetId, durationSec: video.durationSec, onScreenText: s.caption, captionOff: s.captionOff },
     caption: { text: plan.caption, hashtags: plan.hashtags.slice(0, max), ctaLine: plan.cta, ad: plan.product, asPosted: postCaption(plan.caption, plan.hashtags, { ad: plan.product, max, cta: plan.cta }) },
     plan, aiLabel: ch?.disclosure ?? 'Label all posts as AI-generated', exportedAt: deps.clock.now().toISOString(), results: s.results,

@@ -144,6 +144,12 @@ test('Batch from hooks: paste, Make 3 (one price), review with Approve and Rejec
   await page.locator('[data-field="batch-row-2"]').getByRole('button', { name: /Reject/ }).click()
   await expect(page.locator('[data-field="batch-row-0"]')).toContainText('Approved, exported', { timeout: 120_000 })
   await expect(page.locator('[data-field="batch-row-2"]')).toContainText('Rejected')
+  // Approve all that have every picture, in one click (section 42 E).
+  const all = page.locator('[data-field="batch-approve-ready"]')
+  await expect(all).toHaveText(/Approve all 1 with every picture/)
+  await all.click()
+  await expect(page.locator('[data-field="batch-row-1"]')).toContainText('Approved', { timeout: 120_000 })
+  await expect(all).toHaveCount(0)
   await snap(page, info, 'the batch review')
 })
 

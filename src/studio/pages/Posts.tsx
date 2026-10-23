@@ -3,7 +3,8 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { Archive, CopyPlus, FileUp, Film, Images, Layers, Loader2, Maximize2, Plus } from 'lucide-react'
 import { api, assetUrl } from '../api'
-import { keys, useCharacters, useContent, useLibrary } from '../hooks'
+import { isActiveJob, keys, useCharacters, useContent, useLibrary, useLiveJobs } from '../hooks'
+import { postProgress } from '../runs'
 import { Callout, Img, errorMessage, useToast } from '../ui'
 import { REALISM_LINE } from '../copy'
 import type { BatchSpec, ContentItem, LibraryData, MemeSpec, SlideshowSpec } from '../types'
@@ -243,6 +244,7 @@ function PostCard({ item, lib, characterName, productName, hints, select, onView
           <span>{[KIND_LABEL[item.kind], characterName, item.accountTag, productName].filter(Boolean).join(' · ')}</span>
         </div>
         {item.kind === 'batch' && <BatchProgress item={item} />}
+        <CardRuns postId={item.id} />
         <PostingChips item={item} />
         <ResultsRow item={item} hints={hints} />
         <div className="st-row" style={{ gap: 4 }}>
@@ -254,6 +256,16 @@ function PostCard({ item, lib, characterName, productName, hints, select, onView
       </div>
     </div>
   )
+}
+
+// A post's runs on its card while any is going (section 42 E): "4 of 6
+// stills done", the same count as the run list's one line per post.
+function CardRuns({ postId }: { postId: string }) {
+  const live = useLiveJobs()
+  const mine = (live.data?.jobs ?? []).filter(j => j.postId === postId)
+  if (!mine.some(isActiveJob)) return null
+  const p = postProgress(mine)
+  return <span className="st-hint" data-field={`postcard-progress-${postId}`} role="status">{p.done} of {p.total} {p.noun} done{p.failed ? `, ${p.failed} failed` : ''}</span>
 }
 
 // A batch's progress on its card, live while it renders.

@@ -99,8 +99,6 @@ WaveSpeed (section 40), the ComfyUI provider (section 41). Next:
 
 ### Small ideas for launch volume
 
-- Batch review: approve all that have every picture in one click.
-- A "Generate the rest of this day" button on the plan list.
 - The plan grid could open a row's post on a click (today: the list below
   the import).
 
@@ -121,10 +119,6 @@ Ideas from the Oct 22 build, Tier 4 (UX-PLAN section 36; not built):
 - Three platforms: a sound for the reel picked in the Studio (today it is
   silent so the sound is added in the app), and the cover frame of the
   reel chosen like the video cover.
-- Progress grouped by post: the same grouping on Posts home's cards (a
-  small "4 of 6" on the card while it runs).
-- The viewer: next and previous across the Trash and across Posts home's
-  covers.
 
 ### Results and growth
 

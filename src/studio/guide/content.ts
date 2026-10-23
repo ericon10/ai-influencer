@@ -394,6 +394,7 @@ export const GUIDE: GuideSection[] = [
     cost: 'The import and the first pass are free. The run is priced before it starts: for a 5,375-comment scrape (2,208 kept), the quote is $5.82 for all 74 batches (the tags about $1.62, the writer about $2.18, the reviewer about $2.02; a quote holds the most each call can cost, the real charge is lower). Use this line is about $0.01; Write the week about $0.01 to $0.03 an account.',
     shots: [
       { id: 'line-bank', caption: 'The line bank: what passed, the filters, a line with its source comment and scores, Keep or Reject, Use this line' },
+      { id: 'line-bank-page', caption: 'The Line bank page: the counts, the filters and Import lines' },
       { id: 'write-the-week', caption: 'Write the week: an account\'s dated posts and the line each gets, one price' },
     ],
   },
@@ -498,7 +499,7 @@ export const GUIDE: GuideSection[] = [
       'A Drive connected before October 23 can write but not read your sheets: Settings > General > Google Drive shows Reconnect Google Drive (one consent screen).',
     ],
     cost: 'Import (a CSV or a Google Sheet), Re-sync, Fill and its draws, the drafted visuals, Check, Review\'s Approve and Kill, and Send to Drive are free. Fit to voice, Make the week and Redo are priced on their buttons first, on the plan or the API.',
-    shots: [],
+    shots: [{ id: 'weeks', caption: 'The steps and the week grid' }, { id: 'weeks-sheets', caption: 'Import > From Google Sheets' }],
   },
   {
     id: 'accounts', group: 'Grow your accounts', title: 'Accounts', color: 'orange',
@@ -515,7 +516,7 @@ export const GUIDE: GuideSection[] = [
       'Rename (the pencil next to the name): type the new name and press Enter.',
     ],
     tips: ['A plan CSV that names a new account adds it here, with the character its name starts with.'],
-    shots: [],
+    shots: [{ id: 'accounts', caption: 'The Accounts page' }],
   },
   {
     id: 'launch-plan', group: 'Make a post', title: 'The launch plan, from its CSV', color: 'violet',
@@ -785,7 +786,7 @@ export const GUIDE: GuideSection[] = [
       'Faceless stills (Soul) and Genjutsu stay on Higgsfield: no other provider runs them.',
     ],
     cost: 'Picking and testing a key are free. Each run costs the picked provider\'s price, shown on its button before you click.',
-    shots: [],
+    shots: [{ id: 'providers', caption: 'Settings > Models > Providers' }],
   },
   {
     id: 'comfy', group: 'Everything else', title: 'ComfyUI: the workstation', color: 'teal',
@@ -807,7 +808,7 @@ export const GUIDE: GuideSection[] = [
       'Our rules run inside: 21 or older, nothing explicit, the REALISM block on every person shot and no smoothing words, before anything reaches the machine.',
     ],
     cost: '$0 API: the machine\'s owner pays for the electricity. Each run shows about how many minutes it takes before you click.',
-    shots: [],
+    shots: [{ id: 'comfy', caption: 'Settings > General > ComfyUI' }],
   },
   {
     id: 'engine', group: 'Everything else', title: 'The engine lever', color: 'teal',
@@ -822,7 +823,7 @@ export const GUIDE: GuideSection[] = [
     ],
     tips: ['The Higgsfield subscription engine runs on your plan credits when your Higgsfield account is connected; the Higgsfield API engine on dollars.'],
     cost: 'Switching is free. Every run still shows its price, in the engine\'s units, before you click.',
-    shots: [],
+    shots: [{ id: 'engine', caption: 'The engine lever and its table' }],
   },
   {
     id: 'settings', group: 'Everything else', title: 'Settings', color: 'blue',

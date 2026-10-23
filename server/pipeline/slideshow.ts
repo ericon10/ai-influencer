@@ -1,3 +1,4 @@
+import { productRef } from './products.js'
 import { and, asc, desc, eq, inArray, isNull, ne, sql } from 'drizzle-orm'
 import { zipSync } from 'fflate'
 import { candidates, contentItems, hooks as hookRows, slideScenes } from '../db/schema.js'
@@ -1375,7 +1376,7 @@ export async function renderSlideshow(deps: Deps, ctx: Ctx, job: JobRow, row: Co
   files['caption.txt'] = Buffer.from(`${caption}\n\nPost on TikTok as a photo slideshow, the images in tiktok/ in order (1080 x 1920).${insta ? ' The instagram/ set (1080 x 1440) is the same slides in 3:4.' : ''} ${AI_LABEL_LINE}\n`)
   const character = row.characterId ? toData(await getCharacter(deps, ctx, row.characterId)) : null
   const json = postExportJson({
-    post: { id: row.id, kind: row.kind, title: row.title, idea: row.idea, accountTag: row.accountTag, characterId: row.characterId, characterName: character?.name ?? null, variationOf: row.variationOf, batchOf: row.batchOf, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString() },
+    post: { id: row.id, kind: row.kind, title: row.title, idea: row.idea, accountTag: row.accountTag, characterId: row.characterId, characterName: character?.name ?? null, variationOf: row.variationOf, batchOf: row.batchOf, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString(), product: await productRef(deps, ctx, row.productId) },
     slideshow: {
       mode: spec.mode, pattern: spec.pattern, hook: spec.hook, textStyle: spec.textStyle, made: spec.made,
       caption: spec.caption, postCaption: caption, hashtags: spec.hashtags.slice(0, cfg.slideshow.hashtags[1]), ad: isProductPost(spec),

@@ -475,6 +475,7 @@ function MakeStep({ v, onChanged, onNext }: { v: WeekView; onChanged: () => void
   // that post's model, else the post's own pick.
   const engines = useQuery({ queryKey: ['engines'], queryFn: () => api.engines(), staleTime: 60_000 })
   const [provider, setProvider] = useState('')
+  const [day, setDay] = useState('')
   const isFree = (c: WeekCell) => c.postType === 'text_only' || c.postType === 'photo_dump'
   const waiting = v.cells.filter(c => c.review !== 'killed' && !c.made && !c.making && !c.flags.length && c.checked && c.line.trim())
   const ready = waiting.filter(c => !isFree(c))
@@ -504,6 +505,23 @@ function MakeStep({ v, onChanged, onNext }: { v: WeekView; onChanged: () => void
           <span className="st-hint">Text-only and photo-dump posts: no generation, made on the worker for free.</span>
         </div>
       )}
+      {(() => {
+        // Generate the rest of one day (section 42 E): that day's posts not
+        // made yet, priced on their own, waiting for the click.
+        const days = [...new Set(ready.map(c => c.date))].sort()
+        const d = days.includes(day) ? day : days[0]
+        if (days.length < 2 || !d) return null
+        const rest = ready.filter(c => c.date === d)
+        return (
+          <div className="st-row" style={{ gap: 8, alignItems: 'center', flexWrap: 'wrap' }} data-field="weeks-make-day">
+            <span className="st-label" style={{ margin: 0 }}>Generate the rest of</span>
+            <select className="st-select" style={{ width: 'auto' }} aria-label="The day to generate" value={d} onChange={e => setDay(e.target.value)}>
+              {days.map(x => <option key={x} value={x}>{dayLabel(x)} ({ready.filter(c => c.date === x).length})</option>)}
+            </select>
+            <PriceButton size="sm" variant="secondary" label={`Generate the rest of ${dayLabel(d)} (${rest.length})`} action={{ type: 'week_make', week: v.monday, postIds: rest.map(c => c.postId), ...(pick ? { path: pick } : {}), ...(provider ? { provider } : {}) }} onStarted={onChanged} onDone={onChanged} noStatus />
+          </div>
+        )
+      })()}
       <PriceButton label={`Make the week (${ready.length} post${ready.length === 1 ? '' : 's'})`} action={ready.length ? { type: 'week_make', week: v.monday, ...(pick ? { path: pick } : {}), ...(provider ? { provider } : {}) } : null}
         todo={ready.length ? [] : [{ label: v.counts.unchecked ? 'Check the week first' : 'Nothing to make: every checked post is made or making' }]} onStarted={onChanged} onDone={onChanged}
         watch={j => ids.has(j.postId ?? '')} />
