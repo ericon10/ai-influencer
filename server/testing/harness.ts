@@ -60,6 +60,7 @@ export async function createHarness(opts: Partial<Pick<RegistryOptions, 'mockSce
     mockLlmResponders: opts.mockLlmResponders,
     // Voice lines: the mock voice (the take a little higher, words spread).
     voiceMock: true,
+    baseUrls: { kie: env.KIE_API_BASE, wavespeed: env.WAVESPEED_API_BASE },
     // The Higgsfield account path never reaches the network in tests.
     fetchImpl: opts.fetchImpl ?? (async () => { throw new Error('Tests never call the real Higgsfield account.') }),
     overrides: {

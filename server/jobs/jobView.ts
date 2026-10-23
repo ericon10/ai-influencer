@@ -4,6 +4,10 @@ import type { Deps } from '../context.js'
 import { formatUsd } from '../costs/money.js'
 import { modelLabel } from '../costs/quotes.js'
 import { findRiskyWords } from '../core/wording.js'
+import { estimateGen } from '../costs/pricebook.js'
+import { alternatives, providerLabel, providerOf } from '../core/engines.js'
+import { askedModel, readyProviders } from '../pipeline/engines.js'
+import type { GenRequest } from '../providers/types.js'
 
 // The live status of a run (owner, 2026-10-13: feedback everywhere): what it
 // is doing now from the runner's real state, how long it has been at it and
@@ -25,6 +29,11 @@ export interface JobViewRow {
   // A refusal by the provider's filter: the likely trigger words in what
   // was sent, and whether "Retry with safer wording" can run (G46).
   triggers: string[]; safer: boolean
+  // A failed run's next tries (section 40): the other providers that run the
+  // same model, with a key, each priced for this request. Offered, never run.
+  next: Array<{ provider: string; label: string; price: string; verified: boolean }>
+  // Who ran it (Higgsfield, Kie.ai, WaveSpeed...).
+  providerLabel: string
   createdAt: string; completedAt: string | null
   // The post the run belongs to and its short name (the plan's row id, such
   // as P007, else its title or idea), so progress reads per post (item 26).
@@ -152,6 +161,22 @@ export async function jobViews(deps: Deps, accountId: string, rows: JobRow[], la
   const typical = await typicalTimes(deps, accountId, rows)
   const { refs, posts } = await postLabels(deps, accountId, rows)
   const fallback = deps.config.runtime.jobs.typical_sec
+  const ready = rows.some(j => j.kind !== 'llm' && ['failed', 'canceled'].includes(j.status)) ? await readyProviders(deps, { accountId }) : new Set<string>()
+  const offers = new Map<string, JobViewRow['next']>()
+  for (const j of rows) {
+    if (j.kind === 'llm' || !['failed', 'canceled'].includes(j.status) || (j.request as { parentJobId?: string } | null)?.parentJobId) continue
+    const req = j.request as GenRequest
+    const asked = askedModel(req as never)
+    const list = alternatives(deps.config.engines, asked, null).filter(r => ready.has(providerOf(r)))
+    const out: JobViewRow['next'] = []
+    for (const ref of list) {
+      try {
+        const e = estimateGen(deps.config, { ...req, model: ref })
+        out.push({ provider: providerOf(ref), label: providerLabel(deps.config.engines, providerOf(ref)), price: formatUsd(e.totalMicros), verified: e.verified })
+      } catch { /* no price for this shape */ }
+    }
+    offers.set(j.id, out)
+  }
   return rows.map((j, i) => {
     const post = posts.get(refs[i]!.postId ?? refs[i]!.sceneId ?? '') ?? null
     const phase = phaseOf(j)
@@ -181,6 +206,8 @@ export async function jobViews(deps: Deps, accountId: string, rows: JobRow[], la
       // waited on another step is retried from that step.
       retry,
       triggers, safer: retry && triggers.length > 0,
+      next: retry ? offers.get(j.id) ?? [] : [],
+      providerLabel: j.provider === LOCAL ? 'the worker' : j.provider === 'mock' ? 'the demo' : providerLabel(deps.config.engines, providerOf(askedModel((j.request ?? {}) as never)) || j.provider),
       createdAt: j.createdAt.toISOString(), completedAt: j.completedAt?.toISOString() ?? null,
       postId: post?.id ?? null, postLabel: post?.label ?? null,
     }

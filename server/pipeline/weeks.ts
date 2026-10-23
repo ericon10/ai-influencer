@@ -35,6 +35,7 @@ import { lintFor } from './copyLint.js'
 import { setPosting } from './postingDay.js'
 import { STANCES_KEY, painsFor, type BankImport, IMPORTS_KEY } from './lineBank.js'
 import { listSheets, readSheet, startDriveSend } from './drive.js'
+import { withRunProvider } from './engines.js'
 import type { BuiltAction } from './actions.js'
 
 // Weeks (owner, 2026-10-22; UX-PLAN.md section 37): the plan CSV in (spec
@@ -785,7 +786,13 @@ async function postRuns(deps: Deps, ctx: Ctx, row: ContentRow, cell: WeekCell, p
 // Make the week: the week's posts that are not made, not making, not
 // killed and not flagged by Check (or the ticked ones), ten posts at a
 // time; each group checked against the daily cap when its turn comes.
-export async function buildWeekMake(deps: Deps, ctx: Ctx, input: { week: string; postIds?: string[]; path?: StillPath | null; redo?: boolean }): Promise<Built> {
+export async function buildWeekMake(deps: Deps, ctx: Ctx, input: { week: string; postIds?: string[]; path?: StillPath | null; redo?: boolean; provider?: string | null }): Promise<Built> {
+  // "Provider for this run" (section 40): each post uses it where it runs
+  // that post's model, else the post's own pick.
+  return withRunProvider(input.provider, () => buildWeekMakeRun(deps, ctx, input))
+}
+
+async function buildWeekMakeRun(deps: Deps, ctx: Ctx, input: { week: string; postIds?: string[]; path?: StillPath | null; redo?: boolean; provider?: string | null }): Promise<Built> {
   const rows = await weekPosts(deps, ctx, input.week)
   const cells = new Map((await weekCells(deps, ctx, rows)).map(c => [c.postId, c]))
   const wanted = input.postIds?.length ? new Set(input.postIds) : null

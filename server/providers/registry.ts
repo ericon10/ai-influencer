@@ -12,6 +12,8 @@ import { createElevenLabsAdapter } from './elevenlabs.js'
 import { createFalAdapter } from './fal.js'
 import { createApifyAdapter } from './apify.js'
 import { createGoogleAdapter } from './google.js'
+import { createKieAdapter } from './kie.js'
+import { createWavespeedAdapter } from './wavespeed.js'
 import { createHiggsfieldAccountAdapter, type AccountBalance, type LivePriceStore } from './higgsfieldAccount.js'
 import { getSetting, putCacheSetting } from '../pipeline/settings.js'
 import { accountTokenSource, readAccountTokens } from './higgsfieldOAuth.js'
@@ -62,6 +64,8 @@ export interface RegistryOptions {
   serverKeys?: ServerKeys
   // Voice lines without an ElevenLabs key use the mock voice (local dev).
   voiceMock?: boolean
+  // Other API bases for Kie.ai and WaveSpeed (the tests' fake servers).
+  baseUrls?: { kie?: string; wavespeed?: string }
 }
 
 export function createRegistry(o: RegistryOptions): ProviderRegistry & { mockFor(accountId: string): ReturnType<typeof createMockAdapter>; mockLlm: ReturnType<typeof createMockLlm> } {
@@ -153,9 +157,12 @@ export function createRegistry(o: RegistryOptions): ProviderRegistry & { mockFor
       }
       // fal and Google AI Studio (item 19): the account's own key from
       // Settings > Provider keys only, never a server key.
-      if (p === 'fal' || p === 'google' || p === 'apify') {
+      // Kie.ai and WaveSpeed (section 40) too.
+      if (p === 'fal' || p === 'google' || p === 'apify' || p === 'kie' || p === 'wavespeed') {
         const key = await readSecret(o.db, o.vault, accountId, p)
-        if (!key) throw new AppError('provider_not_configured', `Add your ${({ fal: 'fal', google: 'Google AI Studio', apify: 'Apify' } as Record<string, string>)[p]} key in Settings > Provider keys to run this on the API.`)
+        if (!key) throw new AppError('provider_not_configured', `Add your ${({ fal: 'fal', google: 'Google AI Studio', apify: 'Apify', kie: 'Kie.ai', wavespeed: 'WaveSpeed' } as Record<string, string>)[p]} key in Settings > Provider keys to run this on the API.`)
+        if (p === 'kie') return createKieAdapter({ apiKey: key, config: o.config, fetchImpl: o.fetchImpl, baseUrl: o.baseUrls?.kie })
+        if (p === 'wavespeed') return createWavespeedAdapter({ apiKey: key, config: o.config, fetchImpl: o.fetchImpl, baseUrl: o.baseUrls?.wavespeed })
         if (p === 'apify') return createApifyAdapter({ apiKey: key, config: o.config, fetchImpl: o.fetchImpl })
         if (p === 'fal') return createFalAdapter({ apiKey: key, config: o.config, fetchImpl: o.fetchImpl })
         return createGoogleAdapter({ apiKey: key, config: o.config, store: o.store, loadAsset: id => o.loadAsset(accountId, id), fetchImpl: o.fetchImpl })

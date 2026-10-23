@@ -421,6 +421,165 @@ models:
     aliases: [Kling 3.0 Motion Control (fal)]
     use_for: [video_clone]
     notes: fal, pay per second. The clip's motion and camera onto the kept still, in the still's place.
+  # Kie.ai and WaveSpeed (owner, 2026-10-23; UX-PLAN.md section 40): more
+  # providers for models the Studio already runs, and Seedance 1.5 Pro. The
+  # request fields are from Kie's own OpenAPI files (read 2026-10-21) and
+  # WaveSpeed's model pages (2026-10-23); none is confirmed by a run yet.
+  # `endpoint` is the provider's model id. Which provider runs a step is
+  # config/engines.yaml.
+  - ref: kie/nano-banana-2.1
+    label: Nano Banana 2.1
+    kinds: [image, image_edit]
+    max_refs: 10
+    reference: https://docs.kie.ai/market/google/nanobanana2
+    endpoint: nano-banana-2-1
+    input_map: kie_nano_banana
+    verified: false
+    elements: false
+    aliases: [Nano Banana 2.1 (Kie.ai)]
+    params: { resolution: [1k, 2k, 4k] }
+    notes: Kie.ai, pay per image in credits (200 = $1). Up to 10 reference images.
+  - ref: wavespeed/nano-banana-2.1
+    label: Nano Banana 2.1
+    kinds: [image, image_edit]
+    max_refs: 14
+    reference: https://wavespeed.ai/models/google/nano-banana-2.1/edit
+    endpoint: google/nano-banana-2.1/edit
+    input_map: ws_nano_banana
+    verified: false
+    elements: false
+    aliases: [Nano Banana 2.1 (WaveSpeed)]
+    params: { resolution: [1k, 2k, 4k] }
+    notes: WaveSpeed, pay per image plus $0.002 a reference. A still with no reference runs on google/nano-banana-2.1/text-to-image.
+  - ref: kie/seedream-4.5-edit
+    label: Seedream 4.5 edit
+    kinds: [image_edit]
+    max_refs: 14
+    reference: https://docs.kie.ai/market/seedream/4-5-edit
+    endpoint: seedream/4.5-edit
+    input_map: kie_seedream_edit
+    verified: false
+    elements: false
+    aliases: [Seedream 4.5 edit (Kie.ai)]
+    notes: Kie.ai, 6.5 credits ($0.0325) an image; basic is 2K, high is 4K.
+  - ref: wavespeed/seedream-4.5-edit
+    label: Seedream 4.5 edit
+    kinds: [image_edit]
+    max_refs: 10
+    reference: https://wavespeed.ai/models/bytedance/seedream-v4.5/edit
+    endpoint: bytedance/seedream-v4.5/edit
+    input_map: ws_seedream_edit
+    verified: false
+    elements: false
+    aliases: [Seedream 4.5 edit (WaveSpeed)]
+    notes: WaveSpeed, $0.04 an image; the size in pixels (about 2K).
+  - ref: kie/kling-3.0-pro
+    label: Kling 3.0 Pro
+    kinds: [video]
+    max_refs: 0
+    reference: https://docs.kie.ai/market/kling/kling-3-0
+    endpoint: kling-3.0/video
+    input_map: kie_kling_video
+    verified: false
+    aliases: [Kling 3.0 Pro (Kie.ai)]
+    audio: off_switch
+    params: { start_image: true, end_image: true, mode: pro, sound: [on, off] }
+    notes: Kie.ai, pro mode (1080p), 3 to 15 s, a start frame and an end frame.
+  - ref: kie/kling-3.0-standard
+    label: Kling 3.0 Standard
+    kinds: [video]
+    max_refs: 0
+    reference: https://docs.kie.ai/market/kling/kling-3-0
+    endpoint: kling-3.0/video
+    input_map: kie_kling_video
+    verified: false
+    aliases: [Kling 3.0 Standard (Kie.ai)]
+    audio: off_switch
+    params: { start_image: true, end_image: true, mode: std, sound: [on, off] }
+    notes: Kie.ai, std mode (720p), 3 to 15 s.
+  - ref: wavespeed/kling-3.0-pro
+    label: Kling 3.0 Pro
+    kinds: [video]
+    max_refs: 0
+    reference: https://wavespeed.ai/models/kwaivgi/kling-v3.0-pro/image-to-video
+    endpoint: kwaivgi/kling-v3.0-pro/image-to-video
+    input_map: ws_kling_video
+    verified: false
+    aliases: [Kling 3.0 Pro (WaveSpeed)]
+    audio: off_switch
+    params: { start_image: true, end_image: true, mode: pro, sound: [on, off] }
+    notes: WaveSpeed, 3 to 15 s. The end frame goes as last_image (one page names it end_image; the first run confirms).
+  - ref: wavespeed/kling-3.0-standard
+    label: Kling 3.0 Standard
+    kinds: [video]
+    max_refs: 0
+    reference: https://wavespeed.ai/models/kwaivgi/kling-v3.0-std/image-to-video
+    endpoint: kwaivgi/kling-v3.0-std/image-to-video
+    input_map: ws_kling_video
+    verified: false
+    aliases: [Kling 3.0 Standard (WaveSpeed)]
+    audio: off_switch
+    params: { start_image: true, end_image: true, mode: std, sound: [on, off] }
+    notes: WaveSpeed, 3 to 15 s.
+  - ref: kie/seedance-1.5-pro
+    label: Seedance 1.5 Pro
+    kinds: [video]
+    max_refs: 0
+    reference: https://docs.kie.ai/market/bytedance/seedance-1-5-pro
+    endpoint: bytedance/seedance-1.5-pro
+    input_map: kie_seedance
+    verified: false
+    aliases: [Seedance 1.5 Pro (Kie.ai)]
+    audio: off_switch
+    params: { start_image: true, end_image: true, resolution: [480p, 720p, 1080p] }
+    notes: Kie.ai, 4 to 12 s, silent by default (sound doubles the price).
+  - ref: wavespeed/seedance-1.5-pro
+    label: Seedance 1.5 Pro
+    kinds: [video]
+    max_refs: 0
+    reference: https://wavespeed.ai/models/bytedance/seedance-v1.5-pro/image-to-video
+    endpoint: bytedance/seedance-v1.5-pro/image-to-video
+    input_map: ws_seedance
+    verified: false
+    aliases: [Seedance 1.5 Pro (WaveSpeed)]
+    audio: off_switch
+    params: { start_image: true, end_image: true, resolution: [480p, 720p, 1080p] }
+    notes: WaveSpeed, 4 to 12 s, silent unless asked.
+  - ref: kie/wan-2.2-animate-replace
+    label: Wan 2.2 Animate replace
+    kinds: [video_clone]
+    max_refs: 1
+    reference: https://docs.kie.ai/market/wan/2-2-animate-replace
+    endpoint: wan/2-2-animate-replace
+    input_map: kie_wan_animate_replace
+    verified: false
+    clone: { mode: replace, background: [video], image_refs: 1, min_sec: 1, max_sec: 30, prompt: none }
+    aliases: [Wan 2.2 Animate replace (Kie.ai)]
+    params: { resolution: [480p, 580p, 720p] }
+    notes: Kie.ai, pay per second, up to 30 s. Files up to 10 MB each.
+  - ref: wavespeed/wan-2.2-animate-replace
+    label: Wan 2.2 Animate replace
+    kinds: [video_clone]
+    max_refs: 1
+    reference: https://wavespeed.ai/models/wavespeed-ai/wan-2.2/animate
+    endpoint: wavespeed-ai/wan-2.2/animate
+    input_map: ws_wan_animate_replace
+    verified: false
+    clone: { mode: replace, background: [video], image_refs: 1, min_sec: 3, max_sec: 120, prompt: none }
+    aliases: [Wan 2.2 Animate replace (WaveSpeed)]
+    params: { resolution: [480p, 720p] }
+    notes: WaveSpeed, mode replace, pay per second (3 s minimum).
+  - ref: kie/kling-3.0-motion-control
+    label: Kling 3.0 Motion Control
+    kinds: [video_clone]
+    max_refs: 1
+    reference: https://docs.kie.ai/market/kling/motion-control-v3
+    endpoint: kling-3.0/motion-control
+    input_map: kie_kling_motion_control
+    verified: false
+    clone: { mode: motion, background: [image], image_refs: 1, min_sec: 3, max_sec: 30, prompt: optional }
+    aliases: [Kling 3.0 Motion Control (Kie.ai)]
+    notes: Kie.ai, 720p (or 1080p) per second; the clip's motion onto the kept still.
   # Mass recreate (item 24): a TikTok link from the sheet fetched as its
   # video through the owner's Apify account (clockworks/tiktok-scraper with
   # shouldDownloadVideos). Priced per clip; the clip's own sound is kept.

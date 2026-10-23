@@ -724,7 +724,7 @@ export async function buildClone(deps: Deps, ctx: Ctx, input: CloneInput) {
   // working is refused with the same line.
   const path = await motionPath(deps, ctx, wanted)
   if (!path.billing) throw new AppError('bad_request', `${entry.label}: ${path.problem}`)
-  const run = await runModel(deps, ctx, wanted, 'video_clone')
+  const run = await runModel(deps, ctx, wanted, 'video_clone', { characterId: ids.length === 1 ? ids[0] : null })
   const portrait = await sourcePortrait(deps, ctx, source)
   const warnings: RuleViolation[] = []
   if (input.keepSound && !source.hasAudio) warnings.push(warn('video-audio-off', 'No sound to keep', 'This clip has no sound, so the clone stays silent.'))
@@ -912,7 +912,7 @@ async function stillRun(deps: Deps, ctx: Ctx, characterId: string, want?: string
   if (choice.problem) throw new AppError('bad_request', `${choice.label}: ${choice.problem}`)
   const model = choice.ref
   const onPlan = choice.path === 'account'
-  const base = await runModel(deps, ctx, model, 'image_edit')
+  const base = await runModel(deps, ctx, model, 'image_edit', { step: 'recreate_still', characterId })
   // The API choice runs on the API even when the plan is the default path.
   const run = !onPlan && base.model.startsWith('higgsfield/') ? { ...base, billing: 'api' as const } : base
   const entry = deps.config.models.models.find(m => m.ref === model)!

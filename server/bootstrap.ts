@@ -31,6 +31,7 @@ export async function buildDeps(env: Env = loadEnv()): Promise<{ deps: Deps; han
     db: handle.db, vault, config, store,
     serverKeys: { ownerEmail: env.STUDIO_OWNER_EMAIL || 'owner@studio.local', higgsfield: env.HF_CREDENTIALS || undefined, elevenlabs: env.ELEVENLABS_API_KEY || undefined },
     voiceMock: !env.isProduction,
+    baseUrls: { kie: env.KIE_API_BASE, wavespeed: env.WAVESPEED_API_BASE },
     loadAsset: async (accountId, assetId) => (await readAsset(depsRef.current!, { accountId, userId: null, role: 'admin', email: '', requestId: 'mock', log: logger }, assetId)).data,
   })
   const faces = createFaceMatcher({ modelsDir: env.STUDIO_MODELS_DIR, log: logger })

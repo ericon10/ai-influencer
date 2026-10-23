@@ -1890,3 +1890,58 @@ not a paid step.
    read-only Drive permission on top of drive.file. Settings > Google Drive
    says so and offers Reconnect (one consent screen); until then the
    picker shows the reason, never a silent empty list.
+
+## 40. Kie.ai and WaveSpeed: more providers for the same models (owner, 2026-10-23)
+
+Eric picked both by name (Oct 22) after the research in
+`docs/studio/research-wavespeed-kie.md`. Higgsfield stays the default for
+every model it runs until Eric picks another provider. Applies to every
+character, account and product; nothing product-specific. R4: every paid
+step shows its price for the provider picked and waits for the click; the
+API path works for all of it.
+
+**One table: step > model > provider** (`config/engines.yaml`, read by
+`server/core/engines.ts`). Each step (still, edit, video, recreate stills,
+recreate motion) lists its model families; each family lists the provider
+refs that run it, the default first (the model the Studio already used, so
+Higgsfield where it runs it). The ComfyUI build's engine lever adds a
+provider (or a local engine) as one more ref in a family: nothing else
+changes.
+
+| Family | Providers (default first) |
+|---|---|
+| Nano Banana 2.1 | Higgsfield, Google AI Studio, Kie.ai, WaveSpeed |
+| Seedream 4.5 edit | fal, Kie.ai, WaveSpeed |
+| Kling 3.0 Pro | Higgsfield, Kie.ai, WaveSpeed |
+| Kling 3.0 Standard | Higgsfield, Kie.ai, WaveSpeed |
+| Seedance 1.5 Pro | Kie.ai, WaveSpeed (new: the cheapest video) |
+| Wan 2.2 Animate replace | fal, Kie.ai, WaveSpeed |
+| Kling 3.0 Motion Control | Higgsfield, fal, Kie.ai |
+
+1. **Keys.** Settings > Provider keys gets Kie.ai and WaveSpeed (keys made
+   in each dashboard, pasted here only, sealed in the vault). Each saved key
+   has Test key (a free call) and shows its balance when the provider
+   reports one (Kie: credits and dollars; WaveSpeed: dollars).
+2. **Adapters** (`server/providers/kie.ts`, `wavespeed.ts`): submit, poll
+   or webhook, the output fetched into our storage like every provider;
+   reference images, start and end frames and the source clip passed as
+   links where the model takes them. Kie: createTask, recordInfo, its own
+   charge (creditsConsumed). WaveSpeed: POST /api/v3/{model}, the
+   prediction's result.
+3. **Price book.** Each provider's per-image and per-second list price, with
+   the date it was checked (`checked:`), not confirmed until the first real
+   run. Every price button prices the provider picked.
+4. **Provider picker** (`ProviderPick`) on the still, edit, video and
+   recreate steps: every provider that can run the model, its price side by
+   side, the cheapest marked, "Add a key" when there is none. The pick is
+   saved for the step (all characters) or for this character on this step
+   (the character wins). Weeks > Make the week has "Provider for this run":
+   each post uses it where it runs that post's model, else the post's own.
+5. **Failures.** A run that fails or is refused says why and offers the
+   next provider that runs the same model, with its price: "Try on Kie.ai,
+   $0.03". Nothing switches or spends on its own; the offer is a priced
+   button like any other.
+6. **What was sent** names the provider on every output (Provider: Kie.ai).
+7. **Tests** use fake provider servers (`server/testing/fakeProviders.ts`),
+   never the real APIs. The one real still on each provider waits for Eric's
+   keys and his click, and its real charge is checked against the price book.

@@ -119,7 +119,7 @@ export async function buildFacelessStill(deps: Deps, ctx: Ctx, input: { contentI
   const product = post.product
   const model = product ? (FACELESS_PRODUCT_MODELS as readonly string[]).includes(input.model ?? '') ? input.model! : FACELESS_PRODUCT_MODELS[0] : FACELESS_STILL_MODEL
   const path = await stillPathFor(deps, ctx, null, { path: input.path ?? null })
-  const run = await runModel(deps, ctx, model, product ? 'image_edit' : 'image')
+  const run = await runModel(deps, ctx, model, product ? 'image_edit' : 'image', { characterId: row.characterId })
   const level = stillLevelFor(deps, model)
   const body = product ? facelessProductPrompt(still.prompt, product.name) : still.prompt
   // Rule zero holds: every image prompt carries a REALISM line; with no
@@ -162,7 +162,7 @@ export async function buildFacelessVideo(deps: Deps, ctx: Ctx, input: { contentI
   const text = (input.prompt ?? post.videoPrompt).trim() || place?.motion?.trim() || (post.recipe === 'finished_damage' ? FINISHED_DAMAGE.motion : '')
   if (text.length < 3) throw new AppError('invalid_request', 'Say what happens in the video.')
   const durationSec = Math.max(3, Math.min(15, Math.round(input.durationSec ?? (post.recipe === 'finished_damage' ? FINISHED_DAMAGE.durationSec : v.duration))))
-  const run = await runModel(deps, ctx, model, 'video')
+  const run = await runModel(deps, ctx, model, 'video', { characterId: row.characterId })
   const prompt = `${text.replace(/[.\s]+$/, '')}. Starts from this exact still: the same place, light and objects. No people. ${deps.config.pipeline.templates.video.silent}`
   const request: GenRequest = {
     kind: 'video', model: run.model, modelRef: model, prompt, aspect: FACELESS_ASPECT, resolution: picked?.resolution, durationSec, audio: false,

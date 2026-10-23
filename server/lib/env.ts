@@ -44,6 +44,10 @@ const schema = z.object({
   GOOGLE_API_BASE: z.string().optional().default('https://www.googleapis.com'),
   GOOGLE_OAUTH_BASE: z.string().optional().default('https://oauth2.googleapis.com'),
   GOOGLE_ACCOUNTS_BASE: z.string().optional().default('https://accounts.google.com'),
+  // Kie.ai and WaveSpeed's API addresses (section 40): only the browser tests
+  // change them, to fake providers on localhost.
+  KIE_API_BASE: z.string().optional().default('https://api.kie.ai'),
+  WAVESPEED_API_BASE: z.string().optional().default('https://api.wavespeed.ai'),
 })
 
 export type Env = z.infer<typeof schema> & { isProduction: boolean }

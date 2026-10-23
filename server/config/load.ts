@@ -111,11 +111,30 @@ const pricebookSchema = z.object({
     // True when the credit cost was seen live (a real charge or Higgsfield's
     // own price); otherwise the credits are a placeholder.
     credits_verified: z.boolean().optional(),
+    // The day the price was read off the provider's own price list
+    // (section 40), shown next to it.
+    checked: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   })),
   // What one Higgsfield credit costs on the API, in USD (section 31): the
   // daily cap counts plan credits at this rate, so one cap covers both paths.
   api_credit_usd: z.number().nonnegative().default(0.0625),
 })
+
+// Step > model > provider (section 40): config/engines.yaml.
+export const ENGINE_STEPS = ['still', 'edit', 'video', 'recreate_still', 'recreate_motion'] as const
+const engineStep = z.enum(ENGINE_STEPS)
+const enginesSchema = z.object({
+  version: z.number().int(),
+  steps: z.record(engineStep, z.object({ label: z.string(), kinds: z.array(z.string()).min(1) })),
+  families: z.array(z.object({
+    id: z.string().regex(/^[a-z0-9.\-]+$/),
+    label: z.string(),
+    steps: z.array(engineStep).min(1),
+    providers: z.array(z.string()).min(1),
+  })),
+  providers: z.record(z.string(), z.object({ label: z.string(), keys: z.string().optional() })),
+})
+export type EnginesConfig = z.infer<typeof enginesSchema>
 
 const budgetsSchema = z.object({
   job: z.number().positive(),
@@ -220,6 +239,7 @@ export interface StudioConfig {
   budgets: BudgetDefaults
   routing: RoutingConfig
   runtime: RuntimeConfig
+  engines: EnginesConfig
   pipeline: PipelineConfig
 }
 
@@ -251,6 +271,7 @@ export function loadConfig(dir = resolve(process.cwd(), 'config')): StudioConfig
     budgets: readConfigFile(dir, 'budgets.yaml', budgetsSchema),
     routing: readConfigFile(dir, 'routing.yaml', routingSchema),
     runtime: readConfigFile(dir, 'runtime.yaml', runtimeSchema),
+    engines: readConfigFile(dir, 'engines.yaml', enginesSchema),
     pipeline: {
       sheet: readConfigFile(dir, 'sheet.yaml', pipelineSchemas.sheet),
       views: readConfigFile(dir, 'views.yaml', pipelineSchemas.views),
@@ -281,6 +302,21 @@ function validateCrossRefs(cfg: StudioConfig): void {
   }
   const imageRefs = new Set(cfg.models.models.map(m => m.ref))
   const llmRefs = new Set(cfg.models.llm_models.map(m => m.ref))
+  // engines.yaml: every provider ref is a model of a kind its steps run,
+  // has a price, and a ref belongs to one family only.
+  const inFamily = new Map<string, string>()
+  for (const f of cfg.engines.families) {
+    for (const ref of f.providers) {
+      const m = cfg.models.models.find(x => x.ref === ref)
+      if (!m) throw new ConfigError(`engines.yaml: family "${f.id}" names unknown model "${ref}"`)
+      if (inFamily.has(ref)) throw new ConfigError(`engines.yaml: "${ref}" is in "${inFamily.get(ref)}" and "${f.id}"`)
+      inFamily.set(ref, f.id)
+      for (const st of f.steps) if (!cfg.engines.steps[st]?.kinds.some(k => m.kinds.includes(k as never))) throw new ConfigError(`engines.yaml: "${ref}" cannot run the ${st} step`)
+      const [provider, model] = [ref.slice(0, ref.indexOf('/')), ref.slice(ref.indexOf('/') + 1)]
+      if (!cfg.pricebook.entries.some(e => e.provider === provider && e.model === model)) throw new ConfigError(`engines.yaml: "${ref}" has no price in pricebook.yaml`)
+      if (!cfg.engines.providers[provider]) throw new ConfigError(`engines.yaml: provider "${provider}" has no label`)
+    }
+  }
   for (const [task, route] of Object.entries(cfg.routing.tasks)) {
     if (!imageRefs.has(route.model) && !llmRefs.has(route.model)) {
       throw new ConfigError(`routing.yaml: task "${task}" points at unknown model "${route.model}"`)

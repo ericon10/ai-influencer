@@ -126,6 +126,43 @@ entries:
   - { provider: fal, model: wan-2.2-animate-replace, unit: second, price: 0.04, verified: false, when: { resolution: 480p }, source: "fal list price, $0.04 a second at 480p." }
   - { provider: fal, model: wan-2.2-animate-replace, unit: second, price: 0.08, verified: false, source: "Priced as 720p." }
   - { provider: fal, model: kling-3.0-motion-control, unit: second, price: 0.168, verified: false, source: "fal list price for Kling 3.0 Pro Motion Control, $0.168 a second (as reported; matches Kling's own 1080p price)." }
+  # Kie.ai (section 40): 200 credits = $1 (the top-up tier adds about 10%,
+  # not counted here). From Kie's own model pages as published in its API
+  # catalog (read 2026-10-21, checked 2026-10-23). Not confirmed by a run.
+  - { provider: kie, model: nano-banana-2.1, unit: image, price: 0.02, verified: false, when: { resolution: 1k }, checked: "2026-10-23", source: "Kie.ai: 4 credits ($0.02) at 1K." }
+  - { provider: kie, model: nano-banana-2.1, unit: image, price: 0.03, verified: false, when: { resolution: 2k }, checked: "2026-10-23", source: "Kie.ai: 6 credits ($0.03) at 2K." }
+  - { provider: kie, model: nano-banana-2.1, unit: image, price: 0.045, verified: false, checked: "2026-10-23", source: "Kie.ai: 9 credits ($0.045) at 4K; anything else priced at the highest." }
+  - { provider: kie, model: seedream-4.5-edit, unit: image, price: 0.0325, verified: false, checked: "2026-10-23", source: "Kie.ai: 6.5 credits ($0.0325) an image, basic (2K) or high (4K)." }
+  - { provider: kie, model: kling-3.0-pro, unit: second, price: 0.09, verified: false, checked: "2026-10-23", source: "Kie.ai Kling 3.0 Pro: 18 credits ($0.09) a second, no sound." }
+  - { provider: kie, model: kling-3.0-pro, unit: second, price: 0.135, verified: false, when: { audio: "on" }, checked: "2026-10-23", source: "Kie.ai Kling 3.0 Pro: 27 credits ($0.135) a second with sound." }
+  - { provider: kie, model: kling-3.0-standard, unit: second, price: 0.07, verified: false, checked: "2026-10-23", source: "Kie.ai Kling 3.0 Standard: 14 credits ($0.07) a second, no sound." }
+  - { provider: kie, model: kling-3.0-standard, unit: second, price: 0.10, verified: false, when: { audio: "on" }, checked: "2026-10-23", source: "Kie.ai Kling 3.0 Standard: 20 credits ($0.10) a second with sound." }
+  - { provider: kie, model: seedance-1.5-pro, unit: second, price: 0.0175, verified: false, when: { resolution: 720p }, checked: "2026-10-23", source: "Kie.ai Seedance 1.5 Pro, 720p silent: $0.0175 a second (kie.ai/seedance-1-5-pro)." }
+  - { provider: kie, model: seedance-1.5-pro, unit: second, price: 0.0375, verified: false, when: { resolution: 1080p }, checked: "2026-10-23", source: "Kie.ai Seedance 1.5 Pro, 1080p silent: $0.0375 a second (1080p availability conflicts on the page)." }
+  - { provider: kie, model: seedance-1.5-pro, unit: second, price: 0.075, verified: false, when: { audio: "on" }, checked: "2026-10-23", source: "Sound doubles the price; priced at 1080p with sound to be safe." }
+  - { provider: kie, model: seedance-1.5-pro, unit: second, price: 0.0375, verified: false, checked: "2026-10-23", source: "Other resolutions priced as 1080p silent." }
+  - { provider: kie, model: wan-2.2-animate-replace, unit: second, price: 0.0625, verified: false, when: { resolution: 720p }, checked: "2026-10-23", source: "Kie.ai: 12.5 credits ($0.0625) a second at 720p." }
+  - { provider: kie, model: wan-2.2-animate-replace, unit: second, price: 0.0475, verified: false, when: { resolution: 580p }, checked: "2026-10-23", source: "Kie.ai: 9.5 credits ($0.0475) a second at 580p." }
+  - { provider: kie, model: wan-2.2-animate-replace, unit: second, price: 0.03, verified: false, when: { resolution: 480p }, checked: "2026-10-23", source: "Kie.ai: 6 credits ($0.03) a second at 480p." }
+  - { provider: kie, model: wan-2.2-animate-replace, unit: second, price: 0.0625, verified: false, checked: "2026-10-23", source: "Priced as 720p." }
+  - { provider: kie, model: kling-3.0-motion-control, unit: second, price: 0.10, verified: false, checked: "2026-10-23", source: "Kie.ai: 20 credits ($0.10) a second at 720p." }
+  - { provider: kie, model: kling-3.0-motion-control, unit: second, price: 0.135, verified: false, when: { resolution: 1080p }, checked: "2026-10-23", source: "Kie.ai: 27 credits ($0.135) a second at 1080p." }
+  # WaveSpeed (section 40): dollars per run, from its model and pricing
+  # pages as indexed (checked 2026-10-23; docs/studio/research-wavespeed-
+  # kie.md). Not confirmed by a run.
+  - { provider: wavespeed, model: nano-banana-2.1, unit: image, price: 0.048, verified: false, when: { resolution: 1k }, checked: "2026-10-23", source: "WaveSpeed: $0.04 at 1K plus $0.002 a reference (4 references counted)." }
+  - { provider: wavespeed, model: nano-banana-2.1, unit: image, price: 0.068, verified: false, when: { resolution: 2k }, checked: "2026-10-23", source: "WaveSpeed: $0.06 at 2K plus $0.002 a reference (4 counted)." }
+  - { provider: wavespeed, model: nano-banana-2.1, unit: image, price: 0.143, verified: false, checked: "2026-10-23", source: "WaveSpeed: $0.135 at 4K plus $0.002 a reference (4 counted); anything else priced at the highest." }
+  - { provider: wavespeed, model: seedream-4.5-edit, unit: image, price: 0.04, verified: false, checked: "2026-10-23", source: "WaveSpeed: $0.04 an image." }
+  - { provider: wavespeed, model: kling-3.0-pro, unit: second, price: 0.112, verified: false, checked: "2026-10-23", source: "WaveSpeed Kling 3.0 Pro: $0.112 a second, no sound." }
+  - { provider: wavespeed, model: kling-3.0-pro, unit: second, price: 0.168, verified: false, when: { audio: "on" }, checked: "2026-10-23", source: "Sound is 1.5 times the price." }
+  - { provider: wavespeed, model: kling-3.0-standard, unit: second, price: 0.084, verified: false, checked: "2026-10-23", source: "WaveSpeed Kling 3.0 Std: $0.084 a second, no sound (one page says $0.42 per 5 s)." }
+  - { provider: wavespeed, model: kling-3.0-standard, unit: second, price: 0.126, verified: false, when: { audio: "on" }, checked: "2026-10-23", source: "Sound is 1.5 times the price." }
+  - { provider: wavespeed, model: seedance-1.5-pro, unit: second, price: 0.026, verified: false, when: { resolution: 720p }, checked: "2026-10-23", source: "WaveSpeed Seedance 1.5 Pro, 720p silent: $0.026 a second." }
+  - { provider: wavespeed, model: seedance-1.5-pro, unit: second, price: 0.06, verified: false, checked: "2026-10-23", source: "1080p and other resolutions: not listed; priced high until a run shows the charge." }
+  - { provider: wavespeed, model: seedance-1.5-pro, unit: second, price: 0.12, verified: false, when: { audio: "on" }, checked: "2026-10-23", source: "Sound doubles the price; priced at the high 1080p rate." }
+  - { provider: wavespeed, model: wan-2.2-animate-replace, unit: second, price: 0.08, verified: false, checked: "2026-10-23", source: "WaveSpeed Wan 2.2 Animate: $0.08 a second at 720p ($0.40 per 5 s)." }
+  - { provider: wavespeed, model: wan-2.2-animate-replace, unit: second, price: 0.04, verified: false, when: { resolution: 480p }, checked: "2026-10-23", source: "WaveSpeed: $0.04 a second at 480p ($0.20 per 5 s)." }
   # Mass recreate (item 24): one TikTok clip fetched through Apify. The
   # scraper is billed per result plus the video download; set high until
   # the first run shows the charge.

@@ -49,7 +49,7 @@ function genUnit(req: GenRequest): { unit: PriceEntry['unit']; quantity: number;
 export function estimateGen(cfg: StudioConfig, req: GenRequest, pb: PriceBook = cfg.pricebook): CostEstimate {
   const { provider, model } = splitRef(req.model)
   const u = genUnit(req)
-  const entry = findPrice(pb, provider, model, u.unit, { resolution: req.resolution, quality: req.quality, aspect: req.aspect })
+  const entry = findPrice(pb, provider, model, u.unit, { resolution: req.resolution, quality: req.quality, aspect: req.aspect, audio: req.audio === true ? 'on' : 'off' })
   if (!entry) throw new PriceMissingError(`No price for ${req.model} per ${u.unit}. Add it to the price book before running.`)
   const l = line(u.label, u.quantity, u.unit, entry)
   return { totalMicros: l.amountMicros, lines: [l], priceVersion: pb.version, verified: entry.verified }

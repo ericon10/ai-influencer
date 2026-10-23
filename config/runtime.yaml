@@ -21,6 +21,11 @@ downloads:
     # fal's result files (Google's stills come back in the answer itself).
     fal: [fal.media, fal.run, fal.ai]
     apify: [apify.com]
+    # Kie.ai and WaveSpeed's result files (section 40): Kie serves them from
+    # its own and its file hosts' domains, WaveSpeed from its CDN. A host
+    # not listed fails the run with its name, never silently.
+    kie: [aiquickdraw.com, redpandaai.co, kie.ai]
+    wavespeed: [wavespeed.ai, cloudfront.net]
     # Clip links for Recreate from a real clip: direct video files on
     # Higgsfield's own hosts only (no scraping; anything else is uploaded).
     clip_links: [higgsfield.ai, cloudfront.net]

@@ -12,7 +12,7 @@ import { AppError } from '../lib/errors.js'
 // returned to the browser.
 
 // google_oauth: the owner's own OAuth client for Google Drive (CLIENT_ID:CLIENT_SECRET).
-const KNOWN = new Set(['higgsfield', 'anthropic', 'elevenlabs', 'wavespeed', 'fal', 'google', 'apify', 'google_oauth'])
+const KNOWN = new Set(['higgsfield', 'anthropic', 'elevenlabs', 'wavespeed', 'kie', 'fal', 'google', 'apify', 'google_oauth'])
 const aad = (accountId: string, provider: string) => `${accountId}|${provider}`
 
 export interface CredentialView {

@@ -6,6 +6,7 @@ import { hardWrap } from '../core/text.js'
 import type { CostCheck } from '../core/costCheck.js'
 import { formatCredits, modelLabel } from '../costs/quotes.js'
 import { formatUsd } from '../costs/money.js'
+import { providerLabel, providerOf } from '../core/engines.js'
 import type { GenRequest } from '../providers/types.js'
 import { approvedAssets, getCandidate, getCharacter, toData } from './characters.js'
 
@@ -27,6 +28,9 @@ export interface SentView {
   ranOn: string
   path: 'plan' | 'api' | 'demo'
   pathLabel: string
+  // Who ran it (section 40): Higgsfield, Google AI Studio, fal, Kie.ai, WaveSpeed.
+  provider: string
+  providerLabel: string
   settings: Array<{ label: string; value: string }>
   quoted: string
   actual: string | null
@@ -75,7 +79,8 @@ async function sentView(deps: Deps, ctx: Ctx, job: typeof jobs.$inferSelect, cha
     if (row) for (const i of toData(row).identities) if (i.externalId) named.set(i.externalId, i.name || row.name)
   }
   const elements = ids.map(id => ({ id, name: named.get(id) ?? 'Higgsfield element' }))
-  const { demo, path, asked, quoted, actual, check, failed } = runFacts(deps, job)
+  const facts = runFacts(deps, job)
+  const { demo, path, asked, quoted, actual, check, failed } = facts
   const settings = [
     req.aspect ? { label: 'Aspect', value: req.aspect } : null,
     req.resolution ? { label: 'Resolution', value: req.resolution } : null,
@@ -95,11 +100,13 @@ async function sentView(deps: Deps, ctx: Ctx, job: typeof jobs.$inferSelect, cha
     model: modelLabel(deps, asked),
     ranOn: demo ? 'Demo mock, free' : modelLabel(deps, req.model),
     path,
-    pathLabel: PATH_LABEL[path],
+    pathLabel: facts.pathLabel,
+    provider: facts.provider,
+    providerLabel: facts.providerLabel,
     settings,
     quoted,
     actual,
-    costNote: demo ? null : failed ? null : check?.note ?? (path === 'plan' ? 'The charge is read from your Higgsfield transactions when the run finishes.' : 'The Higgsfield API reports no cost for a run, so the price book figure stands.'),
+    costNote: demo ? null : failed ? null : check?.note ?? (path === 'plan' ? 'The charge is read from your Higgsfield transactions when the run finishes.' : facts.provider === 'higgsfield' ? 'The Higgsfield API reports no cost for a run, so the price book figure stands.' : `The price book figure for ${facts.providerLabel} stands; check its dashboard for the real charge.`),
     flagged: check?.flagged ?? false,
     offPct: check?.offPct ?? null,
     status: job.status,
@@ -127,5 +134,8 @@ export function runFacts(deps: Pick<Deps, 'config'>, job: typeof jobs.$inferSele
     : check?.actual.credits != null ? formatCredits(check.actual.credits)
     : check?.actual.micros != null && check.actual.source !== 'quote' ? formatUsd(check.actual.micros)
     : null
-  return { demo, path, pathLabel: PATH_LABEL[path], asked, model: modelLabel(deps, asked), quoted, actual, check, failed }
+  const provider = demo ? 'mock' : providerOf(asked) || job.provider
+  const providerName = demo ? 'Demo' : providerLabel(deps.config.engines, provider)
+  const pathLabel = path === 'api' && provider !== 'higgsfield' ? `${providerName} API` : PATH_LABEL[path]
+  return { demo, path, pathLabel, provider, providerLabel: providerName, asked, model: modelLabel(deps, asked), quoted, actual, check, failed }
 }

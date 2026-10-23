@@ -23,6 +23,7 @@ import type { GenRequest } from '../providers/types.js'
 import { listCredentials } from '../providers/credentials.js'
 import { ACCOUNT_PROVIDER } from '../providers/higgsfieldOAuth.js'
 import { forMode, providerMode, resolveRoute } from './settings.js'
+import { routeModel, type RouteOpts } from './engines.js'
 import { approvedAssets, getCandidate, toData, type CharacterRow } from './characters.js'
 import { brandCheckLine, readBrand, winningStackLine } from '../core/brand.js'
 import { comboEntries, comboProblem, getScene, sceneFields, sceneFieldsFor, sceneRefs, videoModel, type SceneRef } from './scenes.js'
@@ -92,7 +93,11 @@ export function withModelLines(deps: Deps, model: string, prompt: string): strin
 // The model that runs (the mock in demo mode) and the Higgsfield billing
 // path. A model the API does not offer runs on the owner's account, which
 // must be connected (DECISIONS E5).
-export async function runModel(deps: Deps, ctx: Ctx, model: string, kind: GenRequest['kind']): Promise<{ model: string; billing?: 'account' }> {
+// The provider is the owner's pick for this step (step > model > provider,
+// UX-PLAN section 40; Higgsfield stays the default): the same model on Kie.ai
+// or WaveSpeed when picked, for the step, this character, or a whole run.
+export async function runModel(deps: Deps, ctx: Ctx, asked: string, kind: GenRequest['kind'], route: RouteOpts = {}): Promise<{ model: string; billing?: 'account' }> {
+  const model = await routeModel(deps, ctx, asked, kind, route)
   const live = (await providerMode(deps.db, ctx.accountId)) === 'live'
   if (!live) return { model: (await forMode(deps, ctx, { model, kind })).model }
   const entry = modelEntry(deps, model)
@@ -415,7 +420,7 @@ export async function buildSceneRun(deps: Deps, ctx: Ctx, row: CharacterRow, inp
     const kind: GenRequest['kind'] = mode === 'refs' ? 'image_edit' : 'image'
     // A path picked by the caller (the launch plan's clip rows, section 30)
     // bills the Higgsfield model there; otherwise the account's default.
-    const base = await runModel(deps, ctx, model, kind)
+    const base = await runModel(deps, ctx, model, kind, { characterId: row.id })
     const run: { model: string; billing?: 'account' | 'api' } = input.billing && base.model.startsWith('higgsfield/') ? { ...base, billing: input.billing } : base
     const attached = mode === 'refs' ? refs.slice(0, Math.max(1, entry.max_refs)) : []
     prompts.push({ label: `${entry.label} prompt`, text: prompt, wrapped: hardWrap(prompt) })
@@ -507,7 +512,7 @@ export async function buildSceneEdit(deps: Deps, ctx: Ctx, row: CharacterRow, in
   const { templates, scenes: sc, rules } = deps.config.pipeline
   const model = input.model ?? (sc.settings.edit_models.includes(ch.preferredModels.edit ?? '') ? ch.preferredModels.edit! : sc.settings.edit_models[0]!)
   if (!sc.settings.edit_models.includes(model)) throw new AppError('bad_request', `${model} is not offered for edits.`)
-  const run = await runModel(deps, ctx, model, 'image_edit')
+  const run = await runModel(deps, ctx, model, 'image_edit', { characterId: row.id })
   const ref00 = (await approvedAssets(deps, ctx, row.id)).get('REF-00')
   if (input.face && !ref00) throw new AppError('bad_request', 'A face edit attaches REF-00. Approve REF-00 first.')
   const realism: RealismWarning[] = []
@@ -586,7 +591,7 @@ export async function buildSceneVideo(deps: Deps, ctx: Ctx, row: CharacterRow, i
   const endFrame = end && (entry.params as { end_image?: boolean } | undefined)?.end_image !== false ? end : null
   if (end && !endFrame) warnings.push({ ruleId: 'video-single-take', spec: '4.3', title: 'Start frame only', severity: 'warning', message: `${entry.label} takes a start frame only, so the end frame is left out of this test.` })
   if (!input.test && !v.durations.includes(durationSec)) warnings.push({ ruleId: 'video-single-take', spec: '5.4.31', title: 'Unusual length', severity: 'warning', message: `${durationSec} s is not one of the usual lengths (${v.durations.join(' or ')} s). Running anyway.` })
-  const run = await runModel(deps, ctx, model, 'video')
+  const run = await runModel(deps, ctx, model, 'video', { characterId: row.id })
   // "What happens in the video" (owner, 2026-10-13: one box): the motion
   // Claude wrote when the still was used, or the owner's own words. The
   // directions, the silent line and the REALISM block are added after it.
@@ -633,7 +638,7 @@ export async function buildChainedSceneVideo(deps: Deps, ctx: Ctx, row: Characte
   const sw = await ruleSwitches(deps, ctx, row.id)
   const model = await videoModel(deps, ctx)
   const picked = v.models.find(m => m.ref === model) ?? v.models[0]!
-  const run = await runModel(deps, ctx, picked.ref, 'video')
+  const run = await runModel(deps, ctx, picked.ref, 'video', { characterId: row.id })
   const motion = input.motion.trim().replace(/[.\s]+$/, '')
   if (motion.length < 3) throw new AppError('invalid_request', 'Say what happens in the video.')
   const ch = toData(row)
@@ -697,7 +702,7 @@ export async function buildSceneEndFrame(deps: Deps, ctx: Ctx, row: CharacterRow
   const ch = toData(row)
   const { templates: t, scenes: sc, rules } = deps.config.pipeline
   const sw = await ruleSwitches(deps, ctx, row.id)
-  const run = await runModel(deps, ctx, sc.video.end_frame.model, 'image_edit')
+  const run = await runModel(deps, ctx, sc.video.end_frame.model, 'image_edit', { characterId: row.id })
   const ref00 = (await approvedAssets(deps, ctx, row.id)).get('REF-00')
   if (!ref00) throw new AppError('bad_request', 'The end frame attaches REF-00 for the face. Approve REF-00 first.')
   // The mask is made on the worker just before submit; where face detection

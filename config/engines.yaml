@@ -1,0 +1,53 @@
+# Step > model > provider (owner, 2026-10-23; UX-PLAN.md section 40). One
+# table for every paid generation step: each step lists the model families
+# it runs, each family the provider refs that run the same model, the
+# default first. The default is the model the Studio already ran, so
+# Higgsfield stays the default wherever it runs the model until the owner
+# picks another provider (Settings, or the provider picker on the step).
+#
+# The ComfyUI build's engine lever plugs in here: a provider (or a local
+# engine) is one more ref in a family's list, with its model entry in
+# models.yaml and its price in pricebook.yaml. Nothing else changes.
+version: 1
+steps:
+  still: { label: Stills, kinds: [image, image_edit] }
+  edit: { label: Edits, kinds: [image_edit] }
+  video: { label: Video, kinds: [video] }
+  recreate_still: { label: Recreate stills, kinds: [image_edit] }
+  recreate_motion: { label: Recreate motion, kinds: [video_clone] }
+families:
+  - id: nano-banana-2.1
+    label: Nano Banana 2.1
+    steps: [still, edit, recreate_still]
+    providers: [higgsfield/nano-banana-2.1, google/nano-banana-2.1, kie/nano-banana-2.1, wavespeed/nano-banana-2.1]
+  - id: seedream-4.5-edit
+    label: Seedream 4.5 edit
+    steps: [edit, recreate_still]
+    providers: [fal/seedream-4.5-edit, kie/seedream-4.5-edit, wavespeed/seedream-4.5-edit]
+  - id: kling-3.0-pro
+    label: Kling 3.0 Pro
+    steps: [video]
+    providers: [higgsfield/kling-3.0-pro, kie/kling-3.0-pro, wavespeed/kling-3.0-pro]
+  - id: kling-3.0-standard
+    label: Kling 3.0 Standard
+    steps: [video]
+    providers: [higgsfield/kling-3.0-standard, kie/kling-3.0-standard, wavespeed/kling-3.0-standard]
+  - id: seedance-1.5-pro
+    label: Seedance 1.5 Pro
+    steps: [video]
+    providers: [kie/seedance-1.5-pro, wavespeed/seedance-1.5-pro]
+  - id: wan-2.2-animate-replace
+    label: Wan 2.2 Animate replace
+    steps: [recreate_motion]
+    providers: [fal/wan-2.2-animate-replace, kie/wan-2.2-animate-replace, wavespeed/wan-2.2-animate-replace]
+  - id: kling-3.0-motion-control
+    label: Kling 3.0 Motion Control
+    steps: [recreate_motion]
+    providers: [higgsfield/kling-3.0-motion-control, fal/kling-3.0-motion-control, kie/kling-3.0-motion-control]
+# What each provider is called on screen, and where its key is made.
+providers:
+  higgsfield: { label: Higgsfield }
+  google: { label: Google AI Studio }
+  fal: { label: fal }
+  kie: { label: Kie.ai, keys: https://kie.ai/api-key }
+  wavespeed: { label: WaveSpeed, keys: https://wavespeed.ai/accesskey }

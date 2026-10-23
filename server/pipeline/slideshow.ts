@@ -675,8 +675,8 @@ export async function slideStillOptions(deps: Deps, ctx: Ctx, characterId: strin
 // The model that runs on a path: the mock in demo mode; a Higgsfield model
 // billed to the picked path (the plan's credits through the account, or
 // the API's dollars), so the quote, the hold and the charge follow it.
-async function pathRun(deps: Deps, ctx: Ctx, model: string, kind: GenRequest['kind'], path: StillPath): Promise<{ model: string; billing?: StillPath }> {
-  const base = await runModel(deps, ctx, model, kind)
+async function pathRun(deps: Deps, ctx: Ctx, model: string, kind: GenRequest['kind'], path: StillPath, characterId?: string | null): Promise<{ model: string; billing?: StillPath }> {
+  const base = await runModel(deps, ctx, model, kind, { characterId })
   return base.model.startsWith('higgsfield/') ? { model: base.model, billing: path } : { model: base.model }
 }
 
@@ -711,7 +711,7 @@ async function stillContext(deps: Deps, ctx: Ctx, row: ContentRow, spec: Slidesh
   const onPlan = path === 'account'
   if (who === 'none') {
     const kind: GenRequest['kind'] = spec.lock.lookAssetId && entry.max_refs > 0 ? 'image_edit' : 'image'
-    const run = await pathRun(deps, ctx, model, kind, path)
+    const run = await pathRun(deps, ctx, model, kind, path, row.characterId)
     return { row, spec, who, path, model, label: entry.label, entry, run, level, aspect, ch, characterRow, sw }
   }
   // The character: the post's scene (made from the idea or the hook, free)
@@ -743,7 +743,7 @@ async function stillContext(deps: Deps, ctx: Ctx, row: ContentRow, spec: Slidesh
   const identity = identityForModel(ch.identities, model)
   const mode: ReferenceMode = entry.max_refs > 0 ? 'refs' : identity ? 'trained' : 'text'
   const kind: GenRequest['kind'] = mode === 'refs' ? 'image_edit' : 'image'
-  const run = await pathRun(deps, ctx, model, kind, path)
+  const run = await pathRun(deps, ctx, model, kind, path, row.characterId)
   // On the plan the character's Higgsfield element goes with the refs, on
   // a model that takes elements (Flare does not: its refs carry the face).
   const element = onPlan && entry.elements !== false ? ch.identities.find(i => i.kind === 'element' && i.status === 'ready' && i.provider === 'higgsfield')?.externalId ?? null : null

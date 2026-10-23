@@ -178,6 +178,10 @@ export async function settingsView(deps: Deps, ctx: Ctx) {
       // Weeks > Send to Drive (UX-PLAN section 37): the owner's own OAuth client.
       { id: 'google_oauth', label: 'Google Drive (OAuth client)', hint: 'Google Cloud, APIs and Services, Credentials: an OAuth client ID (Web application) whose redirect URI is the one under Google Drive below, with the Google Drive API turned on. Paste CLIENT_ID:CLIENT_SECRET.', placeholder: 'e.g. 1234-abc.apps.googleusercontent.com:GOCSPX-...', usedFor: 'Send to Drive: the approved posts and their manifest into your Google Drive' },
       { id: 'fal', label: 'fal', hint: 'An API key from fal.ai (Dashboard, Keys), with a balance.', placeholder: 'e.g. 1a2b...:3c4d...', usedFor: 'Seedream 4.5 edit stills (the fallback), Wan 2.2 Animate replace and Kling 3.0 Motion Control on the API' },
+      // More providers for the same models (section 40): picked per step in
+      // Settings > Providers or on the step; Higgsfield stays the default.
+      { id: 'kie', label: 'Kie.ai', hint: 'An API key from kie.ai (API Key page). Pay as you go: buy credits there (200 credits = $1).', placeholder: 'e.g. 3f2a...', usedFor: 'Nano Banana 2.1, Seedream 4.5 edit, Kling 3.0, Seedance 1.5 Pro, Wan 2.2 Animate and Kling 3.0 Motion Control when you pick Kie.ai', balance: true },
+      { id: 'wavespeed', label: 'WaveSpeed', hint: 'An API key from wavespeed.ai (Access Keys). Pay as you go: top up there.', placeholder: 'e.g. ws_...', usedFor: 'Nano Banana 2.1, Seedream 4.5 edit, Kling 3.0, Seedance 1.5 Pro and Wan 2.2 Animate when you pick WaveSpeed', balance: true },
     ],
     budgets: {
       job: microsToUsd(b.jobCapMicros), character: microsToUsd(b.characterCapMicros), month: microsToUsd(b.monthCapMicros),

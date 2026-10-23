@@ -33,6 +33,7 @@ import { postCutView, postEditorProject } from '../pipeline/cutView.js'
 import { makeCloseup } from '../pipeline/closeup.js'
 import { addSound, archiveSound, listSounds, soundView, updateSound } from '../pipeline/sounds.js'
 import { addVoiceTakes, getVoiceLine, listVoiceLines, updateVoiceLine, voiceLineView } from '../pipeline/voiceLines.js'
+import { enginesView, pickView, setPick } from '../pipeline/engines.js'
 import { applyFit, bankCsv, bankPage, checkWeek, drawWeek, importLines, importLinesFromSheet, importSheet, importWeek, previewSheet, previewWeek, resyncPlan, resyncSheet, reviewLog, saveFill, sendWeek, setLock, setReview, weekList, weekSheets, weekView } from '../pipeline/weeks.js'
 import { driveAuthUrl, driveCallback, driveDisconnect, driveFolders, driveStatus, setDriveRoot } from '../pipeline/drive.js'
 import { addHook, archiveHook, archiveProduct, archiveVariant, importKit, productSummaries, productView, renameSocialAccount, saveSocialAccount, scoreboard, starterKit, updateHook, updateProduct, useKitVoice } from '../pipeline/scaleKit.js'
@@ -1565,6 +1566,38 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
     return c.json({ credential: { ...view, verifyStatus: verify.ok ? 'ok' : 'failed' }, verify })
   })
 
+  // Step > model > provider (section 40): the table, one model's picker
+  // with every provider's price, and the owner's pick.
+  const engineStep = z.enum(['still', 'edit', 'video', 'recreate_still', 'recreate_motion'])
+  app.get('/engines', async c => c.json(await enginesView(deps, c.get('ctx'))))
+  app.get('/engines/pick', async c => {
+    const q = c.req.query()
+    const input = parse(z.object({ step: engineStep, model: z.string().min(3).max(80), characterId: z.string().max(60).optional(), resolution: z.string().max(10).optional(), seconds: z.coerce.number().int().min(1).max(60).optional(), audio: z.enum(['1', '0']).optional() }), q)
+    return c.json(await pickView(deps, c.get('ctx'), { ...input, audio: input.audio === '1' }))
+  })
+  app.put('/engines/pick', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    const body = parse(z.object({ step: engineStep, family: z.string().min(1).max(60), provider: z.string().max(30).nullable(), characterId: z.string().max(60).nullable().optional() }), await json(c))
+    await setPick(deps, ctx, body)
+    return c.json({ ok: true })
+  })
+  // Test key (section 40): a free call with the saved key, and the
+  // provider's balance when it reports one. Never a generation.
+  app.post('/settings/credentials/:provider/test', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'admin')
+    const provider = parse(z.enum(['kie', 'wavespeed', 'fal', 'google', 'higgsfield', 'apify', 'elevenlabs']), c.req.param('provider'))
+    let verify = { ok: false, message: 'Not verified.' }
+    let balance: { text: string; usd: number | null; credits: number | null } | null = null
+    try {
+      const adapter = await deps.providers.gen(ctx.accountId, `${provider}/x`) as Awaited<ReturnType<typeof deps.providers.gen>> & { balance?: () => Promise<{ text: string; usd: number | null; credits: number | null }> }
+      verify = (await adapter.verifyCredentials?.()) ?? verify
+      if (verify.ok && adapter.balance) balance = await adapter.balance().catch(() => null)
+    } catch (e) { verify = { ok: false, message: (e as Error).message } }
+    await markVerified(deps.db, ctx.accountId, provider, verify.ok, deps.clock.now())
+    return c.json({ verify, balance })
+  })
   app.delete('/settings/credentials/:provider', async c => {
     const ctx = c.get('ctx')
     requireRole(ctx, 'admin')
