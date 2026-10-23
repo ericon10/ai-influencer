@@ -363,7 +363,7 @@ function DriveCard() {
         ) : !d.connected ? (
           <div className="st-col" style={{ gap: 6, alignItems: 'flex-start' }}>
             <AsyncButton className="st-btn" busyLabel="Opening Google..." onClick={async () => { try { const r = await api.driveConnect(); window.location.href = r.url } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) } }}>Connect Google Drive</AsyncButton>
-            <span className="st-hint">Google asks you to sign in and allow the Studio to add the files it makes and read your files (for the week's plan in a Google Sheet). The redirect URI on your OAuth client: <span className="st-mono">{d.redirectUri}</span></span>
+            <span className="st-hint">Google shows its account chooser first: pick the Google account whose Drive the posts go to (a Gmail works; it does not have to be the address you sign in to anything else with, and it is not a Claude.ai sign-in). Then allow the Studio to add the files it makes and read your files (for the week's plan in a Google Sheet). If Google says the app is not verified, it is your own OAuth client: Advanced, then Continue. While your OAuth consent screen is in Testing, add that Google account as a test user in Google Cloud. The redirect URI on your OAuth client: <span className="st-mono">{d.redirectUri}</span></span>
           </div>
         ) : (
           <div className="st-col" style={{ gap: 8 }}>

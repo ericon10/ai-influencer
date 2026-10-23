@@ -228,6 +228,7 @@ describe('a week, from the plan CSV to Google Drive', () => {
     await saveCredential(h.deps, h.ctx, 'google_oauth', '123-abc.apps.googleusercontent.com:secret-xyz')
     const url = new URL(await driveAuthUrl(h.deps, h.ctx, 'http://studio.test'))
     expect(url.searchParams.get('scope')).toMatch(/drive\.file/)
+    expect(url.searchParams.get('prompt')).toBe('select_account consent')
     await driveCallback(h.deps, h.ctx, { code: 'fake-code', state: url.searchParams.get('state')!, origin: 'http://studio.test' })
     expect(await driveStatus(h.deps, h.ctx, 'http://studio.test')).toMatchObject({ connected: true, client: true, email: 'owner@example.com' })
     await setDriveRoot(h.deps, h.ctx, { create: 'Studio test' })

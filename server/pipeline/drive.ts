@@ -60,9 +60,13 @@ const canReadSheets = (s: DriveSettings) => (s.scopes ?? '').split(/\s+/).includ
 export async function driveAuthUrl(deps: Deps, ctx: Ctx, origin: string): Promise<string> {
   const c = await client(deps, ctx)
   if (!c) throw new AppError('provider_not_configured', 'Add your Google OAuth client first (Settings > Provider keys, Google Drive): CLIENT_ID:CLIENT_SECRET from Google Cloud, APIs and Services, Credentials.')
+  // Google's account chooser always shows (prompt select_account): the
+  // Drive can live on another Google account than the browser's (a Gmail
+  // with Drive, next to a work address without it). Nothing here is tied to
+  // a Claude.ai sign-in.
   const state = randomBytes(18).toString('base64url')
   await setSetting(deps, ctx, OAUTH_KEY, { state, at: deps.clock.now().toISOString() })
-  const q = new URLSearchParams({ client_id: c.id, redirect_uri: redirectUri(deps, origin), response_type: 'code', scope: `${SCOPE} ${READ_SCOPE} openid email`, access_type: 'offline', prompt: 'consent', include_granted_scopes: 'true', state })
+  const q = new URLSearchParams({ client_id: c.id, redirect_uri: redirectUri(deps, origin), response_type: 'code', scope: `${SCOPE} ${READ_SCOPE} openid email`, access_type: 'offline', prompt: 'select_account consent', include_granted_scopes: 'true', state })
   return `${deps.env.GOOGLE_ACCOUNTS_BASE.replace(/\/$/, '')}/o/oauth2/v2/auth?${q}`
 }
 
