@@ -31,12 +31,12 @@ async function home(page: Page) {
   await expect(page.locator('[data-field="import-door"]')).toBeVisible({ timeout: 30_000 })
 }
 
-test('one Import door: a plan CSV opens in the Launch plan; Select all, shift-click, Import, the next step; again asks Replace or Add; Clear to the Trash; Restore', async ({ page }, info) => {
+test('one Import door: a launch plan CSV opens on Weeks, in the Launch plan; Select all, shift-click, Import, the next step; again asks Replace or Add; Clear to the Trash; Restore', async ({ page }, info) => {
   test.setTimeout(300_000)
   const file = planFile()
   await home(page)
   await page.locator('[data-field="import-door-file"]').setInputFiles(file)
-  await expect(page.getByText(/is a launch plan .*opened in the Launch plan card/)).toBeVisible()
+  await expect(page.getByText(/is a launch plan .*opened on Weeks/)).toBeVisible()
   const card = page.locator('[data-field="launch-plan"]')
   const preview = card.locator('[data-field="plan-preview"]')
   await expect(preview).toBeVisible({ timeout: 60_000 })

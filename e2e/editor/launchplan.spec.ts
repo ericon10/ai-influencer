@@ -2,7 +2,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { expect, test, type Locator, type Page } from '@playwright/test'
 import { unzipSync } from 'fflate'
-import { API, api, planWithShots, seedData, snap } from './helpers'
+import { API, api, planWithShots, seedData, snap, gotoLaunchPlan } from './helpers'
 
 // Launch ready (UX-PLAN.md sections 28 and 29), like a user, in demo mode:
 // the plan CSV uploaded (shown as its name and rows), Preview (free), the
@@ -39,7 +39,7 @@ async function pay(page: Page, button: Locator, scope?: Locator) {
 }
 
 async function openPlan(page: Page) {
-  await page.goto('/studio')
+  await gotoLaunchPlan(page)
   const card = page.locator('[data-field="launch-plan"]')
   await expect(card).toBeVisible({ timeout: 30_000 })
   const head = card.getByRole('button', { name: /Launch plan/ })

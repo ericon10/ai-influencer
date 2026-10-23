@@ -39,7 +39,9 @@ const dayLabel = (d: string) => {
   return Number.isNaN(t.getTime()) ? d : t.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' })
 }
 
-export function PlanCard({ characters }: { characters: CharacterSummary[] }) {
+// On Weeks (UX-PLAN.md section 37) the older launch plan file still imports
+// here, unchanged; `incoming` is a file sent by Import on Posts home.
+export function PlanCard({ characters, incoming: first = null }: { characters: CharacterSummary[]; incoming?: Incoming | null }) {
   const qc = useQueryClient()
   // While the plan's stills are on their way the plan is read every 3 s, and
   // the plan itself says so (G63): it counts its own running stills, so the
@@ -47,7 +49,7 @@ export function PlanCard({ characters }: { characters: CharacterSummary[] }) {
   // hide the stills still running, and the card stopped at "0 of 6").
   const plan = useQuery({ queryKey: ['plan'], queryFn: () => api.plan(), staleTime: 5_000, refetchInterval: q => (q.state.data?.running ? 3000 : false) })
   const posts = plan.data?.posts ?? []
-  const [open, setOpen] = useState(() => { try { return localStorage.getItem(KEY) === '1' } catch { return false } })
+  const [open, setOpen] = useState(() => { if (first) return true; try { return localStorage.getItem(KEY) === '1' } catch { return false } })
   useEffect(() => { try { localStorage.setItem(KEY, open ? '1' : '0') } catch { /* private window */ } }, [open])
   // Stills started somewhere else (a post's Generate the set) show in the
   // jobs list first: the plan is read then, and once more when they stop.
@@ -64,7 +66,7 @@ export function PlanCard({ characters }: { characters: CharacterSummary[] }) {
     wasRunning.current = running
   }, [running, qc])
   // A plan sent by Import on Posts home opens here with its preview.
-  const [incoming, setIncoming] = useState<Incoming | null>(null)
+  const [incoming, setIncoming] = useState<Incoming | null>(first)
   useIncoming(['plan', 'faceless'], f => { setOpen(true); setIncoming(f) })
   const have = posts.filter(p => p.need > 0 && p.have >= p.need).length
   const exported = posts.filter(p => p.exported).length

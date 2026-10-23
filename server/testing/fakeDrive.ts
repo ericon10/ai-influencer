@@ -37,6 +37,8 @@ export async function startFakeDrive(port = 0): Promise<FakeDrive> {
         if (form.get('grant_type') === 'authorization_code') return json(res, 200, { access_token: 'fake-access', refresh_token: 'fake-refresh-token', expires_in: 3600, id_token: idToken })
         return json(res, 200, { access_token: 'fake-access', expires_in: 3600 })
       }
+      // For the browser tests: what is in the fake Drive (names, parents, sizes, versions).
+      if (u.pathname === '/__files') return json(res, 200, { files: [...files.values()].map(f => ({ ...view(f), size: f.data.length, versions: f.versions, text: /csv|spreadsheet/.test(f.mimeType) || f.name.endsWith('.csv') ? f.data.toString('utf8') : undefined })) })
       if (req.headers.authorization !== 'Bearer fake-access') return json(res, 401, { error: { message: 'Invalid Credentials' } })
       const m = u.pathname.match(/^\/(upload\/)?drive\/v3\/files(?:\/([^/]+))?$/)
       if (!m) return json(res, 404, { error: { message: 'not found' } })

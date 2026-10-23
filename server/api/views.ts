@@ -175,6 +175,8 @@ export async function settingsView(deps: Deps, ctx: Ctx) {
       // made in each provider's own dashboard, pasted here only.
       { id: 'google', label: 'Google AI Studio', hint: 'An API key from aistudio.google.com (Get API key), on a project with billing on.', placeholder: 'e.g. AIza...', usedFor: 'Nano Banana 2.1 Recreate stills and the face pass on the API' },
       { id: 'apify', label: 'Apify', hint: 'Your API token from Apify (Settings, API and Integrations).', placeholder: 'e.g. apify_api_...', usedFor: 'Mass recreate: fetching each TikTok link in your sheet as its video' },
+      // Weeks > Send to Drive (UX-PLAN section 37): the owner's own OAuth client.
+      { id: 'google_oauth', label: 'Google Drive (OAuth client)', hint: 'Google Cloud, APIs and Services, Credentials: an OAuth client ID (Web application) whose redirect URI is the one under Google Drive below, with the Google Drive API turned on. Paste CLIENT_ID:CLIENT_SECRET.', placeholder: 'e.g. 1234-abc.apps.googleusercontent.com:GOCSPX-...', usedFor: 'Send to Drive: the approved posts and their manifest into your Google Drive' },
       { id: 'fal', label: 'fal', hint: 'An API key from fal.ai (Dashboard, Keys), with a balance.', placeholder: 'e.g. 1a2b...:3c4d...', usedFor: 'Seedream 4.5 edit stills (the fallback), Wan 2.2 Animate replace and Kling 3.0 Motion Control on the API' },
     ],
     budgets: {

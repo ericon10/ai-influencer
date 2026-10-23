@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Copy, ImagePlus, Music, Sparkles, Type, Video, Image as ImageIcon, CheckCircle2, Package } from 'lucide-react'
+import { Copy, ImagePlus, Music, Sparkles, Type, Video, Image as ImageIcon, CheckCircle2, Package, Upload } from 'lucide-react'
 import { api, assetUrl } from '../../api'
 import { keys } from '../../hooks'
 import { PriceButton } from '../../PriceButton'
@@ -51,6 +51,32 @@ function CopyLine({ label, text }: { label: string; text: string }) {
     <button type="button" className="st-btn sm ghost" disabled={!text.trim()} aria-label={`Copy the ${label}`} onClick={async () => {
       try { await navigator.clipboard.writeText(text); toast({ tone: 'ok', text: `${label[0]!.toUpperCase()}${label.slice(1)} copied.` }) } catch { toast({ tone: 'bad', text: 'Could not copy. Select the text and copy it.' }) }
     }}><Copy size={13} />Copy</button>
+  )
+}
+
+// Any mp3 goes on the post (owner, 2026-10-22; UX-PLAN.md section 37,
+// item 17): uploaded here, kept in Library > Sounds, picked at once. No gate.
+function UploadSound({ onAdded }: { onAdded: (soundId: string) => void }) {
+  const toast = useToast()
+  const qc = useQueryClient()
+  const input = useRef<HTMLInputElement>(null)
+  const [busy, setBusy] = useState(false)
+  async function upload(file: File | undefined) {
+    if (!file) return
+    setBusy(true)
+    try {
+      const row = await api.addSound(file, 'music')
+      onAdded(row.id)
+      await qc.invalidateQueries({ queryKey: ['sounds'] })
+      toast({ tone: 'ok', text: `${file.name} is on this post (and in Library > Sounds). It is ready once it is prepared, in a few seconds.` })
+    } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) } finally { setBusy(false) }
+  }
+  return (
+    <div className="st-row" style={{ gap: 8, alignItems: 'center' }} data-field="faceless-upload-sound">
+      <input ref={input} type="file" accept="audio/*,.mp3,.m4a,.wav" hidden onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; void upload(f) }} />
+      <button type="button" className="st-btn sm secondary" disabled={busy} onClick={() => input.current?.click()}><Upload size={13} />{busy ? 'Uploading...' : 'Upload an mp3'}</button>
+      <span className="st-hint">Any sound you upload can go on any post.</span>
+    </div>
   )
 }
 
@@ -176,6 +202,7 @@ export function FacelessPost({ ctx }: { ctx: PostCtx }) {
             {music.map(m => <option key={m.id} value={m.id}>{m.title}</option>)}
           </select>
         </label>
+        <UploadSound onAdded={id => draft.setSpec({ sound: { ...(spec.sound ?? {}), music: id } })} />
         {file.sounds.filter(s => s.kind === 'music').length > 0 && <span className="st-hint">From the sound bank: {file.sounds.filter(s => s.kind === 'music').map(s => `${s.name} (search "${s.search}")`).join(', ')}.</span>}
         <div className="st-col" style={{ gap: 4 }} data-field="faceless-sound-name">
           <div className="st-row" style={{ gap: 8 }}><span className="st-label grow">Sound to add in the app</span><CopyLine label="sound name" text={f.musicName ?? ''} /></div>

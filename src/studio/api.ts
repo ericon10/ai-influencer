@@ -1,4 +1,4 @@
-import type { ActionPreview, CharacterSummary, CharacterView, HiggsfieldAccount, JobView, Me, QuoteView, RulesView, SceneFields, ScenesData, SettingsView, StudioAction, Usage, VideoPrice, BrollClip, ContentData, ContentKind, LibraryData, PostStep, WorkerStatus, CloneOptions, CloneResult, CloneSource, CloneStill, CutView, SoundItem, EditorStyle, ImportPreview, VoiceLine, ProductSummary, ProductView, ProductClaims, KitGroup, SocialAccount, SentView, RecreateBatchView, GateCheckView, StorageInfo, TrashRef, TrashItem, ContentItem, AutoCleanItem, BrandLayer, TemplateReport, SlideFamily, ReuseReport, SlideBatch, StillChoice, SlideScene, SlideStillOptions, StillPathId, PlanPreview, PlanPostView, PlanImportResult, PostResults, ResultsCsvPreview, ResultsView, PostingDayView, LibraryItemInfo, LibraryCollection, FacelessFile, FacelessPreview, FacelessImportResult, TakeCall, MassView, BankImport, BankView, BankWeek } from './types'
+import type { ActionPreview, CharacterSummary, CharacterView, HiggsfieldAccount, JobView, Me, QuoteView, RulesView, SceneFields, ScenesData, SettingsView, StudioAction, Usage, VideoPrice, BrollClip, ContentData, ContentKind, LibraryData, PostStep, WorkerStatus, CloneOptions, CloneResult, CloneSource, CloneStill, CutView, SoundItem, EditorStyle, ImportPreview, VoiceLine, ProductSummary, ProductView, ProductClaims, KitGroup, SocialAccount, SentView, RecreateBatchView, GateCheckView, StorageInfo, TrashRef, TrashItem, ContentItem, AutoCleanItem, BrandLayer, TemplateReport, SlideFamily, ReuseReport, SlideBatch, StillChoice, SlideScene, SlideStillOptions, StillPathId, PlanPreview, PlanPostView, PlanImportResult, PostResults, ResultsCsvPreview, ResultsView, PostingDayView, LibraryItemInfo, LibraryCollection, FacelessFile, FacelessPreview, FacelessImportResult, TakeCall, MassView, BankImport, BankView, BankWeek, WeekView, WeekPreview, WeekImportResult, DrawResult, BankPage, LinesImportResult, DriveStatus } from './types'
 import { sheetRefOf, typeOf, uploadFiles } from './files'
 
 // Thin client for /api/v1. Every write sends the CSRF header the server
@@ -262,7 +262,30 @@ export const api = {
   useKitVoice: (productId: string, voice: string, characterId: string) => request<{ ok: true }>('POST', `/products/${productId}/voices/use`, { voice, characterId }),
   // Accounts: tracked link or promo code, signups (ranked by signups).
   socialAccounts: () => request<{ accounts: SocialAccount[]; totalSignups: number }>('GET', '/social-accounts'),
-  saveSocialAccount: (tag: string, patch: Partial<Pick<SocialAccount, 'link' | 'code' | 'signups' | 'views' | 'characterId' | 'productId' | 'notes'>> & { primaryCode?: string | null; backupCode?: string | null }) => request<SocialAccount>('PUT', `/social-accounts/${encodeURIComponent(tag)}`, patch),
+  saveSocialAccount: (tag: string, patch: Partial<Pick<SocialAccount, 'link' | 'code' | 'signups' | 'views' | 'characterId' | 'productId' | 'notes' | 'deviceId' | 'platform'>> & { primaryCode?: string | null; backupCode?: string | null; slotsPerDay?: number | null; lifeShare?: number | null }) => request<SocialAccount>('PUT', `/social-accounts/${encodeURIComponent(tag)}`, patch),
+  renameSocialAccount: (tag: string, to: string) => request<SocialAccount>('POST', `/social-accounts/${encodeURIComponent(tag)}/rename`, { to }),
+
+  // Weeks (UX-PLAN.md section 37).
+  weeks: () => request<{ weeks: Array<{ monday: string; posts: number }> }>('GET', '/weeks'),
+  week: (monday: string) => request<WeekView>('GET', `/weeks/${monday}`),
+  weekPreview: (csv: string) => request<WeekPreview>('POST', '/weeks/preview', { csv }),
+  weekImport: (csv: string, o: { rows: string[]; existing?: 'replace' | 'add' }) => request<WeekImportResult>('POST', '/weeks/import', { csv, ...o }),
+  weekDraw: (monday: string, o: { seed: number; redraw: 'empty' | 'all' | string[]; draft?: Record<string, string | null>; accounts?: string[] }) => request<DrawResult>('POST', `/weeks/${monday}/draw`, o),
+  weekFill: (monday: string, rows: Array<{ postId: string; lineId: string | null; lifeOrJob: 'life' | 'job'; flag?: string | null }>) => request<{ filled: number; empty: number; drafted: number; pulls: number }>('POST', `/weeks/${monday}/fill`, { rows }),
+  weekCheck: (monday: string) => request<{ checked: number; flagged: number }>('POST', `/weeks/${monday}/check`, {}),
+  weekSend: (monday: string, o: { postIds?: string[]; again?: boolean } = {}) => request<{ jobId: string; posts: number }>('POST', `/weeks/${monday}/send`, o),
+  weekLock: (postId: string, locked: boolean) => request<{ ok: true }>('PUT', `/weeks/posts/${postId}/lock`, { locked }),
+  weekReview: (postId: string, call: 'approved' | 'killed' | null) => request<{ ok: true }>('PUT', `/weeks/posts/${postId}/review`, { call }),
+  weekFitApply: (postIds: string[], use: boolean) => request<{ applied: number }>('POST', '/weeks/fit', { postIds, use }),
+  bankPage: (q: Record<string, string | undefined>) => request<BankPage>('GET', `/line-bank/all?${new URLSearchParams(Object.entries(q).filter(([, v]) => v) as Array<[string, string]>).toString()}`),
+  bankCsvUrl: (q: Record<string, string | undefined>) => `/api/v1/line-bank/all.csv?${new URLSearchParams(Object.entries(q).filter(([, v]) => v) as Array<[string, string]>).toString()}`,
+  importLines: (body: { csv: string; name?: string; productId?: string | null; dryRun?: boolean }) => request<LinesImportResult>('POST', '/line-bank/lines/import', body),
+  importPlaces: (characterId: string, csv: string) => request<{ added: number; replaced: number; drafted: number; total: number; problems: string[] }>('POST', `/characters/${characterId}/places/import`, { csv }),
+  drive: () => request<DriveStatus>('GET', '/drive'),
+  driveConnect: () => request<{ url: string }>('POST', '/drive/connect', {}),
+  driveFolders: () => request<{ folders: Array<{ id: string; name: string }> }>('GET', '/drive/folders'),
+  driveRoot: (o: { folderId?: string | null; create?: string | null }) => request<{ rootId: string; rootName: string }>('PUT', '/drive/root', o),
+  driveDisconnect: () => request<{ ok: true }>('DELETE', '/drive'),
   archiveScene: (sceneId: string) => request<{ ok: true }>('DELETE', `/scenes/${sceneId}`),
   crop: (candidateId: string, rect: { x: number; y: number; w: number; h: number }) => request<{ candidateId: string; width: number; height: number }>('POST', `/candidates/${candidateId}/crop`, rect),
 

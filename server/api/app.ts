@@ -1526,7 +1526,9 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
     const view = await saveCredential(deps, ctx, provider, body.secret, body.label)
     // A free call proves the key works (never a generation).
     let verify = { ok: false, message: 'Not verified.' }
-    try {
+    // The Google OAuth client is checked by its own sign-in (Connect Google Drive).
+    if (provider === 'google_oauth') verify = { ok: true, message: 'Saved. Connect Google Drive below to sign in with it.' }
+    else try {
       const model = provider === 'anthropic' ? 'anthropic/claude-haiku-5-5' : `${provider}/x`
       const adapter = provider === 'anthropic' ? await deps.providers.llm(ctx.accountId, model) : await deps.providers.gen(ctx.accountId, model)
       verify = (await adapter.verifyCredentials?.()) ?? verify

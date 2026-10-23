@@ -151,12 +151,14 @@ export function planRows(rows: CsvRow[], ctx: { characters: ImportCharacter[]; c
 //            still_job_id, sound_name or voiceover_clip, no format)
 //  results   a results sheet (row_id or post_id with views_72h and the like)
 //  batch     the video batch sheet (character, clip, caption...)
-export type CsvKind = 'plan' | 'faceless' | 'results' | 'batch' | 'unknown'
+export type CsvKind = 'plan' | 'week' | 'faceless' | 'results' | 'batch' | 'unknown'
 export function csvKind(text: string): CsvKind {
   const first = parseCsv(text.slice(0, 20_000))[0] ?? []
   const h = new Set(first.map(x => x.trim().toLowerCase().replace(/\s+/g, '_')))
   const has = (...c: string[]) => c.some(x => h.has(x))
   if (h.has('row_id') && h.has('format') && h.has('hook')) return 'plan'
+  // A week's plan CSV (docs/PLAN-CSV-SPEC.md): row_id, account, date, slot.
+  if (h.has('row_id') && h.has('account') && h.has('date') && h.has('slot')) return 'week'
   if (h.has('row_id') && !h.has('format') && has('video_prompt', 'still_job_id', 'still_url', 'sound_name', 'voiceover_clip')) return 'faceless'
   if (has('row_id', 'post_id') && has('views_72h', 'views', 'follows_72h', 'follows', 'post_url', 'posted_at')) return 'results'
   if (has('character', 'clip', 'still', 'still_prompt', 'video', 'caption')) return 'batch'
@@ -164,6 +166,7 @@ export function csvKind(text: string): CsvKind {
 }
 export const CSV_KIND_LABEL: Record<CsvKind, string> = {
   plan: 'a launch plan (one row per post: slideshows, photos and clips)',
+  week: 'a week\'s plan CSV (docs/PLAN-CSV-SPEC.md)',
   faceless: 'a faceless account\'s plan',
   results: 'a results sheet (views, follows, saves by row or post)',
   batch: 'a video batch sheet (character, clip, caption)',

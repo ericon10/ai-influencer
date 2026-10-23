@@ -160,7 +160,7 @@ export function readFaceless(x: unknown): FacelessFile {
   const str = (v: unknown, n: number) => (typeof v === 'string' ? v.slice(0, n) : '')
   return {
     persona: { who: str(f.persona?.who, 600), town: str(f.persona?.town, 200), life: str(f.persona?.life, 2000) },
-    places: (Array.isArray(f.places) ? f.places : []).slice(0, MAX_PLACES).map((p, i) => ({ id: str(p?.id, 60) || `place-${i + 1}`, name: str(p?.name, 120), line: str(p?.line, 1200), motion: str(p?.motion, 600), stillJobId: str(p?.stillJobId, 80) })).filter(p => p.line),
+    places: (Array.isArray(f.places) ? f.places : []).slice(0, MAX_PLACES).map((p, i) => { const motion = str(p?.motion, 600), stillJobId = str(p?.stillJobId, 80); return { id: str(p?.id, 60) || `place-${i + 1}`, name: str(p?.name, 120), line: str(p?.line, 1200), ...(motion ? { motion } : {}), ...(stillJobId ? { stillJobId } : {}) } }).filter(p => p.line),
     look: (Array.isArray(f.look) ? f.look : []).map(l => str(l, 300)).filter(Boolean).slice(0, 30),
     voice: { notes: str(f.voice?.notes, 1000), formats: (Array.isArray(f.voice?.formats) ? f.voice!.formats : []).map(l => str(l, 300)).filter(Boolean).slice(0, 20) },
     sounds: (Array.isArray(f.sounds) ? f.sounds : []).slice(0, 120).map((s, i) => ({ id: str(s?.id, 60) || `sound-${i + 1}`, kind: s?.kind === 'voiceover' ? 'voiceover' as const : 'music' as const, name: str(s?.name, 120), search: str(s?.search, 200), soundId: typeof s?.soundId === 'string' ? s.soundId.slice(0, 60) : null })).filter(s => s.name),

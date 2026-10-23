@@ -302,7 +302,8 @@ export async function scoreboard(deps: Deps, ctx: Ctx) {
     // day and the life/job blend (the life %), each a default when unset.
     const characterName = characterId ? names.get(characterId) ?? '' : ''
     const wk = deps.config.pipeline.content.weeks
-    const blendDefault = Object.entries(wk.blend_defaults).find(([n]) => n.toLowerCase() === characterName.toLowerCase())?.[1] ?? wk.blend_fallback
+    // The default by the character's name (its first word: "Doug 2" is Doug).
+    const blendDefault = Object.entries(wk.blend_defaults).find(([n]) => [characterName.toLowerCase(), characterName.toLowerCase().split(/\s+/)[0]].includes(n.toLowerCase()))?.[1] ?? wk.blend_fallback
     return {
       tag, characterId, productId: s?.productId || null, link: s?.link ?? '', code: s?.code ?? '', signups, views: s?.views ?? null, notes: s?.notes ?? '',
       characterName, kind: characterId ? kinds.get(characterId) ?? 'person' : null,

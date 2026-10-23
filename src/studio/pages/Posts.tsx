@@ -10,8 +10,6 @@ import type { BatchSpec, ContentItem, LibraryData, MemeSpec, SlideshowSpec } fro
 import { KIND_LABEL, NEW_POST, STEPS, postName, useDuplicate, useNewPost } from './post/parts'
 import { batchProgress } from './post/batchProgress'
 import { HowTo, QuickStartBanner } from '../guide/Guide'
-import { AccountsCard } from './AccountsCard'
-import { PlanCard } from './PlanCard'
 import { ImportDoor } from '../importDoor'
 import { ResultsCard } from './ResultsCard'
 import { DownloadDayCard } from './DownloadDayCard'
@@ -88,8 +86,8 @@ export default function Posts() {
       </div>
 
       <QuickStartBanner />
-      {characters.length > 0 && <AccountsCard characters={characters} />}
-      {characters.length > 0 && <PlanCard characters={characters} />}
+      {/* Accounts and the Launch plan moved to their pages (UX-PLAN.md section 37). */}
+      {characters.length > 0 && <div className="st-hint" style={{ marginBottom: 14 }} data-field="posts-moved">A week's plan: <Link to="/studio/weeks">Weeks</Link>. Each account's phone, slots and blend: <Link to="/studio/accounts">Accounts</Link>.</div>}
       {characters.length > 0 && items.length > 0 && <DownloadDayCard />}
       {characters.length > 0 && items.length > 0 && <ResultsCard tag={tag} character={character} product={product} filtered={!!(tag || character || product)} />}
 

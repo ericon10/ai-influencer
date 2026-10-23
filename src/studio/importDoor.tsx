@@ -6,8 +6,8 @@ import { useToast } from './ui'
 
 // One import door (owner, 2026-10-22; UX-PLAN.md section 35, item 2g):
 // Import on Posts home reads the file and sends it where it belongs, with a
-// clear message. A launch plan (and a faceless account's plan) opens in the
-// Launch plan card, a results sheet in the Results card, a video batch
+// clear message. A week's plan CSV, a launch plan and a faceless account's
+// plan open on Weeks (section 37), a results sheet in the Results card, a video batch
 // sheet in a new batch post's import, a character file on Characters.
 
 export interface Incoming { kind: CsvKind; name: string; text: string; at: number }
@@ -23,6 +23,18 @@ export function useIncoming(kinds: CsvKind[], on: (f: Incoming) => void) {
     window.addEventListener(EVENT, h)
     return () => window.removeEventListener(EVENT, h)
   }, [kinds.join('|')]) // eslint-disable-line react-hooks/exhaustive-deps
+}
+
+// A plan sent to Weeks (UX-PLAN.md section 37): a week's plan CSV, an older
+// launch plan or a faceless account's plan, waiting for the Weeks page.
+const WEEK_KEY = 'st-import-week'
+export function takeWeekFile(): Incoming | null {
+  try {
+    const raw = sessionStorage.getItem(WEEK_KEY)
+    if (!raw) return null
+    sessionStorage.removeItem(WEEK_KEY)
+    return JSON.parse(raw) as Incoming
+  } catch { return null }
 }
 
 // The batch sheet waiting for the new batch post's import card.
@@ -54,7 +66,7 @@ export function ImportDoor({ newBatch }: { newBatch: () => Promise<string | null
       const kind = csvKind(text)
       const detail: Incoming = { kind, name: f.name, text, at: Date.now() }
       if (kind === 'unknown') {
-        toast({ tone: 'bad', text: `${f.name} is ${CSV_KIND_LABEL.unknown}. A launch plan needs row_id, format and hook; a results sheet row_id and views_72h; a batch sheet character, clip and caption.` })
+        toast({ tone: 'bad', text: `${f.name} is ${CSV_KIND_LABEL.unknown}. A week's plan needs row_id, account, date and slot (docs/PLAN-CSV-SPEC.md); a results sheet row_id and views_72h; a batch sheet character, clip and caption.` })
         return
       }
       if (kind === 'batch') {
@@ -63,8 +75,14 @@ export function ImportDoor({ newBatch }: { newBatch: () => Promise<string | null
         if (id) toast({ tone: 'ok', text: `${f.name} is ${CSV_KIND_LABEL.batch}: it is loaded in this new batch's import. Press Preview.` })
         return
       }
+      if (kind === 'week' || kind === 'plan' || kind === 'faceless') {
+        try { sessionStorage.setItem(WEEK_KEY, JSON.stringify(detail)) } catch { /* private window */ }
+        toast({ tone: 'ok', text: `${f.name} is ${CSV_KIND_LABEL[kind]}: opened on Weeks with its free preview.` })
+        nav('/studio/weeks?step=import')
+        return
+      }
       window.dispatchEvent(new CustomEvent(EVENT, { detail }))
-      toast({ tone: 'ok', text: `${f.name} is ${CSV_KIND_LABEL[kind]}: opened in the ${kind === 'results' ? 'Results' : 'Launch plan'} card below with its free preview.` })
+      toast({ tone: 'ok', text: `${f.name} is ${CSV_KIND_LABEL[kind]}: opened in the Results card below with its free preview.` })
     } finally { setBusy(false) }
   }
   return (

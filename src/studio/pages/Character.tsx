@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
-import { ArrowLeft, Check, Film, Mic, Pencil } from 'lucide-react'
+import { ArrowLeft, Check, FileUp, Film, Mic, Pencil } from 'lucide-react'
 import { useCharacter } from '../hooks'
 import { Img, MarkChip, Meter } from '../ui'
 import { CardEditor } from './character/CardEditor'
@@ -64,6 +64,8 @@ export default function Character() {
         </div>
         <div className="st-row" style={{ gap: 8, flexWrap: 'wrap' }}>
           <DeleteCharacter id={v.id} name={v.data.name} />
+          {/* A half-built character finished by its file (UX-PLAN.md section 37, item 20): the import updates the character of the same name and skips the setup steps. */}
+          {!v.sheet.progress.complete && <Link className="st-btn" to={`/studio/characters?import=1&for=${encodeURIComponent(v.data.name)}`} data-field="finish-with-file"><FileUp size={15} />Import a character file</Link>}
           {ready && <button className="st-btn primary" disabled={!!newPost.busy} onClick={() => void newPost.create('meme', { characterId: v.id })}><Film size={16} />Make a post with {v.data.name}</button>}
         </div>
       </div>

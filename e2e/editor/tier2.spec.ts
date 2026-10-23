@@ -1,7 +1,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { expect, test, type Page } from '@playwright/test'
-import { api, seedData, snap } from './helpers'
+import { api, seedData, snap, gotoLaunchPlan } from './helpers'
 
 // Tier 2 of the Oct 22 build (UX-PLAN.md section 35), like a person, in
 // demo mode: the plan preview's free pre-check (no outfit, no shot line),
@@ -27,7 +27,7 @@ function csvFile(): string {
 }
 
 async function openPlan(page: Page) {
-  await page.goto('/studio')
+  await gotoLaunchPlan(page)
   const card = page.locator('[data-field="launch-plan"]')
   await expect(card).toBeVisible({ timeout: 30_000 })
   const head = card.getByRole('button', { name: /Launch plan/ })

@@ -157,7 +157,7 @@ function LineCard({ l, post, using, onUse, onCall, onPlaced }: { l: BankLineView
   )
 }
 
-function RunBox({ waiting, onStarted }: { waiting: number; onStarted: () => void }) {
+export function RunBox({ waiting, onStarted }: { waiting: number; onStarted: () => void }) {
   const choices = [...new Set([30, 100, 300, waiting].filter(n => n <= waiting))].sort((a, b) => a - b)
   const [limit, setLimit] = useState(waiting)
   const n = Math.min(limit, waiting)
@@ -174,7 +174,7 @@ function RunBox({ waiting, onStarted }: { waiting: number; onStarted: () => void
   )
 }
 
-function ImportBox({ open, last, onDone }: { open: boolean; last: BankImport | null; onDone: () => void }) {
+export function ImportBox({ open, last, onDone }: { open: boolean; last: BankImport | null; onDone: () => void }) {
   const toast = useToast()
   const products = useProducts()
   const [link, setLink] = useState(''), [videosLink, setVideosLink] = useState('')

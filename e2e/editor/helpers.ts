@@ -339,3 +339,12 @@ export async function guideShot(page: Page, box: Locator, id: string, spots: Arr
   writeFileSync(file, `${JSON.stringify(all, null, 2)}\n`)
   await hide.evaluate(el => (el as Element).remove())
 }
+
+// The older launch plan card lives on Weeks now (UX-PLAN.md section 37):
+// Weeks > Import > "An older launch plan file?".
+export async function gotoLaunchPlan(page: Page) {
+  await page.goto('/studio/weeks?step=import')
+  const older = page.getByRole('button', { name: 'An older launch plan file?' })
+  await expect(older).toBeVisible({ timeout: 30_000 })
+  await older.click()
+}

@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Bot, CheckCircle2, CreditCard, HardDrive, KeyRound, Link2, Loader2, RefreshCw, ShieldCheck, Trash2, UserRound } from 'lucide-react'
 import { api } from '../api'
 import { keys, useHiggsfieldAccount, useSettings } from '../hooks'
-import { Callout, Field, PromptViewer, errorMessage, useToast } from '../ui'
+import { AsyncButton, Callout, Field, PromptViewer, errorMessage, useToast } from '../ui'
 import { PriceButton } from '../PriceButton'
 import type { SettingsView, StorageInfo } from '../types'
 import { AutoCleanPreview } from '../trash'
@@ -48,6 +48,7 @@ export default function Settings() {
           <KeysCard d={d} />
           <BillingCard d={d} />
           <ConnectionsCard d={d} />
+          <DriveCard />
           <StorageCard />
         </div>
       )}
@@ -57,7 +58,7 @@ export default function Settings() {
 
 function useInvalidate() {
   const qc = useQueryClient()
-  return () => { qc.invalidateQueries({ queryKey: keys.settings }); qc.invalidateQueries({ queryKey: keys.me }); qc.invalidateQueries({ queryKey: ['estimate'] }) }
+  return () => { qc.invalidateQueries({ queryKey: keys.settings }); qc.invalidateQueries({ queryKey: keys.me }); qc.invalidateQueries({ queryKey: ['estimate'] }); qc.invalidateQueries({ queryKey: ['drive'] }) }
 }
 
 function ModeCard({ d }: { d: SettingsView }) {
@@ -337,6 +338,54 @@ function ConnectionRow({ c }: { c: SettingsView['connections'][number] }) {
 // and Auto-clean.
 const gb = (bytes: number) => bytes >= 1e9 ? `${(bytes / 1e9).toFixed(2)} GB` : `${Math.max(0.01, bytes / 1e6).toFixed(bytes < 1e7 ? 2 : 0)} MB`
 const when = (iso: string | null) => iso ? new Date(iso).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : 'not yet'
+// Google Drive (UX-PLAN.md section 37, item 15): the owner's own Google
+// sign-in (the drive.file scope: only what the Studio makes), then the root
+// folder that Weeks > Send to Drive fills.
+function DriveCard() {
+  const toast = useToast()
+  const qc = useQueryClient()
+  const [params] = useSearchParams()
+  const q = useQuery({ queryKey: ['drive'], queryFn: () => api.drive(), staleTime: 10_000 })
+  const folders = useQuery({ queryKey: ['drive-folders'], queryFn: () => api.driveFolders(), enabled: !!q.data?.connected, staleTime: 30_000 })
+  const [name, setName] = useState('Character Studio posts')
+  const d = q.data
+  const reload = () => { void qc.invalidateQueries({ queryKey: ['drive'] }); void qc.invalidateQueries({ queryKey: ['drive-folders'] }) }
+  useEffect(() => {
+    if (params.get('drive') === 'connected') toast({ tone: 'ok', text: 'Google Drive is connected. Pick the root folder.' })
+    if (params.get('drive_error')) toast({ tone: 'bad', text: `Google Drive did not connect: ${params.get('drive_error')}` })
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  return (
+    <div className="st-card" id="drive" data-field="settings-drive">
+      <div className="st-card-head"><div className="grow"><div className="st-h2 st-row" style={{ gap: 8 }}>Google Drive<HowTo id="weeks" label="How Send to Drive works" /></div><div className="st-hint">Weeks &gt; Send to Drive puts each approved post in ROOT / CHARACTER / week of YYYY-MM-DD /, with a manifest Sheet and CSV. The Studio only sees the folders and files it makes there.</div></div></div>
+      <div className="st-card-body st-col" style={{ gap: 10 }}>
+        {!d ? <span className="st-hint">Reading...</span> : !d.client ? (
+          <span className="st-hint" data-field="drive-needs-client">First add your Google OAuth client in Provider keys above (Google Drive (OAuth client)). Its redirect URI: <span className="st-mono">{d.redirectUri}</span></span>
+        ) : !d.connected ? (
+          <div className="st-col" style={{ gap: 6, alignItems: 'flex-start' }}>
+            <AsyncButton className="st-btn" busyLabel="Opening Google..." onClick={async () => { try { const r = await api.driveConnect(); window.location.href = r.url } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) } }}>Connect Google Drive</AsyncButton>
+            <span className="st-hint">Google asks you to sign in and allow the Studio to see and add the files it makes. The redirect URI on your OAuth client: <span className="st-mono">{d.redirectUri}</span></span>
+          </div>
+        ) : (
+          <div className="st-col" style={{ gap: 8 }}>
+            <span className="st-hint" data-field="drive-connected">Connected{d.email ? ` as ${d.email}` : ''}{d.connectedAt ? ` on ${new Date(d.connectedAt).toLocaleDateString()}` : ''}. Root folder: <b>{d.root?.name ?? 'not picked yet'}</b>.</span>
+            <div className="st-row" style={{ gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+              {(folders.data?.folders.length ?? 0) > 0 && (
+                <select className="st-select" style={{ width: 'auto' }} value={d.root?.id ?? ''} onChange={async e => { try { await api.driveRoot({ folderId: e.target.value }); reload() } catch (err) { toast({ tone: 'bad', text: errorMessage(err) }) } }} aria-label="Root folder">
+                  <option value="" disabled>Pick a folder the Studio made</option>
+                  {folders.data!.folders.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+                </select>
+              )}
+              <input className="st-input" style={{ maxWidth: 240 }} value={name} onChange={e => setName(e.target.value)} aria-label="New root folder name" />
+              <AsyncButton className="st-btn sm secondary" disabled={!name.trim()} busyLabel="Making..." onClick={async () => { try { await api.driveRoot({ create: name.trim() }); reload(); toast({ tone: 'ok', text: `${name.trim()} is the root folder.` }) } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) } }}>Make it the root folder</AsyncButton>
+              <button type="button" className="st-btn sm ghost" onClick={async () => { if (!confirm('Disconnect Google Drive? The files already sent stay in your Drive.')) return; try { await api.driveDisconnect(); reload() } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) } }}>Disconnect</button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function StorageCard() {
   const toast = useToast()
   const [info, setInfo] = useState<StorageInfo | null>(null)

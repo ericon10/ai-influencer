@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link, NavLink, useLocation } from 'react-router-dom'
-import { Activity, BookOpen, FolderOpen, LayoutGrid, Loader2, Moon, Plus, Settings2, Sparkle, Sun, Users } from 'lucide-react'
+import { Activity, BookOpen, CalendarRange, FolderOpen, LayoutGrid, Loader2, Moon, Plus, Quote, Settings2, Smartphone, Sparkle, Sun, Users } from 'lucide-react'
 import { useTheme } from '../context/theme'
 import { api } from './api'
 import { isActiveJob, useActiveJobs, useLiveJobs, useMe, useRefresh, useUsage, useWorker } from './hooks'
@@ -31,9 +31,13 @@ export function Shell({ children }: { children: ReactNode }) {
         <WorkerLight />
         <nav className="st-nav">
           <NewPostButton />
-          <NavLink to="/studio" end className={({ isActive }) => `st-nav-item ${isActive ? 'active' : ''}`}><LayoutGrid size={17} />Posts</NavLink>
+          {/* The owner's order (2026-10-22, UX-PLAN.md section 37). */}
           <NavLink to="/studio/characters" className={({ isActive }) => `st-nav-item ${isActive ? 'active' : ''}`}><Users size={17} />Characters</NavLink>
+          <NavLink to="/studio/weeks" className={({ isActive }) => `st-nav-item ${isActive ? 'active' : ''}`}><CalendarRange size={17} />Weeks</NavLink>
+          <NavLink to="/studio" end className={({ isActive }) => `st-nav-item ${isActive ? 'active' : ''}`}><LayoutGrid size={17} />Posts</NavLink>
+          <NavLink to="/studio/line-bank" className={({ isActive }) => `st-nav-item ${isActive ? 'active' : ''}`}><Quote size={17} />Line bank</NavLink>
           <NavLink to="/studio/library" className={({ isActive }) => `st-nav-item ${isActive ? 'active' : ''}`}><FolderOpen size={17} />Library</NavLink>
+          <NavLink to="/studio/accounts" className={({ isActive }) => `st-nav-item ${isActive ? 'active' : ''}`}><Smartphone size={17} />Accounts</NavLink>
           <NavLink to="/studio/settings" className={({ isActive }) => `st-nav-item ${isActive ? 'active' : ''}`}><Settings2 size={17} />Settings</NavLink>
           <NavLink to="/studio/guide" className={({ isActive }) => `st-nav-item ${isActive ? 'active' : ''}`}><BookOpen size={17} />Guide</NavLink>
         </nav>

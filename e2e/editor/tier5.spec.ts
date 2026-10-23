@@ -1,7 +1,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { expect, test, type Locator, type Page, type TestInfo } from '@playwright/test'
-import { api, guideShot, seedData, snap as attach } from './helpers'
+import { api, guideShot, seedData, snap as attach, gotoLaunchPlan } from './helpers'
 
 // Tier 5 (owner, 2026-10-22; UX-PLAN section 36, item 29): the line bank.
 // Driven like a user in demo mode: import an Apify comment scrape in the
@@ -153,7 +153,7 @@ async function writeTheWeek(page: Page, info: TestInfo, phone: boolean) {
   const est = await api('POST', '/actions/estimate', { action: { type: 'bank_run', limit: null } })
   await api('POST', '/actions/run', { action: { type: 'bank_run', limit: null }, quoteId: est.quote.id, confirmed: true })
   await expect.poll(async () => (await api('GET', '/line-bank')).counts.running, { timeout: 120_000 }).toBe(0)
-  await page.goto('/studio')
+  await gotoLaunchPlan(page)
   const plan = page.locator('[data-field="launch-plan"]')
   if (!(await plan.locator('[data-field="write-the-week"]').isVisible().catch(() => false))) await press(phone, plan.locator('.st-card-head button').first())
   const week = plan.locator('[data-field="write-the-week"]')

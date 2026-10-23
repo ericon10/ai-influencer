@@ -19,6 +19,9 @@ const Library = lazy(() => import('./pages/Library'))
 const Settings = lazy(() => import('./pages/Settings'))
 const Guide = lazy(() => import('./pages/Guide'))
 const RecreateLink = lazy(() => import('./pages/RecreateLink'))
+const Weeks = lazy(() => import('./pages/Weeks'))
+const LineBankPage = lazy(() => import('./pages/LineBankPage'))
+const Accounts = lazy(() => import('./pages/Accounts'))
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { staleTime: 5_000, refetchOnWindowFocus: true } } })
 
@@ -48,6 +51,9 @@ function Gate() {
               <Route path="posts/:id/edit" element={<Post editing />} />
               <Route path="characters" element={<Characters />} />
               <Route path="characters/:id" element={<Character />} />
+              <Route path="weeks" element={<Weeks />} />
+              <Route path="line-bank" element={<LineBankPage />} />
+              <Route path="accounts" element={<Accounts />} />
               <Route path="library" element={<Library />} />
               <Route path="settings" element={<Settings />} />
               <Route path="guide" element={<Guide />} />

@@ -145,6 +145,8 @@ describe('a week, from the plan CSV to Google Drive', () => {
     const draft = Object.fromEntries(d1.rows.filter(r => !r.kept).map(r => [r.postId, r.lineId]))
     const d2 = await drawWeek(h.deps, h.ctx, MONDAY, { seed: 99, redraw: [one.postId], draft })
     for (const r of d2.rows.filter(x => x.postId !== one.postId && !x.kept)) expect(r.lineId).toBe(draft[r.postId])
+    // ...and to another line.
+    expect(d2.rows.find(x => x.postId === one.postId)!.lineId).not.toBe(one.lineId)
     const saved = await saveFill(h.deps, h.ctx, MONDAY, { rows: d2.rows.filter(r => !r.kept).map(r => ({ postId: r.postId, lineId: r.lineId, lifeOrJob: r.lifeOrJob, flag: r.flag })) })
     expect(saved.filled).toBe(d2.rows.filter(r => !r.kept && r.lineId).length)
     // Item 11: every filled post got a visual (Doug's from his place bank).

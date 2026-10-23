@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { unzipSync } from 'fflate'
 import { expect, test, type Locator, type Page, type TestInfo } from '@playwright/test'
-import { API, api, guideShot, planWithShots, seedData, snap as attach } from './helpers'
+import { API, api, guideShot, planWithShots, seedData, snap as attach, gotoLaunchPlan } from './helpers'
 
 // Tier 4 (owner, 2026-10-22; UX-PLAN section 36): help chips never on a
 // title, generation progress grouped by post, the viewer on Trash and Posts
@@ -81,7 +81,7 @@ async function chipSweep(page: Page, info: TestInfo, phone: boolean, light = fal
   const slideshow = items.find(i => i.kind === 'slideshow')
   const pages: string[] = [
     '/studio', `/studio/posts/${basePost}`, `/studio/posts/${recreatePost}`, ...(batch ? [`/studio/posts/${batch.id}`] : []), ...(slideshow ? [`/studio/posts/${slideshow.id}`] : []),
-    '/studio/characters', `/studio/characters/${callie}`, '/studio/library', '/studio/library?tab=trash', '/studio/settings', '/studio/settings?tab=rules', '/studio/settings?tab=usage', '/studio/guide',
+    '/studio/characters', '/studio/weeks', '/studio/accounts', '/studio/line-bank', `/studio/characters/${callie}`, '/studio/library', '/studio/library?tab=trash', '/studio/settings', '/studio/settings?tab=rules', '/studio/settings?tab=usage', '/studio/guide',
   ]
   const found: string[] = []
   let chips = 0
@@ -133,7 +133,7 @@ async function progress(page: Page, info: TestInfo) {
   })
   const need = (await planDrafts()).filter(p => p.account === 'F2' && p.have < p.need).slice(0, 2)
   expect(need).toHaveLength(2)
-  await page.goto('/studio')
+  await gotoLaunchPlan(page)
   const card = page.locator('[data-field="launch-plan"]')
   await expect(card).toBeVisible({ timeout: 30_000 })
   const head = card.getByRole('button', { name: /Launch plan/ })
@@ -208,7 +208,7 @@ async function guidePictures(page: Page) {
   await page.waitForLoadState('networkidle').catch(() => undefined)
   const main = page.locator('main')
   await shot(main, 'posts-home', [
-    [page.locator('.st-pagehead .gd-howto'), 'The Guide for this page, right after its title'], [page.locator('[data-field="launch-plan"]'), "Launch plan: import the plan's CSV, then generate its posts"],
+    [page.locator('.st-pagehead .gd-howto'), 'The Guide for this page, right after its title'], [page.locator('[data-field="posts-moved"]'), 'A week\'s plan is on Weeks, each account on Accounts'],
     [page.locator('.st-postcard').first(), 'A post: open it to keep going where you left off'], [page.locator('.st-postcard-view').first(), 'Its picture full size, in the viewer'],
   ])
   await page.goto('/studio/library')

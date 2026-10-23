@@ -470,7 +470,9 @@ export async function drawWeek(deps: Deps, ctx: Ctx, monday: string, input: { se
   const all = await deps.db.select().from(bankLines).where(and(eq(bankLines.accountId, ctx.accountId), eq(bankLines.passed, true)))
   const byId = new Map(all.map(l => [l.id, l]))
   const draftIds = new Set(Object.entries(draft).filter(([pid, id]) => id && !redrawn.has(pid)).map(([, id]) => id!))
-  const pool: PoolLine[] = all.filter(l => !draftIds.has(l.id) && (!l.usedPostId || redrawn.has(l.usedPostId))).map(l => {
+  // A slot drawn again gets another line: its current one (drafted or saved) is out.
+  const current = new Set([...Object.entries(draft).filter(([pid, id]) => id && redrawn.has(pid)).map(([, id]) => id!), ...live.filter(r => redrawn.has(r.id)).map(r => weekOfPost(r).lineId).filter((x): x is string => !!x)])
+  const pool: PoolLine[] = all.filter(l => !draftIds.has(l.id) && !current.has(l.id) && (!l.usedPostId || redrawn.has(l.usedPostId))).map(l => {
     const t = tagsOf(l)
     return { id: l.id, text: l.line, pain: t.pain ?? '', emotion: t.emotion ?? '', format: t.format ?? '', fits: fitOf(t.fits), lifeOrJob: (l.lifeOrJob as LifeOrJob | null) ?? null, usedAccount: null, fight: !!t.fight }
   })

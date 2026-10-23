@@ -241,6 +241,10 @@ export type StudioAction =
   | { type: 'hook_variants'; hookId: string; characterIds: string[]; perCharacter?: number }
   | { type: 'slideshow_hooks'; contentId: string }
   | { type: 'plan_generate'; postIds: string[]; path?: StillPathId; stillModel?: string | null; remake?: boolean }
+  | { type: 'week_make'; week: string; postIds?: string[]; path?: StillPathId | null }
+  | { type: 'week_redo'; week: string; postIds: string[]; path?: StillPathId | null }
+  | { type: 'week_fit'; week: string; postIds?: string[] }
+  | { type: 'bank_retag'; all?: boolean }
   | { type: 'faceless_still'; contentId: string; placeId?: string | null; line?: string; path?: StillPathId | null; model?: string | null }
   | { type: 'faceless_video'; contentId: string; model?: string | null; prompt?: string; durationSec?: number }
   | { type: 'slideshow_draft'; contentId: string; hook: string; pattern?: string | null; code?: string | null; effectOpen?: string | null; effectPayoff?: string | null; moment?: string; alt?: string; score?: number | null }
@@ -607,7 +611,34 @@ export interface SocialAccount {
   // The playbook (section 28): primary and backup codes, whether the owner
   // set them (else the fit table's), and the last post's code.
   primary?: string | null; backup?: string | null; structuresSet?: boolean; lastCode?: string | null
+  // Weeks (UX-PLAN.md section 37): the phone, the platform, slots a day and
+  // the life/job blend (life %), each with whether the owner set it.
+  characterName: string; kind: 'person' | 'faceless' | null
+  deviceId: string; platform: string; slotsPerDay: number; slotsSet: boolean; lifeShare: number; lifeShareSet: boolean; saved: boolean
 }
+
+// Weeks (UX-PLAN.md section 37).
+export type WeekPostType = 'slideshow' | 'clip' | 'photo' | 'faceless'
+export type WeekStep = 'import' | 'fill' | 'check' | 'make' | 'review' | 'drive'
+export interface WeekCell {
+  postId: string; account: string; date: string; slot: number; rowId: string; postType: WeekPostType; kind: string; characterId: string | null
+  line: string; lineId: string | null; lineFrom: 'csv' | 'drawn' | null; locked: boolean; lifeOrJob: 'life' | 'job' | null; storyBeat: string
+  fillFlag: string | null; flags: string[]; checked: boolean; fit: { before: string; after: string; why: string; at: string } | null
+  need: number; have: number; video: boolean; hasVideo: boolean; made: boolean; making: number
+  thumbAssetId: string | null; videoAssetId: string | null; review: 'approved' | 'killed' | null; approved: boolean; sentAt: string | null; driveName: string
+}
+export interface WeekCounts { posts: number; noLine: number; flagged: number; unchecked: number; toMake: number; making: number; toReview: number; approved: number; killed: number; toSend: number; sent: number }
+export interface WeekAccountRow { tag: string; kind: 'person' | 'faceless' | null; characterId: string | null; characterName: string; slotsPerDay: number; deviceId: string; platform: string; lifeShare: number; saved: boolean }
+export interface WeekView { monday: string; days: string[]; accounts: WeekAccountRow[]; cells: WeekCell[]; counts: WeekCounts; step: WeekStep; fitsWaiting: number }
+export interface WeekPreviewRow { line: number; rowId: string; account: string; date: string; slot: number | null; postType: WeekPostType | null; characterName: string; text: string; lineId: string | null; state: 'new' | 'update' | 'kept' | 'problem'; errors: string[]; warnings: string[]; lint: string[] }
+export interface WeekPreview { rows: WeekPreviewRow[]; problems: string[]; weeks: string[]; newAccounts: Array<{ tag: string; characterName: string }>; totals: { rows: number; ok: number; problem: number; matches: number; withLine: number } }
+export interface WeekImportResult { created: number; replaced: number; skipped: number; posts: Array<{ rowId: string; id: string }>; weeks: string[]; noLine: number; pulls: number }
+export interface DrawRow { postId: string; account: string; date: string; slot: number; rowId: string; lineId: string | null; line: string; pain: string; emotion: string; format: string; fits: 'first' | 'secondhand' | 'both'; lifeOrJob: 'life' | 'job'; kept: boolean; locked: boolean; from: 'csv' | 'drawn' | 'draft' | null; flag: string | null }
+export interface DrawResult { rows: DrawRow[]; seed: number; drawn: number; empty: number; pool: number }
+export interface BankLineRow { id: string; text: string; original: string; source: string; likes: number; pain: string; emotion: string; format: string; fits: 'first' | 'secondhand' | 'both'; lifeOrJob: 'life' | 'job' | null; usedAccount: string | null; usedDate: string | null; usedPostId: string | null; comment: string; fight: boolean }
+export interface BankPage { lines: BankLineRow[]; total: number; counts: { lines: number; untagged: number; life: number; job: number; used: number }; options: { pains: string[]; emotions: string[]; formats: string[]; fits: string[]; sources: string[] } }
+export interface LinesImportResult { rows: number; kept: number; duplicatesInBank: number; duplicatesInFile: number; unknown: string[]; problems: string[]; importId: string | null }
+export interface DriveStatus { client: boolean; connected: boolean; connectedAt: string | null; email: string; root: { id: string; name: string } | null; redirectUri: string }
 
 // Storage, traffic and auto-clean (owner, 2026-10-15; UX-PLAN.md section 22).
 export interface StorageInfo {

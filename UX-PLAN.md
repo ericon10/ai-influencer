@@ -1760,3 +1760,54 @@ Every paid step shows its price and model and waits for the click: Tag the
 bank, Fit to voice, Make the week, Redo. Free and saying so: Import,
 Preview, Fill and its draws, the scene drafts, Check, Review's Approve and
 Kill, Send to Drive. Everything runs on the API path as well as the plan.
+
+### Built (2026-10-22, night)
+
+- **1, 2**: the sidebar in the owner's order (`src/studio/Shell.tsx`); `/studio/weeks`
+  (`src/studio/pages/Weeks.tsx`): the week picker, Download template and Read the
+  spec (the spec read from `docs/PLAN-CSV-SPEC.md` in a drawer), the step bar
+  (`currentStep` in `server/core/weeks.ts`), the grid (`weekView` in
+  `server/pipeline/weeks.ts`). Posts home lost the Launch plan and Accounts cards;
+  Import on Posts home sends a week's plan, an older launch plan or a faceless
+  plan to Weeks (`csvKind` reads `week`). The older launch plan card is unchanged,
+  on Weeks > Import > An older launch plan file?.
+- **3**: `social_accounts` gained `device_id`, `platform`, `slots_per_day`,
+  `life_share` (migration 0019); the blend defaults are `weeks.blend_defaults` in
+  `config/content.yaml` (by the character's name or its first word);
+  `renameSocialAccount` moves posts, bank lines and Drive manifest rows.
+- **4, 5**: `WEEK_COLUMNS`, `readWeek`, `checkWeekRow`, `templateCsv`; a test holds
+  the spec and the list together. `previewWeek`, `importWeek` (Replace or Add).
+- **6 to 8**: `bank_lines` gained `source`, `life_or_job`, `used_date`; the page
+  `src/studio/pages/LineBankPage.tsx` (`bankPage`, `bankCsv`, `importLines` with
+  `nearDuplicate`, the `bank_retag` action and its template `line_bank_retag`).
+- **9 to 11**: `drawLines` (rules a to e over a seeded random; 40 seeds in the
+  tests), `drawWeek`, `saveFill`, `setLock`; `week_fit` (template `week_fit`,
+  `applyFit`), `lineLint` (the 9 points; three new rule switches
+  `lint-line-words`, `lint-line-detail`, `lint-line-tag`); `draftVisual` and
+  `draftVisuals` (a place and its motion for a faceless post, the story beat as
+  the scene for a person post).
+- **12**: `checkWeek` (flags kept on each post's `spec.week.check`).
+- **13**: `week_make` (`buildWeekMake`): each post's still, then its video as a
+  child job with `chainStart` that the still's hook starts from the new still
+  (`activateChained` in `server/jobs/runner.ts`, called by the scene, drift lock
+  and faceless still hooks; a still that fails cancels its video). Queue groups of
+  ten under the daily cap, as Generate N posts.
+- **14**: `setReview` (Approve is Approve for posting; a person clip's still and
+  take are picked for its export), `reviewLog`; `week_redo` (old pictures to the
+  Trash when it starts, never the redo's own).
+- **15, 16**: `server/pipeline/drive.ts`: the owner's OAuth client in the vault
+  (`google_oauth`), the drive.file sign-in, the refresh token sealed
+  (`google_drive`), the root folder, the `drive_send` worker job (folders by
+  character and week, files named by `driveName`, the manifest CSV and Sheet,
+  replaced in place on a resend), `captionWithLabel` for the AI label line. Tests
+  run against `server/testing/fakeDrive.ts`.
+- **17**: every uploaded sound (voice lines too) in the editor's Add media; Upload
+  an mp3 in the faceless Sound drawer.
+- **18**: places carry `motion` and `stillJobId`; `importPlaces` (Import places on
+  the faceless file); `draftMotion` for a place with none; a post whose place has
+  a still pulls it free (`week_pull`). `docs/content/doug-places.csv` (100 places).
+- **19**: lane, line_format, feeling, topic in the plan meta (`planMetaSchema`).
+- **20**: `effectiveStage` in `server/api/views.ts` (a complete sheet opens at the
+  file); a re-import of a character file onto a half-built character sets stage 5;
+  Import a character file on a half-built character's page.
+- **21**: `docs/studio/research-wavespeed-kie.md`.

@@ -187,7 +187,7 @@ async function sweep(page: Page, info: TestInfo, phone: boolean) {
   const slideshow = (await api<{ items: Array<{ id: string; kind: string }> }>('GET', '/content')).items.find(i => i.kind === 'slideshow')
   const pages: Array<[string, string]> = [
     ['/studio', 'Posts home'], [`/studio/posts/${basePost}`, 'a video post'], [`/studio/posts/${recreatePost}`, 'a Recreate post'],
-    [`/studio/characters/${callie}`, 'a character'], ['/studio/library', 'Library'], ['/studio/settings', 'Settings'],
+    [`/studio/characters/${callie}`, 'a character'], ['/studio/library', 'Library'], ['/studio/weeks', 'Weeks'], ['/studio/line-bank', 'Line bank'], ['/studio/settings', 'Settings'],
     ...(slideshow ? [[`/studio/posts/${slideshow.id}`, 'a slideshow'] as [string, string]] : []),
   ]
   const found: string[] = []

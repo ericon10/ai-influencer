@@ -132,6 +132,10 @@ export default async function globalSetup() {
 
   // A fresh local Studio in demo mode: PGlite and local blobs in the run
   // folder, the mock providers, no deployment settings, no keys.
+  // A fake Google (sign-in and Drive) for Send to Drive (UX-PLAN.md section 37).
+  const { startFakeDrive } = await import('../server/testing/fakeDrive')
+  const drive = await startFakeDrive()
+  process.env.E2E_DRIVE_URL = drive.url
   const studioEnv: NodeJS.ProcessEnv = {
     ...process.env,
     NODE_ENV: 'development', VERCEL: '',
@@ -142,6 +146,7 @@ export default async function globalSetup() {
     STUDIO_PUBLIC_URL: '', STUDIO_WORKER_URL: '', STUDIO_WORKER_IDLE: 'poll',
     HF_CREDENTIALS: '', ELEVENLABS_API_KEY: '',
     STUDIO_API_PORT: String(apiPort),
+    GOOGLE_API_BASE: drive.url, GOOGLE_OAUTH_BASE: drive.url, GOOGLE_ACCOUNTS_BASE: drive.url,
     E2E_RUN_DIR: runDir,
   }
   const apiLog = join(runDir, 'api.log'), webLog = join(runDir, 'web.log')
@@ -163,10 +168,12 @@ export default async function globalSetup() {
     process.env.E2E_SEED_FILE = join(runDir, 'seed.json')
   } catch (e) {
     await stop(procs)
+    await drive.stop()
     throw e
   }
   return async () => {
     await stop(procs)
+    await drive.stop()
     const size = (dir: string): number => existsSync(dir) ? readdirSync(dir).reduce((a, f) => { const p = join(dir, f); const st = statSync(p); return a + (st.isDirectory() ? size(p) : st.size) }, 0) : 0
     log(`Studio stopped; the run's data (${Math.round(size(runDir) / 1e6)} MB) and logs are in ${runDir}`)
   }

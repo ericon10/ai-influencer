@@ -255,8 +255,10 @@ export function Todo({ items }: { items: TodoItem[] }) {
 
 // A button that starts work (feedback everywhere): it switches to a working
 // state the moment it is pressed and cannot be pressed twice.
-export function AsyncButton({ onClick, children, busyLabel = 'Submitting...', className = 'st-btn', disabled = false, title, icon }: {
+export function AsyncButton({ onClick, children, busyLabel = 'Submitting...', className = 'st-btn', disabled = false, title, icon, field }: {
   onClick: () => Promise<unknown> | void; children: ReactNode; busyLabel?: string; className?: string; disabled?: boolean; title?: string; icon?: ReactNode
+  // data-field, for the browser tests.
+  field?: string
 }) {
   const [busy, setBusy] = useState(false)
   async function go() {
@@ -265,7 +267,7 @@ export function AsyncButton({ onClick, children, busyLabel = 'Submitting...', cl
     try { await onClick() } finally { setBusy(false) }
   }
   return (
-    <button type="button" className={className} disabled={disabled || busy} onClick={() => void go()} title={title} aria-busy={busy}>
+    <button type="button" className={className} disabled={disabled || busy} onClick={() => void go()} title={title} aria-busy={busy} data-field={field}>
       {busy ? <Loader2 size={14} className="st-spin" /> : icon}{busy ? busyLabel : children}
     </button>
   )

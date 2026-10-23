@@ -9,7 +9,7 @@ export type GuideColor = 'orange' | 'pink' | 'violet' | 'blue' | 'teal' | 'green
 export type GuideId =
   | 'big-picture' | 'posts' | 'characters' | 'setup-start' | 'setup-face' | 'setup-sheet' | 'setup-file'
   | 'post-idea' | 'post-stills' | 'post-video' | 'post-clone' | 'post-mass' | 'line-bank' | 'post-text' | 'post-finish'
-  | 'library' | 'settings' | 'feedback' | 'faceless' | 'realism' | 'voice' | 'hooks' | 'slideshow' | 'launch-plan' | 'products' | 'results' | 'download-day'
+  | 'library' | 'settings' | 'feedback' | 'faceless' | 'realism' | 'voice' | 'hooks' | 'slideshow' | 'launch-plan' | 'products' | 'results' | 'download-day' | 'weeks' | 'accounts'
 
 export interface GuideSection {
   id: GuideId
@@ -87,16 +87,16 @@ export const GUIDE: GuideSection[] = [
       'Filter by account (the tag you give a post, like "Callie TikTok"), by character, or by product (each product, or No product). Each card names its product.',
       'The newest 200 posts show first, the most recently changed on top. Show older posts, under the cards, loads 60 more at a time; a filter applies to them too, so an older post of one account is still found.',
       'Another on a card makes a filled-in copy that opens at the caption: the fastest way to make a series.',
-      'Import (top right) reads any file you have: a launch plan, a results sheet, a video batch sheet or a character file, and sends it to the right place with a message saying where.',
+      'Import (top right) reads any file you have and sends it to the right place with a message saying where: a week\'s plan CSV, an older launch plan or a faceless account\'s plan go to Weeks, a results sheet to the Results card, a video batch sheet to a new batch post, a character file to Characters.',
       'The corner button on a post\'s picture opens it full size in the viewer: arrows go from post to post, and Open the post takes you in. A tap anywhere else on the card opens the post.',
       'Select (above the cards) ticks posts: tap a card, shift-click for a range, or Select all ticks every post the filters show; "N selected" with Clear selection. Move to the Trash sends the ticked posts to Library > Trash, restorable for 7 days.',
-      'Accounts (the card at the top, folded until you open it): each account\'s product, tracked link or promo code and its signups, ranked by signups. An account\'s product is the product of every new post on it. See Hooks and the scoreboard, and Products.',
-      'Download day (the card under the Launch plan): one zip per day of the approved posts, in posting order, with a checklist. Approve for posting is on each card. See Download day.',
+      'Accounts and the Launch plan have their own pages now (the sidebar): Accounts has every account\'s phone, character, platform, slots a day, life/job blend, product, link and signups; Weeks has the plan import, the grid of a week and its steps. See Accounts and Weeks.',
+      'Download day (the card at the top): one zip per day of the approved posts, in posting order, with a checklist. Approve for posting is on each card. See Download day.',
       'Results on each card: once a post is up, open its Results row and type the link, when it went up and its first 72 hours (views, follows, saves, shares), a decision and notes. The decision shows as a colored chip on the card. The Results card at the top adds them up. See Results.',
     ],
     tips: ['Video post from a TikTok (in the New post menu) opens a post with Clone already open.'],
     shots: [
-      { id: 'posts-home', caption: 'Posts home: Accounts, the Launch plan, the filters and the posts' },
+      { id: 'posts-home', caption: 'Posts home: the filters and the posts' },
       { id: 'posts-older', caption: 'Under the newest 200 posts: Show older posts' },
       { id: 'new-post-menu', caption: 'The New post menu' },
     ],
@@ -111,7 +111,8 @@ export const GUIDE: GuideSection[] = [
       'Before anything is imported, the file is checked against character template v1.6, for free: every UNIVERSAL section (Realism principle, Models, Scene rules, Video rules, the candid and recreate recipes), the age (21 or older), one distinguishing mark, REF-00 to REF-11 labeled in the Reference sheet, and the Element ID when the file names an Element. Each shows a tick or what to add; optional sections that are missing are listed in gray, and so are sections still holding [brackets]. Nothing blocks: with something missing the button reads "Import anyway".',
       'A character of the same name already here? "Update Callie" is chosen for you: the file\'s words replace the old ones, and her posts, takes, stills and sheet stay. The combo log is merged, every saved identity is kept, and a sheet image identical to the approved one is skipped, so nothing goes stale. "Import as a new character" is the other choice.',
       'New character (the second button) asks Person or Faceless first; nothing is picked until you pick (a tap, or the arrow keys), and the picked card shows a check. Person: Start from a concept begins with inspiration photos and three concepts (Inspiration step). Faceless: Set up the persona opens its file.',
-      'Open a character to see its four setup steps.',
+      'Open a character to see its four setup steps. A character whose sheet is complete opens at its file, whatever step it was left on.',
+      'Finish a half-built character: on its page, Import a character file takes its .md and its REF images and finishes it in one go. The setup steps are skipped (no hero, no inspiration check) and it opens at its sheet and file.',
       'Voice (next to Edit card on the character page): the character\'s ElevenLabs voice and how they talk. The writers and voice lines use it.',
     ],
     tips: ['The character is always a new person, never a copy of someone in the inspiration photos.'],
@@ -124,13 +125,14 @@ export const GUIDE: GuideSection[] = [
     intro: 'A new character asks Person or Faceless first (pick Faceless, then Set up the persona). A faceless one skips the hero, the sheet, the likeness checks, the Element and every face check: nothing asks for a face. Its page is its file. Doug (31, Peoria IL, laid-off contract data entry, rainy Midwest everyday life) is the first one; start from his file or an empty one.',
     steps: [
       'Persona: who, the town, the life details. The name is never shown on screen.',
-      'Place bank: reusable scenes, picked per post like set plates. Write the place only: no person or body part (hands read as AI) and nothing that carries text (packaging, screens, paper, mail, signs, labeled buttons): Soul writes gibberish on them.',
+      'Place bank: reusable scenes, picked per post like set plates. Each place carries its motion line (the video prompt) and, when it has one, the Higgsfield still it was made from (pulled free when a post uses it). Import places (CSV) takes place_id, scene, motion and still_job_id: a place with the same id is replaced, and a place with no motion gets one drafted. Write the place only: no person or body part (hands read as AI) and nothing that carries text (packaging, screens, paper, mail, signs, labeled buttons): Soul writes gibberish on them.',
       'Look rules, the voice and its line formats, and the sound bank (music beds and voiceover clips, each with its search words). Save the file.',
       'Every still is a plain phone snapshot of a real place, upright portrait and level ("slightly tilted" made Soul rotate the frame, so tilt words are taken out), ending "Level, unedited. Sharp, real phone grain, muted color. No people." Soul 2.0, 9:16, on your plan or the API, its price shown first.',
       'Its posts are video posts in the same workspace: Still (a place from the bank or your own words), Video (the prompt filled in from the plan row, image-to-video, any model with its price), Sound, Text (the on-screen line, the caption and the hashtags, each with Copy) and Posted. The still shows on the post card.',
       'A product post: Soul can\'t render labels, so it switches to an edit model (Nano Banana or GPT Image) with the product photo as the reference, its price shown.',
       'Finished damage: one still, a 7 s "just existing" clip (driving, staring, rain on the windshield), a sad song and the on-screen line. The switch is on every video post: on a person\'s post it fills the Video step\'s take (7 s, the just-existing motion, both editable) and lists what is left.',
-      'Faceless cards say Faceless on Characters, and each account links to one character, a person or faceless (Posts home > Accounts).',
+      'Faceless cards say Faceless on Characters, and each account links to one character, a person or faceless (Accounts).',
+      'Sound: pick a music bed from Library > Sounds, or Upload an mp3 right in the Sound drawer; any sound you upload can go on any post, and every one is in the editor\'s Add media too.',
     ],
     tips: ['The Sound drawer keeps the sound\'s name and the voiceover\'s search words, each with Copy, and Search PlayPhrase.me and Search GetYarn.io open those sites in a new tab with the words already searched. The Studio never fetches or downloads a clip: post.json and the Download day checklist say "Add this sound in the app" with the name and the words.'],
     shots: [],
@@ -370,7 +372,7 @@ export const GUIDE: GuideSection[] = [
   {
     id: 'line-bank', group: 'Grow your accounts', title: 'The line bank: lines from real comments', color: 'teal',
     tagline: 'Every post starts from a line that hits hard, written from what real people said.',
-    where: 'A slideshow > Idea > Pick from the bank; a video post or batch > Caption > Pick from the bank; Posts home > Launch plan > Write the week',
+    where: 'Sidebar > Line bank; a slideshow > Idea > Pick from the bank; a video post or batch > Caption > Pick from the bank; Weeks > Fill',
     intro: 'The line bank turns an Apify comment scrape into on-screen lines. A free first pass keeps the comments worth reading; one priced run tags each one (emotion, topic, the product\'s pain point, who it fits, format), writes its line in Gen Z vernacular starting at 70 (the hit in the first words, readable in about 2 seconds), and a separate reviewer scores every line on gut punch, specificity and "would a real person post this". Only lines at 8 or more on all three, and not setup or meh, ever show. Pick one on a post and it is put in the character\'s voice and placed; Write the week fills an account\'s week at once.',
     steps: [
       'Import (free): open Pick from the bank and Import comments. Choose the comments CSV (columns comment, comment_likes, replies, video_account, video_views, video_url) or paste the comments tab\'s Sheet link (shared as Anyone with the link). Add the same run\'s videos (url and text) for each comment\'s caption. Pick the product whose pain points tag it (SideStep\'s rules have their own list).',
@@ -379,7 +381,9 @@ export const GUIDE: GuideSection[] = [
       'Filter by character (first person and out of work, or secondhand about a friend: read from the voice card, switch it in the drawer), emotion, topic and pain point. Lines are sorted by their source comment\'s likes; each shows its source comment, its tags and its three scores.',
       'Keep or Reject any line. Your latest calls go to the writer and the reviewer as examples on the next run, so the bank learns what you like.',
       'Use this line (priced, one small call): the line is put in the character\'s voice card and checked against their facts (who they are, their point of view). A line that contradicts them is edited to fit, or skipped with the reason. It lands on slide 1 of a slideshow, the caption of a video post, or the next caption of a batch.',
-      'Write the week (Launch plan card): pick an account; its posts dated in the next 7 days without a bank line each get the best unused line that fits their character (kept lines first, then by likes), all rewritten in one priced click. The list shows what each post gets, and which words it replaces.',
+      'The Line bank page (sidebar): every line with its source (comment, caption, transcript, inventory, competitor, claude), source likes, pain, emotion, format, voice fit, life or job and where it was used (account and day). Filter by pain, emotion, format, voice fit, life or job, source and Unused; Download as CSV takes the shown lines with every field. Import lines takes a CSV of finished lines (text required, the rest by name); near-matches of a line already in the bank or earlier in the file are dropped and counted. Tag the bank (priced, one call per 30 lines) gives each line life or job and checks its tags again.',
+      'Weeks > Fill draws from the bank for a whole week at once (see Weeks).',
+      'Write the week (Weeks > Import, the older launch plan card): pick an account; its posts dated in the next 7 days without a bank line each get the best unused line that fits their character (kept lines first, then by likes), all rewritten in one priced click. The list shows what each post gets, and which words it replaces.',
     ],
     tips: [
       'A line used on one account never shows for another account.',
@@ -469,10 +473,51 @@ export const GUIDE: GuideSection[] = [
     ],
   },
   {
+    id: 'weeks', group: 'Make a post', title: 'Weeks: a week of posts on one page', color: 'violet',
+    tagline: 'Plan a character\'s week in chat, then Import, Fill, Check, Make, Review and Send to Drive.',
+    where: 'Sidebar > Weeks',
+    intro: 'You and Claude plan a character\'s week in chat; Claude writes the plan CSV to the spec (Read the spec on Weeks; docs/PLAN-CSV-SPEC.md). Weeks turns it into about 100 posts: the grid shows the week with accounts down and days across, each account\'s slots in its cells, and the step bar on top lights the step you are on with its one main button. Click any post on the grid to open it in its normal workspace.',
+    steps: [
+      'Download template gives the header and one example row per post type (slideshow, clip, photo, faceless). Read the spec shows every column, required or optional, and its allowed values. Required: row_id, account, date, slot.',
+      'Import (free): Upload the plan CSV, see the free preview (each row\'s errors and notes, the 9-point line lint on lines already written), tick the rows (all are ticked), Import N rows. Rows whose row_id matches posts you already have ask Replace them or Add as new posts, never silent. A new account in the file is added to Accounts with the character its name starts with. The last line names the next step.',
+      'Fill (free): Fill empty slots draws a line from the line bank for every post without one, random per slot, under the rules: no pain twice in an account\'s last 7 posts; a line on one account only, ever; emotion and format rotate (never 3 alike in a row); the voice fits (first person for a faceless character or one out of work, secondhand for the others, unless the row\'s voice_fit says); and each account\'s life/job blend, never a job line in a life slot. A life slot with no life line left stays empty and is flagged. The draw shows first: Redraw one slot, Redraw all, Lock a slot (it keeps its line on every redraw), then Save the draw.',
+      'Saving the draw also drafts each filled post\'s visual, free: a faceless post gets a place from its place bank (the line\'s words first, else the least used), its motion line as the video prompt and a music bed; a person post gets its story beat as the scene and a video prompt from the line. Every field stays editable in the post.',
+      'Fit to voice (priced): each line rewritten in its character\'s voice card and fitted to that day\'s story beat, keeping the truth and detail (numbers, times, the petty reason), the hit in the first words. Before and after side by side, each with the 9-point line lint (the hit first, a clear emotion, 12 words or fewer, one specific detail, no long dashes, not opening on You, no hype words, no hashtag or product name, no should or must at the viewer). Nothing changes until you press Use (one) or Use all.',
+      'Check (free): marks a person post with no outfit, no line, no scene, a line outside its product\'s claims, a life slot with a job line, and the same line on two accounts. Flagged posts are marked on the grid with the reason; the rest can run.',
+      'Make the week: one total price, one click. Stills first, then the video where the post has one (a clip or a faceless post), each video starting from its own still when it lands. Ten posts at a time; each group is checked against your daily cap when its turn comes, and a group over it waits and goes on after midnight UTC. Progress is one line per post.',
+      'Review: every made post in a grid with Approve, Kill and Redo (Redo shows its price first; the old pictures go to the Trash when it starts). Keys: A approve, K kill, R redo, the arrows to move. "84 of 100 approved" on top. Every keep or kill is logged. Approve is Approve for posting, so Download day sees it too.',
+      'Send to Drive (free, on the worker): approved posts go to ROOT / CHARACTER / week of YYYY-MM-DD /, named date_slot_account_rowid.mp4 (a .jpg for a photo, a .zip for a slideshow), with a manifest Google Sheet and CSV in the same folder, one row per post: Device ID, Account, file_name, caption (with the AI label line), hashtags, date, slot, sound_name, ad_label. Sending again replaces the same files and rows, never duplicates.',
+    ],
+    tips: [
+      'Write story_beat on every row: one plain sentence of what happens that day. Fit to voice and the drafted scenes use it.',
+      'The older launch plan file (format and hook columns) still imports on Weeks > Import > An older launch plan file?.',
+      'Connect Google Drive once in Settings > General > Google Drive, and pick the root folder.',
+    ],
+    cost: 'Import, Fill and its draws, the drafted visuals, Check, Review\'s Approve and Kill, and Send to Drive are free. Fit to voice, Make the week and Redo are priced on their buttons first, on the plan or the API.',
+    shots: [],
+  },
+  {
+    id: 'accounts', group: 'Grow your accounts', title: 'Accounts', color: 'orange',
+    tagline: 'Each account: its phone, character, platform, slots a day and life/job blend.',
+    where: 'Sidebar > Accounts',
+    intro: 'One row per account. Weeks lays out each account\'s slots and blend from here, and Send to Drive writes each account\'s Device ID first in the manifest. Placeholders are fine (DEVICE-01, callie_ig_01); rename one later and every post, bank line and Drive row follows.',
+    steps: [
+      'Device ID: the phone it posts from (a plan row\'s device_id wins for that post).',
+      'Character: the person or faceless character the account belongs to (each account links to one).',
+      'Platform: TikTok, Instagram or YouTube (read from the name until you pick: callie_ig_01 is Instagram).',
+      'Slots a day: how many posts a day Weeks lays out for the account.',
+      'Life / job: the life % of the week (Callie 70/30, Dani 80/20, Solei 90/10, Doug 0/100 to start, else 50/50). Fill keeps each week to it. Back to the default undoes your number.',
+      'Product, Primary and backup structures, Tracked link, Promo code and Signups: as on the old Accounts card. Ranked by signups, never views.',
+      'Rename (the pencil next to the name): type the new name and press Enter.',
+    ],
+    tips: ['A plan CSV that names a new account adds it here, with the character its name starts with.'],
+    shots: [],
+  },
+  {
     id: 'launch-plan', group: 'Make a post', title: 'The launch plan, from its CSV', color: 'violet',
     tagline: 'A whole plan of posts in one import, every word as written.',
-    where: 'Posts > Launch plan',
-    intro: 'The plan\'s CSV (one row per post: day, slot, account, format, the hook and slides, the scene, the clip\'s action, the caption, hashtags and CTA, and the playbook fields) becomes drafts in the flows you already use: slideshow rows become slideshows, photo rows one-slide slideshows, clip rows video posts. Only the rows you tick are imported, each written for the plan\'s product. Nothing is redrafted and nothing paid runs on import. Then tick posts and generate their pictures with one price, ten posts at a time.',
+    where: 'Weeks > Import > An older launch plan file?',
+    intro: 'The older launch plan file (with format and hook columns) still imports exactly as before, now on Weeks: Import, then "An older launch plan file?". A week\'s plan CSV written to docs/PLAN-CSV-SPEC.md uses Weeks itself (see Weeks). The plan\'s CSV (one row per post: day, slot, account, format, the hook and slides, the scene, the clip\'s action, the caption, hashtags and CTA, and the playbook fields) becomes drafts in the flows you already use: slideshow rows become slideshows, photo rows one-slide slideshows, clip rows video posts. Only the rows you tick are imported, each written for the plan\'s product. Nothing is redrafted and nothing paid runs on import. Then tick posts and generate their pictures with one price, ten posts at a time.',
     steps: [
       'Import on Posts home (next to New post) is the one door for files: it reads the file and sends it where it belongs. A launch plan opens here with its preview, a results sheet in the Results card, a video batch sheet in a new batch post, a character file on Characters. The older batch importer refuses a plan file and says where it goes.',
       '1 · Upload the CSV (or Import a CSV once the plan has posts): it shows as the file\'s name and how many rows it has. See or edit the rows (or Paste the rows instead) shows the text itself.',
@@ -507,7 +552,7 @@ export const GUIDE: GuideSection[] = [
     ],
     cost: 'The preview and the import are free. Generate N posts is one priced run: one still per photo slide (and one per clip) on the model on the button; the total shows before anything runs.',
     shots: [
-      { id: 'launch-plan-preview', caption: 'Posts > Launch plan: the file, Preview (free), the plan\'s product, the rows to tick' },
+      { id: 'launch-plan-preview', caption: 'Weeks > Import > An older launch plan file: the file, Preview (free), the plan\'s product, the rows to tick' },
       { id: 'launch-plan-import', caption: 'Import N rows (free): only the ticked rows' },
       { id: 'launch-plan-posts', caption: 'The plan\'s posts: filter, tick, pick where the stills run, Generate N posts' },
     ],
@@ -723,6 +768,7 @@ export const GUIDE: GuideSection[] = [
     where: 'Sidebar > Settings',
     intro: 'General has Demo or Live, your provider keys (they stay on the server; Google AI Studio and fal run Recreate without a Higgsfield plan, Apify fetches TikTok links for mass recreate; each key is made in that provider\'s own dashboard and pasted here), Higgsfield billing (your plan credits or the pay-per-use API) and Storage (how much your files take and what that costs, Auto-clean, the daily clean). Models sets the Claude model per task and tests each Higgsfield model once. Rules lists every rule. Budgets and usage shows spend and caps.',
     steps: [
+      'General > Google Drive: Connect Google Drive with your own Google sign-in (the Studio only sees the folders and files it makes), then pick the root folder (make one, or pick one it made). The OAuth client is yours: in Google Cloud, APIs and Services, Credentials, make an OAuth client ID (Web application) with the redirect address shown here, turn on the Google Drive API, and paste CLIENT_ID:CLIENT_SECRET in Provider keys, Google Drive. Weeks > Send to Drive uses it.',
       'General: switch to Live when your keys are in, and pick Higgsfield billing.',
       'Models: Sonnet runs every Claude task; switch one to Opus if you want. Run each model\'s small test once.',
       'Rules: fixed rules always apply. Every other rule is a default you can switch off for everyone or one character.',

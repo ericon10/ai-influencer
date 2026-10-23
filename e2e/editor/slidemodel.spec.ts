@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import sharp from 'sharp'
 import { expect, test, type Locator } from '@playwright/test'
-import { API, api, snap } from './helpers'
+import { API, api, snap, gotoLaunchPlan } from './helpers'
 
 // The slide image model (UX-PLAN.md section 30), like a user, in demo mode:
 // the Stills step's path chips (Your Higgsfield plan or the Higgsfield
@@ -87,7 +87,7 @@ test('the Launch plan card: path chips and Generate N posts with its model and p
   const csv = `${lines[0]}\n${row}\n`
   await api('POST', '/plan/import', { csv, store: { SMF2: characterId }, productId: null, rows: ['SM001'] })
 
-  await page.goto('/studio')
+  await gotoLaunchPlan(page)
   const card = page.locator('[data-field="launch-plan"]')
   await expect(card).toBeVisible({ timeout: 30_000 })
   const head = card.getByRole('button', { name: /Launch plan/ })
