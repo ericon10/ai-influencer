@@ -58,7 +58,7 @@ export function WeekSlot({ ctx }: { ctx: PostCtx }) {
         ) : (
           <button type="button" className="st-btn xs secondary" onClick={() => setOpen(o => !o)} aria-expanded={open} data-field="week-slot-open">Add to a week</button>
         )}
-        <HowTo id="line-first" label="Add to a week" />
+        <HowTo id="line-first" label="How a week works" />
       </div>
       {open && (
         <div className="st-row" style={{ gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }} data-field="week-slot-form">

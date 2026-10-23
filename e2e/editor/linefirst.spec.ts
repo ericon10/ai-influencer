@@ -12,7 +12,8 @@ import { api, guideShot, snap } from './helpers'
 const run = Date.now().toString(36).slice(-5)
 const MONDAY = '2027-03-01'
 const NEWPOST = `dougnp_${run}`, WEEK = `dougwk_${run}`
-const MONEY = `rent went up $400 and i have $12 left ${run}`
+// Three run words, so a line of an earlier run is never a near-match (80% of the words shared) that Import lines drops.
+const MONEY = `rent went up $400 and i have $12 left ${run}a ${run}b ${run}c`
 let doug = ''
 
 const q = (v: string) => (/[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v)
@@ -23,7 +24,7 @@ const PLACES = [
   [`GS${run}`, 'Vertical 9:16 iPhone photo, upright portrait, under the bright canopy of a small-town gas station at night, the pumps lit, wet concrete. Level, unedited. Sharp, real phone grain, muted color. No people.', 'Rain falls past the canopy edge, the lights buzz. 6 seconds, 9:16.', '0a1b2c3d-1111-4a2b-9c3d-000000000001'],
   [`MB${run}`, 'Vertical 9:16 iPhone photo, upright portrait, a rusty mailbox at the end of a gravel driveway in steady rain, its door hanging open. Level, unedited. Sharp, real phone grain, muted color. No people.', 'Rain falls, the open mailbox door sways. 6 seconds, 9:16.', '0a1b2c3d-1111-4a2b-9c3d-000000000002'],
 ].map(r => r.map(q).join(',')).join('\n') + '\n'
-const LINES = ['text,source,source_likes,pain,emotion,format,voice_fit,life_or_job', [MONEY, 'comment', '99999', 'rent', 'sad', 'finished damage', 'first', 'job'], [`the portal logged me out mid application again ${run}`, 'comment', '99998', 'portal', 'frustrated', 'finished damage', 'first', 'job'], [`four interviews then a form email ${run}`, 'comment', '99997', 'ghosted', 'angry', 'finished damage', 'first', 'job']]
+const LINES = ['text,source,source_likes,pain,emotion,format,voice_fit,life_or_job', [MONEY, 'comment', '99999', 'rent', 'sad', 'finished damage', 'first', 'job'], [`the portal logged me out mid application again ${run}a ${run}b ${run}c`, 'comment', '99998', 'portal', 'frustrated', 'finished damage', 'first', 'job'], [`four interviews then a form email ${run}a ${run}b ${run}c`, 'comment', '99997', 'ghosted', 'angry', 'finished damage', 'first', 'job']]
   .map(r => (Array.isArray(r) ? r.map(q).join(',') : r)).join('\n') + '\n'
 
 async function pay(page: Page, button: Locator) {
@@ -55,7 +56,8 @@ test('New post for Doug: the line first, the gas station suggested for a money l
   const pick = line.locator('[data-field="line-best-item"]', { hasText: MONEY })
   await expect(pick).toBeVisible({ timeout: 30_000 })
   await pick.getByRole('button', { name: 'Use' }).click()
-  await expect(line.locator('[data-field="line-current"]')).toContainText('pain: rent', { timeout: 20_000 })
+  // The drawer folds to its summary (the line and its pain) and Visual opens.
+  await expect(line.locator('.st-hint').first()).toContainText('rent, sad', { timeout: 20_000 })
 
   // 3. Visual: opens next; the gas station first, its still reused for $0.
   const visual = page.locator('[data-field="faceless-still"]')

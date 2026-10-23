@@ -39,12 +39,13 @@ export function PlaceSuggestions({ ctx, onUsed }: { ctx: PostCtx; onUsed?: (stil
       void qc.invalidateQueries({ queryKey: ['jobs'] })
       toast({ tone: 'ok', text: r.still === 'attached' ? `${p.id}'s still is on this post, $0. Next: the video.` : r.still === 'pulling' ? `Pulling ${p.id}'s still from Higgsfield, $0. It shows here in a few seconds.` : `${p.id} is the scene. Make the still below (priced).` })
       onUsed?.(r.still)
-      // A pull runs on the worker: look again until its still lands (a minute at most).
+      // A pull runs on the worker: look again until its still lands (a minute
+      // at most), then show it where the owner is (the drawer stays open).
       if (r.still === 'pulling') {
         for (let i = 0; i < 30; i++) {
           await new Promise(res => setTimeout(res, 2000))
           const row = await api.postRow(item.id).catch(() => null)
-          if (row?.stillAssetId) { qc.setQueryData(rowKey(item.id), row); await qc.invalidateQueries({ queryKey: keys.content }); onUsed?.('attached'); break }
+          if (row?.stillAssetId) { qc.setQueryData(rowKey(item.id), row); await qc.invalidateQueries({ queryKey: keys.content }); onUsed?.('kept'); break }
         }
       }
     } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) }

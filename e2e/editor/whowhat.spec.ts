@@ -13,8 +13,10 @@ const run = Date.now().toString(36).slice(-5)
 const MONDAY = '2027-06-07'
 const ACCOUNT = `callie_ww_${run}`
 // SideStep lines: three told secondhand (Callie's way) and two in the first person (Doug's).
-const SECOND = [`my roommate got ghosted after four rounds ${run}`, `my sister heard nothing back for six weeks ${run}`, `my friend redid the same unpaid test three times ${run}`]
-const FIRST = [`they ghosted me after round four ${run}`, `i applied to ninety jobs and got one bot email ${run}`]
+// Three run words each, so no line of an earlier run is a near-match that Import lines drops.
+const w = `${run}a ${run}b ${run}c`
+const SECOND = [`my roommate got ghosted after four rounds ${w}`, `my sister heard nothing back for six weeks ${w}`, `my friend redid the same unpaid test three times ${w}`]
+const FIRST = [`they ghosted me after round four ${w}`, `i applied to ninety jobs and got one bot email ${w}`]
 const q = (v: string) => (/[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v)
 
 async function pick(page: Page, character: string, product: string) {
@@ -33,7 +35,9 @@ async function newVideoPost(page: Page): Promise<string> {
 test.beforeAll(async () => {
   const { callie, sideStep } = seedData()
   await api('PUT', '/line-bank/stance', { characterId: callie, stance: 'secondhand' })
-  const rows = [...SECOND.map((t, i) => [t, 'comment', String(9000 - i), 'ghosted', 'sad', 'finished damage', 'secondhand', 'job']), ...FIRST.map((t, i) => [t, 'comment', String(9500 - i), 'ghosted', 'angry', 'finished damage', 'first', 'job'])]
+  // Likes that grow with each run, so this run's lines are the best fits even beside an earlier run's.
+  const base = 100_000 + Math.floor(Date.now() / 1000) % 1_000_000
+  const rows = [...SECOND.map((t, i) => [t, 'comment', String(base - i), 'ghosted', 'sad', 'finished damage', 'secondhand', 'job']), ...FIRST.map((t, i) => [t, 'comment', String(base + 10 - i), 'ghosted', 'angry', 'finished damage', 'first', 'job'])]
   const csv = ['text,source,source_likes,pain,emotion,format,voice_fit,life_or_job', ...rows.map(r => r.map(q).join(','))].join('\n') + '\n'
   await api('POST', '/line-bank/lines/import', { csv, name: `who and what ${run}`, productId: sideStep })
   await api('PUT', `/social-accounts/${ACCOUNT}`, { characterId: callie, slotsPerDay: 1 })
@@ -102,7 +106,7 @@ test('Callie + SideStep: only secondhand lines, the 3 best in the slot; Browse o
   await expect(sheet).toBeVisible()
   await expect(sheet.locator('[data-field="line-sheet-scope"]')).toContainText('Lines for Callie and SideStep')
   for (const t of FIRST) await expect(sheet).not.toContainText(t)
-  await sheet.getByLabel('Search lines').fill(`sister heard nothing back`)
+  await sheet.getByLabel('Search lines').fill(SECOND[1]!)
   const row = sheet.locator('[data-field="line-row"]', { hasText: SECOND[1]! })
   await expect(row).toBeVisible()
   await expect(sheet.locator('[data-field="line-row"]')).toHaveCount(1)
