@@ -33,6 +33,21 @@ bottom of the list they belong to.
   skyline, a commute), to check no person creeps in and the place holds.
   About 6 stills. (Can be the same run as the capped real test.)
 
+### Weeks (UX-PLAN section 37), what is left for the owner
+
+- **Google Drive needs the owner's own OAuth client.** Google Cloud
+  console: a Web client with the redirect
+  `https://character-studio-pi.vercel.app/api/v1/drive/callback` and the
+  Drive API on; paste "CLIENT_ID:CLIENT_SECRET" as the Google key in
+  Settings > Provider keys, then Connect Google Drive and pick the root
+  folder. The Studio asks only for drive.file (the files it makes).
+- **Tag the bank on production:** 174 passed lines, about $0.09 in 6
+  Claude calls, priced on the button on the Line bank page.
+- **The first real week:** import a small plan (2 posts), Make, Approve,
+  Send to Drive, to see the real price per post land against the quote.
+- **WaveSpeed and Kie.ai:** research only (docs/studio/
+  research-wavespeed-kie.md); Kie is about 20 to 40% cheaper. Not wired.
+
 ### Small ideas for launch volume
 
 - Batch review: approve all that have every picture in one click.
