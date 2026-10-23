@@ -2619,7 +2619,7 @@
         "y": 12.8,
         "w": 96.3,
         "h": 5.2,
-        "label": "1 · The CSV: its name and how many rows"
+        "label": "1 \u00b7 The CSV: its name and how many rows"
       },
       {
         "n": 2,
@@ -2627,7 +2627,7 @@
         "y": 19.1,
         "w": 96.3,
         "h": 8.8,
-        "label": "2 · Preview (free), and Draw mock screens by code"
+        "label": "2 \u00b7 Preview (free), and Draw mock screens by code"
       },
       {
         "n": 3,
@@ -2635,7 +2635,7 @@
         "y": 29,
         "w": 96.3,
         "h": 10.3,
-        "label": "3 · This plan is for: the product of the rows that name none"
+        "label": "3 \u00b7 This plan is for: the product of the rows that name none"
       },
       {
         "n": 4,
@@ -2897,7 +2897,7 @@
         "y": 57.7,
         "w": 96.3,
         "h": 12.1,
-        "label": "4 · Import N rows (free): only the ticked rows"
+        "label": "4 \u00b7 Import N rows (free): only the ticked rows"
       }
     ]
   },
@@ -3623,7 +3623,7 @@
         "n": 2,
         "x": 2,
         "y": 47.9,
-        "w": 108.4,
+        "w": 98,
         "h": 17.1,
         "label": "Each engine's model per step, with its price in its own units"
       },
@@ -3631,7 +3631,7 @@
         "n": 3,
         "x": 93.8,
         "y": 65,
-        "w": 16.7,
+        "w": 6.2,
         "h": 27.6,
         "label": "Every engine: one model for a step whatever the engine"
       }

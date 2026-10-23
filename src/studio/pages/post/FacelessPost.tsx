@@ -157,7 +157,7 @@ export function FacelessPost({ ctx }: { ctx: PostCtx }) {
         <label className="st-col" style={{ gap: 4 }}><span className="st-label">Or pick from the whole place bank</span>
           <select className="st-select" value={f.placeId ?? ''} onChange={e => setF({ placeId: e.target.value || null })} aria-label="Place">
             <option value="">Write my own</option>
-            {file.places.map(p => <option key={p.id} value={p.id}>{p.id} · {p.name}</option>)}
+            {file.places.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
         </label>
         {place && !f.line && <span className="st-hint">{place.line}</span>}

@@ -10,7 +10,6 @@ import { createContent, getContent } from './content.js'
 import { addToWeek, linePicks, placeSuggestions, postRow, setPostLine, usePlace } from './postRow.js'
 import { checkWeek, weekView } from './weeks.js'
 import { bankLines } from '../db/schema.js'
-import { newId } from '../lib/ids.js'
 
 // Line first, both doors (UX-PLAN.md section 43) in demo mode: a New post
 // for Doug picks a money line from the bank, gets the gas station first,
@@ -30,7 +29,7 @@ beforeAll(async () => {
   await h.deps.db.insert(bankLines).values([
     { id: 'bl_money', accountId: h.ctx.accountId, importId: 'bim_t', comment: 'rent went up 400 and my checking says 12', likes: 900, state: 'written', passed: true, line: 'rent went up $400 and i have $12', source: 'comment', lifeOrJob: 'job', tags: { emotion: 'sad', topic: '', pain: 'rent', fits: 'first', format: 'finished damage', fight: false, fightReason: '' } },
     { id: 'bl_second', accountId: h.ctx.accountId, importId: 'bim_t', comment: 'my sister got ghosted', likes: 800, state: 'written', passed: true, line: 'my sister got ghosted after 4 rounds', source: 'comment', lifeOrJob: 'job', tags: { emotion: 'angry', topic: '', pain: 'ghosted', fits: 'secondhand', format: 'meme setup', fight: false, fightReason: '' } },
-    { id: 'bl_used', accountId: h.ctx.accountId, importId: 'bim_t', comment: 'x', likes: 950, state: 'written', passed: true, line: 'they paid me in exposure', source: 'comment', lifeOrJob: 'job', usedAccountTag: 'someone_else', usedPostId: newId('ci'), tags: { emotion: 'angry', topic: '', pain: 'lowball pay', fits: 'both', format: 'meme setup', fight: false, fightReason: '' } },
+    { id: 'bl_used', accountId: h.ctx.accountId, importId: 'bim_t', comment: 'x', likes: 950, state: 'written', passed: true, line: 'they paid me in exposure', source: 'comment', lifeOrJob: 'job', usedAccountTag: 'someone_else', usedPostId: 'ci_somewhere_else', tags: { emotion: 'angry', topic: '', pain: 'lowball pay', fits: 'both', format: 'meme setup', fight: false, fightReason: '' } },
   ])
 }, 180_000)
 

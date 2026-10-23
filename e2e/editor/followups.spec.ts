@@ -67,6 +67,7 @@ test('the Sound drawer: the sound and the voiceover words with Copy, and quote s
   // A click opens a new tab (stopped before it leaves for the site).
   await page.context().route(/playphrase\.me/, r => r.fulfill({ status: 200, body: 'ok' }))
   const [tab] = await Promise.all([page.context().waitForEvent('page'), play.click()])
+  await tab.waitForURL(/playphrase\.me/, { timeout: 15_000 })
   expect(tab.url()).toContain('playphrase.me')
   await tab.close()
   await snap(page, info, 'the Sound drawer: name, words, Copy, the two searches')

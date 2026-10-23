@@ -180,7 +180,7 @@ test('Weeks: import a 20-row CSV, fill, check, make 2 posts, approve, send to a 
   const week = files.find(f => f.parents.includes(callieDir.id) && f.name === `week of ${MONDAY}`)!
   expect(files.find(f => f.parents.includes(week.id) && f.name === `${MONDAY}_1_${CALLIE}_C0a${run}.mp4`)?.size).toBeGreaterThan(1000)
   const csv = files.find(f => f.parents.includes(week.id) && f.name === `manifest ${MONDAY}.csv`)!
-  expect(csv.text!.split('\n')[0]).toBe('Device ID,Account,file_name,caption,hashtags,date,slot,sound_name,ad_label')
+  expect(csv.text!.split('\n')[0]).toBe('Device ID,Account,file_name,caption,hashtags,date,slot,sound_name,ad_label,platform')
   expect(csv.text!.split('\n')[1]).toMatch(new RegExp(`^DEVICE-01,${CALLIE},${MONDAY}_1_${CALLIE}_C0a${run}\\.mp4,`))
   expect(files.find(f => f.parents.includes(week.id) && f.name === `manifest ${MONDAY}` && f.mimeType === 'application/vnd.google-apps.spreadsheet')).toBeTruthy()
   const dougDir = files.find(f => f.parents.includes(root.id) && f.name === `Doug ${run}`)!

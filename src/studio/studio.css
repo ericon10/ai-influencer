@@ -1783,7 +1783,7 @@ a.st-chip.st-packed:hover { border-color: var(--st-text-3); }
 .st-linetag:focus-visible { outline: 2px solid var(--st-accent); outline-offset: 2px; }
 .st-linetag-line { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: 12.5px; font-weight: 600; line-height: 1.3; overflow-wrap: anywhere; }
 .st-linetag-line svg { margin-right: 4px; vertical-align: -1px; color: var(--st-text-3); }
-.st-linetag-line.empty { color: var(--st-text-3); font-weight: 500; font-style: italic; }
+.st-linetag-line.empty { color: var(--st-text-2); font-weight: 500; font-style: italic; }
 .st-linetag-place { display: inline-flex; align-items: center; gap: 3px; font-size: 10.5px; font-weight: 600; color: var(--st-text-2); font-variant-numeric: tabular-nums; }
 .st-linetag.compact { padding: 3px 5px; gap: 1px; }
 .st-linetag.compact .st-linetag-line { font-size: 11px; -webkit-line-clamp: 2; }
