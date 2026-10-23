@@ -26,7 +26,12 @@ one, builds it, and crosses it off here.
 1. **Hover states on every button** (`2026-10-23-hover-states.md`). A
    visible bug (New post nearly disappears on hover), small, one session.
    First because it touches every screen the owner uses every day.
-2. **Wire Kie.ai and WaveSpeed** (`2026-10-23-kie-wavespeed.md`). The big
+2. **Weeks: import from Google Sheets** (`2026-10-23-weeks-sheets.md`).
+   Small, and Drive is already connected: pick or paste a sheet, Re-sync
+   that asks before touching posts with paid images, Import lines from a
+   sheet, ROOT / Plans / CHARACTER. Second because it changes how every
+   week starts, on a connection that already works.
+3. **Wire Kie.ai and WaveSpeed** (`2026-10-23-kie-wavespeed.md`). The big
    one: keys, adapters, the price book per provider, the provider picker
    with the cheapest marked, failover that asks, the provider on every
    output, and the step > model > provider table the ComfyUI build plugs

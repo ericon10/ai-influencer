@@ -1811,3 +1811,51 @@ Kill, Send to Drive. Everything runs on the API path as well as the plan.
   file); a re-import of a character file onto a half-built character sets stage 5;
   Import a character file on a half-built character's page.
 - **21**: `docs/studio/research-wavespeed-kie.md`.
+
+## 38. Hover and focus on every control (owner, 2026-10-23)
+
+Bug (Eric, Oct 22, a screenshot): New post in the left menu nearly
+disappeared on hover, its dark text and icon on a dark fill. The cause: the
+menu item's hover fill (`.st-nav-item:hover`) replaced New post's accent
+fill and kept its dark text. Applies to every page, every character, every
+account and both themes.
+
+**The rule.** Hover never lowers contrast. Text keeps at least 4.5:1
+against the fill under it on hover, an icon alone at least 3:1. Hover only
+lightens or tints the fill, or adds a border; it never swaps a fill for a
+darker one under dark text. Primary buttons (New post, Generate, Make the
+week, Send to Drive, any `.st-btn.primary`) keep their accent fill on hover,
+a little brighter (`--st-primary-hover`). Every control shows a focus ring
+to the keyboard (`--st-focus`, `--st-ring`): the legacy pages' stylesheet
+turns the browser's outline off on every button, so the Studio sets its
+own on every button, link, tab, menu item, switch and focusable element.
+
+**Tokens, never one-off colors.** Hover and focus colors live in the theme
+tokens in `src/studio/studio.css`, per theme: `--st-hover`,
+`--st-hover-soft`, `--st-hover-line`, `--st-hover-accent-line`,
+`--st-primary-hover`, `--st-on-accent`, `--st-overlay-hover` (buttons over
+a picture), `--st-focus`, `--st-ring`. Components use them.
+
+**What was fixed (2026-10-23).**
+- New post: keeps its gradient on hover (and while its menu is open).
+- Primary buttons: never showed a focus ring (their own shadow hid it).
+- No focus ring at all before: the menu items (Activity, New post), the
+  post steps, the Weeks steps, chips (filters, Approve for posting, Room
+  tone, TikTok, Reels, None), the Settings tabs (Models, Live, 3 days), the
+  Results and Download day toggles, the cover's view button, Outline, the
+  Guide's numbered pins.
+- Help chips ("How this works") and the Guide's chips: hover tints the fill
+  instead of filling it with the color under dark text (4.45:1 in light).
+- The Guide's links in light theme: darkened toward the text color (3.96:1
+  on white before).
+- Delete on a Library tile in light theme: the red is darker in light
+  (`--st-bad` #c62828; 2.83:1 before).
+- OK buttons keep their green on hover; the over-picture buttons (viewer,
+  tile and cover view) share one hover token.
+
+**Test.** `e2e/editor/hover.spec.ts` hovers every kind of control on Weeks,
+Posts home, four post workspaces (every step), Line bank, Characters, a
+character, Accounts, Library, Settings (three tabs) and the Guide, in both
+themes, reads the pixels at 2x and fails under 4.5:1 (3:1 for an icon), and
+fails any control whose look does not change on keyboard focus. It failed
+on the version before the fix (New post 1.06:1 on hover) and passes after.
