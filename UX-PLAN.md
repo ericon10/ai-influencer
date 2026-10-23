@@ -1859,3 +1859,34 @@ character, Accounts, Library, Settings (three tabs) and the Guide, in both
 themes, reads the pixels at 2x and fails under 4.5:1 (3:1 for an icon), and
 fails any control whose look does not change on keyboard focus. It failed
 on the version before the fix (New post 1.06:1 on hover) and passes after.
+
+## 39. Weeks: import from Google Sheets (owner, 2026-10-23)
+
+Drive is connected on production (Settings, verified by Eric). The week's
+plan can live in a Google Sheet instead of a CSV file: Claude or Eric edit
+the sheet, the Studio reads it. Applies to every character, account and
+product a plan names; nothing product-specific. Free: reading a sheet is
+not a paid step.
+
+1. **From Google Sheets** on Weeks > Import, next to Upload the plan CSV:
+   pick a sheet from Drive (the newest first, a search box, the Plans
+   folders on top) or paste its link. The sheet's first tab is read as
+   CSV and goes through the same reader, spec (`docs/PLAN-CSV-SPEC.md`),
+   pre-check, preview and Replace-or-Add rule as the CSV import. Each
+   imported post keeps the sheet's id and a fingerprint of its row.
+2. **Re-sync** on each linked sheet (Weeks > Import, Linked sheets) pulls
+   the sheet's latest edits. A free preview first: new rows (added),
+   changed rows on drafts with no pictures (drafted again), changed rows
+   whose posts already have pictures (listed, never changed unless ticked:
+   "Update these too, their pictures go to Trash"), rows gone from the
+   sheet (listed, never deleted), unchanged rows (left alone). Apply does
+   only what the preview showed.
+3. **Line bank > Import lines** also takes a Google Sheet (a link or a
+   pick), with the same dry run and near-match dropping.
+4. **Drive layout, made on first use:** ROOT / Plans / CHARACTER / (week
+   sheets), next to ROOT / CHARACTER / week of YYYY-MM-DD / (the output).
+   Made when From Google Sheets first opens with a root folder set.
+5. **Access.** Reading a sheet the Studio did not make needs Google's
+   read-only Drive permission on top of drive.file. Settings > Google Drive
+   says so and offers Reconnect (one consent screen); until then the
+   picker shows the reason, never a silent empty list.

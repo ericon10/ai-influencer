@@ -83,6 +83,23 @@ export function templateCsv(): string {
 
 export interface WeekRow { line: number; cells: WeekCells }
 
+// A row's fingerprint (section 39): Re-sync redrafts a row only when one of
+// its cells changed. FNV-1a over the spec's columns in order, as 8 hex.
+export function rowHash(cells: WeekCells): string {
+  let h = 0x811c9dc5
+  const text = WEEK_COLUMNS.map(c => (cells[c.name] ?? '').trim()).join('\u0001')
+  for (let i = 0; i < text.length; i++) { h ^= text.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0 }
+  return h.toString(16).padStart(8, '0')
+}
+
+// A Google Sheet named by its link or its id (section 39).
+export function sheetRef(text: string): string | null {
+  const t = text.trim()
+  const m = /\/(?:spreadsheets|file)\/d\/([a-zA-Z0-9_-]{10,})/.exec(t) ?? /[?&]id=([a-zA-Z0-9_-]{10,})/.exec(t)
+  if (m) return m[1]!
+  return /^[a-zA-Z0-9_-]{20,}$/.test(t) ? t : null
+}
+
 export function readWeek(text: string): { rows: WeekRow[]; missing: string[]; unknown: string[] } {
   const table = parseCsv(text)
   if (!table.length) return { rows: [], missing: [...REQUIRED_WEEK_COLUMNS], unknown: [] }

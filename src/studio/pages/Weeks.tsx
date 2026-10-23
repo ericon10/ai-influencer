@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { CalendarRange, Check, CheckCircle2, Download, FileText, Lock, LockOpen, RefreshCw, Send, Shuffle, Upload, X } from 'lucide-react'
+import { CalendarRange, Check, CheckCircle2, Download, FileSpreadsheet, FileText, Lock, LockOpen, RefreshCw, Send, Shuffle, Upload, X } from 'lucide-react'
 import { api, assetUrl } from '../api'
 import { keys, useCharacters } from '../hooks'
 import { PriceButton } from '../PriceButton'
@@ -11,6 +11,7 @@ import { SelectAllBox, SelectBox, SelectionCount, useSelection } from '../select
 import { NotesBadge } from '../lint'
 import { StillPaths } from './post/slideshow/StillPaths'
 import { PlanCard } from './PlanCard'
+import { LinkedSheets, SheetPicker } from './weeks/Sheets'
 import { takeWeekFile, type Incoming } from '../importDoor'
 import { lineLint, templateCsv, weekOf } from '../../../server/core/weeks'
 import SPEC from '../../../docs/PLAN-CSV-SPEC.md?raw'
@@ -208,6 +209,9 @@ function ImportStep({ monday, onImported, onNext }: { monday: string; onImported
   const [older, setOlder] = useState(false)
   const [olderFile, setOlderFile] = useState<Incoming | null>(null)
   const [preview, setPreview] = useState<WeekPreview | null>(null)
+  // From Google Sheets (section 39): the sheet the rows came from.
+  const [sheet, setSheet] = useState<{ id: string; name: string } | null>(null)
+  const [picking, setPicking] = useState(false)
   const [existing, setExisting] = useState<'replace' | 'add' | null>(null)
   const [done, setDone] = useState<WeekImportResult | null>(null)
   const good = (preview?.rows ?? []).filter(r => r.state !== 'problem')
@@ -226,7 +230,7 @@ function ImportStep({ monday, onImported, onNext }: { monday: string; onImported
     if (!f) return
     if (f.size > 400_000) { toast({ tone: 'bad', text: `${f.name} is over 400 KB. Split it.` }); return }
     const text = await f.text()
-    setCsv(text); setName(f.name); setPaste(false); setDone(null)
+    setCsv(text); setName(f.name); setPaste(false); setDone(null); setSheet(null)
     await check(text)
   }
   const ticked = good.filter(r => sel.has(r.rowId))
@@ -251,11 +255,17 @@ function ImportStep({ monday, onImported, onNext }: { monday: string; onImported
       <input ref={file} type="file" accept=".csv,text/csv,text/plain" hidden onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; void load(f) }} data-field="weeks-file" />
       <div className="st-row" style={{ gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
         <button type="button" className={`st-btn ${csv ? 'secondary sm' : ''}`} onClick={() => file.current?.click()}><Upload size={14} />Upload the plan CSV</button>
-        {csv && !paste && <span className="st-hint" data-field="weeks-file-name">{name ? `${name} · ` : ''}{csv.split('\n').filter(l => l.trim()).length - 1} rows</span>}
+        {csv && !paste && <span className="st-hint" data-field="weeks-file-name">{sheet ? 'Google Sheet: ' : ''}{name ? `${name} · ` : ''}{csv.split('\n').filter(l => l.trim()).length - 1} rows</span>}
+        <button type="button" className={`st-btn ${csv ? 'secondary sm' : 'secondary'}`} onClick={() => setPicking(p => !p)} aria-expanded={picking} data-field="weeks-from-sheets"><FileSpreadsheet size={14} />From Google Sheets</button>
         <button type="button" className="st-btn xs ghost" onClick={() => setPaste(p => !p)}>{paste ? 'Hide the rows' : csv ? 'See or edit the rows' : 'Paste the rows instead'}</button>
         <button type="button" className="st-btn xs ghost" onClick={() => setOlder(true)}>An older launch plan file?</button>
       </div>
-      {paste && <textarea className="st-textarea" rows={5} value={csv} onChange={e => { setCsv(e.target.value); setName(''); setPreview(null) }} placeholder="Paste the plan (with its header line)" aria-label="Plan rows" />}
+      {picking && <SheetPicker onClose={() => setPicking(false)} onRead={p => {
+        setCsv(p.csv); setName(p.sheet.name); setSheet({ id: p.sheet.id, name: p.sheet.name }); setPaste(false); setPicking(false); setDone(null); setExisting(null)
+        setPreview(p.preview); sel.set(p.preview.rows.filter(r => r.state !== 'problem').map(r => r.rowId))
+      }} />}
+      {!preview && !picking && <LinkedSheets onSynced={r => { setDone(r); onImported(r) }} />}
+      {paste && <textarea className="st-textarea" rows={5} value={csv} onChange={e => { setCsv(e.target.value); setName(''); setSheet(null); setPreview(null) }} placeholder="Paste the plan (with its header line)" aria-label="Plan rows" />}
       {paste && <AsyncButton className="st-btn sm" disabled={!csv.trim()} busyLabel="Reading..." onClick={() => check()}>Preview (free)</AsyncButton>}
       {preview && (
         <div className="st-col" style={{ gap: 10 }} data-field="weeks-preview">
@@ -289,7 +299,8 @@ function ImportStep({ monday, onImported, onNext }: { monday: string; onImported
           <div className="st-col" style={{ gap: 6, alignItems: 'flex-start' }}>
             <AsyncButton className="st-btn" disabled={todo.length > 0} title={todo.map(t => t.label).join('; ') || undefined} busyLabel={`Importing ${ticked.length} rows...`} onClick={async () => {
               try {
-                const r = await api.weekImport(csv, { rows: ticked.map(x => x.rowId), ...(matching.length && existing ? { existing } : {}) })
+                const o = { rows: ticked.map(x => x.rowId), ...(matching.length && existing ? { existing } : {}) }
+                const r = sheet ? await api.sheetImport(sheet.id, o) : await api.weekImport(csv, o)
                 setDone(r); setPreview(null); onImported(r)
                 toast({ tone: 'ok', text: `${r.created + r.replaced} drafts made.` })
               } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) }

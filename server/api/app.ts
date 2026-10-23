@@ -33,7 +33,7 @@ import { postCutView, postEditorProject } from '../pipeline/cutView.js'
 import { makeCloseup } from '../pipeline/closeup.js'
 import { addSound, archiveSound, listSounds, soundView, updateSound } from '../pipeline/sounds.js'
 import { addVoiceTakes, getVoiceLine, listVoiceLines, updateVoiceLine, voiceLineView } from '../pipeline/voiceLines.js'
-import { applyFit, bankCsv, bankPage, checkWeek, drawWeek, importLines, importWeek, previewWeek, reviewLog, saveFill, sendWeek, setLock, setReview, weekList, weekView } from '../pipeline/weeks.js'
+import { applyFit, bankCsv, bankPage, checkWeek, drawWeek, importLines, importLinesFromSheet, importSheet, importWeek, previewSheet, previewWeek, resyncPlan, resyncSheet, reviewLog, saveFill, sendWeek, setLock, setReview, weekList, weekSheets, weekView } from '../pipeline/weeks.js'
 import { driveAuthUrl, driveCallback, driveDisconnect, driveFolders, driveStatus, setDriveRoot } from '../pipeline/drive.js'
 import { addHook, archiveHook, archiveProduct, archiveVariant, importKit, productSummaries, productView, renameSocialAccount, saveSocialAccount, scoreboard, starterKit, updateHook, updateProduct, useKitVoice } from '../pipeline/scaleKit.js'
 import { deleteStyle, editorManifest, listStyles, saveFromEditor, saveStyle } from '../pipeline/openreel.js'
@@ -1265,6 +1265,28 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
     const body = parse(z.object({ csv: z.string().max(400_000), rows: z.array(z.string().max(40)).min(1).max(300), existing: z.enum(['replace', 'add']).optional() }), await json(c))
     return c.json(await importWeek(deps, ctx, body.csv, body))
   })
+  // From Google Sheets and Re-sync (section 39), before /weeks/:monday.
+  app.get('/weeks/sheets', async c => c.json(await weekSheets(deps, c.get('ctx'), c.req.query('q') ?? undefined)))
+  app.post('/weeks/sheets/preview', async c => {
+    const body = parse(z.object({ sheet: z.string().min(1).max(400) }), await json(c))
+    return c.json(await previewSheet(deps, c.get('ctx'), body.sheet))
+  })
+  app.post('/weeks/sheets/import', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    const body = parse(z.object({ sheet: z.string().min(1).max(400), rows: z.array(z.string().max(40)).min(1).max(300), existing: z.enum(['replace', 'add']).optional() }), await json(c))
+    return c.json(await importSheet(deps, ctx, body))
+  })
+  app.get('/weeks/sheets/:id/resync', async c => {
+    const { csv: _csv, ...plan } = await resyncPlan(deps, c.get('ctx'), parse(z.string().min(10).max(80), c.req.param('id')))
+    return c.json(plan)
+  })
+  app.post('/weeks/sheets/:id/resync', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    const body = parse(z.object({ update: z.array(z.string().max(40)).max(300).optional() }), await json(c))
+    return c.json(await resyncSheet(deps, ctx, parse(z.string().min(10).max(80), c.req.param('id')), body))
+  })
   app.get('/weeks/review-log', async c => c.json({ calls: await reviewLog(deps, c.get('ctx')) }))
   app.get('/weeks/:monday', async c => c.json(await weekView(deps, c.get('ctx'), parse(monday, c.req.param('monday')))))
   app.post('/weeks/:monday/draw', async c => {
@@ -1320,6 +1342,12 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
     requireRole(ctx, 'member')
     const body = parse(z.object({ csv: z.string().max(2_000_000), name: z.string().max(120).optional(), productId: z.string().max(60).nullable().optional(), dryRun: z.boolean().optional() }), await json(c))
     return c.json(await importLines(deps, ctx, body))
+  })
+  app.post('/line-bank/lines/sheet', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    const body = parse(z.object({ sheet: z.string().min(1).max(400), productId: z.string().max(60).nullable().optional(), dryRun: z.boolean().optional() }), await json(c))
+    return c.json(await importLinesFromSheet(deps, ctx, body))
   })
   // Google Drive (items 15 and 16).
   const originOf = (c: { req: { header: (n: string) => string | undefined; url: string } }) => c.req.header('origin') || new URL(c.req.url).origin

@@ -226,3 +226,79 @@ test('Line bank page: filters and Download as CSV', async ({ page }, info) => {
   expect(text.split('\n')[0]).toBe('id,text,source,source_likes,pain,emotion,format,voice_fit,life_or_job,used_on_account,used_on_date')
   await snap(page, info, 'line bank page')
 })
+
+// Weeks from Google Sheets (UX-PLAN.md section 39): a sheet the owner made
+// in Drive, read from its pasted link with the same preview, imported; the
+// Plans / CHARACTER folders made on first use; the sheet edited, then
+// Re-sync (its free preview, then Apply); Import lines from a sheet.
+async function ensureDrive(page: Page) {
+  const d = await api<{ client: boolean; connected: boolean; root: { name: string } | null; sheets: boolean }>('GET', '/drive')
+  if (d.connected && d.root && d.sheets) return
+  await page.goto('/studio/settings?tab=general')
+  if (!d.client) {
+    await page.locator('[data-field="key-google_oauth"] input').fill('1234-e2e.apps.googleusercontent.com:GOCSPX-e2e-secret')
+    await page.getByRole('button', { name: 'Save and verify', disabled: false }).click()
+    await expect(page.locator('.st-toast').filter({ hasText: /Google Drive \(OAuth client\) key saved/ })).toBeVisible({ timeout: 15_000 })
+  }
+  const card = page.locator('[data-field="settings-drive"]')
+  await card.getByRole('button', { name: /^(Connect|Reconnect) Google Drive$/ }).first().click()
+  await expect(page).toHaveURL(/drive=connected/, { timeout: 30_000 })
+  await expect(card.locator('[data-field="drive-connected"]')).toContainText('Connected as owner@example.com', { timeout: 30_000 })
+  if (!(await api<{ root: unknown }>('GET', '/drive')).root) {
+    await card.getByLabel('New root folder name').fill(`Test Drive folder ${run}`)
+    await card.getByRole('button', { name: 'Make it the root folder' }).click()
+    await expect(card.locator('[data-field="drive-connected"]')).toContainText('Root folder: Test Drive folder', { timeout: 30_000 })
+  }
+}
+const sheetCall = async (body: unknown) => (await (await fetch(`${DRIVE}/__sheet`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })).json()) as { id: string; name: string }
+
+test('Weeks from Google Sheets: paste a link, the same preview, import; Re-sync pulls the edits; Import lines from a sheet', async ({ page }, info) => {
+  test.skip(!DRIVE, 'The fake Google runs with the hermetic suite (E2E_HERMETIC)')
+  test.setTimeout(240_000)
+  await ensureDrive(page)
+  const WEEK = '2027-01-11'
+  const head = 'row_id,account,date,slot,post_type,story_beat,line,outfit,scene'
+  const row = (id: string, day: string, line: string) => [`${id}${run}`, CALLIE, day, '1', 'photo', `beat ${id}`, line, 'gray hoodie', 'the kitchen'].map(q).join(',')
+  const sheet = await sheetCall({ name: `Callie week of Jan 11 ${run}`, csv: [head, row('G1', WEEK, 'the recruiter said circle back. it is january'), row('G2', '2027-01-12', 'my mom asked if i tried linkedin'), row('G3', '2027-01-13', 'the portal logged me out mid answer')].join('\n') })
+
+  await page.goto(`/studio/weeks?week=${WEEK}&step=import`)
+  await page.locator('[data-field="weeks-from-sheets"]').click()
+  const picker = page.locator('[data-field="weeks-sheets"]')
+  await expect(picker.locator('[data-field="weeks-sheets-list"]')).toContainText(`Callie week of Jan 11 ${run}`, { timeout: 30_000 })
+  await picker.getByLabel('Google Sheets link').fill(`https://docs.google.com/spreadsheets/d/${sheet.id}/edit#gid=0`)
+  await picker.locator('[data-field="weeks-sheets-read-link"]').click()
+  const preview = page.locator('[data-field="weeks-preview"]')
+  await expect(preview).toContainText('3 of 3 rows', { timeout: 30_000 })
+  await expect(page.locator('[data-field="weeks-file-name"]')).toContainText(`Google Sheet: Callie week of Jan 11 ${run}`)
+  await snap(page, info, 'weeks: from Google Sheets, the preview')
+  await preview.getByRole('button', { name: /^Import 3 rows \(free\)$/ }).click()
+  await expect(page.locator('[data-field="weeks-import-done"]')).toContainText('3 drafts made', { timeout: 30_000 })
+  // ROOT / Plans / CHARACTER / made on first use.
+  const files = (await (await fetch(`${DRIVE}/__files`)).json() as { files: Array<{ id: string; name: string; parents: string[] }> }).files
+  const plans = files.find(f => f.name === 'Plans')!
+  expect(files.some(f => f.name === 'Callie' && f.parents.includes(plans.id))).toBe(true)
+
+  // The owner edits the sheet: G1 changed, G3 gone, G4 new.
+  await sheetCall({ id: sheet.id, csv: [head, row('G1', WEEK, 'the recruiter said circle back. it is january now'), row('G2', '2027-01-12', 'my mom asked if i tried linkedin'), row('G4', '2027-01-14', 'the job post was reposted the day after my interview')].join('\n') })
+  await page.goto(`/studio/weeks?week=${WEEK}&step=import`)
+  await page.locator(`[data-field="weeks-resync-${sheet.id}"]`).click()
+  const resync = page.locator('[data-field="weeks-resync"]')
+  await expect(resync).toContainText('1 new row, 1 changed draft, 0 changed posts with pictures, 1 unchanged, 1 gone from the sheet', { timeout: 30_000 })
+  await snap(page, info, 'weeks: Re-sync, the preview')
+  await resync.locator('[data-field="weeks-resync-apply"]').click()
+  await expect(page.locator('.st-toast').filter({ hasText: '1 added, 1 updated' })).toBeVisible({ timeout: 30_000 })
+  const grid = await api<{ cells: Array<{ rowId: string; line: string }> }>('GET', `/weeks/${WEEK}`)
+  expect(grid.cells.find(c => c.rowId === `G1${run}`)?.line).toMatch(/january now/)
+  expect(grid.cells.some(c => c.rowId === `G4${run}`)).toBe(true)
+  expect(grid.cells.some(c => c.rowId === `G3${run}`)).toBe(true)
+
+  // Line bank > Import lines from a Google Sheet.
+  const lines = await sheetCall({ name: `lines ${run}`, csv: `text,source,pain,emotion,format,voice_fit,life_or_job\n"${run} the offer came with a personality test",inventory,unpaid test,angry,finished damage,both,job\n` })
+  await page.goto('/studio/line-bank')
+  const box = page.locator('[data-field="line-bank-import-lines"]')
+  await box.getByLabel('Google Sheets link for lines').fill(`https://docs.google.com/spreadsheets/d/${lines.id}/edit`)
+  await box.locator('[data-field="line-bank-lines-sheet"]').click()
+  await expect(box.locator('[data-field="line-bank-lines-preview"]')).toContainText(`lines ${run}: 1 lines, 1 new`, { timeout: 30_000 })
+  await box.getByRole('button', { name: 'Import 1 line (free)' }).click()
+  await expect(page.locator('.st-toast').filter({ hasText: '1 lines added to the bank.' })).toBeVisible({ timeout: 15_000 })
+})

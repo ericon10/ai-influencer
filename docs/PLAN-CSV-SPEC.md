@@ -17,6 +17,10 @@ fails if this page and that list disagree.
 - 300 rows and 400 KB at most per file. A week of about 100 posts fits.
 - The launch plan's older names still read: `hook` as `line`, `format` as
   `post_type`.
+- A Google Sheet works the same way (Weeks > Import > From Google Sheets):
+  its first tab, with the same header, is read as this CSV. Keep a week's
+  sheet in ROOT / Plans / CHARACTER / in Drive; Re-sync pulls later edits
+  (a post that already has pictures changes only when ticked).
 
 ## Required columns
 

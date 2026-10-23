@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { and, eq, inArray } from 'drizzle-orm'
+import { and, eq, inArray, isNull } from 'drizzle-orm'
 import { createHarness, drain, type Harness } from '../testing/harness.js'
 import { startFakeDrive, type FakeDrive } from '../testing/fakeDrive.js'
 import { registerPipelineHooks } from './hooks.js'
@@ -9,7 +9,7 @@ import { estimateAction, runAction } from './actions.js'
 import { importCharacter } from './files.js'
 import { createFacelessCharacter, facelessOf, importPlaces } from './faceless.js'
 import { renameSocialAccount, saveSocialAccount, scoreboard } from './scaleKit.js'
-import { applyFit, bankPage, checkWeek, drawWeek, importLines, importWeek, previewWeek, reviewLog, saveFill, sendWeek, setLock, setReview, weekView } from './weeks.js'
+import { applyFit, bankPage, checkWeek, drawWeek, importLines, importLinesFromSheet, importSheet, importWeek, previewSheet, previewWeek, resyncPlan, resyncSheet, reviewLog, saveFill, sendWeek, setLock, setReview, weekSheets, weekView } from './weeks.js'
 import { driveAuthUrl, driveCallback, driveStatus, setDriveRoot } from './drive.js'
 import { saveCredential } from '../providers/credentials.js'
 import { getContent } from './content.js'
@@ -273,6 +273,84 @@ describe('a week, from the plan CSV to Google Drive', () => {
     await renameSocialAccount(h.deps, h.ctx, 'callie_tt_main', 'callie_tt_01')
   })
 })
+
+describe('a week from Google Sheets (section 39)', () => {
+  const head = 'row_id,account,date,slot,post_type,story_beat,line,outfit,scene,clip_action'
+  const row = (id: string, day: string, line: string, type = 'photo') => [id, 'callie_tt_01', day, '1', type, `beat ${id}`, line, 'gray hoodie', 'kitchen', ''].map(q).join(',')
+  let sheetId = ''
+  it('From Google Sheets: Plans / CHARACTER folders made on first use; a pasted link reads the first tab with the same preview, and the import links the sheet', async () => {
+    const r = await weekSheets(h.deps, h.ctx)
+    expect(r.readable).toBe(true)
+    expect(r.plans?.folders.sort()).toEqual(['Callie', 'Doug'])
+    const f = drive.files()
+    const plans = f.find(x => x.name === 'Plans' && x.parents.includes(f.find(y => y.name === 'Studio test')!.id))!
+    const callieFolder = f.find(x => x.name === 'Callie' && x.parents.includes(plans.id))!
+    // Eric makes the week's sheet in Callie's Plans folder.
+    const sheet = drive.putSheet('Callie week of Nov 2', [head, row('S1', '2026-11-02', 'the recruiter said circle back. it is november'), row('S2', '2026-11-03', 'my mom asked if i tried linkedin'), row('S3', '2026-11-04', '')].join('\n'), callieFolder.id)
+    sheetId = sheet.id
+    const listed = await weekSheets(h.deps, h.ctx, 'week of nov')
+    expect(listed.sheets[0]).toMatchObject({ id: sheet.id, character: 'Callie' })
+    const p = await previewSheet(h.deps, h.ctx, `https://docs.google.com/spreadsheets/d/${sheet.id}/edit#gid=0`)
+    expect(p.sheet.name).toBe('Callie week of Nov 2')
+    expect(p.preview.totals).toMatchObject({ rows: 3, ok: 3, problem: 0 })
+    const done = await importSheet(h.deps, h.ctx, { sheet: sheet.id, rows: ['S1', 'S2', 'S3'] })
+    expect(done).toMatchObject({ created: 3, weeks: ['2026-11-02'] })
+    expect((await weekSheets(h.deps, h.ctx)).linked.map(l => l.name)).toEqual(['Callie week of Nov 2'])
+    // Importing the same rows again still asks Replace or Add.
+    await expect(importSheet(h.deps, h.ctx, { sheet: sheet.id, rows: ['S1'] })).rejects.toThrow(/Replace them .* or Add as new posts/)
+  })
+
+  it('Re-sync: new rows added, changed drafts redrafted, a changed post with pictures asks first, rows gone listed, never deleted', async () => {
+    const before = await allPostsOf(['S1', 'S2', 'S3'])
+    // S2 gets a picture (as if its still was made).
+    const s2 = before.find(x => x.rowId === 'S2')!
+    await h.deps.db.update(contentItems).set({ spec: { ...(s2.spec as object), stillIds: ['cand_fake'] } }).where(eq(contentItems.id, s2.id))
+    drive.editSheet(sheetId, [head, row('S1', '2026-11-02', 'the recruiter said circle back. it is november now'), row('S2', '2026-11-03', 'my mom asked if i tried linkedin. twice'), row('S4', '2026-11-05', 'new row')].join('\n'))
+    const plan = await resyncPlan(h.deps, h.ctx, sheetId)
+    expect(plan.added.map(x => x.rowId)).toEqual(['S4'])
+    expect(plan.changed.map(x => x.rowId)).toEqual(['S1'])
+    expect(plan.changedWithPictures.map(x => x.rowId)).toEqual(['S2'])
+    expect(plan.gone.map(x => x.rowId)).toEqual(['S3'])
+    expect(plan.unchanged).toBe(0)
+    const r = await resyncSheet(h.deps, h.ctx, sheetId, {})
+    expect(r).toMatchObject({ created: 1, replaced: 1, kept: 1 })
+    const after = await allPostsOf(['S1', 'S2', 'S3', 'S4'])
+    expect(after.find(x => x.rowId === 'S1')!.title).toMatch(/november now/)
+    // S2 kept as it was (its picture and its old line), S3 still there.
+    expect(after.find(x => x.rowId === 'S2')!.id).toBe(s2.id)
+    expect(after.find(x => x.rowId === 'S3')).toBeTruthy()
+    // Ticked: S2 is updated too.
+    const again = await resyncSheet(h.deps, h.ctx, sheetId, { update: ['S2'] })
+    expect(again).toMatchObject({ replaced: 1, kept: 0 })
+    expect((await allPostsOf(['S2']))[0]!.title).toMatch(/twice/)
+    // Nothing changed since: nothing to do.
+    expect(await resyncPlan(h.deps, h.ctx, sheetId)).toMatchObject({ added: [], changed: [], changedWithPictures: [], unchanged: 3 })
+  })
+
+  it('Line bank: Import lines from a Google Sheet, with the same dry run', async () => {
+    const sheet = drive.putSheet('lines from the pain inventory', 'text,source,pain,emotion,format,voice_fit,life_or_job\n"the offer came with a personality test",inventory,unpaid test,angry,finished damage,both,job\n')
+    const dry = await importLinesFromSheet(h.deps, h.ctx, { sheet: `https://docs.google.com/spreadsheets/d/${sheet.id}/edit`, dryRun: true })
+    expect(dry).toMatchObject({ rows: 1, kept: 1, sheet: { name: 'lines from the pain inventory' } })
+  })
+
+  it('Without read-only Drive the picker says why and Settings offers Reconnect', async () => {
+    drive.scopes.value = 'https://www.googleapis.com/auth/drive.file openid email'
+    const url = new URL(await driveAuthUrl(h.deps, h.ctx, 'http://studio.test'))
+    expect(url.searchParams.get('scope')).toMatch(/drive\.readonly/)
+    await driveCallback(h.deps, h.ctx, { code: 'fake-code', state: url.searchParams.get('state')!, origin: 'http://studio.test' })
+    expect(await driveStatus(h.deps, h.ctx, 'http://studio.test')).toMatchObject({ connected: true, sheets: false })
+    await expect(previewSheet(h.deps, h.ctx, sheetId)).rejects.toThrow(/Reconnect Google Drive/)
+    drive.scopes.value = 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive.readonly openid email'
+    const again = new URL(await driveAuthUrl(h.deps, h.ctx, 'http://studio.test'))
+    await driveCallback(h.deps, h.ctx, { code: 'fake-code', state: again.searchParams.get('state')!, origin: 'http://studio.test' })
+    expect((await driveStatus(h.deps, h.ctx, 'http://studio.test')).sheets).toBe(true)
+  })
+})
+
+async function allPostsOf(rowIds: string[]) {
+  const rows = await h.deps.db.select().from(contentItems).where(and(eq(contentItems.accountId, h.ctx.accountId), isNull(contentItems.archivedAt)))
+  return rows.map(r => ({ ...r, rowId: ((r.spec ?? {}) as { plan?: { rowId?: string } }).plan?.rowId ?? '' })).filter(r => rowIds.includes(r.rowId))
+}
 
 describe('the line bank page', () => {
   it('imports lines with their fields, drops near-matches, filters and downloads', async () => {

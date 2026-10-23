@@ -638,7 +638,14 @@ export interface DrawResult { rows: DrawRow[]; seed: number; drawn: number; empt
 export interface BankLineRow { id: string; text: string; original: string; source: string; likes: number; pain: string; emotion: string; format: string; fits: 'first' | 'secondhand' | 'both'; lifeOrJob: 'life' | 'job' | null; usedAccount: string | null; usedDate: string | null; usedPostId: string | null; comment: string; fight: boolean }
 export interface BankPage { lines: BankLineRow[]; total: number; counts: { lines: number; untagged: number; life: number; job: number; used: number }; options: { pains: string[]; emotions: string[]; formats: string[]; fits: string[]; sources: string[] } }
 export interface LinesImportResult { rows: number; kept: number; duplicatesInBank: number; duplicatesInFile: number; unknown: string[]; problems: string[]; importId: string | null }
-export interface DriveStatus { client: boolean; connected: boolean; connectedAt: string | null; email: string; root: { id: string; name: string } | null; redirectUri: string }
+export interface DriveStatus { client: boolean; connected: boolean; connectedAt: string | null; email: string; root: { id: string; name: string } | null; redirectUri: string; sheets: boolean }
+// Weeks from Google Sheets (UX-PLAN.md section 39).
+export interface DriveSheet { id: string; name: string; modifiedTime: string; character: string | null }
+export interface LinkedSheet { id: string; name: string; modifiedTime: string; importedAt: string; syncedAt: string; rows: number }
+export interface SheetsList { sheets: DriveSheet[]; plans: { root: string; folders: string[] } | null; readable: boolean; linked: LinkedSheet[] }
+export interface SheetPreview { sheet: { id: string; name: string; modifiedTime: string }; csv: string; preview: WeekPreview }
+export interface ResyncRow { rowId: string; account: string; title: string; postIds: string[] }
+export interface ResyncPlan { sheet: { id: string; name: string; modifiedTime: string }; added: ResyncRow[]; changed: ResyncRow[]; changedWithPictures: ResyncRow[]; gone: ResyncRow[]; unchanged: number; problems: Array<{ rowId: string; errors: string[] }> }
 
 // Storage, traffic and auto-clean (owner, 2026-10-15; UX-PLAN.md section 22).
 export interface StorageInfo {

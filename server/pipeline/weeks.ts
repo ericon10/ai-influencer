@@ -12,7 +12,7 @@ import { cleanLine, plain, voiceJsonSchema, mockVoice, type BankTags } from '../
 import { claimFlags } from '../core/scriptKit.js'
 import { cleanVoiceCard, voiceCardText } from '../core/voiceCard.js'
 import {
-  assignBlend, checkWeekRow, currentStep, draftVisual, drawLines, hashSeed, lineLint, nearDuplicate, readLines, readWeek, slotNumber, weekDays, weekOf,
+  assignBlend, checkWeekRow, currentStep, draftVisual, drawLines, hashSeed, lineLint, nearDuplicate, readLines, readWeek, rowHash, sheetRef, slotNumber, weekDays, weekOf,
   type CheckedWeekRow, type DrawSlot, type HistoryItem, type LifeOrJob, type PoolLine, type PostType, type VoiceFit, type WeekAccountInfo, type WeekCounts, type WeekRow,
 } from '../core/weeks.js'
 import { enqueueLocalJob, type JobSpec } from '../jobs/runner.js'
@@ -34,7 +34,7 @@ import { productOf } from './products.js'
 import { lintFor } from './copyLint.js'
 import { setPosting } from './postingDay.js'
 import { STANCES_KEY, painsFor, type BankImport, IMPORTS_KEY } from './lineBank.js'
-import { startDriveSend } from './drive.js'
+import { listSheets, readSheet, startDriveSend } from './drive.js'
 import type { BuiltAction } from './actions.js'
 
 // Weeks (owner, 2026-10-22; UX-PLAN.md section 37): the plan CSV in (spec
@@ -195,7 +195,7 @@ export interface WeekImportResult { created: number; replaced: number; skipped: 
 // "Import N rows" (free): each ticked good row a draft on the grid. A row
 // matching posts already made needs Replace (the old posts and their
 // pictures to the Trash, their bank lines freed) or Add as new.
-export async function importWeek(deps: Deps, ctx: Ctx, csv: string, opts: { rows: string[]; existing?: 'replace' | 'add' }): Promise<WeekImportResult> {
+export async function importWeek(deps: Deps, ctx: Ctx, csv: string, opts: { rows: string[]; existing?: 'replace' | 'add'; sheet?: { id: string; name: string; modifiedTime: string } }): Promise<WeekImportResult> {
   const picked = new Set(opts.rows.map(r => r.trim()).filter(Boolean))
   if (!picked.size) throw new AppError('invalid_request', 'Tick the rows to import first.')
   const p = await plan(deps, ctx, csv)
@@ -219,7 +219,7 @@ export async function importWeek(deps: Deps, ctx: Ctx, csv: string, opts: { rows
       }
       replaced = true
     }
-    const created = await draftRow(deps, ctx, p, p.rows[i]!, r)
+    const created = await draftRow(deps, ctx, p, p.rows[i]!, r, opts.sheet?.id ?? '')
     if (created.pull) out.pulls++
     if (!created.text) out.noLine++
     if (replaced) out.replaced++
@@ -229,6 +229,7 @@ export async function importWeek(deps: Deps, ctx: Ctx, csv: string, opts: { rows
     if (wk && !out.weeks.includes(wk)) out.weeks.push(wk)
   }
   out.weeks.sort()
+  if (opts.sheet) await linkSheet(deps, ctx, opts.sheet, p.checked.filter(r => !r.errors.length).length)
   return out
 }
 
@@ -241,7 +242,7 @@ async function freeLines(deps: Deps, ctx: Ctx, postId: string, keep: string | nu
 
 type Plan = Awaited<ReturnType<typeof plan>>
 
-async function draftRow(deps: Deps, ctx: Ctx, p: Plan, raw: WeekRow, r: CheckedWeekRow): Promise<{ id: string; text: string; pull: boolean }> {
+async function draftRow(deps: Deps, ctx: Ctx, p: Plan, raw: WeekRow, r: CheckedWeekRow, sheetId = ''): Promise<{ id: string; text: string; pull: boolean }> {
   const c = raw.cells
   const acct = p.all.get(norm(r.account))!
   const ch = r.characterName ? p.chars.find(x => norm(x.name) === norm(r.characterName))! : p.chars.find(x => x.id === acct.characterId)!
@@ -256,6 +257,7 @@ async function draftRow(deps: Deps, ctx: Ctx, p: Plan, raw: WeekRow, r: CheckedW
     lane: c.lane.slice(0, 60), lineFormat: c.line_format.slice(0, 60), feeling: c.feeling.slice(0, 60), topic: c.topic.slice(0, 60),
     product: /^(?:y|yes|true|1)$/i.test(c.ad), notes: c.notes.slice(0, 1500), scene: c.scene.slice(0, 4000), clipAction: c.clip_action.slice(0, 2000),
     caption: c.caption.slice(0, 2200), hashtags: hashtagsOf(c.hashtags).slice(0, 15),
+    sheetId, rowHash: rowHash(c),
   })
   const week: WeekState = { lineId: bankLine?.id ?? null, lineFrom: text ? 'csv' : null, locked: false }
   const title = `${r.rowId}: ${text || c.story_beat || r.postType}`.slice(0, 120)
@@ -991,3 +993,93 @@ export function registerWeeks(): void {
   registerLocalJob('week_pull', runPull)
 }
 
+
+// ── Google Sheets (section 39) ───────────────────────────────────────
+
+export const SHEETS_KEY = 'week_sheets'
+export interface LinkedSheet { id: string; name: string; modifiedTime: string; importedAt: string; syncedAt: string; rows: number }
+
+async function linkSheet(deps: Deps, ctx: Ctx, sheet: { id: string; name: string; modifiedTime: string }, rows: number): Promise<void> {
+  const all = await getSetting<Record<string, LinkedSheet>>(deps.db, ctx.accountId, SHEETS_KEY, {})
+  const now = deps.clock.now().toISOString()
+  all[sheet.id] = { id: sheet.id, name: sheet.name.slice(0, 200), modifiedTime: sheet.modifiedTime, importedAt: all[sheet.id]?.importedAt ?? now, syncedAt: now, rows }
+  await setSetting(deps, ctx, SHEETS_KEY, all)
+}
+
+export async function linkedSheets(deps: Deps, ctx: Ctx): Promise<LinkedSheet[]> {
+  return Object.values(await getSetting<Record<string, LinkedSheet>>(deps.db, ctx.accountId, SHEETS_KEY, {})).sort((a, b) => b.syncedAt.localeCompare(a.syncedAt))
+}
+
+const refOrThrow = (text: string) => {
+  const id = sheetRef(text)
+  if (!id) throw new AppError('invalid_request', 'That is not a Google Sheets link. Copy it from the address bar of the sheet (docs.google.com/spreadsheets/d/...).')
+  return id
+}
+
+export async function weekSheets(deps: Deps, ctx: Ctx, search?: string) {
+  const chars = (await listCharacters(deps, ctx)).map(c => c.name)
+  return { ...(await listSheets(deps, ctx, { search, characters: chars })), linked: await linkedSheets(deps, ctx) }
+}
+
+// From Google Sheets: the sheet read (its first tab, as CSV) and the same
+// free preview as an uploaded CSV.
+export async function previewSheet(deps: Deps, ctx: Ctx, link: string) {
+  const sheet = await readSheet(deps, ctx, refOrThrow(link))
+  return { sheet: { id: sheet.id, name: sheet.name, modifiedTime: sheet.modifiedTime }, csv: sheet.csv, preview: await previewWeek(deps, ctx, sheet.csv) }
+}
+
+export async function importSheet(deps: Deps, ctx: Ctx, input: { sheet: string; rows: string[]; existing?: 'replace' | 'add' }) {
+  const sheet = await readSheet(deps, ctx, refOrThrow(input.sheet))
+  return importWeek(deps, ctx, sheet.csv, { rows: input.rows, existing: input.existing, sheet })
+}
+
+export interface ResyncRow { rowId: string; account: string; title: string; postIds: string[] }
+export interface ResyncPlan {
+  sheet: { id: string; name: string; modifiedTime: string }
+  added: ResyncRow[]; changed: ResyncRow[]; changedWithPictures: ResyncRow[]; gone: ResyncRow[]; unchanged: number; problems: Array<{ rowId: string; errors: string[] }>
+}
+
+// Re-sync: what the sheet's latest edits would do, row by row. A changed
+// row whose posts have pictures is never touched unless the owner ticks it.
+export async function resyncPlan(deps: Deps, ctx: Ctx, sheetId: string): Promise<ResyncPlan & { csv: string }> {
+  const sheet = await readSheet(deps, ctx, sheetId)
+  const read = readWeek(sheet.csv)
+  if (read.missing.length) throw new AppError('invalid_request', `The sheet needs these columns: ${read.missing.join(', ')} (docs/PLAN-CSV-SPEC.md).`)
+  const p = await plan(deps, ctx, sheet.csv)
+  const made = await existing(deps, ctx)
+  const out: ResyncPlan = { sheet: { id: sheet.id, name: sheet.name, modifiedTime: sheet.modifiedTime }, added: [], changed: [], changedWithPictures: [], gone: [], unchanged: 0, problems: [] }
+  const seen = new Set<string>()
+  for (const [i, r] of p.checked.entries()) {
+    if (r.errors.length || !r.postType) { out.problems.push({ rowId: r.rowId || `line ${r.line}`, errors: r.errors.length ? r.errors : ['no post type'] }); continue }
+    const key = `${norm(r.account)}|${r.rowId}`
+    seen.add(key)
+    const old = made.get(key) ?? []
+    const item: ResyncRow = { rowId: r.rowId, account: r.account, title: (p.rows[i]!.cells.line || p.rows[i]!.cells.story_beat || r.postType).slice(0, 120), postIds: old.map(o => o.id) }
+    if (!old.length) { out.added.push(item); continue }
+    if (old.every(o => planOf(o).rowHash === rowHash(p.rows[i]!.cells))) { out.unchanged++; continue }
+    let pictures = old.some(hasPictures)
+    for (const o of old) if (!pictures) pictures = (await postPictures(deps, ctx, o)).length > 0
+    if (pictures) out.changedWithPictures.push(item)
+    else out.changed.push(item)
+  }
+  for (const [key, rows] of made) {
+    const mine = rows.filter(r => planOf(r).sheetId === sheet.id)
+    if (mine.length && !seen.has(key)) out.gone.push({ rowId: planOf(mine[0]!).rowId, account: mine[0]!.accountTag, title: mine[0]!.title, postIds: mine.map(m => m.id) })
+  }
+  return { ...out, csv: sheet.csv }
+}
+
+export async function resyncSheet(deps: Deps, ctx: Ctx, sheetId: string, input: { update?: string[] } = {}): Promise<WeekImportResult & { kept: number }> {
+  const r = await resyncPlan(deps, ctx, sheetId)
+  const ok = new Set(input.update ?? [])
+  const rows = [...r.added, ...r.changed, ...r.changedWithPictures.filter(x => ok.has(x.rowId))].map(x => x.rowId)
+  const kept = r.changedWithPictures.length - r.changedWithPictures.filter(x => ok.has(x.rowId)).length
+  if (!rows.length) { await linkSheet(deps, ctx, r.sheet, r.added.length + r.changed.length + r.changedWithPictures.length + r.unchanged); return { created: 0, replaced: 0, skipped: 0, posts: [], weeks: [], noLine: 0, pulls: 0, kept } }
+  return { ...(await importWeek(deps, ctx, r.csv, { rows, existing: 'replace', sheet: r.sheet })), kept }
+}
+
+// Line bank > Import lines from a Google Sheet (same dry run and dedupe).
+export async function importLinesFromSheet(deps: Deps, ctx: Ctx, input: { sheet: string; productId?: string | null; dryRun?: boolean }) {
+  const sheet = await readSheet(deps, ctx, refOrThrow(input.sheet))
+  return { ...(await importLines(deps, ctx, { csv: sheet.csv, name: sheet.name, productId: input.productId, dryRun: input.dryRun })), sheet: { id: sheet.id, name: sheet.name } }
+}

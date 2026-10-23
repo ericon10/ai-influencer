@@ -26,6 +26,9 @@ export const planMetaSchema = z.object({
   week: s(10), postType: s(12), deviceId: s(60), lifeOrJob: s(4), voiceFit: s(10), storyBeat: s(800), lineId: s(40),
   placeId: s(60), videoPrompt: s(2000), soundName: s(200), soundType: s(20), voiceoverClip: s(200),
   lane: s(60), lineFormat: s(60), feeling: s(60), topic: s(60),
+  // A row read from a Google Sheet (section 39): the sheet, and the row's
+  // fingerprint, so Re-sync knows what changed.
+  sheetId: s(80), rowHash: s(16),
 }).prefault({})
 export type PlanMeta = z.infer<typeof planMetaSchema>
 export const hasPlan = (p: Partial<PlanMeta> | null | undefined) => !!p && !!(p.rowId || p.structure || p.moment || p.altHook)

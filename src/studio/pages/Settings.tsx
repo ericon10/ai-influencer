@@ -356,18 +356,24 @@ function DriveCard() {
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <div className="st-card" id="drive" data-field="settings-drive">
-      <div className="st-card-head"><div className="grow"><div className="st-h2 st-row" style={{ gap: 8 }}>Google Drive<HowTo id="weeks" label="How Send to Drive works" /></div><div className="st-hint">Weeks &gt; Send to Drive puts each approved post in ROOT / CHARACTER / week of YYYY-MM-DD /, with a manifest Sheet and CSV. The Studio only sees the folders and files it makes there.</div></div></div>
+      <div className="st-card-head"><div className="grow"><div className="st-h2 st-row" style={{ gap: 8 }}>Google Drive<HowTo id="weeks" label="How Send to Drive works" /></div><div className="st-hint">Weeks &gt; Send to Drive puts each approved post in ROOT / CHARACTER / week of YYYY-MM-DD /, with a manifest Sheet and CSV. Weeks &gt; Import reads a week's plan from a Google Sheet (ROOT / Plans / CHARACTER / is made for them). The Studio writes only the files it makes; it reads your sheets.</div></div></div>
       <div className="st-card-body st-col" style={{ gap: 10 }}>
         {!d ? <span className="st-hint">Reading...</span> : !d.client ? (
           <span className="st-hint" data-field="drive-needs-client">First add your Google OAuth client in Provider keys above (Google Drive (OAuth client)). Its redirect URI: <span className="st-mono">{d.redirectUri}</span></span>
         ) : !d.connected ? (
           <div className="st-col" style={{ gap: 6, alignItems: 'flex-start' }}>
             <AsyncButton className="st-btn" busyLabel="Opening Google..." onClick={async () => { try { const r = await api.driveConnect(); window.location.href = r.url } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) } }}>Connect Google Drive</AsyncButton>
-            <span className="st-hint">Google asks you to sign in and allow the Studio to see and add the files it makes. The redirect URI on your OAuth client: <span className="st-mono">{d.redirectUri}</span></span>
+            <span className="st-hint">Google asks you to sign in and allow the Studio to add the files it makes and read your files (for the week's plan in a Google Sheet). The redirect URI on your OAuth client: <span className="st-mono">{d.redirectUri}</span></span>
           </div>
         ) : (
           <div className="st-col" style={{ gap: 8 }}>
             <span className="st-hint" data-field="drive-connected">Connected{d.email ? ` as ${d.email}` : ''}{d.connectedAt ? ` on ${new Date(d.connectedAt).toLocaleDateString()}` : ''}. Root folder: <b>{d.root?.name ?? 'not picked yet'}</b>.</span>
+            {!d.sheets && (
+              <div className="st-row st-callout" style={{ gap: 8, alignItems: 'center', flexWrap: 'wrap' }} data-field="drive-reconnect">
+                <span className="grow">To read a week's plan from your Google Sheets, the Studio needs read access too. Reconnect once (one consent screen); nothing already sent changes.</span>
+                <AsyncButton className="st-btn sm" busyLabel="Opening Google..." onClick={async () => { try { const r = await api.driveConnect(); window.location.href = r.url } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) } }}>Reconnect Google Drive</AsyncButton>
+              </div>
+            )}
             <div className="st-row" style={{ gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
               {(folders.data?.folders.length ?? 0) > 0 && (
                 <select className="st-select" style={{ width: 'auto' }} value={d.root?.id ?? ''} onChange={async e => { try { await api.driveRoot({ folderId: e.target.value }); reload() } catch (err) { toast({ tone: 'bad', text: errorMessage(err) }) } }} aria-label="Root folder">

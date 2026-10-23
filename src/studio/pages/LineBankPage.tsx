@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Download, Upload } from 'lucide-react'
+import { Download, FileSpreadsheet, Upload } from 'lucide-react'
 import { api } from '../api'
 import { PriceButton } from '../PriceButton'
 import { useProducts } from '../hooks'
@@ -106,19 +106,27 @@ function ImportLines({ onDone }: { onDone: () => void }) {
   const [name, setName] = useState('')
   const [productId, setProductId] = useState('')
   const [dry, setDry] = useState<LinesImportResult | null>(null)
+  // Or a Google Sheet (section 39): its link, read on the server.
+  const [sheet, setSheet] = useState('')
+  const [fromSheet, setFromSheet] = useState(false)
+  async function readSheet() {
+    try { const r = await api.importLinesSheet({ sheet, productId: productId || null, dryRun: true }); setDry(r); setName(r.sheet.name); setCsv(''); setFromSheet(true) } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) }
+  }
   async function load(f: File | undefined) {
     if (!f) return
     const text = await f.text()
-    setCsv(text); setName(f.name)
+    setCsv(text); setName(f.name); setFromSheet(false)
     try { setDry(await api.importLines({ csv: text, name: f.name, productId: productId || null, dryRun: true })) } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) }
   }
   return (
     <section className="st-card"><div className="st-card-body st-col" style={{ gap: 8 }} data-field="line-bank-import-lines">
       <span className="st-h3">Import lines</span>
-      <span className="st-hint">A CSV of finished lines: text (required), source (comment, caption, transcript, inventory, competitor, claude), source_likes, pain, emotion, format, voice_fit (first, secondhand, both), life_or_job. Near-matches of a line already in the bank or earlier in the file are dropped. Free.</span>
+      <span className="st-hint">A CSV file or a Google Sheet of finished lines: text (required), source (comment, caption, transcript, inventory, competitor, claude), source_likes, pain, emotion, format, voice_fit (first, secondhand, both), life_or_job. Near-matches of a line already in the bank or earlier in the file are dropped. Free.</span>
       <input ref={file} type="file" accept=".csv,text/csv,text/plain" hidden onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; void load(f) }} data-field="line-bank-lines-file" />
       <div className="st-row" style={{ gap: 8, flexWrap: 'wrap' }}>
         <button type="button" className="st-btn sm secondary" onClick={() => file.current?.click()}><Upload size={13} />Choose the lines CSV</button>
+        <input className="st-input sm" style={{ minWidth: 220, flex: 1 }} value={sheet} onChange={e => setSheet(e.target.value)} placeholder="Or paste a Google Sheets link" aria-label="Google Sheets link for lines" />
+        <AsyncButton className="st-btn sm secondary" disabled={!sheet.trim()} busyLabel="Reading..." field="line-bank-lines-sheet" icon={<FileSpreadsheet size={13} />} onClick={readSheet}>Read the sheet</AsyncButton>
         {products.length > 0 && <select className="st-input sm" style={{ width: 'auto' }} value={productId} onChange={e => setProductId(e.target.value)} aria-label="Product whose pains these are"><option value="">No product</option>{products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select>}
       </div>
       {dry && (
@@ -126,7 +134,7 @@ function ImportLines({ onDone }: { onDone: () => void }) {
           <span className="st-hint" role="status"><b>{name}</b>: {dry.rows} lines, <b>{dry.kept} new</b>, {dry.duplicatesInBank} already in the bank, {dry.duplicatesInFile} near-matches in the file.{dry.unknown.length ? ` Columns not used: ${dry.unknown.join(', ')}.` : ''}</span>
           {dry.problems.map(p => <span key={p} className="st-hint st-warntext">{p}</span>)}
           <AsyncButton className="st-btn sm" disabled={!dry.kept} busyLabel="Importing..." onClick={async () => {
-            try { const r = await api.importLines({ csv, name, productId: productId || null }); setDry(null); setCsv(''); onDone(); toast({ tone: 'ok', text: `${r.kept} lines added to the bank.` }) } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) }
+            try { const r = fromSheet ? await api.importLinesSheet({ sheet, productId: productId || null }) : await api.importLines({ csv, name, productId: productId || null }); setDry(null); setCsv(''); setSheet(''); setFromSheet(false); onDone(); toast({ tone: 'ok', text: `${r.kept} lines added to the bank.` }) } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) }
           }}>Import {dry.kept} line{dry.kept === 1 ? '' : 's'} (free)</AsyncButton>
         </div>
       )}

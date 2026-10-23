@@ -1,4 +1,4 @@
-import type { ActionPreview, CharacterSummary, CharacterView, HiggsfieldAccount, JobView, Me, QuoteView, RulesView, SceneFields, ScenesData, SettingsView, StudioAction, Usage, VideoPrice, BrollClip, ContentData, ContentKind, LibraryData, PostStep, WorkerStatus, CloneOptions, CloneResult, CloneSource, CloneStill, CutView, SoundItem, EditorStyle, ImportPreview, VoiceLine, ProductSummary, ProductView, ProductClaims, KitGroup, SocialAccount, SentView, RecreateBatchView, GateCheckView, StorageInfo, TrashRef, TrashItem, ContentItem, AutoCleanItem, BrandLayer, TemplateReport, SlideFamily, ReuseReport, SlideBatch, StillChoice, SlideScene, SlideStillOptions, StillPathId, PlanPreview, PlanPostView, PlanImportResult, PostResults, ResultsCsvPreview, ResultsView, PostingDayView, LibraryItemInfo, LibraryCollection, FacelessFile, FacelessPreview, FacelessImportResult, TakeCall, MassView, BankImport, BankView, BankWeek, WeekView, WeekPreview, WeekImportResult, DrawResult, BankPage, LinesImportResult, DriveStatus } from './types'
+import type { ActionPreview, CharacterSummary, CharacterView, HiggsfieldAccount, JobView, Me, QuoteView, RulesView, SceneFields, ScenesData, SettingsView, StudioAction, Usage, VideoPrice, BrollClip, ContentData, ContentKind, LibraryData, PostStep, WorkerStatus, CloneOptions, CloneResult, CloneSource, CloneStill, CutView, SoundItem, EditorStyle, ImportPreview, VoiceLine, ProductSummary, ProductView, ProductClaims, KitGroup, SocialAccount, SentView, RecreateBatchView, GateCheckView, StorageInfo, TrashRef, TrashItem, ContentItem, AutoCleanItem, BrandLayer, TemplateReport, SlideFamily, ReuseReport, SlideBatch, StillChoice, SlideScene, SlideStillOptions, StillPathId, PlanPreview, PlanPostView, PlanImportResult, PostResults, ResultsCsvPreview, ResultsView, PostingDayView, LibraryItemInfo, LibraryCollection, FacelessFile, FacelessPreview, FacelessImportResult, TakeCall, MassView, BankImport, BankView, BankWeek, WeekView, WeekPreview, WeekImportResult, DrawResult, BankPage, LinesImportResult, DriveStatus, SheetsList, SheetPreview, ResyncPlan } from './types'
 import { sheetRefOf, typeOf, uploadFiles } from './files'
 
 // Thin client for /api/v1. Every write sends the CSRF header the server
@@ -270,6 +270,11 @@ export const api = {
   week: (monday: string) => request<WeekView>('GET', `/weeks/${monday}`),
   weekPreview: (csv: string) => request<WeekPreview>('POST', '/weeks/preview', { csv }),
   weekImport: (csv: string, o: { rows: string[]; existing?: 'replace' | 'add' }) => request<WeekImportResult>('POST', '/weeks/import', { csv, ...o }),
+  weekSheets: (q?: string) => request<SheetsList>('GET', `/weeks/sheets${q ? `?q=${encodeURIComponent(q)}` : ''}`),
+  sheetPreview: (sheet: string) => request<SheetPreview>('POST', '/weeks/sheets/preview', { sheet }),
+  sheetImport: (sheet: string, o: { rows: string[]; existing?: 'replace' | 'add' }) => request<WeekImportResult>('POST', '/weeks/sheets/import', { sheet, ...o }),
+  resyncPlan: (id: string) => request<ResyncPlan>('GET', `/weeks/sheets/${encodeURIComponent(id)}/resync`),
+  resync: (id: string, update: string[]) => request<WeekImportResult & { kept: number }>('POST', `/weeks/sheets/${encodeURIComponent(id)}/resync`, { update }),
   weekDraw: (monday: string, o: { seed: number; redraw: 'empty' | 'all' | string[]; draft?: Record<string, string | null>; accounts?: string[] }) => request<DrawResult>('POST', `/weeks/${monday}/draw`, o),
   weekFill: (monday: string, rows: Array<{ postId: string; lineId: string | null; lifeOrJob: 'life' | 'job'; flag?: string | null }>) => request<{ filled: number; empty: number; drafted: number; pulls: number }>('POST', `/weeks/${monday}/fill`, { rows }),
   weekCheck: (monday: string) => request<{ checked: number; flagged: number }>('POST', `/weeks/${monday}/check`, {}),
@@ -280,6 +285,7 @@ export const api = {
   bankPage: (q: Record<string, string | undefined>) => request<BankPage>('GET', `/line-bank/all?${new URLSearchParams(Object.entries(q).filter(([, v]) => v) as Array<[string, string]>).toString()}`),
   bankCsvUrl: (q: Record<string, string | undefined>) => `/api/v1/line-bank/all.csv?${new URLSearchParams(Object.entries(q).filter(([, v]) => v) as Array<[string, string]>).toString()}`,
   importLines: (body: { csv: string; name?: string; productId?: string | null; dryRun?: boolean }) => request<LinesImportResult>('POST', '/line-bank/lines/import', body),
+  importLinesSheet: (body: { sheet: string; productId?: string | null; dryRun?: boolean }) => request<LinesImportResult & { sheet: { id: string; name: string } }>('POST', '/line-bank/lines/sheet', body),
   importPlaces: (characterId: string, csv: string) => request<{ added: number; replaced: number; drafted: number; total: number; problems: string[] }>('POST', `/characters/${characterId}/places/import`, { csv }),
   drive: () => request<DriveStatus>('GET', '/drive'),
   driveConnect: () => request<{ url: string }>('POST', '/drive/connect', {}),
