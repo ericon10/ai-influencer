@@ -18,25 +18,27 @@ bottom of the list they belong to.
 
 ## Now (launch week)
 
-### Build queue (owner, 2026-10-23), in this order
+### Build queue (owner, 2026-10-23)
 
-Each brief is in full in `docs/studio/briefs/`; a session takes the top
-one, builds it, and crosses it off here.
+Each brief is in full in `docs/studio/briefs/`. All three are built:
+hover states (UX-PLAN section 38), Weeks from Google Sheets (section 39),
+Kie.ai and WaveSpeed (section 40).
 
-1. **Hover states on every button** (`2026-10-23-hover-states.md`). A
-   visible bug (New post nearly disappears on hover), small, one session.
-   First because it touches every screen the owner uses every day.
-2. **Weeks: import from Google Sheets** (`2026-10-23-weeks-sheets.md`).
-   Small, and Drive is already connected: pick or paste a sheet, Re-sync
-   that asks before touching posts with paid images, Import lines from a
-   sheet, ROOT / Plans / CHARACTER. Second because it changes how every
-   week starts, on a connection that already works.
-3. **Wire Kie.ai and WaveSpeed** (`2026-10-23-kie-wavespeed.md`). The big
-   one: keys, adapters, the price book per provider, the provider picker
-   with the cheapest marked, failover that asks, the provider on every
-   output, and the step > model > provider table the ComfyUI build plugs
-   into. Higgsfield stays the default. After the hover fix, so its new
-   pickers are built on the fixed button styles.
+### Kie.ai and WaveSpeed: what is left for the owner
+
+- **Keys:** Settings > General > Provider keys, Kie.ai (kie.ai, API Key
+  page) and WaveSpeed (wavespeed.ai, Access Keys). Both are pay as you go;
+  a small top-up is enough. Test key shows the balance.
+- **One real still on each** (a few cents each): pick Kie.ai, then
+  WaveSpeed, for Nano Banana 2.1 stills (Settings > Models > Providers),
+  make one still each, and compare each dashboard's charge with the price
+  shown (Kie.ai $0.03 at 2K, WaveSpeed about $0.07 at 2K). Then mark the
+  price confirmed in config/pricebook.yaml (`verified: true`).
+- **Unconfirmed field names**, to watch on the first real runs: WaveSpeed's
+  Kling end frame (`last_image`; one page says `end_image`) and its Nano
+  Banana 2.1 edit fields (taken from the Pro edit model's page); the output
+  hosts (`config/runtime.yaml` allowed_hosts: a run from a new host fails
+  naming the host, never silently).
 
 ### Paid tests queued for the owner (each needs a quote shown first)
 
