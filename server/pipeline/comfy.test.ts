@@ -17,7 +17,7 @@ import { finalizeImagePrompt } from '../core/realism.js'
 import { createCharacter } from './characters.js'
 import { setSetting } from './settings.js'
 import { claim, comfyView, createAgentToken, done, enqueue, heartbeat, loadRepoWorkflows, repoLock, updateComfySettings, LEASE_MS } from './comfy.js'
-import { envHash, type EnvLock } from '../core/comfyWorkflows.js'
+import { bindWorkflow, envHash, type EnvLock } from '../core/comfyWorkflows.js'
 // @ts-expect-error the agent is plain JavaScript (it runs on the machine)
 import { createAgent, envHash as agentEnvHash } from '../../comfy/agent/agent.mjs'
 
@@ -91,6 +91,15 @@ describe('workflows and the environment', () => {
     const wfs = loadRepoWorkflows()
     expect(wfs.map(w => w.manifest.id).sort()).toEqual(['krea-2-turbo', 'qwen-image-edit-2511', 'wan-2.2-animate-mix', 'wan-2.2-animate-replace', 'wan-2.2-i2v'])
     expect(wfs.find(w => w.manifest.id === 'krea-2-turbo')!.manifest.license_check).toBe(true)
+    // Section 44: the Krea 2 graph loads its Qwen3-VL-4B encoder as krea2
+    // (manifest version 2), and runs with no LoRA (the loader bypassed).
+    const krea = wfs.find(w => w.manifest.id === 'krea-2-turbo')!
+    expect(krea.manifest.version).toBe(2)
+    const { graph } = bindWorkflow(krea, { prompt: 'a woman on a bench. REALISM: natural skin.', seed: 1, width: 1088, height: 1920, batch: 1, refs: 0 })
+    const clip = Object.values(graph).find(n => n.class_type === 'CLIPLoader')!
+    expect(clip.inputs.type).toBe('krea2')
+    expect(Object.values(graph).some(n => n.class_type === 'LoraLoaderModelOnly')).toBe(false)
+    expect(Object.values(graph).find(n => n.class_type === 'KSampler')!.inputs.model).toEqual(['1', 0])
     expect(agentEnvHash(repoLock())).toBe(envHash(repoLock()))
     // Whitespace and key order never change the hash.
     expect(envHash(JSON.parse(JSON.stringify({ ...repoLock(), nodes: Object.fromEntries(Object.entries(repoLock().nodes).reverse()) })))).toBe(envHash(repoLock()))
@@ -345,11 +354,24 @@ describe('character LoRAs, the bake-off and the engine lever', () => {
     const callie = await importAs('Callie')
     for (let i = 0; i < 12; i++) await h.deps.db.insert(candidates).values({ id: newId('cand'), accountId: h.ctx.accountId, characterId: callie, target: 'scene', op: 'generate', status: 'approved', prompt: finalizeImagePrompt(`Scene ${i}: she reads on a bench, wearing a gray hoodie.`).prompt, createdAt: new Date(Date.UTC(2026, 9, 1, 12, i)) })
     const est = await estimateAction(h.deps, h.ctx, { type: 'compare_providers', characterId: callie })
-    expect(est.quote.items).toHaveLength(20)
+    // Krea 2 runs too with no LoRA (section 44): 10 prompts on 3 models.
+    expect(est.quote.items).toHaveLength(30)
     expect(est.quote.display).toMatch(/^\$0\.30, about \d+ min on ComfyUI$/)
     expect(est.preview.warnings.map(w => w.ruleId)).toEqual(['bakeoff-krea', 'bakeoff-qwen'])
     // Nothing changes until the owner picks.
     expect(await routeWithLever(h.deps, h.ctx, 'higgsfield/nano-banana-2.1', 'image', { step: 'still' })).toMatchObject({ ref: 'higgsfield/nano-banana-2.1', source: 'asked' })
+    // Count 1 (section 44): one prompt on each model, one Krea job with no LoRA.
+    const one = await estimateAction(h.deps, h.ctx, { type: 'compare_providers', characterId: callie, count: 1 })
+    expect(one.quote.items).toHaveLength(3)
+    expect(one.preview.title).toBe('Compare providers: 1 of Callie\'s prompts')
+    expect(one.preview.warnings.find(w => w.ruleId === 'bakeoff-krea')!.message).toMatch(/no LoRA, text card only/)
+    const { buildCompare } = await import('./comfyActions.js')
+    const built = await buildCompare(h.deps, h.ctx, { characterId: callie, count: 1 })
+    const kreaJobs = built.specs.filter(x => (x.request as { modelRef?: string }).modelRef === 'comfy/krea-2-turbo')
+    expect(kreaJobs).toHaveLength(1)
+    expect(kreaJobs[0]!.label).toMatch(/\(no LoRA, text card only\)$/)
+    // Use as default stays off for Krea 2 until a Krea 2 LoRA exists.
+    await expect(useAsDefault(h.deps, h.ctx, 'comfy/krea-2-turbo', callie)).rejects.toThrow(/once there is a Krea 2 LoRA/)
     await useAsDefault(h.deps, h.ctx, 'comfy/qwen-image-edit-2511')
     expect((await readLever(h.deps, h.ctx.accountId)).steps.still).toBe('comfy/qwen-image-edit-2511')
     expect(await routeWithLever(h.deps, h.ctx, 'higgsfield/nano-banana-2.1', 'image', { step: 'still' })).toMatchObject({ ref: 'comfy/qwen-image-edit-2511', source: 'step' })
@@ -446,11 +468,13 @@ describe('the brief\'s checklist (E6, E7, item 4, item 12)', () => {
       const action = { type: 'compare_providers' as const, characterId: callie }
       const est = await estimateAction(h2.deps, h2.ctx, action)
       const ran = await runAction(h2.deps, h2.ctx, action, est.quote.id, true) as { jobs: Array<{ id: string }> }
-      expect(ran.jobs).toHaveLength(6)
+      expect(ran.jobs).toHaveLength(9)
       const { drain } = await import('../testing/harness.js')
       await drain(h2, 40)
       const v = await compareView(h2.deps, h2.ctx, callie)
-      expect(v.models!.map(m => m.ref)).toEqual(['kie/nano-banana-2.1', 'comfy/qwen-image-edit-2511'])
+      expect(v.models!.map(m => m.ref)).toEqual(['kie/nano-banana-2.1', 'comfy/qwen-image-edit-2511', 'comfy/krea-2-turbo'])
+      expect(v.models!.find(m => m.ref === 'comfy/krea-2-turbo')).toMatchObject({ note: 'no LoRA, text card only', canDefault: false })
+      expect(v.counts).toEqual([1, 3, 10])
       expect(v.rows).toHaveLength(3)
       for (const r of v.rows!) for (const m of v.models!) expect(r.cells[m.ref]).toMatchObject({ status: 'completed', assetId: expect.any(String), face: 1, texture: expect.any(Number) })
       expect(v.models![0]).toMatchObject({ face: 1, texture: expect.any(Number) })

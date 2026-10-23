@@ -6,7 +6,7 @@
     { "path": "vae/qwen_image_vae.safetensors", "family": "qwen", "source": "https://huggingface.co/Comfy-Org/Qwen-Image_ComfyUI", "sha256": null },
     { "path": "diffusion_models/krea2_turbo.safetensors", "family": "krea2", "source": "the machine owner's own Krea 2 Turbo file (confirm the name)", "sha256": null, "license_check": true },
     { "path": "diffusion_models/krea2_raw.safetensors", "family": "krea2", "source": "Krea 2 Raw, the LoRA training base (confirm the name)", "sha256": null, "license_check": true },
-    { "path": "text_encoders/krea2_text_encoder.safetensors", "family": "krea2", "source": "the text encoder Krea 2 ships with (confirm the name)", "sha256": null, "license_check": true },
+    { "path": "text_encoders/krea2_text_encoder.safetensors", "family": "krea2", "source": "Krea 2's text encoder, Qwen3-VL-4B (CLIPLoader type krea2)", "sha256": null, "license_check": true },
     { "path": "vae/krea2_vae.safetensors", "family": "krea2", "source": "the VAE Krea 2 ships with (confirm the name)", "sha256": null, "license_check": true },
     { "path": "diffusion_models/wan2.2_i2v_high_noise_14B_fp16.safetensors", "family": "wan", "source": "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged", "sha256": null },
     { "path": "diffusion_models/wan2.2_i2v_low_noise_14B_fp16.safetensors", "family": "wan", "source": "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged", "sha256": null },

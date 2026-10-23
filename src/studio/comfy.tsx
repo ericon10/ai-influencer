@@ -177,9 +177,10 @@ export function EngineLever({ compact = false }: { compact?: boolean }) {
   const current = v.engines.find(e => e.id === v.engine)
   return (
     <div className={compact ? 'st-col' : 'st-card'} style={compact ? { gap: 8 } : undefined} data-field="engine-lever">
-      <div className={compact ? 'st-row' : 'st-card-head'} style={compact ? { gap: 8, alignItems: 'center', flexWrap: 'wrap' } : undefined}>
-        <div className="grow">
-          <div className={`${compact ? 'st-label' : 'st-h2'} st-row`} style={{ gap: 8, margin: 0 }}>Engine<HowTo id="engine" label="How the engine lever works" /></div>
+      <div className={compact ? 'st-row' : 'st-card-head'} style={compact ? { gap: 8, alignItems: 'center', flexWrap: 'wrap' } : { flexWrap: 'wrap' }}>
+        {/* The title keeps its width on a phone (the select wraps under it), so its help chip stays right after it. */}
+        <div className="grow" style={{ flex: '1 1 220px', minWidth: 0 }}>
+          <div className="st-titlerow"><div className={compact ? 'st-label' : 'st-h2'} style={{ margin: 0 }}>Engine</div><HowTo id="engine" label="How the engine lever works" /></div>
           {!compact && <div className="st-hint">One switch for every step: the engine's model for each step, its prices in its own units. A pick on a step or a character still wins. Nothing runs without its price and your click.</div>}
         </div>
         <select className="st-select" style={{ width: compact ? 260 : 300, maxWidth: "100%" }} aria-label="Engine" value={v.engine ?? ''} onChange={e => void set({ engine: e.target.value || null }, e.target.value ? `Engine: ${v.engines.find(x => x.id === e.target.value)?.label}. Prices follow it.` : 'Each step uses its own model again.')} data-field="engine-select">
@@ -286,7 +287,7 @@ export function LoraCard({ v }: { v: CharacterView }) {
         <PriceButton action={sheetReady ? { type: 'comfy_train', characterId: v.id, base, stillIds: picked } : null} label={`Train ${loras.some(l => l.base === base) ? 'a new version of the' : 'the'} ${base === 'krea2' ? 'Krea 2' : 'Qwen'} LoRA`} todo={sheetReady ? [] : [{ label: 'Approve the reference sheet first (REF-00 at least)' }]} watch={j => j.purpose.startsWith(`comfy_lora:${v.id}:`)} />
         <div className="st-row" style={{ gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
           <button type="button" className="st-btn" onClick={() => setComparing(true)} data-field="open-compare">Compare providers</button>
-          <span className="st-hint">10 of {v.data.name}'s real prompts on Nano Banana (Kie.ai), Qwen and Krea 2 Turbo with her LoRAs, side by side with face and skin scores.</span>
+          <span className="st-hint">1, 3 or 10 of {v.data.name}'s real prompts on Nano Banana (Kie.ai), Qwen and Krea 2 Turbo (with her LoRAs; Krea 2 runs with no LoRA, text card only, until she has one), side by side with face and skin scores.</span>
         </div>
       </div>
       <CompareDrawer v={v} open={comparing} onClose={() => setComparing(false)} />
@@ -300,19 +301,29 @@ export function CompareDrawer({ v, open, onClose }: { v: CharacterView; open: bo
   const toast = useToast()
   const q = useQuery({ queryKey: ['compare', v.id], queryFn: () => api.compare(v.id), enabled: open, refetchInterval: open ? 10_000 : false })
   const c = q.data
+  // How many of her prompts (section 44): 1, 3 or 10; 10 by default.
+  const [count, setCount] = useState(10)
   return (
     <Drawer open={open} onClose={onClose} title={<span className="st-row" style={{ gap: 8 }}>Compare providers<HowTo id="comfy" label="How the comparison works" /></span>} wide>
       <div className="st-col" style={{ gap: 16 }} data-field="compare-drawer">
         <span className="st-hint">Face: the match with REF-00 (higher is the same person). Skin: detail against REF-00's (1.0 is as much real skin texture; low means smoothed). Nothing changes until you press Use as default.</span>
-        <PriceButton action={{ type: 'compare_providers', characterId: v.id }} label="Run the comparison" watch={j => j.purpose.startsWith('bakeoff:') && j.characterId === v.id} />
+        <div className="st-row" style={{ gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          <span className="st-label" style={{ margin: 0 }}>How many of {v.data.name}'s prompts</span>
+          <div className="st-seg sm" role="radiogroup" aria-label="How many prompts" data-field="compare-count">
+            {(c?.counts ?? [1, 3, 10]).map(n => <button key={n} type="button" role="radio" aria-checked={count === n} className={count === n ? 'on' : ''} onClick={() => setCount(n)}>{n}</button>)}
+          </div>
+          <span className="st-hint">The price follows it.</span>
+        </div>
+        {c && !c.kreaLora && <span className="st-hint" data-field="compare-krea-note">Krea 2 Turbo runs with no LoRA, text card only: its face comes from the words alone, so its face score is not a fair one. Train {v.data.name}'s Krea 2 LoRA for that; Use as default stays off for Krea 2 until then.</span>}
+        <PriceButton action={{ type: 'compare_providers', characterId: v.id, count }} label={`Run the comparison (${count} prompt${count === 1 ? '' : 's'})`} watch={j => j.purpose.startsWith('bakeoff:') && j.characterId === v.id} />
         {c?.run && c.models && c.rows && (
           <>
             <div className="st-row" style={{ gap: 10, flexWrap: 'wrap' }} data-field="compare-summary">
               {c.models.map(m => (
                 <div key={m.ref} className="st-card" style={{ padding: 12, minWidth: 200 }}>
-                  <b>{m.label}</b>
+                  <b>{m.label}</b>{m.note && <span className="st-badge plain warn" style={{ marginLeft: 6 }} data-field="compare-no-lora">{m.note}</span>}
                   <div className="st-hint">Face {m.face ?? 'n/a'}, skin {m.texture ?? 'n/a'}</div>
-                  <AsyncButton className="st-btn sm" onClick={async () => { try { await api.useCompared(m.ref); toast({ tone: 'ok', text: `${m.label} is now the default for stills on every character. Settings > Engine changes it back.` }) } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) } }}>Use as default for stills</AsyncButton>
+                  <AsyncButton className="st-btn sm" disabled={m.canDefault === false} title={m.canDefault === false ? 'Train a Krea 2 LoRA first: with none the face comes from the words alone' : undefined} onClick={async () => { try { await api.useCompared(m.ref, v.id); toast({ tone: 'ok', text: `${m.label} is now the default for stills on every character. Settings > Engine changes it back.` }) } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) } }}>Use as default for stills</AsyncButton>
                 </div>
               ))}
             </div>
@@ -326,7 +337,7 @@ export function CompareDrawer({ v, open, onClose }: { v: CharacterView; open: bo
                       return (
                         <figure key={m.ref} className="st-compare-cell">
                           {cell?.assetId ? <img src={assetUrl(cell.assetId, 480)} alt={`${m.label}, prompt ${r.index + 1}`} loading="lazy" /> : <div className="st-skel" style={{ aspectRatio: '9 / 16' }} />}
-                          <figcaption><b>{m.label}</b><span className="st-hint">{cell ? (cell.status === 'completed' ? `Face ${cell.face ?? 'n/a'}, skin ${cell.texture ?? 'n/a'}` : cell.status) : 'not run'}</span></figcaption>
+                          <figcaption><b>{m.label}{m.note ? ` (${m.note})` : ''}</b><span className="st-hint">{cell ? (cell.status === 'completed' ? `Face ${cell.face ?? 'n/a'}, skin ${cell.texture ?? 'n/a'}` : cell.status) : 'not run'}</span></figcaption>
                         </figure>
                       )
                     })}

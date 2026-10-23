@@ -1,6 +1,6 @@
 {
   "id": "krea-2-turbo",
-  "version": 1,
+  "version": 2,
   "label": "Krea 2 Turbo",
   "ref": "comfy/krea-2-turbo",
   "steps": ["still"],

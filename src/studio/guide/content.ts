@@ -824,7 +824,7 @@ export const GUIDE: GuideSection[] = [
       'Environment: the machine reports a hash of its ComfyUI commit, custom nodes, PyTorch and model checksums. A machine that differs gets no jobs, and the card says what differs. After a tested upgrade, press Use this machine\'s environment.',
       'Pick ComfyUI on a step: the provider picker shows it with $0 API, or set the engine (Settings, top) to ComfyUI for every step it can do.',
       'Character file tab > LoRAs on ComfyUI: pick Qwen-Image-Edit or Krea 2 Raw, tick any approved stills to add to the sheet, and press Train. Retrain makes v2; any finished version can be the active one. Faceless characters have none.',
-      'Compare providers (same card): 10 of the character\'s real prompts on Nano Banana (Kie.ai), Qwen and Krea 2 Turbo, side by side with each still\'s face score against REF-00 and its skin texture score. Use as default for stills changes the default; nothing changes until you press it.',
+      'Compare providers (same card): pick how many of the character\'s real prompts (1, 3 or 10; 10 by default, the price follows it) on Nano Banana (Kie.ai), Qwen and Krea 2 Turbo, side by side with each still\'s face score against REF-00 and its skin texture score. With no Krea 2 LoRA yet, Krea 2 still runs, labeled "no LoRA, text card only" (its face comes from the words alone), and the warning on the price stays. Use as default for stills changes the default; nothing changes until you press it, and it stays off for Krea 2 until the character has a Krea 2 LoRA.',
       'Pause the queue (or comfy-agent pause on the machine) when its owner needs the GPU; Max jobs at once is 1 by default.',
     ],
     tips: [

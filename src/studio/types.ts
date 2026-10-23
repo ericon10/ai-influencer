@@ -755,7 +755,10 @@ export interface LeverView {
 export interface CompareView {
   run: string | null
   at?: string
-  models?: Array<{ ref: string; label: string; face: number | null; texture: number | null }>
+  // Section 44: the count choices, whether the character has a Krea 2 LoRA,
+  // and per model its note (no LoRA, text card only) and Use as default.
+  counts?: number[]; kreaLora?: boolean
+  models?: Array<{ ref: string; label: string; face: number | null; texture: number | null; note?: string | null; canDefault?: boolean }>
   rows?: Array<{ index: number; prompt: string; cells: Record<string, { jobId: string; status: string; assetId: string | null; face: number | null; texture: number | null }> }>
 }
 

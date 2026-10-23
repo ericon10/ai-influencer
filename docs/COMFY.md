@@ -12,8 +12,11 @@ the NVIDIA Container Toolkit, about 200 GB free disk, and git.
 ## 1. Get the files
 
 ```
-git clone https://github.com/ericon10/ai-influencer.git studio && cd studio
+git clone -b character-studio https://github.com/ericon10/ai-influencer.git studio && cd studio
 ```
+
+Use `-b character-studio`: the Studio lives on that branch, and `main` has
+no `comfy/` folder. To update later: `git pull` in the same folder.
 
 Everything ComfyUI needs is in `comfy/`:
 `comfy/env/` (the pinned image and its lock), `comfy/workflows/` (the
@@ -54,6 +57,17 @@ clip_vision/clip_vision_h.safetensors
 sam2/sam2.1_hiera_large.safetensors
 loras/                                        empty; trained LoRAs land here
 ```
+
+`text_encoders/krea2_text_encoder.safetensors` is Krea 2's text encoder
+(Qwen3-VL-4B); the Krea 2 workflow loads it with the CLIPLoader type
+`krea2`, which the pinned ComfyUI lists.
+
+**A test machine.** On a smaller card, smaller fp8 files may be saved under
+the expected names above (an fp8 Krea 2 Turbo as `krea2_turbo.safetensors`,
+for example): the workflows find them by name. Their hashes differ from
+another machine's, so press **Use this machine's environment** in Settings >
+General > ComfyUI on each machine (or after you swap a file); the Studio then
+accepts that machine's files.
 
 Most are on Hugging Face under Comfy-Org (the `source` in models.json), for
 example:

@@ -82,6 +82,10 @@ const onLora: JobHook = async (deps, ctx, job, outcome) => {
 // ── The bake-off (item 12) ──
 
 export const BAKEOFF_MODELS = ['kie/nano-banana-2.1', 'comfy/qwen-image-edit-2511', 'comfy/krea-2-turbo'] as const
+// How many of the character's prompts (section 44): 1, 3 or 10.
+export const COMPARE_COUNTS = [1, 3, 10] as const
+// Krea 2 with no LoRA (section 44): it still runs, its face from the words alone.
+export const NO_LORA = 'no LoRA, text card only'
 
 export async function buildCompare(deps: Deps, ctx: Ctx, a: { characterId: string; count?: number }) {
   const ch = await personCharacter(deps, ctx, a.characterId)
@@ -91,23 +95,24 @@ export async function buildCompare(deps: Deps, ctx: Ctx, a: { characterId: strin
   const side = ['REF-02', 'REF-03', 'REF-01'].map(id => sheet.get(id)).find(Boolean)
   const refs = [ref00, ...(side ? [side] : [])].map(assetId => ({ assetId }))
   const rows = await deps.db.select({ prompt: candidates.prompt }).from(candidates).where(and(eq(candidates.accountId, ctx.accountId), eq(candidates.characterId, ch.id), eq(candidates.target, 'scene'), eq(candidates.op, 'generate'))).orderBy(desc(candidates.createdAt)).limit(60)
-  const prompts = [...new Set(rows.map(r => r.prompt).filter(p => p && p.includes('REALISM')))].slice(0, a.count ?? 10)
+  const count = (COMPARE_COUNTS as readonly number[]).includes(a.count ?? 10) ? a.count ?? 10 : 10
+  const prompts = [...new Set(rows.map(r => r.prompt).filter(p => p && p.includes('REALISM')))].slice(0, count)
   if (!prompts.length) throw new AppError('bad_request', `${ch.name} has no scene stills yet. Make a few, then compare providers on her real prompts.`)
   const krea = await activeLora(deps.db, ctx.accountId, ch.id, 'krea2')
   const specs: JobSpec[] = []
   for (const [i, prompt] of prompts.entries()) {
     for (const model of BAKEOFF_MODELS) {
-      if (model === 'comfy/krea-2-turbo' && !krea) continue
+      // Krea 2 runs even with no LoRA (section 44), labeled; the warning stays.
       const text = model === 'comfy/krea-2-turbo'
       const kind = text ? 'image' : 'image_edit'
       // Demo mode runs the free mock in each one's place; modelRef keeps
       // the compared model. Never routed through the lever or the picks.
       const ran = (await forMode(deps, ctx, { model, kind } as never) as { model: string }).model
-      specs.push({ type: 'gen', stage: 'scene', purpose: `bakeoff:${ch.id}:${i}`, label: `Compare ${i + 1}: ${deps.config.models.models.find(m => m.ref === model)?.label}`, request: { kind, model: ran, modelRef: model, prompt, aspect: '9:16', resolution: '2k', ...(text ? {} : { refs }) } })
+      specs.push({ type: 'gen', stage: 'scene', purpose: `bakeoff:${ch.id}:${i}`, label: `Compare ${i + 1}: ${deps.config.models.models.find(m => m.ref === model)?.label}${text && !krea ? ` (${NO_LORA})` : ''}`, request: { kind, model: ran, modelRef: model, prompt, aspect: '9:16', resolution: '2k', ...(text ? {} : { refs }) } })
     }
   }
   const warnings: RuleViolation[] = []
-  if (!krea) warnings.push(warn('bakeoff-krea', 'No Krea 2 LoRA yet', `Krea 2 Turbo is text to image: its face comes from ${ch.name}'s Krea 2 LoRA. Train one to add it to the comparison.`))
+  if (!krea) warnings.push(warn('bakeoff-krea', 'No Krea 2 LoRA yet', `Krea 2 Turbo is text to image: its face comes from ${ch.name}'s Krea 2 LoRA. It runs here with ${NO_LORA} (the face from the words alone), so its face score is not a fair one. Train a Krea 2 LoRA for that; Use as default stays off for Krea 2 until then.`))
   if (!(await activeLora(deps.db, ctx.accountId, ch.id, 'qwen'))) warnings.push(warn('bakeoff-qwen', 'No Qwen LoRA yet', 'Qwen-Image-Edit runs with her refs only. Train her Qwen LoRA for the fair comparison.'))
   return { purpose: `bakeoff:${ch.id}`, characterId: ch.id, specs, preview: { title: `Compare providers: ${prompts.length} of ${ch.name}'s prompts`, prompts: [], warnings, invalidates: [] } }
 }
@@ -132,11 +137,12 @@ const onBakeoff: JobHook = async (deps, ctx, job, outcome) => {
 }
 
 export async function compareView(deps: Deps, ctx: Ctx, characterId: string) {
+  const kreaLora = !!(await activeLora(deps.db, ctx.accountId, characterId, 'krea2'))
   // One comparison is one quote: the latest run's jobs (the purpose is the
   // same each time, so the estimate and the run always match).
   const rows = await deps.db.select().from(jobs).where(and(eq(jobs.accountId, ctx.accountId), eq(jobs.characterId, characterId), like(jobs.purpose, 'bakeoff:%'))).orderBy(desc(jobs.createdAt)).limit(200)
   const runId = rows[0]?.quoteId ?? rows[0]?.id
-  if (!runId) return { run: null }
+  if (!runId) return { run: null, counts: [...COMPARE_COUNTS], kreaLora }
   const mine = rows.filter(r => (r.quoteId ?? r.id) === runId)
   const { jobOutputs } = await import('../db/schema.js')
   const outs = await deps.db.select().from(jobOutputs).where(inArray(jobOutputs.jobId, mine.map(m => m.id)))
@@ -155,15 +161,23 @@ export async function compareView(deps: Deps, ctx: Ctx, characterId: string) {
   const avg = (m: string, k: 'face' | 'texture') => { const v = [...byPrompt.values()].map(r => r.cells[m]?.[k]).filter((x): x is number => x != null); return v.length ? Math.round((v.reduce((a, b) => a + b, 0) / v.length) * 1000) / 1000 : null }
   return {
     run: runId, at: mine[mine.length - 1]!.createdAt.toISOString(),
-    models: models.map(m => ({ ref: m, label: label(m), face: avg(m, 'face'), texture: avg(m, 'texture') })),
+    counts: [...COMPARE_COUNTS], kreaLora,
+    // Krea 2 with no LoRA: labeled, and Use as default stays off for it.
+    models: models.map(m => ({ ref: m, label: label(m), face: avg(m, 'face'), texture: avg(m, 'texture'), note: m === 'comfy/krea-2-turbo' && !kreaLora ? NO_LORA : null, canDefault: m !== 'comfy/krea-2-turbo' || kreaLora })),
     rows: [...byPrompt.entries()].sort((a, b) => a[0] - b[0]).map(([i, r]) => ({ index: i, ...r })),
   }
 }
 
 // "Use as default": that model for stills on every character (the lever's
 // step override). Nothing changes until the owner picks.
-export async function useAsDefault(deps: Deps, ctx: Ctx, ref: string): Promise<void> {
+export async function useAsDefault(deps: Deps, ctx: Ctx, ref: string, characterId?: string | null): Promise<void> {
   if (!(BAKEOFF_MODELS as readonly string[]).includes(ref)) throw new AppError('bad_request', 'Pick one of the compared models.')
+  // Krea 2 as the default only once there is a Krea 2 LoRA (section 44):
+  // with none its face comes from the words alone.
+  if (ref === 'comfy/krea-2-turbo') {
+    const any = characterId ? await activeLora(deps.db, ctx.accountId, characterId, 'krea2') : (await deps.db.select({ id: comfyLoras.id }).from(comfyLoras).where(and(eq(comfyLoras.accountId, ctx.accountId), eq(comfyLoras.base, 'krea2'), eq(comfyLoras.state, 'ready'))).limit(1))[0]
+    if (!any) throw new AppError('bad_request', 'Krea 2 Turbo can be the default once there is a Krea 2 LoRA: with none its face comes from the words alone. Train one first.')
+  }
   await setLever(deps, ctx, { step: { step: 'still', ref } })
 }
 

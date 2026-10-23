@@ -89,12 +89,24 @@ test('the character file tab: Train LoRA (demo mock) lists Qwen v1 active; Compa
   await card.locator('[data-field="open-compare"]').click()
   await expect(page.locator('[data-field="compare-drawer"]')).toBeVisible()
   const drawer = page.locator('[data-field="compare-drawer"]')
-  const runIt = drawer.getByRole('button', { name: /Run the comparison/ })
+  // Section 44: how many prompts (1, 3 or 10; 10 by default); Krea 2 runs
+  // with no LoRA, labeled, and Use as default stays off for it.
+  await expect(drawer.locator('[data-field="compare-count"]').getByRole('radio', { name: '10' })).toHaveAttribute('aria-checked', 'true')
+  await drawer.locator('[data-field="compare-count"]').getByRole('radio', { name: '1', exact: true }).click()
+  await expect(drawer.locator('[data-field="compare-krea-note"]')).toContainText('no LoRA, text card only')
+  const runIt = drawer.getByRole('button', { name: /Run the comparison \(1 prompt\)/ })
   await expect(runIt).toContainText(/\$\d|credits|Free/, { timeout: 30_000 })
   // Demo mode: free mocks stand in; each still gets its face and skin scores.
   await runIt.click()
   const confirmRun = page.getByRole('button', { name: /^Confirm / })
   if (await confirmRun.first().isVisible({ timeout: 1500 }).catch(() => false)) await confirmRun.first().click()
   await expect(drawer.locator('[data-field="compare-summary"]')).toContainText(/Face .*, skin \d/, { timeout: 120_000 })
+  // One prompt: one job per model, Krea 2 among them with no LoRA.
+  await expect.poll(async () => (await api<{ rows?: Array<{ cells: Record<string, unknown> }> }>('GET', `/characters/${callie}/compare`)).rows?.length, { timeout: 60_000 }).toBe(1)
+  const view = await api<{ rows: Array<{ cells: Record<string, unknown> }> }>('GET', `/characters/${callie}/compare`)
+  expect(Object.keys(view.rows[0]!.cells).sort()).toEqual(['comfy/krea-2-turbo', 'comfy/qwen-image-edit-2511', 'kie/nano-banana-2.1'])
+  const kreaCard = drawer.locator('[data-field="compare-summary"] .st-card', { hasText: 'Krea 2' })
+  await expect(kreaCard.locator('[data-field="compare-no-lora"]')).toHaveText('no LoRA, text card only')
+  await expect(kreaCard.getByRole('button', { name: 'Use as default for stills' })).toBeDisabled()
   await snap(page, info, 'character: Compare providers with face and skin scores')
 })

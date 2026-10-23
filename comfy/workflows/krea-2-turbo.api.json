@@ -1,6 +1,6 @@
 {
   "1": { "class_type": "UNETLoader", "inputs": { "unet_name": "krea2_turbo.safetensors", "weight_dtype": "default" } },
-  "2": { "class_type": "CLIPLoader", "inputs": { "clip_name": "krea2_text_encoder.safetensors", "type": "flux2", "device": "default" } },
+  "2": { "class_type": "CLIPLoader", "inputs": { "clip_name": "krea2_text_encoder.safetensors", "type": "krea2", "device": "default" } },
   "3": { "class_type": "VAELoader", "inputs": { "vae_name": "krea2_vae.safetensors" } },
   "4": { "class_type": "LoraLoaderModelOnly", "inputs": { "model": ["1", 0], "lora_name": "studio:lora", "strength_model": 1.0 } },
   "5": { "class_type": "CLIPTextEncode", "inputs": { "clip": ["2", 0], "text": "" } },
