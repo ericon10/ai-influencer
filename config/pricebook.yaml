@@ -106,6 +106,7 @@ entries:
 
   # Mock: small non-zero prices so tests exercise the ledger end to end.
   - { provider: mock, model: image, unit: image, price: 0.04, verified: true }
+  - { provider: mock, model: image, unit: call, price: 0, verified: true, source: "Demo mode stands in for a LoRA training on the ComfyUI machine." }
   - { provider: mock, model: video, unit: second, price: 0.10, verified: true }
   # A mass recreate clip fetch in demo mode (item 24): per clip.
   - { provider: mock, model: video, unit: call, price: 0.01, verified: true }
