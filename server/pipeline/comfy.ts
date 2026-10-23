@@ -167,7 +167,7 @@ export function envCheck(s: ComfySettings, a: AgentStatus | null): { ok: boolean
 export async function agentAccount(db: Db, header: string | undefined): Promise<string> {
   const token = (header ?? '').replace(/^Bearer\s+/i, '').trim()
   const m = /^cfy\.([a-z0-9_]+)\.[A-Za-z0-9_-]{20,}$/.exec(token)
-  if (!m) throw new AppError('unauthorized', 'The agent token is missing or malformed. Make one in Settings > Provider keys > ComfyUI.')
+  if (!m) throw new AppError('unauthorized', 'The agent token is missing or malformed. Make one in Settings > General > ComfyUI.')
   const s = await comfySettings(db, m[1]!)
   const want = Buffer.from(s.tokenHash ?? '', 'hex'), got = Buffer.from(sha256Hex(token), 'hex')
   if (!s.tokenHash || want.length !== got.length || !timingSafeEqual(want, got)) throw new AppError('unauthorized', 'This agent token is not the current one. Make a new one in Settings and put it on the machine.')

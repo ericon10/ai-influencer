@@ -28,7 +28,7 @@ const STEPS: Array<{ id: WeekStep; label: string }> = [
   { id: 'import', label: 'Import' }, { id: 'fill', label: 'Fill' }, { id: 'check', label: 'Check' },
   { id: 'make', label: 'Make' }, { id: 'review', label: 'Review' }, { id: 'drive', label: 'Send to Drive' },
 ]
-const TYPE: Record<string, string> = { slideshow: 'Slides', clip: 'Clip', photo: 'Photo', faceless: 'Faceless' }
+const TYPE: Record<string, string> = { slideshow: 'Slides', clip: 'Clip', photo: 'Photo', faceless: 'Faceless', text_only: 'Text', photo_dump: 'Photo dump' }
 const dayLabel = (d: string) => new Date(`${d}T12:00:00Z`).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' })
 const today = () => new Date().toISOString().slice(0, 10)
 const addDays = (d: string, n: number) => new Date(new Date(`${d}T12:00:00Z`).getTime() + n * 86_400_000).toISOString().slice(0, 10)
@@ -475,7 +475,12 @@ function MakeStep({ v, onChanged, onNext }: { v: WeekView; onChanged: () => void
   // that post's model, else the post's own pick.
   const engines = useQuery({ queryKey: ['engines'], queryFn: () => api.engines(), staleTime: 60_000 })
   const [provider, setProvider] = useState('')
-  const ready = v.cells.filter(c => c.review !== 'killed' && !c.made && !c.making && !c.flags.length && c.checked && c.line.trim())
+  const isFree = (c: WeekCell) => c.postType === 'text_only' || c.postType === 'photo_dump'
+  const waiting = v.cells.filter(c => c.review !== 'killed' && !c.made && !c.making && !c.flags.length && c.checked && c.line.trim())
+  const ready = waiting.filter(c => !isFree(c))
+  // Text-only and photo-dump posts: rendered free on the worker (section 42).
+  const free = waiting.filter(isFree)
+  const toast = useToast()
   const ids = new Set(v.cells.map(c => c.postId))
   return (
     <div className="st-col" style={{ gap: 12 }} data-field="weeks-make">
@@ -492,6 +497,12 @@ function MakeStep({ v, onChanged, onNext }: { v: WeekView; onChanged: () => void
           </select>
           <span className="st-hint">The price below follows it. Models only one provider runs (Soul, Genjutsu) stay where they are.</span>
         </label>
+      )}
+      {free.length > 0 && (
+        <div className="st-row" style={{ gap: 8, alignItems: 'center', flexWrap: 'wrap' }} data-field="weeks-render-free">
+          <AsyncButton className="st-btn" field="weeks-render-free-button" onClick={async () => { try { const r = await api.weekRender(v.monday, free.map(c => c.postId)); toast({ tone: 'ok', text: `Rendering ${r.started} post${r.started === 1 ? '' : 's'} on the worker, free.` }); onChanged() } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) } }}>{`Render ${free.length} $0 post${free.length === 1 ? '' : 's'}`}</AsyncButton>
+          <span className="st-hint">Text-only and photo-dump posts: no generation, made on the worker for free.</span>
+        </div>
       )}
       <PriceButton label={`Make the week (${ready.length} post${ready.length === 1 ? '' : 's'})`} action={ready.length ? { type: 'week_make', week: v.monday, ...(pick ? { path: pick } : {}), ...(provider ? { provider } : {}) } : null}
         todo={ready.length ? [] : [{ label: v.counts.unchecked ? 'Check the week first' : 'Nothing to make: every checked post is made or making' }]} onStarted={onChanged} onDone={onChanged}

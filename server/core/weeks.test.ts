@@ -18,7 +18,7 @@ describe('the plan CSV spec', () => {
     const { rows, missing, unknown } = readWeek(templateCsv())
     expect(missing).toEqual([])
     expect(unknown).toEqual([])
-    expect(rows.map(r => r.cells.post_type)).toEqual(['slideshow', 'clip', 'photo', 'faceless'])
+    expect(rows.map(r => r.cells.post_type)).toEqual(['slideshow', 'clip', 'photo', 'faceless', 'text_only', 'photo_dump'])
     expect(rows[0]!.cells.slide_3).toBe('the email said "we went another direction"')
   })
 

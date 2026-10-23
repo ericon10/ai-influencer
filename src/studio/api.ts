@@ -277,6 +277,7 @@ export const api = {
   resync: (id: string, update: string[]) => request<WeekImportResult & { kept: number }>('POST', `/weeks/sheets/${encodeURIComponent(id)}/resync`, { update }),
   weekDraw: (monday: string, o: { seed: number; redraw: 'empty' | 'all' | string[]; draft?: Record<string, string | null>; accounts?: string[] }) => request<DrawResult>('POST', `/weeks/${monday}/draw`, o),
   weekFill: (monday: string, rows: Array<{ postId: string; lineId: string | null; lifeOrJob: 'life' | 'job'; flag?: string | null }>) => request<{ filled: number; empty: number; drafted: number; pulls: number }>('POST', `/weeks/${monday}/fill`, { rows }),
+  weekRender: (monday: string, postIds: string[]) => request<{ started: number }>('POST', `/weeks/${monday}/render`, { postIds }),
   weekCheck: (monday: string) => request<{ checked: number; flagged: number }>('POST', `/weeks/${monday}/check`, {}),
   weekSend: (monday: string, o: { postIds?: string[]; again?: boolean } = {}) => request<{ jobId: string; posts: number }>('POST', `/weeks/${monday}/send`, o),
   weekLock: (postId: string, locked: boolean) => request<{ ok: true }>('PUT', `/weeks/posts/${postId}/lock`, { locked }),

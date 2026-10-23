@@ -626,7 +626,7 @@ export interface SocialAccount {
 }
 
 // Weeks (UX-PLAN.md section 37).
-export type WeekPostType = 'slideshow' | 'clip' | 'photo' | 'faceless'
+export type WeekPostType = 'slideshow' | 'clip' | 'photo' | 'faceless' | 'text_only' | 'photo_dump'
 export type WeekStep = 'import' | 'fill' | 'check' | 'make' | 'review' | 'drive'
 export interface WeekCell {
   postId: string; account: string; date: string; slot: number; rowId: string; postType: WeekPostType; kind: string; characterId: string | null

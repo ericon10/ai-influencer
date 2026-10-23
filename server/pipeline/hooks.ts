@@ -1,3 +1,4 @@
+import { registerCardRenders } from './weekRender.js'
 import { registerComfyHooks } from './comfyActions.js'
 import { and, eq, sql } from 'drizzle-orm'
 import { candidates, concepts, jobs, refImages } from '../db/schema.js'
@@ -216,6 +217,7 @@ export function registerPipelineHooks(): void {
   registerRecreate()
   registerMassRecreate()
   registerPlatforms()
+  registerCardRenders()
   registerLineBank()
   registerOpenReel()
   registerChain()

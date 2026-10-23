@@ -12,9 +12,11 @@ import { cleanLine, plain, voiceJsonSchema, mockVoice, type BankTags } from '../
 import { claimFlags } from '../core/scriptKit.js'
 import { cleanVoiceCard, voiceCardText } from '../core/voiceCard.js'
 import {
-  assignBlend, checkWeekRow, currentStep, draftVisual, drawLines, hashSeed, lineLint, nearDuplicate, readLines, readWeek, rowHash, sheetRef, slotNumber, weekDays, weekOf,
+  FREE_TYPES, POST_TYPES, assignBlend, checkWeekRow, currentStep, draftVisual, drawLines, hashSeed, lineLint, nearDuplicate, readLines, readWeek, rowHash, sheetRef, slotNumber, weekDays, weekOf,
   type CheckedWeekRow, type DrawSlot, type HistoryItem, type LifeOrJob, type PoolLine, type PostType, type VoiceFit, type WeekAccountInfo, type WeekCounts, type WeekRow,
 } from '../core/weeks.js'
+import { readBgColor, readCardStyle, readStillIds } from '../core/cardRender.js'
+import { dumpStills } from './weekRender.js'
 import { enqueueLocalJob, type JobSpec } from '../jobs/runner.js'
 import { registerJobHook, registerLocalJob, type JobOutcome, type JobRow } from '../jobs/hooks.js'
 import type { RuleViolation } from '../core/rules.js'
@@ -275,6 +277,15 @@ async function draftRow(deps: Deps, ctx: Ctx, p: Plan, raw: WeekRow, r: CheckedW
     id = row.id
     const job = c.still_job_id || place?.stillJobId
     if (job) { await queuePull(deps, ctx, row.id, job); pull = true }
+  } else if (r.postType === 'text_only' || r.postType === 'photo_dump') {
+    // Made free on the worker (section 42 A, B): no scene, no generation.
+    const card = { type: r.postType, bgColor: readBgColor(c.bg_color), textStyle: readCardStyle(c.text_style), motion: /zoom/i.test(c.bg_motion) ? 'zoom' as const : 'none' as const, placeId: c.place_id.slice(0, 60) || null, stillIds: readStillIds(c.still_ids) }
+    const row = await createContent(deps, ctx, { kind: 'meme', characterId: ch.id, title, idea: c.story_beat || text, accountTag, step: 'finish', productId, spec: { caption: text, plan: meta, week, card } })
+    id = row.id
+    // A text post's place still behind the text, pulled free.
+    const place = r.postType === 'text_only' && c.place_id ? facelessOf(ch).places.find(x => x.id === c.place_id) ?? null : null
+    const job = r.postType === 'text_only' ? c.still_job_id || place?.stillJobId : ''
+    if (job) { await queuePull(deps, ctx, row.id, job); pull = true }
   } else if (r.postType === 'clip') {
     const light = lightOf(deps, c.light)
     const moment = (c.clip_action.split(/(?<=[.!?])\s+/)[0] ?? '') || c.story_beat
@@ -346,12 +357,13 @@ export async function weekPosts(deps: Deps, ctx: Ctx, monday: string): Promise<C
 }
 
 const postTypeOf = (row: ContentRow, p: PlanMeta): PostType => {
-  if (['slideshow', 'clip', 'photo', 'faceless'].includes(p.postType)) return p.postType as PostType
+  if ((POST_TYPES as string[]).includes(p.postType)) return p.postType as PostType
   if (row.kind === 'meme') return ((row.spec as { faceless?: unknown }).faceless ? 'faceless' : 'clip')
   return /photo/i.test(p.format) ? 'photo' : 'slideshow'
 }
 export const lineOf = (row: ContentRow) => String((row.kind === 'slideshow' ? (row.spec as { hook?: string }).hook : (row.spec as { caption?: string }).caption) ?? '')
 const needsVideo = (type: PostType) => type === 'clip' || type === 'faceless'
+const isFree = (type: PostType) => FREE_TYPES.includes(type)
 
 export async function weekCells(deps: Deps, ctx: Ctx, rows: ContentRow[]): Promise<WeekCell[]> {
   // A person clip's stills and takes are its scene's.
@@ -362,7 +374,7 @@ export async function weekCells(deps: Deps, ctx: Ctx, rows: ContentRow[]): Promi
   const slideAssets = new Map((stillIds.length ? await deps.db.select({ id: candidates.id, assetId: candidates.assetId }).from(candidates).where(and(eq(candidates.accountId, ctx.accountId), inArray(candidates.id, stillIds))) : []).map(c => [c.id, c.assetId]))
   const postIds = rows.map(r => r.id)
   const active = rows.length ? await deps.db.select({ purpose: jobs.purpose }).from(jobs).where(and(eq(jobs.accountId, ctx.accountId), inArray(jobs.status, ACTIVE), or(
-    ...['slide_still', 'faceless_still', 'faceless_video', 'week_pull'].map(p => like(jobs.purpose, `${p}:%`)), like(jobs.purpose, 'scene:%'), like(jobs.purpose, 'scene_video:%'), like(jobs.purpose, 'drift_lock:%'),
+    ...['slide_still', 'faceless_still', 'faceless_video', 'week_pull', 'week_render'].map(p => like(jobs.purpose, `${p}:%`)), like(jobs.purpose, 'scene:%'), like(jobs.purpose, 'scene_video:%'), like(jobs.purpose, 'drift_lock:%'),
   ))) : []
   const busy = new Map<string, number>()
   for (const j of active) { const key = j.purpose.split(':')[1] ?? ''; busy.set(key, (busy.get(key) ?? 0) + 1) }
@@ -375,6 +387,9 @@ export async function weekCells(deps: Deps, ctx: Ctx, rows: ContentRow[]): Promi
     if (r.kind === 'slideshow') {
       const s = slideshowSpecSchema.parse(r.spec ?? {})
       for (const sl of slideList(s)) { if (sl.special) continue; need++; if (sl.stillId) { have++; thumb ??= slideAssets.get(sl.stillId) ?? null } }
+    } else if ((spec as { card?: unknown }).card) {
+      const out = (r.outputs ?? {}) as { videoAssetId?: string }
+      need = 1; have = out.videoAssetId ? 1 : 0; videoAsset = out.videoAssetId ?? null
     } else if (spec.faceless) {
       need = 1; have = spec.stillId ? 1 : 0; thumb = spec.faceless.stillAssetId ?? null; videoAsset = spec.faceless.clipAssetId ?? null
     } else {
@@ -383,7 +398,7 @@ export async function weekCells(deps: Deps, ctx: Ctx, rows: ContentRow[]): Promi
       const take = mine.find(c => c.op === 'video')
       need = 1; have = still ? 1 : 0; thumb = still?.assetId ?? null; videoAsset = take?.assetId ?? null
     }
-    const video = r.kind === 'meme' && (needsVideo(type) || !!p.videoPrompt)
+    const video = r.kind === 'meme' && !isFree(type) && (needsVideo(type) || !!p.videoPrompt)
     const hasVideo = !!videoAsset
     const making = (busy.get(r.id) ?? 0) + (r.sceneId ? busy.get(r.sceneId) ?? 0 : 0)
     const line = lineOf(r)
@@ -692,7 +707,11 @@ export async function checkWeek(deps: Deps, ctx: Ctx, monday: string): Promise<{
     const person = !!ch && kindOf(ch) !== 'faceless'
     const flags: string[] = []
     if (!line) flags.push('No line')
-    if (type === 'faceless') {
+    if (type === 'photo_dump') {
+      const card = (r.spec as { card?: { stillIds?: string[] } | null }).card
+      const n = (await dumpStills(deps, ctx, r.characterId, card?.stillIds ?? [])).length
+      if (n < 5) flags.push(`A photo dump needs 5 approved stills; ${n === 0 ? 'none' : `only ${n}`} found`)
+    } else if (type === 'faceless') {
       const f = readFacelessPost((r.spec as { faceless?: unknown }).faceless)
       if (!f.placeId && !f.line.trim() && !(r.spec as { stillId?: string | null }).stillId) flags.push('No scene: pick a place or write what the still shows')
     } else if (r.kind === 'meme' && r.sceneId) {
@@ -801,6 +820,8 @@ async function buildWeekMakeRun(deps: Deps, ctx: Ctx, input: { week: string; pos
   const wanted = input.postIds?.length ? new Set(input.postIds) : null
   const pick = rows.filter(r => {
     const c = cells.get(r.id)!
+    // Text-only and photo-dump posts are rendered free (Render N $0 posts).
+    if (isFree(c.postType)) return false
     if (wanted) return wanted.has(r.id) && c.review !== 'killed' && !c.making
     return c.review !== 'killed' && !c.made && !c.making && !c.flags.length && c.checked && c.line.trim()
   }).sort((a, b) => cells.get(a.id)!.date.localeCompare(cells.get(b.id)!.date) || cells.get(a.id)!.slot - cells.get(b.id)!.slot)

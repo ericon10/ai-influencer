@@ -10,8 +10,10 @@ import { plain } from './lineBank.js'
 // near-duplicate test for imported lines. Storage, prices and jobs are the
 // caller's (server/pipeline/weeks.ts).
 
-export type PostType = 'slideshow' | 'clip' | 'photo' | 'faceless'
-export const POST_TYPES: PostType[] = ['slideshow', 'clip', 'photo', 'faceless']
+// text_only and photo_dump (section 42 A, B) are made free on the worker.
+export type PostType = 'slideshow' | 'clip' | 'photo' | 'faceless' | 'text_only' | 'photo_dump'
+export const POST_TYPES: PostType[] = ['slideshow', 'clip', 'photo', 'faceless', 'text_only', 'photo_dump']
+export const FREE_TYPES: PostType[] = ['text_only', 'photo_dump']
 export type LifeOrJob = 'life' | 'job'
 export type VoiceFit = 'first' | 'secondhand' | 'both'
 
@@ -26,7 +28,7 @@ export const WEEK_COLUMNS = [
   { name: 'slot', required: true, values: '1 to the account\'s slots per day (AM, Daily and PM read as 1, 2 and 3)', about: 'The slot that day, in posting order.' },
   { name: 'device_id', required: false, values: 'Any text, e.g. DEVICE-01', about: 'The phone it posts from. Blank: the account\'s Device ID on the Accounts page.' },
   { name: 'character', required: false, values: 'A character\'s name', about: 'Blank: the account\'s character.' },
-  { name: 'post_type', required: false, values: 'slideshow, clip, photo, faceless', about: 'Blank: faceless on a faceless account, clip otherwise.' },
+  { name: 'post_type', required: false, values: 'slideshow, clip, photo, faceless, text_only, photo_dump', about: 'Blank: faceless on a faceless account, clip otherwise. text_only and photo_dump are made free (no generation).' },
   { name: 'life_or_job', required: false, values: 'life, job', about: 'Blank: Fill picks one so the account keeps its life/job blend.' },
   { name: 'story_beat', required: false, values: 'Free text', about: 'What is happening in her week that day. Fit to voice fits the line to it; the scene is drafted from it.' },
   { name: 'line_id', required: false, values: 'A line bank id (bl_...)', about: 'The bank line for this post. Blank with no line: Fill draws one.' },
@@ -62,6 +64,10 @@ export const WEEK_COLUMNS = [
   { name: 'slide_4_image', required: false, about: '' },
   { name: 'slide_5_image', required: false, about: '' },
   { name: 'slide_6_image', required: false, about: '' },
+  { name: 'bg_color', required: false, values: 'A hex color, e.g. #000000', about: 'text_only: the background. Blank: black.' },
+  { name: 'text_style', required: false, values: 'centered, two_beat, dialogue', about: 'text_only: centered white (default); two_beat (the punch line appears at 2 s; split with " / "); dialogue ("Her: ... / Me: ...").' },
+  { name: 'bg_motion', required: false, values: 'none, zoom', about: 'text_only and photo_dump: zoom adds a slow push-in.' },
+  { name: 'still_ids', required: false, values: 'Approved still ids, spaces or commas between', about: 'photo_dump: the 5 or 6 stills to use. Blank: her newest approved stills.' },
 ] as const satisfies readonly WeekColumn[]
 export type WeekColumnName = (typeof WEEK_COLUMNS)[number]['name']
 export const WEEK_COLUMN_NAMES: WeekColumnName[] = WEEK_COLUMNS.map(c => c.name)
@@ -74,6 +80,8 @@ export const WEEK_EXAMPLES: Array<Partial<Record<WeekColumnName, string>>> = [
   { row_id: 'C002', account: 'callie_tt_01', date: '2026-10-26', slot: '2', post_type: 'clip', life_or_job: 'life', story_beat: 'Monday night: laundry day goes wrong', line: 'the dryer ate my one good sweater. i am 26', outfit: 'faded band tee, plaid pajama pants', scene: 'a small laundromat at night, fluorescent light', clip_action: 'she pulls a tiny shrunken sweater out of the dryer and holds it up', sound_name: 'sad violin', sound_type: 'music' },
   { row_id: 'C003', account: 'callie_ig_01', date: '2026-10-27', slot: '1', post_type: 'photo', line_id: 'bl_example', caption: 'tuesday', outfit: 'cream knit sweater, jeans', scene: 'sitting on the floor of her bedroom against the bed, laptop open' },
   { row_id: 'D001', account: 'doug_tt_01', date: '2026-10-26', slot: '1', post_type: 'faceless', story_beat: 'the unemployment portal is down again', place_id: 'IS015', video_prompt: 'Rain falls, the open mailbox door sways a little in the wind. 6 seconds, 9:16.', sound_name: 'sad piano', sound_type: 'music', caption: 'day 41' },
+  { row_id: 'C004', account: 'callie_tt_01', date: '2026-10-28', slot: '1', post_type: 'text_only', line: 'my manager: any questions? / me: is this job real', text_style: 'two_beat', bg_color: '#000000', sound_name: 'ticking clock', sound_type: 'music' },
+  { row_id: 'C005', account: 'callie_ig_01', date: '2026-10-28', slot: '2', post_type: 'photo_dump', line: 'october so far, a recap', bg_motion: 'zoom' },
 ]
 
 export function templateCsv(): string {
@@ -140,6 +148,8 @@ export function readPostType(raw: string): PostType | null {
   if (!s) return null
   if ((POST_TYPES as string[]).includes(s)) return s as PostType
   if (/faceless/.test(s)) return 'faceless'
+  if (/text/.test(s)) return 'text_only'
+  if (/dump/.test(s)) return 'photo_dump'
   if (/photo/.test(s)) return 'photo'
   if (/clip|video/.test(s)) return 'clip'
   if (/slideshow|carousel/.test(s)) return 'slideshow'
@@ -181,7 +191,7 @@ export function checkWeekRow(r: WeekRow, accounts: Map<string, WeekAccountInfo>)
   const acct = accounts.get(account.toLowerCase())
   if (acct && slot && slot > acct.slotsPerDay) warnings.push(`Slot ${slot} is past ${acct.tag}'s ${acct.slotsPerDay} slots a day (it still imports)`)
   let postType = readPostType(c.post_type)
-  if (c.post_type && !postType) errors.push(`post_type "${c.post_type}" is not slideshow, clip, photo or faceless`)
+  if (c.post_type && !postType) errors.push(`post_type "${c.post_type}" is not slideshow, clip, photo, faceless, text_only or photo_dump`)
   if (!postType) postType = acct?.kind === 'faceless' ? 'faceless' : 'clip'
   if (acct?.kind === 'faceless' && postType !== 'faceless') warnings.push(`${acct.tag} is a faceless account: a ${postType} row puts a person on it`)
   if (acct?.kind === 'person' && postType === 'faceless') errors.push(`${acct.tag} is ${acct.characterName}'s account: a faceless row goes on a faceless account`)
@@ -191,7 +201,9 @@ export function checkWeekRow(r: WeekRow, accounts: Map<string, WeekAccountInfo>)
   const voiceFit = readVoiceFit(c.voice_fit)
   if (c.voice_fit && !voiceFit) warnings.push(`voice_fit "${c.voice_fit}" is not first, secondhand or both: the character's way is used`)
   if (c.line && wordsIn(c.line) > 14) warnings.push(`The line is ${wordsIn(c.line)} words: about 12 reads in 2 seconds`)
-  if (c.place_id && postType !== 'faceless') warnings.push('place_id is for faceless rows: left out')
+  if (c.place_id && postType !== 'faceless' && postType !== 'text_only') warnings.push('place_id is for faceless and text_only rows: left out')
+  if (c.bg_color && !/^#?[0-9a-f]{6}$/i.test(c.bg_color.trim())) warnings.push(`bg_color "${c.bg_color}" is not a hex color (#000000): black is used`)
+  if (c.text_style && !['centered', 'two_beat', 'dialogue'].includes(c.text_style.trim().toLowerCase())) warnings.push(`text_style "${c.text_style}" is not centered, two_beat or dialogue: centered is used`)
   if (c.ad && !/^(?:y|yes|n|no|true|false|1|0)$/i.test(c.ad)) warnings.push(`ad "${c.ad}" is not yes or no: read as no`)
   return { line: r.line, rowId: c.row_id, account, date: c.date, slot, postType, lifeOrJob, voiceFit, characterName: c.character.trim(), errors, warnings }
 }

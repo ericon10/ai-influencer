@@ -37,7 +37,7 @@ fails if this page and that list disagree.
 |---|---|---|---|
 | `device_id` | optional | Any text, e.g. `DEVICE-01` | The phone it posts from. Blank: the account's Device ID on the Accounts page. |
 | `character` | optional | A character's name | Blank: the account's character. |
-| `post_type` | optional | `slideshow`, `clip`, `photo`, `faceless` | Blank: `faceless` on a faceless account, `clip` otherwise. |
+| `post_type` | optional | `slideshow`, `clip`, `photo`, `faceless`, `text_only`, `photo_dump` | Blank: `faceless` on a faceless account, `clip` otherwise. `text_only` (the line on a plain background, 6 to 8 s) and `photo_dump` (5 or 6 approved stills, about 1 s each, one line, 6 s) are made free on the worker: no generation, $0. |
 | `life_or_job` | optional | `life`, `job` | Blank: Fill picks one so the account keeps its life/job blend. |
 | `story_beat` | optional | Free text | What is happening in her week that day. Fit to voice fits the line to it; the scene is drafted from it. |
 | `line_id` | optional | A line bank id (`bl_...`) | The bank line for this post. Blank with no `line`: Fill draws one. |
@@ -73,6 +73,10 @@ fails if this page and that list disagree.
 | `slide_4_image` | optional | Free text | Slideshow only. |
 | `slide_5_image` | optional | Free text | Slideshow only. |
 | `slide_6_image` | optional | Free text | Slideshow only. |
+| `bg_color` | optional | A hex color, e.g. `#000000` | `text_only`: the background. Blank: black. |
+| `text_style` | optional | `centered`, `two_beat`, `dialogue` | `text_only`: centered white (default); `two_beat`: the setup, then the punch line appears at 2 s (split the line with ` / `, else after its first sentence); `dialogue`: `Her: ... / Me: ...`, each speaker on its own line. |
+| `bg_motion` | optional | `none`, `zoom` | `text_only` and `photo_dump`: `zoom` adds a slow push-in. |
+| `still_ids` | optional | Approved still ids (`cand_...`), spaces or commas between | `photo_dump`: the 5 or 6 stills to use, in order. Blank: her newest approved stills. |
 
 ## What each post type needs to be ready
 

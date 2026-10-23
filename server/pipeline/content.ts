@@ -308,6 +308,12 @@ const memeSpec = z.object({
   // "Finished damage" on any video post (owner, 2026-10-22, item 4j): one
   // still, a 7 s just-existing clip, a sad song and the on-screen line.
   recipe: z.enum(['finished_damage']).nullable().default(null),
+  // A text-only or photo-dump post (section 42 A, B), made free on the worker.
+  card: z.object({
+    type: z.enum(['text_only', 'photo_dump']), bgColor: z.string().regex(/^#[0-9a-f]{6}$/).default('#000000'),
+    textStyle: z.enum(['centered', 'two_beat', 'dialogue']).default('centered'), motion: z.enum(['none', 'zoom']).default('none'),
+    placeId: z.string().max(60).nullable().default(null), stillIds: z.array(z.string().max(40)).max(6).default([]),
+  }).nullable().default(null),
   // Section 33: Approve for posting, its own day and slot, the Download day
   // zip it went into. Never copied.
   posting: postingSchema.nullable().default(null),

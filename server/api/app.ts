@@ -1,3 +1,4 @@
+import { startCardRenders } from '../pipeline/weekRender.js'
 import { mountComfyAgent, mountComfySettings } from './comfy.js'
 import { autoPlace } from '../pipeline/facePlace.js'
 import { Hono, type Context } from 'hono'
@@ -1310,6 +1311,13 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
     const ctx = c.get('ctx')
     requireRole(ctx, 'member')
     return c.json(await checkWeek(deps, ctx, parse(monday, c.req.param('monday'))))
+  })
+  // Text-only and photo-dump posts, rendered free on the worker (section 42).
+  app.post('/weeks/:monday/render', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    const body = parse(z.object({ postIds: z.array(z.string().max(60)).max(300) }), await json(c))
+    return c.json(await startCardRenders(deps, ctx, body.postIds))
   })
   app.post('/weeks/:monday/send', async c => {
     const ctx = c.get('ctx')
