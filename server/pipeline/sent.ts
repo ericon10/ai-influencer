@@ -7,6 +7,7 @@ import type { CostCheck } from '../core/costCheck.js'
 import { formatCredits, modelLabel } from '../costs/quotes.js'
 import { formatUsd } from '../costs/money.js'
 import { providerLabel, providerOf } from '../core/engines.js'
+import { taskRow } from './comfy.js'
 import type { GenRequest } from '../providers/types.js'
 import { approvedAssets, getCandidate, getCharacter, toData } from './characters.js'
 
@@ -89,6 +90,19 @@ async function sentView(deps: Deps, ctx: Ctx, job: typeof jobs.$inferSelect, cha
     req.kind.startsWith('video') ? { label: 'Sound', value: req.audio === true ? 'on' : 'off' } : null,
     req.seed != null ? { label: 'Seed', value: String(req.seed) } : null,
   ].filter((x): x is { label: string; value: string } => !!x)
+  // ComfyUI (section 41, E5): the recipe log, so a run can be remade exactly.
+  if (job.provider === 'comfy' && job.providerJobId) {
+    const t = await taskRow(deps, ctx.accountId, job.providerJobId)
+    const r = (t?.recipe ?? {}) as { workflow?: string; workflowVersion?: number; seed?: number; lora?: { base: string; version: number; trigger: string } | null; train?: { base: string; steps: number } }
+    if (t) {
+      if (r.workflow) settings.push({ label: 'Workflow', value: `${r.workflow} v${r.workflowVersion ?? 1}` })
+      if (r.seed != null && req.seed == null) settings.push({ label: 'Seed', value: String(r.seed) })
+      if (r.workflow) settings.push({ label: 'LoRA', value: r.lora ? `${r.lora.base === 'krea2' ? 'Krea 2' : 'Qwen'} v${r.lora.version} (${r.lora.trigger})` : 'none' })
+      if (t.startedAt && t.finishedAt) settings.push({ label: 'Machine time', value: `${Math.max(1, Math.round((t.finishedAt.getTime() - t.startedAt.getTime()) / 1000))} s` })
+      if (t.attempt > 1) settings.push({ label: 'Attempt', value: String(t.attempt) })
+      if (t.envHash) settings.push({ label: 'Environment', value: t.envHash.slice(0, 12) })
+    }
+  }
   const error = failed ? (job.error as { message?: string } | null)?.message ?? 'The run did not finish.' : null
   return {
     candidateId,

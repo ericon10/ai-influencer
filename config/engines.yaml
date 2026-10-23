@@ -69,3 +69,32 @@ providers:
   kie: { label: Kie.ai, keys: https://kie.ai/api-key }
   wavespeed: { label: WaveSpeed, keys: https://wavespeed.ai/accesskey }
   comfy: { label: ComfyUI }
+# The engine lever (UX-PLAN.md section 41, item 15): one switch at the top of
+# Settings and on Weeks. Each engine's model per step; a step set to null is
+# one the engine cannot do (it keeps its own model, and Settings says why
+# and what it costs). Billing says which Higgsfield balance pays. The owner
+# can change any cell in Settings > Engine; picks per step and per
+# character win over the lever.
+engines:
+  higgsfield_plan:
+    label: Higgsfield subscription
+    billing: account
+    units: plan credits
+    steps: { still: higgsfield/nano-banana-2.1, edit: higgsfield/nano-banana-2.1, video: higgsfield/kling-3.0-pro, recreate_still: higgsfield/nano-banana-2.1, recreate_motion: higgsfield/kling-3.0-motion-control, lora: null }
+  higgsfield_api:
+    label: Higgsfield API
+    billing: api
+    units: dollars
+    steps: { still: higgsfield/nano-banana-2.1, edit: higgsfield/nano-banana-2.1, video: higgsfield/kling-3.0-pro, recreate_still: higgsfield/nano-banana-2.1, recreate_motion: higgsfield/kling-3.0-motion-control, lora: null }
+  kie:
+    label: Kie.ai
+    units: dollars
+    steps: { still: kie/nano-banana-2.1, edit: kie/seedream-4.5-edit, video: kie/kling-3.0-pro, recreate_still: kie/nano-banana-2.1, recreate_motion: kie/wan-2.2-animate-replace, lora: null }
+  wavespeed:
+    label: WaveSpeed
+    units: dollars
+    steps: { still: wavespeed/nano-banana-2.1, edit: wavespeed/seedream-4.5-edit, video: wavespeed/kling-3.0-pro, recreate_still: wavespeed/nano-banana-2.1, recreate_motion: wavespeed/wan-2.2-animate-replace, lora: null }
+  comfy:
+    label: ComfyUI
+    units: machine minutes
+    steps: { still: comfy/qwen-image-edit-2511, edit: comfy/qwen-image-edit-2511, video: comfy/wan-2.2-i2v, recreate_still: null, recreate_motion: comfy/wan-2.2-animate-replace, lora: comfy/lora-train }

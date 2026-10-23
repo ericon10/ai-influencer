@@ -1,3 +1,4 @@
+import { registerComfyHooks } from './comfyActions.js'
 import { and, eq, sql } from 'drizzle-orm'
 import { candidates, concepts, jobs, refImages } from '../db/schema.js'
 import type { Ctx, Deps } from '../context.js'
@@ -207,6 +208,7 @@ export function registerPipelineHooks(): void {
   registerJobHook('qa', onQa)
   registerJobHook('model_test', onModelTest)
   registerSceneHooks()
+  registerComfyHooks()
   registerImportCheck()
   registerContent()
   registerClips()

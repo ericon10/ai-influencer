@@ -5,6 +5,7 @@ import { assets, comfyLoras, comfyTasks } from '../db/schema.js'
 import type { Ctx, Deps } from '../context.js'
 import { hasRole } from '../context.js'
 import { AppError } from '../lib/errors.js'
+import { compareView, useAsDefault } from '../pipeline/comfyActions.js'
 import { agentAccount, claim, comfyView, createAgentToken, done, fail, heartbeat, progress, receiveOutput, retryTask, updateComfySettings, uploadTarget, uploadWorkflow } from '../pipeline/comfy.js'
 
 // ComfyUI routes (UX-PLAN.md section 41). The agent's routes take its token
@@ -68,6 +69,9 @@ export function mountComfySettings(app: Hono<{ Variables: { ctx: Ctx } }>, deps:
     const b = parse(z.object({ manifest: z.unknown(), graph: z.unknown() }), await body(c))
     return c.json(await uploadWorkflow(deps, ctx, b))
   })
+  // The bake-off (item 12): the latest comparison, and Use as default.
+  app.get('/characters/:id/compare', async c => c.json(await compareView(deps, c.get('ctx'), c.req.param('id'))))
+  app.post('/settings/compare/use', async c => { const ctx = c.get('ctx'); admin(ctx); await useAsDefault(deps, ctx, parse(z.object({ ref: z.string().max(80) }), await body(c)).ref); return c.json({ ok: true }) })
   app.post('/settings/comfy/tasks/:id/retry', async c => { const ctx = c.get('ctx'); admin(ctx); await retryTask(deps, ctx, c.req.param('id')); return c.json({ ok: true }) })
   // A character's LoRAs, and which one rides along.
   app.get('/characters/:id/loras', async c => {

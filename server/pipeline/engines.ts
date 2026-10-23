@@ -7,6 +7,7 @@ import { listCredentials } from '../providers/credentials.js'
 import type { GenKind, GenRequest } from '../providers/types.js'
 import { alternatives, familyOf, providerLabel, providerOf, routeRef, stepOfKind, type EngineChoices, type EngineStep } from '../core/engines.js'
 import { getSetting, setSetting } from './settings.js'
+import { agentStatus, isOnline } from './comfy.js'
 
 // Step > model > provider (owner, 2026-10-23; UX-PLAN.md section 40): the
 // owner's picks (one account setting), the picker's view with every
@@ -40,9 +41,132 @@ export function withRunProvider<T>(provider: string | null | undefined, fn: () =
 // The ref that runs for this step (the owner's pick), before demo mode
 // swaps in the mock.
 export async function routeModel(deps: Deps, ctx: Ctx, model: string, kind: GenKind, opts: RouteOpts = {}): Promise<string> {
+  return (await routeWithLever(deps, ctx, model, kind, opts)).ref
+}
+
+// The full route (section 41, item 15): the run's provider, then this
+// character's provider pick, then the step's pick (all for the same model),
+// then the lever's overrides for this character and this step, then the
+// engine's model for the step, else the model as asked. A model the target
+// cannot run as asked (a still with refs on a text-only model) keeps the
+// asked one. The Higgsfield subscription engine pays from the plan.
+export async function routeWithLever(deps: Deps, ctx: Ctx, model: string, kind: GenKind, opts: RouteOpts = {}): Promise<{ ref: string; billing?: 'account' | 'api'; source: 'pick' | 'character' | 'step' | 'engine' | 'asked'; engine: string | null }> {
   const step = opts.step ?? stepOfKind(kind)
-  if (!familyOf(deps.config.engines, model)) return model
-  return routeRef(deps.config.engines, model, step, await choicesFor(deps, ctx, step!, opts.characterId, opts.provider ?? runProvider.getStore() ?? null))
+  const lever = await readLever(deps, ctx.accountId)
+  const billingFor = (ref: string) => (providerOf(ref) === 'higgsfield' && lever.engine ? deps.config.engines.engines[lever.engine]?.billing : undefined)
+  if (familyOf(deps.config.engines, model)) {
+    const picked = routeRef(deps.config.engines, model, step, await choicesFor(deps, ctx, step!, opts.characterId, opts.provider ?? runProvider.getStore() ?? null))
+    if (picked !== model) return { ref: picked, source: 'pick', engine: lever.engine, billing: billingFor(picked) }
+  }
+  if (!step) return { ref: model, source: 'asked', engine: lever.engine }
+  const fits = (ref: string | null | undefined): ref is string => !!ref && !!deps.config.models.models.find(m => m.ref === ref)?.kinds.includes(kind)
+  const ch = opts.characterId ? lever.characters[opts.characterId]?.[step] : undefined
+  if (fits(ch)) return { ref: ch, source: 'character', engine: lever.engine, billing: billingFor(ch) }
+  const st = lever.steps[step]
+  if (fits(st)) return { ref: st, source: 'step', engine: lever.engine, billing: billingFor(st) }
+  if (lever.engine) {
+    const ref = leverTable(deps, lever)[lever.engine]?.[step]
+    if (fits(ref)) return { ref, source: 'engine', engine: lever.engine, billing: billingFor(ref) }
+  }
+  return { ref: model, source: 'asked', engine: lever.engine, billing: billingFor(model) }
+}
+
+// ── The engine lever (section 41, item 15) ──
+
+export const LEVER_KEY = 'engine_lever'
+export type LeverStep = EngineStep | 'lora'
+export interface Lever {
+  engine: string | null
+  // The owner's edits to the engines' tables (Settings > Engine).
+  table: Record<string, Partial<Record<LeverStep, string | null>>>
+  // Overrides for a step on every engine ("ComfyUI stills"), and for one
+  // character.
+  steps: Partial<Record<EngineStep, string>>
+  characters: Record<string, Partial<Record<EngineStep, string>>>
+}
+
+export async function readLever(deps: Pick<Deps, 'db'>, accountId: string): Promise<Lever> {
+  const s = await getSetting<Partial<Lever>>(deps.db, accountId, LEVER_KEY, {})
+  return { engine: s.engine ?? null, table: s.table ?? {}, steps: s.steps ?? {}, characters: s.characters ?? {} }
+}
+
+export function leverTable(deps: Pick<Deps, 'config'>, lever: Lever): Record<string, Partial<Record<LeverStep, string | null>>> {
+  const out: Record<string, Partial<Record<LeverStep, string | null>>> = {}
+  for (const [id, e] of Object.entries(deps.config.engines.engines)) out[id] = { ...e.steps, ...(lever.table[id] ?? {}) }
+  return out
+}
+
+const LEVER_STEPS: LeverStep[] = ['still', 'edit', 'video', 'recreate_still', 'recreate_motion', 'lora']
+const STEP_LABEL: Record<LeverStep, string> = { still: 'Stills', edit: 'Edits', video: 'Video (image to video)', recreate_still: 'Recreate stills and face pass', recreate_motion: 'Recreate motion', lora: 'Character LoRA' }
+
+// A model's price for one representative run, in the engine's units.
+async function cellPrice(deps: Deps, ctx: Ctx, ref: string, step: LeverStep): Promise<string> {
+  if (step === 'lora') return providerOf(ref) === 'comfy' ? '$0 API, about 30 min on ComfyUI' : 'No price'
+  const kind = (step === 'video' ? 'video' : step === 'recreate_motion' ? 'video_clone' : step === 'still' ? 'image' : 'image_edit') as GenKind
+  try {
+    if (providerOf(ref) === 'comfy') {
+      const e = await (await deps.providers.gen(ctx.accountId, ref)).estimate({ ...sample(step, kind, {}), model: ref })
+      return `$0 API, about ${e.minutes ?? 1} min on ComfyUI`
+    }
+    const e = estimateGen(deps.config, { ...sample(step, kind, {}), model: ref })
+    const credits = deps.config.pricebook.entries.find(x => x.provider === providerOf(ref) && x.model === ref.slice(providerOf(ref).length + 1) && x.credits != null)?.credits
+    return credits != null && providerOf(ref) === 'higgsfield' ? `${formatUsd(e.totalMicros)} or ${credits} plan credits` : formatUsd(e.totalMicros)
+  } catch { return 'No price' }
+}
+
+export async function leverView(deps: Deps, ctx: Ctx) {
+  const lever = await readLever(deps, ctx.accountId)
+  const table = leverTable(deps, lever)
+  const label = (ref: string | null | undefined) => (ref ? deps.config.models.models.find(m => m.ref === ref)?.label ?? ref : null)
+  const engines = Object.entries(deps.config.engines.engines).map(([id, e]) => ({ id, label: e.label, units: e.units, billing: e.billing ?? null }))
+  const rows = []
+  for (const step of LEVER_STEPS) {
+    const cells: Record<string, { ref: string | null; label: string | null; price: string | null; provider: string | null }> = {}
+    for (const e of engines) {
+      const ref = table[e.id]?.[step] ?? null
+      cells[e.id] = { ref, label: label(ref), price: ref ? await cellPrice(deps, ctx, ref, step) : null, provider: ref ? providerLabel(deps.config.engines, providerOf(ref)) : null }
+    }
+    const options = deps.config.models.models.filter(m => !m.ref.startsWith('mock/') && (step === 'lora' ? m.kinds.includes('train_identity') && m.ref.startsWith('comfy/') : m.kinds.some(k => (deps.config.engines.steps[step as EngineStep]?.kinds ?? []).includes(k)))).map(m => ({ ref: m.ref, label: `${m.label}${m.ref.startsWith('comfy/') ? '' : ` (${providerLabel(deps.config.engines, providerOf(m.ref))})`}` }))
+    rows.push({ step, label: STEP_LABEL[step], cells, override: step === 'lora' ? null : lever.steps[step as EngineStep] ?? null, overrideLabel: step === 'lora' ? null : label(lever.steps[step as EngineStep]), options })
+  }
+  // What the chosen engine cannot do, in words, with what runs instead.
+  const notes: string[] = []
+  if (lever.engine) {
+    const e = deps.config.engines.engines[lever.engine]!
+    for (const r of rows) {
+      if (r.cells[lever.engine]?.ref) continue
+      const instead = r.step === 'lora' ? null : engines.map(x => r.cells[x.id]).find(c => c?.ref)
+      notes.push(r.step === 'lora' ? `${e.label} trains no character LoRA; LoRAs train on ComfyUI only.` : `${e.label} cannot do ${r.label.toLowerCase()}: those keep their own model${instead?.ref ? `, for example ${instead.label} on ${instead.provider} at ${instead.price}` : ''}.`)
+    }
+  }
+  return { engine: lever.engine, engines, rows, notes, characters: lever.characters }
+}
+
+export async function setLever(deps: Deps, ctx: Ctx, input: { engine?: string | null; cell?: { engine: string; step: LeverStep; ref: string | null }; step?: { step: EngineStep; ref: string | null }; character?: { characterId: string; step: EngineStep; ref: string | null } }): Promise<void> {
+  const lever = await readLever(deps, ctx.accountId)
+  const known = (ref: string | null) => { if (ref && !deps.config.models.models.some(m => m.ref === ref)) throw new AppError('bad_request', `Unknown model ${ref}.`) }
+  if (input.engine !== undefined) {
+    if (input.engine && !deps.config.engines.engines[input.engine]) throw new AppError('bad_request', 'Unknown engine.')
+    lever.engine = input.engine
+  }
+  if (input.cell) {
+    if (!deps.config.engines.engines[input.cell.engine]) throw new AppError('bad_request', 'Unknown engine.')
+    known(input.cell.ref)
+    lever.table[input.cell.engine] = { ...(lever.table[input.cell.engine] ?? {}), [input.cell.step]: input.cell.ref }
+  }
+  if (input.step) {
+    known(input.step.ref)
+    if (input.step.ref) lever.steps[input.step.step] = input.step.ref
+    else delete lever.steps[input.step.step]
+  }
+  if (input.character) {
+    known(input.character.ref)
+    const c = { ...(lever.characters[input.character.characterId] ?? {}) }
+    if (input.character.ref) c[input.character.step] = input.character.ref
+    else delete c[input.character.step]
+    lever.characters[input.character.characterId] = c
+  }
+  await setSetting(deps, ctx, LEVER_KEY, lever)
 }
 
 // Which providers have what they need to run: a saved key. Higgsfield, the
@@ -51,6 +175,9 @@ export async function routeModel(deps: Deps, ctx: Ctx, model: string, kind: GenK
 export async function readyProviders(deps: Deps, ctx: Pick<Ctx, 'accountId'>): Promise<Set<string>> {
   const out = new Set((await listCredentials(deps.db, ctx.accountId)).map(c => c.provider))
   out.add('higgsfield')
+  // ComfyUI: ready once its agent token is made (section 41); offline is
+  // shown on its own.
+  if ((await getSetting<{ tokenHash?: string }>(deps.db, ctx.accountId, 'comfy', {})).tokenHash) out.add('comfy')
   return out
 }
 
@@ -64,6 +191,8 @@ export interface PickRow {
   ref: string; provider: string; providerLabel: string; label: string
   price: string; micros: number | null; verified: boolean; checked: string | null
   ready: boolean; cheapest: boolean; chosen: boolean; isDefault: boolean; keys: string | null
+  // ComfyUI (section 41): the machine has sent no heartbeat for 2 minutes.
+  offline?: boolean
 }
 export interface PickView {
   step: EngineStep; stepLabel: string; family: { id: string; label: string } | null
@@ -93,10 +222,14 @@ export async function pickView(deps: Deps, ctx: Ctx, input: { step: EngineStep; 
     } catch { /* no price for this request shape */ }
     return {
       ref, provider: p, providerLabel: providerLabel(eng, p), label: m.label,
-      price: micros === null ? 'No price' : formatUsd(micros), micros, verified, checked,
+      price: micros === null ? 'No price' : p === 'comfy' ? '$0 API' : formatUsd(micros), micros, verified, checked,
       ready: ready.has(p), cheapest: false, chosen: ref === chosen, isDefault: i === 0, keys: eng.providers[p]?.keys ?? null,
     }
   })
+  if (rows.some(r => r.provider === 'comfy')) {
+    const off = !isOnline(await agentStatus(deps.db, ctx.accountId), deps.clock.now())
+    for (const r of rows) if (r.provider === 'comfy') r.offline = off
+  }
   const priced = rows.filter(r => r.micros !== null)
   const low = Math.min(...priced.map(r => r.micros!))
   for (const r of rows) r.cheapest = priced.length > 1 && r.micros === low

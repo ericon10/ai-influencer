@@ -8,6 +8,7 @@ import { AsyncButton, Callout, Field, PromptViewer, errorMessage, useToast } fro
 import { PriceButton } from '../PriceButton'
 import type { KeyTest, SettingsView, StorageInfo } from '../types'
 import { EnginesCard } from '../engines'
+import { ComfyCard, EngineLever } from '../comfy'
 import { AutoCleanPreview } from '../trash'
 import { RulesPanel } from './Rules'
 import { UsagePanel } from './Usage'
@@ -30,6 +31,8 @@ export default function Settings() {
   return (
     <div className="st-page">
       <div className="st-pagehead"><div className="grow"><div className="st-kicker">Settings</div><div className="st-titlerow"><h1 className="st-h1">Studio settings</h1><HowTo id="settings" /></div></div></div>
+      {/* The engine lever (UX-PLAN section 41), above every tab. */}
+      <div style={{ marginBottom: 20 }}><EngineLever /></div>
       <div className="st-seg st-tabs" role="tablist" style={{ marginBottom: 20 }}>
         {TABS.map(([k, label]) => <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => open(k)}>{label}</button>)}
       </div>
@@ -48,6 +51,7 @@ export default function Settings() {
         <div className="st-col" style={{ gap: 20 }}>
           <ModeCard d={d} />
           <KeysCard d={d} />
+          <ComfyCard />
           <BillingCard d={d} />
           <ConnectionsCard d={d} />
           <DriveCard />

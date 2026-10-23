@@ -52,16 +52,18 @@ export function ProviderPick({ step, model, characterId, characterName, seconds,
       <div className="st-row" style={{ gap: 6, flexWrap: 'wrap' }}>
         {v.rows.map(r => (
           <button key={r.ref} type="button" className={`st-provider${r.chosen ? ' on' : ''}`} aria-pressed={r.chosen} disabled={!r.ready || busy !== null}
-            title={!r.ready ? `Add your ${r.providerLabel} key in Settings > Provider keys first` : `${r.label} on ${r.providerLabel}: ${r.price} a ${v.per}${r.verified ? '' : ' (list price, not confirmed by a run yet)'}${r.checked ? `, checked ${r.checked}` : ''}`}
+            title={!r.ready ? (r.provider === 'comfy' ? 'Make the ComfyUI agent token in Settings > General > ComfyUI first' : `Add your ${r.providerLabel} key in Settings > Provider keys first`) : r.offline ? 'The ComfyUI machine is offline: a run here waits until it is back. Pick another provider to run now.' : `${r.label} on ${r.providerLabel}: ${r.price} a ${v.per}${r.verified ? '' : ' (list price, not confirmed by a run yet)'}${r.checked ? `, checked ${r.checked}` : ''}`}
             onClick={() => void pick(r.provider, r.isDefault)} data-field={`${field}-${r.provider}`}>
             <b>{r.providerLabel}</b>
             <span className="st-mono">{r.price}{v.per === 'still' ? '' : ` / ${v.per}`}</span>
             {r.cheapest && <span className="st-cheapest"><Check size={12} aria-hidden />Cheapest</span>}
             {r.isDefault && <span className="st-chip xs">Default</span>}
+            {r.offline && <span className="st-badge plain warn" data-field={`${field}-${r.provider}-offline`}>Offline</span>}
             {!r.verified && r.micros !== null && <span className="st-muted" aria-label="not confirmed">*</span>}
           </button>
         ))}
       </div>
+      {v.rows.some(r => r.offline && r.chosen) && <span className="st-hint" data-field={`${field}-offline-note`}>The ComfyUI machine is offline. Runs here wait in its queue until it is back; {v.rows.filter(r => !r.offline && r.ready && r.price !== 'No price').map(r => `${r.providerLabel} ${r.price}`).join(', ') || 'another provider'} would run now.</span>}
       {v.rows.some(r => !r.ready) && (
         <span className="st-hint">{v.rows.filter(r => !r.ready).map(r => r.providerLabel).join(' and ')}: <Link to="/studio/settings?tab=general">add a key</Link> to pick {v.rows.filter(r => !r.ready).length === 1 ? 'it' : 'them'}. * List price, not yet confirmed by a real run.</span>
       )}

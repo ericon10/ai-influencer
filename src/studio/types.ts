@@ -212,7 +212,9 @@ export type StudioAction =
   | { type: 'qa'; characterId: string; candidateId: string }
   | { type: 'model_test'; model: string }
   | { type: 'model_suite' }
-  | { type: 'retry'; jobId: string }
+  | { type: 'comfy_train'; characterId: string; base: 'qwen' | 'krea2'; stillIds: string[]; trigger?: string; steps?: number }
+  | { type: 'compare_providers'; characterId: string; count?: number }
+  | { type: 'retry'; jobId: string; exact?: boolean }
   | { type: 'retry_safer'; jobId: string }
   | { type: 'retry_on'; jobId: string; provider: string }
   | { type: 'scene_plan'; characterId: string; sceneId: string }
@@ -712,6 +714,7 @@ export interface PickRow {
   ref: string; provider: string; providerLabel: string; label: string
   price: string; micros: number | null; verified: boolean; checked: string | null
   ready: boolean; cheapest: boolean; chosen: boolean; isDefault: boolean; keys: string | null
+  offline?: boolean
 }
 export interface PickView {
   step: EngineStep; stepLabel: string; family: { id: string; label: string } | null
@@ -720,3 +723,35 @@ export interface PickView {
 }
 export interface EnginesView { steps: Array<{ step: EngineStep; label: string; models: PickView[] }>; providers: Array<{ id: string; label: string; keys: string | null }> }
 export interface KeyTest { verify: { ok: boolean; message: string }; balance: { text: string; usd: number | null; credits: number | null } | null }
+
+// ComfyUI on a remote workstation (UX-PLAN.md section 41).
+export interface ComfyView {
+  token: { last4: string; at: string | null } | null
+  tunnel: string
+  paused: boolean; localPause: boolean; maxJobs: number
+  online: boolean; lastSeen: string | null
+  agent: { version: string | null; gpu: string | null; vramTotalMb: number | null; vramFreeMb: number | null; gpuUse: number | null; comfyOk: boolean | null; comfyError: string | null; comfyQueue: number | null; models: string[]; loadedFamily: string | null } | null
+  test: { askedAt: string | null; answeredAt: string | null; answered: boolean }
+  env: { ok: boolean; expected: string; actual: string | null; problems: string[]; custom: boolean; acceptedAt: string | null }
+  queue: { queued: number; running: number; failed: number; done: number }
+  failureRate: number | null
+  alert: string | null
+  workflows: Array<{ id: string; label: string; version: number; steps: string[]; family: string; ref: string; licenseCheck: boolean; source: 'repo' | 'uploaded'; estSec: number; avgSec: number | null; done: number; failed: number; confirmed: boolean }>
+  failedTasks: Array<{ id: string; jobId: string | null; jobStatus: string | null; workflowId: string; kind: string; attempt: number; error: string; reason: string | null; at: string }>
+  loras: Array<{ id: string; characterId: string; base: string; version: number; trigger: string; state: string; active: boolean; fileName: string | null; sha256: string | null; images: number; at: string }>
+}
+export interface LoraRow { id: string; base: 'qwen' | 'krea2'; version: number; trigger: string; state: 'training' | 'ready' | 'failed'; active: boolean; fileName: string | null; sha256: string | null; images: number; steps: number; at: string }
+export type LeverStep = EngineStep | 'lora'
+export interface LeverView {
+  engine: string | null
+  engines: Array<{ id: string; label: string; units: string; billing: 'account' | 'api' | null }>
+  rows: Array<{ step: LeverStep; label: string; cells: Record<string, { ref: string | null; label: string | null; price: string | null; provider: string | null }>; override: string | null; overrideLabel: string | null; options: Array<{ ref: string; label: string }> }>
+  notes: string[]
+  characters: Record<string, Partial<Record<EngineStep, string>>>
+}
+export interface CompareView {
+  run: string | null
+  at?: string
+  models?: Array<{ ref: string; label: string; face: number | null; texture: number | null }>
+  rows?: Array<{ index: number; prompt: string; cells: Record<string, { jobId: string; status: string; assetId: string | null; face: number | null; texture: number | null }> }>
+}

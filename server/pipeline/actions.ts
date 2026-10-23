@@ -1,3 +1,5 @@
+import { buildComfyTrain, buildCompare } from './comfyActions.js'
+import { taskRow } from './comfy.js'
 import { and, eq } from 'drizzle-orm'
 import { z } from 'zod'
 import { jobEvents, quotes, refImages } from '../db/schema.js'
@@ -67,7 +69,7 @@ export const actionSchema = z.discriminatedUnion('type', [
   // One small paid test that confirms a model (Settings, Models).
   z.object({ type: z.literal('model_test'), model: z.string() }),
   // Retry a failed run on its own, with a new price (feedback everywhere).
-  z.object({ type: z.literal('retry'), jobId: z.string() }),
+  z.object({ type: z.literal('retry'), jobId: z.string(), exact: z.boolean().optional() }),
   // After a refusal: the same request with the likely trigger words
   // reworded by code (catalog wording, G46). The rewording is free.
   z.object({ type: z.literal('retry_safer'), jobId: z.string() }),
@@ -75,6 +77,10 @@ export const actionSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('retry_on'), jobId: z.string(), provider: z.string().max(30) }),
   // Every real model path once, in one quoted run under a cap (Settings).
   z.object({ type: z.literal('model_suite') }),
+  // ComfyUI (section 41): train a character LoRA on the machine, and the
+  // bake-off of providers on a character's real prompts.
+  z.object({ type: z.literal('comfy_train'), characterId: z.string(), base: z.enum(['qwen', 'krea2']), stillIds: z.array(z.string()).max(40).default([]), trigger: z.string().max(40).optional(), steps: z.number().int().min(500).max(6000).optional() }),
+  z.object({ type: z.literal('compare_providers'), characterId: z.string(), count: z.number().int().min(1).max(10).optional() }),
   // Scenes (Stage 7): plan the fields from the owner's words, then stills on
   // one or two models with QA (and the drift lock after a trained character).
   z.object({ type: z.literal('scene_plan'), characterId: z.string(), sceneId: z.string() }),
@@ -283,7 +289,9 @@ function dedupe(list: RealismWarning[]): RuleViolation[] {
 export async function buildAction(deps: Deps, ctx: Ctx, action: StudioAction): Promise<BuiltAction> {
   if (action.type === 'model_test') return buildModelTest(deps, ctx, action.model)
   if (action.type === 'model_suite') return buildModelSuite(deps, ctx)
-  if (action.type === 'retry') return buildRetry(deps, ctx, action.jobId)
+  if (action.type === 'comfy_train') return buildComfyTrain(deps, ctx, action)
+  if (action.type === 'compare_providers') return buildCompare(deps, ctx, action)
+  if (action.type === 'retry') return buildRetry(deps, ctx, action.jobId, { exact: action.exact })
   if (action.type === 'retry_safer') return buildRetry(deps, ctx, action.jobId, { safer: true })
   if (action.type === 'retry_on') return buildRetry(deps, ctx, action.jobId, { provider: action.provider })
   if (action.type === 'clone') return buildClone(deps, ctx, action)
@@ -487,15 +495,21 @@ export async function buildAction(deps: Deps, ctx: Ctx, action: StudioAction): P
 // The same request as a failed run, quoted again. Only a run that failed or
 // was canceled on its own (not one waiting on another step, not a model
 // test, not free worker steps) can be retried this way.
-async function buildRetry(deps: Deps, ctx: Ctx, jobId: string, o: { safer?: boolean; provider?: string } = {}): Promise<BuiltAction> {
+async function buildRetry(deps: Deps, ctx: Ctx, jobId: string, o: { safer?: boolean; provider?: string; exact?: boolean } = {}): Promise<BuiltAction> {
   const job = await getJob(deps, ctx, jobId)
   const req = job.request as Record<string, unknown>
-  if (!['failed', 'canceled'].includes(job.status)) throw new AppError('bad_request', 'Only a failed run can be retried.')
+  // Remake exactly (section 41, E5): a finished run again with its own seed.
+  if (!['failed', 'canceled'].includes(job.status) && !(o.exact && job.status === 'completed')) throw new AppError('bad_request', 'Only a failed run can be retried.')
   if (job.provider === 'local' || req.parentJobId || job.purpose.startsWith('model_test')) throw new AppError('bad_request', 'Run this again from the step it belongs to.')
   const [created] = await deps.db.select().from(jobEvents).where(and(eq(jobEvents.jobId, job.id), eq(jobEvents.type, 'created')))
   const label = (created?.data as { label?: string } | undefined)?.label || job.purpose
   const { parentJobId: _p, quotedCredits: _q, promptFrom: _f, ...asked } = req
   let request: Record<string, unknown> = asked
+  if (o.exact && job.provider === 'comfy' && job.providerJobId && request.seed == null) {
+    const t = await taskRow(deps, ctx.accountId, job.providerJobId)
+    const seed = (t?.recipe as { seed?: number } | undefined)?.seed
+    if (seed != null) request = { ...request, seed }
+  }
   let onLabel = ''
   if (o.provider) {
     if (job.kind === 'llm') throw new AppError('bad_request', 'Only an image or video run can move to another provider.')
@@ -517,7 +531,7 @@ async function buildRetry(deps: Deps, ctx: Ctx, jobId: string, o: { safer?: bool
   const spec = (job.kind === 'llm'
     ? { type: 'llm', stage: job.stage, purpose: job.purpose, label, request }
     : { type: 'gen', stage: job.stage, purpose: job.purpose, label, request }) as unknown as JobSpec
-  return { purpose: job.purpose, characterId: job.characterId, specs: [spec], preview: { title: `${o.safer ? 'Retry with safer wording' : onLabel ? `Try on ${onLabel}` : 'Retry'}: ${label}`, prompts, warnings, invalidates: [] } }
+  return { purpose: job.purpose, characterId: job.characterId, specs: [spec], preview: { title: `${o.safer ? 'Retry with safer wording' : onLabel ? `Try on ${onLabel}` : o.exact ? 'Remake exactly' : 'Retry'}: ${label}`, prompts, warnings, invalidates: [] } }
 }
 
 // A retry of a Recreate run counts against the post's credit cap like the

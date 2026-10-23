@@ -9,7 +9,7 @@ export type GuideColor = 'orange' | 'pink' | 'violet' | 'blue' | 'teal' | 'green
 export type GuideId =
   | 'big-picture' | 'posts' | 'characters' | 'setup-start' | 'setup-face' | 'setup-sheet' | 'setup-file'
   | 'post-idea' | 'post-stills' | 'post-video' | 'post-clone' | 'post-mass' | 'line-bank' | 'post-text' | 'post-finish'
-  | 'library' | 'settings' | 'feedback' | 'faceless' | 'realism' | 'voice' | 'hooks' | 'slideshow' | 'launch-plan' | 'products' | 'results' | 'download-day' | 'weeks' | 'accounts' | 'providers'
+  | 'library' | 'settings' | 'feedback' | 'faceless' | 'realism' | 'voice' | 'hooks' | 'slideshow' | 'launch-plan' | 'products' | 'results' | 'download-day' | 'weeks' | 'accounts' | 'providers' | 'comfy' | 'engine'
 
 export interface GuideSection {
   id: GuideId
@@ -783,6 +783,43 @@ export const GUIDE: GuideSection[] = [
       'Faceless stills (Soul) and Genjutsu stay on Higgsfield: no other provider runs them.',
     ],
     cost: 'Picking and testing a key are free. Each run costs the picked provider\'s price, shown on its button before you click.',
+    shots: [],
+  },
+  {
+    id: 'comfy', group: 'Everything else', title: 'ComfyUI: the workstation', color: 'teal',
+    tagline: 'Stills, edits, video and character LoRAs on a friend\'s workstation, $0 API, priced in minutes.',
+    where: 'Settings > General > ComfyUI, the provider picker on each step, the character file tab (LoRAs on ComfyUI, Compare providers)',
+    intro: 'ComfyUI runs on the machine\'s own GPU with full-size models: Qwen-Image-Edit-2511 (stills and edits, with the character\'s LoRA and refs), Krea 2 Turbo (text to image with the character\'s Krea 2 LoRA; license check until commercial use is confirmed), Wan 2.2 I2V (video from an approved still) and Wan 2.2 Animate replace and mix (Recreate). A small agent on the machine calls out to the Studio: it never takes a call and opens no port. Every run still waits for your click; its price reads "$0 API, about 4 min on ComfyUI", from the machine\'s own past times.',
+    steps: [
+      'Settings > General > ComfyUI > Make the agent token. Copy it once and give it to the machine\'s owner (docs/COMFY.md, step 4). The Studio keeps only its hash; a new token stops the old one.',
+      'The owner runs the pinned image and the agent (docs/COMFY.md). Test connection asks the machine to answer on its next heartbeat; the card then shows the GPU, its free memory, the queue and the models found.',
+      'Environment: the machine reports a hash of its ComfyUI commit, custom nodes, PyTorch and model checksums. A machine that differs gets no jobs, and the card says what differs. After a tested upgrade, press Use this machine\'s environment.',
+      'Pick ComfyUI on a step: the provider picker shows it with $0 API, or set the engine (Settings, top) to ComfyUI for every step it can do.',
+      'Character file tab > LoRAs on ComfyUI: pick Qwen-Image-Edit or Krea 2 Raw, tick any approved stills to add to the sheet, and press Train. Retrain makes v2; any finished version can be the active one. Faceless characters have none.',
+      'Compare providers (same card): 10 of the character\'s real prompts on Nano Banana (Kie.ai), Qwen and Krea 2 Turbo, side by side with each still\'s face score against REF-00 and its skin texture score. Use as default for stills changes the default; nothing changes until you press it.',
+      'Pause the queue (or comfy-agent pause on the machine) when the owner needs his GPU; Max jobs at once is 1 by default.',
+    ],
+    tips: [
+      'Offline means no heartbeat for 2 minutes. The step says so and the picker offers the other providers with their prices; a run already queued waits for the machine. Nothing switches on its own.',
+      'A job the machine drops (power, a crash) is taken back after 90 seconds of quiet and runs once more; a second loss lands in Failed with Retry. Out of memory retries once at batch 1.',
+      'Our rules run inside: 21 or older, nothing explicit, the REALISM block on every person shot and no smoothing words, before anything reaches the machine.',
+    ],
+    cost: '$0 API: the machine\'s owner pays for the electricity. Each run shows about how many minutes it takes before you click.',
+    shots: [],
+  },
+  {
+    id: 'engine', group: 'Everything else', title: 'The engine lever', color: 'teal',
+    tagline: 'One switch: Higgsfield subscription, Higgsfield API, Kie.ai, WaveSpeed or ComfyUI.',
+    where: 'Settings, at the top of every tab, and Weeks > Make the week',
+    intro: 'Pick an engine and every step follows it: its model for stills, edits, video, Recreate stills and the face pass, Recreate motion and the character LoRA, with prices in its own units (plan credits, dollars or machine minutes). A step the engine cannot do keeps its own model, and the lever says which step and what it costs instead. Picks on a step or a character still win over the lever.',
+    steps: [
+      'Settings (top): Engine. "Each step\'s own model" is the default: nothing changes.',
+      'See which model each step uses: the table, one column per engine. Change any cell; "Every engine" sets one model for a step whatever the engine (for example ComfyUI stills, Higgsfield video).',
+      'The order: a whole run\'s provider (Weeks > Make the week) first, then this character\'s pick, then the step\'s pick, then the lever, then the model the step asked for.',
+      'What was sent under every still and take names the provider and the model that ran.',
+    ],
+    tips: ['The Higgsfield subscription engine runs on your plan credits when your Higgsfield account is connected; the Higgsfield API engine on dollars.'],
+    cost: 'Switching is free. Every run still shows its price, in the engine\'s units, before you click.',
     shots: [],
   },
   {

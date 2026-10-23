@@ -34,7 +34,7 @@ import { postCutView, postEditorProject } from '../pipeline/cutView.js'
 import { makeCloseup } from '../pipeline/closeup.js'
 import { addSound, archiveSound, listSounds, soundView, updateSound } from '../pipeline/sounds.js'
 import { addVoiceTakes, getVoiceLine, listVoiceLines, updateVoiceLine, voiceLineView } from '../pipeline/voiceLines.js'
-import { enginesView, pickView, setPick } from '../pipeline/engines.js'
+import { enginesView, leverView, pickView, setLever, setPick } from '../pipeline/engines.js'
 import { applyFit, bankCsv, bankPage, checkWeek, drawWeek, importLines, importLinesFromSheet, importSheet, importWeek, previewSheet, previewWeek, resyncPlan, resyncSheet, reviewLog, saveFill, sendWeek, setLock, setReview, weekList, weekSheets, weekView } from '../pipeline/weeks.js'
 import { driveAuthUrl, driveCallback, driveDisconnect, driveFolders, driveStatus, setDriveRoot } from '../pipeline/drive.js'
 import { addHook, archiveHook, archiveProduct, archiveVariant, importKit, productSummaries, productView, renameSocialAccount, saveSocialAccount, scoreboard, starterKit, updateHook, updateProduct, useKitVoice } from '../pipeline/scaleKit.js'
@@ -1575,6 +1575,21 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
   // Step > model > provider (section 40): the table, one model's picker
   // with every provider's price, and the owner's pick.
   const engineStep = z.enum(['still', 'edit', 'video', 'recreate_still', 'recreate_motion'])
+  // The engine lever (section 41, item 15).
+  app.get('/engines/lever', async c => c.json(await leverView(deps, c.get('ctx'))))
+  app.put('/engines/lever', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'admin')
+    const step = z.enum(['still', 'edit', 'video', 'recreate_still', 'recreate_motion'])
+    const ref = z.string().max(80).nullable()
+    await setLever(deps, ctx, parse(z.object({
+      engine: z.string().max(40).nullable().optional(),
+      cell: z.object({ engine: z.string().max(40), step: z.enum(['still', 'edit', 'video', 'recreate_still', 'recreate_motion', 'lora']), ref }).optional(),
+      step: z.object({ step, ref }).optional(),
+      character: z.object({ characterId: z.string().max(60), step, ref }).optional(),
+    }), await json(c)))
+    return c.json(await leverView(deps, ctx))
+  })
   app.get('/engines', async c => c.json(await enginesView(deps, c.get('ctx'))))
   app.get('/engines/pick', async c => {
     const q = c.req.query()

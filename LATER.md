@@ -22,13 +22,34 @@ bottom of the list they belong to.
 
 Each brief is in full in `docs/studio/briefs/`. Built: hover states
 (UX-PLAN section 38), Weeks from Google Sheets (section 39), Kie.ai and
-WaveSpeed (section 40). Next, in order:
+WaveSpeed (section 40), the ComfyUI provider (section 41). Next:
 
-1. **ComfyUI provider** (`2026-10-23-comfyui.md`; section 41), tonight.
-2. **The overnight stack A to F** (`2026-10-23-overnight-stack.md`): text
+1. **The overnight stack A to F** (`2026-10-23-overnight-stack.md`): text
    only and photo dump posts, three platforms into Drive, results by
    blend, the sound note, the free LATER items, the polish sweep and the
    Guide screenshots. Nothing that spends money.
+
+### ComfyUI: what is left for the owner
+
+- **Connect the machine:** Settings > General > ComfyUI > Make the agent
+  token, send it to the machine's owner privately, and point him at
+  `docs/COMFY.md`. Test connection shows his GPU when the agent is up.
+- **Accept the environment once:** the lock's model checksums are not
+  measured yet (Hugging Face was out of reach from the build session), so
+  the first heartbeat shows "not measured yet". When his files are in
+  place, Use this machine's environment (or commit `comfy-agent lock`'s
+  output to `comfy/env/environment.lock.json`).
+- **Krea 2:** confirm the file names of his Krea 2 Turbo, Raw, text encoder
+  and VAE, and whether commercial use is allowed (it is marked "license
+  check" until then). If his Krea 2 graph differs from ours, upload his
+  (Save (API) plus a manifest) in Settings > ComfyUI > Workflows.
+- **First real jobs ($0 API):** one Qwen still, one Wan 2.2 I2V take and one
+  Animate replace, each confirms its workflow on the machine; then Train
+  Callie's Qwen LoRA, then Compare providers ($0.30 on Kie.ai).
+- **Animate replace's person point:** the SAM 2 mask starts from a point on
+  the person; it is the frame center for now. Sending the face center of
+  the clip's first frame (we have the face boxes) is the next step if the
+  mask misses.
 
 ### Kie.ai and WaveSpeed: what is left for the owner
 

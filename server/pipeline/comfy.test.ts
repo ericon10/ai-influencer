@@ -280,3 +280,103 @@ describe('our rules inside the pipeline', () => {
     await expect(quoteJobs(h.deps, h.ctx, { purpose: 'test', characterId: null, specs: [spec] })).rejects.toMatchObject({ code: 'prompt_rejected' })
   })
 })
+
+describe('character LoRAs, the bake-off and the engine lever', () => {
+  async function importAs(name: string) {
+    const { readFileSync } = await import('node:fs')
+    const { importCharacter } = await import('./files.js')
+    const md = readFileSync(join(process.cwd(), 'fixtures/callie/character-callie.md'), 'utf8').replace(/^# Character: Callie/m, `# Character: ${name}`)
+    const images: Record<string, { data: Buffer }> = {}
+    for (let i = 0; i <= 11; i++) images[`REF-${String(i).padStart(2, '0')}`] = { data: await renderPlaceholderPortrait(`${name} REF-${i}`) }
+    return (await importCharacter(h.deps, h.ctx, md, { images })).characterId
+  }
+
+  it('Train LoRA runs on the machine, v1 then v2, the newest rides along on a Qwen still; faceless characters have none', async () => {
+    const { registerPipelineHooks } = await import('./hooks.js')
+    const { estimateAction, runAction } = await import('./actions.js')
+    const { comfyLoras } = await import('../db/schema.js')
+    const { writeFileSync } = await import('node:fs')
+    registerPipelineHooks()
+    await start()
+    const callie = await importAs('Callie')
+    // The trainer: a script that writes a small .safetensors file.
+    const trainer = join(home, 'train.mjs')
+    writeFileSync(trainer, "import { writeFileSync } from 'node:fs'; console.log('step 1000/1000'); writeFileSync(process.env.STUDIO_TRAIN_OUT + '/lora.safetensors', 'weights ' + Date.now())")
+    const a = createAgent({ env: { STUDIO_URL: base, STUDIO_AGENT_TOKEN: token, COMFY_URL: comfy.url, COMFY_AGENT_HOME: home, COMFY_MODELS: join(home, 'models'), LORA_TRAIN_CMD: `node ${trainer}` }, measureEnv: async () => repoLock(), pollMs: 50, pingMs: 0, keepAliveMs: 3_600_000, log: () => undefined }) as Agent
+    for (const v of [1, 2]) {
+      const action = { type: 'comfy_train' as const, characterId: callie, base: 'qwen' as const, stillIds: [] }
+      const est = await estimateAction(h.deps, h.ctx, action)
+      expect(est.quote.display).toMatch(/^\$0 API, about \d+ min on ComfyUI$/)
+      expect(est.preview.title).toBe(`Train Callie's Qwen LoRA v${v}`)
+      const ran = await runAction(h.deps, h.ctx, action, est.quote.id, false) as { jobs: Array<{ id: string }> }
+      await tick(h.deps, 10)
+      await Promise.all(await a.tick())
+      expect((await settle(ran.jobs[0]!.id)).status).toBe('completed')
+    }
+    const loras = await h.deps.db.select().from(comfyLoras).where(eq(comfyLoras.characterId, callie))
+    expect(loras.map(l => [l.version, l.state, l.active]).sort()).toEqual([[1, 'ready', false], [2, 'ready', true]])
+    expect(loras.find(l => l.version === 2)!.sha256).toMatch(/^[a-f0-9]{64}$/)
+    expect(loras[0]!.images).toHaveLength(12)
+    // A still now carries the v2 LoRA and its trigger word.
+    const ids = await refs(1)
+    const { rows } = await run([still(ids)], callie)
+    await tick(h.deps, 10)
+    await Promise.all(await a.tick())
+    const g = comfy.prompts.at(-1)!.graph
+    expect(g['4']!.inputs.lora_name).toBe(`studio_${callie}_qwen_v2.safetensors`)
+    expect(String(g['10']!.inputs.prompt)).toMatch(/^callie_studio, /)
+    expect((await settle(rows[0]!.id)).status).toBe('completed')
+    const t = (await h.deps.db.select().from(comfyTasks)).find(x => x.jobId === rows[0]!.id)!
+    expect(t.recipe).toMatchObject({ lora: { version: 2, trigger: 'callie_studio' } })
+    const doug = await createCharacter(h.deps, h.ctx, { name: 'Doug', data: { age: 40 } })
+    const { characters } = await import('../db/schema.js')
+    await h.deps.db.update(characters).set({ features: { kind: 'faceless' } }).where(eq(characters.id, doug.id))
+    await expect(estimateAction(h.deps, h.ctx, { type: 'comfy_train', characterId: doug.id, base: 'qwen', stillIds: [] })).rejects.toMatchObject({ message: expect.stringMatching(/Faceless characters have no LoRA/) })
+  }, 120_000)
+
+  it('Compare providers: 10 of her prompts on Kie.ai Nano Banana and Qwen, priced $0.30 plus machine minutes; Use as default sets stills', async () => {
+    const { estimateAction } = await import('./actions.js')
+    const { saveCredential } = await import('../providers/credentials.js')
+    const { candidates } = await import('../db/schema.js')
+    const { newId } = await import('../lib/ids.js')
+    const { useAsDefault } = await import('./comfyActions.js')
+    const { routeWithLever, readLever } = await import('./engines.js')
+    await saveCredential(h.deps, h.ctx, 'kie', 'kie-test-key-1234')
+    const callie = await importAs('Callie')
+    for (let i = 0; i < 12; i++) await h.deps.db.insert(candidates).values({ id: newId('cand'), accountId: h.ctx.accountId, characterId: callie, target: 'scene', op: 'generate', status: 'approved', prompt: finalizeImagePrompt(`Scene ${i}: she reads on a bench, wearing a gray hoodie.`).prompt, createdAt: new Date(Date.UTC(2026, 9, 1, 12, i)) })
+    const est = await estimateAction(h.deps, h.ctx, { type: 'compare_providers', characterId: callie })
+    expect(est.quote.items).toHaveLength(20)
+    expect(est.quote.display).toMatch(/^\$0\.30, about \d+ min on ComfyUI$/)
+    expect(est.preview.warnings.map(w => w.ruleId)).toEqual(['bakeoff-krea', 'bakeoff-qwen'])
+    // Nothing changes until he picks.
+    expect(await routeWithLever(h.deps, h.ctx, 'higgsfield/nano-banana-2.1', 'image', { step: 'still' })).toMatchObject({ ref: 'higgsfield/nano-banana-2.1', source: 'asked' })
+    await useAsDefault(h.deps, h.ctx, 'comfy/qwen-image-edit-2511')
+    expect((await readLever(h.deps, h.ctx.accountId)).steps.still).toBe('comfy/qwen-image-edit-2511')
+    expect(await routeWithLever(h.deps, h.ctx, 'higgsfield/nano-banana-2.1', 'image', { step: 'still' })).toMatchObject({ ref: 'comfy/qwen-image-edit-2511', source: 'step' })
+  }, 120_000)
+
+  it('the lever: run > character pick > step pick > lever > asked; a step the engine cannot do keeps its model and says so', async () => {
+    const { routeWithLever, setLever, setPick, leverView, withRunProvider } = await import('./engines.js')
+    const r = (model: string, kind: 'image' | 'image_edit' | 'video' | 'video_clone', step?: 'still' | 'edit' | 'video' | 'recreate_still' | 'recreate_motion', characterId?: string) => routeWithLever(h.deps, h.ctx, model, kind, { step, characterId })
+    await setLever(h.deps, h.ctx, { engine: 'comfy' })
+    expect(await r('higgsfield/kling-3.0-pro', 'video', 'video')).toMatchObject({ ref: 'comfy/wan-2.2-i2v', source: 'engine' })
+    expect(await r('higgsfield/nano-banana-2.1', 'image_edit', 'edit')).toMatchObject({ ref: 'comfy/qwen-image-edit-2511', source: 'engine' })
+    // ComfyUI has no Recreate stills model: the asked one stays.
+    expect(await r('higgsfield/nano-banana-2.1', 'image_edit', 'recreate_still')).toMatchObject({ ref: 'higgsfield/nano-banana-2.1', source: 'asked' })
+    const v = await leverView(h.deps, h.ctx)
+    expect(v.notes.join(' ')).toMatch(/ComfyUI cannot do recreate stills and face pass: those keep their own model, for example Nano Banana 2.1 on Higgsfield at \$/)
+    expect(v.rows.find(x => x.step === 'video')!.cells.comfy!.price).toMatch(/^\$0 API, about \d+ min on ComfyUI$/)
+    // A step override ("Higgsfield video") beats the engine.
+    await setLever(h.deps, h.ctx, { step: { step: 'video', ref: 'higgsfield/kling-3.0-pro' } })
+    expect(await r('kie/kling-3.0-pro', 'video', 'video')).toMatchObject({ ref: 'higgsfield/kling-3.0-pro', source: 'step' })
+    // A provider pick for the same model beats the lever.
+    await setPick(h.deps, h.ctx, { step: 'video', family: 'kling-3.0-pro', provider: 'kie' })
+    expect(await r('higgsfield/kling-3.0-pro', 'video', 'video')).toMatchObject({ ref: 'kie/kling-3.0-pro', source: 'pick' })
+    // And the run's provider beats everything.
+    expect(await withRunProvider('wavespeed', () => r('higgsfield/kling-3.0-pro', 'video', 'video'))).toMatchObject({ ref: 'wavespeed/kling-3.0-pro', source: 'pick' })
+    // The subscription engine pays from the plan.
+    await setLever(h.deps, h.ctx, { engine: 'higgsfield_plan', step: { step: 'video', ref: null } })
+    await setPick(h.deps, h.ctx, { step: 'video', family: 'kling-3.0-pro', provider: null })
+    expect(await r('kie/kling-3.0-pro', 'video', 'video')).toMatchObject({ ref: 'higgsfield/kling-3.0-pro', source: 'engine', billing: 'account' })
+  })
+})

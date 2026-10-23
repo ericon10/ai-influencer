@@ -1,3 +1,4 @@
+import { EngineLever } from '../comfy'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
@@ -481,6 +482,7 @@ function MakeStep({ v, onChanged, onNext }: { v: WeekView; onChanged: () => void
       <div className="st-row" style={{ gap: 8, alignItems: 'center' }}><span className="st-h3 grow">Make the week</span><HowTo id="weeks" label="How Make works" /></div>
       <span className="st-hint">One total price, one click: every checked post without a flag, stills first, then the video where the post has one (each video starts from its own still when it lands). Ten posts at a time; each group is checked against your daily cap when its turn comes, and a group over it waits and goes on after midnight (UTC). Progress is one line per post.</span>
       {models.data && <StillPaths field="weeks-make-path" paths={models.data.paths} value={pick} onPick={p => setPath(p)} models={[]} />}
+      <EngineLever compact />
       {engines.data && (
         <label className="st-row" style={{ gap: 8, alignItems: 'center', flexWrap: 'wrap' }} data-field="weeks-make-provider">
           <span className="st-label" style={{ margin: 0 }}>Provider for this run</span>

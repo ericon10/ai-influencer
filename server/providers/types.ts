@@ -78,6 +78,9 @@ export interface GenRequest {
   // Two characters in one Recreate still (item 24): the left and the right
   // person, left to right. Never sent to a provider.
   pair?: { left: string; right: string }
+  // A character LoRA to train on the ComfyUI machine (section 41): the
+  // record made when the run starts. Never sent to a provider.
+  lora?: { base: 'qwen' | 'krea2'; version: number; trigger: string; steps: number; images: Array<{ assetId: string; refId?: string; stillId?: string }> }
   slide?: { slide: number; postId?: string; sceneId?: string | null; variant?: number; row?: number; path?: 'account' | 'api' }
 }
 

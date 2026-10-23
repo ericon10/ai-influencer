@@ -133,6 +133,13 @@ const enginesSchema = z.object({
     providers: z.array(z.string()).min(1),
   })),
   providers: z.record(z.string(), z.object({ label: z.string(), keys: z.string().optional() })),
+  // The engine lever (section 41): each engine's model per step.
+  engines: z.record(z.string().regex(/^[a-z_]+$/), z.object({
+    label: z.string(),
+    billing: z.enum(['account', 'api']).optional(),
+    units: z.string(),
+    steps: z.record(z.enum([...ENGINE_STEPS, 'lora']), z.string().nullable()),
+  })).default({}),
 })
 export type EnginesConfig = z.infer<typeof enginesSchema>
 
@@ -316,6 +323,9 @@ function validateCrossRefs(cfg: StudioConfig): void {
       if (!cfg.pricebook.entries.some(e => e.provider === provider && e.model === model)) throw new ConfigError(`engines.yaml: "${ref}" has no price in pricebook.yaml`)
       if (!cfg.engines.providers[provider]) throw new ConfigError(`engines.yaml: provider "${provider}" has no label`)
     }
+  }
+  for (const [id, e] of Object.entries(cfg.engines.engines)) {
+    for (const [st, ref] of Object.entries(e.steps)) if (ref && !imageRefs.has(ref)) throw new ConfigError(`engines.yaml: engine "${id}" step ${st} names unknown model "${ref}"`)
   }
   for (const [task, route] of Object.entries(cfg.routing.tasks)) {
     if (!imageRefs.has(route.model) && !llmRefs.has(route.model)) {

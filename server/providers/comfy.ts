@@ -5,6 +5,7 @@ import { EXPLICIT_MESSAGE, findExplicitTerms } from '../core/safety.js'
 import { realismBlockers } from '../core/realism.js'
 import { activeLora, agentStatus, bindWorkflow, enqueue, estimateSeconds, isOnline, sweep, taskRow, cancelTask, workflowForRef, type ComfyDeps } from '../pipeline/comfy.js'
 import type { Workflow } from '../core/comfyWorkflows.js'
+import { newId } from '../lib/ids.js'
 import { ProviderError, type CostEstimate, type GenRequest, type JobStatus, type Output, type ProviderAdapter } from './types.js'
 
 // ComfyUI on a remote workstation (UX-PLAN.md section 41): one more provider.
@@ -158,19 +159,21 @@ function outputsOf(raw: unknown): Output[] {
 // the machine.
 async function submitTrain(o: ComfyAdapterOptions, now: Date, req: GenRequest, key: string, job: { id: string; characterId: string | null; userId: string | null } | undefined, faceless: boolean): Promise<{ jobId: string }> {
   if (faceless) throw new ProviderError('Faceless characters have no LoRA.', { retryable: false, submitted: 'no' })
-  const loraId = req.identityId
-  if (!loraId || !job?.characterId) throw new ProviderError('A LoRA training needs its LoRA record. Start it from the character page (Train LoRA).', { retryable: false, submitted: 'no' })
-  const [l] = await o.db.select().from(comfyLoras).where(and(eq(comfyLoras.id, loraId), eq(comfyLoras.accountId, o.accountId)))
-  if (!l) throw new ProviderError('That LoRA record is gone.', { retryable: false, submitted: 'no' })
+  const spec = req.lora
+  if (!spec || !job?.characterId) throw new ProviderError('A LoRA training starts from the character page (Train LoRA).', { retryable: false, submitted: 'no' })
+  // The record, once (a retried submit finds it).
+  await o.db.insert(comfyLoras).values({ id: newId('lora'), accountId: o.accountId, characterId: job.characterId, base: spec.base, version: spec.version, trigger: spec.trigger, steps: spec.steps, images: spec.images, state: 'training', createdBy: job.userId, createdAt: now, updatedAt: now })
+    .onConflictDoNothing({ target: [comfyLoras.accountId, comfyLoras.characterId, comfyLoras.base, comfyLoras.version] })
+  const [l] = await o.db.select().from(comfyLoras).where(and(eq(comfyLoras.accountId, o.accountId), eq(comfyLoras.characterId, job.characterId), eq(comfyLoras.base, spec.base), eq(comfyLoras.version, spec.version)))
   const inputs: Record<string, string> = {}
   ;(req.refs ?? []).forEach((r, i) => { inputs[`img${String(i).padStart(2, '0')}`] = r.assetId })
-  const fileName = `studio_${l.characterId}_${l.base}_v${l.version}.safetensors`
-  const train = { base: l.base, trigger: l.trigger, steps: l.steps, fileName, rank: 32, learningRate: 1e-4, resolution: 1024, caption: `${l.trigger}, a photo of a real person, natural skin texture` }
+  const fileName = `studio_${l!.characterId}_${l!.base}_v${l!.version}.safetensors`
+  const train = { base: l!.base, trigger: l!.trigger, steps: l!.steps, fileName, rank: 32, learningRate: 1e-4, resolution: 1024, caption: `${l!.trigger}, a photo of a real person, natural skin texture` }
   const t = await enqueue(o, o.accountId, now, {
     key, jobId: job.id, characterId: job.characterId, userId: job.userId, kind: 'train',
-    workflow: { manifest: { id: 'lora-train', version: 1, family: l.base === 'krea2' ? 'krea2' : 'qwen', timeout_sec: 4 * 3600 }, graph: {} }, graph: {}, inputs,
-    recipe: { engine: 'comfy', train, loraId: l.id, images: Object.values(inputs) },
+    workflow: { manifest: { id: 'lora-train', version: 1, family: l!.base === 'krea2' ? 'krea2' : 'qwen', timeout_sec: 4 * 3600 }, graph: {} }, graph: {}, inputs,
+    recipe: { engine: 'comfy', train, loraId: l!.id, images: Object.values(inputs) },
   })
-  await o.db.update(comfyLoras).set({ taskId: t.id, updatedAt: now }).where(eq(comfyLoras.id, l.id))
+  await o.db.update(comfyLoras).set({ taskId: t.id, updatedAt: now }).where(eq(comfyLoras.id, l!.id))
   return { jobId: t.id }
 }

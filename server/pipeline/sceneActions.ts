@@ -23,7 +23,7 @@ import type { GenRequest } from '../providers/types.js'
 import { listCredentials } from '../providers/credentials.js'
 import { ACCOUNT_PROVIDER } from '../providers/higgsfieldOAuth.js'
 import { forMode, providerMode, resolveRoute } from './settings.js'
-import { routeModel, type RouteOpts } from './engines.js'
+import { routeWithLever, type RouteOpts } from './engines.js'
 import { approvedAssets, getCandidate, toData, type CharacterRow } from './characters.js'
 import { brandCheckLine, readBrand, winningStackLine } from '../core/brand.js'
 import { comboEntries, comboProblem, getScene, sceneFields, sceneFieldsFor, sceneRefs, videoModel, type SceneRef } from './scenes.js'
@@ -96,11 +96,18 @@ export function withModelLines(deps: Deps, model: string, prompt: string): strin
 // The provider is the owner's pick for this step (step > model > provider,
 // UX-PLAN section 40; Higgsfield stays the default): the same model on Kie.ai
 // or WaveSpeed when picked, for the step, this character, or a whole run.
-export async function runModel(deps: Deps, ctx: Ctx, asked: string, kind: GenRequest['kind'], route: RouteOpts = {}): Promise<{ model: string; billing?: 'account' }> {
-  const model = await routeModel(deps, ctx, asked, kind, route)
+export async function runModel(deps: Deps, ctx: Ctx, asked: string, kind: GenRequest['kind'], route: RouteOpts = {}): Promise<{ model: string; billing?: 'account' | 'api' }> {
+  const routed = await routeWithLever(deps, ctx, asked, kind, route)
+  const model = routed.ref
   const live = (await providerMode(deps.db, ctx.accountId)) === 'live'
   if (!live) return { model: (await forMode(deps, ctx, { model, kind })).model }
   const entry = modelEntry(deps, model)
+  // The Higgsfield subscription engine pays from the plan (section 41).
+  if (routed.billing === 'account' && entry.mcp_id) {
+    const connected = (await listCredentials(deps.db, ctx.accountId)).some(c => c.provider === ACCOUNT_PROVIDER)
+    if (connected) return { model, billing: 'account' }
+  }
+  if (routed.billing === 'api' && entry.api !== false && model.startsWith('higgsfield/')) return { model, billing: 'api' }
   if (entry.api === false) {
     const connected = (await listCredentials(deps.db, ctx.accountId)).some(c => c.provider === ACCOUNT_PROVIDER)
     if (!connected) throw new AppError('bad_request', `${entry.label} runs only through your Higgsfield account. Connect it in Settings, Connected accounts, or pick another model.`)

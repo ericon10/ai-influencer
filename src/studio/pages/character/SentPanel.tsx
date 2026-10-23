@@ -4,6 +4,7 @@ import { AlertTriangle, FileSearch, Loader2 } from 'lucide-react'
 import { api } from '../../api'
 import { Img, Modal, PromptViewer, errorMessage } from '../../ui'
 import { HowTo } from '../../guide/Guide'
+import { PriceButton } from '../../PriceButton'
 
 // "What was sent" (UX-PLAN.md section 15): the final prompt as the model got
 // it (hard-wrapped, one-click copy), the images attached with their REF ids,
@@ -47,6 +48,8 @@ export function SentPanel({ candidateId, jobId }: { candidateId?: string; jobId?
         ) : <span className="st-hint">{s.elements.length ? 'No images: the saved character carried the look.' : 'None: the prompt alone carried the look.'}</span>}
       </div>
       <PromptViewer label="The final prompt, exactly as sent" wrapped={s.wrapped} text={s.prompt} />
+      {/* The recipe log (section 41, E5): the same workflow, LoRA, seed, prompt and refs. */}
+      {s.provider === 'comfy' && s.status === 'completed' && <PriceButton action={{ type: 'retry', jobId: s.jobId, exact: true }} label="Remake exactly" variant="secondary" size="sm" noStatus />}
     </div>
   )
 }

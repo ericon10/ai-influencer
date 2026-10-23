@@ -2054,3 +2054,52 @@ warning on the price naming why and the price. Prices follow the engine's
 units (plan credits, dollars, machine minutes). Picks per step and per
 character still win over the lever; the engine of every run is in What was
 sent.
+
+## 42. The overnight stack: $0 post types, three platforms in Drive, results by blend, polish (owner, 2026-10-23, night)
+
+The brief is `docs/studio/briefs/2026-10-23-overnight-stack.md`. Every item
+applies to every character, account and product; nothing here spends money.
+
+**A. Text only.** A Weeks and plan CSV `post_type` of `text_only`: the line
+on a plain background (black by default; `bg_color` takes any hex color),
+9:16, 6 to 8 seconds by the line's length. `text_style`: `centered` (white,
+centered, the default), `two_beat` (the setup, then the punch line appears
+at 2 s; the line splits on " / " or after its first sentence) or `dialogue`
+("Her: ... / Me: ..." stacked, each speaker's line on its own). `bg_motion`
+`zoom` adds a slow push-in. A dimmed still behind the text: `place_id` names
+a place in the character's place bank whose still is already in the
+Studio ($0); no still means the plain background. Sound: the row's
+`sound_name` as the note, or an mp3 uploaded on the post's Sound row. It is
+made on the worker for free: Make the week shows "Render N $0 posts" next to
+the priced button (a click, no quote). Fill, Check, Review and Send to Drive
+treat it like any post (an .mp4).
+
+**B. Photo dump.** `post_type` `photo_dump`: 5 or 6 of the character's
+approved stills (the newest, or the ones the row names in `still_ids`), about
+1 s each, one line of text over them, 6 s, 9:16, cut (never crossfaded). No
+generation; rendered free like A. Fewer than 5 approved stills is a flag on
+Check that says how many there are.
+
+**C. Three platforms in Drive.** A finished slideshow's Three platforms set
+(the Instagram carousel, the reel, the Shorts copy; section 36) goes to Drive
+with the post when it exists: the carousel as a zip and the two videos, each
+with its own manifest row (`file_name` ending `_ig.zip`, `_reel.mp4`,
+`_shorts.mp4`, the same caption, and a `platform` column at the end:
+tiktok, instagram, reels or shorts).
+
+**D. Results by blend.** The Results card gains two splits: follows per post
+by account, and by life vs job (the plan row's `life_or_job`), so the blend
+test can be called. Entry stays as it is (typed on the card, or the results
+CSV). Every clip export's sound note: `sound_name` and `sound_type` on the
+review card and in post.json (`sound: { name, type, note: "add this sound in
+the app" }`).
+
+**E. Free LATER items.** Approve all, with every picture on screen, in the
+batch review; Generate the rest of this day on the plan list (priced, waits
+for the click); Posts home progress grouped by post; the viewer's next and
+previous across Trash and Posts home; the post.json gaps.
+
+**F. Polish.** Help chips never overlap a title, priced buttons fit their
+card, at desktop and phone width (a browser test measures both); Guide
+screenshots with numbered callouts for Weeks, Accounts, Line bank, From
+Google Sheets, Providers and ComfyUI.

@@ -5,6 +5,7 @@ import { useRefresh } from '../../hooks'
 import { Callout, PromptViewer, errorMessage, useToast } from '../../ui'
 import type { CharacterView } from '../../types'
 import { BrandCard, TemplateCheckList } from './BrandCard'
+import { LoraCard } from '../../comfy'
 
 // Stage 5: character-[name].md, the human-readable source of truth. It
 // round-trips: export, edit by hand, import the edits back.
@@ -42,6 +43,7 @@ export function FileTab({ v }: { v: CharacterView }) {
           <TemplateCheckList report={v.template} />
         </div>
       </section>
+      <LoraCard v={v} />
       <Knowledge v={v} />
     </div>
   )
