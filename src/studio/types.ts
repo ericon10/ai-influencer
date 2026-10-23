@@ -92,6 +92,7 @@ export interface SentView {
   images: Array<{ assetId: string; role: 'ref' | 'start' | 'end' | 'source'; refId: string | null }>
   elements: Array<{ id: string; name: string }>
   model: string; ranOn: string; path: 'plan' | 'api' | 'demo'; pathLabel: string
+  provider?: string; providerLabel?: string
   settings: Array<{ label: string; value: string }>
   quoted: string; actual: string | null; costNote: string | null; flagged: boolean; offPct: number | null
   status: string; error: string | null; providerJobId: string | null; at: string | null
@@ -213,6 +214,7 @@ export type StudioAction =
   | { type: 'model_suite' }
   | { type: 'retry'; jobId: string }
   | { type: 'retry_safer'; jobId: string }
+  | { type: 'retry_on'; jobId: string; provider: string }
   | { type: 'scene_plan'; characterId: string; sceneId: string }
   | { type: 'scene_ideas'; characterId: string; idea: string }
   | { type: 'scene_prompt'; characterId: string; sceneId: string; target: 'still' | 'video'; motion?: string; directions?: string; startCandidateId?: string; endCandidateId?: string; notes?: string; durationSec?: number; audio?: boolean; aspect?: string }
@@ -241,8 +243,8 @@ export type StudioAction =
   | { type: 'hook_variants'; hookId: string; characterIds: string[]; perCharacter?: number }
   | { type: 'slideshow_hooks'; contentId: string }
   | { type: 'plan_generate'; postIds: string[]; path?: StillPathId; stillModel?: string | null; remake?: boolean }
-  | { type: 'week_make'; week: string; postIds?: string[]; path?: StillPathId | null }
-  | { type: 'week_redo'; week: string; postIds: string[]; path?: StillPathId | null }
+  | { type: 'week_make'; week: string; postIds?: string[]; path?: StillPathId | null; provider?: string | null }
+  | { type: 'week_redo'; week: string; postIds: string[]; path?: StillPathId | null; provider?: string | null }
   | { type: 'week_fit'; week: string; postIds?: string[] }
   | { type: 'bank_retag'; all?: boolean }
   | { type: 'faceless_still'; contentId: string; placeId?: string | null; line?: string; path?: StillPathId | null; model?: string | null }
@@ -264,6 +266,10 @@ export interface JobView {
   // A refusal by the provider's filter: the likely trigger words in what was
   // sent, and whether "Retry with safer wording" can run (G46).
   triggers: string[]; safer: boolean
+  // A failed run's next tries (UX-PLAN section 40): the other providers that
+  // run the same model, each priced for this request. Offered, never run.
+  next?: Array<{ provider: string; label: string; price: string; verified: boolean }>
+  providerLabel?: string
   createdAt: string; completedAt: string | null
   // The post the run belongs to and its short name (P007, else its title).
   postId?: string | null; postLabel?: string | null
@@ -282,7 +288,7 @@ export interface SettingsView {
     }>
   }
   credentials: Array<{ id: string; provider: string; last4: string; verifyStatus: string; verifiedAt: string | null; createdAt: string }>
-  providers: Array<{ id: string; label: string; hint: string; placeholder: string; usedFor: string; serverKey?: boolean }>
+  providers: Array<{ id: string; label: string; hint: string; placeholder: string; usedFor: string; serverKey?: boolean; balance?: boolean }>
   budgets: { job: number; character: number; month: number; day: number; confirmAbove: number; warnPct: number }
   routing: Array<{ task: string; configured: string; effective: string }>
   // Claude tasks and the model each runs on (Settings, Claude models).
@@ -699,3 +705,18 @@ export type { BankImport } from '../../server/pipeline/lineBank'
 export type BankView = Awaited<ReturnType<typeof import('../../server/pipeline/lineBank').bankView>>
 export type BankLineView = BankView['lines'][number]
 export type BankWeek = Awaited<ReturnType<typeof import('../../server/pipeline/lineBank').weekPlan>>
+
+// Step > model > provider (UX-PLAN.md section 40).
+export type EngineStep = 'still' | 'edit' | 'video' | 'recreate_still' | 'recreate_motion'
+export interface PickRow {
+  ref: string; provider: string; providerLabel: string; label: string
+  price: string; micros: number | null; verified: boolean; checked: string | null
+  ready: boolean; cheapest: boolean; chosen: boolean; isDefault: boolean; keys: string | null
+}
+export interface PickView {
+  step: EngineStep; stepLabel: string; family: { id: string; label: string } | null
+  per: string; rows: PickRow[]
+  pick: { character: string | null; step: string | null; run: string | null }
+}
+export interface EnginesView { steps: Array<{ step: EngineStep; label: string; models: PickView[] }>; providers: Array<{ id: string; label: string; keys: string | null }> }
+export interface KeyTest { verify: { ok: boolean; message: string }; balance: { text: string; usd: number | null; credits: number | null } | null }

@@ -136,6 +136,11 @@ export default async function globalSetup() {
   const { startFakeDrive } = await import('../server/testing/fakeDrive')
   const drive = await startFakeDrive()
   process.env.E2E_DRIVE_URL = drive.url
+  // A fake Kie.ai and WaveSpeed for their keys, Test key and balance
+  // (UX-PLAN.md section 40). The suite stays in demo mode: nothing runs there.
+  const { startFakeProviders } = await import('../server/testing/fakeProviders')
+  const fakes = await startFakeProviders()
+  process.env.E2E_PROVIDERS_URL = fakes.url
   const studioEnv: NodeJS.ProcessEnv = {
     ...process.env,
     NODE_ENV: 'development', VERCEL: '',
@@ -147,6 +152,7 @@ export default async function globalSetup() {
     HF_CREDENTIALS: '', ELEVENLABS_API_KEY: '',
     STUDIO_API_PORT: String(apiPort),
     GOOGLE_API_BASE: drive.url, GOOGLE_OAUTH_BASE: drive.url, GOOGLE_ACCOUNTS_BASE: drive.url,
+    KIE_API_BASE: fakes.url, WAVESPEED_API_BASE: fakes.url,
     E2E_RUN_DIR: runDir,
   }
   const apiLog = join(runDir, 'api.log'), webLog = join(runDir, 'web.log')
@@ -169,11 +175,13 @@ export default async function globalSetup() {
   } catch (e) {
     await stop(procs)
     await drive.stop()
+    await fakes.stop()
     throw e
   }
   return async () => {
     await stop(procs)
     await drive.stop()
+    await fakes.stop()
     const size = (dir: string): number => existsSync(dir) ? readdirSync(dir).reduce((a, f) => { const p = join(dir, f); const st = statSync(p); return a + (st.isDirectory() ? size(p) : st.size) }, 0) : 0
     log(`Studio stopped; the run's data (${Math.round(size(runDir) / 1e6)} MB) and logs are in ${runDir}`)
   }

@@ -24,6 +24,7 @@ export function SentPanel({ candidateId, jobId }: { candidateId?: string; jobId?
       <div className="st-sent-facts">
         <div><span className="st-label">Model</span><b>{s.model}</b>{s.ranOn !== s.model && <span className="st-hint"> ({s.ranOn})</span>}</div>
         <div><span className="st-label">Path</span>{s.pathLabel}</div>
+        {s.providerLabel && <div data-field="sent-provider"><span className="st-label">Provider</span>{s.providerLabel}</div>}
         {s.settings.map(x => <div key={x.label}><span className="st-label">{x.label}</span>{x.value}</div>)}
         <div><span className="st-label">Quoted</span>{s.quoted}</div>
         <div><span className="st-label">Real cost</span>{s.actual ?? <span className="st-muted">{s.path === 'demo' ? 'Free' : 'Not reported'}</span>}</div>

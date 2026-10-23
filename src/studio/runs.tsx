@@ -172,6 +172,8 @@ export function RunRow({ j, onDismiss, showLabel = true }: { j: JobView; onDismi
             {j.kind !== 'llm' && j.kind !== 'local' && <SentButton jobId={j.id} size="xs" />}
             {j.safer && <SaferRetry jobId={j.id} />}
             {j.retry && <PriceButton action={{ type: 'retry', jobId: j.id }} label="Retry" size="sm" variant="secondary" icon={false} compact />}
+            {/* The next providers of the same model (section 40): priced, never automatic. */}
+            {(j.next ?? []).map(n => <span key={n.provider} data-field={`retry-on-${n.provider}`}><PriceButton action={{ type: 'retry_on', jobId: j.id, provider: n.provider }} label={`Try on ${n.label}`} size="sm" variant="secondary" icon={false} compact /></span>)}
           </div>
         </div>
         {onDismiss && <button type="button" className="st-btn icon ghost sm" aria-label="Hide" onClick={onDismiss}><X size={13} /></button>}

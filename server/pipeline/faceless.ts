@@ -119,7 +119,7 @@ export async function buildFacelessStill(deps: Deps, ctx: Ctx, input: { contentI
   const product = post.product
   const model = product ? (FACELESS_PRODUCT_MODELS as readonly string[]).includes(input.model ?? '') ? input.model! : FACELESS_PRODUCT_MODELS[0] : FACELESS_STILL_MODEL
   const path = await stillPathFor(deps, ctx, null, { path: input.path ?? null })
-  const run = await runModel(deps, ctx, model, product ? 'image_edit' : 'image', { characterId: row.characterId })
+  const run = await runModel(deps, ctx, model, product ? 'image_edit' : 'image', { step: 'still', characterId: row.characterId })
   const level = stillLevelFor(deps, model)
   const body = product ? facelessProductPrompt(still.prompt, product.name) : still.prompt
   // Rule zero holds: every image prompt carries a REALISM line; with no

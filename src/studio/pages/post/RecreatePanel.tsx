@@ -6,6 +6,7 @@ import { api, ApiError, assetUrl } from '../../api'
 import { uploadFiles } from '../../files'
 import { keys, useClones, useCloneStills } from '../../hooks'
 import { PriceButton } from '../../PriceButton'
+import { ProviderPick } from '../../engines'
 import { FailureLine, RunStatus, SaferRetry, Triggers } from '../../runs'
 import { failureLine, FRESH_MS } from '../../failures'
 import { AsyncButton, Callout, Field, errorMessage, isFresh, useToast, type TodoItem } from '../../ui'
@@ -66,6 +67,7 @@ export function RecreatePanel({ ctx, source, o, takes }: { ctx: PostCtx; source:
       </Field>
       <Field id="recreate-model" label="5. The motion model" group hint={`The still as the image, the cleaned clip as the motion, 720p, 9:16, audio off. Price for this ${source.durationSec ?? ''} s clip; your last pick is selected.`}>
         <MotionPicker models={motion} picked={picked?.ref ?? null} onPick={pick} loading={!o} />
+        <ProviderPick step="recreate_motion" model={picked?.ref} characterId={ctx.item.characterId} seconds={Math.max(1, Math.round(source.durationSec ?? 5))} compact />
       </Field>
       <div className="st-row" style={{ gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
         <PriceButton
@@ -306,6 +308,7 @@ function StillsStep({ ctx, list: all, kept, takes, picked, opts }: { ctx: PostCt
           })}
         </div>
       )}
+      <ProviderPick step="recreate_still" model={chosen?.ref} characterId={cid || null} compact />
       <span className="st-row" style={{ gap: 8, alignItems: 'center' }} data-field="recreate-facepass" title={`Runs the face pass (${takes.face} takes) on the best still, in the same price. Both proven hand runs needed it.`}>
         <button type="button" role="switch" aria-checked={facePass} aria-label="Face pass on the best still" className={`st-switch ${facePass ? 'on' : ''}`} onClick={() => setFacePass(f => !f)}><span /></button>
         <span className="st-hint">Face pass on the best still{facePass ? '' : ' (skipped)'}</span>

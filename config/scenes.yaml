@@ -264,6 +264,9 @@ video:
     - { ref: higgsfield/seedance-2.0, resolution: 720p }
     - { ref: higgsfield/seedance-2.5, resolution: 720p }
     - { ref: higgsfield/wan-3.0, resolution: 720p }
+    # Seedance 1.5 Pro (section 40): the cheapest video, on Kie.ai or
+    # WaveSpeed only (pick which in its provider picker; needs that key).
+    - { ref: kie/seedance-1.5-pro, resolution: 720p }
   durations: [5, 10]
   duration: 5
   aspect: "9:16"

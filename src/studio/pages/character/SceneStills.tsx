@@ -4,6 +4,7 @@ import { Check, Copy, Info, Loader2, PenLine, Sparkles, Wand2 } from 'lucide-rea
 import { useNavigate } from 'react-router-dom'
 import { api } from '../../api'
 import { useCharacters, useRefresh } from '../../hooks'
+import { ProviderPick, pathName } from '../../engines'
 import { PriceButton } from '../../PriceButton'
 import { Field, Img, Modal, PromptViewer, SectionProgress, errorMessage, isFresh, scrollToField, useToast, type TodoItem } from '../../ui'
 import type { CharacterView, SceneFields, SceneStill, SceneView, ScenesData } from '../../types'
@@ -462,13 +463,14 @@ function GenerateCard({ v, data, scene, todo, saving, setRefs, onStarted }: { v:
               return (
                 <button key={m.ref} type="button" className={`st-choice ${on ? 'on' : ''}`} disabled={!ok} onClick={() => toggle(m.ref)} title={m.note}>
                   <span className="st-row" style={{ gap: 8 }}><b>{m.label}</b><span className="st-spacer" />{on && <Check size={14} />}</span>
-                  <span className="st-hint">{m.path === 'account' ? 'Your Higgsfield plan' : 'Higgsfield API'}{m.trained ? ' · saved character + drift lock' : m.refs > 0 ? ` · up to ${m.refs} refs` : ''}</span>
+                  <span className="st-hint">{pathName(m.ref, m.path)}{m.trained ? ' · saved character + drift lock' : m.refs > 0 ? ` · up to ${m.refs} refs` : ''}</span>
                   {!ok && <span className="st-hint" style={{ color: 'var(--st-warn)' }}>Connect your Higgsfield account in Settings</span>}
                 </button>
               )
             })}
           </div>
           {trained && <span className="st-hint">{trained.label} uses {v.data.name}'s saved character: no attachments, then a face-only drift lock to REF-00 on every still.</span>}
+          {chosen.map(m => <ProviderPick key={m.ref} step="still" model={m.ref} characterId={v.id} characterName={v.data.name} compact />)}
         </div>
         <div className="st-row" style={{ gap: 18, flexWrap: 'wrap' }}>
           <div className="st-row">

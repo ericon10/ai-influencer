@@ -9,7 +9,7 @@ export type GuideColor = 'orange' | 'pink' | 'violet' | 'blue' | 'teal' | 'green
 export type GuideId =
   | 'big-picture' | 'posts' | 'characters' | 'setup-start' | 'setup-face' | 'setup-sheet' | 'setup-file'
   | 'post-idea' | 'post-stills' | 'post-video' | 'post-clone' | 'post-mass' | 'line-bank' | 'post-text' | 'post-finish'
-  | 'library' | 'settings' | 'feedback' | 'faceless' | 'realism' | 'voice' | 'hooks' | 'slideshow' | 'launch-plan' | 'products' | 'results' | 'download-day' | 'weeks' | 'accounts'
+  | 'library' | 'settings' | 'feedback' | 'faceless' | 'realism' | 'voice' | 'hooks' | 'slideshow' | 'launch-plan' | 'products' | 'results' | 'download-day' | 'weeks' | 'accounts' | 'providers'
 
 export interface GuideSection {
   id: GuideId
@@ -765,14 +765,36 @@ export const GUIDE: GuideSection[] = [
     ],
   },
   {
+    id: 'providers', group: 'Everything else', title: 'Providers: who runs each model', color: 'teal',
+    tagline: 'The same model on Higgsfield, Kie.ai, WaveSpeed, fal or Google AI Studio, with each price side by side.',
+    where: 'Settings > Models > Providers, and on each still, edit, video and Recreate step',
+    intro: 'Several providers run the same model at different prices. One table holds it: each step (stills, edits, video, Recreate stills, Recreate motion), the models on it, and the providers that run each one. Higgsfield is the default wherever it runs the model, so nothing changes until you pick another provider. Every price button prices the provider you picked, and every run still waits for your click.',
+    steps: [
+      'Add a key: Settings > General > Provider keys, Kie.ai or WaveSpeed (made in each one\'s dashboard; pay as you go). Test key makes a free call and shows the balance (Kie.ai in credits and dollars, 200 credits a dollar; WaveSpeed in dollars).',
+      'Pick a provider for every character: Settings > Models > Providers. Each model shows every provider that runs it with its price for one still or 5 seconds, the cheapest marked, and Add a key where there is none. Click one to use it; click the Default to go back.',
+      'Pick for one character: on the character\'s steps (stills, video, Recreate), the same picker with "Callie only" or "Every character". The character\'s pick wins over the step\'s.',
+      'A whole week: Weeks > Make the week > Provider for this run. Every post uses it where it runs that post\'s model, else its own pick.',
+      'When a run fails or is refused, it says why and offers the next provider that runs the same model, with its price: Try on Kie.ai, $0.03. Nothing switches or spends on its own; the offer is a priced button like any other.',
+      'What was sent under each still and take names the provider (Provider: Kie.ai).',
+    ],
+    tips: [
+      'Prices marked * are the providers\' list prices, checked on the date shown, not yet confirmed by a real run. Run one still on a new provider and compare its dashboard\'s charge with the price.',
+      'Seedance 1.5 Pro (Kie.ai and WaveSpeed only) is the cheapest video; Higgsfield\'s Kling 3.0 Pro is cheaper than Kie.ai\'s and WaveSpeed\'s.',
+      'Faceless stills (Soul) and Genjutsu stay on Higgsfield: no other provider runs them.',
+    ],
+    cost: 'Picking and testing a key are free. Each run costs the picked provider\'s price, shown on its button before you click.',
+    shots: [],
+  },
+  {
     id: 'settings', group: 'Everything else', title: 'Settings', color: 'blue',
     tagline: 'Keys, billing, models, rules and budgets.',
     where: 'Sidebar > Settings',
-    intro: 'General has Demo or Live, your provider keys (they stay on the server; Google AI Studio and fal run Recreate without a Higgsfield plan, Apify fetches TikTok links for mass recreate; each key is made in that provider\'s own dashboard and pasted here), Higgsfield billing (your plan credits or the pay-per-use API) and Storage (how much your files take and what that costs, Auto-clean, the daily clean). Models sets the Claude model per task and tests each Higgsfield model once. Rules lists every rule. Budgets and usage shows spend and caps.',
+    intro: 'General has Demo or Live, your provider keys (they stay on the server; Google AI Studio and fal run Recreate without a Higgsfield plan, Apify fetches TikTok links for mass recreate, Kie.ai and WaveSpeed run the same models as Higgsfield at their own prices; each key is made in that provider\'s own dashboard and pasted here, and Test key shows its balance), Higgsfield billing (your plan credits or the pay-per-use API) and Storage (how much your files take and what that costs, Auto-clean, the daily clean). Models sets the Claude model per task, who runs each model on each step (Providers), and tests each Higgsfield model once. Rules lists every rule. Budgets and usage shows spend and caps.',
     steps: [
       'General > Google Drive: Connect Google Drive with your own Google sign-in (the Studio writes only the folders and files it makes, and reads your sheets for Weeks > Import From Google Sheets), then pick the root folder (make one, or pick one it made). A Drive connected before October 23 shows Reconnect Google Drive: once, so the Studio can read your sheets. The OAuth client is yours: in Google Cloud, APIs and Services, Credentials, make an OAuth client ID (Web application) with the redirect address shown here, turn on the Google Drive API, and paste CLIENT_ID:CLIENT_SECRET in Provider keys, Google Drive. Weeks > Send to Drive and From Google Sheets use it.',
       'General: switch to Live when your keys are in, and pick Higgsfield billing.',
       'Models: Sonnet runs every Claude task; switch one to Opus if you want. Run each model\'s small test once.',
+      'Models > Providers: each step\'s models and every provider that runs them, priced side by side with the cheapest marked. Higgsfield is the default; click Kie.ai or WaveSpeed (with its key saved) to run that model there for every character.',
       'Rules: fixed rules always apply. Every other rule is a default you can switch off for everyone or one character.',
       'Rules > Recreate gate check: after every 10 real recreates, the face and margin scores of the stills you picked next to the ones you passed over, and suggested gate numbers. Use these numbers or Keep the current numbers; nothing changes until you click.',
       'Budgets and usage: set the caps per run, per character, per month and per day. Per day starts at $10: everything today (the calendar day in UTC) on your Higgsfield plan and the API together, with plan credits counted at the Higgsfield API rate (1 credit = $0.0625). The panel under the caps shows today\'s spend against it.',

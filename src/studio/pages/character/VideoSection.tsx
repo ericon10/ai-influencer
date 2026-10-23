@@ -5,6 +5,7 @@ import { AlertTriangle, Check, CheckCircle2, Download, Film, Info, Loader2, Rota
 import { api, ApiError, assetUrl } from '../../api'
 import { useRefresh } from '../../hooks'
 import { PriceButton } from '../../PriceButton'
+import { ProviderPick, pathName } from '../../engines'
 import { AsyncButton, Callout, Drawer, Field, Img, PromptViewer, errorMessage, isFresh, useToast, type TodoItem } from '../../ui'
 import type { CharacterView, SceneStill, SceneView, ScenesData } from '../../types'
 import { OP_LABEL, STILL_STATUS, claudeChecked, wrap } from './StillDrawer'
@@ -181,11 +182,12 @@ export function VideoSection({ v, data, scene, startId, setStartId, onUseTake, u
                         <button key={m.ref} type="button" role="radio" aria-checked={on} className={`st-choice ${on ? 'on' : ''}`} onClick={() => pick(m.ref)} title={m.note || undefined}>
                           <span className="st-row" style={{ gap: 8 }}><b>{m.label}</b><span className="st-spacer" />{on && <Check size={14} />}</span>
                           <span className="st-model-price">{prices.isLoading ? <Loader2 size={12} className="st-spin" /> : price?.display ?? 'No price yet'}{price?.display && !price.verified ? <span className="st-muted" style={{ fontWeight: 400 }}> (not confirmed)</span> : null}</span>
-                          <span className="st-hint">{m.path === 'account' ? 'Your Higgsfield plan' : 'Higgsfield API'}{m.resolution ? ` · ${m.resolution}` : ''}</span>
+                          <span className="st-hint">{pathName(m.ref, m.path)}{m.resolution ? ` · ${m.resolution}` : ''}</span>
                         </button>
                       )
                     })}
                   </div>
+                  <ProviderPick step="video" model={picked.ref} characterId={v.id} characterName={v.data.name} seconds={duration} audio={audio} compact />
                 </Field>
               )}
               <div className="st-form">

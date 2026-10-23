@@ -420,7 +420,7 @@ export async function buildSceneRun(deps: Deps, ctx: Ctx, row: CharacterRow, inp
     const kind: GenRequest['kind'] = mode === 'refs' ? 'image_edit' : 'image'
     // A path picked by the caller (the launch plan's clip rows, section 30)
     // bills the Higgsfield model there; otherwise the account's default.
-    const base = await runModel(deps, ctx, model, kind, { characterId: row.id })
+    const base = await runModel(deps, ctx, model, kind, { step: 'still', characterId: row.id })
     const run: { model: string; billing?: 'account' | 'api' } = input.billing && base.model.startsWith('higgsfield/') ? { ...base, billing: input.billing } : base
     const attached = mode === 'refs' ? refs.slice(0, Math.max(1, entry.max_refs)) : []
     prompts.push({ label: `${entry.label} prompt`, text: prompt, wrapped: hardWrap(prompt) })

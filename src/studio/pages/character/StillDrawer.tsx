@@ -3,6 +3,7 @@ import { AlertTriangle, Check, CheckCircle2, Crop, FlipHorizontal2, Loader2, Rot
 import { api, ApiError } from '../../api'
 import { useRefresh } from '../../hooks'
 import { PriceButton } from '../../PriceButton'
+import { ProviderPick } from '../../engines'
 import { Callout, Drawer, Field, Img, PromptViewer, errorMessage, useToast } from '../../ui'
 import { SentPanel } from './SentPanel'
 import type { CharacterView, QaReport, SceneStill, SceneView, ScenesData } from '../../types'
@@ -240,6 +241,7 @@ function FixOne({ v, data, still, drift }: { v: CharacterView; data: ScenesData;
           </select>
         )}
       </div>
+      <ProviderPick step="edit" model={model} characterId={v.id} characterName={v.data.name} compact />
       <PriceButton
         label="Run this edit"
         todo={todo}

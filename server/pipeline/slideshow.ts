@@ -676,7 +676,7 @@ export async function slideStillOptions(deps: Deps, ctx: Ctx, characterId: strin
 // billed to the picked path (the plan's credits through the account, or
 // the API's dollars), so the quote, the hold and the charge follow it.
 async function pathRun(deps: Deps, ctx: Ctx, model: string, kind: GenRequest['kind'], path: StillPath, characterId?: string | null): Promise<{ model: string; billing?: StillPath }> {
-  const base = await runModel(deps, ctx, model, kind, { characterId })
+  const base = await runModel(deps, ctx, model, kind, { step: 'still', characterId })
   return base.model.startsWith('higgsfield/') ? { model: base.model, billing: path } : { model: base.model }
 }
 

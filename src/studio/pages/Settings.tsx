@@ -6,7 +6,8 @@ import { api } from '../api'
 import { keys, useHiggsfieldAccount, useSettings } from '../hooks'
 import { AsyncButton, Callout, Field, PromptViewer, errorMessage, useToast } from '../ui'
 import { PriceButton } from '../PriceButton'
-import type { SettingsView, StorageInfo } from '../types'
+import type { KeyTest, SettingsView, StorageInfo } from '../types'
+import { EnginesCard } from '../engines'
 import { AutoCleanPreview } from '../trash'
 import { RulesPanel } from './Rules'
 import { UsagePanel } from './Usage'
@@ -40,6 +41,7 @@ export default function Settings() {
       ) : tab === 'notices' ? <NoticesCard /> : !d ? <div className="st-skel" style={{ height: 240, borderRadius: 18 }} /> : tab === 'models' ? (
         <div className="st-col" style={{ gap: 20 }}>
           <ClaudeCard d={d} />
+          <EnginesCard />
           <ModelsCard d={d} />
         </div>
       ) : (
@@ -153,7 +155,12 @@ function KeyRow({ p, cred }: { p: SettingsView['providers'][number]; cred?: Sett
   const [editing, setEditing] = useState(!cred && !p.serverKey)
   const [secret, setSecret] = useState('')
   const [busy, setBusy] = useState(false)
+  // Test key (section 40): a free call, and the balance when the provider reports one.
+  const [tested, setTested] = useState<KeyTest | null>(null)
   useEffect(() => setEditing(!cred && !p.serverKey), [cred, p.serverKey])
+  async function test() {
+    try { const r = await api.testKey(p.id); setTested(r); invalidate(); toast({ tone: r.verify.ok ? 'ok' : 'bad', text: r.verify.ok ? `${p.label}: the key works.` : `${p.label}: ${r.verify.message}` }) } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) }
+  }
   async function save() {
     setBusy(true)
     try {
@@ -176,9 +183,15 @@ function KeyRow({ p, cred }: { p: SettingsView['providers'][number]; cred?: Sett
         {!cred && p.serverKey && !editing && <button className="st-btn sm ghost" onClick={() => setEditing(true)}>Use another key</button>}
         {cred && <span className="st-mono">{'*'.repeat(8)}{cred.last4}</span>}
         {cred && <span className={`st-badge ${cred.verifyStatus === 'ok' ? 'ok' : cred.verifyStatus === 'failed' ? 'bad' : ''}`}>{cred.verifyStatus === 'ok' ? 'Verified' : cred.verifyStatus === 'failed' ? 'Check failed' : 'Not checked'}</span>}
+        {cred && p.balance && <AsyncButton className="st-btn sm secondary" busyLabel="Testing..." field={`key-test-${p.id}`} onClick={test}>Test key</AsyncButton>}
         {cred && !editing && <button className="st-btn sm" onClick={() => setEditing(true)}>Replace</button>}
         {cred && <button className="st-btn sm icon ghost" onClick={remove} aria-label="Remove key"><Trash2 size={14} /></button>}
       </div>
+      {tested && (
+        <div className={`st-hint ${tested.verify.ok ? '' : 'st-warntext'}`} style={{ marginTop: 8 }} role="status" data-field={`key-balance-${p.id}`}>
+          {tested.verify.ok ? (tested.balance?.usd != null ? `Balance: ${tested.balance.text}.` : tested.balance ? tested.balance.text : 'The key works. No balance reported.') : tested.verify.message}
+        </div>
+      )}
       {editing && (
         <div className="st-col" style={{ gap: 8, marginTop: 12 }}>
           <Field id={`key-${p.id}`} label={`${p.label} key`} required done={secret.length >= 8}>

@@ -470,6 +470,10 @@ function MakeStep({ v, onChanged, onNext }: { v: WeekView; onChanged: () => void
   const models = useQuery({ queryKey: ['slide-still-models', null], queryFn: () => api.slideStillModels(null), staleTime: 60_000 })
   const [path, setPath] = useState<StillPathId | null>(null)
   const pick = path ?? models.data?.pick ?? null
+  // Provider for this run (section 40): every post uses it where it runs
+  // that post's model, else the post's own pick.
+  const engines = useQuery({ queryKey: ['engines'], queryFn: () => api.engines(), staleTime: 60_000 })
+  const [provider, setProvider] = useState('')
   const ready = v.cells.filter(c => c.review !== 'killed' && !c.made && !c.making && !c.flags.length && c.checked && c.line.trim())
   const ids = new Set(v.cells.map(c => c.postId))
   return (
@@ -477,7 +481,17 @@ function MakeStep({ v, onChanged, onNext }: { v: WeekView; onChanged: () => void
       <div className="st-row" style={{ gap: 8, alignItems: 'center' }}><span className="st-h3 grow">Make the week</span><HowTo id="weeks" label="How Make works" /></div>
       <span className="st-hint">One total price, one click: every checked post without a flag, stills first, then the video where the post has one (each video starts from its own still when it lands). Ten posts at a time; each group is checked against your daily cap when its turn comes, and a group over it waits and goes on after midnight (UTC). Progress is one line per post.</span>
       {models.data && <StillPaths field="weeks-make-path" paths={models.data.paths} value={pick} onPick={p => setPath(p)} models={[]} />}
-      <PriceButton label={`Make the week (${ready.length} post${ready.length === 1 ? '' : 's'})`} action={ready.length ? { type: 'week_make', week: v.monday, ...(pick ? { path: pick } : {}) } : null}
+      {engines.data && (
+        <label className="st-row" style={{ gap: 8, alignItems: 'center', flexWrap: 'wrap' }} data-field="weeks-make-provider">
+          <span className="st-label" style={{ margin: 0 }}>Provider for this run</span>
+          <select className="st-select" style={{ width: 'auto' }} value={provider} onChange={e => setProvider(e.target.value)} aria-label="Provider for this run">
+            <option value="">Each post's own pick (Higgsfield unless you picked another)</option>
+            {engines.data.providers.map(p => <option key={p.id} value={p.id}>{p.label}, where it runs the post's model</option>)}
+          </select>
+          <span className="st-hint">The price below follows it. Models only one provider runs (Soul, Genjutsu) stay where they are.</span>
+        </label>
+      )}
+      <PriceButton label={`Make the week (${ready.length} post${ready.length === 1 ? '' : 's'})`} action={ready.length ? { type: 'week_make', week: v.monday, ...(pick ? { path: pick } : {}), ...(provider ? { provider } : {}) } : null}
         todo={ready.length ? [] : [{ label: v.counts.unchecked ? 'Check the week first' : 'Nothing to make: every checked post is made or making' }]} onStarted={onChanged} onDone={onChanged}
         watch={j => ids.has(j.postId ?? '')} />
       {v.counts.making === 0 && v.counts.toReview > 0 && <div className="st-row" style={{ gap: 8 }}><span className="st-hint grow">{v.counts.toReview} made. Next: Review.</span><button type="button" className="st-btn sm" onClick={onNext}>Go to Review</button></div>}
