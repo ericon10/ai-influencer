@@ -1752,4 +1752,7 @@ a.st-chip.st-packed:hover { border-color: var(--st-text-3); }
 .st-provider:hover:not(:disabled) { border-color: var(--st-hover-line); background: var(--st-hover-soft); }
 .st-provider.on { border-color: var(--st-accent); background: var(--st-accent-soft); box-shadow: inset 0 0 0 1px var(--st-accent); }
 .st-provider:disabled { opacity: 0.5; cursor: not-allowed; }
+/* The cheapest mark: the text keeps the text color (contrast in both themes), the check is the green. */
+.st-cheapest { display: inline-flex; align-items: center; gap: 3px; font-size: 11.5px; font-weight: 700; color: var(--st-text); }
+.st-cheapest > svg { color: var(--st-ok); }
 .st-provider:focus-visible { outline: 2px solid var(--st-focus); outline-offset: 2px; }

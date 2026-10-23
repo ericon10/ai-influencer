@@ -119,9 +119,10 @@ describe('video from a picked still (Stage 9, demo mode)', () => {
     const both = await estimateAction(h.deps, h.ctx, take({ endCandidateId: end.id }))
     expect(both.quote.status).toBe('open')
   })
-  it('picks any of the five video models, each priced; the last pick is the next default', async () => {
+  it('picks any of the six video models, each priced; the last pick is the next default', async () => {
     const before = (await scenesView(h.deps, h.ctx, characterId)).options.video
-    expect(before.models.map(m => m.label)).toEqual(['Kling 3.0 Pro', 'Kling 3.0 Standard', 'Seedance 2.0', 'Seedance 2.5', 'Wan 3.0 Prime'])
+    // Seedance 1.5 Pro (UX-PLAN section 40) runs on Kie.ai or WaveSpeed.
+    expect(before.models.map(m => m.label)).toEqual(['Kling 3.0 Pro', 'Kling 3.0 Standard', 'Seedance 2.0', 'Seedance 2.5', 'Wan 3.0 Prime', 'Seedance 1.5 Pro'])
     expect(before.model.ref).toBe('higgsfield/kling-3.0-pro')
     const prices = await videoPrices(h.deps, h.ctx, { durationSec: 5, aspect: '9:16' })
     expect(prices.map(p => p.label)).toEqual(before.models.map(m => m.label))

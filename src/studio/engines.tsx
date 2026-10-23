@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { Check } from 'lucide-react'
 import { api } from './api'
 import { errorMessage, useToast } from './ui'
 import { HowTo } from './guide/Guide'
@@ -55,7 +56,7 @@ export function ProviderPick({ step, model, characterId, characterName, seconds,
             onClick={() => void pick(r.provider, r.isDefault)} data-field={`${field}-${r.provider}`}>
             <b>{r.providerLabel}</b>
             <span className="st-mono">{r.price}{v.per === 'still' ? '' : ` / ${v.per}`}</span>
-            {r.cheapest && <span className="st-chip xs ok">Cheapest</span>}
+            {r.cheapest && <span className="st-cheapest"><Check size={12} aria-hidden />Cheapest</span>}
             {r.isDefault && <span className="st-chip xs">Default</span>}
             {!r.verified && r.micros !== null && <span className="st-muted" aria-label="not confirmed">*</span>}
           </button>
