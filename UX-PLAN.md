@@ -1945,3 +1945,112 @@ changes.
 7. **Tests** use fake provider servers (`server/testing/fakeProviders.ts`),
    never the real APIs. The one real still on each provider waits for Eric's
    keys and his click, and its real charge is checked against the price book.
+
+## 41. ComfyUI on a remote workstation, and the engine lever (owner, 2026-10-23, night)
+
+The brief is `docs/studio/briefs/2026-10-23-comfyui.md`. ComfyUI runs on a
+friend's workstation (a big GPU, full-size models, no low-VRAM tricks). It
+is one more provider in `config/engines.yaml`, next to Higgsfield, Google,
+fal, Kie.ai and WaveSpeed. Applies to every character, account and
+product; faceless characters use it for stills and video but never train a
+LoRA. Built and tested against a mock ComfyUI (the machine is not
+connected yet); `docs/COMFY.md` is how its owner connects it.
+
+**How it connects (E1, items 1 to 3).** The machine never takes a call from
+the Studio and opens no port. A small agent on it (`comfy/agent/agent.mjs`,
+in the pinned image) calls out: it sends a heartbeat (GPU, VRAM, ComfyUI's
+queue, the models it has, its environment hash), claims jobs, fetches each
+job's inputs through short-lived storage links, runs the workflow on its own
+ComfyUI (upload images, queue the prompt, websocket progress), puts the
+outputs straight into our storage through short-lived links, and reports
+done. Settings > Provider keys > ComfyUI: the agent token (made here, shown
+once, kept as a hash; the agent sends it on every call) and, optionally,
+the machine's private tunnel address (Tailscale or Cloudflare Tunnel) for
+reaching it by hand. Test connection asks the agent to answer on its next
+heartbeat (within a few seconds) and shows the answer.
+
+**The queue (E1, E2, E4, E6).** One persistent queue in Postgres
+(`comfy_tasks`): the API and the Railway worker validate and enqueue, the
+agent pulls. Each task has an idempotency key (the post's row or the run,
+the step and the attempt): submitting the same run twice makes one task,
+reporting done twice stores the outputs once. A claimed task holds a lease;
+progress renews it. A lease that runs out (the agent died, the machine
+lost power) is reclaimed and retried once as attempt 2; a second loss, or a
+hard timeout, puts it in Failed, which Settings lists with Retry (priced as
+$0 API, a click). An out-of-memory failure is retried once at batch 1.
+Claims prefer the model family already loaded (Krea 2, then Qwen, then
+Wan), so models are not swapped back and forth; the agent reports a family
+ready only after its first job of that family loads.
+
+**Frozen environment (E3).** `comfy/env/`: the Dockerfile (a pinned base
+image with CUDA, ComfyUI at a commit, Python packages at versions, Node for
+the agent), `nodes.lock.json` (every custom node at a commit hash),
+`models.json` (each model file, its folder, size and sha256) and
+`environment.lock.json` (the three together). The environment hash is the
+sha256 of that lock. The agent checks the files on start and reports the
+hash; the Studio refuses to hand it jobs when it differs from the one this
+Studio expects, and Settings says which and what to do.
+
+**Workflows (items 4, 5).** API-format JSON in `comfy/workflows/`, each with
+a manifest: name, version, step (still, edit, i2v, recreate), model family,
+the model files it needs, inputs (prompt, negative, seed, refs, start
+image, clip, LoRA and its strength, width, height, frames, fps) bound to
+node fields, outputs, the expected time and a hard timeout. Shipped:
+Qwen-Image-Edit-2511 with the character's LoRA and refs (still and edit),
+Krea 2 Turbo with a LoRA trained on Krea 2 Raw (still, text only; marked
+"license check" until Eric confirms commercial use), Wan 2.2 I2V (video),
+Wan 2.2 Animate replace and mix (recreate: replace keeps the clip's place;
+mix keeps the still's place with the clip's motion). Settings > ComfyUI >
+Workflows: upload a workflow and its manifest (checked: every bound node
+and field exists), no rebuild. Each is marked not confirmed until its first
+real run on the machine.
+
+**Character LoRAs (items 6, 7).** Train LoRA on a person character's page:
+the base (Qwen or Krea 2 Raw), REF-00 to REF-11 (REF-12 and 13 when
+present) and the approved stills ticked, a trigger word, the estimated time
+from the machine's past runs. It runs on the machine as a training task; the
+LoRA file stays on the machine, the Studio keeps its version, trigger word,
+file name and checksum. Retrain makes v2; any version can be the active one.
+Faceless characters have no Train LoRA.
+
+**Our rules inside the pipeline (item 8).** No provider filter here, so
+before a task is queued: the character is 21 or older, the prompt passes
+the explicit-content check, a person shot carries the REALISM block and no
+banned smoothing word (the same runner checks as every provider), a source
+clip passes the adult check (Recreate's own gate), and export adds the AI
+label as everywhere.
+
+**Cost and safety (items 9 to 11).** Every run waits for the click, priced
+"$0 API, about N min on ComfyUI" (N from the machine's own past times per
+workflow, else the manifest's). Machine offline (no heartbeat for 2
+minutes): the step says so (the provider picker marks ComfyUI offline, the
+price button says the machine is offline) and offers the other providers
+of that step with their prices; a run already queued waits, and a batch
+that loses the machine mid-run shows an alert on the status card. Never a
+silent switch. The machine owner's own work comes first: max jobs at once
+(default 1) and Pause the queue (in Settings, or on the machine with
+`comfy-agent pause`).
+
+**The bake-off (item 12).** Review > Compare providers: 10 of Callie's real
+prompts (her latest scene stills) on Nano Banana 2.1 (Kie.ai), Qwen and
+Krea 2 Turbo (her LoRAs), one priced click ($0.30 on Kie.ai, $0 on
+ComfyUI), side by side with each still's face score against REF-00 and its
+skin texture score (the same Laplacian check as Realism rule 5; higher is
+more real skin). Use as default sets that provider for stills; nothing
+changes until he picks.
+
+**Docs (items 13, 14).** `docs/COMFY.md` for the machine owner, step by
+step. `docs/DRIVE-OUTPUT.md`: the Send to Drive layout and manifest as a
+format any install of the posting software reads; nothing in it is tied to
+one person (each install sets its own Drive root, accounts and devices).
+
+**The engine lever (item 15).** One switch at the top of Settings and on
+Weeks > Make the week: Engine = Higgsfield subscription, Higgsfield API,
+Kie.ai, WaveSpeed or ComfyUI. `config/engines.yaml` gains a table of each
+engine's model per step; the lever routes every step through it: the same
+model on that provider where it runs it, else the engine's model for the
+step, else (the engine cannot do the step) the step's own model with a
+warning on the price naming why and the price. Prices follow the engine's
+units (plan credits, dollars, machine minutes). Picks per step and per
+character still win over the lever; the engine of every run is in What was
+sent.

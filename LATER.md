@@ -20,9 +20,15 @@ bottom of the list they belong to.
 
 ### Build queue (owner, 2026-10-23)
 
-Each brief is in full in `docs/studio/briefs/`. All three are built:
-hover states (UX-PLAN section 38), Weeks from Google Sheets (section 39),
-Kie.ai and WaveSpeed (section 40).
+Each brief is in full in `docs/studio/briefs/`. Built: hover states
+(UX-PLAN section 38), Weeks from Google Sheets (section 39), Kie.ai and
+WaveSpeed (section 40). Next, in order:
+
+1. **ComfyUI provider** (`2026-10-23-comfyui.md`; section 41), tonight.
+2. **The overnight stack A to F** (`2026-10-23-overnight-stack.md`): text
+   only and photo dump posts, three platforms into Drive, results by
+   blend, the sound note, the free LATER items, the polish sweep and the
+   Guide screenshots. Nothing that spends money.
 
 ### Kie.ai and WaveSpeed: what is left for the owner
 
