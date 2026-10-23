@@ -1773,3 +1773,5 @@ a.st-chip.st-packed:hover { border-color: var(--st-text-3); }
 .st-compare-cell { margin: 0; display: flex; flex-direction: column; gap: 4px; }
 .st-compare-cell img { width: 100%; aspect-ratio: 9 / 16; object-fit: cover; border-radius: 10px; background: var(--st-surface-2, var(--st-surface)); }
 .st-compare-cell figcaption { display: flex; flex-direction: column; gap: 2px; font-size: 13px; }
+/* A select never pushes the page past the screen (polish sweep, section 42 F). */
+.st-select { max-width: 100%; min-width: 0; text-overflow: ellipsis; }

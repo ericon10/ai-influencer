@@ -21,9 +21,9 @@ test('Weeks: the steps and the grid; From Google Sheets', async ({ page }) => {
   await api('PUT', `/social-accounts/${ACCOUNT}`, { characterId: callie, slotsPerDay: 2 })
   const rows = [
     ['row_id', 'account', 'date', 'slot', 'post_type', 'line', 'outfit', 'scene', 'clip_action'],
-    [`G1${run}`, ACCOUNT, '2027-03-01', '1', 'clip', 'the dryer ate my one good sweater', 'faded band tee', 'a laundromat at night', 'she holds up the sweater'],
-    [`G2${run}`, ACCOUNT, '2027-03-02', '1', 'text_only', 'my manager: any questions? / me: is this job real', '', '', ''],
-    [`G3${run}`, ACCOUNT, '2027-03-03', '2', 'slideshow', 'things nobody tells you about your first job', 'gray hoodie', 'her desk at night', ''],
+    [`G1${run}`, ACCOUNT, '2027-03-01', '1', 'clip', 'the laundromat ate my quarters and my last clean shirt', 'faded band tee', 'a laundromat at night', 'she holds up the shirt'],
+    [`G2${run}`, ACCOUNT, '2027-03-02', '1', 'text_only', 'hr: we are like a family / me: so you will ignore my calls', '', '', ''],
+    [`G3${run}`, ACCOUNT, '2027-03-03', '2', 'slideshow', 'things my first boss said that still live in my head', 'gray hoodie', 'her desk at night', ''],
   ]
   await api('POST', '/weeks/import', { csv: rows.map(r => r.map(q).join(',')).join('\n'), rows: rows.slice(1).map(r => r[0]) })
   await api('POST', `/weeks/${MONDAY}/check`, {})
@@ -37,12 +37,12 @@ test('Weeks: the steps and the grid; From Google Sheets', async ({ page }) => {
   ])
   await page.goto(`/studio/weeks?week=${MONDAY}&step=import`)
   await page.locator('[data-field="weeks-from-sheets"]').click()
-  const sheets = page.locator('[data-field="weeks-sheets"]')
-  await expect(sheets).toBeVisible({ timeout: 30_000 })
-  const first = sheets.getByRole('button').first()
-  await guideShot(page, sheets, 'weeks-sheets', [
-    [sheets.locator('.st-h3, .st-label').first(), 'From Google Sheets: your plans folder in Drive, read with your Google sign-in'],
-    [first, 'Connect (or pick a sheet): the preview is free, then import the ticked rows'],
+  const card = page.locator('[data-field="weeks-import"]')
+  const said = card.getByText(/Connect Google Drive first|plans|sheet/i).last()
+  await expect(said).toBeVisible({ timeout: 30_000 })
+  await guideShot(page, card, 'weeks-sheets', [
+    [page.locator('[data-field="weeks-from-sheets"]'), 'From Google Sheets: your plan sheets in Drive, read with your own Google sign-in'],
+    [said, 'Connect Google Drive first (Settings > General); then pick a sheet, the preview is free, and import the ticked rows'],
   ])
 })
 

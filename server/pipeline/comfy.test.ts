@@ -348,7 +348,7 @@ describe('character LoRAs, the bake-off and the engine lever', () => {
     expect(est.quote.items).toHaveLength(20)
     expect(est.quote.display).toMatch(/^\$0\.30, about \d+ min on ComfyUI$/)
     expect(est.preview.warnings.map(w => w.ruleId)).toEqual(['bakeoff-krea', 'bakeoff-qwen'])
-    // Nothing changes until he picks.
+    // Nothing changes until the owner picks.
     expect(await routeWithLever(h.deps, h.ctx, 'higgsfield/nano-banana-2.1', 'image', { step: 'still' })).toMatchObject({ ref: 'higgsfield/nano-banana-2.1', source: 'asked' })
     await useAsDefault(h.deps, h.ctx, 'comfy/qwen-image-edit-2511')
     expect((await readLever(h.deps, h.ctx.accountId)).steps.still).toBe('comfy/qwen-image-edit-2511')

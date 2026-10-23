@@ -54,13 +54,15 @@ describe('Weeks', () => {
       'row_id,account,date,slot,post_type,line,text_style,bg_color,bg_motion',
       `T1,callie_tt_01,${MONDAY},1,text_only,"my manager: any questions? / me: is this job real",two_beat,#1a2b3c,`,
       `T2,callie_tt_01,${MONDAY},2,photo_dump,october so far a recap,,,zoom`,
+      `T3,callie_tt_01,2026-10-27,1,text_only,"Her: are you ok / Me: define ok",dialogue,,`,
     ].join('\n')
-    const r = await importWeek(h.deps, h.ctx, csv, { rows: ['T1', 'T2'] })
-    expect(r.created).toBe(2)
+    const r = await importWeek(h.deps, h.ctx, csv, { rows: ['T1', 'T2', 'T3'] })
+    expect(r.created).toBe(3)
     await checkWeek(h.deps, h.ctx, MONDAY)
     let v = await weekView(h.deps, h.ctx, MONDAY)
     const t1 = v.cells.find(c => c.rowId === 'T1')!, t2 = v.cells.find(c => c.rowId === 'T2')!
     expect(t1).toMatchObject({ postType: 'text_only', flags: [], made: false, video: false })
+    expect(v.cells.find(c => c.rowId === 'T3')!).toMatchObject({ postType: 'text_only', flags: [] })
     expect(t2.flags.join(' ')).toMatch(/A photo dump needs 5 approved stills; none found/)
     const post = await getContent(h.deps, h.ctx, t1.postId)
     expect((post.spec as { card?: unknown }).card).toEqual({ type: 'text_only', bgColor: '#1a2b3c', textStyle: 'two_beat', motion: 'none', placeId: null, stillIds: [] })

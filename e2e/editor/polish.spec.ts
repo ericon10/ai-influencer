@@ -1,15 +1,26 @@
 import { expect, test, type Page } from '@playwright/test'
-import { seedData, snap } from './helpers'
+import { api, seedData, snap } from './helpers'
 
 // The polish sweep (UX-PLAN.md section 42 F): on every main page, at desktop
 // and phone width, no help chip ("How this works") overlaps a title, and
 // every priced button fits inside its card. Measured in the page, like a
 // person would see it.
 
+// A week with posts on it, so Weeks is swept with its grid.
+const run = Date.now().toString(36).slice(-5)
+const MONDAY = '2027-04-05'
+test.beforeAll(async () => {
+  const account = `callie_polish_${run}`
+  await api('PUT', `/social-accounts/${account}`, { characterId: seedData().callie, slotsPerDay: 2 })
+  const rows = [['row_id', 'account', 'date', 'slot', 'post_type', 'line'], [`P1${run}`, account, MONDAY, '1', 'text_only', `a polish sweep line ${run}`], [`P2${run}`, account, '2027-04-07', '2', 'photo', `another polish line ${run}`]]
+  await api('POST', '/weeks/import', { csv: rows.map(r => r.join(',')).join('\n'), rows: rows.slice(1).map(r => r[0]) })
+  await api('POST', `/weeks/${MONDAY}/check`, {})
+})
+
 const pages = () => {
   const s = seedData()
   return [
-    '/studio/posts', '/studio/weeks', '/studio/accounts', '/studio/line-bank', '/studio/library',
+    '/studio', `/studio/weeks?week=${MONDAY}`, `/studio/weeks?week=${MONDAY}&step=make`, `/studio/weeks?week=${MONDAY}&step=review`, '/studio/accounts', '/studio/line-bank', '/studio/library',
     '/studio/settings', '/studio/settings?tab=models', `/studio/characters/${s.callie}`, `/studio/characters/${s.callie}?tab=file`,
     `/studio/posts/${s.basePost}`, '/studio/guide',
   ]
@@ -47,7 +58,13 @@ async function problems(page: Page): Promise<string[]> {
       const b = r(btn), k = r(card)
       if (b.right > k.right + 1 || b.left < k.left - 1) out.push(`priced button "${btn.textContent?.trim().slice(0, 50)}" sticks out of its card (${Math.round(b.left)}-${Math.round(b.right)} vs ${Math.round(k.left)}-${Math.round(k.right)})`)
     }
-    if (document.documentElement.scrollWidth > window.innerWidth + 1) out.push(`the page is wider than the screen (${document.documentElement.scrollWidth} > ${window.innerWidth})`)
+    if (document.documentElement.scrollWidth > window.innerWidth + 1) {
+      // The outermost element past the right edge, outside any scroller.
+      const clipped = (el: Element) => { for (let p = el.parentElement; p; p = p.parentElement) { const ox = getComputedStyle(p).overflowX; if (ox === 'auto' || ox === 'scroll' || ox === 'hidden') return true } return false }
+      const wide = [...document.querySelectorAll('body *')].filter(el => visible(el) && r(el).right > window.innerWidth + 1 && !clipped(el))
+      const top = wide.filter(el => !wide.some(o => o !== el && o.contains(el) && o !== document.body)).slice(0, 3)
+      out.push(`the page is wider than the screen (${document.documentElement.scrollWidth} > ${window.innerWidth}): ${top.map(el => `${el.tagName.toLowerCase()}.${[...el.classList].join('.')}${el.getAttribute('data-field') ? `[${el.getAttribute('data-field')}]` : ''}`).join(', ')}`)
+    }
     return [...new Set(out)]
   })
 }
@@ -59,12 +76,13 @@ for (const [name, viewport] of [['desktop', { width: 1440, height: 900 }], ['pho
     const found: string[] = []
     for (const path of pages()) {
       await page.goto(path)
-      await page.locator('.st-page, .st-post, main').first().waitFor({ timeout: 30_000 })
+      // The page itself, not only the sidebar.
+      await page.locator('.st-page, .st-post, .st-workspace, [data-field="post"]').first().waitFor({ timeout: 30_000 })
       // Prices and lazy cards settle.
       await page.waitForLoadState('networkidle').catch(() => undefined)
       for (const p of await problems(page)) found.push(`${path}: ${p}`)
     }
-    if (found.length) await snap(page, info, `${name}: last page swept`)
+    if (found.length) { console.log(`POLISH ${name}:\n${found.join('\n')}`); await snap(page, info, `${name}: last page swept`) }
     expect(found).toEqual([])
   })
 }

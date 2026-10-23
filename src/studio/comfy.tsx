@@ -112,7 +112,7 @@ export function ComfyCard() {
                   {[1, 2, 3, 4].map(n => <option key={n} value={n}>{n}</option>)}
                 </select>
               </label>
-              <span className="st-hint">The machine's owner's own work comes first: 1 leaves the rest of the GPU to him.</span>
+              <span className="st-hint">The machine's owner's own work comes first: 1 leaves the rest of the GPU to them.</span>
             </div>
             <div className="st-col" style={{ gap: 8 }} data-field="comfy-workflows">
               <div className="st-row" style={{ alignItems: 'center' }}>

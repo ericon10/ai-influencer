@@ -32,16 +32,16 @@ WaveSpeed (section 40), the ComfyUI provider (section 41). Next:
 ### ComfyUI: what is left for the owner
 
 - **Connect the machine:** Settings > General > ComfyUI > Make the agent
-  token, send it to the machine's owner privately, and point him at
-  `docs/COMFY.md`. Test connection shows his GPU when the agent is up.
+  token, send it to the machine's owner privately, and point them at
+  `docs/COMFY.md`. Test connection shows the GPU when the agent is up.
 - **Accept the environment once:** the lock's model checksums are not
   measured yet (Hugging Face was out of reach from the build session), so
   the first heartbeat shows "not measured yet". When his files are in
   place, Use this machine's environment (or commit `comfy-agent lock`'s
   output to `comfy/env/environment.lock.json`).
-- **Krea 2:** confirm the file names of his Krea 2 Turbo, Raw, text encoder
+- **Krea 2:** confirm the file names of their Krea 2 Turbo, Raw, text encoder
   and VAE, and whether commercial use is allowed (it is marked "license
-  check" until then). If his Krea 2 graph differs from ours, upload his
+  check" until then). If their Krea 2 graph differs from ours, upload theirs
   (Save (API) plus a manifest) in Settings > ComfyUI > Workflows.
 - **First real jobs ($0 API):** one Qwen still, one Wan 2.2 I2V take and one
   Animate replace, each confirms its workflow on the machine; then Train

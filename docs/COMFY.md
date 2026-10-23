@@ -112,11 +112,11 @@ Never open port 8188 on your router.
 
 ## 7. Check it with Eric
 
-In Settings > General > ComfyUI he presses Test connection; the card shows
+In Settings > General > ComfyUI Eric presses Test connection; the card shows
 your GPU, its free memory, the queue and the models found. The first time,
 the environment shows "not measured yet" for the models: once the files are
-in place, he presses Use this machine's environment. From then on a change
-on the machine (a node updated, a model swapped) stops jobs until he accepts
+in place, Eric presses Use this machine's environment. From then on a change
+on the machine (a node updated, a model swapped) stops jobs until Eric accepts
 it again.
 
 To see what the agent measures:

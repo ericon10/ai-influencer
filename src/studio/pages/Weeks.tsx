@@ -68,7 +68,7 @@ export default function Weeks() {
           <div className="st-titlerow"><h1 className="st-h1">Weeks</h1><HowTo id="weeks" /></div>
         </div>
         <div className="st-row" style={{ gap: 8, flexWrap: 'wrap' }}>
-          <select className="st-select" style={{ width: 'auto' }} value={monday} onChange={e => pick(e.target.value)} aria-label="Week">
+          <select className="st-select" style={{ width: 'auto', maxWidth: '100%' }} value={monday} onChange={e => pick(e.target.value)} aria-label="Week">
             {choices.map(([m, n]) => <option key={m} value={m}>Week of {dayLabel(m)}{m === thisWeek ? ' (this week)' : ''}{n ? ` · ${n} posts` : ''}</option>)}
           </select>
           <button type="button" className="st-btn sm secondary" onClick={() => download('plan-template.csv', templateCsv())} data-field="weeks-template"><Download size={13} />Download template</button>
@@ -492,7 +492,7 @@ function MakeStep({ v, onChanged, onNext }: { v: WeekView; onChanged: () => void
       {engines.data && (
         <label className="st-row" style={{ gap: 8, alignItems: 'center', flexWrap: 'wrap' }} data-field="weeks-make-provider">
           <span className="st-label" style={{ margin: 0 }}>Provider for this run</span>
-          <select className="st-select" style={{ width: 'auto' }} value={provider} onChange={e => setProvider(e.target.value)} aria-label="Provider for this run">
+          <select className="st-select" style={{ width: 'auto', maxWidth: '100%' }} value={provider} onChange={e => setProvider(e.target.value)} aria-label="Provider for this run">
             <option value="">Each post's own pick (Higgsfield unless you picked another)</option>
             {engines.data.providers.map(p => <option key={p.id} value={p.id}>{p.label}, where it runs the post's model</option>)}
           </select>
@@ -515,7 +515,7 @@ function MakeStep({ v, onChanged, onNext }: { v: WeekView; onChanged: () => void
         return (
           <div className="st-row" style={{ gap: 8, alignItems: 'center', flexWrap: 'wrap' }} data-field="weeks-make-day">
             <span className="st-label" style={{ margin: 0 }}>Generate the rest of</span>
-            <select className="st-select" style={{ width: 'auto' }} aria-label="The day to generate" value={d} onChange={e => setDay(e.target.value)}>
+            <select className="st-select" style={{ width: 'auto', maxWidth: '100%' }} aria-label="The day to generate" value={d} onChange={e => setDay(e.target.value)}>
               {days.map(x => <option key={x} value={x}>{dayLabel(x)} ({ready.filter(c => c.date === x).length})</option>)}
             </select>
             <PriceButton size="sm" variant="secondary" label={`Generate the rest of ${dayLabel(d)} (${rest.length})`} action={{ type: 'week_make', week: v.monday, postIds: rest.map(c => c.postId), ...(pick ? { path: pick } : {}), ...(provider ? { provider } : {}) }} onStarted={onChanged} onDone={onChanged} noStatus />

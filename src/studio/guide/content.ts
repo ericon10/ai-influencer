@@ -800,7 +800,7 @@ export const GUIDE: GuideSection[] = [
       'Pick ComfyUI on a step: the provider picker shows it with $0 API, or set the engine (Settings, top) to ComfyUI for every step it can do.',
       'Character file tab > LoRAs on ComfyUI: pick Qwen-Image-Edit or Krea 2 Raw, tick any approved stills to add to the sheet, and press Train. Retrain makes v2; any finished version can be the active one. Faceless characters have none.',
       'Compare providers (same card): 10 of the character\'s real prompts on Nano Banana (Kie.ai), Qwen and Krea 2 Turbo, side by side with each still\'s face score against REF-00 and its skin texture score. Use as default for stills changes the default; nothing changes until you press it.',
-      'Pause the queue (or comfy-agent pause on the machine) when the owner needs his GPU; Max jobs at once is 1 by default.',
+      'Pause the queue (or comfy-agent pause on the machine) when its owner needs the GPU; Max jobs at once is 1 by default.',
     ],
     tips: [
       'Offline means no heartbeat for 2 minutes. The step says so and the picker offers the other providers with their prices; a run already queued waits for the machine. Nothing switches on its own.',
