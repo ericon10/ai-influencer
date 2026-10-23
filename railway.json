@@ -3,7 +3,7 @@
   "build": {
     "builder": "DOCKERFILE",
     "dockerfilePath": "Dockerfile",
-    "watchPatterns": ["server/**", "config/**", "scripts/fetch-models.mjs", "package.json", "package-lock.json", "Dockerfile", "railway.json"]
+    "watchPatterns": ["server/**", "config/**", "comfy/workflows/**", "comfy/env/environment.lock.json", "scripts/fetch-models.mjs", "package.json", "package-lock.json", "Dockerfile", "railway.json"]
   },
   "deploy": {
     "healthcheckPath": "/health",

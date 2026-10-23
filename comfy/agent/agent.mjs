@@ -12,7 +12,7 @@
 //   comfy-agent status   what the agent sees
 //
 // Settings (environment): STUDIO_URL (https://character-studio-pi.vercel.app),
-// STUDIO_AGENT_TOKEN (made in Settings > Provider keys > ComfyUI; never in a
+// STUDIO_AGENT_TOKEN (made in Settings > General > ComfyUI; never in a
 // repo), COMFY_URL (http://127.0.0.1:8188), COMFY_DIR, COMFY_MODELS,
 // COMFY_LOCK (the environment.lock.json in the image), COMFY_AGENT_HOME
 // (~/.comfy-agent), LORA_TRAIN_CMD (the trainer, {config} is its file).
@@ -323,7 +323,7 @@ export function createAgent(opts = {}) {
     resume() { rmSync(pauseFile, { force: true }) },
     async run() {
       log(`agent ${AGENT_VERSION}: Studio ${studio}, ComfyUI ${comfy}`)
-      if (!token) throw new Error('Set STUDIO_AGENT_TOKEN (Settings > Provider keys > ComfyUI > Make the agent token).')
+      if (!token) throw new Error('Set STUDIO_AGENT_TOKEN (Settings > General > ComfyUI > Make the agent token).')
       for (;;) {
         try { await tick() } catch (e) { log(`round failed: ${e.message}`) }
         await sleep(running.size ? 2000 : 4000)
