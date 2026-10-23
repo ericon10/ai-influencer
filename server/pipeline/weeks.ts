@@ -38,6 +38,7 @@ import { setPosting } from './postingDay.js'
 import { STANCES_KEY, painsFor, type BankImport, IMPORTS_KEY } from './lineBank.js'
 import { listSheets, readSheet, startDriveSend } from './drive.js'
 import { withRunProvider } from './engines.js'
+import { postPlace } from '../core/postRow.js'
 import type { BuiltAction } from './actions.js'
 
 // Weeks (owner, 2026-10-22; UX-PLAN.md section 37): the plan CSV in (spec
@@ -67,6 +68,8 @@ export interface WeekState {
 }
 const weekOfPost = (row: ContentRow): WeekState => (((row.spec ?? {}) as { week?: WeekState | null }).week ?? {})
 const planOf = (row: ContentRow) => planMetaSchema.parse(((row.spec ?? {}) as { plan?: unknown }).plan ?? {})
+// A pure visual post (section 43): no line on purpose, never drawn one.
+const noLine = (row: ContentRow) => ((row.spec ?? {}) as { lineMode?: string | null }).lineMode === 'none' && !lineOf(row).trim()
 
 // A post's week state, merged and saved on its own: the post's last-changed
 // time stays (like results and posting).
@@ -238,7 +241,7 @@ export async function importWeek(deps: Deps, ctx: Ctx, csv: string, opts: { rows
 
 // A bank line freed from a post (the post went to the Trash, or its line
 // was drawn again): it can be drawn for any account again.
-async function freeLines(deps: Deps, ctx: Ctx, postId: string, keep: string | null = null): Promise<void> {
+export async function freeLines(deps: Deps, ctx: Ctx, postId: string, keep: string | null = null): Promise<void> {
   await deps.db.update(bankLines).set({ usedPostId: null, usedAccountTag: null, usedCharacterId: null, usedText: '', usedAt: null, usedDate: null, updatedAt: deps.clock.now() })
     .where(and(eq(bankLines.accountId, ctx.accountId), eq(bankLines.usedPostId, postId), keep ? sql`${bankLines.id} <> ${keep}` : undefined))
 }
@@ -259,7 +262,7 @@ async function draftRow(deps: Deps, ctx: Ctx, p: Plan, raw: WeekRow, r: CheckedW
     placeId: c.place_id.slice(0, 60), videoPrompt: c.video_prompt.slice(0, 2000), soundName: c.sound_name.slice(0, 200), soundType: c.sound_type.slice(0, 20), voiceoverClip: c.voiceover_clip.slice(0, 200),
     lane: c.lane.slice(0, 60), lineFormat: c.line_format.slice(0, 60), feeling: c.feeling.slice(0, 60), topic: c.topic.slice(0, 60),
     product: /^(?:y|yes|true|1)$/i.test(c.ad), notes: c.notes.slice(0, 1500), scene: c.scene.slice(0, 4000), clipAction: c.clip_action.slice(0, 2000),
-    caption: c.caption.slice(0, 2200), hashtags: hashtagsOf(c.hashtags).slice(0, 15),
+    caption: c.caption.slice(0, 2200), hashtags: hashtagsOf(c.hashtags).slice(0, 15), newStill: /^(?:y|yes|true|1)$/i.test(c.new_still),
     sheetId, rowHash: rowHash(c),
   })
   const week: WeekState = { lineId: bankLine?.id ?? null, lineFrom: text ? 'csv' : null, locked: false }
@@ -275,8 +278,8 @@ async function draftRow(deps: Deps, ctx: Ctx, p: Plan, raw: WeekRow, r: CheckedW
       spec: { caption: text, plan: meta, week, faceless: { placeId: place?.id ?? null, line: c.scene.slice(0, 800), videoPrompt: (c.video_prompt || c.clip_action || place?.motion || '').slice(0, 2000), postCaption: c.caption.slice(0, 2200), hashtags: hashtagsOf(c.hashtags).slice(0, 15), musicName: c.sound_name.slice(0, 120), voiceover: c.voiceover_clip ? { search: c.voiceover_clip.slice(0, 200), note: '' } : null, posted: false } },
     })
     id = row.id
-    const job = c.still_job_id || place?.stillJobId
-    if (job) { await queuePull(deps, ctx, row.id, job); pull = true }
+    if (c.still_job_id) { await queuePull(deps, ctx, row.id, c.still_job_id); pull = true }
+    else if (place && !meta.newStill && !c.scene.trim()) pull = (await reusePlaceStill(deps, ctx, row.id, place)) !== 'none'
   } else if (r.postType === 'text_only' || r.postType === 'photo_dump') {
     // Made free on the worker (section 42 A, B): no scene, no generation.
     const card = { type: r.postType, bgColor: readBgColor(c.bg_color), textStyle: readCardStyle(c.text_style), motion: /zoom/i.test(c.bg_motion) ? 'zoom' as const : 'none' as const, placeId: c.place_id.slice(0, 60) || null, stillIds: readStillIds(c.still_ids) }
@@ -316,22 +319,47 @@ async function draftRow(deps: Deps, ctx: Ctx, p: Plan, raw: WeekRow, r: CheckedW
   return { id, text, pull }
 }
 
-async function useLine(deps: Deps, ctx: Ctx, lineId: string, post: { id: string; accountTag: string; characterId: string | null; text: string; date: string }): Promise<void> {
+export async function useLine(deps: Deps, ctx: Ctx, lineId: string, post: { id: string; accountTag: string; characterId: string | null; text: string; date: string }): Promise<void> {
   await deps.db.update(bankLines).set({ usedPostId: post.id, usedAccountTag: post.accountTag, usedCharacterId: post.characterId, usedText: post.text, usedAt: deps.clock.now(), usedDate: post.date || null, updatedAt: deps.clock.now() })
     .where(and(eq(bankLines.accountId, ctx.accountId), eq(bankLines.id, lineId)))
 }
 
-// A place's own still (still_job_id), pulled free on the worker.
-async function queuePull(deps: Deps, ctx: Ctx, postId: string, jobId: string): Promise<void> {
-  await enqueueLocalJob(deps, ctx, { stage: 'content', purpose: `week_pull:${postId}`, label: `Pull the place's still (${jobId.slice(0, 8)})`, characterId: null, request: { postId, jobId } })
+// A place's own still (still_job_id), pulled free on the worker. placeId:
+// the still is kept as that place's, so the next post reuses it at once.
+export async function queuePull(deps: Deps, ctx: Ctx, postId: string, jobId: string, placeId: string | null = null): Promise<void> {
+  await enqueueLocalJob(deps, ctx, { stage: 'content', purpose: `week_pull:${postId}`, label: `Pull the place's still (${jobId.slice(0, 8)})`, characterId: null, request: { postId, jobId, placeId } })
 }
 async function runPull(deps: Deps, ctx: Ctx, job: JobRow): Promise<unknown> {
-  const req = job.request as { postId: string; jobId: string }
+  const req = job.request as { postId: string; jobId: string; placeId?: string | null }
   const row = await getContent(deps, ctx, req.postId)
   if ((row.spec as { stillId?: string | null }).stillId) return { skipped: 'the post has its still' }
   const assetId = await pullStill(deps, ctx, { jobId: req.jobId })
-  await useStillAsset(deps, ctx, row.id, assetId, `Place still ${req.jobId.slice(0, 8)}`)
+  await useStillAsset(deps, ctx, row.id, assetId, `Place still ${req.placeId || req.jobId.slice(0, 8)}`, { place: req.placeId ?? null, stillFrom: req.placeId ? 'place' : 'pulled' })
   return { assetId }
+}
+
+// Section 43: the stills the Studio already has for a character's places
+// (a place's still pulled, or made from the place with no words of the
+// post's own), the newest per place. Reusing one is free.
+export async function placeStills(deps: Deps, ctx: Ctx, characterId: string): Promise<Map<string, { candidateId: string; assetId: string }>> {
+  const rows = await deps.db.select({ id: candidates.id, assetId: candidates.assetId, place: sql<string | null>`${candidates.meta}->>'place'` }).from(candidates)
+    .where(and(eq(candidates.accountId, ctx.accountId), eq(candidates.characterId, characterId), isNotNull(candidates.assetId), sql`coalesce(${candidates.meta}->>'place', '') <> ''`, sql`${candidates.status} not in ('trashed', 'purged', 'failed', 'superseded')`))
+    .orderBy(desc(candidates.createdAt))
+  const out = new Map<string, { candidateId: string; assetId: string }>()
+  for (const r of rows) if (r.place && r.assetId && !out.has(r.place)) out.set(r.place, { candidateId: r.id, assetId: r.assetId })
+  return out
+}
+
+// A post on a place reuses the place's still for $0: one the Studio has
+// (attached at once), else the place's still_job_id (pulled free on the
+// worker). 'none': the place has no still, so a new one is made (priced).
+export async function reusePlaceStill(deps: Deps, ctx: Ctx, postId: string, place: { id: string; stillJobId?: string }, have?: Map<string, { candidateId: string; assetId: string }>): Promise<'attached' | 'pulling' | 'none'> {
+  const row = await getContent(deps, ctx, postId)
+  if (!row.characterId) return 'none'
+  const known = (have ?? await placeStills(deps, ctx, row.characterId)).get(place.id)
+  if (known) { await useStillAsset(deps, ctx, postId, known.assetId, `Place still ${place.id}`, { place: place.id, stillFrom: 'place', reusedFrom: known.candidateId }); return 'attached' }
+  if (place.stillJobId) { await queuePull(deps, ctx, postId, place.stillJobId, place.id); return 'pulling' }
+  return 'none'
 }
 
 // ── The grid ──────────────────────────────────────────────────────────
@@ -346,6 +374,9 @@ export interface WeekCell {
   fillFlag: string | null; flags: string[]; checked: boolean; fit: WeekState['fit']
   need: number; have: number; video: boolean; hasVideo: boolean; made: boolean; making: number
   thumbAssetId: string | null; videoAssetId: string | null; review: 'approved' | 'killed' | null; approved: boolean; sentAt: string | null; driveName: string
+  // Section 43: no line on purpose (a pure visual post); the post's place;
+  // where its still came from ('place': the place's own, reused at $0).
+  lineNone: boolean; placeId: string | null; stillFrom: 'place' | 'new' | 'upload' | null
 }
 
 export async function weekPosts(deps: Deps, ctx: Ctx, monday: string): Promise<ContentRow[]> {
@@ -382,7 +413,7 @@ export async function weekCells(deps: Deps, ctx: Ctx, rows: ContentRow[]): Promi
     const p = planOf(r)
     const w = weekOfPost(r)
     const type = postTypeOf(r, p)
-    const spec = (r.spec ?? {}) as { stillId?: string | null; clipId?: string | null; faceless?: { stillAssetId?: string; clipAssetId?: string } | null; posting?: { approved?: boolean } | null }
+    const spec = (r.spec ?? {}) as { stillId?: string | null; clipId?: string | null; faceless?: { stillAssetId?: string; clipAssetId?: string; stillFrom?: string } | null; posting?: { approved?: boolean } | null }
     let need = 0, have = 0, thumb: string | null = null, videoAsset: string | null = null
     if (r.kind === 'slideshow') {
       const s = slideshowSpecSchema.parse(r.spec ?? {})
@@ -409,6 +440,8 @@ export async function weekCells(deps: Deps, ctx: Ctx, rows: ContentRow[]): Promi
       fillFlag: w.fillFlag ?? null, flags: w.check?.flags ?? [], checked: !!w.check, fit: w.fit ?? null,
       need, have, video, hasVideo, made: need > 0 && have >= need && (!video || hasVideo), making,
       thumbAssetId: thumb, videoAssetId: videoAsset, review: w.review?.call ?? null, approved: !!spec.posting?.approved, sentAt: w.drive?.sentAt ?? null, driveName: w.drive?.name ?? '',
+      lineNone: noLine(r), placeId: postPlace(r.spec as Record<string, unknown>),
+      stillFrom: !have || !spec.faceless ? (have ? 'new' : null) : spec.faceless.stillFrom === 'place' || spec.faceless.stillFrom === 'pulled' ? 'place' : spec.faceless.stillFrom === 'upload' ? 'upload' : 'new',
     }
   })
 }
@@ -416,7 +449,7 @@ export async function weekCells(deps: Deps, ctx: Ctx, rows: ContentRow[]): Promi
 function countsOf(cells: WeekCell[]): WeekCounts {
   const live = cells.filter(c => c.review !== 'killed')
   return {
-    posts: cells.length, noLine: live.filter(c => !c.line.trim()).length, flagged: live.filter(c => c.flags.length).length, unchecked: live.filter(c => !c.checked).length,
+    posts: cells.length, noLine: live.filter(c => !c.line.trim() && !c.lineNone).length, flagged: live.filter(c => c.flags.length).length, unchecked: live.filter(c => !c.checked).length,
     toMake: live.filter(c => !c.made && !c.making && !c.flags.length).length, making: live.filter(c => c.making > 0).length,
     toReview: live.filter(c => c.made && !c.review).length, approved: cells.filter(c => c.approved).length, killed: cells.length - live.length,
     toSend: cells.filter(c => c.approved && !c.sentAt).length, sent: cells.filter(c => c.sentAt).length,
@@ -452,7 +485,7 @@ const fitOf = (f: unknown): VoiceFit => (f === 'first' || f === 'secondhand' ? f
 
 // How a character tells a line: the owner's pick on the line bank, else a
 // faceless character first person, else from their voice card.
-async function stanceOf(deps: Deps, ctx: Ctx, ch: CharacterRow, picked: Record<string, 'first' | 'secondhand'>): Promise<'first' | 'secondhand'> {
+export async function stanceOf(deps: Deps, ctx: Ctx, ch: CharacterRow, picked: Record<string, 'first' | 'secondhand'>): Promise<'first' | 'secondhand'> {
   if (picked[ch.id]) return picked[ch.id]!
   if (kindOf(ch) === 'faceless') return 'first'
   const { voiceOf } = await import('./lineBank.js')
@@ -477,7 +510,7 @@ export async function drawWeek(deps: Deps, ctx: Ctx, monday: string, input: { se
   const redrawSet = new Set(Array.isArray(input.redraw) ? input.redraw : [])
   const isRedrawn = (r: ContentRow) => {
     const w = weekOfPost(r)
-    if (w.locked) return false
+    if (w.locked || noLine(r)) return false
     const line = lineOf(r).trim()
     const from = w.lineFrom ?? (line ? 'csv' : null)
     if (from === 'csv') return false
@@ -509,7 +542,7 @@ export async function drawWeek(deps: Deps, ctx: Ctx, monday: string, input: { se
     const keepId = redrawn.has(r.id) ? null : (r.id in draft ? draft[r.id] ?? null : w.lineId ?? null)
     const line = lineOf(r).trim()
     const keepLine = keepId ? byId.get(keepId) : null
-    const keep = redrawn.has(r.id) ? null : keepLine ? { lineId: keepLine.id, pain: tagsOf(keepLine).pain ?? '', emotion: tagsOf(keepLine).emotion ?? '', format: tagsOf(keepLine).format ?? '' } : line ? { lineId: null, pain: '', emotion: '', format: '' } : null
+    const keep = redrawn.has(r.id) ? null : keepLine ? { lineId: keepLine.id, pain: tagsOf(keepLine).pain ?? '', emotion: tagsOf(keepLine).emotion ?? '', format: tagsOf(keepLine).format ?? '' } : line || noLine(r) ? { lineId: null, pain: '', emotion: '', format: '' } : null
     return { postId: r.id, account: r.accountTag, date: p.date, slot: slotNumber(p.slot) ?? 1, lifeOrJob: (p.lifeOrJob || null) as LifeOrJob | null, voiceFit: (p.voiceFit || null) as VoiceFit | null, stance: r.characterId ? stances.get(r.characterId) ?? 'secondhand' : 'secondhand', keep }
   })
   const blend = new Map<string, LifeOrJob>()
@@ -537,7 +570,7 @@ export async function drawWeek(deps: Deps, ctx: Ctx, monday: string, input: { se
 // on-screen line), the bank line marked used on that account and day (a
 // line freed when its post got another), empty slots flagged, and the
 // visual drafted for every post that has none (item 11).
-export async function saveFill(deps: Deps, ctx: Ctx, monday: string, input: { rows: Array<{ postId: string; lineId: string | null; lifeOrJob: LifeOrJob; flag?: string | null }> }): Promise<{ filled: number; empty: number; drafted: number; pulls: number }> {
+export async function saveFill(deps: Deps, ctx: Ctx, monday: string, input: { rows: Array<{ postId: string; lineId: string | null; lifeOrJob: LifeOrJob; flag?: string | null }> }): Promise<{ filled: number; empty: number; drafted: number; pulls: number; reused: number; newStills: number }> {
   const rows = new Map((await weekPosts(deps, ctx, monday)).map(r => [r.id, r]))
   let filled = 0, empty = 0
   for (const a of input.rows) {
@@ -547,7 +580,7 @@ export async function saveFill(deps: Deps, ctx: Ctx, monday: string, input: { ro
     const p = planOf(post)
     if (w.lineFrom === 'csv' || (w.locked && w.lineId === a.lineId)) continue
     if (!a.lineId) {
-      if (!lineOf(post).trim()) { await patchWeek(deps, ctx, post.id, { fillFlag: a.flag ?? null }); empty++ }
+      if (!lineOf(post).trim() && !noLine(post)) { await patchWeek(deps, ctx, post.id, { fillFlag: a.flag ?? null }); empty++ }
       continue
     }
     if (a.lineId === w.lineId) continue
@@ -569,17 +602,19 @@ export async function saveFill(deps: Deps, ctx: Ctx, monday: string, input: { ro
 const videoText = (scene: { prompts: unknown }) => String(((scene.prompts ?? {}) as { video?: { text?: string } | null }).video?.text ?? '').trim()
 
 // Item 11: every post with a line and no scene gets one (free, by code).
-export async function draftVisuals(deps: Deps, ctx: Ctx, monday: string): Promise<{ drafted: number; pulls: number }> {
+export async function draftVisuals(deps: Deps, ctx: Ctx, monday: string): Promise<{ drafted: number; pulls: number; reused: number; newStills: number }> {
   const rows = await weekPosts(deps, ctx, monday)
   const chars = new Map((await listCharacters(deps, ctx)).map(c => [c.id, c]))
   const placeUse = new Map<string, number>()
   for (const r of rows) { const f = (r.spec as { faceless?: { placeId?: string | null } | null }).faceless; if (f?.placeId) placeUse.set(f.placeId, (placeUse.get(f.placeId) ?? 0) + 1) }
   const settings = deps.config.pipeline.content.weeks.settings
-  let drafted = 0, pulls = 0
+  const themes = deps.config.pipeline.content.weeks.place_themes
+  const stillsOf = new Map<string, Map<string, { candidateId: string; assetId: string }>>()
+  let drafted = 0, pulls = 0, reused = 0, newStills = 0
   for (const r of rows) {
     const line = lineOf(r).trim()
     const ch = r.characterId ? chars.get(r.characterId) : null
-    if (!line || !ch) continue
+    if ((!line && !noLine(r)) || !ch) continue
     const p = planOf(r)
     const type = postTypeOf(r, p)
     const seed = hashSeed(r.id)
@@ -587,12 +622,20 @@ export async function draftVisuals(deps: Deps, ctx: Ctx, monday: string): Promis
       const f = readFacelessPost((r.spec as { faceless?: unknown }).faceless)
       if (f.placeId || f.line.trim() || (r.spec as { stillId?: string | null }).stillId) continue
       const file = facelessOf(ch)
-      const v = draftVisual({ postType: 'faceless', line, storyBeat: p.storyBeat, name: ch.name, places: file.places.map(x => ({ id: x.id, name: x.name, line: x.line, motion: x.motion ?? '' })), placeUse, sounds: file.sounds.map(s => ({ name: s.name, search: s.search, kind: s.kind })), settings: [], seed })
+      if (!stillsOf.has(ch.id)) stillsOf.set(ch.id, await placeStills(deps, ctx, ch.id))
+      const v = draftVisual({ postType: 'faceless', line, storyBeat: p.storyBeat, name: ch.name, places: file.places.map(x => ({ id: x.id, name: x.name, line: x.line, motion: x.motion ?? '', still: !!x.stillJobId || !!stillsOf.get(ch.id)?.has(x.id) })), placeUse, sounds: file.sounds.map(s => ({ name: s.name, search: s.search, kind: s.kind })), settings: [], seed, themes })
       if (v.placeId) placeUse.set(v.placeId, (placeUse.get(v.placeId) ?? 0) + 1)
       const prev = ((r.spec as { faceless?: Record<string, unknown> | null }).faceless ?? {})
       await updateContent(deps, ctx, r.id, { spec: { faceless: { ...prev, placeId: v.placeId, line: v.placeId ? '' : v.scene.slice(0, 800), videoPrompt: (f.videoPrompt || v.videoPrompt).slice(0, 2000), musicName: (prev.musicName as string | undefined) || v.soundName } } as never })
       const place = v.placeId ? file.places.find(x => x.id === v.placeId) : null
-      if (place?.stillJobId) { await queuePull(deps, ctx, r.id, place.stillJobId); pulls++ }
+      // The place's still is reused at $0 unless the row asks for a new one.
+      if (place && !p.newStill) {
+        if (!stillsOf.has(ch.id)) stillsOf.set(ch.id, await placeStills(deps, ctx, ch.id))
+        const how = await reusePlaceStill(deps, ctx, r.id, place, stillsOf.get(ch.id))
+        if (how === 'attached') reused++
+        else if (how === 'pulling') { pulls++; reused++ }
+        else newStills++
+      } else newStills++
       drafted++
     } else if (r.kind === 'meme' && r.sceneId) {
       const scene = await getScene(deps, ctx, r.sceneId)
@@ -611,7 +654,7 @@ export async function draftVisuals(deps: Deps, ctx: Ctx, monday: string): Promis
       drafted++
     }
   }
-  return { drafted, pulls }
+  return { drafted, pulls, reused, newStills }
 }
 
 export async function setLock(deps: Deps, ctx: Ctx, postId: string, locked: boolean): Promise<void> {
@@ -706,7 +749,7 @@ export async function checkWeek(deps: Deps, ctx: Ctx, monday: string): Promise<{
     const ch = r.characterId ? chars.get(r.characterId) : null
     const person = !!ch && kindOf(ch) !== 'faceless'
     const flags: string[] = []
-    if (!line) flags.push('No line')
+    if (!line && !noLine(r)) flags.push('No line')
     if (type === 'photo_dump') {
       const card = (r.spec as { card?: { stillIds?: string[] } | null }).card
       const n = (await dumpStills(deps, ctx, r.characterId, card?.stillIds ?? [])).length
@@ -823,7 +866,7 @@ async function buildWeekMakeRun(deps: Deps, ctx: Ctx, input: { week: string; pos
     // Text-only and photo-dump posts are rendered free (Render N $0 posts).
     if (isFree(c.postType)) return false
     if (wanted) return wanted.has(r.id) && c.review !== 'killed' && !c.making
-    return c.review !== 'killed' && !c.made && !c.making && !c.flags.length && c.checked && c.line.trim()
+    return c.review !== 'killed' && !c.made && !c.making && !c.flags.length && c.checked && (c.line.trim() || c.lineNone)
   }).sort((a, b) => cells.get(a.id)!.date.localeCompare(cells.get(b.id)!.date) || cells.get(a.id)!.slot - cells.get(b.id)!.slot)
   if (!pick.length) throw new AppError('invalid_request', wanted ? 'Those posts are made already or making now.' : 'Nothing to make: every checked post without a flag is made or making. Run Check first.')
   const path = await stillPathFor(deps, ctx, null, { path: input.path ?? null })

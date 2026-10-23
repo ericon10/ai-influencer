@@ -18,6 +18,9 @@ import { FinishedDamage } from './post/FinishedDamage'
 import { MORE_EVENT, moreKey, type PostCtx } from './post/ctx'
 import { editorUrl, scrollKey } from './post/EditorCard'
 import { HowTo } from '../guide/Guide'
+import { LinePanel, lineSummary, usePostRow } from './post/LineDrawer'
+import { SettingSuggestions } from './post/PlacePanel'
+import { WeekSlot } from './post/WeekSlot'
 import type { GuideId } from '../guide/content'
 
 const STEP_GUIDE: Record<PostStep, GuideId> = { idea: 'post-idea', stills: 'post-stills', video: 'post-video', text: 'post-text', finish: 'post-finish' }
@@ -144,6 +147,7 @@ function Workspace({ item, data }: { item: ContentItem; data: ContentData }) {
           <PlanLine plan={(draft.spec as { plan?: PlanMeta }).plan} />
         </div>
       </div>
+      {(item.kind === 'meme' || item.kind === 'slideshow') && character.data?.kind !== 'faceless' && <PersonLine ctx={ctx} />}
       {item.kind === 'meme' && character.data?.kind !== 'faceless' && <FinishedDamage ctx={ctx} />}
       {item.kind === 'meme' && character.data?.kind === 'faceless' ? <FacelessPost ctx={ctx} /> : (<>
       <nav className="st-steps st-poststeps" aria-label="Steps">
@@ -179,6 +183,36 @@ function Workspace({ item, data }: { item: ContentItem; data: ContentData }) {
       </div>
       </>)}
     </div>
+  )
+}
+
+// Line first (owner, 2026-10-23; UX-PLAN.md section 43): a person post's
+// line comes before its steps, the same record a Weeks row has (the line,
+// then the place from the character's world, the still, the video, the
+// sound and the text). Open until the post has a line (or No line), then
+// one line with Change. Add to a week sits under it.
+function PersonLine({ ctx }: { ctx: PostCtx }) {
+  const row = usePostRow(ctx.item.id)
+  const has = !!row.data && row.data.line.mode !== null
+  const [open, setOpen] = useState<boolean | null>(null)
+  const shown = open ?? (row.data ? !has : false)
+  return (
+    <section className={`st-poststep ${shown ? 'current' : 'done'}`} data-field="post-line" style={{ marginBottom: 14 }}>
+      <header className="st-poststep-head">
+        <span className="st-poststep-dot">{has && !shown ? <Check size={13} strokeWidth={3} /> : 'L'}</span>
+        <div className="grow" style={{ minWidth: 0 }}>
+          <div className="st-h3">Line</div>
+          {!shown && <div className="st-hint st-poststep-sum">{lineSummary(row.data)}</div>}
+        </div>
+        <HowTo id="line-first" />
+        <button className="st-btn sm ghost" onClick={() => setOpen(!shown)} aria-expanded={shown}>{shown ? 'Hide' : has ? 'Change' : 'Pick the line'}</button>
+      </header>
+      {shown && <div className="st-poststep-body st-col" style={{ gap: 12 }}><LinePanel ctx={ctx} onPicked={() => setOpen(false)} /></div>}
+      <div className="st-poststep-body st-col" style={{ gap: 10, paddingTop: shown ? 0 : undefined }}>
+        <SettingSuggestions ctx={ctx} />
+        <WeekSlot ctx={ctx} />
+      </div>
+    </section>
   )
 }
 

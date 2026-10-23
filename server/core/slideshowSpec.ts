@@ -155,6 +155,9 @@ export const slideshowSpecSchema = z.object({
   // Weeks (UX-PLAN.md section 37): the post's line from the bank, its lock,
   // Fit to voice, Check, Review and Drive state. Saved on its own; never copied.
   week: z.record(z.string(), z.unknown()).nullable().default(null),
+  // Line first (UX-PLAN.md section 43): the line from the bank, the owner's
+  // own words, or deliberately none (a pure visual post).
+  lineMode: z.enum(['bank', 'own', 'none']).nullable().default(null),
 })
 export type SlideshowSpec = z.infer<typeof slideshowSpecSchema>
 export type SpecialSlideSpec = z.infer<typeof specialSchema>

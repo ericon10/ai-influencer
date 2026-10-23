@@ -19,6 +19,7 @@ import { ResultsRow, useResultsView } from '../results'
 import type { ResultHint } from '../types'
 import { SelectBar, SelectToggle, TileCheck, useSelection } from '../trash'
 import { Viewer, useViewer } from '../viewer'
+import { LineTag, lineOfItem } from '../postRow'
 
 // Home (UX-PLAN.md): every post, newest work first, filtered by account,
 // character and product (section 29). One click opens a post where it was
@@ -239,6 +240,7 @@ function PostCard({ item, lib, characterName, productName, hints, select, onView
       </Link>
       {onView && !select && (c.image || c.video) && <button type="button" className="st-postcard-view" onClick={onView} aria-label={`View ${postName(item)} full size`} title="Full size"><Maximize2 size={14} /></button>}
       <div className="st-casting-body">
+        {(item.kind === 'meme' || item.kind === 'slideshow') && (() => { const l = lineOfItem(item); return <LineTag postId={item.id} line={l.text} placeId={l.placeId} none={l.mode === 'none'} /> })()}
         <Link to={`/studio/posts/${item.id}`} className="st-postcard-name">{postName(item)}</Link>
         <div className="st-casting-meta">
           <span>{[KIND_LABEL[item.kind], characterName, item.accountTag, productName].filter(Boolean).join(' · ')}</span>

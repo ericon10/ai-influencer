@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Copy, ImagePlus, Music, Sparkles, Type, Video, Image as ImageIcon, CheckCircle2, Package, Upload } from 'lucide-react'
+import { Copy, ImagePlus, Music, Sparkles, Type, Video, Image as ImageIcon, CheckCircle2, Package, Upload, Quote } from 'lucide-react'
 import { api, assetUrl } from '../../api'
 import { keys } from '../../hooks'
 import { PriceButton } from '../../PriceButton'
@@ -11,9 +11,14 @@ import { HowTo } from '../../guide/Guide'
 import type { FacelessFile } from '../../types'
 import type { PostCtx } from './ctx'
 import { FinishStep } from './FinishStep'
+import { LinePanel, lineSummary, usePostRow } from './LineDrawer'
+import { PlaceSuggestions } from './PlacePanel'
+import { WeekSlot } from './WeekSlot'
 
 // A faceless post (owner, 2026-10-22; UX-PLAN.md section 35, item 4e): the
-// same workspace, in drawers: Still (a place from the bank or written, its
+// same workspace, in drawers. Line first (owner, 2026-10-23; section 43):
+// Line (the bank, own words or none), then Visual (was Still: a place from
+// the bank, suggested by the line, its still reused for $0, or written; its
 // price), Video (the prompt filled in from the row, image-to-video, any
 // model with its price), Sound, Text (the on-screen line, the caption and
 // the hashtags, each with Copy), and Posted. The still shows on the post
@@ -89,7 +94,11 @@ export function FacelessPost({ ctx }: { ctx: PostCtx }) {
   const spec = draft.spec as { caption?: string; stillId?: string | null; clipId?: string | null; faceless?: FacelessSpec | null; sound?: Record<string, unknown> }
   const f: FacelessSpec = spec.faceless ?? {}
   const setF = (patch: Partial<FacelessSpec>) => draft.setSpec({ faceless: { ...f, ...patch } })
-  const [open, setOpen] = useState<string>(spec.clipId ? 'text' : spec.stillId ? 'video' : 'still')
+  // Line first (section 43): the default flow is line > visual > video >
+  // sound > text; any drawer opens in any order.
+  const lineSet = !!(spec.caption ?? '').trim() || (draft.spec as { lineMode?: string | null }).lineMode === 'none'
+  const [open, setOpen] = useState<string>(spec.clipId ? 'text' : spec.stillId ? 'video' : lineSet ? 'still' : 'line')
+  const row = usePostRow(item.id)
   const toggle = (id: string) => setOpen(o => (o === id ? '' : id))
   const sounds = useQuery({ queryKey: ['sounds'], queryFn: () => api.sounds(), staleTime: 30_000 })
   const music = (sounds.data?.sounds ?? []).filter(s => s.kind === 'music' && s.status === 'ready')
@@ -136,13 +145,19 @@ export function FacelessPost({ ctx }: { ctx: PostCtx }) {
         <HowTo id="faceless" label="About faceless posts" />
       </div>
 
-      <Drawer id="still" icon={<ImageIcon size={16} />} title="Still" open={open === 'still'} onToggle={() => toggle('still')}
-        sum={spec.stillId ? 'The still is ready.' : place ? `Place: ${place.name}` : f.line ? 'Your own words' : 'Pick a place or write it'}>
+      <Drawer id="line" icon={<Quote size={16} />} title="1. Line" open={open === 'line'} onToggle={() => toggle('line')} sum={lineSummary(row.data)}>
+        <LinePanel ctx={ctx} onPicked={() => setOpen('still')} />
+      </Drawer>
+
+      <Drawer id="still" icon={<ImageIcon size={16} />} title="2. Visual" open={open === 'still'} onToggle={() => toggle('still')}
+        sum={spec.stillId ? `The still is ready${place ? ` (${place.id}${(f as { stillFrom?: string }).stillFrom === 'place' ? ', reused, $0' : ''})` : ''}.` : place ? `Place: ${place.id} · ${place.name}` : f.line ? 'Your own words' : 'Pick a place or write it'}>
         {f.stillAssetId && <Img assetId={f.stillAssetId} width={360} style={{ width: 180, aspectRatio: '9 / 16', objectFit: 'cover', borderRadius: 12 }} />}
-        <label className="st-col" style={{ gap: 4 }}><span className="st-label">From the place bank</span>
+        {f.stillAssetId && (f as { stillFrom?: string }).stillFrom === 'place' && <span className="st-hint" data-field="faceless-still-reused">Reused from {place?.id ?? 'the place'}: $0.</span>}
+        <PlaceSuggestions ctx={ctx} onUsed={still => { refresh(); if (still === 'attached') setOpen('video') }} />
+        <label className="st-col" style={{ gap: 4 }}><span className="st-label">Or pick from the whole place bank</span>
           <select className="st-select" value={f.placeId ?? ''} onChange={e => setF({ placeId: e.target.value || null })} aria-label="Place">
             <option value="">Write my own</option>
-            {file.places.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+            {file.places.map(p => <option key={p.id} value={p.id}>{p.id} · {p.name}</option>)}
           </select>
         </label>
         {place && !f.line && <span className="st-hint">{place.line}</span>}
@@ -172,10 +187,10 @@ export function FacelessPost({ ctx }: { ctx: PostCtx }) {
         <RunStatus match={j => j.purpose === `faceless_still:${item.id}`} />
       </Drawer>
 
-      <Drawer id="video" icon={<Video size={16} />} title="Video" open={open === 'video'} onToggle={() => toggle('video')}
+      <Drawer id="video" icon={<Video size={16} />} title="3. Video" open={open === 'video'} onToggle={() => toggle('video')}
         sum={spec.clipId ? 'The take is ready.' : spec.stillId ? 'From the still' : 'Make the still first'}>
         {f.clipAssetId && <video className="st-clip" src={`${assetUrl(f.clipAssetId)}#t=0.1`} controls muted playsInline style={{ width: 180, aspectRatio: '9 / 16', borderRadius: 12 }} />}
-        <label className="st-col" style={{ gap: 4 }}><span className="st-label">What happens (from the plan row; edit freely)</span>
+        <label className="st-col" style={{ gap: 4 }}><span className="st-label">What happens (from the place's motion, the plan row or the line; edit freely)</span>
           <textarea className="st-textarea" rows={3} value={f.videoPrompt ?? ''} onChange={e => setF({ videoPrompt: e.target.value })} aria-label="Video prompt" />
         </label>
         <div className="st-row" style={{ gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -194,7 +209,7 @@ export function FacelessPost({ ctx }: { ctx: PostCtx }) {
         <RunStatus match={j => j.purpose === `faceless_video:${item.id}`} />
       </Drawer>
 
-      <Drawer id="sound" icon={<Music size={16} />} title="Sound" open={open === 'sound'} onToggle={() => toggle('sound')}
+      <Drawer id="sound" icon={<Music size={16} />} title="4. Sound" open={open === 'sound'} onToggle={() => toggle('sound')}
         sum={[f.musicName ? `Add in the app: ${f.musicName}` : (spec.sound as { music?: string | null } | undefined)?.music ? `Music: ${music.find(m => m.id === (spec.sound as { music?: string }).music)?.title ?? 'picked'}` : 'No sound yet', f.voiceover?.search ? `voiceover "${f.voiceover.search}"` : ''].filter(Boolean).join(' · ')}>
         <label className="st-col" style={{ gap: 4 }}><span className="st-label">Music bed (Library &gt; Sounds)</span>
           <select className="st-select" value={(spec.sound as { music?: string | null } | undefined)?.music ?? ''} aria-label="Music bed" onChange={e => draft.setSpec({ sound: { ...(spec.sound ?? {}), music: e.target.value || null } })}>
@@ -220,7 +235,7 @@ export function FacelessPost({ ctx }: { ctx: PostCtx }) {
         </div>
       </Drawer>
 
-      <Drawer id="text" icon={<Type size={16} />} title="Text" open={open === 'text'} onToggle={() => toggle('text')}
+      <Drawer id="text" icon={<Type size={16} />} title="5. Text" open={open === 'text'} onToggle={() => toggle('text')}
         sum={caption ? `On screen: ${caption.slice(0, 60)}` : 'The on-screen line, the caption, the hashtags'}>
         <div className="st-col" style={{ gap: 4 }}>
           <div className="st-row" style={{ gap: 8 }}><span className="st-label grow">On-screen line</span><CopyLine label="on-screen line" text={caption} /></div>
@@ -236,6 +251,10 @@ export function FacelessPost({ ctx }: { ctx: PostCtx }) {
           <input className="st-input" value={tags.map(t => `#${t}`).join(' ')} aria-label="Hashtags" onChange={e => setF({ hashtags: e.target.value.split(/[\s,]+/).map(t => t.replace(/^#+/, '')).filter(Boolean).slice(0, 15) })} />
         </div>
       </Drawer>
+
+      <section className="st-card" data-field="faceless-week">
+        <div className="st-card-body"><WeekSlot ctx={ctx} /></div>
+      </section>
 
       <section className="st-card" data-field="faceless-posted">
         <div className="st-card-body st-row" style={{ gap: 10, alignItems: 'center' }}>

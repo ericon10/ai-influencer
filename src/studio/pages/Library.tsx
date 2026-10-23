@@ -15,6 +15,7 @@ import { VoiceLinesTab } from './library/VoiceLines'
 import { CollectionButtons, LibraryFilters, NoMatch } from './library/Filters'
 import { EMPTY_FILTER, filterFromParams, filterParams, isFiltered, libraryQueryString, type LibraryTab } from '../../../server/core/libraryFilter'
 import { HooksTab } from './library/Hooks'
+import { LineTag, lineOfItem } from '../postRow'
 
 // The Library (UX-PLAN.md): browse everything made, across characters.
 // Stills and clips start a new post in one click; B-roll is uploaded and
@@ -249,6 +250,7 @@ function ExportedPosts({ data, characterId, sel, del }: { data: ContentData; cha
             {o.videoAssetId ? <video className="st-content-result sm" src={assetUrl(o.videoAssetId)} controls playsInline preload="metadata" />
               : o.imageAssetIds?.[0] ? <Img assetId={o.imageAssetIds[0]} width={320} style={{ aspectRatio: '9 / 16' }} />
               : o.videos?.find(v => v) ? <video className="st-content-result sm" src={assetUrl(o.videos.find(v => v)!.assetId)} controls playsInline preload="metadata" /> : null}
+            {(i.kind === 'meme' || i.kind === 'slideshow') && (() => { const l = lineOfItem(i); return <LineTag postId={i.id} line={l.text} placeId={l.placeId} none={l.mode === 'none'} compact /> })()}
             <Link to={`/studio/posts/${i.id}`} className="st-tile-label">{postName(i)}</Link>
             <span className="st-hint">{[KIND_LABEL[i.kind], i.accountTag].filter(Boolean).join(' · ')}</span>
             <div className="st-row" style={{ gap: 6 }}>

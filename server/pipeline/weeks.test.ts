@@ -190,18 +190,24 @@ describe('a week, from the plan CSV to Google Drive', () => {
     expect(v.counts.unchecked).toBe(0)
   })
 
-  it('Make: one price for two posts, stills first, then each video from its own still', async () => {
+  it('Make: one price for two posts, stills first, then each video from its own still; a place\'s still is reused at $0', async () => {
     const two = [ids.C1a!, ids.D0!]
+    // Section 43: D0's place still was reused at $0 when Fill drafted it, so
+    // Make makes no still for it, only its video.
+    expect((await weekView(h.deps, h.ctx, MONDAY)).cells.find(c => c.postId === ids.D0!)).toMatchObject({ have: 1, stillFrom: 'place' })
     const action = { type: 'week_make' as const, week: MONDAY, postIds: two }
     const { quote, preview } = await estimateAction(h.deps, h.ctx, action)
     expect(quote.totalMicros).toBeGreaterThan(0)
-    expect(preview.title).toBe('Make the week: 2 posts, 2 stills then 2 videos')
+    expect(preview.title).toBe('Make the week: 2 posts, 1 still then 2 videos')
     const ran = await runAction(h.deps, h.ctx, action, quote.id, true)
     const rows = await h.deps.db.select({ purpose: jobs.purpose, status: jobs.status, request: jobs.request }).from(jobs).where(inArray(jobs.id, ran.jobs.map(j => j.id)))
-    // The videos wait for their stills, with no start frame yet.
+    // C1a's video waits for its still, with no start frame yet; D0's starts
+    // from the reused still.
     const videos = rows.filter(r => /video/.test(r.purpose))
     expect(videos).toHaveLength(2)
-    expect(videos.every(r => r.status === 'waiting' && !(r.request as { startFrame?: unknown }).startFrame)).toBe(true)
+    const chained = videos.filter(r => !/faceless/.test(r.purpose))
+    expect(chained.every(r => r.status === 'waiting' && !(r.request as { startFrame?: unknown }).startFrame)).toBe(true)
+    expect((videos.find(r => /faceless/.test(r.purpose))!.request as { startFrame?: unknown }).startFrame).toBeTruthy()
     await drain(h, 60)
     const after = await h.deps.db.select({ purpose: jobs.purpose, status: jobs.status, request: jobs.request }).from(jobs).where(inArray(jobs.id, ran.jobs.map(j => j.id)))
     expect(after.every(r => r.status === 'completed')).toBe(true)

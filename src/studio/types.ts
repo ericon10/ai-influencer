@@ -568,7 +568,7 @@ export interface WorkerStatus {
 
 
 // The Library: everything made, across characters (server/pipeline/clips.ts).
-export interface LibraryStill { id: string; assetId: string; characterId: string; characterName: string; sceneId: string | null; sceneTitle: string; status: string; op: string; createdAt: string; used?: number }
+export interface LibraryStill { id: string; assetId: string; characterId: string; characterName: string; sceneId: string | null; sceneTitle: string; status: string; op: string; createdAt: string; used?: number; post?: { id: string; line: string; placeId: string | null; none: boolean } | null }
 export interface LibraryClip extends LibraryStill { posterId: string | null; durationSec: number | null; title: string; error: string | null }
 // With the Library page's filters (section 34): the Model filter's choices,
 // and whether more than the newest 400 match.
@@ -631,6 +631,8 @@ export type WeekStep = 'import' | 'fill' | 'check' | 'make' | 'review' | 'drive'
 export interface WeekCell {
   postId: string; account: string; date: string; slot: number; rowId: string; postType: WeekPostType; kind: string; characterId: string | null
   line: string; lineId: string | null; lineFrom: 'csv' | 'drawn' | null; locked: boolean; lifeOrJob: 'life' | 'job' | null; storyBeat: string
+  // Section 43: no line on purpose; the post's place; where its still came from.
+  lineNone: boolean; placeId: string | null; stillFrom: 'place' | 'new' | 'upload' | null
   sound: { name: string; type: string } | null
   fillFlag: string | null; flags: string[]; checked: boolean; fit: { before: string; after: string; why: string; at: string } | null
   need: number; have: number; video: boolean; hasVideo: boolean; made: boolean; making: number
@@ -756,3 +758,28 @@ export interface CompareView {
   models?: Array<{ ref: string; label: string; face: number | null; texture: number | null }>
   rows?: Array<{ index: number; prompt: string; cells: Record<string, { jobId: string; status: string; assetId: string | null; face: number | null; texture: number | null }> }>
 }
+
+// Line first, both doors (UX-PLAN.md section 43; server/pipeline/postRow.ts).
+export type LineMode = 'bank' | 'own' | 'none' | null
+export interface RowLine { id: string | null; text: string; mode: LineMode; pain: string; emotion: string; format: string; source: string; likes: number; comment: string; lifeOrJob: string | null }
+export interface PostRowView {
+  postId: string; kind: string; title: string; characterId: string | null; characterName: string; faceless: boolean
+  accountTag: string; rowId: string; date: string; slot: number | null; week: string | null; postType: string
+  line: RowLine
+  place: { id: string; name: string; scene: string; motion: string } | null
+  stillAssetId: string | null; stillFrom: 'place' | 'new' | 'upload' | null; videoAssetId: string | null
+  sound: string; caption: string; hashtags: string[]
+}
+export interface LinePick {
+  id: string; text: string; pain: string; emotion: string; format: string; fits: 'first' | 'secondhand' | 'both'; lifeOrJob: 'life' | 'job' | null
+  source: string; likes: number; comment: string; used: { account: string; date: string | null; here: boolean } | null
+}
+export interface LinePicks {
+  lines: LinePick[]; total: number; unused: number; hidden: number; otherVoice: number
+  options: { pains: string[]; emotions: string[]; formats: string[] }; stance: 'first' | 'secondhand'; characterName: string; current: string | null
+}
+export interface PlaceSuggestion {
+  id: string; name: string; scene: string; motion: string; score: number; why: string; used: number
+  still: { assetId: string | null; from: 'studio' | 'higgsfield' } | null
+}
+export interface PlaceSuggestions { faceless: boolean; line: string; current: string | null; places: PlaceSuggestion[]; settings: Array<{ text: string; score: number; why: string }> }

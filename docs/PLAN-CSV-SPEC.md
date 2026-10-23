@@ -62,6 +62,7 @@ fails if this page and that list disagree.
 | `feeling` | optional | Free text | Line Engine field. |
 | `topic` | optional | Free text | Line Engine field. |
 | `still_job_id` | optional | A Higgsfield job id | Faceless only: that still, pulled free, instead of making one. |
+| `new_still` | optional | yes, no | Faceless only: yes makes a new still even when the place has one. Blank: the place's still is reused at $0 when it has one. |
 | `slide_2` | optional | Free text | Slideshow only: slides 2 to 6 (slide 1 is the line). |
 | `slide_3` | optional | Free text | Slideshow only. |
 | `slide_4` | optional | Free text | Slideshow only. |

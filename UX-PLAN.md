@@ -71,6 +71,21 @@ flow, not what the rules are.
 
 ---
 
+## Rule 2: LINE FIRST, BOTH DOORS (owner, 2026-10-23)
+
+Content enters the Studio two ways only: (1) a plan CSV or Sheet imported
+in Weeks, (2) New post. Both build a post the same way, in the same order,
+so the line, the place, the still, the video and the sound always travel
+together: **line > place > still > video > sound > text**. A post and a
+Weeks row are the same record (`line_id`, `place_id`, still, video, sound,
+caption). Wherever a picture of a post shows (post cards, Weeks cells,
+Review cards, the Library) its line and its place_id show under it, and a
+tap opens the full row with Open post. (Why: Eric picked a Doug still in
+New post and had no idea which line or row it belonged to.) Section 43
+has the details.
+
+---
+
 ## 1. The journey, end to end
 
 ```
@@ -2103,3 +2118,62 @@ previous across Trash and Posts home; the post.json gaps.
 card, at desktop and phone width (a browser test measures both); Guide
 screenshots with numbered callouts for Weeks, Accounts, Line bank, From
 Google Sheets, Providers and ComfyUI.
+
+## 43. Line first, both doors (owner, 2026-10-23)
+
+Rule 2 above, built. Applies to every character (person or faceless),
+every account and every product (rule two): the line bank, the place bank
+(faceless) and the character's own settings (a person's world: the
+character file's places and settings) are each character's own data; a
+post with no product uses neutral defaults. Nothing here spends money
+except the steps that already did (a new still, a video), each priced on
+its button (R4).
+
+**New post order** (the faceless workspace's drawers, and the Line card on
+top of a person post's steps). The drawers stay open-able in any order;
+this is the default flow and the order the post card shows.
+
+| # | Drawer | How it works | Price |
+|---|---|---|---|
+| 1 | Character or product | As today (New post, then the character in the post) | 0 |
+| 2 | **Line** (new, first) | Pick from the bank: filters (pain, emotion, format, life or job), unused lines first, only lines that fit this character's voice (first person or secondhand, as on the line bank), none used on another account. Or **Write my own**, or **No line** for a pure visual post. The picked line shows its pain, emotion and source (the comment it came from, with its likes). Picking marks the bank line used on this post's account (a line goes to one account only) and frees the one it replaces | 0 |
+| 3 | **Visual** (was Still) | A faceless post: places from the character's place bank that fit the line come first (the line's words and the bank's themes, `weeks.place_themes` in `config/content.yaml`: a money line suggests the gas station), each with its thumbnail, scene text and place_id. A place whose still is already in the Studio, or on Higgsfield (`still_job_id`), says **Reuse this still: $0** and is used at once (a pull from Higgsfield is free, on the worker). Or write your own scene (it wins over the place), or Make a new still (priced). A person post: the character's own settings that fit the line, as chips that fill the idea | 0 (reuse), priced (new) |
+| 4 | Video | The motion prefilled from the place's motion line, or drafted from the line when there is no place | priced |
+| 5 | Sound | As today | 0 |
+| 6 | Text | The on-screen line and the caption prefilled from the line (only while empty); editable | 0 |
+
+**Same shape as Weeks.**
+
+| # | Piece | How it works |
+|---|---|---|
+| 7 | Add to a week | On a New post: **Add to a week** (pick the account, the date and the slot). The post gets a row_id (`NP` plus 4), its plan date and slot, and shows on that week's grid; Fill, Check, Make, Review and Send to Drive treat it like any other row. A post already in a week shows "In the week of ... slot ..." with Move |
+| 8 | Fill reuses stills | Weeks Fill picks the place by the same fit (line words and themes, then the least used). It reuses the place's existing still at $0 when one exists (a still the Studio already has for that place first, attached at once; else the place's `still_job_id`, pulled free); it makes a new still only when the row asks (`new_still` = yes in the plan CSV) or no still fits. Fill says "N stills reused at $0, M new stills to make"; Make lists each post's still as **Reused, $0** or **New still** with the price on the button |
+
+**Everywhere an image shows.**
+
+| # | Where | How it works |
+|---|---|---|
+| 9 | Post cards, Weeks cells, Weeks Review cards, the Library | The line under the thumbnail (or "No line") and the place_id. A tap on it opens the full row in a drawer: account, date and slot, row_id, the line with its pain, emotion and source, the place with its scene, the still, the video, the sound and the caption, and **Open post**. A Weeks cell opens the row (Open post is one more click) |
+
+Where it lives: the pure parts in `server/core/postRow.ts` (the line and
+place of a post, the place fit), storage in `server/pipeline/postRow.ts`
+(the row, the line pick, the place suggestions with their stills, Use
+this place, Add to a week), the UI in `src/studio/postRow.tsx` (the line
+tag and the row drawer) and `src/studio/pages/post/LineDrawer.tsx`.
+
+
+## 44. ComfyUI: the Krea 2 encoder, Compare with a count, the clone branch (owner, 2026-10-23)
+
+Applies to every person character (faceless characters have no face to
+compare) and every account; no product rules. Nothing here spends money by
+itself: Compare providers stays a priced run that waits for the click (R4).
+
+| # | Piece | How it works |
+|---|---|---|
+| 1 | The Krea 2 graph | `comfy/workflows/krea-2-turbo.api.json`: the CLIPLoader type is `krea2` (was `flux2`; the pinned ComfyUI lists krea2, and Krea 2's text encoder is Qwen3-VL-4B). The manifest is version 2, so the machine knows the graph changed |
+| 2 | Compare providers: how many | A count picker on the drawer: **1, 3 or 10** of the character's real prompts (10 by default). The price on Run the comparison follows it |
+| 3 | Krea 2 with no LoRA | Krea 2 Turbo runs in the comparison even when the character has no Krea 2 LoRA, labeled **"no LoRA, text card only"** (its face comes from the words alone), and the "No Krea 2 LoRA yet" warning stays on the price. **Use as default** for Krea 2 stays off until the character has a Krea 2 LoRA (the server refuses it too) |
+| 4 | `docs/COMFY.md` | Clone with `-b character-studio` (`main` has no `comfy/` folder). A short "test machine" note: smaller fp8 files may be saved under the expected names; press Use this machine's environment on each machine |
+
+Guide: the ComfyUI section's Compare providers step and the help on the
+Compare drawer say the count and the no-LoRA label.

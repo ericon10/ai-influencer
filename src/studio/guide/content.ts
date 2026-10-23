@@ -9,7 +9,7 @@ export type GuideColor = 'orange' | 'pink' | 'violet' | 'blue' | 'teal' | 'green
 export type GuideId =
   | 'big-picture' | 'posts' | 'characters' | 'setup-start' | 'setup-face' | 'setup-sheet' | 'setup-file'
   | 'post-idea' | 'post-stills' | 'post-video' | 'post-clone' | 'post-mass' | 'line-bank' | 'post-text' | 'post-finish'
-  | 'library' | 'settings' | 'feedback' | 'faceless' | 'realism' | 'voice' | 'hooks' | 'slideshow' | 'launch-plan' | 'products' | 'results' | 'download-day' | 'weeks' | 'accounts' | 'providers' | 'comfy' | 'engine'
+  | 'library' | 'settings' | 'feedback' | 'faceless' | 'realism' | 'voice' | 'hooks' | 'slideshow' | 'launch-plan' | 'products' | 'results' | 'download-day' | 'weeks' | 'line-first' | 'accounts' | 'providers' | 'comfy' | 'engine'
 
 export interface GuideSection {
   id: GuideId
@@ -128,7 +128,7 @@ export const GUIDE: GuideSection[] = [
       'Place bank: reusable scenes, picked per post like set plates. Each place carries its motion line (the video prompt) and, when it has one, the Higgsfield still it was made from (pulled free when a post uses it). Import places (CSV) takes place_id, scene, motion and still_job_id: a place with the same id is replaced, and a place with no motion gets one drafted. Write the place only: no person or body part (hands read as AI) and nothing that carries text (packaging, screens, paper, mail, signs, labeled buttons): Soul writes gibberish on them.',
       'Look rules, the voice and its line formats, and the sound bank (music beds and voiceover clips, each with its search words). Save the file.',
       'Every still is a plain phone snapshot of a real place, upright portrait and level ("slightly tilted" made Soul rotate the frame, so tilt words are taken out), ending "Level, unedited. Sharp, real phone grain, muted color. No people." Soul 2.0, 9:16, on your plan or the API, its price shown first.',
-      'Its posts are video posts in the same workspace: Still (a place from the bank or your own words), Video (the prompt filled in from the plan row, image-to-video, any model with its price), Sound, Text (the on-screen line, the caption and the hashtags, each with Copy) and Posted. The still shows on the post card.',
+      'Its posts are video posts in the same workspace, line first: Line (the bank, your own words or No line), Visual (the places that fit the line, Reuse this still: $0, or your own words), Video (the prompt filled in from the plan row, image-to-video, any model with its price), Sound, Text (the on-screen line, the caption and the hashtags, each with Copy) and Posted. The still shows on the post card.',
       'A product post: Soul can\'t render labels, so it switches to an edit model (Nano Banana or GPT Image) with the product photo as the reference, its price shown.',
       'Finished damage: one still, a 7 s "just existing" clip (driving, staring, rain on the windshield), a sad song and the on-screen line. The switch is on every video post: on a person\'s post it fills the Video step\'s take (7 s, the just-existing motion, both editable) and lists what is left.',
       'Faceless cards say Faceless on Characters, and each account links to one character, a person or faceless (Accounts).',
@@ -474,10 +474,35 @@ export const GUIDE: GuideSection[] = [
     ],
   },
   {
+    id: 'line-first', group: 'Make a post', title: 'Line first: one order for every post', color: 'teal',
+    tagline: 'A post starts from its line. Then the place, the still, the video, the sound and the text, always together.',
+    where: 'Every post: the Line drawer (faceless) or the Line card on top (a person post); Weeks; the line under every picture',
+    intro: 'Posts come in two ways only: a plan CSV or Sheet imported in Weeks, or New post. Both build a post the same way, in the same order: line, place, still, video, sound, text. A New post and a Weeks row are the same record (line_id, place_id, still, video, sound, caption), so a post made by hand can join a week, and every picture of a post tells you which line and row it belongs to.',
+    steps: [
+      'New post, then the character (as always).',
+      'Line, first: From the bank shows only lines that fit the character\'s voice (first person or secondhand), none used on another account, unused lines first. Filter by pain, emotion, format and life or job. Each line shows its pain, emotion and source (the comment, with its likes). Use this line puts it on the post and marks it used on this account. Or Write my own, or No line for a pure visual post (Fill never draws one for it, Check does not flag it).',
+      'Visual: the places that fit the line come first (its words and the place themes: a money line suggests the gas station), each with its thumbnail, scene text and place_id. Reuse this still: $0 puts the place\'s existing still on the post at once (or pulls it free from Higgsfield). Use this place makes its scene the prompt of a new still (priced on Make the still). Your own words still win over the place. A person post shows places from the character\'s own world as chips that fill the idea.',
+      'Video: the prompt is the place\'s motion line, or drafted from the line when there is no place. Edit it freely; the price is on the button.',
+      'Sound, then Text: the on-screen line and the caption are filled from the line while they are empty; edit them freely.',
+      'Add to a week: pick the account, the date and the slot. The post gets a row id (NP plus 4) and shows on that week\'s grid; Fill, Check, Make, Review and Send to Drive treat it like any other row. Move changes the slot.',
+      'Everywhere a picture of a post shows (Posts, the Weeks grid, Weeks Review, the Library) its line and place_id are under it. Tap them for the full row: where it posts, the line with its pain, emotion and source, the place, the still (and whether it was reused for $0), the video, the sound and the caption, and Open post.',
+    ],
+    tips: [
+      'The drawers open in any order; this is the default order and the one the row shows.',
+      'Weeks Fill reuses a place\'s still at $0 when one exists and only makes a new one when the row asks (new_still = yes) or no still fits. Fill says how many were reused; Make lists each post\'s still as Reused, $0 or New still.',
+      'The place themes are data (config/content.yaml, weeks.place_themes): add words to tune which places a line suggests.',
+    ],
+    cost: 'Picking a line, the place suggestions, Reuse this still, Add to a week and the row are free. A new still and the video are priced on their buttons, as always.',
+    shots: [
+      { id: 'line-first-post', caption: 'A New post for a faceless character: the Line drawer first, then the places that fit the line with Reuse this still: $0' },
+      { id: 'line-first-row', caption: 'The row behind a picture: the line with its pain, emotion and source, the place, the still, and Open post' },
+    ],
+  },
+  {
     id: 'weeks', group: 'Make a post', title: 'Weeks: a week of posts on one page', color: 'violet',
     tagline: 'Plan a character\'s week in chat, then Import, Fill, Check, Make, Review and Send to Drive.',
     where: 'Sidebar > Weeks',
-    intro: 'You and Claude plan a character\'s week in chat; Claude writes the plan CSV to the spec (Read the spec on Weeks; docs/PLAN-CSV-SPEC.md). Weeks turns it into about 100 posts: the grid shows the week with accounts down and days across, each account\'s slots in its cells, and the step bar on top lights the step you are on with its one main button. Click any post on the grid to open it in its normal workspace.',
+    intro: 'You and Claude plan a character\'s week in chat; Claude writes the plan CSV to the spec (Read the spec on Weeks; docs/PLAN-CSV-SPEC.md). Weeks turns it into about 100 posts: the grid shows the week with accounts down and days across, each account\'s slots in its cells, and the step bar on top lights the step you are on with its one main button. Click any post on the grid to see its row (its line, place, still, video, sound and caption) and Open post to work on it in its normal workspace. A post made with New post joins a week with Add to a week.',
     steps: [
       'Two post types cost nothing to make: text_only (the line on a plain background, black or bg_color, 6 to 8 s; text_style centered, two_beat with the punch line at 2 s, or dialogue "Her: ... / Me: ..."; bg_motion zoom for a slow push-in) and photo_dump (5 or 6 of her approved stills, about 1 s each, the line over them, 6 s). Make the week shows Render N $0 posts for them: one click, made on the worker, no quote. Check flags a photo dump with fewer than 5 approved stills.',
       'Review shows the sound to add on each card (the row\'s sound_name and sound_type); the same note is in each post.json. Send to Drive sends a slideshow\'s three-platform set too when it was made (the carousel, the reel, the Shorts copy), each with its own manifest row and the platform column.',
@@ -485,10 +510,10 @@ export const GUIDE: GuideSection[] = [
       'Import (free): Upload the plan CSV, or From Google Sheets (pick a sheet from Drive, your Plans folders first, or paste its link; its first tab is read as the plan CSV), see the free preview (each row\'s errors and notes, the 9-point line lint on lines already written), tick the rows (all are ticked), Import N rows. Rows whose row_id matches posts you already have ask Replace them or Add as new posts, never silent. A new account in the file is added to Accounts with the character its name starts with. The last line names the next step.',
       'Re-sync (free): every sheet a week came from is listed under Linked sheets on Import. Re-sync reads its latest edits and shows what it would do first: new rows added, changed drafts drafted again, rows gone from the sheet listed (never deleted), unchanged rows left alone. A changed row whose post already has pictures stays as it is unless you tick it (its pictures go to the Trash). Apply does only what the preview showed.',
       'Fill (free): Fill empty slots draws a line from the line bank for every post without one, random per slot, under the rules: no pain twice in an account\'s last 7 posts; a line on one account only, ever; emotion and format rotate (never 3 alike in a row); the voice fits (first person for a faceless character or one out of work, secondhand for the others, unless the row\'s voice_fit says); and each account\'s life/job blend, never a job line in a life slot. A life slot with no life line left stays empty and is flagged. The draw shows first: Redraw one slot, Redraw all, Lock a slot (it keeps its line on every redraw), then Save the draw.',
-      'Saving the draw also drafts each filled post\'s visual, free: a faceless post gets a place from its place bank (the line\'s words first, else the least used), its motion line as the video prompt and a music bed; a person post gets its story beat as the scene and a video prompt from the line. Every field stays editable in the post.',
+      'Saving the draw also drafts each filled post\'s visual, free: a faceless post gets a place from its place bank (the place that fits the line first: its words and the place themes, else the least used), its motion line as the video prompt and a music bed, and the place\'s still reused at $0 when it has one (a still the Studio already has for it, or its still_job_id pulled free); a new still is made only when the row asks (new_still = yes) or the place has none. The Fill note says how many were reused; a person post gets its story beat as the scene and a video prompt from the line. Every field stays editable in the post.',
       'Fit to voice (priced): each line rewritten in its character\'s voice card and fitted to that day\'s story beat, keeping the truth and detail (numbers, times, the petty reason), the hit in the first words. Before and after side by side, each with the 9-point line lint (the hit first, a clear emotion, 12 words or fewer, one specific detail, no long dashes, not opening on You, no hype words, no hashtag or product name, no should or must at the viewer). Nothing changes until you press Use (one) or Use all.',
       'Check (free): marks a person post with no outfit, no line, no scene, a line outside its product\'s claims, a life slot with a job line, and the same line on two accounts. Flagged posts are marked on the grid with the reason; the rest can run.',
-      'Make the week: one total price, one click. Stills first, then the video where the post has one (a clip or a faceless post), each video starting from its own still when it lands. Ten posts at a time; each group is checked against your daily cap when its turn comes, and a group over it waits and goes on after midnight UTC. Progress is one line per post.',
+      'Make the week: one total price, one click. Each post\'s still shows as Reused, $0 or New still before you click. Stills first, then the video where the post has one (a clip or a faceless post), each video starting from its own still when it lands. Ten posts at a time; each group is checked against your daily cap when its turn comes, and a group over it waits and goes on after midnight UTC. Progress is one line per post.',
       'Review: every made post in a grid with Approve, Kill and Redo (Redo shows its price first; the old pictures go to the Trash when it starts). Keys: A approve, K kill, R redo, the arrows to move. "84 of 100 approved" on top. Every keep or kill is logged. Approve is Approve for posting, so Download day sees it too.',
       'Send to Drive (free, on the worker): approved posts go to ROOT / CHARACTER / week of YYYY-MM-DD /, named date_slot_account_rowid.mp4 (a .jpg for a photo, a .zip for a slideshow), with a manifest Google Sheet and CSV in the same folder, one row per post: Device ID, Account, file_name, caption (with the AI label line), hashtags, date, slot, sound_name, ad_label. Sending again replaces the same files and rows, never duplicates.',
     ],
@@ -887,6 +912,10 @@ export const GUIDE: GuideSection[] = [
 ]
 
 export const GLOSSARY: Array<[string, string]> = [
+  ['Line first', 'Every post is built in one order, whether it came from a Weeks import or New post: line, place, still, video, sound, text. A post and a Weeks row are the same record.'],
+  ['The row', 'A post\'s record: its account, date and slot, row id, line (with its pain, emotion and source), place_id, still, video, sound and caption. Tap the line under any picture to see it.'],
+  ['place_id', 'A place in a faceless character\'s place bank (IS015). Shown under every picture made from it; a place\'s still is reused for $0 by the next post on that place.'],
+  ['Reuse this still: $0', 'A place whose still is already in the Studio (or on Higgsfield, pulled free) goes on the post at once, with no generation.'],
   ['Line bank', 'On-screen lines written from real comments (an Apify scrape): a free first pass, then one priced run that tags, writes and reviews. Only lines the separate reviewer scores 8 or more on gut punch, specificity and "would a real person post this" ever show.'],
   ['Source truth', 'The real comment a post\'s line came from (the line bank). Results groups follows per post by it.'],
   ['Results', 'What a post did once posted: its link, when it went up, its first 72 hours (views, follows, saves, shares), your decision and notes. Typed on its card or in Finish, or pasted from a CSV by row_id. Free.'],

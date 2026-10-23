@@ -188,8 +188,12 @@ export function createMockAdapter(opts: MockOptions): ProviderAdapter & { jobs: 
       return { state: 'succeeded', outputs: job.outputs }
     },
     async result(jobId) {
-      const job = jobs.get(jobId)
+      // A job the mock never ran (a place's still_job_id from the owner's
+      // Higgsfield account, pulled in demo mode): a placeholder still, so
+      // the free pull works end to end with nothing real called.
+      const job = jobs.get(jobId) ?? (/^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(jobId) ? { req: { kind: 'image', model: 'mock/image', prompt: `Higgsfield still ${jobId}`, aspect: '9:16' } as GenRequest, scenario: 'success' as MockScenario, polls: 0 } : null)
       if (!job) throw new ProviderError('Mock job not found.', { retryable: false, submitted: 'no' })
+      jobs.set(jobId, job as MockJob)
       job.outputs ??= await produce(jobId, job)
       return job.outputs
     },

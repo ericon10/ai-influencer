@@ -3636,5 +3636,65 @@
         "label": "Every engine: one model for a step whatever the engine"
       }
     ]
+  },
+  "line-first-post": {
+    "w": 1124,
+    "h": 706,
+    "spots": [
+      {
+        "n": 1,
+        "x": 0.1,
+        "y": 3.4,
+        "w": 99.8,
+        "h": 10.1,
+        "label": "Line, first: the line from the bank (or your own, or No line), with its pain and emotion"
+      },
+      {
+        "n": 2,
+        "x": 1.9,
+        "y": 32,
+        "w": 15.3,
+        "h": 64.6,
+        "label": "The places that fit the line come first: the gas station for a money line, with its place_id and still"
+      },
+      {
+        "n": 3,
+        "x": 2.7,
+        "y": 91.9,
+        "w": 13.7,
+        "h": 3.4,
+        "label": "Reuse this still: $0, no generation"
+      }
+    ]
+  },
+  "line-first-row": {
+    "w": 480,
+    "h": 697,
+    "spots": [
+      {
+        "n": 1,
+        "x": 4.4,
+        "y": 3.4,
+        "w": 91.5,
+        "h": 13.3,
+        "label": "The line, with its pain, emotion and source"
+      },
+      {
+        "n": 2,
+        "x": 4.4,
+        "y": 18.8,
+        "w": 91.5,
+        "h": 17.6,
+        "label": "The place_id and its scene"
+      },
+      {
+        "n": 3,
+        "x": 4.4,
+        "y": 91.1,
+        "w": 25.2,
+        "h": 5.4,
+        "label": "Open post: back to the workspace"
+      }
+    ]
   }
 }

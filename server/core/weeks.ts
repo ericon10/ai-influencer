@@ -1,6 +1,7 @@
 import { parseCsv } from './csvImport.js'
 import { lintCopy, wordsIn, type LintLists } from './copyLint.js'
 import { plain } from './lineBank.js'
+import { placeFit, type PlaceTheme } from './postRow.js'
 
 // Weeks (owner, 2026-10-22; UX-PLAN.md section 37): a character's week
 // planned in chat, written as a plan CSV to docs/PLAN-CSV-SPEC.md, read
@@ -53,6 +54,7 @@ export const WEEK_COLUMNS = [
   { name: 'feeling', required: false, values: 'Free text', about: 'Line Engine field.' },
   { name: 'topic', required: false, values: 'Free text', about: 'Line Engine field.' },
   { name: 'still_job_id', required: false, values: 'A Higgsfield job id', about: 'Faceless only: that still, pulled free, instead of making one.' },
+  { name: 'new_still', required: false, values: 'yes, no', about: 'Faceless only: yes makes a new still even when the place has one. Blank: the place\'s still is reused at $0 when it has one.' },
   { name: 'slide_2', required: false, values: 'Free text', about: 'Slideshow only: slides 2 to 6 (slide 1 is the line).' },
   { name: 'slide_3', required: false, about: '' },
   { name: 'slide_4', required: false, about: '' },
@@ -358,7 +360,8 @@ export function ruleBreaks(rows: Array<{ postId: string; account: string; date: 
 
 // ── The line drives the visual (item 11) ──────────────────────────────
 
-export interface DraftPlace { id: string; name: string; line: string; motion: string }
+// still: the place has a still to reuse for $0 (it wins a tie, section 43).
+export interface DraftPlace { id: string; name: string; line: string; motion: string; still?: boolean }
 export interface DraftSound { name: string; search: string; kind: string }
 
 const words = (s: string) => new Set(plain(s).split(' ').filter(w => w.length > 3))
@@ -388,6 +391,8 @@ export function draftMotion(placeLine: string): string {
 export function draftVisual(input: {
   postType: PostType; line: string; storyBeat: string; name: string
   places: DraftPlace[]; placeUse: Map<string, number>; sounds: DraftSound[]; settings: string[]; seed: number
+  // The place fit's themes (section 43): a money line suits the gas station.
+  themes?: PlaceTheme[]
 }): { placeId: string | null; scene: string; videoPrompt: string; soundName: string } {
   const text = words(`${input.line} ${input.storyBeat}`)
   const music = input.sounds.filter(s => s.kind === 'music')
@@ -395,8 +400,9 @@ export function draftVisual(input: {
   if (input.postType === 'faceless') {
     if (!input.places.length) return { placeId: null, scene: input.storyBeat, videoPrompt: input.storyBeat ? draftMotion(input.storyBeat) : '', soundName: sound }
     const r = rng(hashSeed(input.seed, input.line, input.storyBeat))
-    const scored = shuffle(input.places, r).map(p => ({ p, score: overlap(text, words(`${p.name} ${p.line}`)), used: input.placeUse.get(p.id) ?? 0 }))
-      .sort((a, b) => b.score - a.score || a.used - b.used)
+    const fit = new Map(placeFit(`${input.line} ${input.storyBeat}`, input.places, input.themes ?? []).map(f => [f.id, f.score]))
+    const scored = shuffle(input.places, r).map(p => ({ p, score: input.themes ? fit.get(p.id) ?? 0 : overlap(text, words(`${p.name} ${p.line}`)), used: input.placeUse.get(p.id) ?? 0 }))
+      .sort((a, b) => b.score - a.score || Number(!!b.p.still) - Number(!!a.p.still) || a.used - b.used)
     const pick = scored[0]!.p
     return { placeId: pick.id, scene: pick.line, videoPrompt: pick.motion || draftMotion(pick.line), soundName: sound }
   }

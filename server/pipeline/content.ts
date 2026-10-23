@@ -320,6 +320,9 @@ const memeSpec = z.object({
   posting: postingSchema.nullable().default(null),
   // Weeks (UX-PLAN.md section 37): saved on its own; never copied.
   week: z.record(z.string(), z.unknown()).nullable().default(null),
+  // Line first (UX-PLAN.md section 43): the line from the bank, the owner's
+  // own words, or deliberately none (a pure visual post).
+  lineMode: z.enum(['bank', 'own', 'none']).nullable().default(null),
 })
 // A slideshow (server/core/slideshowSpec.ts; UX-PLAN.md section 27).
 const slideshowSpec = slideshowSpecSchema

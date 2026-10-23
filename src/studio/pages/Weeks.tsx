@@ -2,7 +2,7 @@ import { EngineLever } from '../comfy'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { CalendarRange, Check, CheckCircle2, Download, FileSpreadsheet, FileText, Lock, LockOpen, RefreshCw, Send, Shuffle, Upload, X } from 'lucide-react'
+import { CalendarRange, Check, CheckCircle2, MapPin, Download, FileSpreadsheet, FileText, Lock, LockOpen, RefreshCw, Send, Shuffle, Upload, X } from 'lucide-react'
 import { api, assetUrl } from '../api'
 import { keys, useCharacters } from '../hooks'
 import { PriceButton } from '../PriceButton'
@@ -10,6 +10,7 @@ import { AsyncButton, Drawer, Todo, errorMessage, useToast, type TodoItem } from
 import { HowTo } from '../guide/Guide'
 import { SelectAllBox, SelectBox, SelectionCount, useSelection } from '../select'
 import { NotesBadge } from '../lint'
+import { LineTag, RowDrawer } from '../postRow'
 import { StillPaths } from './post/slideshow/StillPaths'
 import { PlanCard } from './PlanCard'
 import { LinkedSheets, SheetPicker } from './weeks/Sheets'
@@ -154,7 +155,7 @@ function WeekGrid({ v }: { v: WeekView }) {
     <section className="st-card" data-field="weeks-grid">
       <div className="st-card-head st-row" style={{ gap: 10 }}>
         <CalendarRange size={16} />
-        <div className="grow"><div className="st-h3">The week by account and day</div><div className="st-hint">Click a post to open it in its workspace. {v.cells.length} posts.</div></div>
+        <div className="grow"><div className="st-h3">The week by account and day</div><div className="st-hint">Click a post to see its row (line, place, still, video, sound, caption) and open it. {v.cells.length} posts.</div></div>
         <div className="st-weeklegend"><span className="flagged">Flagged</span><span className="made">Made</span><span className="approved">Approved</span></div>
       </div>
       <div className="st-card-body st-tablewrap">
@@ -176,13 +177,7 @@ function WeekGrid({ v }: { v: WeekView }) {
                         {Array.from({ length: slots }, (_, i) => i + 1).map(n => {
                           const here = mine.filter(c => c.slot === n)
                           if (!here.length) return <span key={n} className="st-weekslot none" title={`Slot ${n}: no post`}><span className="top">{n}</span></span>
-                          return here.map(c => (
-                            <Link key={c.postId} to={`/studio/posts/${c.postId}`} className={`st-weekslot ${slotState(c)}`} title={`${c.rowId} · ${TYPE[c.postType]} · ${stateWord(c)}${c.storyBeat ? `\n${c.storyBeat}` : ''}`} data-field={`weeks-cell-${c.rowId}`}>
-                              <span className="top">{n} · {TYPE[c.postType]}{c.lifeOrJob ? ` · ${c.lifeOrJob}` : ''}{c.locked ? <Lock size={10} /> : null}</span>
-                              <span className={`words ${c.line ? '' : 'empty'}`}>{c.line || 'no line'}</span>
-                              <span className="st-hint" style={{ fontSize: 10.5 }}>{c.rowId} · {stateWord(c)}</span>
-                            </Link>
-                          ))
+                          return here.map(c => <WeekSlotCell key={c.postId} c={c} n={n} />)
                         })}
                       </div>
                     </td>
@@ -195,6 +190,23 @@ function WeekGrid({ v }: { v: WeekView }) {
         </table>
       </div>
     </section>
+  )
+}
+
+// A post on the grid (section 43): its picture, line and place_id; a click
+// opens its row (Open post is in it).
+function WeekSlotCell({ c, n }: { c: WeekCell; n: number }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <>
+      <button type="button" className={`st-weekslot ${slotState(c)}`} onClick={() => setOpen(true)} title={`${c.rowId} · ${TYPE[c.postType]} · ${stateWord(c)}${c.storyBeat ? `\n${c.storyBeat}` : ''}`} data-field={`weeks-cell-${c.rowId}`}>
+        <span className="top">{n} · {TYPE[c.postType]}{c.lifeOrJob ? ` · ${c.lifeOrJob}` : ''}{c.locked ? <Lock size={10} /> : null}</span>
+        {c.thumbAssetId && <img className="st-weekslot-thumb" src={assetUrl(c.thumbAssetId, 160)} alt="" />}
+        <span className={`words ${c.line ? '' : 'empty'}`}>{c.line || (c.lineNone ? 'no line (visual)' : 'no line')}</span>
+        <span className="st-hint" style={{ fontSize: 10.5 }}>{c.rowId}{c.placeId ? <> · <MapPin size={9} style={{ verticalAlign: -1 }} />{c.placeId}</> : null} · {stateWord(c)}</span>
+      </button>
+      <RowDrawer postId={c.postId} open={open} onClose={() => setOpen(false)} />
+    </>
   )
 }
 
@@ -329,6 +341,7 @@ function FillStep({ v, onChanged, onNext }: { v: WeekView; onChanged: () => void
   const [draw, setDraw] = useState<DrawRow[] | null>(null)
   const [seed, setSeed] = useState(() => Math.floor(Math.random() * 1e9))
   const [busy, setBusy] = useState(false)
+  const [saved, setSaved] = useState<{ filled: number; drafted: number; reused: number; newStills: number; pulls: number } | null>(null)
   const draft = () => Object.fromEntries((draw ?? []).filter(r => r.from === 'draft').map(r => [r.postId, r.lineId]))
   async function run(redraw: 'empty' | 'all' | string[]) {
     setBusy(true)
@@ -352,6 +365,9 @@ function FillStep({ v, onChanged, onNext }: { v: WeekView; onChanged: () => void
         <AsyncButton className="st-btn" disabled={busy} busyLabel="Drawing..." onClick={() => run('empty')}><Shuffle size={14} />Fill empty slots (free)</AsyncButton>
         {draw && <AsyncButton className="st-btn sm secondary" disabled={busy} busyLabel="Drawing..." onClick={() => run('all')}><RefreshCw size={13} />Redraw all</AsyncButton>}
       </div>
+      {saved && !draw && (
+        <span className="st-hint" role="status" data-field="weeks-fill-saved">Saved: {saved.filled} line{saved.filled === 1 ? '' : 's'}, {saved.drafted} visual{saved.drafted === 1 ? '' : 's'} drafted. <b>{saved.reused} place still{saved.reused === 1 ? '' : 's'} reused at $0</b>{saved.pulls ? ` (${saved.pulls} pulled free from Higgsfield)` : ''}, {saved.newStills} new still{saved.newStills === 1 ? '' : 's'} to make (priced in Make).</span>
+      )}
       {draw && (
         <div className="st-col" style={{ gap: 8 }} data-field="weeks-draw">
           <span className="st-hint" role="status"><b>{drawn.length} drawn</b>, {draw.filter(r => r.kept).length} kept (the plan's own lines, locked and saved ones), {draw.filter(r => !r.lineId && !r.line).length} left empty. Draw {seed}.</span>
@@ -376,8 +392,8 @@ function FillStep({ v, onChanged, onNext }: { v: WeekView; onChanged: () => void
           <AsyncButton className="st-btn" disabled={!drawn.length && !draw.some(r => r.flag)} busyLabel="Saving..." onClick={async () => {
             try {
               const r = await api.weekFill(v.monday, draw.filter(x => x.from === 'draft' || (!x.lineId && !x.line)).map(x => ({ postId: x.postId, lineId: x.lineId, lifeOrJob: x.lifeOrJob, flag: x.flag })))
-              setDraw(null); onChanged()
-              toast({ tone: 'ok', text: `${r.filled} lines saved${r.empty ? `, ${r.empty} left empty and flagged` : ''}; ${r.drafted} visuals drafted from their lines.` })
+              setDraw(null); setSaved(r); onChanged()
+              toast({ tone: 'ok', text: `${r.filled} lines saved${r.empty ? `, ${r.empty} left empty and flagged` : ''}; ${r.drafted} visuals drafted from their lines${r.reused ? `, ${r.reused} place still${r.reused === 1 ? '' : 's'} reused at $0` : ''}.` })
             } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) }
           }} field="weeks-save-draw">Save the draw ({drawn.length} line{drawn.length === 1 ? '' : 's'}, free)</AsyncButton>
         </div>
@@ -477,7 +493,7 @@ function MakeStep({ v, onChanged, onNext }: { v: WeekView; onChanged: () => void
   const [provider, setProvider] = useState('')
   const [day, setDay] = useState('')
   const isFree = (c: WeekCell) => c.postType === 'text_only' || c.postType === 'photo_dump'
-  const waiting = v.cells.filter(c => c.review !== 'killed' && !c.made && !c.making && !c.flags.length && c.checked && c.line.trim())
+  const waiting = v.cells.filter(c => c.review !== 'killed' && !c.made && !c.making && !c.flags.length && c.checked && (c.line.trim() || c.lineNone))
   const ready = waiting.filter(c => !isFree(c))
   // Text-only and photo-dump posts: rendered free on the worker (section 42).
   const free = waiting.filter(isFree)
@@ -522,10 +538,33 @@ function MakeStep({ v, onChanged, onNext }: { v: WeekView; onChanged: () => void
           </div>
         )
       })()}
+      <StillPlan cells={ready} />
       <PriceButton label={`Make the week (${ready.length} post${ready.length === 1 ? '' : 's'})`} action={ready.length ? { type: 'week_make', week: v.monday, ...(pick ? { path: pick } : {}), ...(provider ? { provider } : {}) } : null}
         todo={ready.length ? [] : [{ label: v.counts.unchecked ? 'Check the week first' : 'Nothing to make: every checked post is made or making' }]} onStarted={onChanged} onDone={onChanged}
         watch={j => ids.has(j.postId ?? '')} />
       {v.counts.making === 0 && v.counts.toReview > 0 && <div className="st-row" style={{ gap: 8 }}><span className="st-hint grow">{v.counts.toReview} made. Next: Review.</span><button type="button" className="st-btn sm" onClick={onNext}>Go to Review</button></div>}
+    </div>
+  )
+}
+
+// Which stills Make reuses at $0 and which it makes new (section 43, item
+// 8): a faceless post on a place keeps the place's still; the price on the
+// button is for the new ones (and the videos).
+function StillPlan({ cells }: { cells: WeekCell[] }) {
+  const [open, setOpen] = useState(false)
+  const reused = cells.filter(c => c.have >= c.need && c.need > 0)
+  const fresh = cells.filter(c => c.have < c.need)
+  if (!cells.length) return null
+  return (
+    <div className="st-col" style={{ gap: 6 }} data-field="weeks-make-stills">
+      <span className="st-hint">
+        Stills: <b>{reused.length} already there</b>{reused.filter(c => c.stillFrom === 'place').length ? ` (${reused.filter(c => c.stillFrom === 'place').length} reused from the place bank, $0)` : ''}, <b>{fresh.length} new</b> (priced on the button). <button type="button" className="st-btn xs ghost" onClick={() => setOpen(!open)} aria-expanded={open}>{open ? 'Hide' : 'Show each post'}</button>
+      </span>
+      {open && (
+        <ul className="st-weeklist" data-field="weeks-make-still-list">
+          {cells.map(c => <li key={c.postId}><b>{c.rowId}</b>{c.placeId ? ` (${c.placeId})` : ''}: {c.have >= c.need && c.need > 0 ? (c.stillFrom === 'place' ? 'Reused, $0' : 'Still there, $0') : 'New still'}{c.video && !c.hasVideo ? ', then the video' : ''}</li>)}
+        </ul>
+      )}
     </div>
   )
 }
@@ -573,8 +612,8 @@ function ReviewStep({ v, onChanged, onNext }: { v: WeekView; onChanged: () => vo
             <div className="media">
               {c.videoAssetId ? <video src={assetUrl(c.videoAssetId)} muted loop playsInline onMouseEnter={e => void e.currentTarget.play().catch(() => undefined)} onMouseLeave={e => e.currentTarget.pause()} poster={c.thumbAssetId ? assetUrl(c.thumbAssetId, 480) : undefined} /> : c.thumbAssetId ? <img src={assetUrl(c.thumbAssetId, 480)} alt="" /> : <span className="st-hint">No picture</span>}
             </div>
-            <div style={{ fontSize: 12.5, fontWeight: 600 }} className="st-clamp1" title={c.line}>{c.line}</div>
-            <div className="st-hint" style={{ fontSize: 11 }}>{c.rowId} · {c.account} · {dayLabel(c.date)} {c.slot} · {TYPE[c.postType]}</div>
+            <LineTag postId={c.postId} line={c.line} placeId={c.placeId} none={c.lineNone} compact />
+            <div className="st-hint" style={{ fontSize: 11 }}>{c.rowId} · {c.account} · {dayLabel(c.date)} {c.slot} · {TYPE[c.postType]}{c.stillFrom === 'place' ? ' · still reused, $0' : ''}</div>
             {c.sound && <div className="st-hint st-clamp1" style={{ fontSize: 11 }} data-field={`weeks-review-sound-${c.rowId}`} title="Add this sound in the app when you post">Sound to add: {c.sound.name}{c.sound.type ? ` (${c.sound.type})` : ''}</div>}
             <div className="st-row" style={{ gap: 4, flexWrap: 'wrap' }}>
               <button type="button" className={`st-btn xs ${c.review === 'approved' ? '' : 'secondary'}`} aria-pressed={c.review === 'approved'} onClick={() => void call(c, c.review === 'approved' ? null : 'approved')}><Check size={12} />Approve</button>

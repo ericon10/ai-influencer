@@ -384,6 +384,7 @@ const contentSchema = z.object({
     near_duplicate: z.number().min(0.5).max(1).default(0.8),
     ai_label: z.string().default('AI-generated'),
     settings: z.array(z.string()).default([]),
+    place_themes: z.array(z.object({ id: z.string().min(1), line: z.array(z.string()).default([]), place: z.array(z.string()).default([]) })).default([]),
     drive: z.object({ week_folder: z.string().default('week of {date}'), manifest: z.string().default('manifest {date}') }).default({ week_folder: 'week of {date}', manifest: 'manifest {date}' }),
   }).prefault({}),
   // The language lint's word lists (section 28; the checks are rules), for

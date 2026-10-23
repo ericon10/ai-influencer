@@ -1,7 +1,8 @@
 import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { and, desc, eq, gte, inArray, isNotNull, isNull, lt, ne, not, notInArray, or, sql, type SQL } from 'drizzle-orm'
-import { candidates, characters, jobs, scenes } from '../db/schema.js'
+import { candidates, characters, contentItems, jobs, scenes } from '../db/schema.js'
+import { postLine, postPlace } from '../core/postRow.js'
 import type { Ctx, Deps } from '../context.js'
 import { AppError } from '../lib/errors.js'
 import { newId } from '../lib/ids.js'
@@ -103,6 +104,9 @@ export interface LibraryStill {
   id: string; assetId: string; characterId: string; characterName: string; sceneId: string | null; sceneTitle: string; status: string; op: string; createdAt: string
   // How many live posts use it (only when the Library page asks, with filters).
   used?: number
+  // The post it was made for (section 43): its line and place_id show under
+  // the tile, and a tap opens the row.
+  post?: { id: string; line: string; placeId: string | null; none: boolean } | null
 }
 export interface LibraryClip extends LibraryStill { posterId: string | null; durationSec: number | null; title: string; error: string | null }
 export interface LibraryView {
@@ -203,9 +207,23 @@ export async function libraryView(deps: Deps, ctx: Ctx, opts: { characterId?: st
     return p?.assetId ?? null
   }
   const usedBy = (c: { id: string; assetId: string | null }) => (index ? { used: postsUsing(index, c).length } : {})
+  // The post each item was made for: a faceless or slideshow still's own
+  // post (its meta), or the post on the item's scene.
+  const shownAll = [...stillsShown, ...clipsShown]
+  const metaPost = (c: CandRow) => { const m = (c.meta ?? {}) as { faceless?: unknown; slideshow?: unknown }; return typeof m.faceless === 'string' ? m.faceless : typeof m.slideshow === 'string' ? m.slideshow : null }
+  const postIds = [...new Set(shownAll.map(metaPost).filter((x): x is string => !!x))]
+  const postRows = postIds.length || sceneIds.length ? await deps.db.select({ id: contentItems.id, kind: contentItems.kind, sceneId: contentItems.sceneId, spec: contentItems.spec }).from(contentItems)
+    .where(and(eq(contentItems.accountId, ctx.accountId), isNull(contentItems.archivedAt), or(postIds.length ? inArray(contentItems.id, postIds) : undefined, sceneIds.length ? inArray(contentItems.sceneId, sceneIds) : undefined))) : []
+  const postOf = (c: CandRow): LibraryStill['post'] => {
+    const id = metaPost(c)
+    const p = id ? postRows.find(r => r.id === id) : c.sceneId ? postRows.find(r => r.sceneId === c.sceneId) : null
+    if (!p) return null
+    const l = postLine(p.kind, p.spec as Record<string, unknown>)
+    return { id: p.id, line: l.text, placeId: postPlace(p.spec as Record<string, unknown>), none: l.mode === 'none' }
+  }
   const base = (c: CandRow): LibraryStill => ({
     id: c.id, assetId: c.assetId!, characterId: c.characterId, characterName: names.get(c.characterId) ?? '',
-    sceneId: c.sceneId, sceneTitle: stillTitle(c, sceneTitle), status: c.status, op: c.op, createdAt: c.createdAt.toISOString(), ...usedBy(c),
+    sceneId: c.sceneId, sceneTitle: stillTitle(c, sceneTitle), status: c.status, op: c.op, createdAt: c.createdAt.toISOString(), ...usedBy(c), post: postOf(c),
   })
   const clips: LibraryClip[] = []
   for (const c of clipsShown) {

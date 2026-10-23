@@ -196,6 +196,30 @@ weeks:
   # A person post's default settings for a drafted scene, when its
   # character file has none of its own.
   settings: ['her bedroom, an unmade bed, daylight from one window', 'a small kitchen, the counter cluttered, morning light', 'the front seat of her parked car', 'the couch in her living room at night, one lamp on']
+  # The place fit (UX-PLAN.md section 43): a theme ties a kind of line to a
+  # kind of place, so New post and Fill suggest the places that suit the
+  # line first (a money line: the gas station). Words match whole on the
+  # plain text; a word ending in * matches its start. Any character's place
+  # bank and settings use them; edit freely.
+  place_themes:
+    - id: money
+      line: [money, rent, broke, paycheck*, bill, bills, cash, afford, savings, overdraft, budget, price*, cost*, dollar*, bucks, unemployment check, gas money, spent, spend, pay*, wage*, salary, loan*, debt, credit card, bank account]
+      place: [gas station, gas pump, pumps, canopy, register, roller grill, hot dogs, atm, dollar store, grocery, checkout, wallet]
+    - id: job search
+      line: [interview*, recruiter*, applied, application*, apply, resume, hiring, rejected, rejection, ghosted, offer, portal, linkedin, job, jobs, laid off, layoff, fired, hired, unemployed]
+      place: [kitchen table, laptop, desk, mailbox, office, parking lot, chair, waiting room]
+    - id: night
+      line: [night, sleep, awake, insomnia, 1am, 2am, 3am, 4am, midnight, lonely, alone, tired]
+      place: [bed, bedroom, lamp, night, dark, pillow*, 1am, fridge]
+    - id: food
+      line: [eat, ate, eating, dinner, lunch, breakfast, ramen, food, hungry, groceries, meal*]
+      place: [ramen, bowl, fridge, refrigerator, kitchen, fries, hot dogs, plate, counter]
+    - id: driving
+      line: [drive, drove, driving, car, commute, highway, road, gas tank, tank]
+      place: [car, sedan, windshield, highway, road, passenger seat, dashboard, parking lot]
+    - id: family
+      line: [mom, dad, mother, father, parents, sister, brother, family, grandma, holiday*, thanksgiving, christmas]
+      place: [couch, living room, driveway, porch, front door, mailbox, dining table]
   drive:
     week_folder: 'week of {date}'
     manifest: 'manifest {date}'

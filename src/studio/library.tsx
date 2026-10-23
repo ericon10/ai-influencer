@@ -8,6 +8,7 @@ import { HowTo } from './guide/Guide'
 import { DeleteButton, TileCheck } from './trash'
 import { THUMB_W, ViewButton, Viewer, useViewer, type ViewerItem } from './viewer'
 import type { LibraryClip, LibraryStill } from './types'
+import { LineTag } from './postRow'
 
 // The Library's grids (UX-PLAN.md): stills and clips across characters. The
 // Library page browses them; inside a post they open as a drawer to pick
@@ -46,6 +47,7 @@ export function StillGrid({ stills, picked = [], onPick, action, viewActions, sh
               : onPick ? <button type="button" className="st-tile-open" onClick={() => onPick(s)} aria-pressed={n >= 0} aria-label={`Pick ${name}`}>{body}</button>
               : <button type="button" className="st-tile-open" onClick={() => v.open(s.id)} aria-label={`View ${name}`}>{body}</button>}
             {onPick && !select && <ViewButton onClick={() => v.open(s.id)} label={name} />}
+            {s.post && !select && <LineTag postId={s.post.id} line={s.post.line} placeId={s.post.placeId} none={s.post.none} compact />}
             <div className="st-tile-meta">
               <div className="st-col" style={{ gap: 2, minWidth: 0, flex: 1 }}>
                 <span className="st-tile-label">{name}</span>
@@ -106,6 +108,7 @@ export function ClipGrid({ clips, picked = [], onPick, action, viewActions, show
               : ok ? <button type="button" className="st-tile-open" onClick={() => v.open(c.id)} aria-label={`View ${c.title}`}>{body}</button>
               : <div className="st-tile-open">{body}</div>}
             {onPick && ok && !select && <ViewButton onClick={() => v.open(c.id)} label={c.title} />}
+            {c.post && !select && <LineTag postId={c.post.id} line={c.post.line} placeId={c.post.placeId} none={c.post.none} compact />}
             <div className="st-tile-meta">
               <div className="st-col" style={{ gap: 2, minWidth: 0, flex: 1 }}>
                 <span className="st-tile-label">{c.title}</span>

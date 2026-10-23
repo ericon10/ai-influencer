@@ -130,7 +130,8 @@ export async function buildFacelessStill(deps: Deps, ctx: Ctx, input: { contentI
     kind: product ? 'image_edit' : 'image', model: run.model, modelRef: model, prompt, aspect: FACELESS_ASPECT, quality: level.quality, resolution: level.resolution,
     ...(product ? { refs: [{ assetId: product.assetId }] } : {}),
     ...(run.billing ? { billing: run.billing } : path === 'account' ? { billing: 'account' as const } : {}),
-  }
+    ...(place && !line && !product ? { placeId: place.id } : {}),
+  } as GenRequest
   const warnings = still.warnings.map(w => warn(w.id, w.id === 'faceless-tilt' ? 'Kept level' : w.id === 'faceless-person' ? 'No person in a faceless still' : 'Text on objects', w.message))
   if (product) warnings.push(warn('faceless-product', `${modelEntry(deps, model).label} for the product`, 'Soul can\'t render labels, so a product post is made by an edit model with the product photo as the reference.'))
   return {
@@ -185,8 +186,11 @@ async function onFacelessStill(deps: Deps, ctx: Ctx, job: JobRow, out: JobOutcom
   if (out.status !== 'completed' || !asset || !job.characterId) { await cancelChildren(deps, job.id, 'The still it was waiting for did not finish.'); return }
   const postId = job.purpose.split(':')[1]!
   const id = newId('cand')
-  await deps.db.insert(candidates).values({ id, accountId: job.accountId, characterId: job.characterId, jobId: job.id, createdBy: job.userId, prompt: (job.request as GenRequest).prompt ?? '', target: 'scene', sceneId: null, op: 'generate', status: 'approved', assetId: asset.id, label: 'Faceless still', meta: { faceless: postId } })
-  await setPostField(deps, ctx, postId, { stillId: id }, { stillAssetId: asset.id })
+  // A still made from the place alone (no words of the post's own, no
+  // product) is that place's: the next post on the place reuses it for $0.
+  const place = (job.request as { placeId?: string | null }).placeId ?? null
+  await deps.db.insert(candidates).values({ id, accountId: job.accountId, characterId: job.characterId, jobId: job.id, createdBy: job.userId, prompt: (job.request as GenRequest).prompt ?? '', target: 'scene', sceneId: null, op: 'generate', status: 'approved', assetId: asset.id, label: place ? `Place still ${place}` : 'Faceless still', meta: { faceless: postId, ...(place ? { place } : {}) } })
+  await setPostField(deps, ctx, postId, { stillId: id }, { stillAssetId: asset.id, stillFrom: 'new' })
   await activateChained(deps, job.id, asset.id, id)
 }
 async function onFacelessVideo(deps: Deps, ctx: Ctx, job: JobRow, out: JobOutcome): Promise<void> {
@@ -211,11 +215,14 @@ export async function setPostField(deps: Deps, ctx: Ctx, postId: string, fields:
 
 // An uploaded or pulled still (a plan row's still_job_id or still_url, or
 // a picture from the Library): kept as the post's still.
-export async function useStillAsset(deps: Deps, ctx: Ctx, postId: string, assetId: string, label = 'Imported still'): Promise<string> {
+// o.place: the still is that place's (section 43: the next post on the
+// place reuses it for $0); o.stillFrom: how the post got it (place,
+// pulled, upload), shown in Weeks Make and on the row.
+export async function useStillAsset(deps: Deps, ctx: Ctx, postId: string, assetId: string, label = 'Imported still', o: { place?: string | null; stillFrom?: 'place' | 'pulled' | 'upload'; reusedFrom?: string } = {}): Promise<string> {
   const row = await getContent(deps, ctx, postId)
   const id = newId('cand')
-  await deps.db.insert(candidates).values({ id, accountId: ctx.accountId, characterId: row.characterId!, createdBy: ctx.userId, prompt: '', target: 'scene', sceneId: null, op: 'upload_image', status: 'approved', assetId, label, meta: { faceless: postId } })
-  await setPostField(deps, ctx, postId, { stillId: id }, { stillAssetId: assetId })
+  await deps.db.insert(candidates).values({ id, accountId: ctx.accountId, characterId: row.characterId!, createdBy: ctx.userId, prompt: '', target: 'scene', sceneId: null, op: 'upload_image', status: 'approved', assetId, label, meta: { faceless: postId, ...(o.place ? { place: o.place } : {}), ...(o.reusedFrom ? { reusedFrom: o.reusedFrom } : {}) } })
+  await setPostField(deps, ctx, postId, { stillId: id }, { stillAssetId: assetId, stillFrom: o.stillFrom ?? 'upload' })
   return id
 }
 

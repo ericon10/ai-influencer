@@ -120,6 +120,11 @@ ad column). UX-PLAN.md section 29 has the details.
 - **R4. Every paid step shows its price and waits for the owner's click.**
   Every feature works on the API path, not only on a Higgsfield plan.
 - **R5. One post workspace with drawers.** No bolted-on pages.
+- **R6. Line first, both doors (owner, 2026-10-23; UX-PLAN.md rule 2 and
+  section 43).** Content enters only by a Weeks import or New post, and
+  both build a post in one order: line > place > still > video > sound >
+  text. A post and a Weeks row are the same record. Every picture of a
+  post shows its line and place_id, and a tap opens the row.
 
 This file gives a new Claude Code session enough context to be useful
 immediately. Read this first before making changes.

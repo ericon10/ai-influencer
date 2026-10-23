@@ -77,6 +77,7 @@ import { createUploadSlots, receiveUpload, sheetRefOf, takeUploads, MAX_UPLOAD_B
 import { corsRules } from '../storage/blobStore.js'
 import { startImportCheck } from '../pipeline/importCheck.js'
 import { bankView, importBank, setLineCall, setStance, weekPlan } from '../pipeline/lineBank.js'
+import { addToWeek, linePicks, placeSuggestions, postRow, setPostLine, usePlace } from '../pipeline/postRow.js'
 
 // The Studio API (/api/v1). Every route except webhooks and signed public
 // asset links requires a signed-in principal; every query is scoped to that
@@ -843,6 +844,33 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
       capCredits: z.number().positive().max(100000).nullable().optional(),
     }), await json(c))
     return c.json({ clone: await setCloneChoices(deps, c.get('ctx'), c.req.param('id'), body) })
+  })
+  // Line first, both doors (UX-PLAN.md section 43): the post's row, its
+  // line (the bank, own words or none), the places that fit it, Use this
+  // place (its still reused for $0), Add to a week.
+  app.get('/content/:id/row', async c => c.json(await postRow(deps, c.get('ctx'), c.req.param('id'))))
+  app.get('/content/:id/line-picks', async c => {
+    const q = c.req.query()
+    return c.json(await linePicks(deps, c.get('ctx'), c.req.param('id'), { pain: q.pain || null, emotion: q.emotion || null, format: q.format || null, lifeOrJob: q.lifeOrJob || null, q: q.q || null }))
+  })
+  app.put('/content/:id/line', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    const body = parse(z.object({ lineId: z.string().max(60).nullable().optional(), text: z.string().max(300).nullable().optional(), none: z.boolean().optional() }), await json(c))
+    return c.json(await setPostLine(deps, ctx, c.req.param('id'), body))
+  })
+  app.get('/content/:id/places', async c => c.json(await placeSuggestions(deps, c.get('ctx'), c.req.param('id'))))
+  app.put('/content/:id/place', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    const body = parse(z.object({ placeId: z.string().min(1).max(60), reuse: z.boolean() }), await json(c))
+    return c.json(await usePlace(deps, ctx, c.req.param('id'), body))
+  })
+  app.put('/content/:id/week-slot', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    const body = parse(z.object({ accountTag: z.string().min(1).max(60), date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), slot: z.number().int().min(1).max(24) }), await json(c))
+    return c.json(await addToWeek(deps, ctx, c.req.param('id'), body))
   })
   // A batch of recreates: its rows, a row added, a row's model or Set all.
   app.get('/content/:id/recreate-batch', async c => c.json(await recreateBatch(deps, c.get('ctx'), c.req.param('id'), { facePass: c.req.query('facePass') === '0' ? false : c.req.query('facePass') === '1' ? true : undefined })))
