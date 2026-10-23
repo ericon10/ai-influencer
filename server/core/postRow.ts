@@ -93,6 +93,24 @@ export function fitWhy(s: PlaceScore): string {
   return [s.themes.length ? `fits a ${s.themes.join(' and ')} line` : '', s.words.length ? `shares "${s.words.slice(0, 3).join('", "')}"` : ''].filter(Boolean).join('; ')
 }
 
+// Who and what first (UX-PLAN.md section 45): the owner's two picks. An
+// older post (no picks recorded) counts as picked.
+export interface Picks { character: boolean; product: boolean }
+export function picksOf(spec: Spec | null | undefined): Picks {
+  const p = ((spec ?? {}) as { picks?: Partial<Picks> | null }).picks
+  return p ? { character: p.character !== false, product: p.product !== false } : { character: true, product: true }
+}
+export const picksDone = (spec: Spec | null | undefined) => { const p = picksOf(spec); return p.character && p.product }
+
+// A plan row's product cell: a name, "none" / "No product" (a real choice of
+// no product), or blank (not named: flagged, never filled in for it).
+export function readProductCell(raw: string): { kind: 'name'; name: string } | { kind: 'none' } | { kind: 'blank' } {
+  const v = raw.trim()
+  if (!v) return { kind: 'blank' }
+  if (/^(?:none|no product|no_product|-)$/i.test(v)) return { kind: 'none' }
+  return { kind: 'name', name: v }
+}
+
 // A New post's row id when it joins a week: NP plus four characters.
 export function newPostRowId(postId: string): string {
   const tail = postId.replace(/[^a-z0-9]/gi, '').slice(-4).toUpperCase()

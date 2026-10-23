@@ -25,7 +25,7 @@ test('Weeks: the steps and the grid; From Google Sheets', async ({ page }) => {
     [`G2${run}`, ACCOUNT, '2027-03-02', '1', 'text_only', 'hr: we are like a family / me: so you will ignore my calls', '', '', ''],
     [`G3${run}`, ACCOUNT, '2027-03-03', '2', 'slideshow', 'things my first boss said that still live in my head', 'gray hoodie', 'her desk at night', ''],
   ]
-  await api('POST', '/weeks/import', { csv: rows.map(r => r.map(q).join(',')).join('\n'), rows: rows.slice(1).map(r => r[0]) })
+  await api('POST', '/weeks/import', { csv: rows.map((r, i) => [...r, i ? 'none' : 'product'].map(q).join(',')).join('\n'), rows: rows.slice(1).map(r => r[0]) })
   await api('POST', `/weeks/${MONDAY}/check`, {})
   await page.goto(`/studio/weeks?week=${MONDAY}`)
   const weeks = page.locator('[data-field="weeks"]')

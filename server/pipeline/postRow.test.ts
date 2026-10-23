@@ -96,3 +96,82 @@ describe('a New post for Doug, line first', () => {
     expect(cell.flags).not.toContain('No line')
   })
 })
+
+// Who and what first (UX-PLAN.md section 45): lines are scoped to the post's
+// product and the character's voice; the slot's 3 best fits; an honest empty
+// bank; changing the product clears the line; a Weeks row with no product is
+// flagged and skipped by Fill.
+describe('who and what first', () => {
+  let callie: string, sideStep: string
+  beforeAll(async () => {
+    const { importCharacter } = await import('./files.js')
+    const { renderPlaceholderPortrait } = await import('../providers/mock.js')
+    const { importKit, starterKit } = await import('./scaleKit.js')
+    const { setStance } = await import('./lineBank.js')
+    const md = readFileSync(join(process.cwd(), 'fixtures', 'callie', 'character-callie.md'), 'utf8')
+    const images: Record<string, { data: Buffer }> = {}
+    for (let i = 0; i <= 11; i++) images[`REF-${String(i).padStart(2, '0')}`] = { data: await renderPlaceholderPortrait(`REF-${i}`) }
+    callie = (await importCharacter(h.deps, h.ctx, md, { images })).characterId
+    sideStep = (await importKit(h.deps, h.ctx, starterKit(), 'SideStep')).product.id
+    await setStance(h.deps, h.ctx, callie, 'secondhand')
+    const line = (id: string, text: string, fits: 'first' | 'secondhand' | 'both', likes: number, productId: string | null) => ({ id, accountId: h.ctx.accountId, importId: 'bim_who', productId, comment: text, likes, state: 'written', passed: true, line: text, source: 'comment', lifeOrJob: 'job', tags: { emotion: 'sad', topic: '', pain: 'ghosted', fits, format: 'finished damage', fight: false, fightReason: '' } })
+    await h.deps.db.insert(bankLines).values([
+      line('bl_ss_first', 'they ghosted me after round four', 'first', 700, sideStep),
+      line('bl_ss_2nd_a', 'my roommate got ghosted after four rounds', 'secondhand', 690, sideStep),
+      line('bl_ss_2nd_b', 'my sister heard nothing for six weeks', 'secondhand', 680, sideStep),
+      line('bl_ss_both', 'the recruiter said soon in march', 'both', 670, sideStep),
+      line('bl_ss_2nd_c', 'my friend redid the same test three times', 'secondhand', 660, sideStep),
+    ])
+  }, 180_000)
+
+  it('Callie and No product: no SideStep lines, an honest empty bank', async () => {
+    const post = (await createContent(h.deps, h.ctx, { kind: 'meme', characterId: callie, accountTag: 'callie_who_01', spec: { picks: { character: true, product: true } } })).id
+    const p = await linePicks(h.deps, h.ctx, post, {})
+    expect(p.product).toBeNull()
+    expect(p.lines.filter(l => l.id.startsWith('bl_ss_'))).toEqual([])
+    expect(p.best.filter(l => l.id.startsWith('bl_ss_'))).toEqual([])
+    await expect(setPostLine(h.deps, h.ctx, post, { lineId: 'bl_ss_2nd_a' })).rejects.toThrow(/tagged for another product/)
+  })
+
+  it('Callie and SideStep: only secondhand (or both) lines, the 3 best in the slot, exact voice first', async () => {
+    const post = (await createContent(h.deps, h.ctx, { kind: 'meme', characterId: callie, accountTag: 'callie_who_01', productId: sideStep })).id
+    const p = await linePicks(h.deps, h.ctx, post, {})
+    expect(p.product?.name).toBe('SideStep')
+    expect(p.stance).toBe('secondhand')
+    expect(p.lines.map(l => l.id)).toEqual(['bl_ss_2nd_a', 'bl_ss_2nd_b', 'bl_ss_both', 'bl_ss_2nd_c'])
+    expect(p.best.map(l => l.id)).toEqual(['bl_ss_2nd_a', 'bl_ss_2nd_b', 'bl_ss_2nd_c'])
+    expect((await linePicks(h.deps, h.ctx, post, { q: 'sister' })).lines.map(l => l.id)).toEqual(['bl_ss_2nd_b'])
+  })
+
+  it('changing the product clears the line and frees the bank line', async () => {
+    const post = (await createContent(h.deps, h.ctx, { kind: 'meme', characterId: callie, accountTag: 'callie_who_01', productId: sideStep })).id
+    await setPostLine(h.deps, h.ctx, post, { lineId: 'bl_ss_2nd_c' })
+    const { updateContent } = await import('./content.js')
+    await updateContent(h.deps, h.ctx, post, { productId: null })
+    const after = await getContent(h.deps, h.ctx, post)
+    expect((after.spec as { caption: string }).caption).toBe('')
+    expect((await postRow(h.deps, h.ctx, post)).line).toMatchObject({ mode: null, text: '', id: null })
+    const [l] = await h.deps.db.select().from(bankLines).where(eq(bankLines.id, 'bl_ss_2nd_c'))
+    expect(l!.usedPostId).toBeNull()
+  })
+
+  it('a Weeks row with no product is flagged at import and skipped by Fill; "none" is No product', async () => {
+    const { previewWeek, importWeek, drawWeek, NO_PRODUCT } = await import('./weeks.js')
+    await saveSocialAccount(h.deps, h.ctx, 'callie_who_wk', { characterId: callie })
+    const csv = 'row_id,account,date,slot,post_type,product,outfit,scene\nNP1,callie_who_wk,2027-05-03,1,clip,,gray hoodie,her kitchen\nNP2,callie_who_wk,2027-05-04,1,clip,none,gray hoodie,her kitchen\nNP3,callie_who_wk,2027-05-05,1,clip,SideStep,gray hoodie,her kitchen\n'
+    const pv = await previewWeek(h.deps, h.ctx, csv)
+    expect(pv.rows.find(r => r.rowId === 'NP1')!.warnings).toContain(NO_PRODUCT)
+    expect(pv.rows.find(r => r.rowId === 'NP2')!.warnings).not.toContain(NO_PRODUCT)
+    const r = await importWeek(h.deps, h.ctx, csv, { rows: ['NP1', 'NP2', 'NP3'] })
+    const id = (row: string) => r.posts.find(x => x.rowId === row)!.id
+    expect((await getContent(h.deps, h.ctx, id('NP1'))).productId).toBeNull()
+    expect((await getContent(h.deps, h.ctx, id('NP3'))).productId).toBe(sideStep)
+    const v = await weekView(h.deps, h.ctx, '2027-05-03')
+    expect(v.cells.find(c => c.rowId === 'NP1')!.fillFlag).toBe(NO_PRODUCT)
+    const draw = await drawWeek(h.deps, h.ctx, '2027-05-03', { seed: 3, redraw: 'empty' })
+    expect(draw.rows.map(x => x.rowId).sort()).toEqual(['NP2', 'NP3'])
+    // NP3 draws only SideStep lines in Callie's voice.
+    const np3 = draw.rows.find(x => x.rowId === 'NP3')!
+    if (np3.lineId) expect(['bl_ss_2nd_a', 'bl_ss_2nd_b', 'bl_ss_both']).toContain(np3.lineId)
+  })
+})

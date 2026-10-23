@@ -15,7 +15,7 @@ import { slideshowSpecSchema, type SlideshowSpec } from '../core/slideshowSpec.j
 import { listCharacters, toData, type CharacterRow } from './characters.js'
 import { createContent, getContent, updateContent, type ContentRow } from './content.js'
 import { lintFor } from './copyLint.js'
-import { checkProduct, defaultProductFor, postWriting, type WritingStandard } from './products.js'
+import { checkProduct, postWriting, type WritingStandard } from './products.js'
 import { createScene, updateScene } from './scenes.js'
 import { buildSceneRun } from './sceneActions.js'
 import { getCharacter } from './characters.js'
@@ -310,10 +310,8 @@ export async function previewPlan(deps: Deps, ctx: Ctx, csv: string, opts: Opts 
   const ok = rows.filter(r => r.state !== 'problem')
   const usd = ok.reduce((a, r) => a + r.priceUsd, 0)
   const credits = Math.round(ok.reduce((a, r) => a + r.credits, 0) * 100) / 100
-  // The product the plan's accounts agree on (each account's product on the
-  // Accounts card), to pre-fill "This plan is for".
-  const linked = new Set<string>()
-  for (const a of accounts) { const id = await defaultProductFor(deps, ctx, a.tag); if (id) linked.add(id) }
+  // "This plan is for" is never pre-filled (section 45): the owner picks the
+  // product, or No product.
   return {
     rows: scheduleOrder(rows), accounts, problems,
     days: [...new Set(scheduleOrder(rows).map(r => r.date))],
@@ -329,7 +327,7 @@ export async function previewPlan(deps: Deps, ctx: Ctx, csv: string, opts: Opts 
     },
     planId: planIdOf(checked),
     product: product ? { id: product.id, name: product.name, writingLabel: std?.label ?? 'General standard', notes: !!std?.lint } : null,
-    suggestedProductId: linked.size === 1 ? [...linked][0]! : null,
+    suggestedProductId: null,
     blankProductRows: rows.filter(r => r.productFrom === 'plan' && r.state !== 'problem').length,
   }
 }

@@ -292,9 +292,16 @@ export function standardVars(deps: Deps, std: WritingStandard | null) {
 }
 
 // The reviewer of a product whose rules add one (SideStep's stop test).
-function reviewTemplate(deps: Deps, std: WritingStandard | null): { system: string; prompt: string } {
+// Only the product's own: another product's reviewer never stands in
+// (section 45); a product with none gets the general one-call writer.
+function ownReview(deps: Deps, std: WritingStandard | null): { system: string; prompt: string } | null {
   const t = deps.config.pipeline.templates as Record<string, unknown>
-  return (std && t[`${std.key}_slideshow_hooks_review`] as { system: string; prompt: string } | undefined) ?? deps.config.pipeline.templates.sidestep_slideshow_hooks_review
+  return (std && t[`${std.key}_slideshow_hooks_review`] as { system: string; prompt: string } | undefined) ?? null
+}
+function reviewTemplate(deps: Deps, std: WritingStandard | null): { system: string; prompt: string } {
+  const own = ownReview(deps, std)
+  if (!own) throw new AppError('bad_request', `${std?.label ?? 'This product'} has no reviewer of its own.`)
+  return own
 }
 
 // "Write 10 with Claude" (section 28): the writer, then a separate reviewer
@@ -310,7 +317,7 @@ export async function buildSlideshowHooks(deps: Deps, ctx: Ctx, contentId: strin
   const purpose = `slideshow_hooks:${row.id}`
   // The general standard (section 29): one call; the writer runs the stop
   // test itself. A product whose rules add the reviewer gets the second call.
-  if (!std?.review) {
+  if (!std?.review || !ownReview(deps, std)) {
     return {
       purpose, characterId: row.characterId,
       preview: { title: `Write ${n} hooks`, prompts: [{ label: 'Hook writer', text: `${system}\n${prompt}`, wrapped: hardWrap(`${system}\n${prompt}`) }], warnings: [], invalidates: [] },
@@ -374,7 +381,7 @@ async function onSlideshowHooks(deps: Deps, ctx: Ctx, job: JobRow, out: JobOutco
   const kit = post ? await kitFor(deps, ctx, post.productId) : null
   const listed = ideas.map((h, i) => `${i + 1}. Moment: ${h.moment || 'not given'}. Code: ${h.code ? codeLabel(h.code) : 'not given'}. Hook: ${h.text}`).join('\n')
   await activateChildren(deps, job.id, c => ({
-    prompt: fill(reviewTemplate(deps, kit?.std ?? null).prompt, { claims: kit?.claims ?? '', hooks: listed }),
+    prompt: fill((ownReview(deps, kit?.std ?? null) ?? { prompt: '' }).prompt, { claims: kit?.claims ?? '', hooks: listed }),
     schema: reviewJsonSchema(ideas.length),
     meta: { ...((c.request as { meta?: Record<string, unknown> }).meta ?? {}), mockReview: mockReview(ideas.length) },
   }))

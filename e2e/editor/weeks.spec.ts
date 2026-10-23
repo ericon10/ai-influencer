@@ -33,7 +33,8 @@ function planCsv(): string {
   // Doug: 2 faceless rows (no outfit needed).
   rows.push([`D0${run}`, DOUG, DAYS[0]!, '1', 'faceless', 'checking the mailbox in the rain', '', '', '', '', 'day 41', 'unemployed', 'DEVICE-07'])
   rows.push([`D1${run}`, DOUG, DAYS[1]!, '1', 'faceless', 'the portal is down again', '', '', '', '', 'day 42', 'unemployed', 'DEVICE-07'])
-  return [head.join(','), ...rows.slice(0, 20).map(r => r.map(q).join(','))].join('\n') + '\n'
+  // Every row names its product (section 45): none here.
+  return [[...head, 'product'].join(','), ...rows.slice(0, 20).map(r => [...r, 'none'].map(q).join(','))].join('\n') + '\n'
 }
 // Lines for the bank: life and job, every voice fit, across pains, emotions and formats.
 function linesCsv(): string {

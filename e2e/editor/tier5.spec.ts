@@ -80,6 +80,9 @@ async function lineBank(page: Page, info: TestInfo, phone: boolean) {
   await expect.poll(() => imp.evaluate(el => (el as HTMLDetailsElement).open)).toBe(true)
   await imp.getByLabel('The comments as a CSV file').setInputFiles({ name: `apify-${run}.csv`, mimeType: 'text/csv', buffer: Buffer.from(csvFor(run)) })
   await imp.getByLabel('The videos as a CSV file').setInputFiles({ name: 'videos.csv', mimeType: 'text/csv', buffer: Buffer.from(videos) })
+  // The product is the owner's pick, never the first one (section 45).
+  await expect(imp.getByRole('button', { name: 'Import (free)' })).toBeDisabled()
+  await imp.getByLabel('Product', { exact: true }).selectOption({ label: 'SideStep' })
   await press(phone, imp.getByRole('button', { name: 'Import (free)' }))
   const summary = imp.locator('[data-field="line-bank-import-summary"]')
   await expect(summary).toContainText(`apify-${run}.csv`)

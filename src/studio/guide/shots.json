@@ -2619,7 +2619,7 @@
         "y": 12.8,
         "w": 96.3,
         "h": 5.2,
-        "label": "1 \u00b7 The CSV: its name and how many rows"
+        "label": "1 · The CSV: its name and how many rows"
       },
       {
         "n": 2,
@@ -2627,7 +2627,7 @@
         "y": 19.1,
         "w": 96.3,
         "h": 8.8,
-        "label": "2 \u00b7 Preview (free), and Draw mock screens by code"
+        "label": "2 · Preview (free), and Draw mock screens by code"
       },
       {
         "n": 3,
@@ -2635,7 +2635,7 @@
         "y": 29,
         "w": 96.3,
         "h": 10.3,
-        "label": "3 \u00b7 This plan is for: the product of the rows that name none"
+        "label": "3 · This plan is for: the product of the rows that name none"
       },
       {
         "n": 4,
@@ -2897,7 +2897,7 @@
         "y": 57.7,
         "w": 96.3,
         "h": 12.1,
-        "label": "4 \u00b7 Import N rows (free): only the ticked rows"
+        "label": "4 · Import N rows (free): only the ticked rows"
       }
     ]
   },
@@ -3694,6 +3694,96 @@
         "w": 25.2,
         "h": 5.4,
         "label": "Open post: back to the workspace"
+      }
+    ]
+  },
+  "who-what": {
+    "w": 640,
+    "h": 244,
+    "spots": [
+      {
+        "n": 1,
+        "x": 3.6,
+        "y": 9.8,
+        "w": 92.8,
+        "h": 27.9,
+        "label": "1. The character: nothing is picked for you"
+      },
+      {
+        "n": 2,
+        "x": 3.6,
+        "y": 44.3,
+        "w": 92.8,
+        "h": 23.8,
+        "label": "2. The product, or No product (a real choice)"
+      },
+      {
+        "n": 3,
+        "x": 77.4,
+        "y": 74.6,
+        "w": 19.1,
+        "h": 15.6,
+        "label": "Start the post: on once both are set"
+      }
+    ]
+  },
+  "line-first-slot": {
+    "w": 1124,
+    "h": 84,
+    "spots": [
+      {
+        "n": 1,
+        "x": 1.7,
+        "y": 28.6,
+        "w": 24.3,
+        "h": 42.9,
+        "label": "The 3 best-fit lines for this character and product, with Use"
+      },
+      {
+        "n": 2,
+        "x": 76.2,
+        "y": 35.7,
+        "w": 7.6,
+        "h": 28.6,
+        "label": "Browse all: the line picker"
+      },
+      {
+        "n": 3,
+        "x": 94.5,
+        "y": 35.7,
+        "w": 6.4,
+        "h": 28.6,
+        "label": "Write my own, or No line"
+      }
+    ]
+  },
+  "line-first-sheet": {
+    "w": 680,
+    "h": 340,
+    "spots": [
+      {
+        "n": 1,
+        "x": 6.3,
+        "y": 7.1,
+        "w": 90.3,
+        "h": 9.8,
+        "label": "Search the lines and their comments"
+      },
+      {
+        "n": 2,
+        "x": 3.4,
+        "y": 29.8,
+        "w": 93.2,
+        "h": 8.8,
+        "label": "Filter chips: pain, emotion, format, life or job"
+      },
+      {
+        "n": 3,
+        "x": 3.4,
+        "y": 69.8,
+        "w": 93.2,
+        "h": 23.1,
+        "label": "A compact row: tap for the source comment; Use fills the slot"
       }
     ]
   }

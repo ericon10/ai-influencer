@@ -11,6 +11,7 @@ import { getCharacter, listCharacters, toData } from './characters.js'
 import { facelessOf, kindOf, readFacelessPost } from './faceless.js'
 import { saveSocialAccount, scoreboard } from './scaleKit.js'
 import { getSetting } from './settings.js'
+import { productRef } from './products.js'
 import { STANCES_KEY } from './lineBank.js'
 import { bankPage, freeLines, patchWeek, placeStills, reusePlaceStill, stanceOf, useLine, weekCells } from './weeks.js'
 
@@ -78,25 +79,33 @@ export async function postRow(deps: Deps, ctx: Ctx, postId: string): Promise<Pos
 
 export interface LinePickQuery { pain?: string | null; emotion?: string | null; format?: string | null; lifeOrJob?: string | null; q?: string | null }
 
-// The bank for one post: only lines that fit the character's voice (first
-// person or secondhand, as on the line bank), none used on another account,
-// unused lines first (most liked first), then this account's used ones.
+// The bank for one post (section 45): only lines tagged for the post's
+// product (No product: lines tagged no product), only lines whose voice fit
+// matches the character (first person or both for a first-person character,
+// secondhand or both otherwise), none used on another account; unused
+// first, then by likes. best: the 3 for the slot (unused, the exact voice
+// before "both", then likes). Never another product's lines.
 export async function linePicks(deps: Deps, ctx: Ctx, postId: string, q: LinePickQuery) {
   const row = await getContent(deps, ctx, postId)
   const ch = row.characterId ? await getCharacter(deps, ctx, row.characterId) : null
   const picked = await getSetting<Record<string, 'first' | 'secondhand'>>(deps.db, ctx.accountId, STANCES_KEY, {})
   const stance = ch ? await stanceOf(deps, ctx, ch, picked) : 'secondhand'
   const page = await bankPage(deps, ctx, { ...q, limit: 5000 })
+  const product = row.productId ? await productRef(deps, ctx, row.productId) : null
   const here = norm(row.accountTag)
   const current = postLine(row.kind, specOf(row)).lineId
-  const fits = page.lines.filter(l => l.fits === 'both' || l.fits === stance)
+  const mine = page.lines.filter(l => (l.productId ?? null) === (row.productId ?? null))
+  const fits = mine.filter(l => l.fits === 'both' || l.fits === stance)
   const open = fits.filter(l => !l.usedAccount || l.usedPostId === row.id || (here && norm(l.usedAccount) === here))
   const rank = (l: (typeof open)[number]) => (l.id === current ? 0 : !l.usedAccount ? 1 : 2)
   const lines = [...open].sort((a, b) => rank(a) - rank(b) || b.likes - a.likes)
+  const view = (l: (typeof open)[number]) => ({ id: l.id, text: l.original, pain: l.pain === 'none' ? '' : l.pain, emotion: l.emotion === 'none' ? '' : l.emotion, format: l.format, fits: l.fits, lifeOrJob: l.lifeOrJob, source: l.source, likes: l.likes, comment: l.comment !== l.original ? l.comment : '', used: l.usedAccount ? { account: l.usedAccount, date: l.usedDate, here: l.usedPostId === row.id } : null })
+  const best = open.filter(l => !l.usedAccount && l.id !== current).sort((a, b) => Number(b.fits === stance) - Number(a.fits === stance) || b.likes - a.likes).slice(0, 3)
   return {
-    lines: lines.slice(0, 60).map(l => ({ id: l.id, text: l.original, pain: l.pain === 'none' ? '' : l.pain, emotion: l.emotion === 'none' ? '' : l.emotion, format: l.format, fits: l.fits, lifeOrJob: l.lifeOrJob, source: l.source, likes: l.likes, comment: l.comment !== l.original ? l.comment : '', used: l.usedAccount ? { account: l.usedAccount, date: l.usedDate, here: l.usedPostId === row.id } : null })),
-    total: lines.length, unused: lines.filter(l => !l.usedAccount).length, hidden: fits.length - open.length, otherVoice: page.lines.length - fits.length,
+    lines: lines.slice(0, 200).map(view), best: best.map(view),
+    total: lines.length, unused: lines.filter(l => !l.usedAccount).length, hidden: fits.length - open.length, otherVoice: mine.length - fits.length,
     options: page.options, stance, characterName: ch?.name ?? '', current,
+    product: product ? { id: product.id, name: product.name } : null,
   }
 }
 
@@ -116,6 +125,8 @@ export async function setPostLine(deps: Deps, ctx: Ctx, postId: string, input: {
     const l = await bankLine(deps, ctx, input.lineId)
     if (!l || !l.passed) throw new AppError('not_found', 'That line is not in the bank any more.')
     if (l.usedPostId && l.usedPostId !== row.id && l.usedAccountTag && norm(l.usedAccountTag) !== norm(row.accountTag)) throw new AppError('invalid_request', `That line is used on ${l.usedAccountTag}: a line goes to one account only.`)
+    // Section 45: a line is tagged for one product (or none) and only goes on its posts.
+    if ((l.productId ?? null) !== (row.productId ?? null)) throw new AppError('invalid_request', 'That line is tagged for another product. Pick a line for this post\'s product, write your own, or pick No line.')
     text = l.line; lineId = l.id; mode = 'bank'
   } else {
     text = (input.text ?? '').trim().slice(0, 300)

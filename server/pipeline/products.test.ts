@@ -60,14 +60,16 @@ describe('products', () => {
     expect((await postWriting(h.deps, h.ctx, glow)).std).toBeNull()
   })
 
-  it('a new post takes its account\'s product (the Accounts card), else none; never the first product; copies keep it; Posts home filters by it', async () => {
+  it('a post\'s product is only ever the owner\'s pick: never its account\'s, never the first product; copies keep it; Posts home filters by it', async () => {
     // No account has a product until the owner sets one.
     expect(await defaultProductFor(h.deps, h.ctx, 'F2')).toBeNull()
     const before = await createContent(h.deps, h.ctx, { kind: 'slideshow', characterId: callie })
     expect(before.productId).toBeNull()
     expect((await createContent(h.deps, h.ctx, { kind: 'slideshow', characterId: callie, accountTag: 'F2' })).productId).toBeNull()
+    // Section 45: the account's product is never taken for a post.
     await saveSocialAccount(h.deps, h.ctx, 'F2', { productId: sideStep })
-    const f2 = await createContent(h.deps, h.ctx, { kind: 'meme', characterId: callie, accountTag: 'F2' })
+    expect((await createContent(h.deps, h.ctx, { kind: 'meme', characterId: callie, accountTag: 'F2' })).productId).toBeNull()
+    const f2 = await createContent(h.deps, h.ctx, { kind: 'meme', characterId: callie, accountTag: 'F2', productId: sideStep })
     expect(f2.productId).toBe(sideStep)
     const mine = await createContent(h.deps, h.ctx, { kind: 'meme', characterId: callie, accountTag: 'CALLIE' })
     expect(mine.productId).toBeNull()
@@ -75,8 +77,9 @@ describe('products', () => {
     expect((await createContent(h.deps, h.ctx, { kind: 'meme', characterId: callie, accountTag: 'F2', productId: null })).productId).toBeNull()
     expect((await createContent(h.deps, h.ctx, { kind: 'batch', characterId: callie, accountTag: 'CALLIE', productId: glow })).productId).toBe(glow)
     await expect(checkProduct(h.deps, h.ctx, 'prd_nope000000000000000')).rejects.toThrow()
-    // A post with none takes its new account's product when the account changes.
-    expect((await updateContent(h.deps, h.ctx, before.id, { accountTag: 'F2' })).productId).toBe(sideStep)
+    // A post with none keeps none when its account changes (section 45).
+    expect((await updateContent(h.deps, h.ctx, before.id, { accountTag: 'F2' })).productId).toBeNull()
+    expect((await updateContent(h.deps, h.ctx, before.id, { productId: sideStep })).productId).toBe(sideStep)
     // The Idea step's pick.
     expect((await updateContent(h.deps, h.ctx, mine.id, { productId: glow })).productId).toBe(glow)
     expect((await updateContent(h.deps, h.ctx, mine.id, { productId: null })).productId).toBeNull()
@@ -167,9 +170,9 @@ describe('products', () => {
   it('the plan import: the plan\'s product on every ticked row, only the ticked rows, and the ad switch stays the row\'s own', async () => {
     await expect(importPlan(h.deps, h.ctx, CSV, { rows: ['P001'] })).rejects.toThrow(/Pick the plan's product/)
     await expect(importPlan(h.deps, h.ctx, CSV, { productId: sideStep, rows: [] })).rejects.toThrow(/Tick the rows/)
-    // The accounts that have a product agree (F2 is SideStep's): the pick is filled.
+    // The plan's product is never pre-filled from the accounts (section 45).
     const p = await previewPlan(h.deps, h.ctx, CSV)
-    expect(p.suggestedProductId).toBe(sideStep)
+    expect(p.suggestedProductId).toBeNull()
     expect(p.product).toBeNull()
     // The language notes follow the plan's product: SideStep's all of them,
     // no product the dash check only.

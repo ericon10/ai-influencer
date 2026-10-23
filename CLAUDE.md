@@ -125,6 +125,12 @@ ad column). UX-PLAN.md section 29 has the details.
   both build a post in one order: line > place > still > video > sound >
   text. A post and a Weeks row are the same record. Every picture of a
   post shows its line and place_id, and a tap opens the row.
+- **R7. Who and what first, every path (owner, 2026-10-23; UX-PLAN.md rule
+  3 and section 45).** Every content path starts with two picks by the
+  user: the character (or faceless account) and the product, where No
+  product is a real choice. The Studio never picks or assumes a product,
+  and SideStep is never a default anywhere. Changing the product clears
+  the line.
 
 This file gives a new Claude Code session enough context to be useful
 immediately. Read this first before making changes.

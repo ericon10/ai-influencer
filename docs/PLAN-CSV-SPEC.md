@@ -54,7 +54,7 @@ fails if this page and that list disagree.
 | `sound_name` | optional | Free text | The sound to add in the app (in the manifest). |
 | `sound_type` | optional | `music`, `voiceover`, `original` | |
 | `voiceover_clip` | optional | Free text | The voiceover's search words. |
-| `product` | optional | A product's name, or blank | The post's product (its rules and claims). A name not in Products is an error in the preview. |
+| `product` | optional | A product's name, or `none` (No product) | The post's product (its rules, claims and lines). A name not in Products is an error in the preview. Blank is flagged and skipped by Fill until the product is set on the post; no row gets a product it did not name. |
 | `ad` | optional | `yes`, `no` | An ad for its product (#ad, "Ad:" first in the caption). |
 | `notes` | optional | Free text | Kept on the post. |
 | `lane` | optional | Free text | Line Engine field, kept on the post and in post.json. |
@@ -96,23 +96,23 @@ The template (**Download template** on Weeks) has these four rows under the
 header. Real ids in place of `bl_example` and the dates of the week.
 
 ```csv
-row_id,account,date,slot,post_type,life_or_job,story_beat,line,caption,hashtags,outfit,slide_2,slide_3,slide_4,slide_5,slide_6,slide_1_image
-C001,callie_tt_01,2026-10-26,1,slideshow,job,Monday: her roommate got a rejection email at 7am,my roommate got rejected at 7:02am. before coffee,she said she is fine,jobsearch roommate,"oversized gray hoodie, black leggings",she read it out loud like a eulogy,"the email said ""we went another direction""",there was no direction,she made pancakes anyway,we ate them in silence,"a phone on a messy kitchen counter next to a coffee maker, morning light"
+row_id,account,date,slot,product,post_type,life_or_job,story_beat,line,caption,hashtags,outfit,slide_2,slide_3,slide_4,slide_5,slide_6,slide_1_image
+C001,callie_tt_01,2026-10-26,1,none,slideshow,job,Monday: her roommate got a rejection email at 7am,my roommate got rejected at 7:02am. before coffee,she said she is fine,jobsearch roommate,"oversized gray hoodie, black leggings",she read it out loud like a eulogy,"the email said ""we went another direction""",there was no direction,she made pancakes anyway,we ate them in silence,"a phone on a messy kitchen counter next to a coffee maker, morning light"
 ```
 
 ```csv
-row_id,account,date,slot,post_type,life_or_job,story_beat,line,outfit,scene,clip_action,sound_name,sound_type
-C002,callie_tt_01,2026-10-26,2,clip,life,Monday night: laundry day goes wrong,the dryer ate my one good sweater. i am 26,"faded band tee, plaid pajama pants","a small laundromat at night, fluorescent light",she pulls a tiny shrunken sweater out of the dryer and holds it up,sad violin,music
+row_id,account,date,slot,product,post_type,life_or_job,story_beat,line,outfit,scene,clip_action,sound_name,sound_type
+C002,callie_tt_01,2026-10-26,2,none,clip,life,Monday night: laundry day goes wrong,the dryer ate my one good sweater. i am 26,"faded band tee, plaid pajama pants","a small laundromat at night, fluorescent light",she pulls a tiny shrunken sweater out of the dryer and holds it up,sad violin,music
 ```
 
 ```csv
-row_id,account,date,slot,post_type,line_id,caption,outfit,scene
-C003,callie_ig_01,2026-10-27,1,photo,bl_example,tuesday,"cream knit sweater, jeans","sitting on the floor of her bedroom against the bed, laptop open"
+row_id,account,date,slot,product,post_type,line_id,caption,outfit,scene
+C003,callie_ig_01,2026-10-27,1,none,photo,bl_example,tuesday,"cream knit sweater, jeans","sitting on the floor of her bedroom against the bed, laptop open"
 ```
 
 ```csv
-row_id,account,date,slot,post_type,story_beat,place_id,video_prompt,sound_name,sound_type,caption
-D001,doug_tt_01,2026-10-26,1,faceless,the unemployment portal is down again,IS015,"Rain falls, the open mailbox door sways a little in the wind. 6 seconds, 9:16.",sad piano,music,day 41
+row_id,account,date,slot,product,post_type,story_beat,place_id,video_prompt,sound_name,sound_type,caption
+D001,doug_tt_01,2026-10-26,1,none,faceless,the unemployment portal is down again,IS015,"Rain falls, the open mailbox door sways a little in the wind. 6 seconds, 9:16.",sad piano,music,day 41
 ```
 
 ## What the Studio does with the file
@@ -121,7 +121,7 @@ D001,doug_tt_01,2026-10-26,1,faceless,the unemployment portal is down again,IS01
    notes. Rows matching posts already made ask Replace or Add. Rows land as
    drafts on the Weeks grid.
 2. **Fill** (free): every post with no line gets one drawn from the line
-   bank under the rules (no pain twice in an account's last 7 posts; a line
+   bank, from lines tagged for the post's product only, under the rules (no pain twice in an account's last 7 posts; a line
    on one account only, ever; emotion and format rotate, never 3 alike in a
    row; the voice fits; the account's life/job blend, never a job line in a
    life slot). Then **Fit to voice** (priced) puts each in the character's
@@ -133,6 +133,8 @@ D001,doug_tt_01,2026-10-26,1,faceless,the unemployment portal is down again,IS01
 ## Writing a good week (Claude's checklist)
 
 - Every `row_id` unique; every `date` in the same Monday to Sunday week.
+- A `product` on every row: the product's name, or `none` for No product. A
+  blank product is flagged and skipped by Fill; the Studio never picks one.
 - Slots 1 to the account's slots per day, no gaps.
 - `story_beat` on every row: one plain sentence of what happens that day.
 - Leave `line` and `line_id` blank to have the Studio draw from the bank;

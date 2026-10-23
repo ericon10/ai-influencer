@@ -778,6 +778,8 @@ export interface LinePick {
   source: string; likes: number; comment: string; used: { account: string; date: string | null; here: boolean } | null
 }
 export interface LinePicks {
+  // Section 45: the 3 for the slot, and the post's product (null: No product).
+  best: LinePick[]; product: { id: string; name: string } | null
   lines: LinePick[]; total: number; unused: number; hidden: number; otherVoice: number
   options: { pains: string[]; emotions: string[]; formats: string[] }; stance: 'first' | 'secondhand'; characterName: string; current: string | null
 }

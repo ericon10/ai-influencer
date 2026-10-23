@@ -52,7 +52,8 @@ export async function startRecreate(deps: Deps, ctx: Ctx, input: { character: st
     if (!m?.clone || m.clone.mode !== 'motion') throw new AppError('invalid_request', `"${input.model}" is not one of the motion models.`)
     await saveCloneModel(deps, ctx, m.ref)
   }
-  const post = await createContent(deps, ctx, { kind: 'meme', characterId, idea: 'Recreate from a real clip', step: 'video', spec: { start: 'clip' } })
+  // The link names the character; the product is still the owner's pick on the start sheet (section 45).
+  const post = await createContent(deps, ctx, { kind: 'meme', characterId, idea: 'Recreate from a real clip', step: 'video', spec: { start: 'clip', picks: { character: true, product: false } } })
   await addCloneSource(deps, ctx, { contentId: post.id, name: input.name, capCredits: input.cap ?? null, ...from })
   return { id: post.id }
 }

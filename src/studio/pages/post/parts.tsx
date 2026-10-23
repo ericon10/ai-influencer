@@ -123,7 +123,10 @@ export function useNewPost() {
       if (!list.length) { nav('/studio/characters'); return }
       const last = read(LAST_CHARACTER)
       const characterId = extra.characterId ?? (list.find(c => c.id === last) ?? list.find(c => c.progress.approved > 0) ?? list[0]!).id
-      const { id } = await api.createContent({ kind, characterId, accountTag: read(LAST_TAG) ?? '', ...extra })
+      // Who and what first (section 45): the post opens on its start sheet,
+      // nothing picked for the owner (a clip's own character comes ticked).
+      const picks = { character: !!extra.characterId, product: extra.productId !== undefined }
+      const { id } = await api.createContent({ kind, characterId, accountTag: read(LAST_TAG) ?? '', ...extra, spec: { picks, ...(extra.spec ?? {}) } })
       await qc.invalidateQueries({ queryKey: keys.content })
       nav(`/studio/posts/${id}${open}`)
     } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) } finally { setBusy(null) }

@@ -13,7 +13,7 @@ test.beforeAll(async () => {
   const account = `callie_polish_${run}`
   await api('PUT', `/social-accounts/${account}`, { characterId: seedData().callie, slotsPerDay: 2 })
   const rows = [['row_id', 'account', 'date', 'slot', 'post_type', 'line'], [`P1${run}`, account, MONDAY, '1', 'text_only', `a polish sweep line ${run}`], [`P2${run}`, account, '2027-04-07', '2', 'photo', `another polish line ${run}`]]
-  await api('POST', '/weeks/import', { csv: rows.map(r => r.join(',')).join('\n'), rows: rows.slice(1).map(r => r[0]) })
+  await api('POST', '/weeks/import', { csv: rows.map((r, i) => [...r, i ? 'none' : 'product'].join(',')).join('\n'), rows: rows.slice(1).map(r => r[0]) })
   await api('POST', `/weeks/${MONDAY}/check`, {})
 })
 

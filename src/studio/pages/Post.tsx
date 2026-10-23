@@ -18,7 +18,8 @@ import { FinishedDamage } from './post/FinishedDamage'
 import { MORE_EVENT, moreKey, type PostCtx } from './post/ctx'
 import { editorUrl, scrollKey } from './post/EditorCard'
 import { HowTo } from '../guide/Guide'
-import { LinePanel, lineSummary, usePostRow } from './post/LineDrawer'
+import { LineSlot, lineSummary, usePostRow } from './post/LineDrawer'
+import { StartSheet, WhoWhat, picksDoneOf } from './post/StartSheet'
 import { SettingSuggestions } from './post/PlacePanel'
 import { WeekSlot } from './post/WeekSlot'
 import type { GuideId } from '../guide/content'
@@ -131,6 +132,21 @@ function Workspace({ item, data }: { item: ContentItem; data: ContentData }) {
     idea: <IdeaStep ctx={ctx} />, stills: <StillsStep ctx={ctx} />, video: <VideoStep ctx={ctx} />, text: <TextStep ctx={ctx} />, finish: <FinishStep ctx={ctx} />,
   }
 
+  // Who and what first (section 45): until the owner has picked the
+  // character and the product, the post is only its start sheet.
+  if (!picksDoneOf(item)) {
+    return (
+      <div className="st-page" data-field="post-start">
+        <div className="st-row" style={{ gap: 10, marginBottom: 10 }}><Link to="/studio" className="st-btn ghost sm"><ArrowLeft size={14} />Posts</Link></div>
+        <div className="st-kicker">{KIND_LABEL[item.kind]}</div>
+        <StartSheet item={item} characters={chars.data?.characters ?? []} />
+      </div>
+    )
+  }
+  // Line, step 1 of the stepper (section 45) on a person's video post or
+  // slideshow; a faceless post's first drawer is the same slot.
+  const withLine = (item.kind === 'meme' || item.kind === 'slideshow') && character.data?.kind !== 'faceless'
+
   return (
     <div className="st-page">
       <div className="st-row" style={{ gap: 10, marginBottom: 10 }}>
@@ -145,29 +161,32 @@ function Workspace({ item, data }: { item: ContentItem; data: ContentData }) {
           <div className="st-kicker">{KIND_LABEL[item.kind]}{item.accountTag ? ` · ${item.accountTag}` : ''}</div>
           <input className="st-input st-scene-title" value={draft.fields.title} placeholder={postName({ ...item, title: '' })} maxLength={120} onChange={e => draft.setFields({ title: e.target.value })} aria-label="Post name" />
           <PlanLine plan={(draft.spec as { plan?: PlanMeta }).plan} />
+          <WhoWhat item={item} characters={chars.data?.characters ?? []} />
+          {withLine && <div style={{ marginTop: 6 }}><WeekSlot ctx={ctx} /></div>}
         </div>
       </div>
-      {(item.kind === 'meme' || item.kind === 'slideshow') && character.data?.kind !== 'faceless' && <PersonLine ctx={ctx} />}
       {item.kind === 'meme' && character.data?.kind !== 'faceless' && <FinishedDamage ctx={ctx} />}
       {item.kind === 'meme' && character.data?.kind === 'faceless' ? <FacelessPost ctx={ctx} /> : (<>
       <nav className="st-steps st-poststeps" aria-label="Steps">
+        {withLine && <LineStepButton ctx={ctx} />}
         {steps.map(([k, label], i) => {
           const state = i < ci ? 'done' : i === ci ? 'current' : 'waiting'
           return (
             <button key={k} type="button" className={`st-step ${state === 'done' ? 'done' : state === 'current' ? 'current' : ''}`} aria-current={state === 'current' ? 'step' : undefined} onClick={() => jump(k, state)}>
-              <span className="dot">{state === 'done' ? <Check size={12} strokeWidth={3} /> : i + 1}</span>{label}
+              <span className="dot">{state === 'done' ? <Check size={12} strokeWidth={3} /> : i + 1 + (withLine ? 1 : 0)}</span>{label}
             </button>
           )
         })}
       </nav>
       {!character.data && character.isError && <Callout tone="bad">This post's character could not be loaded. Pick another one in the Idea step.</Callout>}
       <div className="st-col" style={{ gap: 14 }}>
+        {withLine && <LineStep ctx={ctx} />}
         {steps.map(([k, label], i) => {
           const state = i < ci ? 'done' : i === ci ? 'current' : 'waiting'
           return (
             <section key={k} className={`st-poststep ${state}`} data-field={`step-${k}`}>
               <header className="st-poststep-head">
-                <span className="st-poststep-dot">{state === 'done' ? <Check size={13} strokeWidth={3} /> : i + 1}</span>
+                <span className="st-poststep-dot">{state === 'done' ? <Check size={13} strokeWidth={3} /> : i + 1 + (withLine ? 1 : 0)}</span>
                 <div className="grow" style={{ minWidth: 0 }}>
                   <div className="st-h3">{label}</div>
                   {state === 'done' && summary[k] && <div className="st-hint st-poststep-sum">{summary[k]}</div>}
@@ -186,33 +205,45 @@ function Workspace({ item, data }: { item: ContentItem; data: ContentData }) {
   )
 }
 
-// Line first (owner, 2026-10-23; UX-PLAN.md section 43): a person post's
-// line comes before its steps, the same record a Weeks row has (the line,
-// then the place from the character's world, the still, the video, the
-// sound and the text). Open until the post has a line (or No line), then
-// one line with Change. Add to a week sits under it.
-function PersonLine({ ctx }: { ctx: PostCtx }) {
+// Line, step 1 of the stepper (owner, 2026-10-23; UX-PLAN.md sections 43,
+// 45): the line comes before the idea, the same record a Weeks row has.
+// The slot is one row (the 3 best-fit lines, Browse all, Write my own, No
+// line); once picked it folds to a line with Change. Places from the
+// character's world that fit the line sit under it.
+function LineStep({ ctx }: { ctx: PostCtx }) {
   const row = usePostRow(ctx.item.id)
   const has = !!row.data && row.data.line.mode !== null
-  const [open, setOpen] = useState<boolean | null>(null)
-  const shown = open ?? (row.data ? !has : false)
+  const [open, setOpen] = useState(false)
+  const shown = !has || open
   return (
-    <section className={`st-poststep ${shown ? 'current' : 'done'}`} data-field="post-line" style={{ marginBottom: 14 }}>
+    <section className={`st-poststep ${shown ? 'current' : 'done'}`} data-field="step-line">
       <header className="st-poststep-head">
-        <span className="st-poststep-dot">{has && !shown ? <Check size={13} strokeWidth={3} /> : 'L'}</span>
+        <span className="st-poststep-dot">{shown ? 1 : <Check size={13} strokeWidth={3} />}</span>
         <div className="grow" style={{ minWidth: 0 }}>
           <div className="st-h3">Line</div>
           {!shown && <div className="st-hint st-poststep-sum">{lineSummary(row.data)}</div>}
         </div>
-        <HowTo id="line-first" />
-        <button className="st-btn sm ghost" onClick={() => setOpen(!shown)} aria-expanded={shown}>{shown ? 'Hide' : has ? 'Change' : 'Pick the line'}</button>
+        {shown && <HowTo id="line-first" />}
+        {!shown && <button className="st-btn sm ghost" onClick={() => setOpen(true)}>Change</button>}
+        {!has && <span className="st-badge accent">First</span>}
       </header>
-      {shown && <div className="st-poststep-body st-col" style={{ gap: 12 }}><LinePanel ctx={ctx} onPicked={() => setOpen(false)} /></div>}
-      <div className="st-poststep-body st-col" style={{ gap: 10, paddingTop: shown ? 0 : undefined }}>
-        <SettingSuggestions ctx={ctx} />
-        <WeekSlot ctx={ctx} />
-      </div>
+      {shown && (
+        <div className="st-poststep-body st-col" style={{ gap: 10 }}>
+          <LineSlot ctx={ctx} onPicked={() => setOpen(false)} />
+          <SettingSuggestions ctx={ctx} />
+        </div>
+      )}
     </section>
+  )
+}
+
+function LineStepButton({ ctx }: { ctx: PostCtx }) {
+  const row = usePostRow(ctx.item.id)
+  const has = !!row.data && row.data.line.mode !== null
+  return (
+    <button type="button" className={`st-step ${has ? 'done' : 'current'}`} onClick={() => window.setTimeout(() => scrollToField('step-line'), 60)} data-field="stepper-line">
+      <span className="dot">{has ? <Check size={12} strokeWidth={3} /> : 1}</span>Line
+    </button>
   )
 }
 

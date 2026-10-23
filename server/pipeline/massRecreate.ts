@@ -215,7 +215,9 @@ async function queueDriveFetch(deps: Deps, ctx: Ctx, batchId: string) {
 // A row's clip becomes its own video post, open at Recreate; the clip is
 // prepared (cleaned) on the worker, then the free first pass runs.
 async function startRow(deps: Deps, ctx: Ctx, batchId: string, row: MassRow, from: { assetId: string } | { uploadId: string } | { link: string }): Promise<string> {
-  const post = await createContent(deps, ctx, { kind: 'meme', characterId: row.characters[0]!, idea: `Recreate: ${row.source.name}`, step: 'video', spec: { start: 'clip', massOf: { batchId, rowId: row.id } } })
+  // A row's post is for the batch's product, the owner's pick on the batch (section 45).
+  const batch = await getContent(deps, ctx, batchId)
+  const post = await createContent(deps, ctx, { kind: 'meme', characterId: row.characters[0]!, idea: `Recreate: ${row.source.name}`, step: 'video', productId: batch.productId, spec: { start: 'clip', massOf: { batchId, rowId: row.id } } })
   await addCloneSource(deps, ctx, { contentId: post.id, name: row.source.name, ...from })
   await patchRow(deps, ctx, batchId, row.id, { postId: post.id, status: 'checking', reason: null })
   return post.id

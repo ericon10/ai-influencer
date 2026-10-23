@@ -24,7 +24,7 @@ test('Make the week: Render 2 $0 posts makes the text posts; Generate the rest o
     [`K1${run}`, ACCOUNT, '2027-02-01', '2', 'clip', 'the dryer ate my one good sweater ' + run, '', 'faded band tee', 'a laundromat at night', 'she holds up the tiny sweater'],
     [`K2${run}`, ACCOUNT, '2027-02-03', '2', 'clip', 'my plant died on my day off ' + run, '', 'gray hoodie', 'her small kitchen', 'she looks at the dead plant'],
   ]
-  await api('POST', '/weeks/import', { csv: rows.map(r => r.map(q).join(',')).join('\n'), rows: rows.slice(1).map(r => r[0]) })
+  await api('POST', '/weeks/import', { csv: rows.map((r, i) => [...r, i ? 'none' : 'product'].map(q).join(',')).join('\n'), rows: rows.slice(1).map(r => r[0]) })
   await api('POST', `/weeks/${MONDAY}/check`, {})
   await page.goto(`/studio/weeks?week=${MONDAY}&step=make`)
   const make = page.locator('[data-field="weeks-make"]')

@@ -174,12 +174,13 @@ export async function bankView(deps: Deps, ctx: Ctx, q: BankQuery) {
     return true
   })
   const imports = await getSetting<BankImport[]>(deps.db, ctx.accountId, IMPORTS_KEY, [])
-  const productId = (q.importId ? imports.find(i => i.id === q.importId)?.productId : imports.find(i => i.productId)?.productId) ?? null
+  // The pain list: the import asked about, never "the first product" (section 45).
+  const productId = (q.importId ? imports.find(i => i.id === q.importId)?.productId : null) ?? null
   return {
     counts, imports, voice: voice ? { characterId: voice.characterId, name: voice.name, stance: voice.stance, picked: voice.picked } : null,
     lines: shown.slice(0, Math.min(q.limit ?? 200, 500)).map(lineView), total: shown.length,
     skippedHere: voice ? all.filter(r => ((r.skips as Skip[]) ?? []).some(s => s.characterId === voice.characterId)).slice(0, 20).map(r => ({ id: r.id, line: r.line, why: ((r.skips as Skip[]) ?? []).find(s => s.characterId === voice.characterId)?.why ?? '' })) : [],
-    options: { emotions: cfg.emotions, topics: cfg.topics, pains: await painsFor(deps, ctx, productId), fits: cfg.fits, formats: cfg.formats, passScore: cfg.pass_score, maxWords: cfg.max_words, dropLabels: DROP_LABEL },
+    options: { emotions: cfg.emotions, topics: cfg.topics, pains: [...new Set([...(await painsFor(deps, ctx, productId)), ...all.map(r => String(((r.tags ?? {}) as { pain?: string }).pain ?? '')).filter(p => p && p !== 'none')])].sort(), fits: cfg.fits, formats: cfg.formats, passScore: cfg.pass_score, maxWords: cfg.max_words, dropLabels: DROP_LABEL },
   }
 }
 

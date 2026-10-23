@@ -22,7 +22,8 @@ export function HooksTab({ characters }: { characters: CharacterSummary[] }) {
   const list = useProducts()
   const products = list.data?.products ?? []
   const [productId, setProductId] = useState<string | null>(null)
-  const current = productId && products.some(p => p.id === productId) ? productId : products[0]?.id ?? null
+  // No product opens by itself (section 45): the owner picks one to browse.
+  const current = productId && products.some(p => p.id === productId) ? productId : null
   const product = useProduct(current)
   const [busy, setBusy] = useState<string | null>(null)
   const file = useRef<HTMLInputElement | null>(null)
@@ -55,6 +56,11 @@ export function HooksTab({ characters }: { characters: CharacterSummary[] }) {
           No products yet. A script kit holds a product's hook vault, its claims sheet and how buyers talk.{' '}
           <button className="st-todo-link" disabled={!!busy} onClick={() => void load({ starter: true })}>Load the SideStep script kit</button> or import your own (.md).
         </Callout>
+      ) : !current ? (
+        <div className="st-col" style={{ gap: 10 }}>
+          <span className="st-hint" data-field="hooks-pick">Pick a product above to see its hooks, claims and buyer language.</span>
+          <RunStatus match={j => j.purpose.startsWith('hook_variants:')} />
+        </div>
       ) : !product.data ? <div className="st-skel" style={{ height: 320 }} /> : (
         <ProductPanel p={product.data} characters={characters} />
       )}

@@ -103,7 +103,8 @@ describe('the line bank', () => {
     expect(imp).toMatchObject({ rows: 15, empty: 1, kept: 9, already: 0, captions: 2, productName: 'SideStep', dropped: { duplicate: 1, likes: 1, short: 1, language: 1, video: 1, topic: 1 } })
     const again = await importBank(h.deps, h.ctx, { comments: { csv } })
     expect(again).toMatchObject({ kept: 0, already: 9 })
-    const view = await bankView(h.deps, h.ctx, {})
+    // The import's own product's pains (never "the first product", section 45).
+    const view = await bankView(h.deps, h.ctx, { importId: imp.id })
     expect(view.counts).toMatchObject({ comments: 9, waiting: 9, passed: 0 })
     // Nothing shows before the reviewer has passed it.
     expect(view.lines).toEqual([])

@@ -146,7 +146,8 @@ export async function importFacelessPlan(deps: Deps, ctx: Ctx, csv: string, opts
     const row = await createContent(deps, ctx, {
       kind: 'meme', characterId: ch.id, title: `${c.row_id}: ${c.hook}`.slice(0, 120), idea: c.moment, accountTag: pv.accountTag, step: 'stills',
       spec: {
-        caption: c.hook.slice(0, 400), plan,
+        // The file names no product: the post asks for it on its start sheet (section 45).
+        caption: c.hook.slice(0, 400), plan, picks: { character: true, product: false },
         faceless: { line: c.scene.slice(0, 800), videoPrompt: (c.video_prompt || c.clip_action).slice(0, 2000), postCaption: c.caption.slice(0, 2200), hashtags: hashtagsOf(c.hashtags).slice(0, 15), musicName: c.sound_name.slice(0, 120), voiceover: c.voiceover_clip ? { search: c.voiceover_clip.slice(0, 200), note: '' } : null, posted: false },
       },
     })

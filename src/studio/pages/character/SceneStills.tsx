@@ -219,7 +219,8 @@ function CopyScene({ v, scene, open, onClose }: { v: CharacterView; scene: Scene
   // Each copy opens as a new video post of that character, at its stills.
   async function openCopy(d: { characterId: string; sceneId: string }) {
     try {
-      const { id } = await api.createContent({ kind: 'meme', characterId: d.characterId, sceneId: d.sceneId, idea: scene.brief, step: 'stills' })
+      // The character is the copy's; the product is still the owner's pick (section 45).
+      const { id } = await api.createContent({ kind: 'meme', characterId: d.characterId, sceneId: d.sceneId, idea: scene.brief, step: 'stills', spec: { picks: { character: true, product: false } } })
       onClose()
       nav(`/studio/posts/${id}`)
     } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) }

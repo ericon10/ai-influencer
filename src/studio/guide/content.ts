@@ -9,7 +9,7 @@ export type GuideColor = 'orange' | 'pink' | 'violet' | 'blue' | 'teal' | 'green
 export type GuideId =
   | 'big-picture' | 'posts' | 'characters' | 'setup-start' | 'setup-face' | 'setup-sheet' | 'setup-file'
   | 'post-idea' | 'post-stills' | 'post-video' | 'post-clone' | 'post-mass' | 'line-bank' | 'post-text' | 'post-finish'
-  | 'library' | 'settings' | 'feedback' | 'faceless' | 'realism' | 'voice' | 'hooks' | 'slideshow' | 'launch-plan' | 'products' | 'results' | 'download-day' | 'weeks' | 'line-first' | 'accounts' | 'providers' | 'comfy' | 'engine'
+  | 'library' | 'settings' | 'feedback' | 'faceless' | 'realism' | 'voice' | 'hooks' | 'slideshow' | 'launch-plan' | 'products' | 'results' | 'download-day' | 'weeks' | 'who-what' | 'line-first' | 'accounts' | 'providers' | 'comfy' | 'engine'
 
 export interface GuideSection {
   id: GuideId
@@ -213,7 +213,7 @@ export const GUIDE: GuideSection[] = [
     where: 'Any post > Idea',
     intro: 'Write what happens in your own words, or paste a full prompt. The Studio reads what your words already say (a selfie, the front camera, close framing, a black tank, the place, the light) and shows it as chips; nothing you wrote is rewritten. Everything else (character, account, format, places and every detail of the shot) is under More control, collapsed.',
     steps: [
-      'Product (the row under the character): No product, or one of your products. The post is written to the general standard either way; its product adds its own rules, its vault and its claims sheet (see Products). A new post takes its account\'s product (Posts home > Accounts), else none.',
+      'Product (the row under the character): No product, or one of your products. The post is written to the general standard either way; its product adds its own rules, its vault and its claims sheet (see Products). You pick it on the start sheet when the post begins (No product is a choice), and change it here; changing it clears the line.',
       'Pick how to start: Describe it (write the shot; stills and a video follow), or Start from a real clip (your character in a TikTok or Reel; see Start from a real clip).',
       'Type the idea, or paste a prompt. It saves as you type.',
       'Check the chips under the box: Camera, Phone camera, Framing, Outfit, Makeup, Place, Light. Click one to change it (it then says "you set"); the x puts it back to what your words say. "+ Set a detail" adds one your words did not name.',
@@ -474,13 +474,35 @@ export const GUIDE: GuideSection[] = [
     ],
   },
   {
+    id: 'who-what', group: 'Make a post', title: 'Who and what first: the start sheet', color: 'orange',
+    tagline: 'Every post starts with two picks by you: the character, then the product (No product is a real choice).',
+    where: 'New post (every kind and path); a post\'s header, Who and what, Change',
+    intro: 'Nothing is picked for you. New post opens a sheet with two picks, the character (or faceless account) and the product, and nothing of the post loads until both are set. The Studio never assumes a product and never takes one from the account: No product is its own choice, and SideStep is never a default anywhere. The product decides which lines you see, which rules the writers follow and which claims are checked.',
+    steps: [
+      'New post (a video post, slideshow, batch or From a TikTok; Library > Make a video post too): the start sheet opens in the middle of the screen (full height on a phone).',
+      '1. Character: tap one. A clip\'s own character comes ticked when you started from that clip.',
+      '2. Product: tap a product, or No product. Both say REQUIRED until set; Start the post stays off and names what is left.',
+      'Start the post: the post opens at its first step, Line, with lines for that character and product only.',
+      'To change either later, press Change next to "Callie · SideStep" in the post\'s header. Changing the product clears the line (the sheet says so first) so a line never rides on the wrong product; the bank line goes back to the bank.',
+      'Weeks: each plan row names its product, or none for No product. A row with a blank product is flagged ("No product: pick one on the post") and Fill skips it; open the post and its start sheet asks for the product.',
+    ],
+    tips: [
+      'No product is a real choice: those posts get the general standard and lines tagged no product.',
+      'The Accounts page still records each account\'s product for your notes and results; it never fills in a post\'s product.',
+    ],
+    cost: 'Free.',
+    shots: [{ id: 'who-what', caption: 'The start sheet: the character, then the product (No product is a choice), both required' }],
+  },
+  {
     id: 'line-first', group: 'Make a post', title: 'Line first: one order for every post', color: 'teal',
     tagline: 'A post starts from its line. Then the place, the still, the video, the sound and the text, always together.',
     where: 'Every post: the Line drawer (faceless) or the Line card on top (a person post); Weeks; the line under every picture',
     intro: 'Posts come in two ways only: a plan CSV or Sheet imported in Weeks, or New post. Both build a post the same way, in the same order: line, place, still, video, sound, text. A New post and a Weeks row are the same record (line_id, place_id, still, video, sound, caption), so a post made by hand can join a week, and every picture of a post tells you which line and row it belongs to.',
     steps: [
-      'New post, then the character (as always).',
-      'Line, first: From the bank shows only lines that fit the character\'s voice (first person or secondhand), none used on another account, unused lines first. Filter by pain, emotion, format and life or job. Each line shows its pain, emotion and source (the comment, with its likes). Use this line puts it on the post and marks it used on this account. Or Write my own, or No line for a pure visual post (Fill never draws one for it, Check does not flag it).',
+      'New post, then the start sheet: the character and the product (see Who and what first).',
+      'Line is step 1 of the stepper (Line, Idea, Stills, Video, Caption, Finish; a faceless post\'s first drawer). Its slot is one row: the 3 best-fit lines for this character and product with Use, Browse all N, Write my own and No line (a pure visual post: Fill never draws one for it, Check does not flag it). A picked line shows in the slot with its tags and Change.',
+      'Browse all (or Change) opens the line picker in the middle of the screen: search at the top, filter chips (pain, emotion, format, life or job), unused lines first, then by likes. Each row is the line and small tags; tap it for its source comment. Use closes the picker and fills the slot.',
+      'Only lines tagged for the post\'s product show (No product: lines tagged no product), and only in the character\'s voice: first person (or both) for Doug, secondhand (or both) for Callie, Dani and Solei. None used on another account. When there are none, it says "No lines for Callie and SideStep yet", with Write your own and No line; it never shows another product\'s lines.',
       'Visual: the places that fit the line come first (its words and the place themes: a money line suggests the gas station), each with its thumbnail, scene text and place_id. Reuse this still: $0 puts the place\'s existing still on the post at once (or pulls it free from Higgsfield). Use this place makes its scene the prompt of a new still (priced on Make the still). Your own words still win over the place. A person post shows places from the character\'s own world as chips that fill the idea.',
       'Video: the prompt is the place\'s motion line, or drafted from the line when there is no place. Edit it freely; the price is on the button.',
       'Sound, then Text: the on-screen line and the caption are filled from the line while they are empty; edit them freely.',
@@ -494,6 +516,8 @@ export const GUIDE: GuideSection[] = [
     ],
     cost: 'Picking a line, the place suggestions, Reuse this still, Add to a week and the row are free. A new still and the video are priced on their buttons, as always.',
     shots: [
+      { id: 'line-first-slot', caption: 'Line, step 1: the 3 best-fit lines for this character and product, Browse all, Write my own, No line' },
+      { id: 'line-first-sheet', caption: 'The line picker: search, filter chips, compact rows, unused first; Use fills the slot' },
       { id: 'line-first-post', caption: 'A New post for a faceless character: the Line drawer first, then the places that fit the line with Reuse this still: $0' },
       { id: 'line-first-row', caption: 'The row behind a picture: the line with its pain, emotion and source, the place, the still, and Open post' },
     ],
@@ -649,7 +673,7 @@ export const GUIDE: GuideSection[] = [
     intro: 'The Studio promotes many things for many characters on many accounts. Every post is written to the general standard: a hook a stranger would stop on, clear on one read with no image, saying exactly what happened, sounding like a person; one story thread; every slide clear to a stranger; an image line a slide; the voice from the character\'s voice card or the account. A post\'s product brings its own vault, buyer language and claims sheet, and it can add its own rules on top. SideStep\'s rules add the job word, pain 7 or more, its honest endings, a separate reviewer and the language notes; they reach SideStep posts only. A post with no product gets the general standard and no product words.',
     steps: [
       'In the Idea step of any post (video post, slideshow, batch), pick the Product: No product, or one of yours. The line under it says what the post is written to. Saved at once, free.',
-      'A new post takes its account\'s product (Posts home > Accounts, the Product column). No account has a product until you set it there, so Callie\'s or Solei\'s posts start with No product unless you pick one.',
+      'Every new post asks for its product on the start sheet: a product, or No product. The Studio never picks one for you and never takes one from the account (the Accounts page\'s Product column is for your notes and results).',
       'Written for a product is not the same as an ad for it. #ad (or a plan row\'s ad column) makes a post an ad: "Ad" on slide 1, "Ad:" first in the caption and, on a product with them, its honest endings. A post written for a product with #ad off never names it.',
       'Library > Hooks, each product\'s card: Writing rules. The general standard alone, or a set of rules on top (SideStep rules v1.2). A product made from the SideStep kit starts on SideStep\'s rules; any other starts on the general standard.',
       'Posts home: the Product chips filter the posts (each product, or No product), on the server, so Show older posts finds older ones too. Each card names its product.',
@@ -912,6 +936,8 @@ export const GUIDE: GuideSection[] = [
 ]
 
 export const GLOSSARY: Array<[string, string]> = [
+  ['Start sheet', 'The two picks every post starts with: the character, then the product (No product is a real choice). Nothing is picked for you; nothing loads until both are set.'],
+  ['No product', 'A real choice on the start sheet or a plan row ("none"): the general standard and lines tagged no product. A blank product on a plan row is flagged, never filled in.'],
   ['Line first', 'Every post is built in one order, whether it came from a Weeks import or New post: line, place, still, video, sound, text. A post and a Weeks row are the same record.'],
   ['The row', 'A post\'s record: its account, date and slot, row id, line (with its pain, emotion and source), place_id, still, video, sound and caption. Tap the line under any picture to see it.'],
   ['place_id', 'A place in a faceless character\'s place bank (IS015). Shown under every picture made from it; a place\'s still is reused for $0 by the next post on that place.'],
@@ -1010,7 +1036,7 @@ export const GLOSSARY: Array<[string, string]> = [
   ['Hook vault', 'A product\'s numbered opening lines, grouped by type. Library > Hooks.'],
   ['Hook pattern', 'What kind of hook it is: someone doubts or reacts, POV, things nobody tells you, red flags, listicle, storytime, myth vs fact, tier list. Every hook a slideshow writes is tagged with one.'],
   ['Use this hook', 'On a slideshow: drafts every slide from the hook, one story thread (setup, the turn, the payoff, relief or a question last), each with the image line its photo shows, plus the caption. Priced, a small Claude call.'],
-  ['Product', 'What a post is for (SideStep, a brand deal, anything you promote), or No product. Picked in the Idea step; a new post takes its account\'s. The product brings its vault, claims sheet and the rules it adds; nothing of it reaches another product\'s posts.'],
+  ['Product', 'What a post is for (SideStep, a brand deal, anything you promote), or No product. Picked on the start sheet when the post begins (never assumed), changed in the Idea step. The product brings its vault, claims sheet and the rules it adds; nothing of it reaches another product\'s posts.'],
   ['General standard', 'How every post is written, any product or none: the stop test (a stranger would stop, clear on one read, says exactly what happened, sounds like a person), one story thread, every slide clear to a stranger, an image line a slide, the voice from the character\'s voice card or the account. A product can add its own rules on top.'],
   ['One camera roll', 'A slideshow\'s locked scene: the same place, light, phone, outfit and 2 details in every photo, so the set looks like one day\'s photos.'],
   ['Scene library', 'Saved slideshow scenes (place, light, camera, 2 details) for a character or a topic. Pick one in any slideshow and the same room looks the same every time.'],

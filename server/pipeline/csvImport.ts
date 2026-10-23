@@ -90,7 +90,8 @@ export async function runImport(deps: Deps, ctx: Ctx, batchId: string, raw: unkn
   for (const r of good) {
     const idea = r.stillPrompt ? [r.stillPrompt, r.videoPrompt ? `In the video: ${r.videoPrompt}` : ''].filter(Boolean).join('\n') : r.caption
     const row = await createContent(deps, ctx, {
-      kind: 'meme', characterId: r.characterId!, title: r.caption.slice(0, 60), idea, accountTag: r.accountTag || batch.accountTag,
+      // The batch's product, the owner's pick on the batch (section 45).
+      kind: 'meme', characterId: r.characterId!, title: r.caption.slice(0, 60), idea, accountTag: r.accountTag || batch.accountTag, productId: batch.productId,
       step: r.status === 'reuse' ? 'finish' : 'stills',
       spec: { caption: r.caption, ...(r.clipId ? { clipId: r.clipId } : {}), ...(r.style ? { edit: { style: r.style } } : {}) },
     })

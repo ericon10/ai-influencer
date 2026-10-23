@@ -38,7 +38,7 @@ import { setPosting } from './postingDay.js'
 import { STANCES_KEY, painsFor, type BankImport, IMPORTS_KEY } from './lineBank.js'
 import { listSheets, readSheet, startDriveSend } from './drive.js'
 import { withRunProvider } from './engines.js'
-import { postPlace } from '../core/postRow.js'
+import { picksOf, postPlace, readProductCell } from '../core/postRow.js'
 import type { BuiltAction } from './actions.js'
 
 // Weeks (owner, 2026-10-22; UX-PLAN.md section 37): the plan CSV in (spec
@@ -66,6 +66,9 @@ export interface WeekState {
   review?: { call: 'approved' | 'killed'; at: string } | null
   drive?: { fileId?: string; folderId?: string; name?: string; sentAt?: string } | null
 }
+// A row that named no product (section 45): flagged, and Fill skips it.
+export const NO_PRODUCT = 'No product: pick one (or No product) on the post; Fill skips it until then'
+const productNamed = (row: ContentRow) => picksOf(row.spec as Record<string, unknown>).product
 const weekOfPost = (row: ContentRow): WeekState => (((row.spec ?? {}) as { week?: WeekState | null }).week ?? {})
 const planOf = (row: ContentRow) => planMetaSchema.parse(((row.spec ?? {}) as { plan?: unknown }).plan ?? {})
 // A pure visual post (section 43): no line on purpose, never drawn one.
@@ -150,13 +153,17 @@ async function plan(deps: Deps, ctx: Ctx, csv: string) {
   }
   // A product by name (rule two).
   const list = await deps.db.select({ id: products.id, name: products.name }).from(products).where(and(eq(products.accountId, ctx.accountId), isNull(products.archivedAt))).orderBy(asc(products.createdAt))
-  const productOfRow = new Map<number, string>()
+  // Who and what first (section 45): a row names its product, or "none"
+  // for No product. A blank product is flagged (imported as a draft, skipped
+  // by Fill until it is set on the post); no row gets a product it did not name.
+  const productOfRow = new Map<number, string | null>()
   for (const [i, r] of checked.entries()) {
-    const name = rows[i]!.cells.product.trim()
-    if (!name) continue
-    const hit = list.find(p => norm(p.name) === norm(name))
+    const cell = readProductCell(rows[i]!.cells.product)
+    if (cell.kind === 'blank') { r.warnings.push(NO_PRODUCT); continue }
+    if (cell.kind === 'none') { productOfRow.set(r.line, null); continue }
+    const hit = list.find(p => norm(p.name) === norm(cell.name))
     if (hit) productOfRow.set(r.line, hit.id)
-    else r.errors.push(`Product "${name}" is not in Products: add it there, or fix the row`)
+    else r.errors.push(`Product "${cell.name}" is not in Products: add it there, or fix the row`)
   }
   return { rows, checked, problems, all, fresh, chars, bank, productOfRow, productNames: list.map(p => p.name) }
 }
@@ -315,6 +322,9 @@ async function draftRow(deps: Deps, ctx: Ctx, p: Plan, raw: WeekRow, r: CheckedW
     }
     id = (await createContent(deps, ctx, { kind: 'slideshow', characterId: ch.id, title, idea: c.story_beat || text, accountTag, step: 'stills', spec, productId })).id
   }
+  // The owner's picks: the character from the row or its account, the
+  // product only when the row named one (or "none").
+  await deps.db.update(contentItems).set({ spec: sql`jsonb_set(coalesce(${contentItems.spec}, '{}'::jsonb), '{picks}', ${JSON.stringify({ character: true, product: p.productOfRow.has(r.line) })}::jsonb, true)` }).where(eq(contentItems.id, id))
   if (bankLine) await useLine(deps, ctx, bankLine.id, { id, accountTag, characterId: ch.id, text, date: r.date })
   return { id, text, pull }
 }
@@ -437,7 +447,7 @@ export async function weekCells(deps: Deps, ctx: Ctx, rows: ContentRow[]): Promi
       postId: r.id, account: r.accountTag, date: p.date, slot: slotNumber(p.slot) ?? 1, rowId: p.rowId, postType: type, kind: r.kind, characterId: r.characterId,
       line, lineId: w.lineId ?? null, lineFrom: w.lineFrom ?? (line ? 'csv' : null), locked: !!w.locked, lifeOrJob: (p.lifeOrJob || null) as LifeOrJob | null, storyBeat: p.storyBeat,
       sound: (() => { const name = (p as { soundName?: string }).soundName || String((spec as { faceless?: { musicName?: string } }).faceless?.musicName ?? ''); return name ? { name, type: (p as { soundType?: string }).soundType || '' } : null })(),
-      fillFlag: w.fillFlag ?? null, flags: w.check?.flags ?? [], checked: !!w.check, fit: w.fit ?? null,
+      fillFlag: !productNamed(r) ? NO_PRODUCT : w.fillFlag ?? null, flags: w.check?.flags ?? [], checked: !!w.check, fit: w.fit ?? null,
       need, have, video, hasVideo, made: need > 0 && have >= need && (!video || hasVideo), making,
       thumbAssetId: thumb, videoAssetId: videoAsset, review: w.review?.call ?? null, approved: !!spec.posting?.approved, sentAt: w.drive?.sentAt ?? null, driveName: w.drive?.name ?? '',
       lineNone: noLine(r), placeId: postPlace(r.spec as Record<string, unknown>),
@@ -500,7 +510,8 @@ export interface DrawRow { postId: string; account: string; date: string; slot: 
 // line), 'all' (every post not locked and not the plan's), or post ids.
 export async function drawWeek(deps: Deps, ctx: Ctx, monday: string, input: { seed: number; redraw: 'empty' | 'all' | string[]; draft?: Record<string, string | null>; accounts?: string[] }): Promise<{ rows: DrawRow[]; seed: number; drawn: number; empty: number; pool: number }> {
   const rows = (await weekPosts(deps, ctx, monday)).filter(r => !input.accounts?.length || input.accounts.some(a => norm(a) === norm(r.accountTag)))
-  const live = rows.filter(r => weekOfPost(r).review?.call !== 'killed')
+  // A row that named no product is skipped until its product is set (section 45).
+  const live = rows.filter(r => weekOfPost(r).review?.call !== 'killed' && productNamed(r))
   const accounts = await weekAccounts(deps, ctx)
   const chars = new Map((await listCharacters(deps, ctx)).map(c => [c.id, c]))
   const picked = await getSetting<Record<string, 'first' | 'secondhand'>>(deps.db, ctx.accountId, STANCES_KEY, {})
@@ -551,7 +562,13 @@ export async function drawWeek(deps: Deps, ctx: Ctx, monday: string, input: { se
     const share = accounts.get(norm(tag))?.lifeShare ?? deps.config.pipeline.content.weeks.blend_fallback
     for (const [k, v] of assignBlend(mine.map(s => ({ postId: s.postId, lifeOrJob: s.lifeOrJob ?? (s.keep?.lineId ? ((byId.get(s.keep.lineId)?.lifeOrJob as LifeOrJob | null) ?? null) : null) })), share, hashSeed(input.seed, tag))) blend.set(k, v)
   }
-  const draws = drawLines({ slots, pool, history, blend, seed: input.seed, rules: deps.config.pipeline.content.weeks.rules })
+  // Each post draws only from lines tagged for its own product (section 45).
+  const productOfLine = new Map(all.map(l => [l.id, l.productId ?? null]))
+  const productOfPost = new Map(live.map(r => [r.id, r.productId ?? null]))
+  const draws = [...new Set(live.map(r => r.productId ?? ''))].flatMap(key => drawLines({
+    slots: slots.filter(sl => (productOfPost.get(sl.postId) ?? '') === key), pool: pool.filter(l => (productOfLine.get(l.id) ?? '') === key),
+    history, blend, seed: input.seed, rules: deps.config.pipeline.content.weeks.rules,
+  }))
   const postsById = new Map(live.map(r => [r.id, r]))
   const out: DrawRow[] = draws.map(d => {
     const r = postsById.get(d.postId)!
@@ -749,6 +766,7 @@ export async function checkWeek(deps: Deps, ctx: Ctx, monday: string): Promise<{
     const ch = r.characterId ? chars.get(r.characterId) : null
     const person = !!ch && kindOf(ch) !== 'faceless'
     const flags: string[] = []
+    if (!productNamed(r)) flags.push(NO_PRODUCT)
     if (!line && !noLine(r)) flags.push('No line')
     if (type === 'photo_dump') {
       const card = (r.spec as { card?: { stillIds?: string[] } | null }).card
@@ -958,14 +976,15 @@ export async function bankPage(deps: Deps, ctx: Ctx, q: BankPageQuery) {
   const all = await deps.db.select().from(bankLines).where(and(eq(bankLines.accountId, ctx.accountId), eq(bankLines.passed, true))).orderBy(desc(bankLines.likes))
   const lines = all.map(r => {
     const t = tagsOf(r)
-    return { id: r.id, text: r.usedText || r.line, original: r.line, source: r.source, likes: r.likes, pain: t.pain ?? '', emotion: t.emotion ?? '', format: t.format ?? '', fits: fitOf(t.fits), lifeOrJob: (r.lifeOrJob as LifeOrJob | null) ?? null, usedAccount: r.usedAccountTag, usedDate: r.usedDate, usedPostId: r.usedPostId, comment: r.comment, fight: !!t.fight }
+    return { id: r.id, productId: r.productId ?? null, text: r.usedText || r.line, original: r.line, source: r.source, likes: r.likes, pain: t.pain ?? '', emotion: t.emotion ?? '', format: t.format ?? '', fits: fitOf(t.fits), lifeOrJob: (r.lifeOrJob as LifeOrJob | null) ?? null, usedAccount: r.usedAccountTag, usedDate: r.usedDate, usedPostId: r.usedPostId, comment: r.comment, fight: !!t.fight }
   })
   const words = (q.q ?? '').trim().toLowerCase()
   const shown = lines.filter(l => (!q.pain || l.pain === q.pain) && (!q.emotion || l.emotion === q.emotion) && (!q.format || l.format === q.format) && (!q.fits || l.fits === q.fits)
     && (!q.lifeOrJob || (q.lifeOrJob === 'untagged' ? !l.lifeOrJob : l.lifeOrJob === q.lifeOrJob)) && (!q.unused || !l.usedAccount) && (!q.source || l.source === q.source) && (!words || l.text.toLowerCase().includes(words) || l.comment.toLowerCase().includes(words)))
   const cfg = deps.config.pipeline.content.line_bank
   const imports = await getSetting<BankImport[]>(deps.db, ctx.accountId, IMPORTS_KEY, [])
-  const productId = imports.find(i => i.productId)?.productId ?? null
+  // Every product's pains are in the lines themselves; no "first product" (section 45).
+  const productId = null
   const options = { pains: [...new Set([...(await painsFor(deps, ctx, productId)), ...lines.map(l => l.pain).filter(p => p && p !== 'none')])].sort(), emotions: cfg.emotions, formats: [...new Set([...cfg.formats, ...lines.map(l => l.format).filter(Boolean)])], fits: ['first', 'secondhand', 'both'], sources: [...new Set(lines.map(l => l.source))] }
   return {
     lines: shown.slice(0, Math.min(q.limit ?? 500, 5000)), total: shown.length,

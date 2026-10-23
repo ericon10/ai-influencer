@@ -11,7 +11,7 @@ import { HowTo } from '../../guide/Guide'
 import type { FacelessFile } from '../../types'
 import type { PostCtx } from './ctx'
 import { FinishStep } from './FinishStep'
-import { LinePanel, lineSummary, usePostRow } from './LineDrawer'
+import { LineSlot, lineSummary, usePostRow } from './LineDrawer'
 import { PlaceSuggestions } from './PlacePanel'
 import { WeekSlot } from './WeekSlot'
 
@@ -146,7 +146,7 @@ export function FacelessPost({ ctx }: { ctx: PostCtx }) {
       </div>
 
       <Drawer id="line" icon={<Quote size={16} />} title="1. Line" open={open === 'line'} onToggle={() => toggle('line')} sum={lineSummary(row.data)}>
-        <LinePanel ctx={ctx} onPicked={() => setOpen('still')} />
+        <LineSlot ctx={ctx} onPicked={() => setOpen('still')} />
       </Drawer>
 
       <Drawer id="still" icon={<ImageIcon size={16} />} title="2. Visual" open={open === 'still'} onToggle={() => toggle('still')}

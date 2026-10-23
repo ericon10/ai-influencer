@@ -6,6 +6,7 @@ import { keys, useContent } from './hooks'
 import { errorMessage, useToast } from './ui'
 import { HowTo } from './guide/Guide'
 import type { ContentItem, ProductBrief } from './types'
+import { lineOfItem } from './postRow'
 
 // Products (owner, 2026-10-17; UX-PLAN.md section 29): every post belongs to
 // one product, or none. Every post is written to the general standard; its
@@ -36,12 +37,18 @@ export function ProductPicker({ item }: { item: ContentItem }) {
   const [busy, setBusy] = useState(false)
   if (!list.length) return null
   const current = item.productId ?? null
+  // Section 45: changing the product clears the line (a line never rides on
+  // the wrong product).
+  const hasLine = !!lineOfItem(item).text || lineOfItem(item).mode === 'none'
   async function pick(id: string | null) {
     if (id === current || busy) return
     setBusy(true)
     try {
       await api.updateContent(item.id, { productId: id })
       await qc.invalidateQueries({ queryKey: keys.content })
+      void qc.invalidateQueries({ queryKey: ['post-row', item.id] })
+      void qc.invalidateQueries({ queryKey: ['line-picks', item.id] })
+      if (hasLine) toast({ tone: '', text: `Product changed to ${productById(list, id)?.name ?? 'No product'}: the line was cleared. Pick a line for it in the Line step.` })
     } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) } finally { setBusy(false) }
   }
   const on = productById(list, current)
@@ -56,6 +63,7 @@ export function ProductPicker({ item }: { item: ContentItem }) {
         ))}
       </div>
       <span className="st-hint" data-field="post-product-rules">{writingLine(on)}</span>
+      {hasLine && <span className="st-hint" data-field="post-product-clears">Changing the product clears this post's line.</span>}
     </div>
   )
 }

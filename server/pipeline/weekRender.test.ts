@@ -51,10 +51,10 @@ describe('the frames', () => {
 describe('Weeks', () => {
   it('imports text_only and photo_dump rows, flags a dump without 5 stills, renders both free into 9:16 mp4s', async () => {
     const csv = [
-      'row_id,account,date,slot,post_type,line,text_style,bg_color,bg_motion',
-      `T1,callie_tt_01,${MONDAY},1,text_only,"my manager: any questions? / me: is this job real",two_beat,#1a2b3c,`,
-      `T2,callie_tt_01,${MONDAY},2,photo_dump,october so far a recap,,,zoom`,
-      `T3,callie_tt_01,2026-10-27,1,text_only,"Her: are you ok / Me: define ok",dialogue,,`,
+      'row_id,account,date,slot,post_type,line,text_style,bg_color,bg_motion,product',
+      `T1,callie_tt_01,${MONDAY},1,text_only,"my manager: any questions? / me: is this job real",two_beat,#1a2b3c,,none`,
+      `T2,callie_tt_01,${MONDAY},2,photo_dump,october so far a recap,,,zoom,none`,
+      `T3,callie_tt_01,2026-10-27,1,text_only,"Her: are you ok / Me: define ok",dialogue,,,none`,
     ].join('\n')
     const r = await importWeek(h.deps, h.ctx, csv, { rows: ['T1', 'T2', 'T3'] })
     expect(r.created).toBe(3)

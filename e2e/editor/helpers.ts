@@ -348,3 +348,17 @@ export async function gotoLaunchPlan(page: Page) {
   await expect(older).toBeVisible({ timeout: 30_000 })
   await older.click()
 }
+
+// Who and what first (UX-PLAN.md section 45): a post made from the UI opens
+// on its start sheet; pick the character (when it is not ticked already)
+// and the product (or No product), then Start the post.
+export async function startPost(page: Page, opts: { character?: string; product?: string } = {}) {
+  const sheet = page.locator('[data-field="start-sheet"]')
+  await expect(sheet).toBeVisible({ timeout: 30_000 })
+  const chars = sheet.locator('[data-field="start-character"]')
+  if (opts.character) await chars.getByRole('radio', { name: new RegExp(`^${opts.character}`) }).first().click()
+  else if (!(await chars.locator('[aria-checked="true"]').count())) await chars.getByRole('radio').first().click()
+  await sheet.locator('[data-field="start-product"]').getByRole('radio', { name: opts.product ?? 'No product', exact: true }).click()
+  await sheet.locator('[data-field="start-go"]').click()
+  await expect(sheet).toHaveCount(0, { timeout: 20_000 })
+}

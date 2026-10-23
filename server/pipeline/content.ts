@@ -6,7 +6,7 @@ import { and, desc, eq, inArray, isNull, sql } from 'drizzle-orm'
 import { zipSync } from 'fflate'
 import sharp from 'sharp'
 import { z } from 'zod'
-import { brollClips, candidates, contentItems, products, scenes } from '../db/schema.js'
+import { bankLines, brollClips, candidates, contentItems, products, scenes } from '../db/schema.js'
 import { isVideoOp } from '../core/clips.js'
 import type { Ctx, Deps } from '../context.js'
 import { AppError, notFound } from '../lib/errors.js'
@@ -16,7 +16,7 @@ import { enqueueLocalJob, type JobSpec } from '../jobs/runner.js'
 import { captionPng, captionWords, type CaptionLook } from '../core/overlay.js'
 import { slideshowSpecSchema } from '../core/slideshowSpec.js'
 import { renderSlideshow, slideshowProblems } from './slideshow.js'
-import { checkProduct, defaultProductFor, GENERAL_LABEL, standardOf } from './products.js'
+import { checkProduct, GENERAL_LABEL, standardOf } from './products.js'
 import { fill, hardWrap } from '../core/text.js'
 import { pronounVars } from '../core/prompts.js'
 import { transcodeBroll } from '../media/meme.js'
@@ -323,6 +323,11 @@ const memeSpec = z.object({
   // Line first (UX-PLAN.md section 43): the line from the bank, the owner's
   // own words, or deliberately none (a pure visual post).
   lineMode: z.enum(['bank', 'own', 'none']).nullable().default(null),
+  // Who and what first (UX-PLAN.md section 45): the owner's two picks on the
+  // start sheet. null: an older post (both taken as picked); false: still
+  // to pick (the post shows only its start sheet; Weeks flags a row with no
+  // product).
+  picks: z.object({ character: z.boolean(), product: z.boolean() }).nullable().default(null),
 })
 // A slideshow (server/core/slideshowSpec.ts; UX-PLAN.md section 27).
 const slideshowSpec = slideshowSpecSchema
@@ -330,6 +335,11 @@ const slideshowSpec = slideshowSpecSchema
 // 2026-10-13): video i uses clip i mod n and B-roll i mod m. Older drafts
 // with one clipId and brollId read as lists of one.
 const batchObject = z.object({
+  // Who and what first (UX-PLAN.md section 45): the owner's two picks on the
+  // start sheet. null: an older post (both taken as picked); false: still
+  // to pick (the post shows only its start sheet; Weeks flags a row with no
+  // product).
+  picks: z.object({ character: z.boolean(), product: z.boolean() }).nullable().default(null),
   // Export for TikTok, Reels or Shorts (long run part 4).
   exportPreset: z.string().max(20).default('tiktok'),
   clipIds: z.array(id).max(20).default([]),
@@ -499,7 +509,9 @@ export async function createContent(deps: Deps, ctx: Ctx, input: PostInput): Pro
   const base = input.kind === 'batch' ? { count: defaults.batch.default_count } : input.kind === 'meme' ? { brollSeconds: defaults.meme.broll_seconds, order: defaults.meme.order } : {}
   const spec = parseSpec(input.kind, { ...base, ...((input.spec as object) ?? {}) })
   const accountTag = cleanTag(input.accountTag ?? '')
-  const productId = input.productId !== undefined ? await checkProduct(deps, ctx, input.productId) : await defaultProductFor(deps, ctx, accountTag)
+  // Who and what first (section 45): the product is the owner's pick, or
+  // none; never taken from the account or any other default.
+  const productId = input.productId ? await checkProduct(deps, ctx, input.productId) : null
   const [row] = await deps.db.insert(contentItems).values({
     id: newId('cnt'), accountId: ctx.accountId, characterId: input.characterId, kind: input.kind,
     title: (input.title ?? '').slice(0, 120), spec, createdBy: ctx.userId, productId,
@@ -539,11 +551,19 @@ export async function updateContent(deps: Deps, ctx: Ctx, itemId: string, patch:
     const scene = await getScene(deps, ctx, sceneId)
     if (scene.brief.trim() === row.idea.trim()) await updateScene(deps, ctx, sceneId, { brief: patch.idea.trim() })
   }
-  // The product (section 29): picked, else a post with none takes its new
-  // account's product when the account changes.
+  // The product (sections 29, 45): only ever the owner's pick. Changing it
+  // clears the line, so a line never rides on the wrong product.
   const accountTag = patch.accountTag !== undefined ? cleanTag(patch.accountTag) : row.accountTag
-  const productId = patch.productId !== undefined ? await checkProduct(deps, ctx, patch.productId)
-    : !row.productId && accountTag !== row.accountTag ? await defaultProductFor(deps, ctx, accountTag) : row.productId
+  const productId = patch.productId !== undefined ? (patch.productId ? await checkProduct(deps, ctx, patch.productId) : null) : row.productId
+  if (productId !== row.productId && (kind === 'meme' || kind === 'slideshow')) {
+    const sp = (spec ?? {}) as { caption?: string; hook?: string; lineMode?: string | null; plan?: Record<string, unknown>; week?: Record<string, unknown> | null }
+    const had = !!(kind === 'slideshow' ? sp.hook : sp.caption)?.trim() || !!sp.lineMode
+    if (had) {
+      spec = parseSpec(kind, { ...sp, ...(kind === 'slideshow' ? { hook: '' } : { caption: '' }), lineMode: null, plan: { ...(sp.plan ?? {}), lineId: '' }, week: sp.week ? { ...sp.week, lineId: null, lineFrom: null, fit: null, check: null } : null })
+      await deps.db.update(bankLines).set({ usedPostId: null, usedAccountTag: null, usedCharacterId: null, usedText: '', usedAt: null, usedDate: null, updatedAt: deps.clock.now() })
+        .where(and(eq(bankLines.accountId, ctx.accountId), eq(bankLines.usedPostId, row.id)))
+    }
+  }
   const [out] = await deps.db.update(contentItems).set({
     title: patch.title !== undefined ? patch.title.slice(0, 120) : row.title, spec,
     idea: patch.idea !== undefined ? patch.idea.slice(0, 2000) : row.idea,

@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page, type TestInfo } from '@playwright/test'
-import { api, seedData, snap } from './helpers'
+import { api, seedData, snap, startPost } from './helpers'
 
 // Character template v1.6 scene rules (long run part 2, owner 2026-10-15):
 // makeup by setting (no makeup at home or the gym, soft everyday makeup out
@@ -22,6 +22,8 @@ async function newPost(page: Page, characterId: string, idea: string, phone: boo
   await press(page.getByRole('button', { name: 'Video post', exact: true }).first(), phone)
   await page.waitForURL(/\/studio\/posts\/cnt_/)
   const id = page.url().match(/cnt_[a-z0-9]+/)![0]
+  // Who and what first (section 45): Callie, No product.
+  await startPost(page, { character: 'Callie', product: 'No product' })
   const box = page.locator('[data-field="post-idea"] textarea')
   await press(box, phone)
   await box.fill(idea)

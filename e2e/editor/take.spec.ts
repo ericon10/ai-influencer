@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page, type TestInfo } from '@playwright/test'
-import { api, captionBlocks, clipBlocks, seedData, seedPost, seek, snap } from './helpers'
+import { api, captionBlocks, clipBlocks, seedData, seedPost, seek, snap, startPost } from './helpers'
 import { editorReady, LIVE, startLive, type Live } from './r2'
 
 // The editor opens with the take (owner, 2026-10-15): "Open editor brings
@@ -158,6 +158,8 @@ test('every path opens the editor with the take: Recreate review, a finished pos
   await make.click()
   await page.waitForURL(/\/studio\/posts\/cnt_/, { timeout: 30_000 })
   const fromLib = page.url().match(/posts\/(cnt_[a-z0-9]+)/)![1]!
+  // Who and what first (section 45): the clip's character comes ticked; No product.
+  await startPost(page, { product: 'No product' })
   await toFinish(page, fromLib)
   await openFromFinish(page)
   await takeIsThere(page, fromLib, info, 'path 3: Library, Make a video post')

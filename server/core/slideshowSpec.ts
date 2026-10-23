@@ -158,6 +158,11 @@ export const slideshowSpecSchema = z.object({
   // Line first (UX-PLAN.md section 43): the line from the bank, the owner's
   // own words, or deliberately none (a pure visual post).
   lineMode: z.enum(['bank', 'own', 'none']).nullable().default(null),
+  // Who and what first (UX-PLAN.md section 45): the owner's two picks on the
+  // start sheet. null: an older post (both taken as picked); false: still
+  // to pick (the post shows only its start sheet; Weeks flags a row with no
+  // product).
+  picks: z.object({ character: z.boolean(), product: z.boolean() }).nullable().default(null),
 })
 export type SlideshowSpec = z.infer<typeof slideshowSpecSchema>
 export type SpecialSlideSpec = z.infer<typeof specialSchema>

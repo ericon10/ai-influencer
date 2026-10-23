@@ -4,8 +4,9 @@ import { api, seedData, snap } from './helpers'
 // Products (owner, 2026-10-17; UX-PLAN.md section 29), like a user, in demo
 // mode: a Callie video post with No product gets no SideStep notes (the
 // dash check only); the same post picked as SideStep gets them; Posts home
-// filters by product; an account's product is the default of its new
-// posts; a product's writing rules on its card.
+// filters by product; an account's product is never taken for its new
+// posts (section 45: only the owner picks); a product's writing rules on
+// its card.
 
 const products = async () => (await api<{ products: { id: string; name: string }[] }>('GET', '/products')).products
 // The seeded Callie; SideStep is the owner's starter kit (the seed checks it is there).
@@ -42,7 +43,7 @@ test('a video post with No product gets the dash check only; picked as SideStep,
   expect((await api<{ item: { productId: string | null } }>('GET', `/content/${id}`)).item.productId).toBe((await products()).find(p => p.name === 'SideStep')!.id)
 })
 
-test('Posts home filters by product; an account\'s product is the default of its new posts; a product\'s writing rules', async ({ page }, info) => {
+test('Posts home filters by product; an account\'s product is never taken for a new post; a product\'s writing rules', async ({ page }, info) => {
   test.setTimeout(120_000)
   const sideStep = seedData().sideStep
   const tag = 'e2e.products'
@@ -58,8 +59,10 @@ test('Posts home filters by product; an account\'s product is the default of its
   await expect.poll(async () => (await api<{ accounts: { tag: string; productId: string | null }[] }>('GET', '/social-accounts')).accounts.find(a => a.tag === tag)?.productId, { timeout: 15_000 }).toBe(sideStep)
   await accounts.locator(`[data-field="account-product-${tag}"]`).scrollIntoViewIfNeeded()
   await snap(page, info, 'the Accounts page: each account\'s product')
+  // Section 45: the account's product never fills in a post's; the owner picks it.
   const after = await api<{ id: string }>('POST', '/content', { kind: 'meme', characterId: await callieId(), accountTag: tag })
-  expect((await api<{ item: { productId: string | null } }>('GET', `/content/${after.id}`)).item.productId).toBe(sideStep)
+  expect((await api<{ item: { productId: string | null } }>('GET', `/content/${after.id}`)).item.productId).toBeNull()
+  await api('PATCH', `/content/${after.id}`, { productId: sideStep })
 
   // Posts home: the Product filter.
   await page.goto('/studio')
@@ -75,6 +78,9 @@ test('Posts home filters by product; an account\'s product is the default of its
 
   // Library > Hooks: SideStep's writing rules on its card.
   await page.goto('/studio/library?tab=hooks')
+  // No product opens by itself (section 45): pick SideStep.
+  await expect(page.locator('[data-field="hooks-pick"]')).toBeVisible({ timeout: 30_000 })
+  await page.getByRole('button', { name: /^SideStep/ }).first().click()
   const writing = page.locator('[data-field="product-writing"]')
   await expect(writing).toBeVisible({ timeout: 30_000 })
   await expect(writing.getByLabel(/Writing rules for/)).toHaveValue(/sidestep|^$/)

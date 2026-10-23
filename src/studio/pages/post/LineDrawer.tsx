@@ -1,24 +1,25 @@
-import { useState, type ReactNode } from 'react'
+import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Ban, Check, Library, PenLine } from 'lucide-react'
+import { Ban, Library, PenLine, Search, X } from 'lucide-react'
 import { api } from '../../api'
 import { keys } from '../../hooks'
 import { AsyncButton, Callout, errorMessage, useToast } from '../../ui'
 import { rowKey } from '../../postRow'
 import { HowTo } from '../../guide/Guide'
-import type { LinePick, PostRowView } from '../../types'
+import type { LinePick, LinePicks, PostRowView } from '../../types'
 import type { PostCtx } from './ctx'
 
-// The Line drawer (owner, 2026-10-23; UX-PLAN.md section 43, item 2): the
-// first step of a New post, the same record a Weeks row has. Pick from the
-// bank (filters, unused lines first, only lines that fit this character's
-// voice, none used on another account), write your own, or No line for a
-// pure visual post. The picked line shows its pain, emotion and source.
-// The place, the video and the text are filled from it in the drawers
-// after it.
+// The Line step (owner, 2026-10-23; UX-PLAN.md sections 43 and 45): step 1
+// of every post, the same record a Weeks row has. A slot one row tall: the
+// 3 best-fit lines for this character and product with Use, Browse all N,
+// Write my own and No line; a picked line shows with its tags and Change.
+// Browse (and Change) opens the line picker, a centered sheet: search,
+// filter chips, compact rows, unused first then by likes. Only lines tagged
+// for the post's product and in the character's voice ever show; an empty
+// bank says so, never filling in with another product's lines.
 
 const short = (n: number) => (n >= 1_000_000 ? `${Math.round(n / 100_000) / 10}M` : n >= 1000 ? `${Math.round(n / 100) / 10}k` : String(n))
-type Mode = 'bank' | 'own' | 'none'
 
 export function lineSummary(r: PostRowView | undefined): string {
   if (!r) return 'Pick a line, write your own, or No line'
@@ -30,94 +31,159 @@ export function usePostRow(postId: string) {
   return useQuery({ queryKey: rowKey(postId), queryFn: () => api.postRow(postId), staleTime: 5_000 })
 }
 
-export function LinePanel({ ctx, onPicked }: { ctx: PostCtx; onPicked?: () => void }) {
-  const { item, draft } = ctx
+type Filters = { pain: string; emotion: string; format: string; lifeOrJob: string; q: string }
+const NONE: Filters = { pain: '', emotion: '', format: '', lifeOrJob: '', q: '' }
+
+// Who the lines are for, in words: "Callie and SideStep", "Doug and no product".
+const forWhom = (p: LinePicks | undefined) => `${p?.characterName || 'this character'} and ${p?.product ? p.product.name : 'no product'}`
+
+function useSetLine(ctx: PostCtx, onDone?: () => void) {
   const qc = useQueryClient()
   const toast = useToast()
-  const row = usePostRow(item.id)
-  const r = row.data
-  const [mode, setMode] = useState<Mode>(r?.line.mode === 'own' ? 'own' : r?.line.mode === 'none' ? 'none' : 'bank')
-  const [f, setF] = useState({ pain: '', emotion: '', format: '', lifeOrJob: '' })
-  const picks = useQuery({ queryKey: ['line-picks', item.id, f], queryFn: () => api.linePicks(item.id, f), enabled: mode === 'bank', staleTime: 10_000 })
-  const [own, setOwn] = useState(r?.line.mode === 'own' ? r.line.text : '')
-
-  async function put(body: { lineId?: string | null; text?: string | null; none?: boolean }, said: string) {
+  return async (body: { lineId?: string | null; text?: string | null; none?: boolean }, said: string) => {
     try {
-      await draft.flush()
-      const next = await api.setPostLine(item.id, body)
-      qc.setQueryData(rowKey(item.id), next)
+      await ctx.draft.flush()
+      const next = await api.setPostLine(ctx.item.id, body)
+      qc.setQueryData(rowKey(ctx.item.id), next)
       await qc.invalidateQueries({ queryKey: keys.content })
-      void qc.invalidateQueries({ queryKey: ['line-picks', item.id] })
-      void qc.invalidateQueries({ queryKey: ['post-places', item.id] })
+      void qc.invalidateQueries({ queryKey: ['line-picks', ctx.item.id] })
+      void qc.invalidateQueries({ queryKey: ['post-places', ctx.item.id] })
       void qc.invalidateQueries({ queryKey: ['line-bank'] })
       toast({ tone: 'ok', text: said })
-      onPicked?.()
+      onDone?.()
     } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) }
   }
+}
+
+// The slot: one row. onPicked moves the post on (the next drawer or step).
+export function LineSlot({ ctx, onPicked }: { ctx: PostCtx; onPicked?: () => void }) {
+  const { item } = ctx
+  const row = usePostRow(item.id)
+  const r = row.data
+  const picks = useQuery({ queryKey: ['line-picks', item.id, NONE], queryFn: () => api.linePicks(item.id, NONE), staleTime: 10_000 })
   const p = picks.data
-  const select = (k: keyof typeof f, label: string, list: string[]) => (
-    <select className="st-input sm" style={{ width: 'auto', maxWidth: '100%' }} aria-label={label} value={f[k]} onChange={e => setF({ ...f, [k]: e.target.value })}>
-      <option value="">Any {label.toLowerCase()}</option>
-      {list.map(x => <option key={x} value={x}>{x}</option>)}
-    </select>
-  )
+  const [sheet, setSheet] = useState(false)
+  const [own, setOwn] = useState<string | null>(null)
+  const put = useSetLine(ctx, onPicked)
+  const picked = !!r && (r.line.mode === 'bank' || r.line.mode === 'own' || r.line.mode === 'none')
 
   return (
-    <div className="st-col" style={{ gap: 12 }} data-field="line-panel">
-      {r?.line.text && (
-        <div className="st-linepick on" data-field="line-current">
-          <span className="st-label" style={{ margin: 0 }}>This post's line{r.line.mode === 'own' ? ' (your own words)' : ''}</span>
-          <div className="st-linepick-text">{r.line.text}</div>
-          <LineFacts pain={r.line.pain} emotion={r.line.emotion} format={r.line.format} lifeOrJob={r.line.lifeOrJob} source={r.line.source} likes={r.line.likes} comment={r.line.comment} />
+    <div className="st-col" style={{ gap: 8 }} data-field="line-slot">
+      {picked && r ? (
+        <div className="st-lineslot" data-field="line-current">
+          {r.line.text
+            ? <span className="st-lineslot-pick" style={{ borderColor: 'var(--st-accent)' }}><span className="t" title={r.line.text}>{r.line.text}</span>{r.line.mode === 'own' && <span className="st-hint">your words</span>}</span>
+            : <span className="st-hint">No line: a visual post.</span>}
+          <span className="st-linerow-tags">{[r.line.pain && `pain: ${r.line.pain}`, r.line.emotion, r.line.format].filter(Boolean).map(t => <span key={t as string}>{t}</span>)}</span>
+          <button type="button" className="st-btn xs ghost" onClick={() => setSheet(true)} data-field="line-change">Change</button>
+          <HowTo id="line-first" label="Line first" />
         </div>
-      )}
-      <div className="st-row" style={{ gap: 8, alignItems: 'center' }}><span className="st-hint grow">The line comes first: the place, the video and the text are filled from it.</span><HowTo id="line-first" label="Line first" /></div>
-      <div className="st-seg sm" role="radiogroup" aria-label="Where the line comes from" data-field="line-mode">
-        {([['bank', <Library key="b" size={13} />, 'From the bank'], ['own', <PenLine key="o" size={13} />, 'Write my own'], ['none', <Ban key="n" size={13} />, 'No line']] as Array<[Mode, ReactNode, string]>).map(([m, icon, label]) => (
-          <button key={m} type="button" role="radio" aria-checked={mode === m} className={mode === m ? 'on' : ''} onClick={() => setMode(m)}>{icon}{label}</button>
-        ))}
-      </div>
-
-      {mode === 'bank' && (
-        <div className="st-col" style={{ gap: 10 }}>
-          {p && (
-            <>
-              <div className="st-row" style={{ gap: 8, flexWrap: 'wrap', alignItems: 'center' }} data-field="line-filters">
-                {select('pain', 'Pain', p.options.pains)}
-                {select('emotion', 'Emotion', p.options.emotions)}
-                {select('format', 'Format', p.options.formats)}
-                {select('lifeOrJob', 'Life or job', ['life', 'job'])}
-              </div>
-              <span className="st-hint" data-field="line-picks-count">
-                {p.total} line{p.total === 1 ? '' : 's'} that fit {p.characterName || 'this character'} ({p.stance === 'first' ? 'first person' : 'secondhand'}), {p.unused} unused, unused first{p.hidden ? `; ${p.hidden} used on other accounts left out` : ''}{p.otherVoice ? `; ${p.otherVoice} in another voice left out` : ''}.
+      ) : (
+        <>
+          <div className="st-lineslot" data-field="line-best">
+            {p?.best.map(l => (
+              <span key={l.id} className="st-lineslot-pick" data-field="line-best-item" data-id={l.id}>
+                <span className="t" title={l.text}>{l.text}</span>
+                <AsyncButton className="st-btn xs primary" onClick={() => put({ lineId: l.id }, 'The line is on this post.')}>Use</AsyncButton>
               </span>
-            </>
-          )}
+            ))}
+            {p && p.total > 0 && <button type="button" className="st-btn xs secondary" onClick={() => setSheet(true)} data-field="line-browse">Browse all {p.total}</button>}
+            {p && p.total === 0 && <span className="st-hint" data-field="line-empty">No lines for {forWhom(p)} yet.</span>}
+            <button type="button" className="st-btn xs ghost" onClick={() => setOwn(own === null ? '' : null)} aria-expanded={own !== null}><PenLine size={12} />Write my own</button>
+            <AsyncButton className="st-btn xs ghost" field="line-none" onClick={() => put({ none: true }, 'No line: a visual post.')}><Ban size={12} />No line</AsyncButton>
+          </div>
           {picks.isLoading && <span className="st-hint">Reading the line bank...</span>}
           {picks.error && <Callout tone="bad">{errorMessage(picks.error)}</Callout>}
-          {p && !p.lines.length && <Callout tone="info">No line in the bank fits these filters. Import lines on the Line bank page, or write your own.</Callout>}
-          <div className="st-col" style={{ gap: 8 }} data-field="line-picks">
-            {p?.lines.map(l => <PickCard key={l.id} l={l} current={p.current === l.id} onUse={() => put({ lineId: l.id }, 'The line is on this post. Next: the visual.')} />)}
-          </div>
-        </div>
+        </>
       )}
+      {own !== null && <OwnLine value={own} onChange={setOwn} onUse={async () => { await put({ text: own }, 'Your line is on this post.'); setOwn(null) }} />}
+      {sheet && <LineSheet ctx={ctx} onClose={() => setSheet(false)} onPicked={() => { setSheet(false); onPicked?.() }} />}
+    </div>
+  )
+}
 
-      {mode === 'own' && (
-        <div className="st-col" style={{ gap: 8 }}>
-          <textarea className="st-textarea" rows={2} value={own} maxLength={300} onChange={e => setOwn(e.target.value)} placeholder="the line, 12 words or fewer, the hit first" aria-label="Your own line" />
-          <div className="st-row" style={{ gap: 8 }}>
-            <AsyncButton className="st-btn sm primary" disabled={!own.trim()} field="line-own-use" onClick={() => put({ text: own }, 'Your line is on this post. Next: the visual.')}>Use my line</AsyncButton>
-            <span className="st-hint">Your words go on as written (the line lint still checks them in Text).</span>
-          </div>
-        </div>
-      )}
+function OwnLine({ value, onChange, onUse }: { value: string; onChange: (v: string) => void; onUse: () => Promise<void> }) {
+  return (
+    <div className="st-row" style={{ gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+      <input className="st-input sm" style={{ flex: '1 1 260px', minWidth: 0 }} value={value} maxLength={300} onChange={e => onChange(e.target.value)} placeholder="the line, 12 words or fewer, the hit first" aria-label="Your own line" />
+      <AsyncButton className="st-btn sm primary" disabled={!value.trim()} field="line-own-use" onClick={onUse}>Use my line</AsyncButton>
+    </div>
+  )
+}
 
-      {mode === 'none' && (
-        <div className="st-row" style={{ gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-          <AsyncButton className="st-btn sm" field="line-none" onClick={() => put({ none: true }, 'No line: a visual post. Next: the visual.')}><Ban size={13} />No line: a visual post</AsyncButton>
-          <span className="st-hint">The post has no on-screen line; Fill never draws one for it and Check does not flag it.</span>
+// The line picker: a centered sheet (full height on a phone).
+export function LineSheet({ ctx, onClose, onPicked }: { ctx: PostCtx; onClose: () => void; onPicked: () => void }) {
+  const { item } = ctx
+  const [f, setF] = useState<Filters>(NONE)
+  const [typed, setTyped] = useState('')
+  useEffect(() => { const t = setTimeout(() => setF(x => ({ ...x, q: typed.trim() })), 250); return () => clearTimeout(t) }, [typed])
+  useEffect(() => { const on = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }; window.addEventListener('keydown', on); return () => window.removeEventListener('keydown', on) }, [onClose])
+  const picks = useQuery({ queryKey: ['line-picks', item.id, f], queryFn: () => api.linePicks(item.id, f), staleTime: 10_000 })
+  const p = picks.data
+  const [open, setOpen] = useState<string | null>(null)
+  const [own, setOwn] = useState<string | null>(null)
+  const put = useSetLine(ctx, onPicked)
+  const chips = (k: keyof Filters, label: string, list: string[]) => (
+    <div className="st-chiprow" role="radiogroup" aria-label={label} data-field={`line-filter-${k}`}>
+      <span className="st-label" style={{ margin: 0, flex: 'none' }}>{label}</span>
+      <button type="button" role="radio" aria-checked={!f[k]} className={`st-chip ${!f[k] ? 'on' : ''}`} onClick={() => setF({ ...f, [k]: '' })}>Any</button>
+      {list.map(x => <button key={x} type="button" role="radio" aria-checked={f[k] === x} className={`st-chip ${f[k] === x ? 'on' : ''}`} onClick={() => setF({ ...f, [k]: f[k] === x ? '' : x })}>{x}</button>)}
+    </div>
+  )
+  return createPortal(
+    <div className="st-root" style={{ minHeight: 0, background: 'transparent' }}>
+      <div className="st-overlay" onClick={onClose} />
+      <div className="st-modal st-linesheet" role="dialog" aria-modal="true" aria-label="Pick the line" data-field="line-sheet">
+        <div className="st-row" style={{ gap: 8, alignItems: 'center' }}>
+          <div className="st-titlerow grow"><div className="st-h2" style={{ margin: 0 }}>Pick the line</div><HowTo id="line-first" label="How lines are picked" /></div>
+          <button type="button" className="st-btn icon ghost" onClick={onClose} aria-label="Close"><X size={18} /></button>
         </div>
-      )}
+        <span className="st-hint" data-field="line-sheet-scope">Lines for {forWhom(p)}: tagged for {p?.product ? p.product.name : 'no product'}, told {p?.stance === 'first' ? 'in the first person' : 'secondhand'}. Unused first, then by likes.</span>
+        <label className="st-row" style={{ gap: 6, alignItems: 'center' }}>
+          <Search size={14} />
+          <input className="st-input sm" style={{ flex: 1, minWidth: 0 }} value={typed} onChange={e => setTyped(e.target.value)} placeholder="Search the lines and their comments" aria-label="Search lines" autoFocus />
+        </label>
+        {p && (
+          <div className="st-col" style={{ gap: 4 }}>
+            {p.options.pains.length > 0 && chips('pain', 'Pain', p.options.pains)}
+            {chips('emotion', 'Emotion', p.options.emotions)}
+            {chips('format', 'Format', p.options.formats)}
+            {chips('lifeOrJob', 'Life or job', ['life', 'job'])}
+          </div>
+        )}
+        {p && <span className="st-hint" data-field="line-sheet-count">{p.total} line{p.total === 1 ? '' : 's'}, {p.unused} unused{p.hidden ? `; ${p.hidden} used on other accounts left out` : ''}.</span>}
+        {picks.error && <Callout tone="bad">{errorMessage(picks.error)}</Callout>}
+        {p && !p.total && (
+          <div className="st-col" style={{ gap: 8 }} data-field="line-sheet-empty">
+            <Callout tone="info">{f.q || f.pain || f.emotion || f.format || f.lifeOrJob ? 'No line matches these filters.' : `No lines for ${forWhom(p)} yet.`}</Callout>
+          </div>
+        )}
+        <div className="st-linerows" data-field="line-rows">
+          {p?.lines.map(l => <LineRow key={l.id} l={l} current={p.current === l.id} open={open === l.id} onToggle={() => setOpen(open === l.id ? null : l.id)} onUse={() => put({ lineId: l.id }, 'The line is on this post.')} />)}
+        </div>
+        <div className="st-row" style={{ gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+          <button type="button" className="st-btn xs ghost" onClick={() => setOwn(own === null ? '' : null)} aria-expanded={own !== null}><PenLine size={12} />Write my own</button>
+          <AsyncButton className="st-btn xs ghost" onClick={() => put({ none: true }, 'No line: a visual post.')}><Ban size={12} />No line</AsyncButton>
+          <a className="st-btn xs ghost" href="/studio/line-bank"><Library size={12} />The line bank</a>
+        </div>
+        {own !== null && <OwnLine value={own} onChange={setOwn} onUse={() => put({ text: own }, 'Your line is on this post.')} />}
+      </div>
+    </div>,
+    document.body,
+  )
+}
+
+function LineRow({ l, current, open, onToggle, onUse }: { l: LinePick; current: boolean; open: boolean; onToggle: () => void; onUse: () => Promise<void> }) {
+  return (
+    <div className="st-linerow" data-field="line-row" data-id={l.id}>
+      <div className="st-linerow-main">
+        <button type="button" className="st-linerow-text" onClick={onToggle} aria-expanded={open} title="Show the source">{l.text}</button>
+        {current ? <span className="st-badge accent">On this post</span> : <AsyncButton className="st-btn xs primary" onClick={onUse}>Use</AsyncButton>}
+      </div>
+      <div className="st-linerow-tags">
+        {[l.pain && `pain: ${l.pain}`, l.emotion, l.format, l.lifeOrJob, l.used ? (l.used.here ? 'this post' : `used @${l.used.account}`) : 'unused', l.likes ? `${short(l.likes)} likes` : ''].filter(Boolean).map(t => <span key={t as string}>{t}</span>)}
+      </div>
+      {open && <span className="st-hint" data-field="line-row-source">Source: {l.source || 'unknown'}{l.likes ? `, ${short(l.likes)} likes` : ''}{l.comment ? `: "${l.comment.slice(0, 280)}"` : ''}</span>}
     </div>
   )
 }
@@ -133,19 +199,5 @@ export function LineFacts({ pain, emotion, format, lifeOrJob, source, likes, com
       </div>
       {source && <span className="st-hint">Source: {source}{likes ? `, ${short(likes)} likes` : ''}{comment ? `: "${comment.slice(0, 180)}"` : ''}</span>}
     </>
-  )
-}
-
-function PickCard({ l, current, onUse }: { l: LinePick; current: boolean; onUse: () => Promise<void> }) {
-  return (
-    <div className={`st-linepick ${current ? 'on' : ''}`} data-field="line-pick" data-id={l.id}>
-      <div className="st-linepick-text">{l.text}</div>
-      <LineFacts pain={l.pain} emotion={l.emotion} format={l.format} lifeOrJob={l.lifeOrJob} source={l.source} likes={l.likes} comment={l.comment} />
-      <div className="st-row" style={{ gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-        {l.used ? <span className="st-badge ok">{l.used.here ? 'On this post' : `Used on @${l.used.account}${l.used.date ? ` ${l.used.date}` : ''}`}</span> : <span className="st-badge plain">Unused</span>}
-        <span className="st-spacer" />
-        {current ? <span className="st-hint"><Check size={12} style={{ verticalAlign: -2 }} /> This post's line</span> : <AsyncButton className="st-btn xs primary" onClick={onUse}>Use this line</AsyncButton>}
-      </div>
-    </div>
   )
 }

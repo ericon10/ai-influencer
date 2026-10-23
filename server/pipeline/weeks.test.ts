@@ -41,7 +41,8 @@ function plan(): string {
     rows.push([`C${i}b`, 'callie_tt_01', d, '2', i === 2 ? 'slideshow' : 'photo', `day ${i + 1}: evening`, i === 5 ? 'the landlord texted happy friday and raised rent $400' : '', 'black tank top, jeans', 'on the couch at night, one lamp on', '', '', '', i === 2 ? 'she read it out loud' : '', i === 2 ? 'we ate in silence' : '', '', ''])
     if (i < 6) rows.push([`D${i}`, 'doug_tt_01', d, '1', 'faceless', i === 0 ? 'checking the mailbox in the rain' : `day ${i + 1} of nothing`, '', '', '', '', `day ${41 + i}`, 'unemployed', '', '', i === 1 ? 'IS016' : '', 'DEVICE-07'])
   })
-  return [head.join(','), ...rows.map(r => r.map(q).join(','))].join('\n')
+  // Every row names its product (section 45): none here.
+  return [[...head, 'product'].join(','), ...rows.map(r => [...r, 'none'].map(q).join(','))].join('\n')
 }
 
 // A bank of passed lines: job lines and life lines, across pains,

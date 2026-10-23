@@ -48,15 +48,14 @@ test('New post for Doug: the line first, the gas station suggested for a money l
   const { id: post } = await api<{ id: string }>('POST', '/content', { kind: 'meme', characterId: doug, accountTag: NEWPOST, spec: { faceless: { posted: false } } })
   await page.goto(`/studio/posts/${post}`)
 
-  // 2. Line: the first drawer, open; lines in Doug's voice, unused first.
+  // 2. Line: the first drawer, open: the slot with the 3 best fits for Doug
+  // and this post's product (none), in his voice (section 45).
   const line = page.locator('[data-field="faceless-line"]')
-  await expect(line.locator('[data-field="line-panel"]')).toBeVisible({ timeout: 30_000 })
-  await expect(line.locator('[data-field="line-picks-count"]')).toContainText('first person')
-  const pick = line.locator('[data-field="line-pick"]', { hasText: MONEY })
+  await expect(line.locator('[data-field="line-slot"]')).toBeVisible({ timeout: 30_000 })
+  const pick = line.locator('[data-field="line-best-item"]', { hasText: MONEY })
   await expect(pick).toBeVisible({ timeout: 30_000 })
-  await expect(pick.locator('[data-field="line-facts"]')).toContainText('pain: rent')
-  await expect(pick).toContainText('Source: comment')
-  await pick.getByRole('button', { name: 'Use this line' }).click()
+  await pick.getByRole('button', { name: 'Use' }).click()
+  await expect(line.locator('[data-field="line-current"]')).toContainText('pain: rent', { timeout: 20_000 })
 
   // 3. Visual: opens next; the gas station first, its still reused for $0.
   const visual = page.locator('[data-field="faceless-still"]')
@@ -112,9 +111,9 @@ test('New post for Doug: the line first, the gas station suggested for a money l
 
 test('Weeks Fill on 2 Doug slots reuses the place-bank stills at $0, and Make lists them', async ({ page }, info) => {
   test.setTimeout(300_000)
-  const head = ['row_id', 'account', 'date', 'slot', 'post_type', 'story_beat', 'caption']
+  const head = ['row_id', 'account', 'date', 'slot', 'post_type', 'story_beat', 'caption', 'product']
   // Story beats that fit the two places with stills (a mailbox, gas money).
-  const rows = [[`W1${run}`, WEEK, '2027-03-01', '1', 'faceless', 'checked the mailbox in the rain, nothing', 'day 60'], [`W2${run}`, WEEK, '2027-03-02', '1', 'faceless', 'gas money ran out at the pump', 'day 61']]
+  const rows = [[`W1${run}`, WEEK, '2027-03-01', '1', 'faceless', 'checked the mailbox in the rain, nothing', 'day 60', 'none'], [`W2${run}`, WEEK, '2027-03-02', '1', 'faceless', 'gas money ran out at the pump', 'day 61', 'none']]
   const csv = [head, ...rows].map(r => r.map(q).join(',')).join('\n') + '\n'
   await api('POST', '/weeks/import', { csv, rows: rows.map(r => r[0]) })
   await page.goto(`/studio/weeks?week=${MONDAY}&step=fill`)

@@ -1800,3 +1800,28 @@ a.st-chip.st-packed:hover { border-color: var(--st-text-3); }
 button.st-weekslot { font: inherit; font-size: 11.5px; text-align: left; cursor: pointer; width: 100%; min-width: 0; }
 button.st-weekslot:focus-visible { outline: 2px solid var(--st-accent); outline-offset: 2px; }
 .st-weekslot-thumb { width: 100%; max-height: 72px; object-fit: cover; border-radius: 5px; }
+
+/* Who and what first (UX-PLAN.md section 45): the start sheet, centered; full
+   height on a phone. */
+.st-modal.st-startsheet { width: min(640px, calc(100vw - 32px)); display: flex; flex-direction: column; gap: 16px; }
+@media (max-width: 560px) {
+  .st-modal.st-startsheet { left: 0; top: 0; transform: none; width: 100vw; height: 100dvh; max-height: 100dvh; border-radius: 0; }
+}
+/* The line slot, one row tall, and the line picker sheet. */
+/* One row, always: on a narrow screen it scrolls sideways instead of growing. */
+.st-lineslot { display: flex; flex-wrap: nowrap; gap: 6px; align-items: center; min-width: 0; overflow-x: auto; padding-bottom: 2px; }
+.st-lineslot > * { flex: none; }
+.st-lineslot-pick { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; min-width: 0; padding: 5px 6px 5px 10px; border: 1px solid var(--st-line-2); border-radius: 999px; background: var(--st-surface-2); font-size: 12.5px; }
+.st-lineslot-pick .t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 210px; }
+.st-modal.st-linesheet { width: min(680px, calc(100vw - 32px)); display: flex; flex-direction: column; gap: 10px; }
+@media (max-width: 560px) {
+  .st-modal.st-linesheet { left: 0; top: 0; transform: none; width: 100vw; height: 100dvh; max-height: 100dvh; border-radius: 0; }
+}
+.st-linerows { display: flex; flex-direction: column; min-width: 0; }
+.st-linerow { display: flex; flex-direction: column; gap: 2px; padding: 7px 4px; border-bottom: 1px solid var(--st-line); min-width: 0; }
+.st-linerow-main { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.st-linerow-text { flex: 1; min-width: 0; text-align: left; background: none; border: 0; padding: 0; color: inherit; font: inherit; font-size: 13.5px; font-weight: 600; line-height: 1.3; cursor: pointer; overflow-wrap: anywhere; }
+.st-linerow-tags { display: flex; gap: 4px; flex-wrap: wrap; font-size: 10.5px; color: var(--st-text-2); }
+.st-linerow-tags span { padding: 1px 6px; border-radius: 999px; background: var(--st-surface-3); }
+.st-chiprow { display: flex; gap: 4px; overflow-x: auto; padding-bottom: 2px; align-items: center; }
+.st-chiprow .st-chip { flex: none; }

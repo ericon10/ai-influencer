@@ -84,6 +84,17 @@ tap opens the full row with Open post. (Why: Eric picked a Doug still in
 New post and had no idea which line or row it belonged to.) Section 43
 has the details.
 
+## Rule 3: WHO AND WHAT FIRST, EVERY PATH (owner, 2026-10-23)
+
+Every content path starts with two picks by the user: the character (or
+faceless account) and the product, where **No product** is a real choice.
+The Studio never picks or assumes a product, and SideStep is never a
+default anywhere. New post opens a start sheet with the two picks before
+anything else loads; a Weeks row names its product (or "none"), and a row
+that names none is flagged and skipped by Fill until it is set. Changing
+the product later clears the line, so a line never rides on the wrong
+product. Section 45 has the details.
+
 ---
 
 ## 1. The journey, end to end
@@ -2177,3 +2188,34 @@ itself: Compare providers stays a priced run that waits for the click (R4).
 
 Guide: the ComfyUI section's Compare providers step and the help on the
 Compare drawer say the count and the no-LoRA label.
+
+## 45. Who and what first, every path; Line as step 1 (owner, 2026-10-23)
+
+Rule 3 above, built. Applies to every character (person or faceless),
+every account and every product, and to No product (rule two: a post with
+no product uses the neutral defaults). Nothing here spends money.
+
+**The start sheet.**
+
+| # | Piece | How it works |
+|---|---|---|
+| 1 | Start sheet | New post (every kind and path: Describe it, Start from a real clip, Finished damage, faceless, a batch, Library > Make a video post) opens a centered sheet (full height on a phone): **Character**, then **Product** (every product, and No product). Both required, neither picked for you (a clip's own character is the one exception: it comes pre-ticked); nothing of the post loads until both are set and Start is pressed. A Weeks post whose row named no product opens the same sheet at the product |
+| 2 | Change later | The post's header shows "Callie · SideStep · Change", which opens the same sheet. Changing the product clears the line, with one line of warning on the sheet ("Changing the product clears this post's line") and a toast after; the bank line is freed for any account |
+
+**Line, step 1 of the stepper.**
+
+| # | Piece | How it works |
+|---|---|---|
+| 3 | The stepper | A person post's stepper is Line, Idea, Stills, Video, Caption, Finish (a slideshow: Line, Idea, Slides, Finish); Line is its own step, not a block above it. Steps still open in any order. A faceless post's first drawer is the same Line slot |
+| 4 | The slot | One row tall: the 3 best-fit lines for this character and product (unused first, the exact voice before "both", then likes) with Use, and **Browse all N**, Write my own, No line. A picked line shows in the slot with its tags and Change. The bank never expands inline |
+| 5 | The line picker | A centered sheet from Browse (or Change): search at the top, filter chips (pain, emotion, format, life or job), unused first, then by likes. Compact rows: the line and small tags; a tap shows its source comment. About 10 rows on a phone screen. Use closes the sheet and fills the slot |
+| 6 | Scoped | Only lines tagged for the post's product (No product: lines tagged no product), and only lines whose voice fit matches the character (first person or both for a first-person character like Doug; secondhand or both for Callie, Dani, Solei). The server refuses a line from another product |
+| 7 | Empty is honest | "No lines for Callie and SideStep yet" (or "and no product"), with Write your own and No line. Never another product's lines |
+
+**Weeks.**
+
+| # | Piece | How it works |
+|---|---|---|
+| 8 | A row with no product | The product column names a product, or "none" / "No product" for a post with none. A blank product is flagged in the import preview and on the grid ("No product: pick one on the post"), imported as a draft, and skipped by Fill (and so by Make) until the product is set on the post's start sheet. No row gets a product it did not name. Fill draws each post's line only from lines tagged for its product |
+| 9 | No fallback product | Removed: a new post taking its account's product (on create and on an account change), a plan preview pre-filling "This plan is for" from the accounts, the line bank's pain list and import box defaulting to the first product, the Library hook tab opening on the first product, and SideStep's reviewer standing in for a product with no reviewer of its own. Kept (not a default): the owner's account is seeded with the SideStep kit as a product record, and Library > Hooks can load it on request |
+

@@ -183,7 +183,8 @@ export function ImportBox({ open, last, onDone }: { open: boolean; last: BankImp
   const [productId, setProductId] = useState<string>('')
   const [done, setDone] = useState<BankImport | null>(null)
   const shown = done ?? last
-  const product = productId || products.data?.products[0]?.id || ''
+  // No product is picked for you (section 45): choose one, or No product.
+  const product = productId
   // Open by itself while the bank is empty; then yours to open and close.
   const [shown_, setShown] = useState(open)
   useEffect(() => { if (open) setShown(true) }, [open])
@@ -202,10 +203,11 @@ export function ImportBox({ open, last, onDone }: { open: boolean; last: BankImp
       <div className="st-row" style={{ gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
         <span className="st-hint">Pain points from</span>
         <select className="st-input sm" style={{ width: 'auto' }} aria-label="Product" value={product} onChange={e => setProductId(e.target.value)}>
+          <option value="" disabled>Pick the product (required)</option>
           {(products.data?.products ?? []).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
           <option value="none">No product</option>
         </select>
-        <AsyncButton className="st-btn sm" icon={<Sheet size={13} />} disabled={!link.trim() && !csv} busyLabel="Reading..." onClick={async () => {
+        <AsyncButton className="st-btn sm" icon={<Sheet size={13} />} disabled={(!link.trim() && !csv) || !product} busyLabel="Reading..." onClick={async () => {
           try {
             const r = await api.lineBankImport({
               comments: csv ? { csv: csv.text } : { link: link.trim() },
