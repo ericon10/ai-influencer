@@ -1,0 +1,9 @@
+# The machine's model folder, mounted at /models (docs/COMFY.md).
+studio:
+  base_path: /models
+  diffusion_models: diffusion_models
+  text_encoders: text_encoders
+  vae: vae
+  clip_vision: clip_vision
+  loras: loras
+  sam2: sam2

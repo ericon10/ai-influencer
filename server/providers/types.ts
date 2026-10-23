@@ -111,6 +111,8 @@ export interface CostEstimate {
   // Why this is not a fresh live price (Higgsfield was slow, so a saved live
   // price or the price book answered). Shown with the quote and logged.
   note?: string
+  // ComfyUI (section 41): $0 API, about this many minutes on the machine.
+  minutes?: number
 }
 
 export type JobState = 'queued' | 'running' | 'succeeded' | 'failed' | 'nsfw' | 'canceled'

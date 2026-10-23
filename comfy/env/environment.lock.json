@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "comfyui": "d07dff4565ea9804277fff8cdfa0c817e08c3d44",
+  "pytorch": "2.8.0+cu128",
+  "nodes": {
+    "ComfyUI-KJNodes": "74b7f1731cfd0208ae50b9ffc55145564c25e65f",
+    "ComfyUI-segment-anything-2": "0c35fff5f382803e2310103357b5e985f5437f32",
+    "comfyui_controlnet_aux": "a587a4c1594524c1d2de5cd1a86cd868ff448e1c"
+  },
+  "models": {
+    "clip_vision/clip_vision_h.safetensors": null,
+    "diffusion_models/krea2_raw.safetensors": null,
+    "diffusion_models/krea2_turbo.safetensors": null,
+    "diffusion_models/qwen_image_edit_2511_bf16.safetensors": null,
+    "diffusion_models/wan2.2_animate_14B_bf16.safetensors": null,
+    "diffusion_models/wan2.2_i2v_high_noise_14B_fp16.safetensors": null,
+    "diffusion_models/wan2.2_i2v_low_noise_14B_fp16.safetensors": null,
+    "sam2/sam2.1_hiera_large.safetensors": null,
+    "text_encoders/krea2_text_encoder.safetensors": null,
+    "text_encoders/qwen_2.5_vl_7b_fp8_scaled.safetensors": null,
+    "text_encoders/umt5_xxl_fp16.safetensors": null,
+    "vae/krea2_vae.safetensors": null,
+    "vae/qwen_image_vae.safetensors": null,
+    "vae/wan_2.1_vae.safetensors": null,
+    "@comfy/custom_nodes/comfyui_controlnet_aux/ckpts/yzd-v/DWPose/dw-ll_ucoco_384.onnx": null,
+    "@comfy/custom_nodes/comfyui_controlnet_aux/ckpts/yzd-v/DWPose/yolox_l.onnx": null
+  }
+}

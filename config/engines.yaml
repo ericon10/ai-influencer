@@ -39,11 +39,28 @@ families:
   - id: wan-2.2-animate-replace
     label: Wan 2.2 Animate replace
     steps: [recreate_motion]
-    providers: [fal/wan-2.2-animate-replace, kie/wan-2.2-animate-replace, wavespeed/wan-2.2-animate-replace]
+    providers: [fal/wan-2.2-animate-replace, kie/wan-2.2-animate-replace, wavespeed/wan-2.2-animate-replace, comfy/wan-2.2-animate-replace]
   - id: kling-3.0-motion-control
     label: Kling 3.0 Motion Control
     steps: [recreate_motion]
     providers: [higgsfield/kling-3.0-motion-control, fal/kling-3.0-motion-control, kie/kling-3.0-motion-control]
+  # ComfyUI only (section 41): models that run on the machine.
+  - id: qwen-image-edit-2511
+    label: Qwen-Image-Edit-2511
+    steps: [still, edit]
+    providers: [comfy/qwen-image-edit-2511]
+  - id: krea-2-turbo
+    label: Krea 2 Turbo
+    steps: [still]
+    providers: [comfy/krea-2-turbo]
+  - id: wan-2.2-i2v
+    label: Wan 2.2 I2V
+    steps: [video]
+    providers: [comfy/wan-2.2-i2v]
+  - id: wan-2.2-animate-mix
+    label: Wan 2.2 Animate mix
+    steps: [recreate_motion]
+    providers: [comfy/wan-2.2-animate-mix]
 # What each provider is called on screen, and where its key is made.
 providers:
   higgsfield: { label: Higgsfield }
@@ -51,3 +68,4 @@ providers:
   fal: { label: fal }
   kie: { label: Kie.ai, keys: https://kie.ai/api-key }
   wavespeed: { label: WaveSpeed, keys: https://wavespeed.ai/accesskey }
+  comfy: { label: ComfyUI }

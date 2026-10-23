@@ -1,0 +1,25 @@
+{
+  "id": "qwen-image-edit-2511",
+  "version": 1,
+  "label": "Qwen-Image-Edit-2511",
+  "ref": "comfy/qwen-image-edit-2511",
+  "steps": ["still", "edit"],
+  "kinds": ["image", "image_edit"],
+  "family": "qwen",
+  "models": ["diffusion_models/qwen_image_edit_2511_bf16.safetensors", "text_encoders/qwen_2.5_vl_7b_fp8_scaled.safetensors", "vae/qwen_image_vae.safetensors"],
+  "lora_base": "qwen",
+  "inputs": {
+    "prompt": { "node": "10", "field": "prompt" },
+    "negative": { "node": "11", "field": "prompt" },
+    "seed": { "node": "13", "field": "seed" },
+    "width": { "node": "12", "field": "width" },
+    "height": { "node": "12", "field": "height" },
+    "batch": { "node": "12", "field": "batch_size" },
+    "refs": [{ "node": "7", "field": "image" }, { "node": "8", "field": "image" }, { "node": "9", "field": "image" }],
+    "lora": { "node": "4", "field": "lora_name", "strength_field": "strength_model", "optional": true }
+  },
+  "outputs": [{ "node": "15", "kind": "image" }],
+  "est_sec": 75,
+  "timeout_sec": 900,
+  "notes": "The character's LoRA plus up to three refs (REF-00 first). Without a LoRA the loader is bypassed; without refs it is a text-to-image run."
+}

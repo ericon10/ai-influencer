@@ -141,6 +141,13 @@
       "when": 1792714170606,
       "tag": "0019_weeks",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1792731967792,
+      "tag": "0020_comfy",
+      "breakpoints": true
     }
   ]
 }

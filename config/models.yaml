@@ -665,6 +665,57 @@ models:
     verified: false
 
   # ── Mock (free, deterministic; tests and demo mode) ──
+  # ComfyUI on a remote workstation (UX-PLAN.md section 41): the machine's
+  # agent pulls each run from the Studio's queue. `endpoint` is the
+  # workflow id in comfy/workflows. $0 API; priced in machine minutes.
+  - ref: comfy/qwen-image-edit-2511
+    label: Qwen-Image-Edit-2511 (ComfyUI)
+    kinds: [image, image_edit]
+    max_refs: 3
+    endpoint: qwen-image-edit-2511
+    input_map: comfy
+    verified: false
+    notes: On the ComfyUI machine, with the character's Qwen LoRA and up to three refs.
+  - ref: comfy/krea-2-turbo
+    label: Krea 2 Turbo (ComfyUI)
+    kinds: [image]
+    max_refs: 0
+    endpoint: krea-2-turbo
+    input_map: comfy
+    verified: false
+    notes: On the ComfyUI machine, text to image with the character's Krea 2 LoRA. License check until Eric confirms commercial use.
+  - ref: comfy/wan-2.2-i2v
+    label: Wan 2.2 I2V (ComfyUI)
+    kinds: [video]
+    max_refs: 0
+    endpoint: wan-2.2-i2v
+    input_map: comfy
+    verified: false
+    notes: On the ComfyUI machine, full-size 14B, from an approved still.
+  - ref: comfy/wan-2.2-animate-replace
+    label: Wan 2.2 Animate replace (ComfyUI)
+    kinds: [video_clone]
+    max_refs: 1
+    endpoint: wan-2.2-animate-replace
+    input_map: comfy
+    verified: false
+    notes: On the ComfyUI machine. The character takes the person's place in the clip; the clip's place stays.
+  - ref: comfy/wan-2.2-animate-mix
+    label: Wan 2.2 Animate mix (ComfyUI)
+    kinds: [video_clone]
+    max_refs: 1
+    endpoint: wan-2.2-animate-mix
+    input_map: comfy
+    verified: false
+    notes: On the ComfyUI machine. The still's place, moving like the person in the clip.
+  - ref: comfy/lora-train
+    label: LoRA training (ComfyUI machine)
+    kinds: [train_identity]
+    max_refs: 40
+    endpoint: lora-train
+    input_map: comfy
+    verified: false
+    notes: Trains a character LoRA on the machine (ai-toolkit); the file stays there.
   - ref: mock/image
     label: Mock image
     kinds: [image, image_edit, upscale]

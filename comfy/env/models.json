@@ -1,0 +1,21 @@
+{
+  "note": "Paths are under the models folder (COMFY_MODELS); @comfy/ means under the ComfyUI folder (COMFY_DIR). Every model file the workflows need, by ComfyUI folder. sha256 null means not measured yet: run `comfy-agent lock` on the machine once the files are in place, then press Use this machine's environment in Settings > ComfyUI (or commit the printed lock). Files are never downloaded at job time.",
+  "files": [
+    { "path": "diffusion_models/qwen_image_edit_2511_bf16.safetensors", "family": "qwen", "source": "https://huggingface.co/Comfy-Org/Qwen-Image-Edit_ComfyUI", "sha256": null },
+    { "path": "text_encoders/qwen_2.5_vl_7b_fp8_scaled.safetensors", "family": "qwen", "source": "https://huggingface.co/Comfy-Org/Qwen-Image_ComfyUI", "sha256": null },
+    { "path": "vae/qwen_image_vae.safetensors", "family": "qwen", "source": "https://huggingface.co/Comfy-Org/Qwen-Image_ComfyUI", "sha256": null },
+    { "path": "diffusion_models/krea2_turbo.safetensors", "family": "krea2", "source": "the machine owner's own Krea 2 Turbo file (confirm the name)", "sha256": null, "license_check": true },
+    { "path": "diffusion_models/krea2_raw.safetensors", "family": "krea2", "source": "Krea 2 Raw, the LoRA training base (confirm the name)", "sha256": null, "license_check": true },
+    { "path": "text_encoders/krea2_text_encoder.safetensors", "family": "krea2", "source": "the text encoder Krea 2 ships with (confirm the name)", "sha256": null, "license_check": true },
+    { "path": "vae/krea2_vae.safetensors", "family": "krea2", "source": "the VAE Krea 2 ships with (confirm the name)", "sha256": null, "license_check": true },
+    { "path": "diffusion_models/wan2.2_i2v_high_noise_14B_fp16.safetensors", "family": "wan", "source": "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged", "sha256": null },
+    { "path": "diffusion_models/wan2.2_i2v_low_noise_14B_fp16.safetensors", "family": "wan", "source": "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged", "sha256": null },
+    { "path": "diffusion_models/wan2.2_animate_14B_bf16.safetensors", "family": "wan", "source": "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged", "sha256": null },
+    { "path": "text_encoders/umt5_xxl_fp16.safetensors", "family": "wan", "source": "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged", "sha256": null },
+    { "path": "vae/wan_2.1_vae.safetensors", "family": "wan", "source": "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged", "sha256": null },
+    { "path": "clip_vision/clip_vision_h.safetensors", "family": "wan", "source": "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged", "sha256": null },
+    { "path": "sam2/sam2.1_hiera_large.safetensors", "family": "wan", "source": "https://huggingface.co/Kijai/sam2-safetensors", "sha256": null },
+    { "path": "@comfy/custom_nodes/comfyui_controlnet_aux/ckpts/yzd-v/DWPose/yolox_l.onnx", "family": "wan", "source": "https://huggingface.co/yzd-v/DWPose", "sha256": null },
+    { "path": "@comfy/custom_nodes/comfyui_controlnet_aux/ckpts/yzd-v/DWPose/dw-ll_ucoco_384.onnx", "family": "wan", "source": "https://huggingface.co/yzd-v/DWPose", "sha256": null }
+  ]
+}

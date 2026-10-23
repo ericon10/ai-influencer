@@ -1,0 +1,25 @@
+{
+  "id": "krea-2-turbo",
+  "version": 1,
+  "label": "Krea 2 Turbo",
+  "ref": "comfy/krea-2-turbo",
+  "steps": ["still"],
+  "kinds": ["image"],
+  "family": "krea2",
+  "license_check": true,
+  "models": ["diffusion_models/krea2_turbo.safetensors", "text_encoders/krea2_text_encoder.safetensors", "vae/krea2_vae.safetensors"],
+  "lora_base": "krea2",
+  "inputs": {
+    "prompt": { "node": "5", "field": "text" },
+    "negative": { "node": "6", "field": "text" },
+    "seed": { "node": "8", "field": "seed" },
+    "width": { "node": "7", "field": "width" },
+    "height": { "node": "7", "field": "height" },
+    "batch": { "node": "7", "field": "batch_size" },
+    "lora": { "node": "4", "field": "lora_name", "strength_field": "strength_model", "optional": true }
+  },
+  "outputs": [{ "node": "10", "kind": "image" }],
+  "est_sec": 20,
+  "timeout_sec": 600,
+  "notes": "Text to image only: the face comes from the character's LoRA trained on Krea 2 Raw. License check: not for paid posts until Eric confirms commercial use. The machine owner already runs Krea 2: replace this graph with his own (Save (API) in ComfyUI, then upload in Settings > ComfyUI > Workflows) if his loader or text encoder differ."
+}

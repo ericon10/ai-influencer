@@ -4,7 +4,7 @@
   ],
   "functions": {
     "api/studio.ts": {
-      "includeFiles": "{config/**,server/**,package.json,package-lock.json}",
+      "includeFiles": "{config/**,server/**,comfy/workflows/**,comfy/env/environment.lock.json,package.json,package-lock.json}",
       "excludeFiles": "{.data/**,.vercel/**,dist/**,dist-worker/**,fixtures/**,docs/**}"
     }
   },

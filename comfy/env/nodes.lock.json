@@ -1,0 +1,9 @@
+{
+  "comfyui": { "repo": "https://github.com/comfyanonymous/ComfyUI", "commit": "d07dff4565ea9804277fff8cdfa0c817e08c3d44" },
+  "nodes": {
+    "comfyui_controlnet_aux": { "repo": "https://github.com/Fannovel16/comfyui_controlnet_aux", "commit": "a587a4c1594524c1d2de5cd1a86cd868ff448e1c", "why": "DWPose for Wan 2.2 Animate (the clip's pose)" },
+    "ComfyUI-segment-anything-2": { "repo": "https://github.com/kijai/ComfyUI-segment-anything-2", "commit": "0c35fff5f382803e2310103357b5e985f5437f32", "why": "SAM 2 person mask for Animate replace" },
+    "ComfyUI-KJNodes": { "repo": "https://github.com/kijai/ComfyUI-KJNodes", "commit": "74b7f1731cfd0208ae50b9ffc55145564c25e65f", "why": "Mask and video helpers for Animate" }
+  },
+  "trainer": { "repo": "https://github.com/ostris/ai-toolkit", "commit": "7cc9fef46927a2737049e7d31ec99d6de2448665", "why": "Character LoRA training (Qwen-Image-Edit and Krea 2 Raw)" }
+}

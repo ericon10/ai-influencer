@@ -1,0 +1,26 @@
+{
+  "id": "wan-2.2-i2v",
+  "version": 1,
+  "label": "Wan 2.2 I2V",
+  "ref": "comfy/wan-2.2-i2v",
+  "steps": ["video"],
+  "kinds": ["video"],
+  "family": "wan",
+  "models": ["diffusion_models/wan2.2_i2v_high_noise_14B_fp16.safetensors", "diffusion_models/wan2.2_i2v_low_noise_14B_fp16.safetensors", "text_encoders/umt5_xxl_fp16.safetensors", "vae/wan_2.1_vae.safetensors"],
+  "inputs": {
+    "prompt": { "node": "7", "field": "text" },
+    "negative": { "node": "8", "field": "text" },
+    "seed": { "node": "11", "field": "noise_seed" },
+    "width": { "node": "10", "field": "width" },
+    "height": { "node": "10", "field": "height" },
+    "frames": { "node": "10", "field": "length" },
+    "fps": { "node": "14", "field": "fps" },
+    "start_image": { "node": "9", "field": "image" }
+  },
+  "outputs": [{ "node": "15", "kind": "video" }],
+  "fps": 16,
+  "max_frames": 121,
+  "est_sec": 420,
+  "timeout_sec": 2400,
+  "notes": "Full-size 14B high and low noise models, 20 steps split 10 and 10, 16 fps. Starts from an approved still; silent (the Studio strips any track)."
+}

@@ -653,3 +653,86 @@ export const bankLines = pgTable('bank_lines', {
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 }, t => [index('bank_lines_account_idx').on(t.accountId, t.likes), index('bank_lines_import_idx').on(t.accountId, t.importId)])
+
+// ── ComfyUI on a remote workstation (UX-PLAN.md section 41) ────────
+
+// The queue the machine's agent pulls from. The API and the worker enqueue
+// (idempotent on `key`: the run, the step and the attempt); the agent claims
+// a task, renews its lease with progress and reports done or failed. A lease
+// that runs out is reclaimed once as attempt 2; then the task is Failed.
+export const comfyTasks = pgTable('comfy_tasks', {
+  id: text('id').primaryKey(),
+  accountId: text('account_id').notNull().references(() => accounts.id),
+  // The Studio job this task runs (null for a LoRA training started on its
+  // own), the character and who clicked.
+  jobId: text('job_id'),
+  characterId: text('character_id'),
+  userId: text('user_id'),
+  key: text('key').notNull(),
+  // workflow | train
+  kind: text('kind').notNull(),
+  workflowId: text('workflow_id').notNull(),
+  workflowVersion: integer('workflow_version').notNull().default(1),
+  // qwen | krea2 | wan: claims prefer the family the machine has loaded.
+  family: text('family').notNull(),
+  // The API graph with the Studio's inputs bound; images are placeholders
+  // ("studio:ref0") the agent fills with the names it uploaded.
+  graph: jsonb('graph').notNull(),
+  // { slot: assetId } for every image or clip the agent fetches.
+  inputs: jsonb('inputs').notNull().default({}),
+  // The recipe log (E5): workflow, models, LoRA version, seed, prompt, refs.
+  recipe: jsonb('recipe').notNull().default({}),
+  // queued | claimed | running | done | failed | canceled
+  state: text('state').notNull().default('queued'),
+  attempt: integer('attempt').notNull().default(1),
+  batch: integer('batch').notNull().default(1),
+  leaseUntil: timestamp('lease_until', { withTimezone: true }),
+  claimedAt: timestamp('claimed_at', { withTimezone: true }),
+  startedAt: timestamp('started_at', { withTimezone: true }),
+  finishedAt: timestamp('finished_at', { withTimezone: true }),
+  timeoutSec: integer('timeout_sec').notNull().default(900),
+  progress: doublePrecision('progress').notNull().default(0),
+  // A lease token per claim: a late report from an earlier claim is refused.
+  claimToken: text('claim_token'),
+  // [{ storageKey, kind, mime, width, height, durationSec }]
+  outputs: jsonb('outputs'),
+  // A LoRA training's result: { fileName, sha256 }.
+  result: jsonb('result'),
+  error: text('error'),
+  // Why it failed: oom | lease | timeout | agent | env.
+  failReason: text('fail_reason'),
+  envHash: text('env_hash'),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+}, t => [
+  uniqueIndex('comfy_tasks_key_uq').on(t.accountId, t.key),
+  index('comfy_tasks_state_idx').on(t.accountId, t.state, t.createdAt),
+  index('comfy_tasks_job_idx').on(t.jobId),
+])
+
+// A character's LoRAs, trained on the machine. The file stays there; the
+// Studio keeps its version, trigger word, file name and checksum.
+export const comfyLoras = pgTable('comfy_loras', {
+  id: text('id').primaryKey(),
+  accountId: text('account_id').notNull().references(() => accounts.id),
+  characterId: text('character_id').notNull(),
+  // qwen | krea2
+  base: text('base').notNull(),
+  version: integer('version').notNull(),
+  trigger: text('trigger').notNull(),
+  // training | ready | failed
+  state: text('state').notNull().default('training'),
+  taskId: text('task_id'),
+  fileName: text('file_name'),
+  sha256: text('sha256'),
+  // The images it was trained on: [{ assetId, refId? }].
+  images: jsonb('images').notNull().default([]),
+  active: boolean('active').notNull().default(false),
+  steps: integer('steps').notNull().default(2000),
+  createdBy: text('created_by'),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+}, t => [
+  uniqueIndex('comfy_loras_version_uq').on(t.accountId, t.characterId, t.base, t.version),
+  index('comfy_loras_character_idx').on(t.accountId, t.characterId),
+])

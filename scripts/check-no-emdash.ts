@@ -9,7 +9,7 @@ const EM_DASH = String.fromCharCode(0x2014)
 const ROOT = process.cwd()
 
 // Studio-owned paths. Legacy files are retired, not edited (see DECISIONS.md B13).
-const SCAN = ['server', 'config', 'src/studio', 'docs/studio', 'scripts', 'fixtures', 'api/studio.ts', 'CLAUDE.md', 'SPEC.md', '.env.example', '.github']
+const SCAN = ['server', 'config', 'comfy', 'docs/COMFY.md', 'docs/DRIVE-OUTPUT.md', 'src/studio', 'docs/studio', 'scripts', 'fixtures', 'api/studio.ts', 'CLAUDE.md', 'SPEC.md', '.env.example', '.github']
 const TEXT_EXT = new Set(['.ts', '.tsx', '.js', '.mjs', '.json', '.yaml', '.yml', '.md', '.css', '.html', '.sql', '.txt', '.example', ''])
 const SKIP_DIRS = new Set(['node_modules', '.git', 'dist', '.data'])
 

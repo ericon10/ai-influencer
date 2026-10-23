@@ -1,0 +1,65 @@
+{
+  "version": 1,
+  "family": "wan",
+  "kinds": [
+    "video_clone"
+  ],
+  "steps": [
+    "recreate_motion"
+  ],
+  "models": [
+    "diffusion_models/wan2.2_animate_14B_bf16.safetensors",
+    "text_encoders/umt5_xxl_fp16.safetensors",
+    "vae/wan_2.1_vae.safetensors",
+    "clip_vision/clip_vision_h.safetensors"
+  ],
+  "inputs": {
+    "prompt": {
+      "node": "13",
+      "field": "text"
+    },
+    "negative": {
+      "node": "14",
+      "field": "text"
+    },
+    "seed": {
+      "node": "17",
+      "field": "seed"
+    },
+    "width": {
+      "node": "15",
+      "field": "width"
+    },
+    "height": {
+      "node": "15",
+      "field": "height"
+    },
+    "frames": {
+      "node": "15",
+      "field": "length"
+    },
+    "refs": [
+      {
+        "node": "5",
+        "field": "image"
+      }
+    ],
+    "clip": {
+      "node": "7",
+      "field": "file"
+    }
+  },
+  "outputs": [
+    {
+      "node": "21",
+      "kind": "video"
+    }
+  ],
+  "max_frames": 77,
+  "est_sec": 600,
+  "timeout_sec": 3000,
+  "id": "wan-2.2-animate-mix",
+  "label": "Wan 2.2 Animate mix",
+  "ref": "comfy/wan-2.2-animate-mix",
+  "notes": "Mix: the still's place and the character, moving the way the person in the clip moves (pose from the clip, no background from it)."
+}

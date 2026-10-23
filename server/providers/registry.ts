@@ -14,6 +14,7 @@ import { createApifyAdapter } from './apify.js'
 import { createGoogleAdapter } from './google.js'
 import { createKieAdapter } from './kie.js'
 import { createWavespeedAdapter } from './wavespeed.js'
+import { createComfyAdapter } from './comfy.js'
 import { createHiggsfieldAccountAdapter, type AccountBalance, type LivePriceStore } from './higgsfieldAccount.js'
 import { getSetting, putCacheSetting } from '../pipeline/settings.js'
 import { accountTokenSource, readAccountTokens } from './higgsfieldOAuth.js'
@@ -66,6 +67,8 @@ export interface RegistryOptions {
   voiceMock?: boolean
   // Other API bases for Kie.ai and WaveSpeed (the tests' fake servers).
   baseUrls?: { kie?: string; wavespeed?: string }
+  // The clock ComfyUI leases are read against (tests move it).
+  now?: () => Date
 }
 
 export function createRegistry(o: RegistryOptions): ProviderRegistry & { mockFor(accountId: string): ReturnType<typeof createMockAdapter>; mockLlm: ReturnType<typeof createMockLlm> } {
@@ -148,6 +151,9 @@ export function createRegistry(o: RegistryOptions): ProviderRegistry & { mockFor
       }
       if (o.overrides?.gen?.[p]) return o.overrides.gen[p]!
       if (p === 'mock') return mockFor(accountId)
+      // ComfyUI (section 41): no key; the machine's agent pulls from our
+      // own queue with its token.
+      if (p === 'comfy') return createComfyAdapter({ db: o.db, store: o.store, config: o.config, accountId, now: o.now })
       if (p === 'elevenlabs') {
         const key = (await readSecret(o.db, o.vault, accountId, p)) ?? (await serverKeyFor(o.db, o.serverKeys, accountId, p))
         const base = { config: o.config, store: o.store, loadAsset: (id: string) => o.loadAsset(accountId, id), fetchImpl: o.fetchImpl }

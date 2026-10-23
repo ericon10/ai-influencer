@@ -31,6 +31,9 @@ RUN npm ci --omit=dev --no-audit --no-fund && npm cache clean --force
 COPY --from=build /app/dist-worker ./dist-worker
 COPY --from=build /app/models ./models
 COPY config ./config
+# ComfyUI workflows and the environment lock (UX-PLAN.md section 41).
+COPY comfy/workflows ./comfy/workflows
+COPY comfy/env/environment.lock.json ./comfy/env/environment.lock.json
 COPY server/db/migrations ./server/db/migrations
 USER node
 CMD ["node", "--enable-source-maps", "--max-old-space-size=384", "dist-worker/worker.mjs"]

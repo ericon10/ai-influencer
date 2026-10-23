@@ -167,3 +167,11 @@ entries:
   # scraper is billed per result plus the video download; set high until
   # the first run shows the charge.
   - { provider: apify, model: tiktok-video, unit: call, price: 0.01, verified: false, source: "Apify's TikTok scraper, per result with the video kept: placeholder at $0.01 a clip until a run shows the charge." }
+  # ComfyUI on the machine (section 41): no API charge. The quote shows
+  # "$0 API, about N min on ComfyUI" from the machine's own past times.
+  - { provider: comfy, model: qwen-image-edit-2511, unit: image, price: 0, verified: true, checked: "2026-10-23", source: "Runs on the ComfyUI machine; no API charge." }
+  - { provider: comfy, model: krea-2-turbo, unit: image, price: 0, verified: true, checked: "2026-10-23", source: "Runs on the ComfyUI machine; no API charge." }
+  - { provider: comfy, model: wan-2.2-i2v, unit: second, price: 0, verified: true, checked: "2026-10-23", source: "Runs on the ComfyUI machine; no API charge." }
+  - { provider: comfy, model: wan-2.2-animate-replace, unit: second, price: 0, verified: true, checked: "2026-10-23", source: "Runs on the ComfyUI machine; no API charge." }
+  - { provider: comfy, model: wan-2.2-animate-mix, unit: second, price: 0, verified: true, checked: "2026-10-23", source: "Runs on the ComfyUI machine; no API charge." }
+  - { provider: comfy, model: lora-train, unit: call, price: 0, verified: true, checked: "2026-10-23", source: "Trains on the ComfyUI machine; no API charge." }

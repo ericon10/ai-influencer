@@ -1,3 +1,4 @@
+import { mountComfyAgent, mountComfySettings } from './comfy.js'
 import { autoPlace } from '../pipeline/facePlace.js'
 import { Hono, type Context } from 'hono'
 import { importFacelessPlan, previewFacelessPlan } from '../pipeline/facelessImport.js'
@@ -214,6 +215,9 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
     return c.redirect(`${r.returnTo ?? ''}/studio/settings?${params}`, 302)
   })
 
+  // The ComfyUI machine's agent (section 41): its own token, no sign-in.
+  mountComfyAgent(app, deps)
+
   // ── Session ──
   app.post('/auth/login', async c => {
     const body = parse(z.object({ email: z.string().email(), passphrase: z.string().min(1) }), await json(c))
@@ -236,6 +240,8 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
   })
 
   app.post('/auth/logout', async c => { await auth.logout(c); return c.json({ ok: true }) })
+
+  mountComfySettings(app, deps)
 
   app.get('/me', async c => {
     const ctx = c.get('ctx')

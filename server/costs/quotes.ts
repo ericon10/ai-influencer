@@ -58,15 +58,19 @@ export function formatCredits(credits: number): string {
   return `${n.toLocaleString('en-US')} ${n === 1 ? 'credit' : 'credits'}`
 }
 
-// Credit items show credits; everything else shows dollars.
-export function displayPrice(items: Array<{ amountMicros: number; credits?: number | null }>): string {
+// Credit items show credits; everything else shows dollars. Runs on the
+// ComfyUI machine add their minutes: "$0 API, about 4 min on ComfyUI".
+export function displayPrice(items: Array<{ amountMicros: number; credits?: number | null; minutes?: number | null }>): string {
   const credits = items.reduce((s, i) => s + (i.credits ?? 0), 0)
   const usd = items.filter(i => i.credits == null).reduce((s, i) => s + i.amountMicros, 0)
   const hasCredits = items.some(i => i.credits != null)
+  const minutes = items.reduce((s, i) => s + (i.minutes ?? 0), 0)
+  const onlyMachine = items.length > 0 && items.every(i => i.minutes != null)
   const parts: string[] = []
   if (hasCredits) parts.push(formatCredits(credits))
-  if (!hasCredits || usd > 0) parts.push(formatUsd(usd))
-  return parts.join(' + ')
+  if (!hasCredits || usd > 0) parts.push(onlyMachine && usd === 0 ? '$0 API' : formatUsd(usd))
+  const price = parts.join(' + ')
+  return minutes > 0 ? `${price}, about ${Math.round(minutes)} min on ComfyUI` : price
 }
 
 export function fingerprintItems(purpose: string, characterId: string | null, items: Array<Pick<QuoteItem, 'provider' | 'model' | 'kind' | 'request'>>): string {
@@ -92,7 +96,7 @@ export async function createQuote(deps: Deps, ctx: Ctx, input: { purpose: string
   const items = input.items.map(i => ({
     label: i.label, provider: i.provider, model: i.model, kind: i.kind,
     amountMicros: i.estimate.totalMicros, verified: i.estimate.verified, lines: i.estimate.lines, priceVersion: i.estimate.priceVersion,
-    credits: i.estimate.credits ?? null,
+    credits: i.estimate.credits ?? null, minutes: i.estimate.minutes ?? null,
   }))
   await deps.db.insert(quotes).values({
     id, accountId: ctx.accountId, userId: ctx.userId, characterId: input.characterId, purpose: input.purpose,
@@ -111,7 +115,7 @@ export async function createQuote(deps: Deps, ctx: Ctx, input: { purpose: string
     credits: items.reduce((s, i) => s + (i.credits ?? 0), 0),
     display: displayPrice(items),
     verified: input.items.every(i => i.estimate.verified),
-    items: items.map((i, k) => ({ label: i.label, model: `${i.provider}/${i.model}`, modelLabel: labels[k]!, amount: i.credits != null ? formatCredits(i.credits) : formatUsd(i.amountMicros), amountMicros: i.amountMicros, credits: i.credits, verified: i.verified })),
+    items: items.map((i, k) => ({ label: i.label, model: `${i.provider}/${i.model}`, modelLabel: labels[k]!, amount: i.credits != null ? formatCredits(i.credits) : i.minutes != null ? displayPrice([i]) : formatUsd(i.amountMicros), amountMicros: i.amountMicros, credits: i.credits, verified: i.verified })),
     models: [...new Set(labels)],
     notes: [...new Set(input.items.map(i => i.estimate.note).filter((n): n is string => !!n))],
     budget, status, expiresAt: expiresAt.toISOString(), needsConfirm: budget.needsConfirm,

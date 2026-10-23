@@ -1,0 +1,70 @@
+{
+  "version": 1,
+  "family": "wan",
+  "kinds": [
+    "video_clone"
+  ],
+  "steps": [
+    "recreate_motion"
+  ],
+  "models": [
+    "diffusion_models/wan2.2_animate_14B_bf16.safetensors",
+    "text_encoders/umt5_xxl_fp16.safetensors",
+    "vae/wan_2.1_vae.safetensors",
+    "clip_vision/clip_vision_h.safetensors",
+    "sam2/sam2.1_hiera_large.safetensors"
+  ],
+  "inputs": {
+    "prompt": {
+      "node": "13",
+      "field": "text"
+    },
+    "negative": {
+      "node": "14",
+      "field": "text"
+    },
+    "seed": {
+      "node": "17",
+      "field": "seed"
+    },
+    "width": {
+      "node": "15",
+      "field": "width"
+    },
+    "height": {
+      "node": "15",
+      "field": "height"
+    },
+    "frames": {
+      "node": "15",
+      "field": "length"
+    },
+    "refs": [
+      {
+        "node": "5",
+        "field": "image"
+      }
+    ],
+    "clip": {
+      "node": "7",
+      "field": "file"
+    },
+    "person_point": {
+      "node": "11",
+      "field": "coordinates_positive"
+    }
+  },
+  "outputs": [
+    {
+      "node": "21",
+      "kind": "video"
+    }
+  ],
+  "max_frames": 77,
+  "est_sec": 600,
+  "timeout_sec": 3000,
+  "id": "wan-2.2-animate-replace",
+  "label": "Wan 2.2 Animate replace",
+  "ref": "comfy/wan-2.2-animate-replace",
+  "notes": "Replace: the character (the picked still, REF first) takes the place of the person in the clip; the clip's place, light and motion stay. The person mask is SAM 2 from a point on the person (the Studio sends the face center of the clip's first frame). The clip's sound is put back by the Studio when asked."
+}
