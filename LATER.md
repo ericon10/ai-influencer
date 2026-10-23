@@ -18,6 +18,21 @@ bottom of the list they belong to.
 
 ## Now (launch week)
 
+### Build queue (owner, 2026-10-23), in this order
+
+Each brief is in full in `docs/studio/briefs/`; a session takes the top
+one, builds it, and crosses it off here.
+
+1. **Hover states on every button** (`2026-10-23-hover-states.md`). A
+   visible bug (New post nearly disappears on hover), small, one session.
+   First because it touches every screen the owner uses every day.
+2. **Wire Kie.ai and WaveSpeed** (`2026-10-23-kie-wavespeed.md`). The big
+   one: keys, adapters, the price book per provider, the provider picker
+   with the cheapest marked, failover that asks, the provider on every
+   output, and the step > model > provider table the ComfyUI build plugs
+   into. Higgsfield stays the default. After the hover fix, so its new
+   pickers are built on the fixed button styles.
+
 ### Paid tests queued for the owner (each needs a quote shown first)
 
 - **The capped real test (under $1, the owner's click in production):**
