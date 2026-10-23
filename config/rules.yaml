@@ -548,6 +548,28 @@ rules:
     title: 'The line carries a clear emotion'
     check: { type: behavior }
     message: 'Slide 1 or a video''s on-screen line with no clear emotion word (angry, infuriated, sad, frustrated and the like, config/content.yaml copy_lint) gets a free warning. Shown, never blocking; on every post, any product.'
+  - id: lint-line-words
+    bucket: default
+    area: copy
+    spec: "37"
+    # Owner, 2026-10-22: the 9-point line lint on Fit to voice (item 10).
+    title: 'An on-screen line is 12 words or fewer'
+    check: { type: behavior }
+    message: 'A line over the line bank''s word limit (12, config/content.yaml line_bank.max_words) gets a free warning in the 9-point line lint: it reads in about 2 seconds. Shown, never blocking.'
+  - id: lint-line-detail
+    bucket: default
+    area: copy
+    spec: "37"
+    title: 'An on-screen line carries one specific detail'
+    check: { type: behavior }
+    message: 'A line with no number, time, day, amount or quoted words gets a free warning in the 9-point line lint: keep the original truth and detail. Shown, never blocking.'
+  - id: lint-line-tag
+    bucket: default
+    area: copy
+    spec: "37"
+    title: 'No hashtag or product name in an on-screen line'
+    check: { type: behavior }
+    message: 'A line with a hashtag or the post''s product name gets a free warning in the 9-point line lint: hashtags go in the caption, the product never in the line. Shown, never blocking.'
   - id: structure-repeat
     bucket: default
     area: copy

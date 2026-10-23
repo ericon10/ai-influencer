@@ -1,7 +1,9 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { and, asc, desc, eq, inArray, isNull, sql } from 'drizzle-orm'
-import { contentItems, hookVariants, hooks, products, socialAccounts } from '../db/schema.js'
+import { bankLines, contentItems, hookVariants, hooks, products, socialAccounts } from '../db/schema.js'
+import { kindOf } from './faceless.js'
+import { renameInManifests } from './drive.js'
 import type { Ctx, Deps } from '../context.js'
 import { AppError, notFound } from '../lib/errors.js'
 import { newId } from '../lib/ids.js'
@@ -279,7 +281,9 @@ export async function scoreboard(deps: Deps, ctx: Ctx) {
     .from(contentItems).where(and(eq(contentItems.accountId, ctx.accountId), isNull(contentItems.archivedAt)))
     .groupBy(contentItems.accountTag, contentItems.characterId, contentItems.status, contentItems.kind)
   const tags = new Set<string>([...saved.map(s => s.tag), ...posts.map(p => p.tag).filter(Boolean)])
-  const names = new Map((await listCharacters(deps, ctx)).map(c => [c.id, c.name]))
+  const chars = await listCharacters(deps, ctx)
+  const names = new Map(chars.map(c => [c.id, c.name]))
+  const kinds = new Map(chars.map(c => [c.id, kindOf(c)]))
   const lastCodes = new Map<string, string | null>()
   for (const tag of tags) lastCodes.set(tag, codeBefore(await placedPosts(deps, ctx, tag), null))
   const rows = [...tags].map(tag => {
@@ -294,8 +298,16 @@ export async function scoreboard(deps: Deps, ctx: Ctx) {
     // The playbook (section 28): the account's own primary and backup, else
     // the fit table's for its tag or its character; and its last code.
     const fit = fitFor(deps, [tag, characterId ? names.get(characterId) : null])
+    // Weeks (UX-PLAN.md section 37): the phone, the platform, the slots a
+    // day and the life/job blend (the life %), each a default when unset.
+    const characterName = characterId ? names.get(characterId) ?? '' : ''
+    const wk = deps.config.pipeline.content.weeks
+    const blendDefault = Object.entries(wk.blend_defaults).find(([n]) => n.toLowerCase() === characterName.toLowerCase())?.[1] ?? wk.blend_fallback
     return {
       tag, characterId, productId: s?.productId || null, link: s?.link ?? '', code: s?.code ?? '', signups, views: s?.views ?? null, notes: s?.notes ?? '',
+      characterName, kind: characterId ? kinds.get(characterId) ?? 'person' : null,
+      deviceId: s?.deviceId ?? '', platform: s?.platform || platformOf(tag), slotsPerDay: s?.slotsPerDay ?? wk.slots_per_day, slotsSet: s?.slotsPerDay != null,
+      lifeShare: s?.lifeShare ?? blendDefault, lifeShareSet: s?.lifeShare != null, saved: !!s,
       primary: s?.primaryCode ?? fit.primary, backup: s?.backupCode ?? fit.backup, structuresSet: !!(s?.primaryCode || s?.backupCode), lastCode: lastCodes.get(tag) ?? null,
       posts: made, exported: ready, perPost: ready ? Math.round((signups / ready) * 100) / 100 : null, updatedAt: s?.updatedAt.toISOString() ?? null,
     }
@@ -306,8 +318,15 @@ export async function scoreboard(deps: Deps, ctx: Ctx) {
 }
 
 const cleanTag = (s: string) => s.trim().replace(/^@+/, '').replace(/\s+/g, ' ').slice(0, 60)
+// A tag's platform by its words (callie_ig_01 is Instagram), a default.
+export function platformOf(tag: string): string {
+  const t = tag.toLowerCase()
+  if (/(^|[._-])(ig|insta|instagram|reels?)([._-]|\d|$)/.test(t)) return 'instagram'
+  if (/(^|[._-])(yt|youtube|shorts)([._-]|\d|$)/.test(t)) return 'youtube'
+  return 'tiktok'
+}
 
-export async function saveSocialAccount(deps: Deps, ctx: Ctx, rawTag: string, patch: { link?: string; code?: string; signups?: number; views?: number | null; characterId?: string | null; productId?: string | null; notes?: string; primaryCode?: string | null; backupCode?: string | null }) {
+export async function saveSocialAccount(deps: Deps, ctx: Ctx, rawTag: string, patch: { link?: string; code?: string; signups?: number; views?: number | null; characterId?: string | null; productId?: string | null; notes?: string; primaryCode?: string | null; backupCode?: string | null; deviceId?: string; platform?: string; slotsPerDay?: number | null; lifeShare?: number | null }) {
   const tag = cleanTag(rawTag)
   if (!tag) throw new AppError('bad_request', 'Name the account first.')
   if (patch.characterId) await getCharacter(deps, ctx, patch.characterId)
@@ -325,11 +344,37 @@ export async function saveSocialAccount(deps: Deps, ctx: Ctx, rawTag: string, pa
     notes: patch.notes !== undefined ? patch.notes.slice(0, 400) : cur?.notes ?? '',
     primaryCode: patch.primaryCode !== undefined ? patch.primaryCode : cur?.primaryCode ?? null,
     backupCode: patch.backupCode !== undefined ? patch.backupCode : cur?.backupCode ?? null,
+    deviceId: patch.deviceId !== undefined ? patch.deviceId.trim().slice(0, 60) : cur?.deviceId ?? '',
+    platform: patch.platform !== undefined ? patch.platform.trim().toLowerCase().slice(0, 20) : cur?.platform ?? '',
+    slotsPerDay: patch.slotsPerDay !== undefined ? (patch.slotsPerDay == null ? null : Math.max(1, Math.min(24, Math.round(patch.slotsPerDay)))) : cur?.slotsPerDay ?? null,
+    lifeShare: patch.lifeShare !== undefined ? (patch.lifeShare == null ? null : Math.max(0, Math.min(100, Math.round(patch.lifeShare)))) : cur?.lifeShare ?? null,
     updatedBy: ctx.userId, updatedAt: deps.clock.now(),
   }
   if (cur) await deps.db.update(socialAccounts).set(values).where(eq(socialAccounts.id, cur.id))
   else await deps.db.insert(socialAccounts).values({ id: newId('soc'), accountId: ctx.accountId, tag, ...values })
   return (await scoreboard(deps, ctx)).accounts.find(a => a.tag === tag)!
+}
+
+// Rename an account (owner, 2026-10-22, item 3): every post, bank line and
+// Drive manifest row that carries the old tag follows. A name already in use
+// is refused (merge them by hand).
+export async function renameSocialAccount(deps: Deps, ctx: Ctx, rawFrom: string, rawTo: string) {
+  const from = cleanTag(rawFrom), to = cleanTag(rawTo)
+  if (!from || !to) throw new AppError('bad_request', 'Name the account first.')
+  if (from === to) return (await scoreboard(deps, ctx)).accounts.find(a => a.tag === to)!
+  const board = await scoreboard(deps, ctx)
+  if (!board.accounts.some(a => a.tag === from)) throw new AppError('not_found', `There is no account ${from}.`)
+  if (board.accounts.some(a => a.tag.toLowerCase() === to.toLowerCase() && a.tag !== from)) throw new AppError('bad_request', `${to} is already an account. Pick another name.`)
+  const now = deps.clock.now()
+  await deps.db.transaction(async tx => {
+    const [cur] = await tx.select().from(socialAccounts).where(and(eq(socialAccounts.accountId, ctx.accountId), eq(socialAccounts.tag, from)))
+    if (cur) await tx.update(socialAccounts).set({ tag: to, updatedBy: ctx.userId, updatedAt: now }).where(eq(socialAccounts.id, cur.id))
+    else await tx.insert(socialAccounts).values({ id: newId('soc'), accountId: ctx.accountId, tag: to, updatedBy: ctx.userId })
+    await tx.update(contentItems).set({ accountTag: to }).where(and(eq(contentItems.accountId, ctx.accountId), eq(contentItems.accountTag, from)))
+    await tx.update(bankLines).set({ usedAccountTag: to }).where(and(eq(bankLines.accountId, ctx.accountId), eq(bankLines.usedAccountTag, from)))
+  })
+  await renameInManifests(deps, ctx, from, to)
+  return (await scoreboard(deps, ctx)).accounts.find(a => a.tag === to)!
 }
 
 let registered = false

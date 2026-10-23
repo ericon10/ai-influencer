@@ -56,6 +56,9 @@ const DEFAULTS: Record<string, LlmResponder> = {
   line_bank_writer: req => req.meta?.mockLines ?? { lines: [] },
   line_bank_reviewer: req => req.meta?.mockReview ?? { reviews: [] },
   line_bank_voice: req => req.meta?.mockVoice ?? { results: [] },
+  // Weeks (UX-PLAN section 37): Fit to voice and Tag the bank.
+  week_fit: req => req.meta?.mockVoice ?? { results: [] },
+  line_bank_retag: req => req.meta?.mockRetag ?? { tags: [] },
   clone_caption: req => ({ caption: (req.meta?.mockCaption as string | undefined) ?? 'when the drop finally hits' }),
   clone_outfit: () => ({ outfit: 'black ribbed tank top with thin straps, going-out look' }),
   clone_traits: () => ({ traits: 'dark brown hair, brown eyes, a nose ring, winged liner', keep: ['a marble kitchen counter with flowers', 'warm ceiling light', 'handheld phone at chest height', 'one hand on the counter'], outfit: 'dark green ribbed tank top with thin straps, fitted at the waist, going-out look', motion: 'she looks into the lens with a skeptical squint, turns to glance back over her shoulder, then turns back with a slight head tilt' }),

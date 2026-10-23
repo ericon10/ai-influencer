@@ -39,6 +39,11 @@ const schema = z.object({
   // Worker loop: "poll" checks every second (local dev); "wake" sleeps when
   // nothing is queued until the API wakes it, so the database can suspend.
   STUDIO_WORKER_IDLE: z.enum(['poll', 'wake']).default('poll'),
+  // Google's API and sign-in addresses (Drive, UX-PLAN section 37). Only the
+  // browser tests change them, to a fake Google on localhost.
+  GOOGLE_API_BASE: z.string().optional().default('https://www.googleapis.com'),
+  GOOGLE_OAUTH_BASE: z.string().optional().default('https://oauth2.googleapis.com'),
+  GOOGLE_ACCOUNTS_BASE: z.string().optional().default('https://accounts.google.com'),
 })
 
 export type Env = z.infer<typeof schema> & { isProduction: boolean }

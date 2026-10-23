@@ -182,6 +182,9 @@ const templatesSchema = z.object({
   line_bank_writer: z.object({ system: z.string(), prompt: z.string() }),
   line_bank_reviewer: z.object({ system: z.string(), prompt: z.string() }),
   line_bank_voice: z.object({ system: z.string(), prompt: z.string() }),
+  // Weeks (UX-PLAN section 37): Fit to voice, and Tag the bank (life or job).
+  week_fit: z.object({ system: z.string(), prompt: z.string() }),
+  line_bank_retag: z.object({ system: z.string(), prompt: z.string() }),
   sidestep_slideshow_draft: z.object({ system: z.string(), prompt: z.string() }),
   sidestep_playbook_menu: z.string(),
   sidestep_hook_standard: z.string(),
@@ -371,6 +374,18 @@ const contentSchema = z.object({
     english_words: z.array(z.string()).min(1),
     first_person_words: z.array(z.string()).default([]),
   }),
+  // Weeks (UX-PLAN section 37): the fill rules, blends and Drive layout.
+  weeks: z.object({
+    rules: z.object({ pain_window: z.number().int().min(0).max(50).default(7), max_run: z.number().int().min(1).max(10).default(2) }).default({ pain_window: 7, max_run: 2 }),
+    blend_defaults: z.record(z.string(), z.number().min(0).max(100)).default({}),
+    blend_fallback: z.number().min(0).max(100).default(50),
+    slots_per_day: z.number().int().min(1).max(24).default(3),
+    platforms: z.array(z.string()).min(1).default(['tiktok', 'instagram', 'youtube']),
+    near_duplicate: z.number().min(0.5).max(1).default(0.8),
+    ai_label: z.string().default('AI-generated'),
+    settings: z.array(z.string()).default([]),
+    drive: z.object({ week_folder: z.string().default('week of {date}'), manifest: z.string().default('manifest {date}') }).default({ week_folder: 'week of {date}', manifest: 'manifest {date}' }),
+  }).prefault({}),
   // The language lint's word lists (section 28; the checks are rules), for
   // the writing standards with lint on.
   copy_lint: z.object({ values: z.array(z.string()), hype: z.array(z.string()), products: z.array(z.string()), max_hashtags: z.number().int().min(0).max(30), hook_max_words: z.number().int().min(4).max(40).default(22), hook_labels: z.array(z.string()).default([]), job_words: z.array(z.string()).default([]), ending_never: z.array(z.string()).default([]), setup_openers: z.array(z.string()).optional(), emotion_words: z.array(z.string()).optional() })

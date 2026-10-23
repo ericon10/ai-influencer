@@ -1086,7 +1086,7 @@ async function onSlideshowVariations(deps: Deps, ctx: Ctx, job: JobRow, out: Job
       shots: order.map(from => list[from]?.shot ?? ''),
       people: order.map(from => spec.people[from] ?? ''),
       specials: order.map(from => list[from]?.special ?? null),
-      stillIds: [], textPos: [], hookIdeas: [], hookReview: null, review: null, batchHooks: [], results: null, posting: null,
+      stillIds: [], textPos: [], hookIdeas: [], hookReview: null, review: null, batchHooks: [], results: null, posting: null, week: null,
       // The variation's own alt hook is the source's hook (one tap swaps back).
       plan: { ...spec.plan, rowId: '', planId: '', altHook: spec.hook },
       caption, hashtags: tags(v.hashtags, cfgOf(deps).hashtags[1]),
@@ -1169,7 +1169,7 @@ async function onSlideDraft(deps: Deps, ctx: Ctx, job: JobRow, out: JobOutcome):
   // A batch row: its own slideshow, the batch's scene and settings.
   const parentSpec = parse(anchor)
   const id = batchChildId(job.id)
-  const base: SlideshowSpec = { ...parentSpec, hook: '', slides: [], stillIds: [], shots: [], specials: [], textPos: [], people: [], hookIdeas: [], hookReview: null, batchHooks: [], caption: '', ctaLine: '', hashtags: [], review: 'pending', results: null, posting: null }
+  const base: SlideshowSpec = { ...parentSpec, hook: '', slides: [], stillIds: [], shots: [], specials: [], textPos: [], people: [], hookIdeas: [], hookReview: null, batchHooks: [], caption: '', ctaLine: '', hashtags: [], review: 'pending', results: null, posting: null, week: null }
   const spec = { ...base, ...draftPatch(deps, base, d, { hook, pattern: meta.pattern ?? null, n: meta.n ?? parentSpec.slideCount, endings: isProductPost(base) ? productEndings(deps, std) : [] }), review: 'pending' as const }
   await deps.db.insert(contentItems).values({
     id, accountId: ctx.accountId, characterId: anchor.characterId, kind: 'slideshow', title: '', idea: hook, productId: anchor.productId,

@@ -8,7 +8,8 @@ import { switchesReader } from './rules.js'
 // account and per character (Settings > Rules). The browser runs the checks
 // as you type with these; the server runs the same ones on the plan import.
 
-export const LINT_SWITCH_IDS = [...LINT_RULE_IDS, 'structure-repeat'] as const
+// The 9-point line lint's own three (UX-PLAN.md section 37, item 10).
+export const LINT_SWITCH_IDS = [...LINT_RULE_IDS, 'structure-repeat', 'lint-line-words', 'lint-line-detail', 'lint-line-tag'] as const
 
 export function lintLists(deps: Deps): LintLists {
   const cl = deps.config.pipeline.content.copy_lint

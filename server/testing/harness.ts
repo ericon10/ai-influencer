@@ -36,7 +36,7 @@ export interface Harness {
   newAccount(name?: string): Promise<Ctx>
 }
 
-export async function createHarness(opts: Partial<Pick<RegistryOptions, 'mockScenario' | 'mockPollsUntilDone' | 'mockLlmResponders' | 'mockTransform' | 'overrides' | 'fetchImpl'>> & { publicUrl?: string; faces?: FaceMatcher } = {}): Promise<Harness> {
+export async function createHarness(opts: Partial<Pick<RegistryOptions, 'mockScenario' | 'mockPollsUntilDone' | 'mockLlmResponders' | 'mockTransform' | 'overrides' | 'fetchImpl'>> & { publicUrl?: string; faces?: FaceMatcher; env?: Record<string, string> } = {}): Promise<Harness> {
   const handle = await openDb({ memory: true })
   let now = new Date('2026-10-12T12:00:00Z')
   const clock = { now: () => new Date(now), advance: (ms: number) => { now = new Date(now.getTime() + ms) }, set: (d: Date) => { now = d } }
@@ -48,6 +48,7 @@ export async function createHarness(opts: Partial<Pick<RegistryOptions, 'mockSce
     STUDIO_MASTER_KEYS: `t1:${randomBytes(32).toString('base64')}`,
     STUDIO_SESSION_SECRET: randomBytes(32).toString('base64'),
     STUDIO_PUBLIC_URL: opts.publicUrl ?? '',
+    ...(opts.env ?? {}),
   })
   const depsRef: { current?: Deps } = {}
   const registry = createRegistry({

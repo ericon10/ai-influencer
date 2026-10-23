@@ -55,6 +55,12 @@ export async function importCharacter(deps: Deps, ctx: Ctx, markdown: string, op
   const checkShots = await attachCheckImages(deps, ctx, characterId, opts.checks ?? [])
   const sheetModel = data.preferredModels.sheet
   if (sheetModel && !opts.characterId) await setCharacterFields(deps, ctx, characterId, { sheetLock: { model: sheetModel, quality: deps.config.pipeline.sheet.settings.quality, resolution: deps.config.pipeline.sheet.settings.resolution } })
+  // A half-built character finished by its file (owner, 2026-10-22, UX-PLAN
+  // section 37, item 20): the setup steps are skipped, as for a new import.
+  if (opts.characterId) {
+    const row = await getCharacter(deps, ctx, characterId)
+    if (row.stage < 5) await setCharacterFields(deps, ctx, characterId, { stage: 5, ...(sheetModel && !row.sheetLock ? { sheetLock: { model: sheetModel, quality: deps.config.pipeline.sheet.settings.quality, resolution: deps.config.pipeline.sheet.settings.resolution } } : {}) })
+  }
   return { characterId, result, importedShots, unchangedShots, checkShots }
 }
 

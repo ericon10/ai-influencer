@@ -23,6 +23,8 @@ import { registerRecreate } from './recreate.js'
 import { registerMassRecreate } from './massRecreate.js'
 import { registerPlatforms } from './platforms.js'
 import { registerLineBank } from './lineBank.js'
+import { registerWeeks } from './weeks.js'
+import { registerDrive } from './drive.js'
 import { registerOpenReel } from './openreel.js'
 import { registerChain } from './chain.js'
 import { registerSounds } from './sounds.js'
@@ -221,6 +223,8 @@ export function registerPipelineHooks(): void {
   registerSlideshow()
   registerFaceless()
   registerPostingDay()
+  registerWeeks()
+  registerDrive()
   registerCloseup()
   registerStorage()
 }

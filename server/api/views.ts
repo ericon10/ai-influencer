@@ -28,6 +28,15 @@ import { comboPreview, stillBasis } from '../pipeline/sceneActions.js'
 
 // Response shapes for the UI. Plain data only; no secrets, no internals.
 
+// The step a character is at: its own, or past it when its sheet says so
+// (item 20: Solei had all 12 refs approved and still opened at
+// Inspiration). A complete sheet is set up; an approved REF-00 has a face.
+export function effectiveStage(stage: number, progress: { complete: boolean }, ref00Approved: boolean): number {
+  if (progress.complete) return Math.max(stage, 5)
+  if (ref00Approved) return Math.max(stage, 4)
+  return stage
+}
+
 export async function characterSummary(deps: Deps, ctx: Ctx, row: CharacterRow) {
   const state = await sheetState(deps, ctx, row.id)
   const ref00 = state.refs.find(r => r.refId === 'REF-00')
@@ -38,7 +47,7 @@ export async function characterSummary(deps: Deps, ctx: Ctx, row: CharacterRow) 
   }
   const costs = await characterCosts(deps, ctx, row.id)
   return {
-    id: row.id, name: row.name, stage: row.stage, status: row.status, card: row.card,
+    id: row.id, name: row.name, stage: effectiveStage(row.stage, state.progress, !!ref00?.approvedCandidateId), status: row.status, card: row.card,
     // Person or faceless (section 35, item 4): a faceless card is labeled so.
     kind: kindOf(row),
     portraitAssetId: ref00Asset, progress: state.progress, spent: costs.spent, updatedAt: row.updatedAt.toISOString(),
@@ -71,7 +80,7 @@ export async function characterView(deps: Deps, ctx: Ctx, id: string) {
     .where(and(eq(jobs.accountId, ctx.accountId), eq(jobs.characterId, id), eq(jobs.purpose, 'card_update'), eq(jobs.status, 'completed')))
     .orderBy(desc(jobs.completedAt)).limit(1)
   return {
-    id: row.id, name: row.name, slug: row.slug, stage: row.stage, status: row.status, revision: row.revision,
+    id: row.id, name: row.name, slug: row.slug, stage: effectiveStage(row.stage, state.progress, !!state.refs.find(r => r.refId === 'REF-00')?.approvedCandidateId), status: row.status, revision: row.revision,
     kind: kindOf(row), faceless: kindOf(row) === 'faceless' ? facelessOf(row) : null,
     buildRefs: buildRefsOn(row),
     // Kept sections are shown hard-wrapped, like prompts.

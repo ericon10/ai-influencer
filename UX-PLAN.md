@@ -1690,3 +1690,73 @@ in `server/pipeline/lineBank.ts` (a `bank_lines` table and a
   character, Import a character file, Edit card, Voice, Delete character,
   a price's Details) at desktop and phone width and checks the padding,
   that left and right match, and that nothing sticks out.
+
+## 37. Weeks: the bulk planner, and finished posts out to Google Drive (owner, 2026-10-22, night)
+
+Goal: Eric and Claude plan a character's week in chat; Claude writes a plan
+CSV to `docs/PLAN-CSV-SPEC.md`; the Studio fills it, makes about 100 posts
+at about 85% ready, Eric reviews them, and the finished posts land in
+Google Drive for his posting software. One flow, one page. Same standing
+rules as section 35 (R1 to R5); defaults, never locks; no new paid
+provider.
+
+Applies to: every character (person or faceless), every account and every
+product (rule two). The fill rules, the blends, the line lint and the
+Drive layout are data (`config/content.yaml`, `weeks`), never code paths
+for one character. Callie, Dani, Solei and Doug only appear as the
+default blends, which the owner edits on the Accounts page.
+
+**Navigation (the owner's call, this build: it updates section 2 and rule
+R5).** The sidebar is: New post, then **Characters, Weeks, Posts, Line
+bank, Library, Accounts, Settings**, then Guide. Posts stays home
+(`/studio`). Weeks (`/studio/weeks`) replaces the Launch plan card on Posts
+home: its import, its Replace or Add rule, its queue of ten and its daily
+cap logic move there unchanged. The line bank gets its own page
+(`/studio/line-bank`); the drawer in the Idea and Caption steps stays.
+Accounts (`/studio/accounts`) replaces the Accounts card on Posts home.
+Everything that makes one post still happens in the post workspace and
+its drawers (R5): a cell on the Weeks grid opens that post.
+
+| # | Piece | Where | How it works | Clicks |
+|---|---|---|---|---|
+| 1 | Sidebar | Every page | Characters, Weeks, Posts, Line bank, Library, Accounts, Settings (and Guide). Posts home loses the Launch plan and Accounts cards; Import on Posts home sends a plan CSV to Weeks | 1 |
+| 2 | Weeks grid | Weeks | Accounts down, the 7 days of the week across (Monday first), each account's slots in its cells. A cell shows the slot, the post type, the first words of its line and its state (no line, flagged, ready to make, making, made, approved, killed, in Drive). The week picker lists every week with plan posts. Click a cell: the post opens in the normal workspace, with its drawers. A row on a phone scrolls inside its card (3.11) | 1 |
+| 2b | The step bar | Top of Weeks | **Import > Fill > Check > Make > Review > Send to Drive**. The current step (the first one with work left) is lit with its one main button; any step can be opened. Each step's panel ends on a line that names the next step | 0 |
+| 3 | Accounts page | Accounts | One row per account: Account, Device ID, character (person or faceless, shown), platform (TikTok, Instagram, YouTube), slots per day, life/job blend (life %; defaults by character name: Callie 70/30, Dani 80/20, Solei 90/10, Doug 0/100; else 50/50; editable, a default), product, tracked link, promo code, signups. Placeholders are fine (DEVICE-01, callie_ig_01). **Rename** an account: every post, bank line, Drive row and plan row that carries it follows | 1 per edit |
+| 4 | The plan CSV spec | `docs/PLAN-CSV-SPEC.md`; Weeks: **Download template**, **Read the spec** | Every column, required or optional, allowed values, one example row per post type (slideshow, clip, photo, faceless). Required: row_id, account, date, slot. The template is made from the same column list the reader uses (`WEEK_COLUMNS`), and a test fails if the doc and the list disagree | 1 |
+| 5 | Import | Weeks > Import | Upload or paste; Preview (free) by account and day, each row's errors and notes; tick rows (all ticked); rows whose row_id matches posts already made ask **Replace them** or **Add as new posts**, never silent (0b). Rows land as drafts in the grid. The last line names the next step ("98 drafts made. Next: Fill 61 empty slots, free") | 2 to 3 |
+| 6 | Line bank fields | Line bank page | Every line: text, source (comment, caption, transcript, inventory, competitor, claude), source likes, pain, emotion (infuriated, angry, sad, crying, frustrated), format, voice fit (first-person, secondhand, both), life or job, used on (account, date). **Tag the bank** (priced, one Sonnet call per 30 lines, the price on the button): the lines that passed get life or job, and their pain, emotion, format and voice fit checked again | 1 |
+| 7 | Import lines | Line bank page | A CSV with those columns (text required; the rest optional, read by name). Lines land written and passed (they were written by people or by Claude in chat); near-matches of a line already in the bank or in the same file (same words after case and punctuation, or 80% of the words shared) are dropped and counted | 2 |
+| 8 | Filters, download | Line bank page | Pain, emotion, format, voice fit, life or job, unused (chips); Download as CSV (the shown lines, every field) | 1 per filter |
+| 9 | Fill empty slots | Weeks > Fill | Free and random per slot, under the rules: (a) no pain repeats within that account's last 7 posts; (b) a line is never used on two accounts, ever; (c) emotion and format rotate, never 3 of the same in a row on an account; (d) voice fit matches (first-person characters get first-person or both; the others secondhand or both, unless the row's voice_fit says); (e) the account's blend sets each empty slot to life or job (a row's life_or_job wins); a life slot with no life line left stays empty and is flagged; never a job line in a life slot. The draw shows before anything is saved: each slot with its line, pain, emotion and format, **Redraw** per slot or **Redraw all**, **Lock** per slot (a locked slot keeps its line on every redraw), then **Save the draw** | 2+ |
+| 10 | Fit to voice | Weeks > Fill, after a saved draw | Priced (Sonnet, one call per character, the price on the button): each drawn line rewritten in the character's voice card and fitted to its row's story_beat, keeping the original truth and detail (numbers, times, the petty reason), starting at 70 (the first words are the hit). Shows before and after with the 9-point line lint on each; **Use these** applies only after Eric's OK (per line or all) | 2 |
+| 11 | The line drives the visual | Weeks > Fill (on Save the draw, free) | Each filled post with no scene gets one drafted by code: a faceless post a place from its character's place bank (words of the line and the story beat first, else the least used place), its motion line as the video prompt and a music bed from the sound bank; a person post its story beat with the character's own settings as the scene, a video prompt from the line, and a sound suggestion. Never an empty Video step; every field stays editable | 0 |
+| 12 | Check | Weeks > Check | Free, before money: a person post with no outfit, no line, no scene, a line outside the product's claims sheet (SideStep's rules, on SideStep posts only), a life slot with a job line, the same line on two accounts. Bad rows are marked in the grid with the reason; the rest can run | 1 |
+| 13 | Make the week | Weeks > Make | One total price, one click: stills first, then the video where the row asks (a clip, a faceless post, a row with a video_prompt), each video chained to its own still (it starts when that still lands, on the same quote). Ten posts at a time, each group checked against the daily cap when its turn comes; a group over the cap waits and goes on after midnight UTC (the cap-resume cron). Progress is one line per post | 1 |
+| 14 | Review | Weeks > Review | A grid of finished posts with **Approve**, **Kill** and **Redo** (priced, the redo's price on it). Keyboard: A, K, R, arrows. "84 of 100 approved" on top. Approve is Approve for posting (section 33); every keep or kill is logged (Settings > Rules, Your calls on posts) | 1 per post |
+| 15 | Google Drive | Settings > General > Google Drive | **Connect Google Drive** (Google's own sign-in, the drive.file scope: the Studio sees only the folders and files it made), then **pick a root folder** (make one, or pick one the Studio made). The OAuth client is Eric's own (Google Cloud, the same project as his AI Studio key), its ID and secret pasted in Settings > Provider keys and sealed in the vault | 2 |
+| 16 | Send to Drive | Weeks > Send to Drive | Free, on the worker: approved posts to `ROOT / CHARACTER / week of YYYY-MM-DD /`, files named `date_slot_account_rowid.mp4` (`.jpg` a photo, `.zip` a slideshow), plus a manifest Google Sheet and a CSV in the same folder, one row per post: Device ID, Account (first two), file_name, caption, hashtags, date, slot, sound_name, ad_label. Sending again replaces the same files and rows, never duplicates. Each caption carries the AI label line (the character file's disclosure; the export's rule) | 1 |
+| 17 | Sound | The editor's Add media, the faceless Sound drawer | Any uploaded mp3 (music, ambience, voiceover clips, voice lines) can go on a post: every sound is in the editor's media, and the faceless Sound drawer has Upload. No gate | 1 |
+| 18 | Places | A faceless character's file | Every place carries a motion line (the video prompt) and, when it has one, the Higgsfield still it was made from (`still_job_id`, pulled free when a post uses it). A place with no motion gets one drafted by code from its line. **Import places (CSV)**: place_id, scene, motion, still_job_id. Doug's 100 places from `doug-places.csv` | 1 |
+| 19 | Line Engine fields | The plan CSV | lane, line_format, feeling, topic ride along on the post (its Plan line, post.json) | 0 |
+| 20 | Finish a half-built character | Any character's page | **Import a character file** (the file plus its REF images) finishes it: the setup steps are skipped and the character opens at its sheet or file. A character whose sheet is complete opens there whatever step it was left on (Solei was stuck at Inspiration with all 12 refs approved) | 2 |
+| 21 | WaveSpeed and Kie.ai | The report only | Research: which models each offers, real prices, reference image support. Not wired in | 0 |
+
+Where each part lives: the pure parts in `server/core/weeks.ts` (the
+columns, the reader, the checks, the draw, the scene draft, the 9-point
+line lint), storage and jobs in `server/pipeline/weeks.ts` and
+`server/pipeline/drive.ts` (Drive), the page in `src/studio/pages/Weeks.tsx`,
+the line bank page in `src/studio/pages/LineBankPage.tsx`, the accounts page
+in `src/studio/pages/Accounts.tsx`.
+
+**The 9-point line lint** (free, warnings only, each a default in Settings >
+Rules): (1) the hit in the first words, no setup opening; (2) a clear
+emotion; (3) 12 words or fewer; (4) one specific detail (a number, a time,
+a day, an amount or a named thing); (5) no long dashes; (6) not opening on
+"You"; (7) no hype words; (8) no hashtag or product name on screen; (9) no
+should, must or need to aimed at the viewer.
+
+Every paid step shows its price and model and waits for the click: Tag the
+bank, Fit to voice, Make the week, Redo. Free and saying so: Import,
+Preview, Fill and its draws, the scene drafts, Check, Review's Approve and
+Kill, Send to Drive. Everything runs on the API path as well as the plan.

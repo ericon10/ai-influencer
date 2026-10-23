@@ -622,6 +622,30 @@ export async function buildSceneVideo(deps: Deps, ctx: Ctx, row: CharacterRow, i
   }
 }
 
+// A take chained to the still made in the same run (Make the week, UX-PLAN.md
+// section 37): the same prompt as Video from the still, on the account's
+// video model, waiting for its parent still and starting from it (rule R3:
+// nothing limits its shots).
+export async function buildChainedSceneVideo(deps: Deps, ctx: Ctx, row: CharacterRow, input: { sceneId: string; motion: string; durationSec?: number; aspect?: string }): Promise<JobSpec> {
+  const scene = await getScene(deps, ctx, input.sceneId)
+  const { templates: t, scenes: sc, rules } = deps.config.pipeline
+  const v = sc.video
+  const sw = await ruleSwitches(deps, ctx, row.id)
+  const model = await videoModel(deps, ctx)
+  const picked = v.models.find(m => m.ref === model) ?? v.models[0]!
+  const run = await runModel(deps, ctx, picked.ref, 'video')
+  const motion = input.motion.trim().replace(/[.\s]+$/, '')
+  if (motion.length < 3) throw new AppError('invalid_request', 'Say what happens in the video.')
+  const ch = toData(row)
+  const prompt = assembleVideoPrompt(t, `${motion}.`, { directions: '', audio: false, realism: ch.realism?.block, skin: skinFor(sc, sceneFields(deps, scene).framing) })
+  const request = {
+    kind: 'video', model: run.model, modelRef: picked.ref, prompt, aspect: input.aspect ?? '9:16', resolution: picked.resolution, durationSec: input.durationSec ?? v.duration, audio: false,
+    ...(run.billing ? { billing: run.billing } : {}), chainStart: true,
+  } as GenRequest
+  lintOrThrow(lintPrompt(rules, prompt, { stage: 'video', kind: 'video', request: { ...request, model: picked.ref }, switches: sw }), 'Video')
+  return { type: 'gen', stage: 'video', purpose: `scene_video:${scene.id}:chain`, label: 'Video take (from its still)', request }
+}
+
 // The price of a take on each video model, for the picker (owner,
 // 2026-10-13: "each with its price"). Estimates are free; the account path
 // asks Higgsfield (saved for hours), the API path uses the price book.

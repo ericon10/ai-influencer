@@ -593,6 +593,13 @@ export const socialAccounts = pgTable('social_accounts', {
   // to L25. Null: the playbook's fit table for the tag (config).
   primaryCode: text('primary_code'),
   backupCode: text('backup_code'),
+  // Weeks (UX-PLAN.md section 37): the phone it posts from, the platform,
+  // its slots per day and its life/job blend (the life %; null: the default
+  // for its character, config/content.yaml weeks.blend_defaults).
+  deviceId: text('device_id').notNull().default(''),
+  platform: text('platform').notNull().default(''),
+  slotsPerDay: integer('slots_per_day'),
+  lifeShare: integer('life_share'),
   updatedBy: text('updated_by'),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
@@ -637,6 +644,12 @@ export const bankLines = pgTable('bank_lines', {
   usedAt: timestamp('used_at', { withTimezone: true }),
   // Characters whose facts it contradicts (never offered to them again).
   skips: jsonb('skips').notNull().default([]),
+  // Weeks (UX-PLAN.md section 37, item 6): where the line came from
+  // (comment, caption, transcript, inventory, competitor, claude), life or
+  // job (null: not tagged yet; read as job), and the day it posts.
+  source: text('source').notNull().default('comment'),
+  lifeOrJob: text('life_or_job'),
+  usedDate: text('used_date'),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 }, t => [index('bank_lines_account_idx').on(t.accountId, t.likes), index('bank_lines_import_idx').on(t.accountId, t.importId)])

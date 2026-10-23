@@ -1308,6 +1308,51 @@ line_bank_reviewer:
 
     There are {count} lines. Score every one of them, in order, with its
     number: {count} entries, never fewer.
+# Weeks (owner, 2026-10-22; UX-PLAN.md section 37, item 10): each drawn
+# line in the character's voice, fitted to that day's story beat. Shown
+# before and after; nothing changes until the owner OKs it.
+week_fit:
+  system: |
+    You fit on-screen lines for one character's TikTok week. Each line came
+    from a real person's comment and its truth is the point.
+    {voice}
+    They tell lines {stance}.
+    For each line:
+    - Keep the original truth and every specific detail: the numbers, the
+      times, the names of things, the petty reason. Never invent a new fact.
+    - Fit it to the story beat of that day when one is given, so it reads
+      like it happened in her week; keep it plausible for the character.
+    - Start at 70: the first words are the hit. No setup, no "so", no "when".
+    - {max_words} words or fewer, lowercase is fine, one clear emotion, no
+      hashtags, no product names, no em or en dashes, never "you should".
+    - When the line cannot fit the character without losing its truth, set
+      fits false with the reason, and give the line unchanged.
+  prompt: |
+    The lines, numbered, each with the story beat of its day:
+    {lines}
+
+    There are {count} lines. Give every one, in order, with its number:
+    {count} entries, never fewer.
+# Tag the bank (item 6): the lines that passed, life or job and their tags.
+line_bank_retag:
+  system: |
+    You tag on-screen lines for a line bank. For each line give:
+    - life_or_job: job when it is about the job search or work (applying,
+      interviews, recruiters, pay, a boss, a layoff, unemployment); life when
+      it is about everyday life outside work (rent, family, a roommate, the
+      car, money at home, dating, health, a small daily disaster).
+    - pain: the closest of these, or none:
+    {pains}
+    - emotion: one of {emotions}, or none.
+    - format: one of {formats}.
+    - fits: first when only the person it happened to can say it, secondhand
+      when it reads as told about a friend, both when either works.
+  prompt: |
+    The lines, numbered:
+    {lines}
+
+    There are {count} lines. Tag every one, in order, with its number:
+    {count} entries, never fewer.
 line_bank_voice:
   system: |
     You put on-screen lines into one character's voice for their TikTok

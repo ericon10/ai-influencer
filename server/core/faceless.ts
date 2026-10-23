@@ -5,7 +5,10 @@
 // beds and voiceover clips with their search words). Pure: the file's
 // shape, the first one (Doug), and the still prompt with its rules.
 
-export interface FacelessPlace { id: string; name: string; line: string }
+// motion: the place's video prompt (owner, 2026-10-22, item 18), drafted
+// by code from its line when it has none; stillJobId: the Higgsfield still
+// it was made from, pulled free when a post uses the place.
+export interface FacelessPlace { id: string; name: string; line: string; motion?: string; stillJobId?: string }
 export interface FacelessSound { id: string; kind: 'music' | 'voiceover'; name: string; search: string; soundId?: string | null }
 export interface FacelessFile {
   persona: { who: string; town: string; life: string }
@@ -126,12 +129,38 @@ export function soundLine(s: { music: string; voiceover: string } | null): strin
 }
 
 // The file read from stored JSON (fields missing in an older one stay empty).
+// A place bank of a few hundred (Doug's has 106).
+export const MAX_PLACES = 300
+
+// Import places (item 18): a CSV of place_id, scene, motion, still_job_id
+// (name optional; the scene's first words name it). A place already in the
+// bank by id is replaced; a place with no motion gets one drafted.
+export function readPlacesCsv(rows: string[][], draft: (line: string) => string): { places: FacelessPlace[]; problems: string[]; drafted: number } {
+  if (!rows.length) return { places: [], problems: ['The file is empty.'], drafted: 0 }
+  const head = rows[0]!.map(h => h.trim().toLowerCase().replace(/\s+/g, '_'))
+  const at = (...n: string[]) => head.findIndex(h => n.includes(h))
+  const c = { id: at('place_id', 'id'), scene: at('scene', 'line', 'still_prompt'), motion: at('motion', 'video_prompt'), job: at('still_job_id', 'job_id'), name: at('name', 'place') }
+  if (c.scene < 0) return { places: [], problems: ['The file needs a scene column (the still\'s line).'], drafted: 0 }
+  const problems: string[] = []
+  let drafted = 0
+  const places = rows.slice(1).filter(r => r.some(x => x.trim())).map((r, i) => {
+    const cell = (k: number) => (k >= 0 ? r[k] ?? '' : '').trim()
+    const line = cell(c.scene).replace(/\s+/g, ' ')
+    const id = cell(c.id) || `place-${i + 1}`
+    if (!line) problems.push(`${id}: no scene`)
+    const name = cell(c.name) || line.replace(/^vertical 9:16 iphone photo,?\s*(?:upright portrait,?\s*)?/i, '').split(/[,.]/)[0]!.slice(0, 80)
+    const motion = cell(c.motion) || (line ? (drafted++, draft(line)) : '')
+    return { id: id.slice(0, 60), name: name.slice(0, 120), line: line.slice(0, 1200), motion: motion.slice(0, 600), stillJobId: cell(c.job).slice(0, 80) }
+  }).filter(p => p.line)
+  return { places, problems, drafted }
+}
+
 export function readFaceless(x: unknown): FacelessFile {
   const f = (x ?? {}) as Partial<FacelessFile>
   const str = (v: unknown, n: number) => (typeof v === 'string' ? v.slice(0, n) : '')
   return {
     persona: { who: str(f.persona?.who, 600), town: str(f.persona?.town, 200), life: str(f.persona?.life, 2000) },
-    places: (Array.isArray(f.places) ? f.places : []).slice(0, 80).map((p, i) => ({ id: str(p?.id, 60) || `place-${i + 1}`, name: str(p?.name, 120), line: str(p?.line, 600) })).filter(p => p.line),
+    places: (Array.isArray(f.places) ? f.places : []).slice(0, MAX_PLACES).map((p, i) => ({ id: str(p?.id, 60) || `place-${i + 1}`, name: str(p?.name, 120), line: str(p?.line, 1200), motion: str(p?.motion, 600), stillJobId: str(p?.stillJobId, 80) })).filter(p => p.line),
     look: (Array.isArray(f.look) ? f.look : []).map(l => str(l, 300)).filter(Boolean).slice(0, 30),
     voice: { notes: str(f.voice?.notes, 1000), formats: (Array.isArray(f.voice?.formats) ? f.voice!.formats : []).map(l => str(l, 300)).filter(Boolean).slice(0, 20) },
     sounds: (Array.isArray(f.sounds) ? f.sounds : []).slice(0, 120).map((s, i) => ({ id: str(s?.id, 60) || `sound-${i + 1}`, kind: s?.kind === 'voiceover' ? 'voiceover' as const : 'music' as const, name: str(s?.name, 120), search: str(s?.search, 200), soundId: typeof s?.soundId === 'string' ? s.soundId.slice(0, 60) : null })).filter(s => s.name),

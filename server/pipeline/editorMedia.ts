@@ -6,6 +6,7 @@ import { getAsset } from '../storage/assets.js'
 import { getContent, listBroll } from './content.js'
 import { libraryView } from './clips.js'
 import { listSounds } from './sounds.js'
+import { listVoiceLines } from './voiceLines.js'
 import { directLink } from './openreel.js'
 
 // The editor's Add media, Studio first (owner, 2026-10-15; UX-PLAN.md
@@ -74,13 +75,18 @@ export async function editorLibrary(deps: Deps, ctx: Ctx, contentId: string): Pr
 
   // The Library: B-roll, music and ambience, other characters' clips.
   const broll = (await listBroll(deps, ctx)).filter(b => b.status === 'ready' && b.assetId)
+  // Every sound the owner uploaded can go on a post (owner, 2026-10-22,
+  // UX-PLAN section 37, item 17): music, ambience and voice lines, any
+  // character's. No gate.
   const sounds = (await listSounds(deps, ctx)).filter(s => s.status === 'ready' && s.assetId)
+  const voices = (await listVoiceLines(deps, ctx)).filter(v => v.assetId)
   const others = post.characterId
     ? (await libraryView(deps, ctx)).clips.filter(c => c.characterId !== post.characterId && c.status === 'approved' && c.assetId).slice(0, 40)
     : []
   const libraryItems = [
     ...await Promise.all(broll.map(b => item(b.assetId!, `B-roll: ${b.title || 'clip'}`, 'video'))),
     ...await Promise.all(sounds.map(s => item(s.assetId!, `${s.kind === 'music' ? 'Music' : 'Ambience'}: ${s.title || 'sound'}`, 'audio', null, s.durationMs ? Math.round(s.durationMs / 100) / 10 : null))),
+    ...await Promise.all(voices.map(v => item(((v.meta as { convertedAssetId?: string | null }).convertedAssetId) || v.assetId!, `Voice: ${v.title || 'voice line'}`, 'audio', null, v.durationMs ? Math.round(v.durationMs / 100) / 10 : null))),
     ...await Promise.all(others.map(c => item(c.assetId, `${c.characterName}: ${c.title || 'clip'}`, 'video', c.posterId, c.durationSec))),
   ]
 

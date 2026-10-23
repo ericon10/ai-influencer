@@ -3,7 +3,7 @@ import { candidates, jobs } from '../db/schema.js'
 import type { Ctx, Deps } from '../context.js'
 import { newId } from '../lib/ids.js'
 import { registerJobHook, type JobOutcome, type JobRow } from '../jobs/hooks.js'
-import { activateChildren, cancelChildren, childJobs } from '../jobs/runner.js'
+import { activateChained, activateChildren, cancelChildren, childJobs, isChained } from '../jobs/runner.js'
 import { checkSceneFields, fieldsFromWords, isBankHair, makeupForSetting, sceneFieldsSchema, type SceneFields } from '../core/scenes.js'
 import { finalize, type QaReport } from '../core/qa/marks.js'
 import { evaluateScene, sceneMirrorFix } from '../core/qa/scene.js'
@@ -32,7 +32,9 @@ import { catalogWording } from '../core/wording.js'
 
 const ACTIVE = ['waiting', 'queued', 'submitting', 'running', 'ingesting']
 const sceneIdOf = (job: JobRow) => job.purpose.split(':')[1]!
-const parentCandidateOf = (job: JobRow) => job.purpose.split(':')[2]
+// The still a take started from: its purpose, or (a take chained to its
+// still by Make the week) the candidate the still became.
+const parentCandidateOf = (job: JobRow) => (job.request as { meta?: { startCandidateId?: string | null } } | null)?.meta?.startCandidateId ?? (/^cand_/.test(job.purpose.split(':')[2] ?? '') ? job.purpose.split(':')[2] : undefined)
 
 async function newCandidate(deps: Deps, job: JobRow, fields: Partial<typeof candidates.$inferInsert>): Promise<string> {
   const id = newId('cand')
@@ -226,9 +228,10 @@ async function onScene(deps: Deps, ctx: Ctx, job: JobRow, out: JobOutcome): Prom
       await newCandidate(deps, job, { assetId: asset.id, status: 'superseded', qaReport: info('Still from the saved character, before the drift lock.'), qaVerdict: 'uncertain' })
       await activateChildren(deps, job.id, child => (child.id === lock.id
         ? { refs: [{ assetId: asset.id }, ...((child.request as GenRequest).refs ?? []).slice(1)] }
-        : {}))
+        : {}), c => !isChained(c))
     } else {
       const id = await newCandidate(deps, job, { assetId: asset.id, status: 'qa_pending' })
+      await activateChained(deps, job.id, asset.id, id)
       if (!(await startQa(deps, job, asset.id, id, null))) {
         const report = await localStillChecks(deps, ctx, job, asset.id)
         await deps.db.update(candidates).set({ status: 'in_review', qaReport: report, qaVerdict: report.verdict }).where(eq(candidates.id, id))
@@ -249,6 +252,8 @@ async function onDriftLock(deps: Deps, ctx: Ctx, job: JobRow, out: JobOutcome): 
     const texture = await textureCheck(deps, ctx, base?.assetId ?? undefined, asset.id, true)
     const t = texture ? textureSummary(texture) : null
     const id = await newCandidate(deps, job, { assetId: asset.id, parentId: base?.id ?? null, op: 'drift_lock', status: 'qa_pending' })
+    // A video chained to the still waits on the face-locked one.
+    if (req.parentJobId) await activateChained(deps, req.parentJobId, asset.id, id)
     if (!(await startQa(deps, job, asset.id, id, t))) {
       const report = t?.smoothed ? finalize([{ code: 'skin_smoothed', severity: 'fail', message: t.message }], null) : info('Face locked to REF-00 after the saved character still.')
       await deps.db.update(candidates).set({ status: t?.smoothed ? 'qa_failed' : 'in_review', qaReport: { ...report, texture: t }, qaVerdict: report.verdict }).where(eq(candidates.id, id))
@@ -257,6 +262,7 @@ async function onDriftLock(deps: Deps, ctx: Ctx, job: JobRow, out: JobOutcome): 
     // The still before the lock stays reviewable, with the reason.
     if (base) await deps.db.update(candidates).set({ status: 'in_review', qaReport: finalize([{ code: 'uncertain', severity: 'warn', message: `The drift lock did not finish (${out.error ?? 'no result'}). This is the saved character's still before the face lock; check the face yourself.` }], null), qaVerdict: 'uncertain' }).where(eq(candidates.id, base.id))
     await cancelChildren(deps, job.id, 'The drift lock it was checking did not finish.')
+    if (req.parentJobId) await cancelChildren(deps, req.parentJobId, 'The still it was waiting for did not finish.')
   }
   await refreshSceneStatus(deps, ctx, sceneIdOf(job))
 }

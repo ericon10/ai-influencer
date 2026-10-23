@@ -21,6 +21,11 @@ export const planMetaSchema = z.object({
   // hashtags (a slideshow keeps them in its own fields).
   scene: s(4000), clipAction: s(2000), cta: s(300), statSource: s(200), notes: s(1500),
   caption: s(2200), hashtags: z.array(z.string().max(60)).max(15).default([]),
+  // Weeks (UX-PLAN.md section 37): the plan CSV's own columns (spec v1),
+  // and the Line Engine fields (item 19), kept on the post and in post.json.
+  week: s(10), postType: s(12), deviceId: s(60), lifeOrJob: s(4), voiceFit: s(10), storyBeat: s(800), lineId: s(40),
+  placeId: s(60), videoPrompt: s(2000), soundName: s(200), soundType: s(20), voiceoverClip: s(200),
+  lane: s(60), lineFormat: s(60), feeling: s(60), topic: s(60),
 }).prefault({})
 export type PlanMeta = z.infer<typeof planMetaSchema>
 export const hasPlan = (p: Partial<PlanMeta> | null | undefined) => !!p && !!(p.rowId || p.structure || p.moment || p.altHook)

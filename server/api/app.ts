@@ -1,7 +1,7 @@
 import { autoPlace } from '../pipeline/facePlace.js'
 import { Hono, type Context } from 'hono'
 import { importFacelessPlan, previewFacelessPlan } from '../pipeline/facelessImport.js'
-import { createFacelessCharacter, saveFaceless } from '../pipeline/faceless.js'
+import { createFacelessCharacter, importPlaces, saveFaceless } from '../pipeline/faceless.js'
 import { z } from 'zod'
 import { and, desc, eq, gt, inArray, or, sql } from 'drizzle-orm'
 import type { Ctx, Deps, Principal } from '../context.js'
@@ -33,7 +33,9 @@ import { postCutView, postEditorProject } from '../pipeline/cutView.js'
 import { makeCloseup } from '../pipeline/closeup.js'
 import { addSound, archiveSound, listSounds, soundView, updateSound } from '../pipeline/sounds.js'
 import { addVoiceTakes, getVoiceLine, listVoiceLines, updateVoiceLine, voiceLineView } from '../pipeline/voiceLines.js'
-import { addHook, archiveHook, archiveProduct, archiveVariant, importKit, productSummaries, productView, saveSocialAccount, scoreboard, starterKit, updateHook, updateProduct, useKitVoice } from '../pipeline/scaleKit.js'
+import { applyFit, bankCsv, bankPage, checkWeek, drawWeek, importLines, importWeek, previewWeek, reviewLog, saveFill, sendWeek, setLock, setReview, weekList, weekView } from '../pipeline/weeks.js'
+import { driveAuthUrl, driveCallback, driveDisconnect, driveFolders, driveStatus, setDriveRoot } from '../pipeline/drive.js'
+import { addHook, archiveHook, archiveProduct, archiveVariant, importKit, productSummaries, productView, renameSocialAccount, saveSocialAccount, scoreboard, starterKit, updateHook, updateProduct, useKitVoice } from '../pipeline/scaleKit.js'
 import { deleteStyle, editorManifest, listStyles, saveFromEditor, saveStyle } from '../pipeline/openreel.js'
 import { previewImport, runImport } from '../pipeline/csvImport.js'
 import { answerGateCheck, gateCheck } from '../pipeline/gateCheck.js'
@@ -1231,8 +1233,121 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
       link: z.string().max(400).optional(), code: z.string().max(60).optional(), signups: z.number().int().min(0).max(10_000_000).optional(),
       views: z.number().int().min(0).nullable().optional(), characterId: z.string().max(60).nullable().optional(), productId: z.string().max(60).nullable().optional(), notes: z.string().max(400).optional(),
       primaryCode: z.string().max(4).nullable().optional(), backupCode: z.string().max(4).nullable().optional(),
+      deviceId: z.string().max(60).optional(), platform: z.string().max(20).optional(), slotsPerDay: z.number().int().min(1).max(24).nullable().optional(), lifeShare: z.number().int().min(0).max(100).nullable().optional(),
     }), await json(c))
     return c.json(await saveSocialAccount(deps, ctx, decodeURIComponent(c.req.param('tag')), body))
+  })
+  // A faceless character's places from a CSV (item 18).
+  app.post('/characters/:id/places/import', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    const body = parse(z.object({ csv: z.string().max(2_000_000) }), await json(c))
+    return c.json(await importPlaces(deps, ctx, c.req.param('id'), body.csv))
+  })
+  // Rename an account (UX-PLAN section 37, item 3): its posts, bank lines and Drive rows follow.
+  app.post('/social-accounts/:tag/rename', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    const body = parse(z.object({ to: z.string().min(1).max(60) }), await json(c))
+    return c.json(await renameSocialAccount(deps, ctx, decodeURIComponent(c.req.param('tag')), body.to))
+  })
+
+  // ── Weeks (UX-PLAN section 37): the bulk planner and Send to Drive ──
+  const monday = z.string().regex(/^\d{4}-\d{2}-\d{2}$/)
+  app.get('/weeks', async c => c.json({ weeks: await weekList(deps, c.get('ctx')) }))
+  app.post('/weeks/preview', async c => {
+    const body = parse(z.object({ csv: z.string().max(400_000) }), await json(c))
+    return c.json(await previewWeek(deps, c.get('ctx'), body.csv))
+  })
+  app.post('/weeks/import', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    const body = parse(z.object({ csv: z.string().max(400_000), rows: z.array(z.string().max(40)).min(1).max(300), existing: z.enum(['replace', 'add']).optional() }), await json(c))
+    return c.json(await importWeek(deps, ctx, body.csv, body))
+  })
+  app.get('/weeks/review-log', async c => c.json({ calls: await reviewLog(deps, c.get('ctx')) }))
+  app.get('/weeks/:monday', async c => c.json(await weekView(deps, c.get('ctx'), parse(monday, c.req.param('monday')))))
+  app.post('/weeks/:monday/draw', async c => {
+    const body = parse(z.object({ seed: z.number().int().min(0).max(2 ** 31), redraw: z.union([z.enum(['empty', 'all']), z.array(z.string().max(60)).max(300)]), draft: z.record(z.string().max(60), z.string().max(60).nullable()).optional(), accounts: z.array(z.string().max(60)).max(50).optional() }), await json(c))
+    return c.json(await drawWeek(deps, c.get('ctx'), parse(monday, c.req.param('monday')), body))
+  })
+  app.post('/weeks/:monday/fill', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    const body = parse(z.object({ rows: z.array(z.object({ postId: z.string().max(60), lineId: z.string().max(60).nullable(), lifeOrJob: z.enum(['life', 'job']), flag: z.string().max(300).nullable().optional() })).max(300) }), await json(c))
+    return c.json(await saveFill(deps, ctx, parse(monday, c.req.param('monday')), body))
+  })
+  app.post('/weeks/:monday/check', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    return c.json(await checkWeek(deps, ctx, parse(monday, c.req.param('monday'))))
+  })
+  app.post('/weeks/:monday/send', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    const body = parse(z.object({ postIds: z.array(z.string().max(60)).max(300).optional(), again: z.boolean().optional() }), await json(c))
+    return c.json(await sendWeek(deps, ctx, parse(monday, c.req.param('monday')), body))
+  })
+  app.put('/weeks/posts/:id/lock', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    const body = parse(z.object({ locked: z.boolean() }), await json(c))
+    await setLock(deps, ctx, c.req.param('id'), body.locked)
+    return c.json({ ok: true })
+  })
+  app.put('/weeks/posts/:id/review', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    const body = parse(z.object({ call: z.enum(['approved', 'killed']).nullable() }), await json(c))
+    await setReview(deps, ctx, c.req.param('id'), body.call)
+    return c.json({ ok: true })
+  })
+  app.post('/weeks/fit', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    const body = parse(z.object({ postIds: z.array(z.string().max(60)).min(1).max(300), use: z.boolean() }), await json(c))
+    return c.json(await applyFit(deps, ctx, body))
+  })
+  // The line bank page (items 6 to 8).
+  const bankQuery = (q: Record<string, string>) => ({ pain: q.pain || null, emotion: q.emotion || null, format: q.format || null, fits: q.fits || null, lifeOrJob: q.lifeOrJob || null, unused: q.unused === '1', source: q.source || null, q: q.q || null, limit: q.limit ? Number(q.limit) : undefined })
+  app.get('/line-bank/all', async c => c.json(await bankPage(deps, c.get('ctx'), bankQuery(c.req.query()))))
+  app.get('/line-bank/all.csv', async c => {
+    const r = await bankPage(deps, c.get('ctx'), { ...bankQuery(c.req.query()), limit: 5000 })
+    return new Response(bankCsv(r.lines), { headers: { 'content-type': 'text/csv; charset=utf-8', 'content-disposition': 'attachment; filename="line-bank.csv"' } })
+  })
+  app.post('/line-bank/lines/import', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'member')
+    const body = parse(z.object({ csv: z.string().max(2_000_000), name: z.string().max(120).optional(), productId: z.string().max(60).nullable().optional(), dryRun: z.boolean().optional() }), await json(c))
+    return c.json(await importLines(deps, ctx, body))
+  })
+  // Google Drive (items 15 and 16).
+  const originOf = (c: { req: { header: (n: string) => string | undefined; url: string } }) => c.req.header('origin') || new URL(c.req.url).origin
+  app.get('/drive', async c => c.json(await driveStatus(deps, c.get('ctx'), originOf(c))))
+  app.post('/drive/connect', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'admin')
+    return c.json({ url: await driveAuthUrl(deps, ctx, originOf(c)) })
+  })
+  app.get('/drive/callback', async c => {
+    const q = c.req.query()
+    const back = (p: Record<string, string>) => c.redirect(`/studio/settings?${new URLSearchParams({ tab: 'general', ...p })}#drive`, 302)
+    if (q.error) return back({ drive_error: q.error_description || q.error })
+    try { await driveCallback(deps, c.get('ctx'), { code: q.code ?? '', state: q.state ?? '', origin: new URL(c.req.url).origin }) } catch (e) { return back({ drive_error: (e as Error).message }) }
+    return back({ drive: 'connected' })
+  })
+  app.get('/drive/folders', async c => c.json({ folders: await driveFolders(deps, c.get('ctx')) }))
+  app.put('/drive/root', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'admin')
+    const body = parse(z.object({ folderId: z.string().max(200).nullable().optional(), create: z.string().max(120).nullable().optional() }), await json(c))
+    return c.json(await setDriveRoot(deps, ctx, body))
+  })
+  app.delete('/drive', async c => {
+    const ctx = c.get('ctx')
+    requireRole(ctx, 'admin')
+    await driveDisconnect(deps, ctx)
+    return c.json({ ok: true })
   })
   // A batch's failed videos render again (free).
   app.post('/content/:id/render/retry-failed', async c => {

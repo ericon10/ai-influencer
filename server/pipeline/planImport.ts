@@ -6,7 +6,7 @@ import type { JobSpec } from '../jobs/runner.js'
 import { hardWrap } from '../core/text.js'
 import type { RuleViolation } from '../core/rules.js'
 import { lintPost } from '../core/copyLint.js'
-import type { PlanMeta } from '../core/planMeta.js'
+import { planMetaSchema, type PlanMeta } from '../core/planMeta.js'
 import { checkRow, hashtagsOf, isCharacterKind, namesProduct, planYes, readPlan, repeatedCodes, rowScene, scheduleOrder, screenFor, type CheckedRow, type PlanKind, type PlanRow } from '../core/planImport.js'
 import { emptySpecial } from '../core/slides.js'
 import { isThin } from '../core/punchUp.js'
@@ -194,7 +194,7 @@ async function plan(deps: Deps, ctx: Ctx, csv: string, opts: Opts, std: WritingS
 // (generic names; the switch, on by default, turns it off), or the owner's
 // own screenshot when the line names one of the account's products (never
 // generated or priced).
-function slidesOf(deps: Deps, raw: PlanRow, kind: PlanKind, drawSpecials: boolean, productNames: string[]) {
+export function slidesOf(deps: Deps, raw: PlanRow, kind: PlanKind, drawSpecials: boolean, productNames: string[]) {
   const c = raw.cells
   const scene = rowScene(c, kind)
   const texts = kind === 'photo' ? [c.hook] : [c.hook, c.slide_2, c.slide_3, c.slide_4, c.slide_5, c.slide_6]
@@ -216,7 +216,7 @@ function slidesOf(deps: Deps, raw: PlanRow, kind: PlanKind, drawSpecials: boolea
 
 // A plan's light words: a light preset when they name one, else words kept
 // with the place (the lock's light is a preset id).
-function lightOf(deps: Deps, words: string): { id: string; words: string } {
+export function lightOf(deps: Deps, words: string): { id: string; words: string } {
   const w = words.trim().toLowerCase()
   if (!w) return { id: '', words: '' }
   const hit = deps.config.pipeline.scenes.lights.find(l => l.id === w.replace(/\s+/g, '_') || l.label.toLowerCase() === w)
@@ -225,7 +225,7 @@ function lightOf(deps: Deps, words: string): { id: string; words: string } {
 
 function metaOf(raw: PlanRow, r: CheckedRow, planId: string): PlanMeta {
   const c = raw.cells
-  return {
+  return planMetaSchema.parse({
     rowId: r.rowId, planId, date: r.date, slot: r.slot, format: r.format.slice(0, 40),
     tension: c.tension.slice(0, 12), pillar: c.pillar.slice(0, 12), audience: c.audience.slice(0, 12),
     // (The plan row's product field is its ad switch, as before.)
@@ -234,7 +234,7 @@ function metaOf(raw: PlanRow, r: CheckedRow, planId: string): PlanMeta {
     momentId: c.moment_id.slice(0, 30), moment: c.moment.slice(0, 800), altHook: c.alt_hook.slice(0, 200),
     scene: c.scene.slice(0, 4000), clipAction: c.clip_action.slice(0, 2000), cta: c.cta.slice(0, 300), statSource: c.stat_source.slice(0, 200), notes: c.notes.slice(0, 1500),
     caption: r.kind === 'clip' ? c.caption.slice(0, 2200) : '', hashtags: r.kind === 'clip' ? hashtagsOf(c.hashtags).slice(0, 15) : [],
-  }
+  })
 }
 
 export async function previewPlan(deps: Deps, ctx: Ctx, csv: string, opts: Opts = {}): Promise<PlanPreview> {

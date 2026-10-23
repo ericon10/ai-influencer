@@ -11,7 +11,8 @@ import { AppError } from '../lib/errors.js'
 // are sealed with the key vault and only the last four characters are ever
 // returned to the browser.
 
-const KNOWN = new Set(['higgsfield', 'anthropic', 'elevenlabs', 'wavespeed', 'fal', 'google', 'apify'])
+// google_oauth: the owner's own OAuth client for Google Drive (CLIENT_ID:CLIENT_SECRET).
+const KNOWN = new Set(['higgsfield', 'anthropic', 'elevenlabs', 'wavespeed', 'fal', 'google', 'apify', 'google_oauth'])
 const aad = (accountId: string, provider: string) => `${accountId}|${provider}`
 
 export interface CredentialView {
@@ -30,6 +31,9 @@ export async function saveCredential(deps: Deps, ctx: Ctx, provider: string, sec
   if (trimmed.length < 8) throw new AppError('bad_request', 'That key looks too short.')
   if (provider === 'higgsfield' && !/^[^:\s]+:[^:\s]+$/.test(trimmed)) {
     throw new AppError('bad_request', 'Higgsfield keys look like KEY_ID:KEY_SECRET (both parts from the Higgsfield Console).')
+  }
+  if (provider === 'google_oauth' && !/^[^:\s]+\.apps\.googleusercontent\.com:[^:\s]{6,}$/.test(trimmed)) {
+    throw new AppError('bad_request', 'A Google OAuth client looks like CLIENT_ID:CLIENT_SECRET, the ID ending in .apps.googleusercontent.com (Google Cloud, APIs and Services, Credentials).')
   }
   return storeSecret(deps, ctx, provider, trimmed, label, trimmed.slice(-4))
 }

@@ -40,6 +40,7 @@ import { EFFECT_CODES, STRUCTURE_CODES } from '../core/playbook.js'
 import { buildPlanGenerate, remakeStarted } from './planImport.js'
 import { buildPunchUp } from './punchUp.js'
 import { buildFacelessStill, buildFacelessVideo } from './faceless.js'
+import { buildBankRetag, buildWeekFit, buildWeekMake, redoStarted } from './weeks.js'
 import { saferPrompt } from '../core/wording.js'
 
 // Every paid step is an action. The same builder produces the job specs for
@@ -176,6 +177,13 @@ export const actionSchema = z.discriminatedUnion('type', [
   // A faceless post (UX-PLAN.md section 35, item 4): its still and its video.
   z.object({ type: z.literal('faceless_still'), contentId: z.string().max(60), placeId: z.string().max(60).nullable().optional(), line: z.string().max(800).optional(), path: z.enum(['account', 'api']).nullable().optional(), model: z.string().max(80).nullable().optional() }),
   z.object({ type: z.literal('faceless_video'), contentId: z.string().max(60), model: z.string().max(80).nullable().optional(), prompt: z.string().max(2000).optional(), durationSec: z.number().int().min(3).max(15).optional() }),
+  // Weeks (UX-PLAN.md section 37): Make the week (stills, then each video
+  // chained to its still, ten posts at a time), Redo one post, Fit to
+  // voice, and Tag the bank (life or job).
+  z.object({ type: z.literal('week_make'), week: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), postIds: z.array(z.string().max(60)).max(300).optional(), path: z.enum(['account', 'api']).nullable().optional() }),
+  z.object({ type: z.literal('week_redo'), week: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), postIds: z.array(z.string().max(60)).min(1).max(20), path: z.enum(['account', 'api']).nullable().optional() }),
+  z.object({ type: z.literal('week_fit'), week: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), postIds: z.array(z.string().max(60)).max(300).optional() }),
+  z.object({ type: z.literal('bank_retag'), all: z.boolean().optional() }),
   z.object({ type: z.literal('slideshow_variations'), contentId: z.string().max(60), count: z.number().int().min(1).max(10) }),
   z.object({ type: z.literal('slideshow_batch'), contentId: z.string().max(60) }),
 ])
@@ -288,6 +296,10 @@ export async function buildAction(deps: Deps, ctx: Ctx, action: StudioAction): P
   if (action.type === 'slideshow_draft') return buildSlideshowDraft(deps, ctx, action)
   if (action.type === 'slideshow_stills') return buildSlideshowStills(deps, ctx, action)
   if (action.type === 'plan_generate') return buildPlanGenerate(deps, ctx, action)
+  if (action.type === 'week_make') return buildWeekMake(deps, ctx, action)
+  if (action.type === 'week_redo') return buildWeekMake(deps, ctx, { ...action, redo: true })
+  if (action.type === 'week_fit') return buildWeekFit(deps, ctx, action)
+  if (action.type === 'bank_retag') return buildBankRetag(deps, ctx, action)
   if (action.type === 'faceless_still') return buildFacelessStill(deps, ctx, action)
   if (action.type === 'faceless_video') return buildFacelessVideo(deps, ctx, action)
   if (action.type === 'slideshow_caption') return buildSlideshowCaption(deps, ctx, action.contentId)
@@ -576,6 +588,11 @@ async function afterStart(deps: Deps, ctx: Ctx, action: StudioAction, built: Bui
   // The slideshow stills path picked last is the next run's default.
   if ((action.type === 'slideshow_stills' || action.type === 'plan_generate') && (action.path || action.stillModel)) {
     await saveSlideStillPath(deps, ctx, await stillPathFor(deps, ctx, null, { path: action.path, stillModel: action.stillModel })).catch(() => undefined)
+  }
+  if (action.type === 'week_redo') await redoStarted(deps, ctx, action.postIds, jobs.map(j => j.id))
+  if (action.type === 'week_make' || action.type === 'week_redo') {
+    if (action.path) await saveSlideStillPath(deps, ctx, action.path).catch(() => undefined)
+    for (const j of jobs) if (/^scene:/.test(j.purpose)) await markSceneBusy(deps, ctx, j.purpose.split(':')[1]!).catch(() => undefined)
   }
   if (action.type === 'plan_generate') {
     // A remake: the old pictures go to the Trash now that the run started.

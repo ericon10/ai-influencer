@@ -7,9 +7,11 @@ import { dropMentions, hardWrap } from '../core/text.js'
 import { realismBlock } from '../core/realism.js'
 import type { RuleViolation } from '../core/rules.js'
 import type { GenRequest } from '../providers/types.js'
-import type { JobSpec } from '../jobs/runner.js'
+import { activateChained, cancelChildren, type JobSpec } from '../jobs/runner.js'
 import { registerJobHook, type JobOutcome, type JobRow } from '../jobs/hooks.js'
-import { DOUG, EMPTY_FACELESS, FACELESS_ASPECT, FACELESS_PRODUCT_MODELS, FACELESS_STILL_MODEL, FINISHED_DAMAGE, facelessFinal, facelessProductPrompt, facelessStillPrompt, readFaceless, type FacelessFile } from '../core/faceless.js'
+import { parseCsv } from '../core/csvImport.js'
+import { draftMotion } from '../core/weeks.js'
+import { DOUG, EMPTY_FACELESS, MAX_PLACES, readPlacesCsv, FACELESS_ASPECT, FACELESS_PRODUCT_MODELS, FACELESS_STILL_MODEL, FINISHED_DAMAGE, facelessFinal, facelessProductPrompt, facelessStillPrompt, readFaceless, type FacelessFile } from '../core/faceless.js'
 import { createCharacter, getCharacter, type CharacterRow } from './characters.js'
 import { getContent, type ContentRow } from './content.js'
 import { modelEntry, runModel, stillLevelFor } from './sceneActions.js'
@@ -42,6 +44,24 @@ export async function saveFaceless(deps: Deps, ctx: Ctx, characterId: string, fi
   const clean = readFaceless(file)
   await deps.db.update(characters).set({ features: { ...(row.features as object ?? {}), kind: 'faceless', faceless: clean }, updatedAt: deps.clock.now() }).where(eq(characters.id, row.id))
   return clean
+}
+
+// Import places (item 18): a CSV of place_id, scene, motion, still_job_id
+// into the character's place bank; a place with the same id is replaced,
+// the rest kept; a place with no motion line gets one drafted by code.
+export async function importPlaces(deps: Deps, ctx: Ctx, characterId: string, csv: string): Promise<{ added: number; replaced: number; drafted: number; total: number; problems: string[] }> {
+  const row = await getCharacter(deps, ctx, characterId)
+  if (kindOf(row) !== 'faceless') throw new AppError('bad_request', 'Places belong to a faceless character.')
+  if (csv.length > 2_000_000) throw new AppError('bad_request', 'That file is too big (2 MB). Split it.')
+  const { places, problems, drafted } = readPlacesCsv(parseCsv(csv), draftMotion)
+  if (!places.length) throw new AppError('invalid_request', problems[0] ?? 'No places in the file.')
+  const file = facelessOf(row)
+  const byId = new Map(file.places.map(p => [p.id, p]))
+  let added = 0, replaced = 0
+  for (const p of places) { if (byId.has(p.id)) replaced++; else added++; byId.set(p.id, p) }
+  const merged = [...byId.values()].slice(0, MAX_PLACES)
+  await saveFaceless(deps, ctx, row.id, { ...file, places: merged })
+  return { added, replaced, drafted, total: merged.length, problems }
 }
 
 // A faceless post's own fields (in the video post's spec).
@@ -123,24 +143,32 @@ export async function buildFacelessStill(deps: Deps, ctx: Ctx, input: { contentI
 // The video (priced): image-to-video from the post's still with the
 // prompt prefilled from the row, any video model (rule R3: no limit on its
 // shots; rule R4: on the plan or the API).
-export async function buildFacelessVideo(deps: Deps, ctx: Ctx, input: { contentId: string; model?: string | null; prompt?: string; durationSec?: number }): Promise<Built> {
-  const { row, ch, post } = await facelessPost(deps, ctx, input.contentId)
+// chain (Make the week, UX-PLAN.md section 37): the still is made in the
+// same run, so the video waits for it and starts from it (no start frame
+// yet). A place's own motion line is the prompt when the post has none.
+export async function buildFacelessVideo(deps: Deps, ctx: Ctx, input: { contentId: string; model?: string | null; prompt?: string; durationSec?: number; chain?: boolean }): Promise<Built> {
+  const { row, ch, post, file } = await facelessPost(deps, ctx, input.contentId)
   const stillId = (row.spec as { stillId?: string | null }).stillId
-  if (!stillId) throw new AppError('invalid_request', 'Make or pick the still first: the video starts from it.')
-  const [still] = await deps.db.select().from(candidates).where(and(eq(candidates.accountId, ctx.accountId), eq(candidates.id, stillId)))
-  if (!still?.assetId) throw new AppError('invalid_request', 'The still is still on its way.')
+  let still: { assetId: string | null } | undefined
+  if (!input.chain) {
+    if (!stillId) throw new AppError('invalid_request', 'Make or pick the still first: the video starts from it.')
+    ;[still] = await deps.db.select().from(candidates).where(and(eq(candidates.accountId, ctx.accountId), eq(candidates.id, stillId)))
+    if (!still?.assetId) throw new AppError('invalid_request', 'The still is still on its way.')
+  }
+  const place = post.placeId ? file.places.find(p => p.id === post.placeId) : null
   const v = deps.config.pipeline.scenes.video
   const model = input.model && v.models.some(m => m.ref === input.model) ? input.model : v.model
   const picked = v.models.find(m => m.ref === model)
-  const text = (input.prompt ?? post.videoPrompt).trim() || (post.recipe === 'finished_damage' ? FINISHED_DAMAGE.motion : '')
+  const text = (input.prompt ?? post.videoPrompt).trim() || place?.motion?.trim() || (post.recipe === 'finished_damage' ? FINISHED_DAMAGE.motion : '')
   if (text.length < 3) throw new AppError('invalid_request', 'Say what happens in the video.')
   const durationSec = Math.max(3, Math.min(15, Math.round(input.durationSec ?? (post.recipe === 'finished_damage' ? FINISHED_DAMAGE.durationSec : v.duration))))
   const run = await runModel(deps, ctx, model, 'video')
   const prompt = `${text.replace(/[.\s]+$/, '')}. Starts from this exact still: the same place, light and objects. No people. ${deps.config.pipeline.templates.video.silent}`
   const request: GenRequest = {
     kind: 'video', model: run.model, modelRef: model, prompt, aspect: FACELESS_ASPECT, resolution: picked?.resolution, durationSec, audio: false,
-    startFrame: { assetId: still.assetId }, ...(run.billing ? { billing: run.billing } : {}),
-  }
+    ...(still?.assetId ? { startFrame: { assetId: still.assetId } } : {}), ...(run.billing ? { billing: run.billing } : {}),
+    ...(input.chain ? { chainStart: true } : {}),
+  } as GenRequest
   return {
     purpose: `faceless_video:${row.id}`, characterId: ch.id,
     preview: { title: `The video (${modelEntry(deps, model).label}, ${durationSec} s)`, prompts: [{ label: 'Video prompt', text: prompt, wrapped: hardWrap(prompt) }], warnings: [], invalidates: [] },
@@ -152,11 +180,14 @@ export async function buildFacelessVideo(deps: Deps, ctx: Ctx, input: { contentI
 // faceless post has no face to check). The post card shows the still.
 async function onFacelessStill(deps: Deps, ctx: Ctx, job: JobRow, out: JobOutcome): Promise<void> {
   const asset = out.assets?.find(a => a.kind === 'image') ?? out.assets?.[0]
-  if (out.status !== 'completed' || !asset || !job.characterId) return
+  // A video chained to this still (Make the week) never waits on a still
+  // that did not come.
+  if (out.status !== 'completed' || !asset || !job.characterId) { await cancelChildren(deps, job.id, 'The still it was waiting for did not finish.'); return }
   const postId = job.purpose.split(':')[1]!
   const id = newId('cand')
   await deps.db.insert(candidates).values({ id, accountId: job.accountId, characterId: job.characterId, jobId: job.id, createdBy: job.userId, prompt: (job.request as GenRequest).prompt ?? '', target: 'scene', sceneId: null, op: 'generate', status: 'approved', assetId: asset.id, label: 'Faceless still', meta: { faceless: postId } })
   await setPostField(deps, ctx, postId, { stillId: id }, { stillAssetId: asset.id })
+  await activateChained(deps, job.id, asset.id, id)
 }
 async function onFacelessVideo(deps: Deps, ctx: Ctx, job: JobRow, out: JobOutcome): Promise<void> {
   const asset = out.assets?.find(a => a.kind === 'video') ?? out.assets?.[0]

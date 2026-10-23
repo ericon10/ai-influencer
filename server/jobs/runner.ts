@@ -698,13 +698,22 @@ export async function childJobs(deps: Deps, parentJobId: string): Promise<JobRow
 
 // Starts a parent's waiting children, patching their requests (for example
 // with the asset the parent produced).
-export async function activateChildren(deps: Deps, parentJobId: string, patch: (child: JobRow) => Record<string, unknown>): Promise<JobRow[]> {
-  const children = (await childJobs(deps, parentJobId)).filter(c => c.status === 'waiting')
+export async function activateChildren(deps: Deps, parentJobId: string, patch: (child: JobRow) => Record<string, unknown>, only: (child: JobRow) => boolean = () => true): Promise<JobRow[]> {
+  const children = (await childJobs(deps, parentJobId)).filter(c => c.status === 'waiting' && only(c))
   for (const c of children) {
     await deps.db.update(jobs).set({ request: { ...(c.request as object), ...patch(c) }, status: 'queued', nextPollAt: deps.clock.now(), updatedAt: deps.clock.now() }).where(eq(jobs.id, c.id))
     await event(deps.db, c, 'activated', { parentJobId })
   }
   return children
+}
+
+// A video chained to its still (Weeks, UX-PLAN.md section 37, Make the
+// week): a child whose request says chainStart waits for its parent's
+// still and starts from it. The parent's hook calls this with the still's
+// asset (and its candidate, for the take's parent).
+export const isChained = (c: JobRow) => (c.request as { chainStart?: boolean } | null)?.chainStart === true
+export async function activateChained(deps: Deps, parentJobId: string, assetId: string, startCandidateId: string | null): Promise<JobRow[]> {
+  return activateChildren(deps, parentJobId, c => ({ startFrame: { assetId }, meta: { ...((c.request as { meta?: object }).meta ?? {}), startCandidateId } }), isChained)
 }
 
 // One waiting job canceled with its hold released (a slideshow slide that

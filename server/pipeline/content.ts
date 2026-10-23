@@ -311,6 +311,8 @@ const memeSpec = z.object({
   // Section 33: Approve for posting, its own day and slot, the Download day
   // zip it went into. Never copied.
   posting: postingSchema.nullable().default(null),
+  // Weeks (UX-PLAN.md section 37): saved on its own; never copied.
+  week: z.record(z.string(), z.unknown()).nullable().default(null),
 })
 // A slideshow (server/core/slideshowSpec.ts; UX-PLAN.md section 27).
 const slideshowSpec = slideshowSpecSchema
@@ -566,7 +568,7 @@ export async function duplicateContent(deps: Deps, ctx: Ctx, itemId: string): Pr
   const withStack = spec?.editor ? { ...spec, editor: { projectAssetId: null, savedAt: null, stack: spec.editor.stack ?? null } } : row.spec
   // What the post did once posted and its posting state are its own
   // (sections 32 and 33).
-  const copied = { ...((withStack ?? {}) as object), results: null, posting: null }
+  const copied = { ...((withStack ?? {}) as object), results: null, posting: null, week: null }
   const [out] = await deps.db.insert(contentItems).values({
     id: newId('cnt'), accountId: ctx.accountId, characterId: row.characterId, kind: row.kind,
     title: row.title, idea: row.idea, accountTag: row.accountTag, sceneId: row.sceneId, spec: copied, productId: row.productId,
