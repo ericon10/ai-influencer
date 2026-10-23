@@ -40,6 +40,7 @@ Columns, always in this order, Device ID and Account first:
 | `slot` | The slot in the day (1, 2, 3...), as the plan has it. |
 | `sound_name` | The sound to add in the app, free text; blank for none. |
 | `ad_label` | `Ad` when the post is an ad for its product (the #ad switch), else blank. |
+| `platform` | `tiktok` for the post's own file. A slideshow's three-platform set adds rows of its own: `instagram` (the carousel as a zip, `..._ig.zip`), `reels` (`..._reel.mp4`) and `shorts` (`..._shorts.mp4`), with the same caption. |
 
 Rules a reader can rely on:
 

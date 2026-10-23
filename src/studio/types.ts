@@ -631,6 +631,7 @@ export type WeekStep = 'import' | 'fill' | 'check' | 'make' | 'review' | 'drive'
 export interface WeekCell {
   postId: string; account: string; date: string; slot: number; rowId: string; postType: WeekPostType; kind: string; characterId: string | null
   line: string; lineId: string | null; lineFrom: 'csv' | 'drawn' | null; locked: boolean; lifeOrJob: 'life' | 'job' | null; storyBeat: string
+  sound: { name: string; type: string } | null
   fillFlag: string | null; flags: string[]; checked: boolean; fit: { before: string; after: string; why: string; at: string } | null
   need: number; have: number; video: boolean; hasVideo: boolean; made: boolean; making: number
   thumbAssetId: string | null; videoAssetId: string | null; review: 'approved' | 'killed' | null; approved: boolean; sentAt: string | null; driveName: string

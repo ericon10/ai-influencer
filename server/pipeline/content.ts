@@ -1114,7 +1114,8 @@ export async function videoPostJson(deps: Deps, ctx: Ctx, row: ContentRow, video
   if (!plan.caption && f.postCaption) plan.caption = f.postCaption
   if (!plan.hashtags.length && f.hashtags?.length) plan.hashtags = f.hashtags
   return videoPostExportJson({
-    sound: soundToAdd(f),
+    // A plan row's sound_name and sound_type when the post has no faceless sound (section 42 D).
+    sound: soundToAdd(f) ?? (plan.soundName ? { music: plan.soundName, voiceover: '', type: plan.soundType || '' } : null),
     post: { id: row.id, kind: row.kind, title: row.title, idea: row.idea, accountTag: row.accountTag, characterId: row.characterId, characterName: ch?.name ?? null, variationOf: row.variationOf, batchOf: row.batchOf, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString() },
     video: { file: video.file, assetId: video.assetId, durationSec: video.durationSec, onScreenText: s.caption, captionOff: s.captionOff },
     caption: { text: plan.caption, hashtags: plan.hashtags.slice(0, max), ctaLine: plan.cta, ad: plan.product, asPosted: postCaption(plan.caption, plan.hashtags, { ad: plan.product, max, cta: plan.cta }) },

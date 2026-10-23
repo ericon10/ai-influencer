@@ -250,7 +250,8 @@ describe('a week, from the plan CSV to Google Drive', () => {
     const sheet = f.find(x => x.name === `manifest ${MONDAY}` && x.parents.includes(week.id))!
     expect(sheet.mimeType).toBe('application/vnd.google-apps.spreadsheet')
     const csv = parseCsv(f.find(x => x.name === `manifest ${MONDAY}.csv` && x.parents.includes(week.id))!.data.toString('utf8'))
-    expect(csv[0]).toEqual(['Device ID', 'Account', 'file_name', 'caption', 'hashtags', 'date', 'slot', 'sound_name', 'ad_label'])
+    expect(csv[0]).toEqual(['Device ID', 'Account', 'file_name', 'caption', 'hashtags', 'date', 'slot', 'sound_name', 'ad_label', 'platform'])
+    expect(csv[1]![9]).toBe('tiktok')
     expect(csv[1]!.slice(0, 3)).toEqual(['DEVICE-01', 'callie_tt_01', `${days[1]}_1_callie_tt_01_C1a.mp4`])
     // The AI label line in the caption.
     expect(csv[1]![3]).toMatch(/AI-generated/)

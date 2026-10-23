@@ -209,16 +209,19 @@ export interface ResultPost {
   // the source comment, so Results shows which truths perform.
   truth?: { id: string; label: string } | null
   variationOf: string | null; momentId: string
+  // The plan row's life or job (Weeks, the blend test; section 42 D).
+  lifeOrJob?: string | null
   results: PostResults | null
 }
 export interface ResultRow { key: string; label: string; posts: number; views: number; follows: number; saves: number; shares: number; followsPerPost: number | null }
-export type Dimension = 'account' | 'product' | 'character' | 'structure' | 'truth'
-export const DIMENSION_LABEL: Record<Dimension, string> = { account: 'Account', product: 'Product', character: 'Character', structure: 'Hook structure', truth: 'Source truth' }
+export type Dimension = 'account' | 'product' | 'character' | 'structure' | 'truth' | 'blend'
+export const DIMENSION_LABEL: Record<Dimension, string> = { account: 'Account', product: 'Product', character: 'Character', structure: 'Hook structure', truth: 'Source truth', blend: 'Life or job' }
 
 const keyOf = (p: ResultPost, d: Dimension): [string, string] => {
   if (d === 'account') return p.accountTag ? [p.accountTag, p.accountTag] : ['', 'No account']
   if (d === 'product') return p.productId ? [p.productId, p.productName || 'Product'] : ['', 'No product']
   if (d === 'character') return p.topic ? ['topic', 'No one (topic posts)'] : p.characterId ? [p.characterId, p.characterName || 'Character'] : ['', 'No character']
+  if (d === 'blend') return p.lifeOrJob === 'life' ? ['life', 'Life'] : p.lifeOrJob === 'job' ? ['job', 'Job'] : ['', 'Not tagged']
   if (d === 'truth') return p.truth ? [p.truth.id, p.truth.label] : ['', 'Not from the line bank']
   return p.structure ? [p.structure, codeLabel(p.structure)] : ['', 'No structure']
 }
@@ -257,7 +260,7 @@ export function aggregateResults(posts: ResultPost[], range: { from?: string | n
   return {
     totals: total(list),
     undated: ranged ? withResults.filter(p => !(p.results?.postedAt ?? '')).length : 0,
-    by: { account: by('account'), product: by('product'), character: by('character'), structure: by('structure'), truth: by('truth') },
+    by: { account: by('account'), product: by('product'), character: by('character'), structure: by('structure'), truth: by('truth'), blend: by('blend') },
   }
 }
 

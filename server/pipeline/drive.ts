@@ -245,7 +245,26 @@ async function runSend(deps: Deps, ctx: Ctx, job: JobRow): Promise<unknown> {
       m.rows[row.id] = {
         'Device ID': s.plan?.deviceId || accountsByTag.get(row.accountTag.toLowerCase())?.deviceId || '', Account: row.accountTag, file_name: name,
         caption: captionWithLabel(caption, label), hashtags: hashtags.map(h => `#${h.replace(/^#+/, '')}`).join(' '), date, slot,
-        sound_name: s.plan?.soundName || s.faceless?.musicName || '', ad_label: (row.kind === 'slideshow' ? s.ad : s.plan?.product) ? 'Ad' : '',
+        sound_name: s.plan?.soundName || s.faceless?.musicName || '', ad_label: (row.kind === 'slideshow' ? s.ad : s.plan?.product) ? 'Ad' : '', platform: 'tiktok',
+      }
+      // A slideshow's three platforms set (section 42 C), when made: the
+      // Instagram carousel (a zip), the reel and the Shorts copy, each with
+      // its own manifest row.
+      const plat = (row.outputs as ContentOutputs | null)?.platforms
+      if (row.kind === 'slideshow' && plat) {
+        const extras: Array<{ platform: string; suffix: string; ext: string; mime: string; data: () => Promise<Uint8Array> }> = [
+          { platform: 'instagram', suffix: 'ig', ext: 'zip', mime: 'application/zip', data: async () => { const f: Record<string, Uint8Array> = {}; for (const [i, a] of plat.carouselIds.entries()) f[`${String(i + 1).padStart(2, '0')}.jpg`] = (await readAsset(deps, ctx, a)).data; return zipSync(f, { level: 0 }) } },
+          { platform: 'reels', suffix: 'reel', ext: 'mp4', mime: 'video/mp4', data: async () => (await readAsset(deps, ctx, plat.reelId)).data },
+          { platform: 'shorts', suffix: 'shorts', ext: 'mp4', mime: 'video/mp4', data: async () => (await readAsset(deps, ctx, plat.shortsId)).data },
+        ]
+        const prevExtras = (prev as { extras?: Record<string, string> } | undefined)?.extras ?? {}
+        const extraIds: Record<string, string> = {}
+        for (const x of extras) {
+          const xname = name.replace(/\.[a-z0-9]+$/, `_${x.suffix}.${x.ext}`)
+          extraIds[x.platform] = await putFile(deps, ctx, { id: prev?.folderId === folderId ? prevExtras[x.platform] ?? null : null, parentId: folderId, name: xname, mime: x.mime, data: await x.data() })
+          m.rows[`${row.id}:${x.platform}`] = { ...m.rows[row.id]!, file_name: xname, platform: x.platform }
+        }
+        await setWeekField(deps, ctx, row.id, { drive: { fileId, folderId, name, sentAt: deps.clock.now().toISOString(), extras: extraIds } as never })
       }
       manifests[folderKey] = m
       touched.add(folderKey)

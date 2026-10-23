@@ -57,7 +57,7 @@ async function loadPosts(deps: Deps, ctx: Ctx): Promise<Loaded[]> {
     id: contentItems.id, kind: contentItems.kind, title: contentItems.title, idea: contentItems.idea, accountTag: contentItems.accountTag,
     productId: contentItems.productId, characterId: contentItems.characterId, variationOf: contentItems.variationOf,
     results: sql<unknown>`${contentItems.spec}->'results'`,
-    plan: sql<{ rowId?: string; structure?: string | null; momentId?: string } | null>`${contentItems.spec}->'plan'`,
+    plan: sql<{ rowId?: string; structure?: string | null; momentId?: string; lifeOrJob?: string } | null>`${contentItems.spec}->'plan'`,
     mode: sql<string | null>`${contentItems.spec}->>'mode'`,
     hook: sql<string | null>`${contentItems.spec}->>'hook'`,
     caption: sql<string | null>`${contentItems.spec}->>'caption'`,
@@ -76,7 +76,7 @@ async function loadPosts(deps: Deps, ctx: Ctx): Promise<Loaded[]> {
       name: r.title.trim() || (words ?? '').trim().slice(0, 80) || r.idea.trim().slice(0, 60) || `Untitled ${KIND[r.kind] ?? 'post'}`,
       accountTag: r.accountTag, productId: r.productId, productName: prods.find(p => p.id === r.productId)?.name ?? '',
       characterId: r.characterId, characterName: chars.find(c => c.id === r.characterId)?.name ?? '', topic: r.kind === 'slideshow' && r.mode === 'topic',
-      structure: plan.structure ?? null, truth: truth ? { id: truth.id, label: `${truth.comment.slice(0, 140)}${truth.comment.length > 140 ? '...' : ''} (${truth.likes.toLocaleString('en-US')} likes)` } : null, variationOf: r.variationOf, momentId: String(plan.momentId ?? ''), rowId: String(plan.rowId ?? ''),
+      structure: plan.structure ?? null, truth: truth ? { id: truth.id, label: `${truth.comment.slice(0, 140)}${truth.comment.length > 140 ? '...' : ''} (${truth.likes.toLocaleString('en-US')} likes)` } : null, variationOf: r.variationOf, momentId: String(plan.momentId ?? ''), rowId: String(plan.rowId ?? ''), lifeOrJob: plan.lifeOrJob || null,
       results: readResults(r.results),
     }
   })

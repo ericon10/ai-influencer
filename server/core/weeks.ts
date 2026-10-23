@@ -510,7 +510,8 @@ export function driveName(p: { date: string; slot: number | string; account: str
   return `${safe(p.date)}_${safe(String(p.slot))}_${safe(p.account)}_${safe(p.rowId)}.${p.ext}`
 }
 
-export const MANIFEST_COLUMNS = ['Device ID', 'Account', 'file_name', 'caption', 'hashtags', 'date', 'slot', 'sound_name', 'ad_label'] as const
+// `platform` (section 42 C) is last: columns are only ever added at the end.
+export const MANIFEST_COLUMNS = ['Device ID', 'Account', 'file_name', 'caption', 'hashtags', 'date', 'slot', 'sound_name', 'ad_label', 'platform'] as const
 export function manifestCsv(rows: Array<Record<(typeof MANIFEST_COLUMNS)[number], string>>): string {
   const esc = (v: string) => (/[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v)
   return [MANIFEST_COLUMNS.join(','), ...rows.map(r => MANIFEST_COLUMNS.map(c => esc(r[c] ?? '')).join(','))].join('\n') + '\n'

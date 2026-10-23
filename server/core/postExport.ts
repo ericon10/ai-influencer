@@ -59,6 +59,8 @@ export function planJson(p: PlanMeta | null | undefined): Record<string, unknown
     effect_payoff: p.effectPayoff ? { code: p.effectPayoff, name: effectName(p.effectPayoff) } : null,
     hook_score: p.hookScore, moment_id: p.momentId || null, moment: p.moment || null, alt_hook: p.altHook || null,
     scene: p.scene || null, clip_action: p.clipAction || null, cta: p.cta || null, stat_source: p.statSource || null, notes: p.notes || null,
+    // The sound to add in the app (section 42 D).
+    sound_name: (p as { soundName?: string }).soundName || null, sound_type: (p as { soundType?: string }).soundType || null,
   }
 }
 
@@ -148,7 +150,7 @@ export interface VideoExportInput {
   exportedAt: string
   results?: PostResults | null
   // A sound to add in the app (a faceless post's music and voiceover words).
-  sound?: { music: string; voiceover: string } | null
+  sound?: { music: string; voiceover: string; type?: string } | null
 }
 export function videoPostExportJson(i: VideoExportInput): Record<string, unknown> {
   return {
@@ -164,7 +166,7 @@ export function videoPostExportJson(i: VideoExportInput): Record<string, unknown
     caption: { text: i.caption.text, hashtags: i.caption.hashtags, ad: i.caption.ad, cta_line: i.caption.ctaLine || null, as_posted: i.caption.asPosted },
     plan: planJson(i.plan),
     results: resultsJson(i.results),
-    ...(i.sound ? { sound_to_add: { music: i.sound.music || null, voiceover_search: i.sound.voiceover || null, note: 'Add this sound in the app.' } } : {}),
+    ...(i.sound ? { sound_to_add: { music: i.sound.music || null, sound_type: i.sound.type || null, voiceover_search: i.sound.voiceover || null, note: 'Add this sound in the app.' } } : {}),
     ai_label: i.aiLabel,
   }
 }

@@ -546,6 +546,7 @@ function ReviewStep({ v, onChanged, onNext }: { v: WeekView; onChanged: () => vo
             </div>
             <div style={{ fontSize: 12.5, fontWeight: 600 }} className="st-clamp1" title={c.line}>{c.line}</div>
             <div className="st-hint" style={{ fontSize: 11 }}>{c.rowId} · {c.account} · {dayLabel(c.date)} {c.slot} · {TYPE[c.postType]}</div>
+            {c.sound && <div className="st-hint st-clamp1" style={{ fontSize: 11 }} data-field={`weeks-review-sound-${c.rowId}`} title="Add this sound in the app when you post">Sound to add: {c.sound.name}{c.sound.type ? ` (${c.sound.type})` : ''}</div>}
             <div className="st-row" style={{ gap: 4, flexWrap: 'wrap' }}>
               <button type="button" className={`st-btn xs ${c.review === 'approved' ? '' : 'secondary'}`} aria-pressed={c.review === 'approved'} onClick={() => void call(c, c.review === 'approved' ? null : 'approved')}><Check size={12} />Approve</button>
               <button type="button" className={`st-btn xs ${c.review === 'killed' ? '' : 'ghost'}`} aria-pressed={c.review === 'killed'} onClick={() => void call(c, c.review === 'killed' ? null : 'killed')}><X size={12} />Kill</button>

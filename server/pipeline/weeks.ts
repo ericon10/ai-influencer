@@ -330,6 +330,8 @@ const ACTIVE = ['waiting', 'queued', 'submitting', 'running', 'ingesting']
 export interface WeekCell {
   postId: string; account: string; date: string; slot: number; rowId: string; postType: PostType; kind: string; characterId: string | null
   line: string; lineId: string | null; lineFrom: WeekState['lineFrom']; locked: boolean; lifeOrJob: LifeOrJob | null; storyBeat: string
+  // The sound to add in the app (section 42 D): its name and type.
+  sound: { name: string; type: string } | null
   fillFlag: string | null; flags: string[]; checked: boolean; fit: WeekState['fit']
   need: number; have: number; video: boolean; hasVideo: boolean; made: boolean; making: number
   thumbAssetId: string | null; videoAssetId: string | null; review: 'approved' | 'killed' | null; approved: boolean; sentAt: string | null; driveName: string
@@ -388,6 +390,7 @@ export async function weekCells(deps: Deps, ctx: Ctx, rows: ContentRow[]): Promi
     return {
       postId: r.id, account: r.accountTag, date: p.date, slot: slotNumber(p.slot) ?? 1, rowId: p.rowId, postType: type, kind: r.kind, characterId: r.characterId,
       line, lineId: w.lineId ?? null, lineFrom: w.lineFrom ?? (line ? 'csv' : null), locked: !!w.locked, lifeOrJob: (p.lifeOrJob || null) as LifeOrJob | null, storyBeat: p.storyBeat,
+      sound: (() => { const name = (p as { soundName?: string }).soundName || String((spec as { faceless?: { musicName?: string } }).faceless?.musicName ?? ''); return name ? { name, type: (p as { soundType?: string }).soundType || '' } : null })(),
       fillFlag: w.fillFlag ?? null, flags: w.check?.flags ?? [], checked: !!w.check, fit: w.fit ?? null,
       need, have, video, hasVideo, made: need > 0 && have >= need && (!video || hasVideo), making,
       thumbAssetId: thumb, videoAssetId: videoAsset, review: w.review?.call ?? null, approved: !!spec.posting?.approved, sentAt: w.drive?.sentAt ?? null, driveName: w.drive?.name ?? '',
