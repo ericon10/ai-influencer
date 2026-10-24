@@ -2219,3 +2219,18 @@ no product uses the neutral defaults). Nothing here spends money.
 | 8 | A row with no product | The product column names a product, or "none" / "No product" for a post with none. A blank product is flagged in the import preview and on the grid ("No product: pick one on the post"), imported as a draft, and skipped by Fill (and so by Make) until the product is set on the post's start sheet. No row gets a product it did not name. Fill draws each post's line only from lines tagged for its product |
 | 9 | No fallback product | Removed: a new post taking its account's product (on create and on an account change), a plan preview pre-filling "This plan is for" from the accounts, the line bank's pain list and import box defaulting to the first product, the Library hook tab opening on the first product, and SideStep's reviewer standing in for a product with no reviewer of its own. Kept (not a default): the owner's account is seeded with the SideStep kit as a product record, and Library > Hooks can load it on request |
 
+
+## 46. Accounts kept apart; the owner's product stays the owner's (owner, 2026-10-24)
+
+The first step toward paying customers (multi-user brainstorm, 2026-10-24).
+Applies to every account. Nothing here spends money.
+
+| # | Piece | How it works |
+|---|---|---|
+| 1 | Isolation, route by route | One test (`server/api/isolation.test.ts`) fills the owner's account the way the browser suite does (the e2e seed, in-process), signs in as a customer and sends every API route the owner's ids, in the path and in the body under every id field. The customer never gets an owner id back, the owner's records are exactly as they were, and none of the customer's records point at anything of the owner's. A new route is swept the day it is added |
+| 2 | The owner's product rules | A writing standard can be the owner's only (`owner_only` in `config/content.yaml` writing_standards; SideStep's is). Only the owner's account (STUDIO_OWNER_EMAIL) can pick it on a product card, get it by naming a product SideStep, or load the SideStep script kit (Library > Hooks). Any other account never sees it in the list, and a product that holds it anyway reads as the general standard |
+| 3 | Keys ask for the password | Saving or removing a provider key (Settings > General > Provider keys) asks for the signed-in user's password again, so a stolen session alone cannot swap a key. Wrong passwords count toward the sign-in pause (5 in 15 minutes). A local Studio with no password (demo) skips it |
+
+Still owner wording in shared config, seen by every account (a follow-up,
+not a leak of records): model notes in `config/models.yaml` and
+`blend_defaults` in `config/content.yaml` name the owner's characters.

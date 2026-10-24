@@ -38,7 +38,9 @@ import { addVoiceTakes, getVoiceLine, listVoiceLines, updateVoiceLine, voiceLine
 import { enginesView, leverView, pickView, setLever, setPick } from '../pipeline/engines.js'
 import { applyFit, bankCsv, bankPage, checkWeek, drawWeek, importLines, importLinesFromSheet, importSheet, importWeek, previewSheet, previewWeek, resyncPlan, resyncSheet, reviewLog, saveFill, sendWeek, setLock, setReview, weekList, weekSheets, weekView } from '../pipeline/weeks.js'
 import { driveAuthUrl, driveCallback, driveDisconnect, driveFolders, driveStatus, setDriveRoot } from '../pipeline/drive.js'
-import { addHook, archiveHook, archiveProduct, archiveVariant, importKit, productSummaries, productView, renameSocialAccount, saveSocialAccount, scoreboard, starterKit, updateHook, updateProduct, useKitVoice } from '../pipeline/scaleKit.js'
+import { isOwner } from '../pipeline/products.js'
+import { confirmPassword } from '../auth/provider.js'
+import { addHook, archiveHook, archiveProduct, archiveVariant, importKit, importStarterKit, productSummaries, productView, renameSocialAccount, saveSocialAccount, scoreboard, updateHook, updateProduct, useKitVoice } from '../pipeline/scaleKit.js'
 import { deleteStyle, editorManifest, listStyles, saveFromEditor, saveStyle } from '../pipeline/openreel.js'
 import { previewImport, runImport } from '../pipeline/csvImport.js'
 import { answerGateCheck, gateCheck } from '../pipeline/gateCheck.js'
@@ -1201,13 +1203,14 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
   })
   // The scale kit (overnight item 5): products (hook vault, claims, buyer
   // language), hooks and variants; accounts and the signups scoreboard.
-  app.get('/products', async c => c.json({ products: await productSummaries(deps, c.get('ctx')) }))
+  // `starter`: this account may load the owner's SideStep kit (the owner's only).
+  app.get('/products', async c => c.json({ products: await productSummaries(deps, c.get('ctx')), starter: await isOwner(deps, c.get('ctx')) }))
   app.post('/products/import', async c => {
     const ctx = c.get('ctx')
     requireRole(ctx, 'member')
     const body = parse(z.object({ markdown: z.string().max(200_000).optional(), starter: z.boolean().optional(), name: z.string().max(80).optional() }), await json(c))
     if (!body.starter && !body.markdown?.trim()) throw new AppError('bad_request', 'Pick a script kit file (.md) to import.')
-    const r = await importKit(deps, ctx, body.starter ? starterKit() : body.markdown!, body.name || undefined)
+    const r = body.starter ? await importStarterKit(deps, ctx) : await importKit(deps, ctx, body.markdown!, body.name || undefined)
     return c.json({ product: { id: r.product.id, name: r.product.name, hooks: r.hooks }, hooks: r.hooks, voicesApplied: r.voicesApplied }, 201)
   })
   app.get('/products/:id', async c => c.json(await productView(deps, c.get('ctx'), c.req.param('id'))))
@@ -1593,7 +1596,8 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
     const ctx = c.get('ctx')
     requireRole(ctx, 'admin')
     const provider = c.req.param('provider')
-    const body = parse(z.object({ secret: z.string().min(8).max(500), label: z.string().max(60).default('') }), await json(c))
+    const body = parse(z.object({ secret: z.string().min(8).max(500), label: z.string().max(60).default(''), password: z.string().max(200).optional() }), await json(c))
+    await confirmPassword(deps, c, ctx, body.password)
     const view = await saveCredential(deps, ctx, provider, body.secret, body.label)
     // A free call proves the key works (never a generation).
     let verify = { ok: false, message: 'Not verified.' }
@@ -1658,6 +1662,8 @@ export function createApp(deps: Deps, auth: AuthProvider): Hono<Env> {
   app.delete('/settings/credentials/:provider', async c => {
     const ctx = c.get('ctx')
     requireRole(ctx, 'admin')
+    const body = parse(z.object({ password: z.string().max(200).optional() }), await c.req.json().catch(() => ({})))
+    await confirmPassword(deps, c, ctx, body.password)
     await revokeCredential(deps, ctx, c.req.param('provider'))
     return c.json({ ok: true })
   })

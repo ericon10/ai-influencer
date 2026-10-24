@@ -13,7 +13,7 @@ import {
 import { activateChildren, cancelChildren, type JobSpec } from '../jobs/runner.js'
 import { registerJobHook, type JobOutcome, type JobRow } from '../jobs/hooks.js'
 import { getSetting, resolveRoute, setSetting } from './settings.js'
-import { postWriting, productOf, standardOf, templateFor } from './products.js'
+import { isOwner, postWriting, productOf, standardOf, templateFor } from './products.js'
 import { getContent, updateContent } from './content.js'
 import { getCharacter, toData } from './characters.js'
 import { sheetCsvUrl } from './massRecreate.js'
@@ -45,7 +45,7 @@ const cfgOf = (deps: Deps): LineBankConfig => deps.config.pipeline.content.line_
 // without.
 export async function painsFor(deps: Deps, ctx: Ctx, productId: string | null): Promise<string[]> {
   const product = await productOf(deps, ctx, productId)
-  const std = standardOf(deps, product?.writing)
+  const std = standardOf(deps, product?.writing, await isOwner(deps, ctx))
   return std ? deps.config.pipeline.content.writing_standards[std.key]?.pains ?? [] : []
 }
 

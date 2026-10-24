@@ -154,7 +154,7 @@ describe('hook first', () => {
     // The writer's prompt lists the four honest endings and the never list.
     const { preview } = await estimateAction(h.deps, h.ctx, { type: 'slideshow_draft', contentId: id, hook: s.hook, pattern: 'doubt' })
     const text = preview.prompts[0]!.text
-    const std = standardOf(h.deps, 'sidestep')
+    const std = standardOf(h.deps, 'sidestep', true)
     for (const e of productEndings(h.deps, std)) expect(text).toContain(e.line)
     expect(productEndings(h.deps, null)).toEqual([])
     expect(productEndings(h.deps, std).map(e => e.pain)).toEqual(['retyping the resume into boxes', "hours on jobs you don't fit", 'rewriting the resume for every job', 'paying monthly for job tools'])

@@ -90,3 +90,30 @@ export function createPassphraseAuth(deps: Deps, opts: { devAutoLogin: boolean }
     },
   }
 }
+
+// The signed-in user's password again before a provider key is saved or
+// removed (multi-user, 2026-10-24): a stolen session alone cannot swap a
+// key. Wrong tries count toward the same sign-in throttle. A user with no
+// password set is refused in production; in local development (the demo
+// owner signs in with no password) there is nothing to check.
+export async function hasPassword(deps: Deps, userId: string | null): Promise<boolean> {
+  if (!userId) return false
+  const [u] = await deps.db.select({ hash: users.passwordHash }).from(users).where(eq(users.id, userId))
+  return !!u?.hash
+}
+
+export async function confirmPassword(deps: Deps, c: Context, who: { userId: string | null; accountId: string }, password: string | undefined): Promise<void> {
+  const [u] = who.userId ? await deps.db.select().from(users).where(eq(users.id, who.userId)) : []
+  if (!u?.passwordHash) {
+    if (deps.env.isProduction) throw new AppError('forbidden', 'Set a password for this sign-in first.')
+    return
+  }
+  const email = u.email
+  const since = new Date(deps.clock.now().getTime() - LOGIN_WINDOW_MS)
+  const [{ n }] = await deps.db.select({ n: count() }).from(loginAttempts).where(and(eq(loginAttempts.email, email), eq(loginAttempts.ok, false), gt(loginAttempts.createdAt, since))) as [{ n: number }]
+  if (n >= MAX_FAILS_PER_EMAIL) throw new AppError('too_many_requests', 'Too many wrong passwords. Wait 15 minutes, then try again.')
+  if (!password) throw new AppError('forbidden', 'Enter your password to change a key.')
+  if (await verifyPassword(password, u.passwordHash)) return
+  await deps.db.insert(loginAttempts).values({ id: newId('lga'), accountId: who.accountId, email, ip: clientIp(c), ok: false, createdAt: deps.clock.now() })
+  throw new AppError('forbidden', 'That password is not right.')
+}

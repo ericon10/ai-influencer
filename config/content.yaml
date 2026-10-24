@@ -109,6 +109,9 @@ writing_standards:
   sidestep:
     label: SideStep rules v1.2 (job word, pain 7+, honest endings)
     names: [SideStep]
+    # The owner's own product: no other account can pick it or get it by
+    # naming a product SideStep (multi-user, 2026-10-24).
+    owner_only: true
     # The five-check stop test and the ladder after Write 10 (a second call).
     review: true
     # The language notes (copy_lint below) on its posts' words.

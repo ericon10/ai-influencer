@@ -147,18 +147,23 @@ function KeysCard({ d }: { d: SettingsView }) {
     <div className="st-card">
       <div className="st-card-head"><div className="grow"><div className="st-h2">Provider keys</div><div className="st-hint">Stored encrypted for this account. Only the last 4 characters are ever shown.</div></div></div>
       <div className="st-card-body st-col" style={{ gap: 14 }}>
-        {d.providers.map(p => <KeyRow key={p.id} p={p} cred={d.credentials.find(c => c.provider === p.id)} />)}
+        {d.providers.map(p => <KeyRow key={p.id} p={p} cred={d.credentials.find(c => c.provider === p.id)} needPassword={d.keyPassword} />)}
       </div>
     </div>
   )
 }
 
-function KeyRow({ p, cred }: { p: SettingsView['providers'][number]; cred?: SettingsView['credentials'][number] }) {
+// Saving or removing a key asks for the signed-in user's password again
+// (multi-user, 2026-10-24), so a stolen session alone cannot swap a key.
+function KeyRow({ p, cred, needPassword }: { p: SettingsView['providers'][number]; cred?: SettingsView['credentials'][number]; needPassword: boolean }) {
   const toast = useToast()
   const invalidate = useInvalidate()
   const [editing, setEditing] = useState(!cred && !p.serverKey)
   const [secret, setSecret] = useState('')
+  const [password, setPassword] = useState('')
+  const [removing, setRemoving] = useState(false)
   const [busy, setBusy] = useState(false)
+  const passwordLeft = needPassword && !password
   // Test key (section 40): a free call, and the balance when the provider reports one.
   const [tested, setTested] = useState<KeyTest | null>(null)
   useEffect(() => setEditing(!cred && !p.serverKey), [cred, p.serverKey])
@@ -168,16 +173,23 @@ function KeyRow({ p, cred }: { p: SettingsView['providers'][number]; cred?: Sett
   async function save() {
     setBusy(true)
     try {
-      const r = await api.saveKey(p.id, secret)
+      const r = await api.saveKey(p.id, secret, needPassword ? password : undefined)
       setSecret('')
+      setPassword('')
       invalidate()
       toast({ tone: r.verify.ok ? 'ok' : 'bad', text: r.verify.ok ? `${p.label} key saved and verified.` : `${p.label} key saved, but the check failed: ${r.verify.message}` })
     } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) } finally { setBusy(false) }
   }
   async function remove() {
-    if (!confirm(`Remove the ${p.label} key?`)) return
-    try { await api.removeKey(p.id); invalidate() } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) }
+    if (!needPassword && !confirm(`Remove the ${p.label} key?`)) return
+    setBusy(true)
+    try { await api.removeKey(p.id, needPassword ? password : undefined); setPassword(''); setRemoving(false); invalidate() } catch (e) { toast({ tone: 'bad', text: errorMessage(e) }) } finally { setBusy(false) }
   }
+  const passwordField = (
+    <Field id={`key-password-${p.id}`} label="Your password" required done={!!password}>
+      <input className="st-input" type="password" autoComplete="current-password" value={password} onChange={e => setPassword(e.target.value)} />
+    </Field>
+  )
   return (
     <div className="st-card" style={{ padding: 14, boxShadow: 'none' }}>
       <div className="st-row">
@@ -189,7 +201,7 @@ function KeyRow({ p, cred }: { p: SettingsView['providers'][number]; cred?: Sett
         {cred && <span className={`st-badge ${cred.verifyStatus === 'ok' ? 'ok' : cred.verifyStatus === 'failed' ? 'bad' : ''}`}>{cred.verifyStatus === 'ok' ? 'Verified' : cred.verifyStatus === 'failed' ? 'Check failed' : 'Not checked'}</span>}
         {cred && p.balance && <AsyncButton className="st-btn sm secondary" busyLabel="Testing..." field={`key-test-${p.id}`} onClick={test}>Test key</AsyncButton>}
         {cred && !editing && <button className="st-btn sm" onClick={() => setEditing(true)}>Replace</button>}
-        {cred && <button className="st-btn sm icon ghost" onClick={remove} aria-label="Remove key"><Trash2 size={14} /></button>}
+        {cred && <button className="st-btn sm icon ghost" onClick={() => (needPassword ? setRemoving(r => !r) : void remove())} aria-label="Remove key"><Trash2 size={14} /></button>}
       </div>
       {tested && (
         <div className={`st-hint ${tested.verify.ok ? '' : 'st-warntext'}`} style={{ marginTop: 8 }} role="status" data-field={`key-balance-${p.id}`}>
@@ -201,7 +213,17 @@ function KeyRow({ p, cred }: { p: SettingsView['providers'][number]; cred?: Sett
           <Field id={`key-${p.id}`} label={`${p.label} key`} required done={secret.length >= 8}>
             <input className="st-input st-mono" type="password" autoComplete="off" placeholder={p.placeholder} value={secret} onChange={e => setSecret(e.target.value)} />
           </Field>
-          <div className="st-row"><span className="st-hint" style={{ flex: 1 }}>{p.hint}</span><button className="st-btn primary sm" disabled={secret.length < 8 || busy} onClick={save} title={secret.length < 8 ? 'Enter the key first' : undefined}>Save and verify</button></div>
+          {needPassword && passwordField}
+          <div className="st-row"><span className="st-hint" style={{ flex: 1 }}>{p.hint}</span><button className="st-btn primary sm" data-field={`key-save-${p.id}`} disabled={secret.length < 8 || passwordLeft || busy} onClick={save} title={secret.length < 8 ? 'Enter the key first' : passwordLeft ? 'Enter your password first' : undefined}>Save and verify</button></div>
+        </div>
+      )}
+      {removing && cred && (
+        <div className="st-col" style={{ gap: 8, marginTop: 12 }} data-field={`key-remove-${p.id}`}>
+          {passwordField}
+          <div className="st-row" style={{ justifyContent: 'flex-end' }}>
+            <button className="st-btn sm ghost" onClick={() => { setRemoving(false); setPassword('') }}>Cancel</button>
+            <button className="st-btn sm bad" disabled={passwordLeft || busy} onClick={() => void remove()} title={passwordLeft ? 'Enter your password first' : undefined}>Remove the {p.label} key</button>
+          </div>
         </div>
       )}
     </div>

@@ -16,7 +16,7 @@ import { enqueueLocalJob, type JobSpec } from '../jobs/runner.js'
 import { captionPng, captionWords, type CaptionLook } from '../core/overlay.js'
 import { slideshowSpecSchema } from '../core/slideshowSpec.js'
 import { renderSlideshow, slideshowProblems } from './slideshow.js'
-import { checkProduct, GENERAL_LABEL, standardOf } from './products.js'
+import { checkProduct, GENERAL_LABEL, isOwner, standardOf } from './products.js'
 import { fill, hardWrap } from '../core/text.js'
 import { pronounVars } from '../core/prompts.js'
 import { transcodeBroll } from '../media/meme.js'
@@ -1495,12 +1495,13 @@ export async function contentView(deps: Deps, ctx: Ctx) {
   const durations = new Map<string, number | null>()
   for (const a of assetIds) durations.set(a, (await getAsset(deps, ctx, a).catch(() => null))?.durationMs ?? null)
   const cfg = deps.config.pipeline.content
+  const owner = await isOwner(deps, ctx)
   return {
     // A clip made before products were picked keeps its old label.
     broll: broll.map(b => ({ id: b.id, title: b.title, productId: b.productId, product: productRows.find(p => p.id === b.productId)?.name ?? b.product, status: b.status, error: b.error, assetId: b.assetId, durationSec: b.assetId && durations.get(b.assetId) ? Math.round(durations.get(b.assetId)! / 100) / 10 : null, createdAt: b.createdAt.toISOString() })),
     // The account's products (section 29) and their writing rules: what the
     // post's product brings (the language notes only with lint on).
-    products: productRows.map(p => { const std = standardOf(deps, p.writing); return { id: p.id, name: p.name, writing: std?.key ?? '', writingLabel: std?.label ?? GENERAL_LABEL, lint: !!std?.lint, review: !!std?.review } }),
+    products: productRows.map(p => { const std = standardOf(deps, p.writing, owner); return { id: p.id, name: p.name, writing: std?.key ?? '', writingLabel: std?.label ?? GENERAL_LABEL, lint: !!std?.lint, review: !!std?.review } }),
     items: items.map(itemView),
     // Where Posts home's "Show older posts" starts (null: none older).
     next: items.length === LIST_SIZE ? items[LIST_SIZE - 1]!.id : null,

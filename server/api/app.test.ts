@@ -320,8 +320,33 @@ describe('Studio API', () => {
     expect((await call('POST', '/uploads', { cookie: cookieA, body: { files: [{ name: 'x.png', type: 'image/png', size: 30 * 1024 * 1024 }] } })).status).toBe(400)
   })
 
+  it('saving or removing a key asks for the password again; wrong tries count toward the sign-in pause', async () => {
+    const key = { secret: 'sk-ant-test-0000000000-WXYZ' }
+    const none = await call('PUT', '/settings/credentials/anthropic', { body: key, cookie: cookieB })
+    expect(none.status).toBe(403)
+    expect(none.json.error.message).toMatch(/Enter your password/)
+    const wrong = await call('PUT', '/settings/credentials/anthropic', { body: { ...key, password: 'not it' }, cookie: cookieB })
+    expect(wrong.status).toBe(403)
+    expect(wrong.json.error.message).toMatch(/not right/)
+    expect((await call('GET', '/settings', { cookie: cookieB })).json.credentials).toHaveLength(0)
+    expect((await call('GET', '/settings', { cookie: cookieB })).json.keyPassword).toBe(true)
+    expect((await call('PUT', '/settings/credentials/anthropic', { body: { ...key, password: 'another long phrase' }, cookie: cookieB })).status).toBe(200)
+    expect((await call('DELETE', '/settings/credentials/anthropic', { cookie: cookieB })).status).toBe(403)
+    expect((await call('DELETE', '/settings/credentials/anthropic', { body: { password: 'nope' }, cookie: cookieB })).status).toBe(403)
+    expect((await call('GET', '/settings', { cookie: cookieB })).json.credentials).toHaveLength(1)
+    expect((await call('DELETE', '/settings/credentials/anthropic', { body: { password: 'another long phrase' }, cookie: cookieB })).status).toBe(200)
+    expect((await call('GET', '/settings', { cookie: cookieB })).json.credentials).toHaveLength(0)
+    // Five wrong passwords pause key changes, even with the right one.
+    for (let i = 0; i < 3; i++) await call('PUT', '/settings/credentials/anthropic', { body: { ...key, password: `wrong ${i}` }, cookie: cookieB })
+    const paused = await call('PUT', '/settings/credentials/anthropic', { body: { ...key, password: 'another long phrase' }, cookie: cookieB })
+    expect(paused.status).toBe(429)
+    h.clock.advance(16 * 60_000)
+    expect((await call('PUT', '/settings/credentials/anthropic', { body: { ...key, password: 'another long phrase' }, cookie: cookieB })).status).toBe(200)
+    expect((await call('DELETE', '/settings/credentials/anthropic', { body: { password: 'another long phrase' }, cookie: cookieB })).status).toBe(200)
+  })
+
   it('stores provider keys encrypted and only ever returns the last 4', async () => {
-    const r = await call('PUT', '/settings/credentials/anthropic', { body: { secret: 'sk-ant-test-1234567890-ABCD' }, cookie: cookieA })
+    const r = await call('PUT', '/settings/credentials/anthropic', { body: { secret: 'sk-ant-test-1234567890-ABCD', password: 'correct horse battery' }, cookie: cookieA })
     expect(r.status).toBe(200)
     expect(JSON.stringify(r.json)).not.toContain('sk-ant-test')
     expect(r.json.credential.last4).toBe('ABCD')
@@ -334,7 +359,7 @@ describe('Studio API', () => {
 
   it('refuses live mode without keys, and rejects malformed Higgsfield keys', async () => {
     expect((await call('PUT', '/settings/mode', { body: { mode: 'live' }, cookie: cookieB })).status).toBe(400)
-    const bad = await call('PUT', '/settings/credentials/higgsfield', { body: { secret: 'just-one-part-key' }, cookie: cookieB })
+    const bad = await call('PUT', '/settings/credentials/higgsfield', { body: { secret: 'just-one-part-key', password: 'another long phrase' }, cookie: cookieB })
     expect(bad.status).toBe(400)
     expect(bad.json.error.message).toMatch(/KEY_ID:KEY_SECRET/)
   })

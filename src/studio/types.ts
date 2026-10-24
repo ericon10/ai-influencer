@@ -290,6 +290,8 @@ export interface SettingsView {
     }>
   }
   credentials: Array<{ id: string; provider: string; last4: string; verifyStatus: string; verifiedAt: string | null; createdAt: string }>
+  // Saving or removing a key asks for the signed-in user's password.
+  keyPassword: boolean
   providers: Array<{ id: string; label: string; hint: string; placeholder: string; usedFor: string; serverKey?: boolean; balance?: boolean }>
   budgets: { job: number; character: number; month: number; day: number; confirmAbove: number; warnPct: number }
   routing: Array<{ task: string; configured: string; effective: string }>

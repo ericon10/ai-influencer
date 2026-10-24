@@ -74,11 +74,13 @@ export async function createHarness(opts: Partial<Pick<RegistryOptions, 'mockSce
   depsRef.current = deps
   const ctxBase = { userId: null, role: 'owner' as const, email: '', requestId: 'test', log: logger }
 
-  const newAccount = async (name = 'Test Studio'): Promise<Ctx> => {
-    const p = await createAccount(handle.db, { name, ownerEmail: `owner-${randomBytes(4).toString('hex')}@example.com` })
+  // The first account is the owner's (STUDIO_OWNER_EMAIL, as in
+  // production); every newAccount() after it is a customer's.
+  const newAccount = async (name = 'Test Studio', owner = false): Promise<Ctx> => {
+    const p = await createAccount(handle.db, { name, ownerEmail: owner ? (env.STUDIO_OWNER_EMAIL || 'owner@studio.local') : `owner-${randomBytes(4).toString('hex')}@example.com` })
     return { ...p, requestId: 'test', log: logger }
   }
-  const ctx = await newAccount()
+  const ctx = await newAccount('Test Studio', true)
   return { deps, ctx, handle, registry, clock, close: () => handle.close(), newAccount }
 }
 

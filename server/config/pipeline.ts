@@ -354,6 +354,9 @@ const contentSchema = z.object({
     review: z.boolean().default(false), lint: z.boolean().default(false), endings: z.boolean().default(false), structures: z.boolean().default(false),
     // The ICP's pain points (the line bank's tags, UX-PLAN section 36, 29c).
     pains: z.array(z.string()).default([]),
+    // The owner's own product rules: only the owner's account can pick,
+    // load or be given them; any other account reads them as none.
+    owner_only: z.boolean().default(false),
   })).default({}),
   // The line bank (UX-PLAN section 36, item 29): the free first pass's word
   // lists, the tags, the batch sizes and the reviewer's bar.

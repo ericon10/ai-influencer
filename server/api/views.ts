@@ -4,6 +4,7 @@ import type { Ctx, Deps } from '../context.js'
 import { validateCharacter } from '../core/character.js'
 import { hardWrap } from '../core/text.js'
 import { listCredentials } from '../providers/credentials.js'
+import { hasPassword } from '../auth/provider.js'
 import { effectiveBudgets } from '../costs/budgets.js'
 import { formatUsd, microsToUsd } from '../costs/money.js'
 import { and, desc, eq, inArray } from 'drizzle-orm'
@@ -146,6 +147,8 @@ export async function settingsView(deps: Deps, ctx: Ctx) {
       }),
     },
     credentials: credentials.filter(c => !connectionIds.some(id => c.provider === `${id}_account`)),
+    // Saving or removing a key asks for the signed-in user's password.
+    keyPassword: await hasPassword(deps, ctx.userId),
     // Accounts on the owner's own plan, over MCP (one connection flow).
     connections: Object.entries(deps.config.runtime.mcp_connections).map(([id, c]) => {
       const cred = credentials.find(x => x.provider === `${id}_account`)

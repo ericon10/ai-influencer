@@ -255,7 +255,9 @@ async function recreatePost(s: Studio, callie: string, title: string): Promise<{
   return { post: id, take: take.id }
 }
 
-export async function seed(api: string, log: Log = line => console.log(`[seed] ${line}`)): Promise<Seed> {
+// `save` false: return the seed without writing seed.json (the API
+// isolation test seeds its own in-process Studio).
+export async function seed(api: string, log: Log = line => console.log(`[seed] ${line}`), opts: { save?: boolean } = {}): Promise<Seed> {
   const s = new Studio(api.replace(/\/$/, ''), log)
   const started = Date.now()
   // Never on a live Studio: every provider must be the mock.
@@ -274,9 +276,11 @@ export async function seed(api: string, log: Log = line => console.log(`[seed] $
     api: s.api, createdAt: new Date().toISOString(), callie, solei, sideStep, stills: lib.stills, libraryClip: lib.clip,
     basePost: base, voiceLine: voice, music: bed, recreatePost: rec.post, recreateTake: rec.take, takeRecreatePost: takeRec.post,
   }
-  mkdirSync(dirname(SEED_FILE), { recursive: true })
-  writeFileSync(SEED_FILE, `${JSON.stringify(out, null, 2)}\n`)
-  log(`done in ${Math.round((Date.now() - started) / 1000)} s: ${SEED_FILE}`)
+  if (opts.save !== false) {
+    mkdirSync(dirname(SEED_FILE), { recursive: true })
+    writeFileSync(SEED_FILE, `${JSON.stringify(out, null, 2)}\n`)
+  }
+  log(`done in ${Math.round((Date.now() - started) / 1000)} s${opts.save !== false ? `: ${SEED_FILE}` : ''}`)
   return out
 }
 

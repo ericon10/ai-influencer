@@ -54,7 +54,9 @@ export function HooksTab({ characters }: { characters: CharacterSummary[] }) {
       {!list.data ? <div className="st-skel" style={{ height: 160 }} /> : !products.length ? (
         <Callout tone="info">
           No products yet. A script kit holds a product's hook vault, its claims sheet and how buyers talk.{' '}
-          <button className="st-todo-link" disabled={!!busy} onClick={() => void load({ starter: true })}>Load the SideStep script kit</button> or import your own (.md).
+          {list.data.starter
+            ? <><button className="st-todo-link" disabled={!!busy} onClick={() => void load({ starter: true })}>Load the SideStep script kit</button> or import your own (.md).</>
+            : <>Import yours (.md) with Import a script kit.</>}
         </Callout>
       ) : !current ? (
         <div className="st-col" style={{ gap: 10 }}>

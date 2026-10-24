@@ -9,7 +9,6 @@ import { AppError, notFound } from '../lib/errors.js'
 import { newId } from '../lib/ids.js'
 import { registerJobHook, type JobOutcome, type JobRow } from '../jobs/hooks.js'
 import type { JobSpec } from '../jobs/runner.js'
-import { isOwnerAccount } from '../providers/serverKeys.js'
 import { fill, hardWrap } from '../core/text.js'
 import { claimFlags, claimsText, languageText, parseScriptKit, type Claims, type Group, type KitVoice, type Language } from '../core/scriptKit.js'
 import { cleanVoiceCard, voiceCardText, type VoiceCard } from '../core/voiceCard.js'
@@ -17,7 +16,7 @@ import { getCharacter, listCharacters, toData, updateCharacter } from './charact
 import { resolveRoute } from './settings.js'
 import { codeBefore, fitFor, placedPosts } from './playbook.js'
 import { STRUCTURE_CODES } from '../core/playbook.js'
-import { GENERAL_LABEL, standardOf, templateFor, writingForName, writingStandards } from './products.js'
+import { GENERAL_LABEL, isOwner, standardOf, templateFor, writingForName, writingStandards } from './products.js'
 
 // The scale kit (overnight item 5, DECISIONS G35; UX-PLAN.md section 14):
 // per product, the hook vault, the claims sheet and the buyer-language
@@ -37,7 +36,7 @@ export const claimsOf = (r: ProductRow): Claims => {
   return { groups: c.groups ?? [], lines: c.lines ?? [], watch: c.watch ?? [], mentions: c.mentions ?? [r.name.toLowerCase()] }
 }
 // A product's writing rules for the views (section 29).
-const writingView = (deps: Deps, r: ProductRow) => { const std = standardOf(deps, r.writing); return { writing: std?.key ?? '', writingLabel: std?.label ?? GENERAL_LABEL } }
+const writingView = (deps: Deps, r: ProductRow, owner: boolean) => { const std = standardOf(deps, r.writing, owner); return { writing: std?.key ?? '', writingLabel: std?.label ?? GENERAL_LABEL } }
 export const languageOf = (r: ProductRow): Language => ({ groups: ((r.language ?? {}) as Partial<Language>).groups ?? [] })
 const voicesOf = (r: ProductRow): KitVoice[] => (Array.isArray(r.voices) ? r.voices as KitVoice[] : [])
 
@@ -46,20 +45,27 @@ export async function listProducts(deps: Deps, ctx: Ctx): Promise<ProductRow[]> 
   if (rows.length) return rows
   // The owner's account starts with the SideStep kit (the owner asked for
   // it to be seeded); any other account starts empty and can load it.
-  const owner = await isOwnerAccount(deps.db, ctx.accountId, deps.env.STUDIO_OWNER_EMAIL || 'owner@studio.local')
-  if (!owner) return rows
+  if (!await isOwner(deps, ctx)) return rows
   await importKit(deps, ctx, starterKit())
   return deps.db.select().from(products).where(and(eq(products.accountId, ctx.accountId), isNull(products.archivedAt))).orderBy(asc(products.createdAt))
 }
 
 export const starterKit = () => readFileSync(join(KIT_DIR, STARTER), 'utf8')
 
+// The SideStep kit is the owner's own product: only the owner's account
+// loads it (multi-user, 2026-10-24).
+export async function importStarterKit(deps: Deps, ctx: Ctx) {
+  if (!await isOwner(deps, ctx)) throw new AppError('forbidden', 'The starter kit is the owner\'s own product. Import your own kit file (.md).')
+  return importKit(deps, ctx, starterKit())
+}
+
 // The product chips: name and how many hooks.
 export async function productSummaries(deps: Deps, ctx: Ctx) {
   const rows = await listProducts(deps, ctx)
   const counts = rows.length ? await deps.db.select({ productId: hooks.productId, n: sql<number>`count(*)` }).from(hooks)
     .where(and(eq(hooks.accountId, ctx.accountId), inArray(hooks.productId, rows.map(r => r.id)), isNull(hooks.archivedAt))).groupBy(hooks.productId) : []
-  return rows.map(r => ({ id: r.id, name: r.name, hooks: Number(counts.find(c => c.productId === r.id)?.n ?? 0), ...writingView(deps, r) }))
+  const owner = await isOwner(deps, ctx)
+  return rows.map(r => ({ id: r.id, name: r.name, hooks: Number(counts.find(c => c.productId === r.id)?.n ?? 0), ...writingView(deps, r, owner) }))
 }
 
 export async function getProduct(deps: Deps, ctx: Ctx, id: string): Promise<ProductRow> {
@@ -73,13 +79,14 @@ export async function getProduct(deps: Deps, ctx: Ctx, id: string): Promise<Prod
 // (a default: the owner's own edits are never overwritten).
 export async function importKit(deps: Deps, ctx: Ctx, md: string, name?: string): Promise<{ product: ProductRow; hooks: number; voicesApplied: string[] }> {
   if (md.length > 200_000) throw new AppError('bad_request', 'That kit is too big (200 KB at most).')
+  const owner = await isOwner(deps, ctx)
   const kit = parseScriptKit(md, name || 'Product')
   if (!kit.hooks.length && !kit.claims.groups.length) throw new AppError('bad_request', 'No hooks or claims found. A kit has a "Claims sheet" section and a "Hook vault" section with numbered hooks.')
   const id = newId('prd')
   const [product] = await deps.db.insert(products).values({
     id, accountId: ctx.accountId, name: (name || kit.product).slice(0, 80), claims: kit.claims, language: kit.language, voices: kit.voices, notes: kit.notes.slice(0, 20_000), createdBy: ctx.userId,
     // The rules it adds (section 29): the standard that names it, else none.
-    writing: writingForName(deps, name || kit.product),
+    writing: writingForName(deps, name || kit.product, owner),
   }).returning()
   if (kit.hooks.length) {
     await deps.db.insert(hooks).values(kit.hooks.slice(0, 500).map(h => ({ id: newId('hok'), accountId: ctx.accountId, productId: id, number: h.number, kind: h.kind.slice(0, 80), text: h.text.slice(0, 600) })))
@@ -110,7 +117,7 @@ export async function updateProduct(deps: Deps, ctx: Ctx, id: string, patch: { n
   const row = await getProduct(deps, ctx, id)
   // The rules it adds on top of the general standard (section 29): one in
   // config, or "" for none.
-  if (patch.writing && !standardOf(deps, patch.writing)) throw new AppError('bad_request', 'Pick the general standard or one of the product rules.')
+  if (patch.writing && !standardOf(deps, patch.writing, await isOwner(deps, ctx))) throw new AppError('bad_request', 'Pick the general standard or one of the product rules.')
   const c = claimsOf(row)
   const claims: Claims = patch.claims ? {
     groups: patch.claims.groups ? groupSchema(patch.claims.groups) : c.groups,
@@ -173,14 +180,15 @@ export async function archiveVariant(deps: Deps, ctx: Ctx, id: string): Promise<
 // A product with its hooks and each hook's variants (newest first).
 export async function productView(deps: Deps, ctx: Ctx, id: string) {
   const row = await getProduct(deps, ctx, id)
+  const owner = await isOwner(deps, ctx)
   const hookRows = await deps.db.select().from(hooks).where(and(eq(hooks.accountId, ctx.accountId), eq(hooks.productId, row.id), isNull(hooks.archivedAt))).orderBy(asc(hooks.number))
   const ids = hookRows.map(h => h.id)
   const vars = ids.length ? await deps.db.select().from(hookVariants).where(and(eq(hookVariants.accountId, ctx.accountId), inArray(hookVariants.hookId, ids), isNull(hookVariants.archivedAt))).orderBy(desc(hookVariants.createdAt)) : []
   return {
-    id: row.id, name: row.name, claims: claimsOf(row), language: languageOf(row), voices: voicesOf(row), notes: row.notes, ...writingView(deps, row),
+    id: row.id, name: row.name, claims: claimsOf(row), language: languageOf(row), voices: voicesOf(row), notes: row.notes, ...writingView(deps, row, owner),
     // What a product can pick: the general standard alone ("") or a set of
     // rules on top, from config (section 29).
-    writings: [{ key: '', label: GENERAL_LABEL }, ...writingStandards(deps).map(w => ({ key: w.key, label: w.label }))],
+    writings: [{ key: '', label: GENERAL_LABEL }, ...writingStandards(deps, owner).map(w => ({ key: w.key, label: w.label }))],
     hooks: hookRows.map(h => ({
       id: h.id, number: h.number, kind: h.kind, text: h.text,
       variants: vars.filter(v => v.hookId === h.id).map(v => ({ id: v.id, characterId: v.characterId, text: v.text, flags: (v.flags as string[]) ?? [], createdAt: v.createdAt.toISOString() })),
@@ -234,7 +242,7 @@ export async function buildHookVariants(deps: Deps, ctx: Ctx, a: { hookId: strin
     claims: claimsText(product.name, claimsOf(product)),
     language: languageText(languageOf(product)) || 'None collected yet.',
     // The general standard, or the hook's product's own on top (section 29).
-    standard: templateFor(deps, standardOf(deps, product.writing), 'hook_standard').trim(),
+    standard: templateFor(deps, standardOf(deps, product.writing, await isOwner(deps, ctx)), 'hook_standard').trim(),
     voices,
   }
   const system = fill(t.system, vars)

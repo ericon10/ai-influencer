@@ -7,7 +7,7 @@ import { importCharacter } from './files.js'
 import { getCharacter, toData } from './characters.js'
 import { estimateAction, runAction } from './actions.js'
 import { createContent, updateContent } from './content.js'
-import { addHook, importKit, listProducts, productView, saveSocialAccount, scoreboard, starterKit, updateProduct, useKitVoice } from './scaleKit.js'
+import { addHook, importStarterKit, listProducts, productView, saveSocialAccount, scoreboard, updateProduct, useKitVoice } from './scaleKit.js'
 import { renderPlaceholderPortrait } from '../providers/mock.js'
 
 // The scale kit (overnight item 5). Mock adapters only: the variant writer
@@ -29,17 +29,20 @@ beforeAll(async () => {
 let productId: string
 
 describe('products: hook vault, claims sheet, buyer language', () => {
-  it('an account that is not the owner\'s starts empty; the kit loads in one call', async () => {
-    expect(await listProducts(h.deps, h.ctx)).toEqual([])
-    const r = await importKit(h.deps, h.ctx, starterKit())
-    expect(r.product.name).toBe('SideStep')
-    expect(r.hooks).toBe(50)
+  it('the owner\'s account starts with the SideStep kit; a customer\'s starts empty and cannot load it', async () => {
+    const [p] = await listProducts(h.deps, h.ctx)
+    expect(p!.name).toBe('SideStep')
+    expect(p!.writing).toBe('sidestep')
+    expect((await productView(h.deps, h.ctx, p!.id)).hooks).toHaveLength(50)
     // Callie's live card from the kit fills her empty voice card.
-    expect(r.voicesApplied).toEqual(['Callie'])
     const v = toData(await getCharacter(h.deps, h.ctx, callie)).persona.voice!
     expect(v.uses).toContain('be so for real')
     expect(v.never).toContain('synergy')
-    productId = r.product.id
+    productId = p!.id
+    const customer = await h.newAccount('Customer')
+    expect(await listProducts(h.deps, customer)).toEqual([])
+    await expect(importStarterKit(h.deps, customer)).rejects.toThrow(/owner/)
+    expect(await listProducts(h.deps, customer)).toEqual([])
   })
 
   it('reads the vault, the claims and the buyer language', async () => {

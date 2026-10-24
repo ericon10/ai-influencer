@@ -6,7 +6,10 @@ import { registerPipelineHooks } from './hooks.js'
 import { estimateAction, runAction, type StudioAction } from './actions.js'
 import { importCharacter } from './files.js'
 import { contentPage, createContent, duplicateContent, getContent, updateContent } from './content.js'
-import { addHook, importKit, productView, saveSocialAccount, starterKit, updateProduct } from './scaleKit.js'
+import { addHook, importKit, productSummaries, productView, saveSocialAccount, starterKit, updateProduct } from './scaleKit.js'
+import { painsFor } from './lineBank.js'
+import { products } from '../db/schema.js'
+import { eq } from 'drizzle-orm'
 import { checkProduct, defaultProductFor, postWriting } from './products.js'
 import { importPlan, previewPlan } from './planImport.js'
 import { PLAN_COLUMNS, readPlan } from '../core/planImport.js'
@@ -58,6 +61,28 @@ describe('products', () => {
     expect((await postWriting(h.deps, h.ctx, glow)).std?.key).toBe('sidestep')
     await updateProduct(h.deps, h.ctx, glow, { writing: '' })
     expect((await postWriting(h.deps, h.ctx, glow)).std).toBeNull()
+  })
+
+  it('SideStep\'s rules are the owner\'s only: a customer\'s product named SideStep starts on the general standard, cannot pick them, and reads them as none', async () => {
+    const customer = await h.newAccount('Customer')
+    // Their own kit, named SideStep in any case: the general standard.
+    for (const name of ['SideStep', ' sidestep ']) {
+      const { product } = await importKit(h.deps, customer, starterKit(), name)
+      expect(product.writing).toBe('')
+      expect((await postWriting(h.deps, customer, product.id)).std).toBeNull()
+    }
+    const [mine] = (await productSummaries(h.deps, customer))
+    const v = await productView(h.deps, customer, mine!.id)
+    expect(v.writings.map(w => w.key)).toEqual([''])
+    await expect(updateProduct(h.deps, customer, mine!.id, { writing: 'sidestep' })).rejects.toThrow(/general standard or one of the product rules/)
+    // A row that says sidestep anyway (written before the rule) reads as none.
+    await h.deps.db.update(products).set({ writing: 'sidestep' }).where(eq(products.id, mine!.id))
+    expect((await postWriting(h.deps, customer, mine!.id)).std).toBeNull()
+    expect(await painsFor(h.deps, customer, mine!.id)).toEqual([])
+    expect((await productView(h.deps, customer, mine!.id))).toMatchObject({ writing: '', writingLabel: 'General standard' })
+    // The owner's own still are.
+    expect((await postWriting(h.deps, h.ctx, sideStep)).std?.key).toBe('sidestep')
+    expect((await painsFor(h.deps, h.ctx, sideStep)).length).toBeGreaterThan(0)
   })
 
   it('a post\'s product is only ever the owner\'s pick: never its account\'s, never the first product; copies keep it; Posts home filters by it', async () => {
