@@ -1,5 +1,23 @@
 # Project context for Claude Code
 
+## Branches and sessions (read this first)
+
+- **`character-studio` is the live branch.** Production (Vercel project
+  `character-studio`, the Railway worker, Neon, R2) deploys from it, and
+  it holds all of the Studio. Describe the app only from this branch.
+- **`main` is the original June app**, hundreds of commits behind. A
+  session that starts from `main` sees the old localStorage app with only
+  Higgsfield and Claude, which is wrong. Never plan or answer from it.
+- **Every session gets its own `claude/...` branch.** If it was created
+  from `main`, bring it up to date first: `git fetch origin
+  character-studio && git merge --ff-only origin/character-studio`.
+- **Several sessions work in this repo at once.** Fetch and merge
+  `origin/character-studio` before starting and again before pushing, so
+  no session overwrites another. Finished work merges into
+  `character-studio`.
+- **Before saying the app has or lacks something, check
+  `origin/character-studio`**, not the branch you happened to start on.
+
 ## Rule zero: REALISM PRINCIPLE (above everything else)
 
 Characters look real because they are not perfect. Flaws,
